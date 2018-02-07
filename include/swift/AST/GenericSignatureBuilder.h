@@ -258,11 +258,13 @@ public:
     Type getTypeInContext(GenericSignatureBuilder &builder,
                           GenericEnvironment *genericEnv);
 
-    /// Dump a debugging representation of this equivalence class.
-    void dump(llvm::raw_ostream &out) const;
+    /// Dump a debugging representation of this equivalence class,
+    void dump(llvm::raw_ostream &out,
+              GenericSignatureBuilder *builder = nullptr) const;
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                              "only for use in the debugger");
+    LLVM_ATTRIBUTE_DEPRECATED(
+                  void dump(GenericSignatureBuilder *builder = nullptr) const,
+                  "only for use in the debugger");
 
     /// Caches.
 
@@ -443,6 +445,11 @@ private:
 
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
+
+  /// Add a rewrite rule for a same-type constraint between the given
+  /// types.
+  void addSameTypeRewriteRule(PotentialArchetype *type1,
+                              PotentialArchetype *type2);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
@@ -801,6 +808,16 @@ public:
 
   /// Determine whether the two given types are in the same equivalence class.
   bool areInSameEquivalenceClass(Type type1, Type type2);
+
+  /// Simplify the given type, which is described by a base parameter
+  /// followed by a sequence of associated types.
+  ///
+  /// \param path is updated to describe the best path from the given base
+  /// to the same equivalence class.
+  ///
+  /// \returns true if the path was simplified at all.
+  bool simplifyType(GenericParamKey base,
+                    SmallVectorImpl<AssociatedTypeDecl *> &path);
 
   /// Verify the correctness of the given generic signature.
   ///

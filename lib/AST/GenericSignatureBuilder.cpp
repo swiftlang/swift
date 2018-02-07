@@ -107,6 +107,117 @@ STATISTIC(NumDelayedRequirementUnresolved,
           "Delayed requirements left unresolved");
 STATISTIC(NumConditionalRequirementsAdded,
           "# of conditional requirements added");
+STATISTIC(NumComponentsCollapsedViaRewriting,
+          "# of same-type components collapsed via term rewriting");
+
+namespace  {
+/// A node within the prefix tree that is used to match associated type
+/// references.
+class RewriteTreeNode {
+  /// The associated type that leads to this node.
+  ///
+  /// The bit indicates whether there is a rewrite rule for this particular
+  /// node. If the bit is not set, \c rewrite is invalid.
+  llvm::PointerIntPair<AssociatedTypeDecl *, 1, bool> assocTypeAndHasRewrite;
+
+  /// The sequence of associated types to which a reference to this associated
+  /// type (from the equivalence class root) can be rewritten. This field is
+  /// only valid when the bit of \c assocTypeAndHasRewrite is set.
+  ///
+  /// Consider a requirement "Self.A.B.C == C". This will be encoded as
+  /// a prefix tree starting at the equivalence class for Self with
+  /// the following nodes:
+  ///
+  /// (assocType: A,
+  ///   children: [
+  ///     (assocType: B,
+  ///       children: [
+  ///         (assocType: C, rewrite: [C], children: [])
+  ///       ])
+  ///   ])
+  llvm::TinyPtrVector<AssociatedTypeDecl *> rewrite;
+
+  /// The child nodes, which extend the sequence to be matched.
+  ///
+  /// The child nodes are sorted by the associated type declaration
+  /// pointers, so we can perform binary searches quickly.
+  llvm::TinyPtrVector<RewriteTreeNode *> children;
+
+public:
+  /// A path consisting of a sequence of associated type references.
+  using Path = ArrayRef<AssociatedTypeDecl *>;
+
+  ~RewriteTreeNode();
+
+  RewriteTreeNode(AssociatedTypeDecl *assocType)
+    : assocTypeAndHasRewrite(assocType, false) { }
+
+  /// Retrieve the associated type declaration one must match to use this
+  /// node, which may the
+  AssociatedTypeDecl *getMatch() const {
+    return assocTypeAndHasRewrite.getPointer();
+  }
+
+  /// Determine whether this particular node has a rewrite rule.
+  bool hasRewriteRule() const {
+    return assocTypeAndHasRewrite.getInt();
+  }
+
+  /// Set a new rewrite rule for this particular node. This can only be
+  /// performed once.
+  void setRewriteRule(Path replacementPath) {
+    assert(!hasRewriteRule());
+    assocTypeAndHasRewrite.setInt(true);
+    rewrite = TinyPtrVector<AssociatedTypeDecl *>(replacementPath);
+  }
+
+  /// Retrieve the path to which this node will be rewritten.
+  ArrayRef<AssociatedTypeDecl *> getRewriteRule() const {
+    assert(hasRewriteRule());
+    return rewrite;
+  }
+
+  /// Add a new rewrite rule to this tree node.
+  ///
+  /// \param matchPath The path of associated type declarations that must
+  /// be matched to produce a rewrite.
+  ///
+  /// \param replacementPath The sequence of associated type declarations
+  /// with which a match will be replaced.
+  void addRewriteRule(Path matchPath, Path replacementPath);
+
+  /// Enumerate all of the paths to which the given matched path can be
+  /// rewritten.
+  ///
+  /// \param matchPath The path to match.
+  ///
+  /// \param callback A callback that will be invoked with (prefix, rewrite)
+  /// pairs, where \c prefix is the length of the matching prefix of
+  /// \c matchPath that matched and \c rewrite is the path to which it can
+  /// be rewritten.
+  void enumerateRewritePaths(
+                         Path matchPath,
+                         llvm::function_ref<void(unsigned, Path)> callback,
+                         unsigned depth = 0) const;
+
+  /// Find the best rewrite rule to match the given path.
+  std::pair<unsigned, Path> bestMatch(Path path);
+
+  /// Merge the given rewrite tree into \c other.
+  void mergeInto(RewriteTreeNode *other);
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
+  /// Dump the tree.
+  void dump(llvm::raw_ostream &out, bool lastChild = true) const;
+
+private:
+  /// Merge the given rewrite tree into \c other.
+  void mergeIntoRec(RewriteTreeNode *other,
+                    llvm::SmallVectorImpl<AssociatedTypeDecl *> &matchPath);
+};
+}
 
 struct GenericSignatureBuilder::Implementation {
   /// Allocator.
@@ -131,6 +242,9 @@ struct GenericSignatureBuilder::Implementation {
   /// Equivalence classes that are not currently being used.
   std::vector<void *> FreeEquivalenceClasses;
 
+  /// The roots of the rewrite tree.
+  DenseMap<const EquivalenceClass *, RewriteTreeNode *> RewriteTreeRoots;
+
   /// The generation number, which is incremented whenever we successfully
   /// introduce a new constraint.
   unsigned Generation = 0;
@@ -140,16 +254,6 @@ struct GenericSignatureBuilder::Implementation {
 
   /// Whether we are currently processing delayed requirements.
   bool ProcessingDelayedRequirements = false;
-
-  /// Tear down an implementation.
-  ~Implementation();
-
-  /// Allocate a new equivalence class with the given representative.
-  EquivalenceClass *allocateEquivalenceClass(
-                                       PotentialArchetype *representative);
-
-  /// Deallocate the given equivalence class, returning it to the free list.
-  void deallocateEquivalenceClass(EquivalenceClass *equivClass);
 
   /// Whether there were any errors.
   bool HadAnyError = false;
@@ -161,12 +265,35 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether we've already finalized the builder.
   bool finalized = false;
 #endif
+
+  /// Tear down an implementation.
+  ~Implementation();
+
+  /// Allocate a new equivalence class with the given representative.
+  EquivalenceClass *allocateEquivalenceClass(
+                                       PotentialArchetype *representative);
+
+  /// Deallocate the given equivalence class, returning it to the free list.
+  void deallocateEquivalenceClass(EquivalenceClass *equivClass);
+
+  /// Retrieve the rewrite tree root for the given equivalence class,
+  /// if present.
+  RewriteTreeNode *getRewriteTreeRootIfPresent(
+                                      const EquivalenceClass *equivClass);
+
+  /// Retrieve the rewrite tree root for the given equivalence class,
+  /// creating it if needed.
+  RewriteTreeNode *getOrCreateRewriteTreeRoot(
+                                        const EquivalenceClass *equivClass);
 };
 
 #pragma mark Memory management
 GenericSignatureBuilder::Implementation::~Implementation() {
   for (auto pa : PotentialArchetypes)
     pa->~PotentialArchetype();
+
+  for (const auto &root : RewriteTreeRoots)
+    delete root.second;
 }
 
 EquivalenceClass *
@@ -2138,7 +2265,8 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   return archetype;
 }
 
-void EquivalenceClass::dump(llvm::raw_ostream &out) const {
+void EquivalenceClass::dump(llvm::raw_ostream &out,
+                            GenericSignatureBuilder *builder) const {
   out << "Equivalence class represented by "
     << members.front()->getRepresentative()->getDebugName() << ":\n";
   out << "Members: ";
@@ -2183,6 +2311,13 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
 
   out << "\n";
 
+  if (builder) {
+    if (auto rewriteRoot = builder->Impl->getRewriteTreeRootIfPresent(this)) {
+      out << "---Rewrite tree---\n";
+      rewriteRoot->dump(out);
+    }
+  }
+
   {
     out << "---GraphViz output for same-type constraints---\n";
 
@@ -2215,8 +2350,8 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   }
 }
 
-void EquivalenceClass::dump() const {
-  dump(llvm::errs());
+void EquivalenceClass::dump(GenericSignatureBuilder *builder) const {
+  dump(llvm::errs(), builder);
 }
 
 void DelayedRequirement::dump(llvm::raw_ostream &out) const {
@@ -2520,6 +2655,25 @@ int swift::compareDependentTypes(Type type1, Type type2) {
       return +1;
   }
 
+  return 0;
+}
+
+/// Compare two dependent paths to determine which is better.
+static int compareDependentPaths(ArrayRef<AssociatedTypeDecl *> path1,
+                                 ArrayRef<AssociatedTypeDecl *> path2) {
+  // Shorter paths win.
+  if (path1.size() != path2.size())
+    return path1.size() < path2.size() ? -1 : 1;
+
+
+  // The paths are the same length, so order by comparing the associted
+  // types.
+  for (unsigned index : indices(path1)) {
+    if (int result = compareAssociatedTypes(path1[index], path2[index]))
+      return result;
+  }
+
+  // Identical paths.
   return 0;
 }
 
@@ -2881,6 +3035,351 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
       nested->dump(Out, SrcMgr, Indent + 2);
     }
   }
+}
+
+#pragma mark Rewrite tree
+RewriteTreeNode::~RewriteTreeNode() {
+  for (auto child : children)
+    delete child;
+}
+
+namespace {
+/// Function object used to order rewrite tree nodes based on the address
+/// of the associated type.
+class OrderTreeRewriteNode {
+  bool compare(AssociatedTypeDecl *lhs, AssociatedTypeDecl *rhs) const {
+    // Make sure null pointers precede everything else.
+    if (static_cast<bool>(lhs) != static_cast<bool>(rhs))
+      return static_cast<bool>(rhs);
+
+    // Use std::less to provide a defined ordering.
+    return std::less<AssociatedTypeDecl *>()(lhs, rhs);
+  }
+
+public:
+  bool operator()(RewriteTreeNode *lhs, AssociatedTypeDecl *rhs) const {
+    return compare(lhs->getMatch(), rhs);
+  }
+
+  bool operator()(AssociatedTypeDecl *lhs, RewriteTreeNode *rhs) const {
+    return compare(lhs, rhs->getMatch());
+  }
+
+  bool operator()(RewriteTreeNode *lhs, RewriteTreeNode *rhs) const {
+    return compare(lhs->getMatch(), rhs->getMatch());
+  }
+};
+}
+
+void RewriteTreeNode::addRewriteRule(
+                             ArrayRef<AssociatedTypeDecl *> matchPath,
+                             ArrayRef<AssociatedTypeDecl *> replacementPath) {
+  // If the match path is empty, we're adding the rewrite rule to this node.
+  if (matchPath.empty()) {
+    // If we don't already have a rewrite rule, add it.
+    if (!hasRewriteRule()) {
+      setRewriteRule(replacementPath);
+      return;
+    }
+
+    // If we already have this rewrite rule, we're done.
+    if (getRewriteRule() == replacementPath) return;
+
+    // Check whether any of the continuation children matches.
+    auto insertPos = children.begin();
+    while (insertPos != children.end() && !(*insertPos)->getMatch()) {
+      if ((*insertPos)->hasRewriteRule() &&
+          (*insertPos)->getRewriteRule() == replacementPath)
+        return;
+    }
+
+    // We already have a rewrite rule, so add a new child with a
+    // null associated type match to hold the rewrite rule.
+    auto newChild = new RewriteTreeNode(nullptr);
+    newChild->setRewriteRule(replacementPath);
+    children.insert(insertPos, newChild);
+    return;
+  }
+
+  // Find (or create) a child node describing the next step in the match.
+  auto matchFront = matchPath.front();
+  auto childPos =
+    std::lower_bound(children.begin(), children.end(), matchFront,
+                     OrderTreeRewriteNode());
+  if (childPos == children.end() || (*childPos)->getMatch() != matchFront) {
+    childPos = children.insert(childPos, new RewriteTreeNode(matchFront));
+  }
+
+  // Add the rewrite rule to the child.
+  (*childPos)->addRewriteRule(matchPath.slice(1), replacementPath);
+}
+
+void RewriteTreeNode::enumerateRewritePaths(
+                         Path matchPath,
+                         llvm::function_ref<void(unsigned, Path)> callback,
+                         unsigned depth) const {
+  // Determine whether we know anything about the next step in the path.
+  auto childPos =
+    depth < matchPath.size()
+      ? std::lower_bound(children.begin(), children.end(),
+                         matchPath[depth], OrderTreeRewriteNode())
+      : children.end();
+  if (childPos != children.end() &&
+      (*childPos)->getMatch() == matchPath[depth]) {
+    // Try to match the rest of the path.
+    (*childPos)->enumerateRewritePaths(matchPath, callback, depth + 1);
+  }
+
+  // If we have a rewrite rule at this position, invoke it.
+  if (hasRewriteRule()) {
+    // Invoke the callback with the first result.
+    callback(depth, rewrite);
+  }
+
+  // Walk any children with NULL associated types; they might have more matches.
+  for (auto otherRewrite : children) {
+    if (otherRewrite->getMatch()) break;
+    otherRewrite->enumerateRewritePaths(matchPath, callback, depth);
+  }
+}
+
+auto RewriteTreeNode::bestMatch(Path path) -> std::pair<unsigned, Path> {
+  std::pair<unsigned, Path> result(0, Path());
+  enumerateRewritePaths(path,
+                        [&result](unsigned length, Path path) {
+    if (length > result.first ||
+        (length == result.first &&
+         compareDependentPaths(path, result.second) < 0))
+      result = { length, path };
+  });
+  return result;
+}
+
+void RewriteTreeNode::mergeInto(RewriteTreeNode *other) {
+  SmallVector<AssociatedTypeDecl *, 4> matchPath;
+  mergeIntoRec(other, matchPath);
+}
+
+void RewriteTreeNode::mergeIntoRec(
+                     RewriteTreeNode *other,
+                     llvm::SmallVectorImpl<AssociatedTypeDecl *> &matchPath) {
+  // FIXME: A destructive version of this operation would be more efficient,
+  // since we generally don't care about \c other after doing this.
+  if (auto assocType = getMatch())
+    matchPath.push_back(assocType);
+
+  // Add this rewrite rule, if there is one.
+  if (hasRewriteRule())
+    other->addRewriteRule(matchPath, rewrite);
+
+  // Recurse into the child nodes.
+  for (auto child : children)
+    child->mergeIntoRec(other, matchPath);
+
+  if (auto assocType = getMatch())
+    matchPath.pop_back();
+}
+
+void RewriteTreeNode::dump() const {
+  dump(llvm::errs());
+}
+
+void RewriteTreeNode::dump(llvm::raw_ostream &out, bool lastChild) const {
+  std::string prefixStr;
+
+  std::function<void(const RewriteTreeNode *, bool lastChild)> print;
+  print = [&](const RewriteTreeNode *node, bool lastChild) {
+    out << prefixStr << " `--";
+
+    // Print the node name.
+    out.changeColor(raw_ostream::GREEN);
+    if (auto assoc = node->getMatch())
+      out << assoc->getProtocol()->getName() << "." << assoc->getName();
+    else
+      out << "(cont'd)";
+    out.resetColor();
+
+    // Print the rewrite, if there is one.
+    if (node->hasRewriteRule()) {
+      out << " --> [";
+      interleave(node->rewrite.begin(), node->rewrite.end(),
+                 [&](AssociatedTypeDecl *assocType) {
+                   out.changeColor(raw_ostream::BLUE);
+                   out << assocType->getProtocol()->getName() << "."
+                      << assocType->getName();
+                   out.resetColor();
+                 }, [&] {
+                   out << " -> ";
+                 });
+      out << "]";
+    }
+
+    out << "\n";
+
+    // Print children.
+    prefixStr += ' ';
+    prefixStr += (lastChild ? ' ' : '|');
+    prefixStr += "  ";
+
+    for (auto child : node->children) {
+      print(child, child == node->children.back());
+    }
+
+    prefixStr.erase(prefixStr.end() - 4, prefixStr.end());
+  };
+
+  print(this, lastChild);
+}
+
+/// Unpack the given potential archetype into a path from a generic parameter
+/// through a sequence of associated type declarations.
+///
+/// \returns the generic parameter at the root of the type, or \c None if
+/// a potential archetype along the path doesn't have an associated type.
+static Optional<GenericParamKey>
+unpackPath(PotentialArchetype *type,
+           SmallVectorImpl<AssociatedTypeDecl *> &path) {
+  if (auto parent = type->getParent()) {
+    auto result = unpackPath(parent, path);
+    if (!result) return None;
+    auto assocType = type->getResolvedAssociatedType();
+    if (!assocType) return None;
+
+    path.push_back(assocType);
+    return result;
+  }
+
+  return type->getGenericParamKey();
+}
+
+/// Form a dependent type with the (canonical) generic parameter for the given
+/// parameter key, then following the path of associated types.
+static Type formDependentType(ASTContext &ctx, GenericParamKey genericParam,
+                              ArrayRef<AssociatedTypeDecl *> path) {
+  return std::accumulate(path.begin(), path.end(),
+                         Type(GenericTypeParamType::get(genericParam.Depth,
+                                                        genericParam.Index,
+                                                        ctx)),
+                         [](Type type, AssociatedTypeDecl *assocType) -> Type {
+                           return DependentMemberType::get(type, assocType);
+                         });
+}
+
+RewriteTreeNode *
+GenericSignatureBuilder::Implementation::getRewriteTreeRootIfPresent(
+                                          const EquivalenceClass *equivClass) {
+  auto known = RewriteTreeRoots.find(equivClass);
+  if (known != RewriteTreeRoots.end()) return known->second;
+
+  return nullptr;
+}
+
+RewriteTreeNode *
+GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
+                                          const EquivalenceClass *equivClass) {
+  auto known = RewriteTreeRoots.find(equivClass);
+  if (known != RewriteTreeRoots.end()) return known->second;
+
+  auto root = new RewriteTreeNode(nullptr);
+  RewriteTreeRoots[equivClass] = root;
+  return root;
+}
+
+void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *type1,
+                                                     PotentialArchetype *type2){
+  SmallVector<AssociatedTypeDecl *, 4> pathVec1;
+  auto baseOpt1 = unpackPath(type1, pathVec1);
+  if (!baseOpt1) return;
+  ArrayRef<AssociatedTypeDecl *> path1(pathVec1);
+
+  SmallVector<AssociatedTypeDecl *, 4> pathVec2;
+  auto baseOpt2 = unpackPath(type2, pathVec2);
+  if (!baseOpt2) return;
+  ArrayRef<AssociatedTypeDecl *> path2(pathVec2);
+
+  // FIXME: These could land in the same equivalence class, in which case
+  // we won't need to bail out.
+  if (*baseOpt1 != *baseOpt2)
+    return;
+
+  // Make sure path1 is no longer than path2.
+  if (path1.size() > path2.size()) {
+    std::swap(path1, path2);
+  }
+
+  // Find the length of the common prefix.
+  unsigned prefixLength =
+    std::mismatch(path1.begin(), path1.end(), path2.begin()).first
+      - path1.begin();
+
+  // Find the equivalence class that corresponds to the common prefix.
+  auto commonPrefixType = formDependentType(getASTContext(), *baseOpt1,
+                                            path1.slice(0, prefixLength));
+  auto equivClass =
+    resolveEquivalenceClass(commonPrefixType,
+                            ArchetypeResolutionKind::WellFormed);
+  if (!equivClass)
+    return;
+
+  // Chop off the common prefix; these are the paths we'll take from the
+  // equivalence class.
+  path1 = path1.slice(prefixLength);
+  path2 = path2.slice(prefixLength);
+
+  // Order the paths so that we go to the more-canonical path.
+  if (compareDependentPaths(path1, path2) < 0)
+    std::swap(path1, path2);
+
+  // Add the rewrite rule.
+  auto root = Impl->getOrCreateRewriteTreeRoot(equivClass);
+  root->addRewriteRule(path1, path2);
+}
+
+bool GenericSignatureBuilder::simplifyType(
+                                 GenericParamKey base,
+                                 SmallVectorImpl<AssociatedTypeDecl *> &path) {
+  Type currentType =
+    GenericTypeParamType::get(base.Depth, base.Index, getASTContext());
+  auto equivClass =
+    resolveEquivalenceClass(currentType, ArchetypeResolutionKind::WellFormed);
+  if (!equivClass) return false;
+
+  unsigned startIndex = 0;
+  bool simplified = false;
+  do {
+    if (auto rootNode = Impl->getRewriteTreeRootIfPresent(equivClass)) {
+      // Find the best rewrite rule for the path starting at startIndex.
+      auto match =
+        rootNode->bestMatch(llvm::makeArrayRef(path).slice(startIndex));
+
+      // If we have a match, replace the matched path with the replacement
+      // path.
+      if (match.first > 0) {
+        // Overwrite the beginning of the match.
+        assert(match.first >= match.second.size());
+        auto pathStartPos = path.begin() + startIndex;
+        std::copy(match.second.begin(), match.second.end(), pathStartPos);
+
+        // Erase the rest.
+        path.erase(pathStartPos + match.second.size(),
+                   pathStartPos + match.first);
+
+        // Move back to the beginning; we may have opened up other rewrites.
+        simplified = true;
+        startIndex = 0;
+        continue;
+      }
+    }
+
+    // FIXME: It would be nice if there were a better way to get the equivalence
+    // class of a named nested type.
+    currentType = DependentMemberType::get(currentType, path[startIndex++]);
+    equivClass =
+      resolveEquivalenceClass(currentType, ArchetypeResolutionKind::WellFormed);
+    if (!equivClass) break;
+  } while (startIndex < path.size());
+
+  return simplified;
 }
 
 #pragma mark Equivalence classes
@@ -3865,6 +4364,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT2,
        const RequirementSource *Source) 
 {
+  // Add a rewrite rule based on the given same-type constraint.
+  addSameTypeRewriteRule(OrigT1, OrigT2);
+
   // Record the same-type constraint, and bail out if it was already known.
   if (!OrigT1->getOrCreateEquivalenceClass(*this)
         ->recordSameTypeConstraint(OrigT1, OrigT2, Source))
@@ -3910,6 +4412,20 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
                                    equivClass2->sameTypeConstraints.end());
+
+    // Combine the rewrite rules.
+    if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(equivClass2)) {
+      if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(equivClass)) {
+        // Merge the second rewrite tree into the first.
+        rewriteRoot2->mergeInto(rewriteRoot1);
+        Impl->RewriteTreeRoots.erase(equivClass2);
+        delete rewriteRoot2;
+      } else {
+        // Take the second rewrite tree and make it the first.
+        Impl->RewriteTreeRoots.erase(equivClass2);
+        (void)Impl->RewriteTreeRoots.insert({equivClass, rewriteRoot2});
+      }
+    }
   }
 
   // Same-type-to-concrete requirements.
@@ -5446,7 +5962,7 @@ namespace {
       return lhs.constraint < rhs.constraint;
     }
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                               "only for use in the debugger");
   };
 }
