@@ -128,7 +128,7 @@ extension String {
       let offset = _toCoreIndex(i)
       let length: Int
       if _slowPath(_guts._isOpaque) {
-        length = _guts._asOpaque().unicodeScalarWidth(startingAt: offset)
+        length = _opaqueScalarWidth(startingAt: offset)
       } else if _guts.isASCII {
         length = 1
       } else {
@@ -138,6 +138,12 @@ extension String {
       return _fromCoreIndex(offset + length)
     }
 
+    @_versioned // @opaque
+    func _opaqueScalarWidth(startingAt offset: Int) -> Int {
+      _sanityCheck(_guts._isOpaque)
+      return _guts._asOpaque().unicodeScalarWidth(startingAt: offset)
+    }
+
     /// Returns the previous consecutive location before `i`.
     ///
     /// - Precondition: The previous location exists.
@@ -145,8 +151,9 @@ extension String {
     public func index(before i: Index) -> Index {
       let offset = _toCoreIndex(i)
       let length: Int
+
       if _slowPath(_guts._isOpaque) {
-        length = _guts._asOpaque().unicodeScalarWidth(endingAt: offset)
+        length = _opaqueScalarWidth(endingAt: offset)
       } else if _guts.isASCII {
         length = 1
       } else {
@@ -154,6 +161,12 @@ extension String {
         length = utf16.unicodeScalarWidth(endingAt: offset)
       }
       return _fromCoreIndex(offset - length)
+    }
+
+    @_versioned // @opaque
+    func _opaqueScalarWidth(endingAt offset: Int) -> Int {
+      _sanityCheck(_guts._isOpaque)
+      return _guts._asOpaque().unicodeScalarWidth(endingAt: offset)
     }
 
     /// Accesses the Unicode scalar value at the given position.
@@ -194,17 +207,36 @@ extension String {
 
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
-      internal init(_ _guts: _StringGuts) {
-        self._guts = _guts
-        if _slowPath(_guts._isOpaque) {
-          self._opaqueIterator = _guts._asOpaque().makeUnicodeScalarIterator()
-        } else if _guts.isASCII {
+      internal init(_ guts: _StringGuts) {
+        if _slowPath(guts._isOpaque) {
+          self.init(_opaque: guts)
+          return
+        }
+        self.init(_concrete: guts)
+      }
+
+      @_inlineable // FIXME(sil-serialize-all)
+      @_versioned // FIXME(sil-serialize-all)
+      @inline(__always)
+      internal init(_concrete guts: _StringGuts) {
+        _sanityCheck(!guts._isOpaque)
+        self._guts = guts
+        defer { _fixLifetime(self) }
+        if _guts.isASCII {
           self._asciiIterator =
             _guts._unmanagedASCIIView.makeUnicodeScalarIterator()
         } else {
           self._utf16Iterator =
             _guts._unmanagedUTF16View.makeUnicodeScalarIterator()
         }
+      }
+
+      @_versioned // @opaque
+      init(_opaque _guts: _StringGuts) {
+        _sanityCheck(_guts._isOpaque)
+        defer { _fixLifetime(self) }
+        self._guts = _guts
+        self._opaqueIterator = _guts._asOpaque().makeUnicodeScalarIterator()
       }
 
       /// Advances to the next element and returns it, or `nil` if no next
@@ -276,7 +308,7 @@ extension _StringGuts {
   @_versioned
   internal func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
     if _slowPath(_isOpaque) {
-      return _asOpaque().unicodeScalar(startingAt: offset)
+      return opaqueUnicodeScalar(startingAt: offset)
     }
     if isASCII {
       let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset)
@@ -285,17 +317,31 @@ extension _StringGuts {
     return _unmanagedUTF16View.unicodeScalar(startingAt: offset)
   }
 
+  @_versioned // @opaque
+  func opaqueUnicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    return _asOpaque().unicodeScalar(startingAt: offset)
+  }
+
   @_inlineable
   @_versioned
   internal func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
     if _slowPath(_isOpaque) {
-      return _asOpaque().unicodeScalar(endingAt: offset)
+      return opaqueUnicodeScalar(endingAt: offset)
     }
     if isASCII {
       let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset - 1)
       return Unicode.Scalar(_unchecked: UInt32(u))
     }
     return _unmanagedUTF16View.unicodeScalar(endingAt: offset)
+  }
+
+  @_versioned // @opaque
+  func opaqueUnicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    return _asOpaque().unicodeScalar(endingAt: offset)
   }
 }
 
