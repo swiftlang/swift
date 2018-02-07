@@ -281,6 +281,9 @@ class NullExecutor(CommandExecutor):
 
     # Overriding commands that mutate the system
 
+    def cd(self, path):
+        self._fake_popen(['cd', path])
+
     def cp(self, source, destination):
         self._fake_popen(['cp', '-r', source, destination])
 
@@ -289,6 +292,12 @@ class NullExecutor(CommandExecutor):
 
     def mv(self, source, destination):
         self._fake_popen(['mv', source, destination])
+
+    @contextmanager
+    def pushd(self, path):
+        self._fake_popen(['pushd', path])
+        yield
+        self._fake_popen(['popd'])
 
     def rm(self, path):
         self._fake_popen(['rm', '-rf', path])
