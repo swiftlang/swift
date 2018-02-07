@@ -1045,22 +1045,16 @@ static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
 }
 
-static void getClangLibraryPathOnDarwin(SmallVectorImpl<char> &libPath,
-                                        const ArgList &args,
-                                        const ToolChain &TC) {
-  getRuntimeLibraryPath(libPath, args, TC);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(libPath);
-  llvm::sys::path::append(libPath, "clang", "lib", "darwin");
-}
+static void getClangLibraryPath(const ToolChain &TC, const ArgList &Args,
+                                SmallString<128> &LibPath) {
+  const llvm::Triple &T = TC.getTriple();
 
-static void getClangLibraryPathOnLinux(SmallVectorImpl<char> &libPath,
-                                        const ArgList &args,
-                                        const ToolChain &TC) {
-  getRuntimeLibraryPath(libPath, args, TC);
+  getRuntimeLibraryPath(LibPath, Args, TC);
   // Remove platform name.
-  llvm::sys::path::remove_filename(libPath);
-  llvm::sys::path::append(libPath, "clang", "lib", "linux");
+  llvm::sys::path::remove_filename(LibPath);
+  llvm::sys::path::append(LibPath, "clang", "lib",
+                          T.isOSDarwin() ? "darwin"
+                                         : getPlatformNameForTriple(T));
 }
 
 /// Get the runtime library link path for static linking,
@@ -1142,7 +1136,7 @@ getSanitizerRuntimeLibNameForLinux(StringRef Sanitizer, const llvm::Triple &Trip
 bool toolchains::Darwin::sanitizerRuntimeLibExists(
     const ArgList &args, StringRef sanitizer) const {
   SmallString<128> sanitizerLibPath;
-  getClangLibraryPathOnDarwin(sanitizerLibPath, args, *this);
+  getClangLibraryPath(*this, args, sanitizerLibPath);
   llvm::sys::path::append(sanitizerLibPath,
       getSanitizerRuntimeLibNameForDarwin(sanitizer, this->getTriple()));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
@@ -1151,7 +1145,7 @@ bool toolchains::Darwin::sanitizerRuntimeLibExists(
 bool toolchains::GenericUnix::sanitizerRuntimeLibExists(
     const ArgList &args, StringRef sanitizer) const {
   SmallString<128> sanitizerLibPath;
-  getClangLibraryPathOnLinux(sanitizerLibPath, args, *this);
+  getClangLibraryPath(*this, args, sanitizerLibPath);
   llvm::sys::path::append(sanitizerLibPath,
       getSanitizerRuntimeLibNameForLinux(sanitizer, this->getTriple()));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
@@ -1163,7 +1157,7 @@ addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
                            StringRef DarwinLibName, bool AddRPath,
                            const ToolChain &TC) {
   SmallString<128> ClangLibraryPath;
-  getClangLibraryPathOnDarwin(ClangLibraryPath, Args, TC);
+  getClangLibraryPath(TC, Args, ClangLibraryPath);
 
   SmallString<128> P(ClangLibraryPath);
   llvm::sys::path::append(P, DarwinLibName);
