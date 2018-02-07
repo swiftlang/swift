@@ -345,6 +345,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
     return InlineCost::Expensive;
 
   case SILInstructionKind::MetatypeInst:

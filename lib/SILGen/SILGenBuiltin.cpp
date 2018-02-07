@@ -749,6 +749,19 @@ static ManagedValue emitBuiltinClassifyBridgeObject(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(result);
 }
 
+static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
+                                                   SILLocation loc,
+                                                   SubstitutionList subs,
+                                                   ArrayRef<ManagedValue> args,
+                                                   SGFContext C) {
+  assert(args.size() == 1 && "ValueToBridgeObject should have one argument");
+  assert(subs.size() == 1 && "ValueToBridgeObject should have one sub");
+  auto &fromTL = SGF.getTypeLowering(subs[0].getReplacement());
+  assert(fromTL.isTrivial() && "Expected a trivial type");
+
+  SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
+  return SGF.emitManagedRetain(loc, result);
+}
 
 // This should only accept as an operand type single-refcounted-pointer types,
 // class existentials, or single-payload enums (optional). Type checking must be

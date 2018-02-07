@@ -882,6 +882,13 @@ static ValueDecl *getClassifyBridgeObject(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, { C.TheBridgeObjectType }, resultTy);
 }
 
+static ValueDecl *getValueToBridgeObject(ASTContext &C, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(C);
+  builder.addParameter(makeGenericParam(0));
+  builder.setResult(makeConcrete(C.TheBridgeObjectType));
+  return builder.build(Id);
+}
+
 static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
   // <T : AnyObject> T -> (T, Int8Ty)
   //
@@ -1820,6 +1827,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ClassifyBridgeObject:
     if (!Types.empty()) return nullptr;
     return getClassifyBridgeObject(Context, Id);
+  case BuiltinValueKind::ValueToBridgeObject:
+    if (!Types.empty())
+      return nullptr;
+    return getValueToBridgeObject(Context, Id);
   case BuiltinValueKind::UnsafeGuaranteed:
     return getUnsafeGuaranteed(Context, Id);
 
