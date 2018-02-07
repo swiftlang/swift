@@ -1990,6 +1990,36 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   return CFI;
 }
 
+ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
+  auto *CFI = ::new (Buffer) ConvertEscapeToNoEscapeInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty);
+  // If we do not have lowered SIL, make sure that are not performing
+  // ABI-incompatible conversions.
+  //
+  // *NOTE* We purposely do not use an early return here to ensure that in
+  // builds without assertions this whole if statement is optimized out.
+  if (F.getModule().getStage() != SILStage::Lowered) {
+    // Make sure we are not performing ABI-incompatible conversions.
+    CanSILFunctionType opTI =
+        CFI->getOperand()->getType().castTo<SILFunctionType>();
+    (void)opTI;
+    CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
+    (void)resTI;
+    assert(opTI->isABICompatibleWith(resTI).isCompatible() &&
+           "Can not convert in between ABI incompatible function types");
+  }
+  return CFI;
+}
+
 bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   switch (getKind()) {
   case Kind::StoredProperty:
