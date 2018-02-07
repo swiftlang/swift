@@ -1781,7 +1781,7 @@ static StringRef getOutputFilename(Compilation &C,
                                    const llvm::opt::DerivedArgList &Args,
                                    bool AtTopLevel,
                                    StringRef BaseInput,
-                                   ArrayRef<const Job *> InputJobs,
+                                   StringRef PrimaryInput,
                                    DiagnosticEngine &Diags,
                                    llvm::SmallString<128> &Buffer) {
   if (JA->getType() == types::TY_Nothing)
@@ -1808,7 +1808,7 @@ static StringRef getOutputFilename(Compilation &C,
 
   // dSYM actions are never treated as top-level.
   if (isa<GenerateDSYMJobAction>(JA)) {
-    Buffer = InputJobs.front()->getOutput().getPrimaryOutputFilename();
+    Buffer = PrimaryInput;
     Buffer.push_back('.');
     Buffer.append(types::getTypeTempSuffix(JA->getType()));
     return Buffer.str();
@@ -1858,10 +1858,26 @@ static StringRef getOutputFilename(Compilation &C,
   return Buffer.str();
 }
 
+static bool hasExistingAdditionalOutput(CommandOutput &output,
+                                        types::ID outputType,
+                                        StringRef outputPath = StringRef()) {
+
+  auto existing = output.getAdditionalOutputForType(outputType);
+  if (!existing.empty()) {
+    assert(outputPath.empty() || outputPath == existing);
+    return true;
+  }
+  return false;
+}
+
 static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
                                types::ID outputType, const OutputInfo &OI,
                                const TypeToPathMap *outputMap,
                                StringRef outputPath = StringRef()) {
+
+  if (hasExistingAdditionalOutput(output, outputType, outputPath))
+    return;
+
   StringRef outputMapPath;
   if (outputMap) {
     auto iter = outputMap->find(outputType);
@@ -2020,13 +2036,19 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   // 3. Determine the CommandOutput for the job.
   StringRef BaseInput;
+  StringRef PrimaryInput;
   if (!InputActions.empty()) {
-    // Use the first InputAction as our BaseInput.
+    // Use the first InputAction as our BaseInput and PrimaryInput.
     const InputAction *IA = cast<InputAction>(InputActions[0]);
     BaseInput = IA->getInputArg().getValue();
+    PrimaryInput = BaseInput;
   } else if (!InputJobs.empty()) {
+    const CommandOutput &Out = InputJobs.front()->getOutput();
+    size_t i = JA->getInputIndex();
     // Use the first Job's BaseInput as our BaseInput.
-    BaseInput = InputJobs.front()->getOutput().getBaseInput(JA->getInputIndex());
+    BaseInput = Out.getBaseInput(i);
+    // Use the first Job's Primary Output as our PrimaryInput.
+    PrimaryInput = Out.getPrimaryOutputFilenames()[i];
   }
 
   const TypeToPathMap *OutputMap = nullptr;
@@ -2042,10 +2064,11 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   }
 
-  std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType()));
+  std::unique_ptr<CommandOutput> Output(
+      new CommandOutput(JA->getType(), C.getDerivedOutputFileMap()));
   llvm::SmallString<128> Buf;
   computeMainOutput(C, JA, OI, OFM, TC, AtTopLevel, InputActions, InputJobs,
-                    OutputMap, BaseInput, Buf, Output.get());
+                    OutputMap, BaseInput, PrimaryInput, Buf, Output.get());
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA))
     chooseSwiftModuleOutputPath(C, OI, OFM, OutputMap, Output.get());
@@ -2167,38 +2190,47 @@ void Driver::computeMainOutput(Compilation &C, const JobAction *JA,
                                SmallVectorImpl<const Action *> &InputActions,
                                SmallVectorImpl<const Job *> &InputJobs,
                                const TypeToPathMap *OutputMap,
-                               StringRef BaseInput, llvm::SmallString<128> &Buf,
+                               StringRef BaseInput, StringRef PrimaryInput,
+                               llvm::SmallString<128> &Buf,
                                CommandOutput *Output) const {
   StringRef OutputFile;
   if (OI.isMultiThreading() && isa<CompileJobAction>(JA) &&
       types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
-    auto OutputFunc = [&](StringRef Input) {
+    auto OutputFunc = [&](StringRef Base, StringRef Primary) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
-        OMForInput = OFM->getOutputMapForInput(Input);
+        OMForInput = OFM->getOutputMapForInput(Base);
 
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
-                                     C.getArgs(), AtTopLevel, Input, InputJobs,
+                                     C.getArgs(), AtTopLevel, Base, Primary,
                                      Diags, Buf);
-      Output->addPrimaryOutput(OutputFile, Input);
+      Output->addPrimaryOutput(CommandInputPair{Base, Primary},
+                               OutputFile);
     };
     // Add an output file for each input action.
     for (const Action *A : InputActions) {
       const InputAction *IA = cast<InputAction>(A);
-      OutputFunc(IA->getInputArg().getValue());
+      StringRef IV = IA->getInputArg().getValue();
+      OutputFunc(IV, IV);
     }
-    // Add an output file for each input job.
-    for (const Job *job : InputJobs) {
-      OutputFunc(job->getOutput().getBaseInput(0));
+    // Add an output file for each primary output of each input job.
+    for (const Job *IJ : InputJobs) {
+      size_t i = 0;
+      CommandOutput const &Out = IJ->getOutput();
+      for (auto OutPrimary : Out.getPrimaryOutputFilenames()) {
+        OutputFunc(Out.getBaseInput(i++), OutPrimary);
+      }
     }
   } else {
     // The common case: there is a single output file.
     OutputFile =
         getOutputFilename(C, JA, OI, OutputMap, TC.getTriple(), C.getArgs(),
-                          AtTopLevel, BaseInput, InputJobs, Diags, Buf);
-    Output->addPrimaryOutput(OutputFile, BaseInput);
+                          AtTopLevel, BaseInput, PrimaryInput, Diags, Buf);
+    Output->addPrimaryOutput(
+        CommandInputPair{BaseInput, PrimaryInput},
+        OutputFile);
   }
 }
 
@@ -2206,6 +2238,10 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
                                          const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          CommandOutput *Output) const {
+
+  if (hasExistingAdditionalOutput(*Output, types::TY_SwiftModuleFile))
+    return;
+
   StringRef OFMModuleOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_SwiftModuleFile);
@@ -2214,6 +2250,7 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
   }
 
   const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
+
   if (!OFMModuleOutputPath.empty()) {
     // Prefer a path from the OutputMap.
     Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
@@ -2223,6 +2260,11 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
     // so prefer to use -emit-module-path, if present.
     Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
                                        A->getValue());
+  } else if (Output->getPrimaryOutputType() == types::TY_SwiftModuleFile) {
+    // If the primary type is already a module type, we're out of
+    // options for overriding the primary name choice: stop now.
+    assert(!Output->getPrimaryOutputFilename().empty());
+    return;
   } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
              OI.ShouldTreatModuleAsTopLevelOutput) {
     // We're performing a single compile and don't have -emit-module-path,
@@ -2257,6 +2299,10 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
 void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
                                             const TypeToPathMap *OutputMap,
                                             CommandOutput *Output) const {
+
+  if (hasExistingAdditionalOutput(*Output, types::TY_SwiftModuleDocFile))
+    return;
+
   StringRef OFMModuleDocOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_SwiftModuleDocFile);
@@ -2282,6 +2328,10 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
 void Driver::chooseRemappingOutputPath(Compilation &C,
                                        const TypeToPathMap *OutputMap,
                                        CommandOutput *Output) const {
+
+  if (hasExistingAdditionalOutput(*Output, types::TY_Remapping))
+    return;
+
   StringRef OFMFixitsOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_Remapping);
@@ -2407,6 +2457,10 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               const OutputInfo &OI,
                                               const TypeToPathMap *OutputMap,
                                               CommandOutput *Output) const {
+
+  if (hasExistingAdditionalOutput(*Output, types::TY_ObjCHeader))
+    return;
+
   StringRef ObjCHeaderPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_ObjCHeader);
