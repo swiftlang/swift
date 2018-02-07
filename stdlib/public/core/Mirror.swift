@@ -908,19 +908,11 @@ extension DictionaryLiteral : RandomAccessCollection {
 extension DictionaryLiteral : Equatable where Key: Equatable, Value : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>) -> Bool {
-    let lhsCount = lhs.count
-    if lhsCount != rhs.count {
+    if lhs.count != rhs.count {
       return false
     }
 
-    // We know that lhs.count == rhs.count, compare element wise.
-    for idx in 0..<lhsCount {
-      if lhs[idx].key != rhs[idx].key ||
-        lhs[idx].value != rhs[idx].value {
-        return false
-      }
-    }
-    return true
+    return lhs.elementsEqual(rhs, by: ==)
   }
 }
 
