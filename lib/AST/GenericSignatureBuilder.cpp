@@ -3091,6 +3091,8 @@ void RewriteTreeNode::addRewriteRule(
       if ((*insertPos)->hasRewriteRule() &&
           (*insertPos)->getRewriteRule() == replacementPath)
         return;
+
+      ++insertPos;
     }
 
     // We already have a rewrite rule, so add a new child with a
@@ -3338,13 +3340,17 @@ void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *type1,
 bool GenericSignatureBuilder::simplifyType(
                                  GenericParamKey base,
                                  SmallVectorImpl<AssociatedTypeDecl *> &path) {
-  Type currentType =
+
+  Type genericParamType =
     GenericTypeParamType::get(base.Depth, base.Index, getASTContext());
-  auto equivClass =
-    resolveEquivalenceClass(currentType, ArchetypeResolutionKind::WellFormed);
-  if (!equivClass) return false;
+
+  auto initialEquivClass =
+    resolveEquivalenceClass(genericParamType, ArchetypeResolutionKind::WellFormed);
+  if (!initialEquivClass) return false;
 
   unsigned startIndex = 0;
+  auto equivClass = initialEquivClass;
+  Type currentType = genericParamType;
   bool simplified = false;
   do {
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(equivClass)) {
@@ -3367,6 +3373,8 @@ bool GenericSignatureBuilder::simplifyType(
         // Move back to the beginning; we may have opened up other rewrites.
         simplified = true;
         startIndex = 0;
+        currentType = genericParamType;
+        equivClass = initialEquivClass;
         continue;
       }
     }
