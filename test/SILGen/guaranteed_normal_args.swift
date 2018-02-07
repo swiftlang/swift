@@ -214,3 +214,11 @@ extension Unmanaged {
     return result
   }
 }
+
+// Make sure that we properly forward x into memory and don't crash.
+public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Builtin.BridgeObject {
+  // y would normally be 0._builtinWordValue. We don't want to define that
+  // conformance.
+  let object = Builtin.castToBridgeObject(x, y)
+  return object
+}
