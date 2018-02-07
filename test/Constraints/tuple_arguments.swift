@@ -1642,3 +1642,15 @@ public extension Optional {
     return value.apply(self)
   }
 }
+
+
+// https://bugs.swift.org/browse/SR-6837
+do {
+  func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
+  func takePair(_ pair: (Int, Int?)) {}
+  takeFn(fn: takePair) // Allow for -swift-version 4, but not later
+  takeFn(fn: { (pair: (Int, Int?)) in } ) // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  takeFn { (pair: (Int, Int?)) in } // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+}
