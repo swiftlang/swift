@@ -33,8 +33,8 @@ extension Syntax {
 #if os(macOS)
     let Service = SourceKitdService()
     let Request = SourceKitdRequest(uid: .source_request_editor_open)
-    Request.addParameter(.key_sourcefile, value: url.absoluteString)
-    Request.addParameter(.key_name, value: url.absoluteString)
+    Request.addParameter(.key_sourcefile, value: url.path)
+    Request.addParameter(.key_name, value: url.path)
     Request.addParameter(.key_enable_syntax_tree, value: 1)
     let Resp = Service.sendSyn(request: Request)
     return Resp.value.getString(.key_serialized_syntax_tree).data(using: .utf8)!
