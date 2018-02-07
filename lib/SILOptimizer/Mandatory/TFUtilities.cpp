@@ -228,6 +228,26 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
         continue;
       }
 
+      if (auto *ubc = dyn_cast<UncheckedBitwiseCastInst>(str)) {
+        str = ubc->getOperand();
+        continue;
+      }
+
+      // Look through the various operands that bit-mangle things into bridged
+      // string representations.  This is gross, Swift should have higher level
+      // operations for bridge values like this.
+      if (auto *bi = dyn_cast<BuiltinInst>(str)) {
+        switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::And:
+        case BuiltinValueKind::Or:
+        case BuiltinValueKind::ZExtOrBitCast:
+        case BuiltinValueKind::PtrToInt:
+          str = bi->getOperand(0);
+          continue;
+        default: break;
+        }
+      }
+
       // It is possible that we have a variable string, we want to reject it
       // as a non-constant value.
       return nullptr;
