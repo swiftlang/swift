@@ -125,18 +125,26 @@ TensorTests.testCPUAndGPU("XWPlusB") {
   let b = Tensor([0.5, 0.5])
   // Do xW+b!
   let result = x ⊗ w + b
-  // let resultArray = result
   expectEqual([1, 2], result.shape)
   expectEqual([12.5, 6.5], result.units)
 }
 
 TensorTests.testCPUAndGPU("Transpose") {
   // Shape: 3 x 2
-  let xT = Tensor([[1, 2], [3, 4], [5, 6]]).transposed(withPermutations: 1, 0)
+  let xT = Tensor([[1, 2], [3, 4], [5, 6]]).transposed()
   let xTArray = xT.array
   expectEqual(2, xTArray.rank)
   expectEqual([2, 3], xTArray.shape)
   expectEqual([1, 3, 5, 2, 4, 6], xTArray.units)
+}
+
+TensorTests.testCPUAndGPU("Reverse") {
+  // Shape: 3 x 2
+  let reversed = Tensor([[1, 2], [3, 4], [5, 6]]).reversed(alongAxes: [1])
+  let reversedArray = reversed.array
+  expectEqual(2, reversedArray.rank)
+  expectEqual([3, 2], reversedArray.shape)
+  expectEqual([2, 1, 4, 3, 6, 5], reversedArray.units)
 }
 
 // FIXME: The While op doesn't work on the CPU.
