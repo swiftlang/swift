@@ -470,7 +470,6 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<ValueID> &ListOfValues) {
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back((unsigned)Ref.getResilienceExpansion());
   ListOfValues.push_back(Ref.getParameterListCount() - 1);
   ListOfValues.push_back(Ref.isForeign);
 }

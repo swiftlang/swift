@@ -1872,9 +1872,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, ResilienceExpansion::Minimal,
-                      /*uncurryLevel*/ 0,
-                      /*foreign*/ true);
+  SILDeclRef constant(loc, /*uncurryLevel*/ 0, /*foreign*/ true);
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   return convertCFunctionSignature(
