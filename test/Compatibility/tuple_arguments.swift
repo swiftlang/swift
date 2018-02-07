@@ -1493,3 +1493,12 @@ do {
   func bar() -> ((()) -> Void)? { return nil }
   foo(bar()) // OK in Swift 3 mode
 }
+
+// https://bugs.swift.org/browse/SR-6837
+do {
+  func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
+  func takePair(_ pair: (Int, Int?)) {}
+  takeFn(fn: takePair)
+  takeFn(fn: { (pair: (Int, Int?)) in } )
+  takeFn { (pair: (Int, Int?)) in }
+}
