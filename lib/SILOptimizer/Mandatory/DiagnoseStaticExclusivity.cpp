@@ -41,7 +41,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 template <typename... T, typename... U>
@@ -180,6 +182,7 @@ enum class RecordedAccessKind {
 class RecordedAccess {
 private:
   RecordedAccessKind RecordKind;
+
   union {
    BeginAccessInst *Inst;
     struct {
@@ -815,6 +818,12 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap(nullptr);
 }
 
+static llvm::cl::opt<bool> ShouldAssertOnFailure(
+    "sil-assert-on-exclusivity-failure",
+    llvm::cl::desc("Should the compiler assert when it diagnoses conflicting "
+                   "accesses rather than emitting a diagnostic? Intended for "
+                   "use only with debugging."));
+
 /// If making an access of the given kind at the given subpath would
 /// would conflict, returns the first recorded access it would conflict
 /// with. Otherwise, returns None.
@@ -824,7 +833,10 @@ shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
   if (Info.alreadyHadConflict())
     return None;
 
-  return Info.conflictsWithAccess(Kind, SubPath);
+  auto result = Info.conflictsWithAccess(Kind, SubPath);
+  if (ShouldAssertOnFailure && result.hasValue())
+    llvm_unreachable("Standard assertion routine.");
+  return result;
 }
 
 /// For each projection that the summarized function accesses on its
