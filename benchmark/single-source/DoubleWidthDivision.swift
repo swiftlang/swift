@@ -12,14 +12,20 @@
 
 // This test checks performance of division using DoubleWidth.
 
-import Foundation
+// FIXME: This needs to be disabled with an #if because it runs into pathological
+// compile time and code size problems.
+// [SR-6947] DoubleWidth compile time.
+// import Foundation
 import TestsUtils
 
 public let DoubleWidthDivision = BenchmarkInfo(
   name: "DoubleWidthDivision",
-  runFunction: run_DoubleWidthDivision,
+  runFunction: disabled,
   tags: [.validation, .algorithm]
 )
+public func disabled(_ N: Int) {}
+
+#if false
 
 private typealias Int128 = DoubleWidth<Int64>
 private typealias Int256 = DoubleWidth<Int128>
@@ -54,3 +60,4 @@ public func run_DoubleWidthDivision(_ N: Int) {
   }
   CheckResults(sum == 0)
 }
+#endif
