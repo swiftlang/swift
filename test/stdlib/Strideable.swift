@@ -19,7 +19,7 @@ import StdlibUnittest
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
-extension StrideToIterator where Element : TestProtocol1 {
+extension StrideTo.Iterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -31,7 +31,7 @@ extension StrideTo where Element : TestProtocol1 {
   }
 }
 
-extension StrideThroughIterator where Element : TestProtocol1 {
+extension StrideThrough.Iterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
