@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -511,6 +511,8 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
   bool DriverPrintOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_output_file_map);
+  bool DriverPrintDerivedOutputFileMap =
+    ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
   bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
@@ -694,6 +696,11 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   buildJobs(TopLevelActions, OI, OFM.get(), TC, *C);
+
+  if (DriverPrintDerivedOutputFileMap) {
+    C->getDerivedOutputFileMap().dump(llvm::outs(), true);
+    return nullptr;
+  }
 
   // For getting bulk fixits, or for when users explicitly request to continue
   // building despite errors.
