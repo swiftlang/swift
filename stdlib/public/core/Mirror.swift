@@ -913,7 +913,6 @@ extension DictionaryLiteral : Equatable where Key: Equatable, Value : Equatable 
       return false
     }
 
-    return lhs.elementsEqual(rhs)
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {
       if lhs[idx].key != rhs[idx].key ||
