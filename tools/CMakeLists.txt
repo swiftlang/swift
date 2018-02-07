@@ -16,18 +16,10 @@ add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
 add_swift_tool_subdirectory(swift-refactor)
 
-if (SWIFT_BUILD_SOURCEKIT AND SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
-  set(BUILD_SOURCEKIT_SWIFT_CLIENT TRUE)
-else()
-  set(BUILD_SOURCEKIT_SWIFT_CLIENT FALSE)
-endif()
-
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
-  if(BUILD_SOURCEKIT_SWIFT_CLIENT)
-    add_subdirectory(SwiftSourceKitClient)
-  endif()
 endif()
+
 
 if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # Only build Darwin-specific tools when deploying to OS X.
@@ -36,7 +28,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # SwiftSyntax depends on both the standard library (because it's a
   # Swift module), and the SDK overlays (because it depends on Foundation).
   # Ensure we only build SwiftSyntax when we're building both.
-  if(BUILD_SOURCEKIT_SWIFT_CLIENT)
+  if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(SwiftSyntax)
   endif()
 endif()
