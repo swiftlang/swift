@@ -600,31 +600,6 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   swift_runtime_unreachable("associated type names don't line up");
 }
 
-class TypeOwnership {
-  enum : uint8_t {
-    Weak = 1 << 0,
-    Unowned = 1 << 1,
-    Unmanaged = 1 << 2,
-  };
-
-  uint8_t Data;
-
-  constexpr TypeOwnership(uint8_t Data) : Data(Data) {}
-
-public:
-  constexpr TypeOwnership() : Data(0) {}
-
-  bool isWeak() const { return Data & Weak; }
-  bool isUnowned() const { return Data & Unowned; }
-  bool isUnmanaged() const { return Data & Unmanaged; }
-
-  void setWeak() { Data |= Weak; }
-
-  void setUnowned() { Data |= Unowned; }
-
-  void setUnmanaged() { Data |= Unmanaged; }
-};
-
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
@@ -1046,7 +1021,7 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
         flatIndex += parametersPerLevel[i];
 
       return flatSubstitutions[flatIndex];
-    }).first;
+    });
 }
 
 void swift::swift_getFieldAt(
@@ -1062,8 +1037,6 @@ void swift::swift_getFieldAt(
     auto name = field.getFieldName(0);
     auto type = field.getMangledTypeName(0);
 
-    const Metadata *metadata;
-    TypeOwnership ownership;
 
     std::vector<const ContextDescriptor *> descriptorPath;
     {
@@ -1077,7 +1050,7 @@ void swift::swift_getFieldAt(
       }
     }
 
-    std::tie(metadata, ownership) = _swift_getTypeByMangledName(
+    auto typeInfo = _getTypeByMangledName(
         type, [&](unsigned depth, unsigned index) -> const Metadata * {
           if (depth >= descriptorPath.size())
             return nullptr;
@@ -1102,9 +1075,9 @@ void swift::swift_getFieldAt(
         });
 
     callback(name, FieldType()
-                       .withType(metadata)
+                       .withType(typeInfo)
                        .withIndirect(field.isIndirectCase())
-                       .withWeak(ownership.isWeak()));
+                       .withWeak(typeInfo.isWeak()));
 
   };
 
