@@ -859,3 +859,24 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
   return dest;
 }
 
+#ifndef NDEBUG
+
+void HeapObject::dump() const {
+  auto *Self = const_cast<HeapObject *>(this);
+  printf("HeapObject: %p\n", Self);
+  printf("HeapMetadata Pointer: %p.\n", Self->metadata);
+  printf("Strong Ref Count: %d.\n", Self->refCounts.getCount());
+  printf("Unowned Ref Count: %d.\n", Self->refCounts.getUnownedCount());
+  printf("Weak Ref Count: %d.\n", Self->refCounts.getWeakCount());
+  if (Self->metadata->getKind() == MetadataKind::Class) {
+    printf("Uses Native Retain: %s.\n",
+           (objectUsesNativeSwiftReferenceCounting(Self) ? "true" : "false"));
+  } else {
+    printf("Uses Native Retain: Not a class. N/A.\n");
+  }
+  printf("RefCount Side Table: %p.\n", Self->refCounts.getSideTable());
+  printf("Is Deiniting: %s.\n",
+         (Self->refCounts.isDeiniting() ? "true" : "false"));
+}
+
+#endif
