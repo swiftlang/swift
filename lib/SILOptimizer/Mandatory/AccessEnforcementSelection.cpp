@@ -456,6 +456,8 @@ void SelectEnforcement::updateCapture(AddressCapture capture) {
       return;
     }
     switch (user->getKind()) {
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+    case SILInstructionKind::MarkDependenceInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::BeginBorrowInst:
     case SILInstructionKind::CopyValueInst:
