@@ -124,10 +124,24 @@ public:
       const llvm::opt::ArgList &args, DiagnosticEngine &diags,
       const FrontendInputsAndOutputs &inputsAndOutputs,
       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  Optional<SupplementaryOutputPaths> computeOutputPaths() const;
+  Optional<std::vector<SupplementaryOutputPaths>> computeOutputPaths() const;
 
 private:
-  /// \return None if error.
+  /// \Return a set of supplementary output paths for each input that might
+  /// produce supplementary outputs, or None to signal an error.
+  /// \note
+  /// At present, only one input can produce supplementary outputs, but
+  /// in the future, batch-mode will support multiple primary inputs and thus,
+  /// multiple sets of supplementary outputs. This function is written with that
+  /// future in mind.
+  /// \par
+  /// The paths are derived from arguments
+  /// such as -emit-module-path. These are not the final computed paths,
+  /// merely the ones passed in via the command line.
+  /// \note
+  /// In the future, these will also include those passed in via whatever
+  /// filelist scheme gets implemented to handle cases where the command line
+  /// arguments become burdensome.
   Optional<std::vector<SupplementaryOutputPaths>>
   getSupplementaryOutputPathsFromArguments() const;
 

@@ -289,9 +289,7 @@ void FrontendInputsAndOutputs::forEachInputProducingAMainOutputFile(
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     ArrayRef<std::string> outputFiles,
     SupplementaryOutputPaths supplementaryOutputs) {
-  if (outputFiles.empty())
-    ;
-  else if (hasPrimaryInputs()) {
+  if (hasPrimaryInputs()) {
     unsigned i = 0;
     for (auto index : indices(AllInputs)) {
       InputFile &f = AllInputs[index];
@@ -344,15 +342,14 @@ bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
 
 unsigned
 FrontendInputsAndOutputs::countOfFilesProducingSupplementaryOutput() const {
-  assertMustNotBeMoreThanOnePrimaryInput();
-  return 1; // will be extended when batch mode is implemented
+  return hasPrimaryInputs() ? primaryInputCount() : hasInputs() ? 1 : 0;
 }
 
 void FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
     llvm::function_ref<void(const InputFile &)> fn) const {
   if (hasPrimaryInputs())
     forEachPrimaryInput(fn);
-  else
+  else if (hasInputs())
     fn(firstInput());
 }
 

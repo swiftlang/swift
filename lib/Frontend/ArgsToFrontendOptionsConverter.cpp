@@ -441,9 +441,6 @@ bool ArgsToFrontendOptionsConverter::
                             .convert(mainOutputs, supplementaryOutputs);
   if (hadError)
     return true;
-  assert(FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
-         mainOutputs.empty() &&
-             "Should be no main outputs if action does not produce them");
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
                                                        supplementaryOutputs);
   return false;

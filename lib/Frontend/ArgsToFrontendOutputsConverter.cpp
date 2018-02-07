@@ -34,10 +34,6 @@ using namespace llvm::opt;
 bool ArgsToFrontendOutputsConverter::convert(
     std::vector<std::string> &mainOutputs,
     SupplementaryOutputPaths &supplementaryOutputs) {
-  const auto requestedAction =
-      ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
-  if (!FrontendOptions::doesActionProduceOutput(requestedAction))
-    return false;
 
   Optional<OutputFilesComputer> ofc =
       OutputFilesComputer::create(Args, Diags, InputsAndOutputs);
@@ -47,7 +43,7 @@ bool ArgsToFrontendOutputsConverter::convert(
   if (!mains)
     return true;
 
-  Optional<SupplementaryOutputPaths> supplementaries =
+  Optional<std::vector<SupplementaryOutputPaths>> supplementaries =
       SupplementaryOutputPathsComputer(Args, Diags, InputsAndOutputs, *mains,
                                        ModuleName)
           .computeOutputPaths();
@@ -55,7 +51,10 @@ bool ArgsToFrontendOutputsConverter::convert(
     return true;
 
   mainOutputs = std::move(*mains);
-  supplementaryOutputs = std::move(*supplementaries);
+  assert(supplementaries->size() <= 1 &&
+         "Have not implemented multiple primaries yet");
+  if (!supplementaries->empty())
+    supplementaryOutputs = std::move(supplementaries->front());
   return false;
 }
 
@@ -166,6 +165,13 @@ OutputFilesComputer::computeOutputFiles() const {
 Optional<std::string>
 OutputFilesComputer::computeOutputFile(StringRef outputArg,
                                        const InputFile &input) const {
+  // Return an empty string to signify no output.
+  // The frontend does not currently produce a diagnostic
+  // if a -o argument is present for such an action
+  // for instance swiftc -frontend -o foo -interpret foo.swift
+  if (!FrontendOptions::doesActionProduceOutput(RequestedAction))
+    return std::string();
+
   if (!OutputDirectoryArgument.empty())
     return deriveOutputFileForDirectory(input);
 
@@ -228,16 +234,41 @@ SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
-Optional<SupplementaryOutputPaths>
+Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::computeOutputPaths() const {
   Optional<std::vector<SupplementaryOutputPaths>> pathsFromUser =
       getSupplementaryOutputPathsFromArguments();
   if (!pathsFromUser)
     return None;
 
-  return computeOutputPathsForOneInput(
-      OutputFiles[0], (*pathsFromUser)[0],
-      InputsAndOutputs.firstInputProducingOutput());
+  if (InputsAndOutputs.hasPrimaryInputs())
+    assert(OutputFiles.size() == pathsFromUser->size());
+  else if (InputsAndOutputs.isSingleThreadedWMO())
+    assert(OutputFiles.size() == pathsFromUser->size() &&
+           pathsFromUser->size() == 1);
+  else {
+    // Multi-threaded WMO is the exception
+    assert(OutputFiles.size() == InputsAndOutputs.inputCount() &&
+                   pathsFromUser->size() == InputsAndOutputs.hasInputs()
+               ? 1
+               : 0);
+  }
+
+  std::vector<SupplementaryOutputPaths> outputPaths;
+  unsigned i = 0;
+  bool hadError = false;
+  InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> void {
+        if (auto suppPaths = computeOutputPathsForOneInput(
+                OutputFiles[i], (*pathsFromUser)[i], input))
+          outputPaths.push_back(*suppPaths);
+        else
+          hadError = true;
+        ++i;
+      });
+  if (hadError)
+    return None;
+  return outputPaths;
 }
 
 Optional<std::vector<SupplementaryOutputPaths>>
@@ -302,7 +333,7 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
     return std::vector<std::string>(N, std::string());
 
   Diags.diagnose(SourceLoc(), diag::error_wrong_number_of_arguments,
-                 Args.getLastArg(pathID)->getOption().getName(), N,
+                 Args.getLastArg(pathID)->getOption().getPrefixedName(), N,
                  paths.size());
   return None;
 }
@@ -387,7 +418,6 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     options::ID emitOpt, std::string pathFromArguments, StringRef extension,
     StringRef mainOutputIfUsable,
     StringRef defaultSupplementaryOutputPathExcludingExtension) const {
-  using namespace options;
 
   if (!pathFromArguments.empty())
     return pathFromArguments;
