@@ -88,10 +88,10 @@ extension String {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF8View
     : BidirectionalCollection,
-      CustomStringConvertible, 
+      CustomStringConvertible,
       CustomDebugStringConvertible {
 
-    /// Underlying UTF-16-compatible representation 
+    /// Underlying UTF-16-compatible representation
     @_versioned
     internal var _guts: _StringGuts
 
@@ -189,7 +189,7 @@ extension String {
       }
       return Index(encodedOffset: n, .utf8(buffer: buffer))
     }
-  
+
     /// Returns the next consecutive position after `i`.
     ///
     /// - Precondition: The next position is representable.
@@ -202,15 +202,15 @@ extension String {
       }
 
       var j = i
-      
+
       // Ensure j's cache is utf8
       if _slowPath(j._cache.utf8 == nil) {
         j = _index(atEncodedOffset: j.encodedOffset)
         precondition(j != endIndex, "Index out of bounds")
       }
-      
+
       let buffer = j._cache.utf8._unsafelyUnwrappedUnchecked
-      
+
       var scalarLength16 = 1
       let b0 = buffer.first._unsafelyUnwrappedUnchecked
       var nextBuffer = buffer
@@ -235,7 +235,7 @@ extension String {
         nextBuffer.removeFirst(n8)
       }
 
-      if _fastPath(!nextBuffer.isEmpty) {        
+      if _fastPath(!nextBuffer.isEmpty) {
         return Index(
           encodedOffset: j.encodedOffset + scalarLength16,
           .utf8(buffer: nextBuffer))
@@ -250,14 +250,14 @@ extension String {
         precondition(i.encodedOffset > 0)
         return Index(encodedOffset: i.encodedOffset - 1)
       }
-      
+
       if i._transcodedOffset != 0 {
         _sanityCheck(i._cache.utf8 != nil)
         var r = i
         r._compoundOffset = r._compoundOffset &- 1
         return r
       }
-      
+
       // Handle the scalar boundary the same way as the not-a-utf8-index case.
       _precondition(i.encodedOffset > 0, "Can't move before startIndex")
 
@@ -270,7 +270,7 @@ extension String {
         .utf8(buffer: String.Index._UTF8Buffer(u8))
       )
     }
-    
+
     @_inlineable // FIXME(sil-serialize-all)
     public func distance(from i: Index, to j: Index) -> Int {
       if _fastPath(_guts.isASCII) {
@@ -288,7 +288,7 @@ extension String {
         _count(fromUTF16: IteratorSequence(_guts.makeIterator(
           in: i.encodedOffset..<j.encodedOffset)))
     }
-    
+
     /// Accesses the code unit at the given position.
     ///
     /// The following example uses the subscript to print the value of a
@@ -640,7 +640,7 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
   }
 }
 
-// backward compatibility for index interchange.  
+// backward compatibility for index interchange.
 extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
   @available(

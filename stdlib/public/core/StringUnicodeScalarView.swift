@@ -85,7 +85,7 @@ extension String {
     }
 
     public typealias Index = String.Index
-    
+
     /// Translates a `_guts` index into a `UnicodeScalarIndex` using this
     /// view's `_coreOffset`.
     @_inlineable // FIXME(sil-serialize-all)
@@ -93,7 +93,7 @@ extension String {
     internal func _fromCoreIndex(_ i: Int) -> Index {
       return Index(encodedOffset: i + _coreOffset)
     }
-    
+
     /// Translates a `UnicodeScalarIndex` into a `_guts` index using this
     /// view's `_coreOffset`.
     @_inlineable // FIXME(sil-serialize-all)
@@ -101,7 +101,7 @@ extension String {
     internal func _toCoreIndex(_ i: Index) -> Int {
       return i.encodedOffset - _coreOffset
     }
-    
+
     /// The position of the first Unicode scalar value if the string is
     /// nonempty.
     ///
@@ -336,7 +336,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public init() {
     self = String.UnicodeScalarView(_StringGuts())
   }
-  
+
   /// Reserves enough space in the view's underlying storage to store the
   /// specified number of ASCII characters.
   ///
@@ -353,7 +353,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
-  
+
   /// Appends the given Unicode scalar to the view.
   ///
   /// - Parameter c: The character to append to the string.
@@ -518,7 +518,7 @@ extension String.UnicodeScalarView {
     if _fastPath(!UTF16.isTrailSurrogate(_guts[i2])) { return true }
     return i2 == 0 || !UTF16.isLeadSurrogate(_guts[i2 &- 1])
   }
-  
+
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   @_inlineable // FIXME(sil-serialize-all)
@@ -550,7 +550,7 @@ extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
   }
 }
 
-// backward compatibility for index interchange.  
+// backward compatibility for index interchange.
 extension String.UnicodeScalarView {
   @_inlineable // FIXME(sil-serialize-all)
   @available(

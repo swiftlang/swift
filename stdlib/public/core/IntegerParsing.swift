@@ -47,7 +47,7 @@ where Rest.Element : UnsignedInteger {
     guard _fastPath(!overflow0) else { return nil }
     result = result0
   }
-  
+
   while let u = rest.next() {
     let d0 = _asciiDigit(codeUnit: u, radix: radix)
     guard _fastPath(d0 != nil), let d = d0 else { return nil }
