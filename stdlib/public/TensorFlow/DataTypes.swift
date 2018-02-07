@@ -91,7 +91,10 @@ public protocol AccelerableTensorUnit {
   /// the scalar that it produces.  Users should call the _TFGetScalarOrDie
   /// wrapper function.
   static func _getScalarOrDie(_ handle: TensorHandle<Self>) -> Self
-  // TODO: Move _TFMakeScalarTensor and _TFScalarize to this model.
+
+  /// This converts a scalar to a 0d TensorHandle that contains the value.
+  /// Users should call the _TFMakeScalarTensor wrapper function.
+  static func _makeScalarTensor(_ scalar: Self) -> TensorHandle<Self>
 }
 
 // This is the implementation of the _getScalarOrDie requirement for each
@@ -102,7 +105,6 @@ public protocol AccelerableTensorUnit {
 private func _TFGetScalarOrDieImpl<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
   return handle.makeHostCopy().scalar!
 }
-
 
 internal extension AccelerableTensorUnit {
   @_versioned
@@ -120,6 +122,11 @@ extension Bool : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<Bool>) -> Bool {
     return _TFGetScalarOrDieImpl(handle)
   }
+
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Bool) -> TensorHandle<Bool> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Int8 : AccelerableTensorUnit {
@@ -129,6 +136,10 @@ extension Int8 : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Int8") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int8>) -> Int8 {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Int8) -> TensorHandle<Int8> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
 
@@ -140,6 +151,10 @@ extension UInt8 : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt8>) -> UInt8 {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: UInt8) -> TensorHandle<UInt8> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Int16 : AccelerableTensorUnit {
@@ -149,6 +164,10 @@ extension Int16 : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Int16") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int16>) -> Int16 {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Int16) -> TensorHandle<Int16> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
 
@@ -160,6 +179,11 @@ extension UInt16 : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt16>) -> UInt16 {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: UInt16)
+  -> TensorHandle<UInt16> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Int32 : AccelerableTensorUnit {
@@ -169,6 +193,10 @@ extension Int32 : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Int32") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int32>) -> Int32 {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Int32) -> TensorHandle<Int32> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
 
@@ -180,6 +208,11 @@ extension UInt32 : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt32>) -> UInt32 {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: UInt32)
+  -> TensorHandle<UInt32> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Int64 : AccelerableTensorUnit {
@@ -189,6 +222,10 @@ extension Int64 : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Int64") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int64>) -> Int64 {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Int64) -> TensorHandle<Int64> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
 
@@ -200,6 +237,11 @@ extension UInt64 : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt64>) -> UInt64 {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: UInt64)
+  -> TensorHandle<UInt64> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Int : AccelerableTensorUnit {
@@ -209,6 +251,10 @@ extension Int : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Int") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int>) -> Int {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Int) -> TensorHandle<Int> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
 
@@ -220,6 +266,10 @@ extension UInt : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt>) -> UInt {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: UInt) -> TensorHandle<UInt> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Float : AccelerableTensorUnit {
@@ -230,6 +280,10 @@ extension Float : AccelerableTensorUnit {
   public static func _getScalarOrDie(_ handle: TensorHandle<Float>) -> Float {
     return _TFGetScalarOrDieImpl(handle)
   }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Float) -> TensorHandle<Float> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  }
 }
 
 extension Double : AccelerableTensorUnit {
@@ -239,5 +293,10 @@ extension Double : AccelerableTensorUnit {
   @_silgen_name("__tf_get_scalar_or_die_Double") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Double>) -> Double {
     return _TFGetScalarOrDieImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: Double)
+  -> TensorHandle<Double> {
+    return #tfop("tfc.scalarToTensor", "s:t", scalar)
   }
 }
