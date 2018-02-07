@@ -35,7 +35,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # SwiftSyntax depends on both the standard library (because it's a
   # Swift module), and the SDK overlays (because it depends on Foundation).
   # Ensure we only build SwiftSyntax when we're building both.
-  if(BUILD_SOURCEKIT_SWIFT_CLIENT)
+  if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(SwiftSyntax)
   endif()
 endif()
