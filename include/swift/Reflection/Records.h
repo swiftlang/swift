@@ -186,6 +186,10 @@ public:
             Kind == FieldDescriptorKind::ObjCProtocol);
   }
 
+  bool isStruct() const {
+    return Kind == FieldDescriptorKind::Struct;
+  }
+
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();
     auto End = Begin + NumFields;
