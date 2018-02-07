@@ -819,6 +819,12 @@ public:
   bool simplifyType(GenericParamKey base,
                     SmallVectorImpl<AssociatedTypeDecl *> &path);
 
+  /// Simplify the given type down to its anchor.
+  ///
+  /// \returns null if the type involved dependent member types that
+  /// don't have associated types.
+  Type simplifyType(Type type);
+
   /// Verify the correctness of the given generic signature.
   ///
   /// This routine will test that the given generic signature is both minimal

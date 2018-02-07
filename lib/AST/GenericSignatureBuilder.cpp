@@ -2042,22 +2042,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   return populateResult((nestedTypeNameCache[name] = std::move(entry)));
 }
 
-/// Determine whether any part of this potential archetype's path to the
-/// root contains the given equivalence class.
-static bool pathContainsEquivalenceClass(GenericSignatureBuilder &builder,
-                                         PotentialArchetype *pa,
-                                         EquivalenceClass *equivClass) {
-  // Chase the potential archetype up to the root.
-  for (; pa; pa = pa->getParent()) {
-    // Check whether this potential archetype is in the given equivalence
-    // class.
-    if (pa->getOrCreateEquivalenceClass(builder) == equivClass)
-      return true;
-  }
-
-  return false;
-}
-
 Type EquivalenceClass::getAnchor(
                             GenericSignatureBuilder &builder,
                             TypeArrayView<GenericTypeParamType> genericParams) {
@@ -2097,54 +2081,26 @@ Type EquivalenceClass::getAnchor(
 
     // If we saw a generic parameter, ignore any nested types.
     if (bestGenericParam) continue;
-
-    // If the nested type doesn't have an associated type, skip it.
-    auto assocType = member->getResolvedAssociatedType();
-    if (!assocType) continue;
-
-    // Dig out the equivalence class of the parent.
-    auto parentEquivClass =
-      member->getParent()->getOrCreateEquivalenceClass(builder);
-
-    // If the path from this member to the root contains this equivalence
-    // class, it cannot be part of the anchor.
-    if (pathContainsEquivalenceClass(builder, member->getParent(), this))
-      continue;
-
-    // Take the best associated type for this equivalence class.
-    assocType = assocType->getAssociatedTypeAnchor();
-    auto &bestAssocType = nestedTypes[parentEquivClass];
-    if (!bestAssocType ||
-        compareAssociatedTypes(assocType, bestAssocType) < 0)
-      bestAssocType = assocType;
   }
 
   // If we found a generic parameter, return that.
   if (bestGenericParam)
     return bestGenericParam;
 
-  // Determine the best anchor among the parent equivalence classes.
-  Type bestParentAnchor;
-  AssociatedTypeDecl *bestAssocType = nullptr;
-  std::pair<EquivalenceClass *, Identifier> bestNestedType;
-  for (const auto &nestedType : nestedTypes) {
-    auto parentAnchor = nestedType.first->getAnchor(builder, genericParams);
-    if (!bestParentAnchor ||
-        compareDependentTypes(parentAnchor, bestParentAnchor) < 0) {
-      bestParentAnchor = parentAnchor;
-      bestAssocType = nestedType.second;
-    }
+  // Form the anchor.
+  for (auto member : members) {
+    auto anchorType =
+      builder.simplifyType(member->getDependentType(genericParams));
+    if (!anchorType) continue;
+
+    // Record the cache miss and update the cache.
+    ++NumArchetypeAnchorCacheMisses;
+    archetypeAnchorCache.anchor = anchorType;
+    archetypeAnchorCache.numMembers = members.size();
+    return anchorType;
   }
 
-  // Form the anchor type.
-  Type anchorType = DependentMemberType::get(bestParentAnchor, bestAssocType);
-
-  // Record the cache miss and update the cache.
-  ++NumArchetypeAnchorCacheMisses;
-  archetypeAnchorCache.anchor = anchorType;
-  archetypeAnchorCache.numMembers = members.size();
-
-  return anchorType;
+  llvm_unreachable("Unable to compute anchor");
 }
 
 Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
@@ -3254,17 +3210,46 @@ unpackPath(PotentialArchetype *type,
   return type->getGenericParamKey();
 }
 
+/// Unpack the given dependent type into a path from a generic parameter
+/// through a sequence of associated type declarations.
+///
+/// \returns the generic parameter at the root of the type, or NULL if
+/// this is not a well-formed dependent member type. along the path doesn't
+/// have an associated type.
+static GenericTypeParamType *
+unpackPath(Type type, SmallVectorImpl<AssociatedTypeDecl *> &path) {
+  if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    auto result = unpackPath(depMemTy->getBase(), path);
+    if (!result) return nullptr;
+
+    auto assocType = depMemTy->getAssocType();
+    if (!assocType) return nullptr;
+
+    path.push_back(assocType);
+    return result;
+  }
+
+  return type->getAs<GenericTypeParamType>();
+}
+
+/// Form a dependent type with the given generic parameter, then following the
+/// path of associated types.
+static Type formDependentType(GenericTypeParamType *base,
+                              ArrayRef<AssociatedTypeDecl *> path) {
+  return std::accumulate(path.begin(), path.end(), Type(base),
+                         [](Type type, AssociatedTypeDecl *assocType) -> Type {
+                           return DependentMemberType::get(type, assocType);
+                         });
+}
+
 /// Form a dependent type with the (canonical) generic parameter for the given
 /// parameter key, then following the path of associated types.
 static Type formDependentType(ASTContext &ctx, GenericParamKey genericParam,
                               ArrayRef<AssociatedTypeDecl *> path) {
-  return std::accumulate(path.begin(), path.end(),
-                         Type(GenericTypeParamType::get(genericParam.Depth,
-                                                        genericParam.Index,
-                                                        ctx)),
-                         [](Type type, AssociatedTypeDecl *assocType) -> Type {
-                           return DependentMemberType::get(type, assocType);
-                         });
+  return formDependentType(GenericTypeParamType::get(genericParam.Depth,
+                                                     genericParam.Index,
+                                                     ctx),
+                           path);
 }
 
 RewriteTreeNode *
@@ -3388,6 +3373,16 @@ bool GenericSignatureBuilder::simplifyType(
   } while (startIndex < path.size());
 
   return simplified;
+}
+
+Type GenericSignatureBuilder::simplifyType(Type type) {
+  SmallVector<AssociatedTypeDecl *, 4> path;
+  auto base = unpackPath(type, path);
+  if (!base) return nullptr;
+
+  if (!simplifyType(base, path)) return type;
+
+  return formDependentType(base, path);
 }
 
 #pragma mark Equivalence classes
