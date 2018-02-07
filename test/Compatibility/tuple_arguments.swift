@@ -1507,3 +1507,12 @@ public extension Optional {
     return value.apply(self)
   }
 } 
+
+// https://bugs.swift.org/browse/SR-6837
+do {
+  func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
+  func takePair(_ pair: (Int, Int?)) {}
+  takeFn(fn: takePair)
+  takeFn(fn: { (pair: (Int, Int?)) in } )
+  takeFn { (pair: (Int, Int?)) in }
+}
