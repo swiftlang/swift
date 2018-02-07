@@ -109,3 +109,15 @@ public func testZeros() -> Tensor<Float> {
   let b2 = Tensor<Float>.zeros(shape: [1, 4])
   return (b1+b2).toHost()
 }
+
+// Here ".mean()" contains a tensor2scalar operation, and we then convert that
+// scalar back to a tensor.  This checks to make sure that tf-partition can pull
+// this whole mess in graph without leaving anything on the host that will cause
+// a send/receive.
+public func tensorToScalarToTensor(a : Tensor<Int>) -> Tensor<Int> {
+  let scalar = a.toDevice().mean()
+  let b = Tensor(scalar)
+  return (b+b).toHost()
+}
+
+

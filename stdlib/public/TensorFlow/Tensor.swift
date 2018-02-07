@@ -76,7 +76,7 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
 /// the scalar that it produces.  This is intended for use in op definitions
 /// where it is known that the Op always returns a 0d tensor, it is not for use
 /// in general code.
-@_versioned @_inlineable
+@_versioned @_inlineable @inline(__always)
 func _TFGetScalarOrDie<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
   return Unit._getScalarOrDie(handle)
 }
@@ -101,10 +101,9 @@ func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int])
     })
 }
 
-@_versioned
-@_inlineable @inline(__always)
+@_versioned @_inlineable @inline(__always)
 func _TFMakeScalarTensor<Unit>(_ scalar: Unit) -> TensorHandle<Unit> {
-  return #tfop("tfc.scalarToTensor", "s:t", scalar)
+  return Unit._makeScalarTensor(scalar)
 }
 
 @_versioned @inline(never)

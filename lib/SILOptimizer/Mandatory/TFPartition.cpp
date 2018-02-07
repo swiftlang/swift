@@ -61,21 +61,47 @@ static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   return fieldType;
 }
 
-static bool isOverflowCheckingIntegerOp(SILInstruction *inst) {
-  auto *BI = dyn_cast<BuiltinInst>(inst);
-  if (!BI) return false;
+/// Classification of instructions that are interesting to the partitioning
+/// pass for various reasons.
+enum class PartitioningClass {
+  Unknown,
 
-  switch (BI->getBuiltinInfo().ID) {
-  default: return false;
-  case BuiltinValueKind::UAddOver:
-  case BuiltinValueKind::SAddOver:
-  case BuiltinValueKind::USubOver:
-  case BuiltinValueKind::SSubOver:
-  case BuiltinValueKind::UMulOver:
-  case BuiltinValueKind::SMulOver:
-    return true;
+  /// This is an apply instruction of the __tf_get_scalar_or_die family.
+  /// Its result is a scalar, operand #0 is the callee function_ref, operand #1
+  /// is a TensorHandle, and operand #2 is a metatype because these are defined
+  /// as methods.
+  GetScalarOrDie,
+
+  /// Scalar instructions that check for overflow like "sadd.with.overflow" and
+  /// friends.
+  OverflowCheckingInst,
+};
+
+static PartitioningClass classifyInst(SILInstruction *inst) {
+  if (auto *BI = dyn_cast<BuiltinInst>(inst)) {
+    switch (BI->getBuiltinInfo().ID) {
+    default: return PartitioningClass::Unknown;
+    case BuiltinValueKind::UAddOver:
+    case BuiltinValueKind::SAddOver:
+    case BuiltinValueKind::USubOver:
+    case BuiltinValueKind::SSubOver:
+    case BuiltinValueKind::UMulOver:
+    case BuiltinValueKind::SMulOver:
+      return PartitioningClass::OverflowCheckingInst;
+    }
   }
+
+  // Classify well-known functions defined in the TensorFlow module.
+  if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+    if (auto fn = apply->getCalleeFunction()) {
+      if (fn->getName().startswith("__tf_get_scalar_or_die_"))
+        return PartitioningClass::GetScalarOrDie;
+    }
+  }
+
+  return PartitioningClass::Unknown;
 }
+
 
 /// Given an overflow-checking integer operation, return true if the overflow
 /// result will be unused in the tensor program.  This could be because the
@@ -114,6 +140,7 @@ static bool canPromoteOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
 enum class PromotedScalarKind {
   Invalid,
   Literal,
+  TensorToScalar,
   Conversion,
   Binary,
   OverflowingBinary,
@@ -123,30 +150,38 @@ enum class PromotedScalarKind {
 /// If the specified scalar operation can be partitioned and run on the
 /// accelerator, return the name of the op to use to implement it.
 static std::pair<const char*, PromotedScalarKind>
-classifyPromotedScalarOp(SILInstruction *I) {
+classifyPromotedScalarOp(SILInstruction *inst) {
   // We can turn integer and FP literals into constant nodes if their type is
   // compatible.
-  if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
-    auto resultTy = I->getResults()[0]->getType();
+  if (isa<IntegerLiteralInst>(inst) || isa<FloatLiteralInst>(inst)) {
+    auto resultTy = inst->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
       return { "Const", PromotedScalarKind::Literal };
   }
 
-  auto *BI = dyn_cast<BuiltinInst>(I);
-  if (!BI) return { nullptr, PromotedScalarKind::Invalid };
+  auto instClass = classifyInst(inst);
+
+  // __tf_get_scalar_or_die cannot be marked as having no side effects
+  // because it takes a +1 value as its argument.  That said, it is safe to
+  // hoist and sink it.
+  if (instClass == PartitioningClass::GetScalarOrDie)
+    return { "tfc.getScalarOrDie", PromotedScalarKind::TensorToScalar };
+
+  auto *builtin = dyn_cast<BuiltinInst>(inst);
+  if (!builtin) return { nullptr, PromotedScalarKind::Invalid };
 
   // Verify that the instruction is processing dtypes that are supported by
   // TensorFlow nodes - we don't want to handle SIMD vectors or other exotic
   // types.
-  if (BI->getNumOperands() != 0) {
-    auto opTy = BI->getOperand(0)->getType();
+  if (builtin->getNumOperands() != 0) {
+    auto opTy = builtin->getOperand(0)->getType();
     if (!isValidTensorFlowElementType(opTy.getSwiftRValueType()))
       return { nullptr, PromotedScalarKind::Invalid };
   }
   // Verify the result is a valid tensorflow type, or a 2-element tuple that
   // starts with one (used by the overflowing ops).
-  if (!isValidTensorFlowElementType(BI->getType().getSwiftRValueType())) {
-    auto *tt = BI->getType().getSwiftRValueType()->getAs<TupleType>();
+  if (!isValidTensorFlowElementType(builtin->getType().getSwiftRValueType())) {
+    auto *tt = builtin->getType().getSwiftRValueType()->getAs<TupleType>();
     if (!tt || tt->getNumElements() != 2 ||
         !isValidTensorFlowElementType(tt->getElementType(0)))
       return { nullptr, PromotedScalarKind::Invalid };
@@ -162,7 +197,7 @@ classifyPromotedScalarOp(SILInstruction *I) {
 
   auto overflowingBinary = [&](const char *name)
        -> std::pair<const char*, PromotedScalarKind> {
-    if (!canPromoteOverflowCheckingInstToTensorProgram(BI))
+    if (!canPromoteOverflowCheckingInstToTensorProgram(builtin))
       return { nullptr, PromotedScalarKind::Invalid };
     return { name, PromotedScalarKind::OverflowingBinary };
   };
@@ -171,7 +206,7 @@ classifyPromotedScalarOp(SILInstruction *I) {
     return { "Cast", PromotedScalarKind::Conversion };
   };
 
-  switch (BI->getBuiltinInfo().ID) {
+  switch (builtin->getBuiltinInfo().ID) {
   default: return { nullptr, PromotedScalarKind::Invalid };
   // TODO: Unsigned comparisons: ICMP_UGT, ICMP_ULE, ICMP_UGE
   // TODO: FP Comparisons.
@@ -630,7 +665,7 @@ private:
   void markArgument(SILArgument *arg, SILInstruction *user);
   void markValue(SILValue value, SILInstruction *user);
 
-  bool sinkValueIntoRegionForPromotion(SILInstruction *&inst);
+  void sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   // Rewriting the host function.
   PartitionedTensorProgram
@@ -839,7 +874,8 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
   // operation.
   if (auto *TE = dyn_cast<TupleExtractInst>(inst)) {
     auto *op = dyn_cast<SILInstruction>((SILNode*)TE->getOperand());
-    if (!op || TE->getFieldNo() != 0 || !isOverflowCheckingIntegerOp(op))
+    if (!op || TE->getFieldNo() != 0 ||
+        classifyInst(op) != PartitioningClass::OverflowCheckingInst)
       return ScalarPromoteClass::NeverPromote;
 
     // We can only handle this tuple_extract if the underlying instruction can
@@ -854,22 +890,24 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
   if (scalarClass == PromotedScalarKind::Invalid)
     return ScalarPromoteClass::NeverPromote;
 
-  // TODO: We should do a bit more cost model analysis on this.  It doesn't make
-  // sense to pull over a partial chain of computation when some root can't be
-  // done there.  It is just shifting compute around.
-
-  // If this is an integer or floating point literal, then it is cheaper to put
-  // this in graph than it is to pass it as an argument (because then TensorFlow
-  // can do constant propagation etc).  Don't attempt to hoist it ahead of the
-  // start point.
+  // Determine which scalar operations make sense to pull into the graph, even
+  // if they are defined above the current start point.  We can always sink them
+  // down into the tensor region if we want to, but that's pointless if it just
+  // puts scalar computation onto the device for no reason.
   //
   // Cases that are handled here should be handled by
   // sinkValueIntoRegionForPromotion.
-  if (isa<LiteralInst>(inst))
+
+  // We prefer to put integer and floating point literals in graph because this
+  // allows TensorFlow to do constant propagation.  We prefer to put
+  // TensorToScalar into the graph because that avoids a pointless conversion
+  // which forces the tensor data itself onto the host.
+  if (scalarClass == PromotedScalarKind::Literal ||
+      scalarClass == PromotedScalarKind::TensorToScalar)
     return ScalarPromoteClass::ShouldPromote;
 
   // If this is a conversion from an instruction that should be promoted (like
-  // a literal), then try hard to promote it too.
+  // a literal), then try hard to promote the conversion.
   if (scalarClass == PromotedScalarKind::Conversion)
     if (auto *op = dyn_cast<SILInstruction>((SILNode*)inst->getOperand(0)))
       if (shouldPromoteToTensorOp(op) == ScalarPromoteClass::ShouldPromote)
@@ -916,11 +954,21 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   if (mark != Marking::Move) {
     auto operandRange = inst.getAllOperands();
 
-    // Overflow-checking integer ops have a "should check" bit as their last
-    // parameter, we don't remap it, so don't mark it.
-    if (isOverflowCheckingIntegerOp(&inst)) {
+    // Some instructions require special handling during marking.
+    switch (classifyInst(&inst)) {
+    default: break;  // No special handling.
+
+    case PartitioningClass::OverflowCheckingInst:
+      // Overflow-checking integer ops have a "should check" bit as their last
+      // parameter, we don't remap it, so don't mark it.
       assert(operandRange.back().get()->getType().is<BuiltinIntegerType>());
       operandRange = operandRange.drop_back();
+      break;
+
+    case PartitioningClass::GetScalarOrDie:
+      // The __tf_get_scalar_or_die has a callee and a metatype to ignore.
+      operandRange = operandRange.drop_front().drop_back();
+      break;
     }
 
     // Scan the operands to make sure they are available: either by moving the
@@ -1011,14 +1059,11 @@ static bool canMoveInstruction(SILInstruction *inst) {
     return true;
   }
 
-  // The __tf_get_scalar_or_die cannot be marked as having no side effects
-  // because it takes a +1 value as its argument.  That said, it is safe to
-  // hoist and sink it.
-  if (auto *apply = dyn_cast<ApplyInst>(inst)) {
-    auto fn = apply->getCalleeFunction();
-    if (fn && fn->getName().startswith("__tf_get_scalar_or_die_"))
-      return true;
-  }
+  // __tf_get_scalar_or_die cannot be marked as having no side effects because
+  // it takes a +1 value as its argument.  That said, it is safe to hoist and
+  // sink it.
+  if (classifyInst(inst) == PartitioningClass::GetScalarOrDie)
+    return true;
 
   return false;
 }
@@ -1100,13 +1145,27 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
 /// program, and is known to be promotable to a tensor op.   Try to sink it down
 /// to be part of the tensor program and return true if successful.
 ///
-/// NOTE: This trivially simple implementation currently can't fail, but when
-/// we generalize it later it can, so we return a bool to indicate success.
-bool TFFunctionPartition::
+void TFFunctionPartition::
 sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
-  // This instruction may have other users, so instead of moving it, we clone
-  // it.
-  // TODO: Move it if we can to avoid duplications.
+  // Determine whether the instruction is only used by things after the
+  // tensorStartPoint.  If so, we can move it into place.
+  bool hasProblematicUsers = false;
+  for (auto result : inst->getResults())
+    for (auto *use : result->getUses())
+      if (!DI.dominates(tensorStartPoint, use->getUser())) {
+        hasProblematicUsers = true;
+        break;
+      }
+
+  // If all the users are after the start point, we can just move it into place.
+  if (!hasProblematicUsers) {
+    inst->moveBefore(tensorStartPoint);
+    tensorStartPoint = inst;
+    return;
+  }
+
+  // This instruction has multiple users, some of which are ahead of the
+  // tensorStartPoint.  Instead of moving it, we clone it.
   auto oldInst = inst;
   inst = inst->clone(tensorStartPoint);
   inst->setDebugLocation(oldInst->getDebugLocation());
@@ -1125,7 +1184,7 @@ sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
     }
   }
 
-  return true;
+  return;
 }
 
 /// Indicate that the specified value must be available on the accelerator.
@@ -1158,26 +1217,24 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // If this is a scalar operation that we really want to promote to a tensor
   // operation, then try to do so.
   if (promotionClass == ScalarPromoteClass::ShouldPromote) {
-    // If the value is defined before of the program region, is used by the
+    // If the value is defined before the program region, is used by the
     // tensor program, and if it is better to have it in the tensor program than
     // for it to be an argument, sink it into the tensor program and mark it.
     // This is useful for constants.  Consider code like this:
     //
     //   x = <opaque value>
-    //   y = tensor_literal [1,2,3]
+    //   y = tensor_literal 1
     //   z = x+y
     //
     // In this case, the operation "+" will be the start point, but we'd like to
     // sink the constant '1' into the region (it will actually become the new
     // start point).
-    if (isBeforeStartPoint &&
-        sinkValueIntoRegionForPromotion(inst))
-      isBeforeStartPoint = false;
+    if (isBeforeStartPoint)
+      sinkValueIntoRegionForPromotion(inst);
 
     // If the instruction is in the tensor program region (either because it was
     // already or because we just moved it) then we can mark it to be copied in.
-    if (!isBeforeStartPoint)
-      return markInstruction(*inst, Marking::Copy);
+    return markInstruction(*inst, Marking::Copy);
   }
 
   // If the value is defined outside of the region dominated by the tensor
@@ -1324,6 +1381,59 @@ bool TFFunctionPartition::markFunction() {
   for (auto inst : tensorOps)
     markInstruction(*inst, Marking::Move);
 
+  // Optimize the host code (and avoid copies back to the host in some cases) by
+  // changing scalar operations marked as "Copy" into "Move" when all of their
+  // users are known to be moved or deleted.
+  //
+  // TODO: This should be an iterative optimistic algorithm in general, allowing
+  // moving over of cyclic references.  Start simple for now.
+  SmallVector<SILInstruction*, 4> additionalInstsToDelete;
+  for (auto &markInfo : markedInstructions) {
+    auto *inst = markInfo.first;
+    if (markInfo.second != Marking::Copy ||
+        isa<TermInst>(inst))
+      continue;
+
+    unsigned instToDeleteSize = additionalInstsToDelete.size();
+    bool canMove = true;
+    for (auto result : inst->getResults())
+      for (auto *use : result->getUses()) {
+        auto *user = use->getUser();
+        // If this user is marked for deletion or to be moved, then it won't
+        // require the instruction to be around.
+        auto it = markedInstructions.find(user);
+        if (it != markedInstructions.end() &&
+            (it->second == Marking::Move || it->second == Marking::Delete))
+          continue;
+
+        // If this is a debug_value or retain/release instruction that becomes
+        // obsolete if we move the value, then keep track of it, but keep going.
+        if (isUserIgnoredByPartitioning(user)) {
+          additionalInstsToDelete.push_back(user);
+          continue;
+        }
+
+        // Otherwise, there are host instructions that need this value.  Leave
+        // the computation on the host.
+        canMove = false;
+        break;
+      }
+
+    if (canMove) {
+      markInfo.second = Marking::Move;
+    } else {
+      // If we're keeping it on the host, don't remove any of the instructions
+      // we would delete only if moving it.
+      additionalInstsToDelete.resize(instToDeleteSize);
+    }
+  }
+
+  // We may have decided to delete some new instructions.  This wasn't added in
+  // the loop above because that would invalidate the DenseMap iterator.  Add
+  // these values now.
+  for (auto inst : additionalInstsToDelete)
+    markedInstructions[inst] = Marking::Delete;
+
   // Not that we know all of the instructions we'll be moving over, find the end
   // point by finding the nearest common post dominating ancestor of the marked
   // instructions.
@@ -1427,26 +1537,28 @@ public:
   }
 
   void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
-  void visitScalarPromotionInst(SingleValueInstruction *inst);
+  void visitScalarInst(SingleValueInstruction *inst);
 
-  void visitBuiltinInst(BuiltinInst *inst) {
+  void visitScalarOrOpInst(SingleValueInstruction *inst) {
     // Check to see if this is an op.
     if (auto tfopInfo = SILTensorOpInfo::decode(inst))
       return visitOpInst(inst, tfopInfo.getValue());
 
     // Otherwise it is a scalar to promote.
-    visitScalarPromotionInst(inst);
+    visitScalarInst(inst);
+  }
+
+  void visitBuiltinInst(BuiltinInst *inst) {
+    visitScalarOrOpInst(inst);
   }
   void visitApplyInst(ApplyInst *inst) {
-    // We know that this is an op, otherwise it won't have been marked.
-    auto tfOpInfo = SILTensorOpInfo::decode(inst).getValue();
-    return visitOpInst(inst, tfOpInfo);
+    visitScalarOrOpInst(inst);
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
-    visitScalarPromotionInst(inst);
+    visitScalarInst(inst);
   }
   void visitFloatLiteralInst(FloatLiteralInst *inst) {
-    visitScalarPromotionInst(inst);
+    visitScalarInst(inst);
   }
 
   void visitTupleExtractInst(TupleExtractInst *inst);
@@ -1620,17 +1732,28 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 /// Given a primitive scalar instruction like a literal or an LLVM IR
 /// instruction (represented as a builtin), promote it to a tensor op in the
 /// graph function.
-void PartitionCloner::visitScalarPromotionInst(SingleValueInstruction *inst) {
+void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   auto loc = remapLocation(inst->getLoc());
 
+  // Determine which kind of scalar operation this is, since different forms get
+  // different sorts of processing applied to them.
   auto opInfo = classifyPromotedScalarOp(inst);
   assert(opInfo.first != nullptr && "Invalid scalar operation to promote");
+  auto opKind = opInfo.second;
+
+  // The TensorToScalar operation is promoted by just dropping the operation
+  // and using the incoming tensor value.
+  if (opKind == PromotedScalarKind::TensorToScalar) {
+    ValueMap[inst] = remapValue(inst->getOperand(1));
+    return;
+  }
+  
   std::string opName = "__tfop_" + std::string(opInfo.first);
 
-  auto opKind = opInfo.second;
   switch (opKind) {
   case PromotedScalarKind::Invalid:
     llvm_unreachable("Invalid scalar operation to promote");
+  case PromotedScalarKind::TensorToScalar: assert(0 && "handled above");
   case PromotedScalarKind::Literal:           opName += ",:t"; break;
   case PromotedScalarKind::Conversion:        opName += ",t:t"; break;
   case PromotedScalarKind::Binary:            opName += ",tt:t"; break;
@@ -1912,13 +2035,13 @@ void PartitionCloner::finalizeOriginal() {
     // we only emit strong_release on %arg3, and not on %r1, since the
     // strong_retain on %r1 will be removed when all references of the first Add
     // instruction are dropped along with that instruction itself.
-    if (FP.tensorOpsSet.count(i)) {
+    if (isa<ApplyInst>(i) || isa<BuiltinInst>(i)) {
       SILBuilder BH(i);  // Builder for the host.
-      for (auto& operand: i->getAllOperands()) {
+      for (auto &operand : i->getAllOperands()) {
         auto op = operand.get();
-        if (!isTensorHandle(op->getType().getSwiftRValueType())) {
+        if (!isTensorHandle(op->getType().getSwiftRValueType()))
           continue;
-        }
+
         // def could be NULL, say if the operand is produced by argument passed
         // into FP.fn.
         auto def = op->getDefiningInstruction();
