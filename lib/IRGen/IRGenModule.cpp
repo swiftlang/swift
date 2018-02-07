@@ -283,6 +283,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
   OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
+  NoEscapeFunctionPairTy = createStructType(*this, "swift.noescape.function", {
+    FunctionPtrTy,
+    OpaquePtrTy,
+  });
 
   ProtocolRecordTy =
     createStructType(*this, "swift.protocolref", {

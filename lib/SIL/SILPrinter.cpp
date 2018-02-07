@@ -1432,6 +1432,9 @@ public:
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
+  void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand());
+  }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
