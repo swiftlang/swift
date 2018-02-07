@@ -352,22 +352,22 @@ public extension ${Self} where Unit : Numeric {
 % if rank > 1:
   @_inlineable @inline(__always)
   func min(alongAxis axis: Int) -> ${ElementTensor} {
-    return ${ElementTensor}(base: base.min(alongAxes: axis))
+    return ${ElementTensor}(base: base.min(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
   func max(alongAxis axis: Int) -> ${ElementTensor} {
-    return ${ElementTensor}(base: base.max(alongAxes: axis))
+    return ${ElementTensor}(base: base.max(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
   func sum(alongAxis axis: Int) -> ${ElementTensor} {
-    return ${ElementTensor}(base: base.sum(alongAxes: axis))
+    return ${ElementTensor}(base: base.sum(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
   func mean(alongAxis axis: Int) -> ${ElementTensor} {
-    return ${ElementTensor}(base: base.mean(alongAxes: axis))
+    return ${ElementTensor}(base: base.mean(alongAxes: [axis]))
   }
 % end
 }

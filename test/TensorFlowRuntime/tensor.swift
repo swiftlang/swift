@@ -68,7 +68,7 @@ TensorTests.testCPUAndGPU("DataTypeCast") {
 
 TensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  let sum = x.sum(alongAxes: 0, keepingDimensions: true)
+  let sum = x.sum(alongAxes: [0], keepingDimensions: true)
   expectEqual(ShapedArray(shape: [1, 5], units: [2, 4, 6, 8, 10]), sum.array)
 }
 
