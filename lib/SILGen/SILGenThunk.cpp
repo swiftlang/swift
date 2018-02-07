@@ -105,7 +105,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
   auto constantInfo = SGF.SGM.Types.getConstantInfo(next);
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    if (getMethodDispatch(func) == MethodDispatch::Class) {
+    if (getMethodDispatch(func, SGF.F) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
       if (vd->isDynamic())
         return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);

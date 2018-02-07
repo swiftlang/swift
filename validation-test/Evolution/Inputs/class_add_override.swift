@@ -10,7 +10,7 @@ public func getVersion() -> Int {
 open class AddOverrideBase {
   public init() {}
 
-  public var description: String {
+  open var description: String {
     return "Base"
   }
 }
@@ -21,17 +21,25 @@ open class AddOverrideGeneric<T> : AddOverrideBase {}
 
 open class AddOverrideConcrete : AddOverrideBase {}
 
+final public class AddOverrideConcreteFinal : AddOverrideBase {}
+
 #else
 
 open class AddOverrideGeneric<T> : AddOverrideBase {
-  override public var description: String {
+  override open var description: String {
     return "Generic"
   }
 }
 
 open class AddOverrideConcrete : AddOverrideBase {
-  override public var description: String {
+  override open var description: String {
     return "Concrete"
+  }
+}
+
+final public class AddOverrideConcreteFinal : AddOverrideBase {
+  override public var description: String {
+    return "ConcreteFinal"
   }
 }
 

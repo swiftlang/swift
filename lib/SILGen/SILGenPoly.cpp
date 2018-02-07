@@ -3309,6 +3309,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
   FormalEvaluationScope formalEvalScope(*this);
 
+  // FIXME: here
   auto witnessKind = getWitnessDispatchKind(witness);
   auto thunkTy = F.getLoweredFunctionType();
 

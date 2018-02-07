@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -29,7 +31,8 @@ using namespace swift;
 
 /// Get the method dispatch mechanism for a method.
 MethodDispatch
-swift::getMethodDispatch(AbstractFunctionDecl *method) {
+swift::getMethodDispatch(const AbstractFunctionDecl *method,
+                         const SILFunction &callingFunction) {
   // Some methods are forced to be statically dispatched.
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
@@ -44,9 +47,30 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
     if (method->isDynamic())
       return MethodDispatch::Class;
 
-    // Final methods can be statically referenced.
-    if (method->isFinal())
-      return MethodDispatch::Static;
+    // Final methods can be statically referenced, unless they're overrides in
+    // a resilient module.
+    // FIXME: In theory it's safe to statically reference those too, as long as
+    // there's availability information. If you never plan to run against an
+    // older version of the library, or you know that the final override was
+    // introduced at the same time as the original owner of the vtable slot,
+    // a static dispatch is still going to be correct. But that's an
+    // optimization; a dynamic dispatch will also produce the right behavior.
+    if (method->isFinal()) {
+      if (!method->getOverriddenDecl())
+        return MethodDispatch::Static;
+
+      const ModuleDecl *owningModule = method->getModuleContext();
+      if (owningModule->getResilienceStrategy() !=
+          ResilienceStrategy::Resilient) {
+        return MethodDispatch::Static;
+      }
+
+      if (callingFunction.getResilienceExpansion() ==
+            ResilienceExpansion::Maximal &&
+          callingFunction.getModule().getSwiftModule() == owningModule) {
+        return MethodDispatch::Static;
+      }
+    }
 
     // Members defined directly inside a class are dynamically dispatched.
     if (isa<ClassDecl>(dc))

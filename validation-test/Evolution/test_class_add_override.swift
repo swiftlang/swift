@@ -59,4 +59,14 @@ ClassAddOverrideTest.test("AddOverrideConcreteSubclass") {
   }
 }
 
+ClassAddOverrideTest.test("AddOverrideConcreteFinal") {
+  let c = AddOverrideConcreteFinal()
+
+  if getVersion() == 0 {
+    expectEqual("Base", c.description)
+  } else {
+    expectEqual("ConcreteFinal", c.description)
+  }
+}
+
 runAllTests()
