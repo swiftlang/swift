@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : StringProtocol, RangeReplaceableCollection {  
+extension String : StringProtocol, RangeReplaceableCollection {
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
@@ -32,7 +32,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Parameters:
   ///   - repeatedValue: The character to repeat.
-  ///   - count: The number of times to repeat `repeatedValue` in the 
+  ///   - count: The number of times to repeat `repeatedValue` in the
   ///     resulting string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: Character, count: Int) {
@@ -43,7 +43,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   // that String conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
   // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
-  
+
   /// Creates a new string containing the characters in the given sequence.
   ///
   /// You can use this initializer to create a new string from the result of
@@ -57,16 +57,16 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter other: A string instance or another sequence of 
+  /// - Parameter other: A string instance or another sequence of
   ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
     self = other.description
   }
-  
+
   // The defaulted argument prevents this initializer from satisfies the
-  // LosslessStringConvertible conformance.  You can satisfy a protocol 
+  // LosslessStringConvertible conformance.  You can satisfy a protocol
   // requirement with something that's not yet available, but not with
   // something that has become unavailable. Without this, the code won't
   // compile as Swift 4.
@@ -311,7 +311,7 @@ extension String {
   ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter characters: A string instance or another sequence of 
+  /// - Parameter characters: A string instance or another sequence of
   ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
