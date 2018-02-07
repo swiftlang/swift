@@ -1566,16 +1566,6 @@ Reflection.test("SetIterator/Mirror") {
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
-func computeCountLeadingZeroes(_ x: Int64) -> Int64 {
-  var x = x
-  var r: Int64 = 64
-  while x != 0 {
-    x >>= 1
-    r -= 1
-  }
-  return r
-}
-
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
@@ -1584,13 +1574,6 @@ BitTwiddlingTestSuite.test("_pointerSize") {
 #else
   fatalError("implement")
 #endif
-}
-
-BitTwiddlingTestSuite.test("_countLeadingZeros") {
-  for i in Int64(0)..<1000 {
-    expectEqual(computeCountLeadingZeroes(i), _countLeadingZeros(i))
-  }
-  expectEqual(0, _countLeadingZeros(Int64.min))
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
@@ -1629,13 +1612,6 @@ BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
   expectTrue(_isPowerOf2(asUInt(1024)))
   expectTrue(_isPowerOf2(asUInt(0x8000_0000)))
   expectFalse(_isPowerOf2(UInt.max))
-}
-
-BitTwiddlingTestSuite.test("_floorLog2") {
-  expectEqual(_floorLog2(1), 0)
-  expectEqual(_floorLog2(8), 3)
-  expectEqual(_floorLog2(15), 3)
-  expectEqual(_floorLog2(Int64.max), 62) // 63 minus 1 for sign bit.
 }
 
 var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
