@@ -318,6 +318,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
 
   case SILInstructionKind::BridgeObjectToWordInst:
     return InlineCost::Free;

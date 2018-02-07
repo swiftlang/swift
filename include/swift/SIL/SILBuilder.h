@@ -789,6 +789,12 @@ public:
                                               getFunction(), OpenedArchetypes));
   }
 
+  ConvertEscapeToNoEscapeInst *
+  createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty) {
+    return insert(ConvertEscapeToNoEscapeInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
+  }
+
   ThinFunctionToPointerInst *
   createThinFunctionToPointer(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new (getModule()) ThinFunctionToPointerInst(
