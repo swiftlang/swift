@@ -72,7 +72,7 @@ private:
 
   /// The ToolChain this Compilation was built with, that it may reuse to build
   /// subsequent BatchJobs.
-  const ToolChain &TheToolChain;
+  LLVM_ATTRIBUTE_UNUSED const ToolChain &TheToolChain;
 
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
