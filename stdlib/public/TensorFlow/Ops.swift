@@ -590,30 +590,26 @@ public extension TensorProtocol where Unit == Bool {
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func mean() -> Unit {
-    let result = Tensor<Unit>(#tfop("Mean", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
+    return _TFGetScalarOrDie(#tfop("Mean", "tt:t", handle,
+                                   Tensor<Int>([] as [Int]).handle))
   }
 
   @_inlineable @inline(__always)
   func min() -> Unit {
-    let result = Tensor<Unit>(#tfop("Min", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
+    return _TFGetScalarOrDie(#tfop("Min", "tt:t", handle,
+                                   Tensor<Int>([] as [Int]).handle))
   }
 
   @_inlineable @inline(__always)
   func max() -> Unit {
-    let result = Tensor<Unit>(#tfop("Max", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
+    return _TFGetScalarOrDie(#tfop("Max", "tt:t", handle,
+                                   Tensor<Int>([] as [Int]).handle))
   }
 
   @_inlineable @inline(__always)
   func sum() -> Unit {
-    let result = Tensor<Unit>(#tfop("Sum", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
+    return _TFGetScalarOrDie(#tfop("Sum", "tt:t", handle,
+                                   Tensor<Int>([] as [Int]).handle))
   }
 
   @inline(never) // make @_inlineable when implemented.
@@ -630,7 +626,7 @@ public extension TensorProtocol {
 public extension Tensor {
   @_inlineable @inline(__always)
   func mean(
-    alongAxes axes: Int...,
+    alongAxes axes: [Int],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
@@ -639,7 +635,7 @@ public extension Tensor {
 
   @_inlineable @inline(__always)
   func min(
-    alongAxes axes: Int...,
+    alongAxes axes: [Int],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Min", "tt:t", handle, Tensor<Int>(axes).handle,
@@ -648,7 +644,7 @@ public extension Tensor {
 
   @_inlineable @inline(__always)
   func max(
-    alongAxes axes: Int...,
+    alongAxes axes: [Int],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Max", "tt:t", handle, Tensor<Int>(axes).handle,
@@ -657,7 +653,7 @@ public extension Tensor {
 
   @_inlineable @inline(__always)
   func sum(
-    alongAxes axes: Int...,
+    alongAxes axes: [Int],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle,

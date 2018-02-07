@@ -19,7 +19,7 @@ func testInferredElementResult() -> TensorHandle<Int> {
 // of the internal attribute name.
 public func nonConstantAttribute(x: Tensor<Float>, someBool: Bool) {
   // expected-error @+1 {{attribute 'keep_dims' requires a constant argument}}
-  print(x.mean(alongAxes: 1,2,3, keepingDimensions: someBool))
+  print(x.mean(alongAxes: [1,2,3], keepingDimensions: someBool))
 }
 
 public func shapeError() {
