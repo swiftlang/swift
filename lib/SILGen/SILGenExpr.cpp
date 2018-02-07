@@ -372,8 +372,9 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   }
 
   RValue result = emitRValue(E, SGFContext(I));
-  if (!result.isInContext())
-    std::move(result).forwardInto(*this, L ? *L : E, I);
+  if (result.isInContext())
+    return;
+  std::move(result).ensurePlusOne(*this, E).forwardInto(*this, L ? *L : E, I);
 }
 
 namespace {
