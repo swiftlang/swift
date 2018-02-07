@@ -136,6 +136,22 @@ RankedTensorTests.testCPUAndGPU("testXWPlusB") {
   expectPointwiseNearlyEqual([12.5, 6.5], result.units)
 }
 
+RankedTensorTests.testCPUAndGPU("Transpose") {
+  // Shape: 3 x 2
+  let xT = Tensor2D([[1, 2], [3, 4], [5, 6]]).transposed()
+  expectEqual(2, xT.rank)
+  expectEqual([2, 3], xT.shape)
+  expectEqual([1, 3, 5, 2, 4, 6], xT.units)
+}
+
+RankedTensorTests.testCPUAndGPU("Reverse") {
+  // Shape: 3 x 2
+  let reversed = Tensor2D([[1, 2], [3, 4], [5, 6]]).reversed(alongAxes: [1])
+  expectEqual(2, reversed.rank)
+  expectEqual([3, 2], reversed.shape)
+  expectEqual([2, 1, 4, 3, 6, 5], reversed.units)
+}
+
 // FIXME: The While op doesn't work on the CPU.
 RankedTensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
