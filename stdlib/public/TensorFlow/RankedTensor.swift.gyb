@@ -66,7 +66,7 @@ public struct ${Self}<Unit : AccelerableTensorUnit> {
     }
   }
 
-  /// TODO(danielzheng): Add an 'array' property, which returns a RankedArray
+  /// - TODO(danielzheng): Add an 'array' property, which returns a RankedArray
   /// (to be implemented in Arrays.swift.gyb).
   @_inlineable
   public var units: [Unit] {
@@ -180,7 +180,7 @@ public extension ${Self} {
 }
 
 /// Memory transfer markers
-/// TODO: Remove when send/receive semantics gets revisited.
+/// - TODO: Remove when send/receive semantics gets revisited.
 public extension ${Self} {
   /// Indicate that this tensor is being moved to the accelerator.
   @_inlineable @inline(__always)
@@ -240,6 +240,23 @@ public extension ${Self} where Unit : FloatingPoint {
 }
 
 //===----------------------------------------------------------------------===//
+// Transforms
+//===----------------------------------------------------------------------===//
+
+public extension ${Self} {
+  /// Returns a transposed tensor, with dimensions permuted in reverse order.
+  @_inlineable @inline(__always)
+  func transposed() -> ${Self} {
+    let defaultPermutations = Tensor<Int>(
+      rangeFrom: Tensor<Int>(_TFMakeScalarTensor(0)),
+      to: Tensor<Int>(_TFMakeScalarTensor(rank)),
+      stride: Tensor<Int>(_TFMakeScalarTensor(1))
+    ).reversed(alongAxes: [0])
+    return transposed(withPermutations: defaultPermutations)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Indexing and slicing
 //===----------------------------------------------------------------------===//
 
@@ -248,8 +265,8 @@ public extension ${Self} {
   /// Returns the number of units in a ${Self} (equivalent to the first
   /// dimension). Equivalent to `unitCount` for ${Self}.
 % else:
-  /// Returns the number of element tensors in a ${Self} (equivalent to the first
-  /// dimension).
+  /// Returns the number of element tensors in a ${Self} (equivalent to the
+  /// first dimension).
   /// - Note: `count` is distinct from `unitCount`, which represents the total
   ///   number of units.
 % end
@@ -315,7 +332,7 @@ public extension ${Self} {
 
   /// Returns the subtensor defined by the specified bounds.
   /// - Parameter bounds: contiguous range of indices
-  // TODO: begin/end are vectors in general.
+  //  - TODO: begin/end are vectors in general.
   // tfop_slice(tensor, begin, end) -> tensor
   subscript(bounds: Range<Int>) -> ${Self} {
     get {
