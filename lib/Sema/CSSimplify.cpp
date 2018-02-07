@@ -1151,6 +1151,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
           if (!func1Input->hasParenSugar())
             func2Input = paren2->getUnderlyingType();
+        } else if (getASTContext().isSwiftVersionAtLeast(4)
+                   && !getASTContext().isSwiftVersionAtLeast(5)
+                   && !func2Input->hasParenSugar()) {
+          auto *simplified = locator.trySimplifyToExpr();
+          // We somehow let tuple unsplatting function conversions
+          // through in some cases in Swift 4, so let's let that
+          // continue to work, but only for Swift 4.
+          if (simplified && isa<DeclRefExpr>(simplified))
+            if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
+              func1Input = paren1->getUnderlyingType();
         }
       }
     }
