@@ -53,6 +53,11 @@ struct HeapObject {
     : metadata(newMetadata)
     , refCounts(InlineRefCounts::Initialized)
   { }
+
+#ifndef NDEBUG
+  void dump() const LLVM_ATTRIBUTE_USED;
+#endif
+
 #endif // __cplusplus
 };
 
