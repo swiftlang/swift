@@ -1002,14 +1002,25 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
 /// arbitrary other instructions.  This is basically "side effect free" in the
 /// most liberal sense.
 static bool canMoveInstruction(SILInstruction *inst) {
-  if (inst->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
-    return false;
-  if (isa<TermInst>(inst))
-    return false;
-  // Can't hoist allocation and dealloc stacks.
-  if (isa<AllocationInst>(inst) || isa<DeallocStackInst>(inst))
-    return false;
-  return true;
+  if (inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None) {
+    if (isa<TermInst>(inst))
+      return false;
+    // Can't hoist allocation and dealloc stacks.
+    if (isa<AllocationInst>(inst) || isa<DeallocStackInst>(inst))
+      return false;
+    return true;
+  }
+
+  // The __tf_get_scalar_or_die cannot be marked as having no side effects
+  // because it takes a +1 value as its argument.  That said, it is safe to
+  // hoist and sink it.
+  if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+    auto fn = apply->getCalleeFunction();
+    if (fn && fn->getName().startswith("__tf_get_scalar_or_die_"))
+      return true;
+  }
+
+  return false;
 }
 
 /// The specified instruction is in the region dominated by the start point of

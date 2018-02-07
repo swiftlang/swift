@@ -71,6 +71,17 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
   return handle.makeHostCopy().scalar
 }
 
+
+/// This function converts a TensorHandle that is known to have a 0d value into
+/// the scalar that it produces.  This is intended for use in op definitions
+/// where it is known that the Op always returns a 0d tensor, it is not for use
+/// in general code.
+@_versioned @_inlineable
+func _TFGetScalarOrDie<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
+  return Unit._getScalarOrDie(handle)
+}
+
+
 /// This compiler builtin is known by the partitioning pass, which recognizes it
 /// and promotes calls to it to being in graph when it can.  This signature was
 /// designed to align with the requirements of the 'Const' Tensorflow operation.
