@@ -1678,7 +1678,82 @@ ${operatorComment(x.nonMaskingOperator, False)}
 
 }
 
-// Strideable conformance
+
+//===----------------------------------------------------------------------===//
+//===--- CustomStringConvertible conformance ------------------------------===//
+//===----------------------------------------------------------------------===//
+
+extension BinaryInteger {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  @_transparent
+  internal func _description(
+    radix: Int = 10, uppercase: Bool = false
+  ) -> String {
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+
+    if bitWidth <= 64 {
+      let radix_ = Int64(radix)
+      return Self.isSigned
+        ? _int64ToString(
+          Int64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
+        : _uint64ToString(
+          UInt64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
+    }
+
+    if self == (0 as Self) { return "0" }
+
+    // Bit shifting can be faster than division when `radix` is a power of two
+    // (although not necessarily the case for builtin types).
+    let isRadixPowerOfTwo = radix.nonzeroBitCount == 1
+    let radix_ = Magnitude(radix)
+    let quotientAndRemainder: (Magnitude) -> (Magnitude, Magnitude) = { value in
+      return isRadixPowerOfTwo
+        ? (value >> radix.trailingZeroBitCount, value & (radix_ - 1))
+        : value.quotientAndRemainder(dividingBy: radix_)
+    }
+
+    let hasLetters = radix > 10
+    let ascii: (UInt8) -> UInt8 = { digit in
+      let base: UInt8
+      if !hasLetters || digit < 10 {
+        base = UInt8(("0" as Unicode.Scalar).value)
+      } else if uppercase {
+        base = UInt8(("A" as Unicode.Scalar).value) &- 10
+      } else {
+        base = UInt8(("a" as Unicode.Scalar).value) &- 10
+      }
+      return base &+ digit
+    }
+
+    let isNegative = Self.isSigned && self < (0 as Self)
+    var value = magnitude
+    var result: [UInt8] = []
+    while value != 0 {
+      let (quotient, remainder) = quotientAndRemainder(value)
+      result.append(ascii(UInt8(truncatingIfNeeded: remainder)))
+      value = quotient
+    }
+
+    if isNegative {
+      result.append(UInt8(("-" as Unicode.Scalar).value))
+    }
+    return String._fromWellFormedCodeUnitSequence(
+      UTF8.self, input: result.reversed())
+  }
+
+  /// A textual representation of this value.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var description: String {
+    return _description()
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+//===--- Strideable conformance -------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
   /// Returns the distance from this value to the given value, expressed as a
@@ -1968,6 +2043,7 @@ extension BinaryInteger {
 
 //===----------------------------------------------------------------------===//
 //===--- Ambiguity breakers -----------------------------------------------===//
+//
 // These two versions of the operators are not ordered with respect to one
 // another, but the compiler choses the second one, and that results in infinite
 // recursion.
@@ -2694,38 +2770,6 @@ extension UnsignedInteger {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static var isSigned: Bool { return false }
-
-  /// A textual representation of this value.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var description: String {
-    if self.bitWidth <= ${word_bits} {
-      return _uint64ToString(UInt64(truncatingIfNeeded: self))
-    }
-    if self == (0 as Self) {
-      return "0"
-    }
-    return renderNonZeroDescription()
-  }
-
-  // FIXME(integers): perhaps a faster implementation is possible
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  @_transparent
-  internal func renderNonZeroDescription() -> String {
-    let ascii0 = 48
-    var buf: [Unicode.Scalar] = []
-
-    var x = self
-    repeat {
-      let r = x % 10
-      x /= 10
-      buf.append(
-        Unicode.Scalar(
-          ascii0 + Int(UInt(truncatingIfNeeded: r)._value))!)
-    }
-    while x != (0 as Self)
-    return String(buf.reversed().lazy.map { Character($0) })
-  }
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
@@ -2828,17 +2872,6 @@ public protocol SignedInteger : BinaryInteger, SignedNumeric {
 }
 
 extension SignedInteger {
-  /// A textual representation of this value.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var description: String {
-    if self.bitWidth <= ${word_bits} {
-      return _int64ToString(Int64(truncatingIfNeeded: self))
-    }
-
-    let base = magnitude.description
-    return self < (0 as Self) ? "-" + base : base
-  }
-
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `true` for signed integer types.
