@@ -885,9 +885,9 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 }
 
 static bool useHasTransitiveOwnership(const SILInstruction *I) {
-  // convert_function is used to add the @noescape attribute. It does not change
-  // ownership of the function value.
-  return isa<ConvertFunctionInst>(I);
+  // convert_escape_to_noescape is used to convert to a @noescape function type.
+  // It does not change ownership of the function value.
+  return isa<ConvertEscapeToNoEscapeInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(
@@ -1094,11 +1094,10 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
   // Then delete all user instructions in reverse so that leaf uses are deleted
   // first.
   for (auto *User : reverse(Tracker.getTrackedUsers())) {
-    assert(User->getResults().empty()
-           || useHasTransitiveOwnership(User)
-                  && "We expect only ARC operations without "
-                     "results. This is true b/c of "
-                     "isARCOperationRemovableIfObjectIsDead");
+    assert(User->getResults().empty() ||
+           useHasTransitiveOwnership(User) &&
+               "We expect only ARC operations without "
+               "results or a cast from escape to noescape without users");
     Callbacks.DeleteInst(User);
   }
 
