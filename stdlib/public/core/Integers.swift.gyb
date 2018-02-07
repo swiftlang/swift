@@ -1687,9 +1687,7 @@ extension BinaryInteger {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
-  internal func _description(
-    radix: Int = 10, uppercase: Bool = false
-  ) -> String {
+  internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
     if bitWidth <= 64 {
@@ -1707,14 +1705,14 @@ extension BinaryInteger {
     // (although not necessarily the case for builtin types).
     let isRadixPowerOfTwo = radix.nonzeroBitCount == 1
     let radix_ = Magnitude(radix)
-    let quotientAndRemainder: (Magnitude) -> (Magnitude, Magnitude) = { value in
+    func _quotientAndRemainder(_ value: Magnitude) -> (Magnitude, Magnitude) {
       return isRadixPowerOfTwo
         ? (value >> radix.trailingZeroBitCount, value & (radix_ - 1))
         : value.quotientAndRemainder(dividingBy: radix_)
     }
 
     let hasLetters = radix > 10
-    let ascii: (UInt8) -> UInt8 = { digit in
+    func _ascii(_ digit: UInt8) -> UInt8 {
       let base: UInt8
       if !hasLetters || digit < 10 {
         base = UInt8(("0" as Unicode.Scalar).value)
@@ -1730,8 +1728,8 @@ extension BinaryInteger {
     var value = magnitude
     var result: [UInt8] = []
     while value != 0 {
-      let (quotient, remainder) = quotientAndRemainder(value)
-      result.append(ascii(UInt8(truncatingIfNeeded: remainder)))
+      let (quotient, remainder) = _quotientAndRemainder(value)
+      result.append(_ascii(UInt8(truncatingIfNeeded: remainder)))
       value = quotient
     }
 
@@ -1745,7 +1743,7 @@ extension BinaryInteger {
   /// A textual representation of this value.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return _description()
+    return _description(radix: 10, uppercase: false)
   }
 }
 
