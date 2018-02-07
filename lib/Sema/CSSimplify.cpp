@@ -1067,6 +1067,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
     if (kind < ConstraintKind::Subtype)
       return getTypeMatchFailure(locator);
+
+    increaseScore(SK_FunctionConversion);
   }
   
   // A non-throwing function can be a subtype of a throwing function.
@@ -1824,8 +1826,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // If the 2nd type is an autoclosure, then we don't actually want to
       // treat these as parallel. The first type needs wrapping in a closure
       // despite already being a function type.
-      if (!func1->isAutoClosure() && func2->isAutoClosure())
+      if (!func1->isAutoClosure() && func2->isAutoClosure()) {
+        increaseScore(SK_FunctionConversion);
         break;
+      }
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
