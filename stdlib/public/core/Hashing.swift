@@ -201,6 +201,7 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 ///
 /// [ref]: https://pdfs.semanticscholar.org/03bf/7be88e88ba047c6ab28036d0f28510299226.pdf
 @inline(never)
+@effects(readonly)
 public // @testable
 func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   // Use a magic number based on the golden ratio
