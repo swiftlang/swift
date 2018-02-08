@@ -43,6 +43,24 @@ func testSwitchEnumOnExistential(_ value: Any) {
 // CHECK:   checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to Bar<Int>
 // CHECK:   checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to Bar<Foo>
 
+func testSwitchEnumOnArchetype<T>(_ value: T) {
+  switch value {
+  case Foo.A:
+    ()
+  case Bar<Int>.B(let i):
+    ()
+  case Bar<Foo>.B(let f):
+    ()
+  default:
+    ()
+  }
+}
+
+// CHECK-LABEL: sil hidden @$S10switch_isa25testSwitchEnumOnArchetypeyyxlF : $@convention(thin) <T> (@in T) -> ()
+// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Foo
+// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Bar<Int>
+// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Bar<Foo>
+
 class B {}
 class D: B {}
 

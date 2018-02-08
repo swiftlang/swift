@@ -129,6 +129,67 @@ default:
   break
 }
 
+func testSwitchEnumOnHairTypeArchetype<T : HairType>(_ x: T) {
+  switch x {
+  case MacbookHair.HairSupply(let s):
+    s.s()
+  case iPadHair<S>.HairForceOne:
+    ()
+  case iPadHair<E>.HairForceOne:
+    ()
+  case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'T'}}
+    ()
+  case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+    ()
+  // TODO: Bad error message
+  case .HairForceOne: // expected-error{{cannot convert}}
+    ()
+  default:
+    break
+  }
+}
+
+func testSwitchEnumOnUnconstrainedArchetype<T>(_ x: T) {
+  switch x {
+  case MacbookHair.HairSupply(let s):
+    s.s()
+  case iPadHair<S>.HairForceOne:
+    ()
+  case iPadHair<E>.HairForceOne:
+    ()
+  case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'T'}}
+    ()
+  case Watch.Edition:
+    ()
+  // TODO: Bad error message
+  case .HairForceOne: // expected-error{{cannot convert}}
+    ()
+  default:
+    break
+  }
+}
+
+extension HairType {
+  func testSwitchEnumOnImplicitSelfArchetype() {
+    switch self {
+    case MacbookHair.HairSupply(let s):
+      s.s()
+    case iPadHair<S>.HairForceOne:
+      ()
+    case iPadHair<E>.HairForceOne:
+      ()
+    case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'Self'}}
+      ()
+    case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+      ()
+    // TODO: Bad error message
+    case .HairForceOne: // expected-error{{cannot convert}}
+      ()
+    default:
+      break
+    }
+  }
+}
 
 // <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {

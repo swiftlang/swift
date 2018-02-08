@@ -1398,8 +1398,8 @@ recur:
         }
       }
       // Otherwise, see if we can introduce a cast pattern to get from an
-      // existential pattern type to the enum type.
-      else if (type->isAnyExistentialType()) {
+      // existential or archetype pattern type to the enum type.
+      else if (type->isAnyExistentialType() || type->is<ArchetypeType>()) {
         auto foundCastKind =
           typeCheckCheckedCast(type, parentTy,
                                CheckedCastContextKind::EnumElementPattern,
