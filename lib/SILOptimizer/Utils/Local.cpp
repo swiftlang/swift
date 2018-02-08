@@ -585,6 +585,12 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   // Function types are interchangeable if they're also ABI-compatible.
   if (SrcTy.is<SILFunctionType>()) {
     if (DestTy.is<SILFunctionType>()) {
+      assert(SrcTy.getAs<SILFunctionType>()->isNoEscape() ==
+                 DestTy.getAs<SILFunctionType>()->isNoEscape() ||
+             SrcTy.getAs<SILFunctionType>()->getRepresentation() !=
+                     SILFunctionType::Representation::Thick &&
+                 "Swift thick functions that differ in escapeness are not ABI "
+                 "compatible");
       // Insert convert_function.
       return B->createConvertFunction(Loc, Value, DestTy);
     }
