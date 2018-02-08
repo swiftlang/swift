@@ -31,8 +31,8 @@ ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
   expectDoesNotThrow({
     let currentFileContents = try String(contentsOf: currentFile)
-    let parsed = SourceFileSyntax.decodeSourceFileSyntax(try SourceKitdService.
-      encodeSourceFileSyntax(currentFile))
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SourceKitdService.encodeSourceFileSyntax(currentFile))
     expectEqual("\(parsed)", currentFileContents)
   })
 }

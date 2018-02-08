@@ -27,8 +27,8 @@ VisitorTests.test("Basic") {
     }
   }
   expectDoesNotThrow({
-    let parsed = SourceFileSyntax.decodeSourceFileSyntax(try SourceKitdService.
-      encodeSourceFileSyntax(getInput("visitor.swift")))
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SourceKitdService.encodeSourceFileSyntax(getInput("visitor.swift")))
     let counter = FuncCounter()
     let hashBefore = parsed.hashValue
     counter.visit(parsed)
