@@ -6156,7 +6156,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // func bar() -> ((()) -> Void)? { return nil }
       // foo(bar) // This expression should compile in Swift 3 mode
       // ```
-      if (tc.getLangOpts().isSwiftVersion3()) {
+      //
+      // See also: https://bugs.swift.org/browse/SR-6796
+      if (cs.getASTContext().isSwiftVersionAtLeast(3) &&
+          !cs.getASTContext().isSwiftVersionAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
         auto obj2 = toType->getOptionalObjectType();
 
