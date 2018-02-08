@@ -1626,7 +1626,21 @@ func rdar33239714() {
 do {
   func foo(_: (() -> Void)?) {}
   func bar() -> ((()) -> Void)? { return nil }
-  foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  foo(bar()) // Allow ((()) -> Void)? to be passed in place of (() -> Void)? for -swift-version 4 but not later.
+}
+
+// https://bugs.swift.org/browse/SR-6509
+public extension Optional {
+  public func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
+    return self.flatMap { value in
+      transform.map { $0(value) }
+    }
+  }
+
+  public func apply<Value, Result>(_ value: Value?) -> Result?
+    where Wrapped == (Value) -> Result {
+    return value.apply(self)
+  }
 }
 
 // https://bugs.swift.org/browse/SR-6837
@@ -1638,4 +1652,15 @@ do {
   // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
   takeFn { (pair: (Int, Int?)) in } // Disallow for -swift-version 4 and later
   // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+}
+
+// https://bugs.swift.org/browse/SR-6796
+do {
+  func f(a: (() -> Void)? = nil) {}
+  func log<T>() -> ((T) -> Void)? { return nil }
+
+  f(a: log() as ((()) -> Void)?) // Allow ((()) -> Void)? to be passed in place of (() -> Void)? for -swift-version 4 but not later.
+
+  func logNoOptional<T>() -> (T) -> Void { }
+  f(a: logNoOptional() as ((()) -> Void)) // Also allow the optional-injected form.
 }
