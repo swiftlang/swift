@@ -247,11 +247,11 @@ public extension ${Self} {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @_inlineable @inline(__always)
   func transposed() -> ${Self} {
-    let defaultPermutations = Tensor<Int>(
+    let defaultPermutations = (rank - 1) - Tensor<Int>(
       rangeFrom: Tensor<Int>(_TFMakeScalarTensor(0)),
       to: Tensor<Int>(_TFMakeScalarTensor(rank)),
       stride: Tensor<Int>(_TFMakeScalarTensor(1))
-    ).reversed(alongAxes: [0])
+    )
     return transposed(withPermutations: defaultPermutations)
   }
 }
