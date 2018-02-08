@@ -892,7 +892,7 @@ bb2:
 // from the performance inliner doesn't result in an assert/crash.
 
 class C {
-  @inline(never) func callThrowing<T>(other: T, closure: () throws -> T) -> T
+  @inline(never) func callThrowing<T>(other: T, closure: @escaping () throws -> T) -> T
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing

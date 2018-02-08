@@ -347,7 +347,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
@@ -358,7 +358,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
@@ -415,7 +415,7 @@ func testNoReturnAttr() -> Never {}
 // CHECK-LABEL: sil hidden @$S9functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden @$S9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Never) -> ()
+// CHECK-LABEL: sil hidden @$S9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@noescape @callee_guaranteed () -> Never) -> ()
 func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @$S9functions15testTransparent{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int1) -> Builtin.Int1

@@ -131,7 +131,8 @@ func while_loop() {
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
-// CHECK:         destroy_value %0
+// CHECK-NOT:         destroy_value %0
+// CHECK:         return
 func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }

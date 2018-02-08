@@ -613,11 +613,11 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$S8closures8SuperSubC1fyyFyycfU_yyKXKfu_]] : $@convention(thin) (@guaranteed SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_function [[PA]]
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]]
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[CVT]])
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]    
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]    
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let f1 = {
@@ -645,11 +645,11 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$S8closures8SuperSubC1g.*]] : $@convention(thin) (@guaranteed SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
-    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[CVT]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @error Error) -> (@out (), @error Error)
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
+    // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @error Error) -> (@out (), @error Error)
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func g1() {
@@ -693,16 +693,14 @@ class SuperSub : SuperBase {
 // CHECK:         destroy_value [[SELF]]
 // -- closure takes unowned ownership
 // CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[UNOWNED_SELF2_COPY]])
-// CHECK:         [[OUTER_CONVERT:%.*]] = convert_function [[OUTER_CLOSURE]]
+// CHECK:         [[OUTER_CONVERT:%.*]] = convert_escape_to_noescape [[OUTER_CLOSURE]]
 // -- call consumes closure
 // -- strong +1, unowned +1
-// CHECK:         [[B:%.*]] = begin_borrow [[OUTER_CONVERT]]
-// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[B]]
+// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CONVERT]]
 // CHECK:         [[B:%.*]] = begin_borrow [[INNER_CLOSURE]]
 // CHECK:         [[CONSUMED_RESULT:%.*]] = apply [[B]]()
 // CHECK:         destroy_value [[CONSUMED_RESULT]]
 // CHECK:         destroy_value [[INNER_CLOSURE]]
-// CHECK:         destroy_value [[OUTER_CONVERT]]
 // -- destroy_values unowned self in box
 // -- strong +1, unowned +0
 // CHECK:         destroy_value [[OUTER_SELF_CAPTURE]]
@@ -790,4 +788,4 @@ struct r29810997 {
 }
 
 //   DI will turn this into a direct capture of the specific stored property.
-// CHECK-LABEL: sil hidden @$S8closures16r29810997_helperyS3iXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int) -> Int
+// CHECK-LABEL: sil hidden @$S8closures16r29810997_helperyS3iXEF : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> Int
