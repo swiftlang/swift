@@ -3905,7 +3905,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
   if (Flags.contains(PD_InProtocol) || isInSILMode()) {
     if (Tok.is(tok::r_brace)) {
       // Give syntax node an empty statement list.
-      SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+      SyntaxParsingContext StmtListContext(SyntaxContext,
+                                           SyntaxKind::CodeBlockItemList);
     }
     while (Tok.isNot(tok::r_brace)) {
       if (Tok.is(tok::eof))
@@ -3988,7 +3989,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
     // Give syntax node an empty statement list.
-    SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+    SyntaxParsingContext StmtListContext(SyntaxContext,
+                                         SyntaxKind::CodeBlockItemList);
     diagnose(Tok, diag::computed_property_no_accessors);
     return true;
   }
