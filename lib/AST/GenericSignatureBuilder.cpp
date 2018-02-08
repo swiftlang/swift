@@ -2118,12 +2118,10 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 Type EquivalenceClass::getAnchor(
                             GenericSignatureBuilder &builder,
                             TypeArrayView<GenericTypeParamType> genericParams) {
-  // Check whether the cache is valid.
-  if (archetypeAnchorCache.anchor &&
-      archetypeAnchorCache.numMembers == members.size()) {
-    ++NumArchetypeAnchorCacheHits;
+  // Substitute into the anchor with the given generic parameters.
+  auto substAnchor = [&] {
+    if (genericParams.empty()) return archetypeAnchorCache.anchor;
 
-    // Reparent the anchor using genericParams.
     return archetypeAnchorCache.anchor.subst(
              [&](SubstitutableType *dependentType) {
                if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
@@ -2135,30 +2133,28 @@ Type EquivalenceClass::getAnchor(
                return Type(dependentType);
              },
              MakeAbstractConformanceForGenericType());
+
+  };
+
+  // Check whether the cache is valid.
+  if (archetypeAnchorCache.anchor &&
+      archetypeAnchorCache.lastGeneration == builder.Impl->Generation) {
+    ++NumArchetypeAnchorCacheHits;
+    return substAnchor();
   }
 
-  // Map the members of this equivalence class to the best associated type
-  // within that equivalence class.
-  llvm::SmallDenseMap<EquivalenceClass *, AssociatedTypeDecl *> nestedTypes;
+  // Check whether we already have an anchor, in which case we
+  // can simplify it further.
+  if (archetypeAnchorCache.anchor) {
+    // Record the cache miss.
+    ++NumArchetypeAnchorCacheMisses;
 
-  Type bestGenericParam;
-  for (auto member : members) {
-    // If the member is a generic parameter, keep the best generic parameter.
-    if (member->isGenericParam()) {
-      Type genericParamType = member->getDependentType(genericParams);
-      if (!bestGenericParam ||
-          compareDependentTypes(genericParamType, bestGenericParam) < 0)
-        bestGenericParam = genericParamType;
-      continue;
-    }
-
-    // If we saw a generic parameter, ignore any nested types.
-    if (bestGenericParam) continue;
+    // Update the anchor by simplifying it further.
+    archetypeAnchorCache.anchor =
+      builder.getCanonicalTypeParameter(archetypeAnchorCache.anchor);
+    archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
+    return substAnchor();
   }
-
-  // If we found a generic parameter, return that.
-  if (bestGenericParam)
-    return bestGenericParam;
 
   // Form the anchor.
   for (auto member : members) {
@@ -2169,8 +2165,8 @@ Type EquivalenceClass::getAnchor(
     // Record the cache miss and update the cache.
     ++NumArchetypeAnchorCacheMisses;
     archetypeAnchorCache.anchor = anchorType;
-    archetypeAnchorCache.numMembers = members.size();
-    return anchorType;
+    archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
+    return substAnchor();
   }
 
   llvm_unreachable("Unable to compute anchor");

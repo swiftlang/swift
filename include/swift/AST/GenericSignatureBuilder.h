@@ -273,9 +273,8 @@ public:
       /// The cached anchor itself.
       Type anchor;
 
-      /// The number of members of the equivalence class when the archetype
-      /// anchor was cached.
-      unsigned numMembers;
+      /// The generation at which the anchor was last computed.
+      unsigned lastGeneration;
     } archetypeAnchorCache;
 
     /// Describes a cached nested type.
