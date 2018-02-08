@@ -298,6 +298,7 @@ public:  // Lowering functionality.
   void visitTFOpInst(BuiltinInst *inst);
   void visitTupleInst(TupleInst *inst);
   void visitTupleExtractInst(TupleExtractInst *inst);
+  void visitUncheckedRefCastInst(UncheckedRefCastInst *inst);
 
   void visitReturnInst(ReturnInst *inst);
   void visitBranchInst(BranchInst *inst);
@@ -698,6 +699,17 @@ void TFGraphLowering::visitTupleExtractInst(TupleExtractInst *inst) {
   // tuple_extracts only exist as part of the handling for multi-result
   // tensor operations.  This is handled as part of the 'getOperandValue'
   // implementation.
+}
+
+void TFGraphLowering::
+visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
+  // UncheckedBitwiseCast's get generated between two identical TensorHandle's
+  // when one is using a Swift type like Int32 and one is using Builtin.Int32.
+  // None of this matters for graph lowering.
+  auto opValue = getOperandValue(inst->getOperand());
+  if (!opValue.oper) return;  // Error occurred.
+
+  addValueMapping({inst, 0}, opValue);
 }
 
 

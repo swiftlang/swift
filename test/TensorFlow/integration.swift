@@ -57,9 +57,10 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
 // CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:   %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%2 : $Builtin.Int32, %1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   %4 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %3 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   return %5 : $TensorHandle<Float>
+// CHECK-NEXT:   %4 = unchecked_ref_cast %3 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // user: %5
+// CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %6 = builtin "__tfop_Add,tt:t"(%5 : $TensorHandle<Float>, %5 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   return %6 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
 
@@ -99,8 +100,9 @@ public func testExitBranch1(i: Int) {
 // CHECK-NEXT:   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
 // CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:   %2 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%1 : $Builtin.Int32, %0 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   %3 = builtin "__tfop_Add,tt:t"(%2 : $TensorHandle<Builtin.FPIEEE32>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
-// CHECK-NEXT:   return %3 : $TensorHandle<Float>
+// CHECK-NEXT:   %3 = unchecked_ref_cast %2 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // users: %4, %4
+// CHECK-NEXT:   %4 = builtin "__tfop_Add,tt:t"(%3 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   return %4 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
 
@@ -294,15 +296,18 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
 // CHECK-NEXT:  %2 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:  %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%2 : $Builtin.Int32, %1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %4 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %3 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
-// CHECK-NEXT:  %5 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%4 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:  %6 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
-// CHECK-NEXT:  %7 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  %8 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%7 : $Builtin.Int32, %6 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %9 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %10 = builtin "__tfop_Add,tt:t"(%9 : $TensorHandle<Builtin.FPIEEE32>, %8 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %11 = builtin "__tfop_Add,tt:t"(%10 : $TensorHandle<Builtin.FPIEEE32>, %10 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
-// CHECK-NEXT:  return %11 : $TensorHandle<Float>
+// CHECK-NEXT:  %4 = unchecked_ref_cast %3 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+
+// CHECK-NEXT:  %5 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  %6 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%5 : $TensorHandle<Float>) : $()
+// CHECK-NEXT:  %7 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
+// CHECK-NEXT:  %8 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %9 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%8 : $Builtin.Int32, %7 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %10 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %11 = builtin "__tfop_Add,tt:t"(%10 : $TensorHandle<Builtin.FPIEEE32>, %9 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %12 = unchecked_ref_cast %11 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK-NEXT:  %13 = builtin "__tfop_Add,tt:t"(%12 : $TensorHandle<Float>, %12 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  return %13 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 

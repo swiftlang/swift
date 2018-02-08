@@ -616,11 +616,15 @@ public:
   /// The instructions that are to be run on the accelerator.
   DenseMap<SILInstruction*, Marking> markedInstructions;
 
-  /// BB Arguments that are marked as being moved or copied over.  If a marked
-  /// argument is moved over, it is deleted from the host program.  If the
-  /// host also uses the argument, then a copy will have to be inserted back
-  /// from the accelerator to the host.
-  DenseMap<SILArgument*, Marking> markedBBArguments;
+  /// BB Arguments that are marked as being moved, copied, or used as arguments.
+  /// If a marked argument is moved over, it is deleted from the host program.
+  /// If the host also uses the argument, then a copy will have to be inserted
+  /// back from the accelerator to the host.
+  ///
+  /// We capture source location information for BB arguments during the marking
+  /// phase, because once we start chopping up instructions we can't reliably
+  /// get it.
+  DenseMap<SILArgument*, std::pair<Marking, SILLocation>> markedBBArguments;
 
   /// The set of values that must be sent to the accelerator.
   SmallPtrSet<SILValue, 8> valuesToSend;
@@ -655,8 +659,9 @@ public:
   };
   PartitionedTensorProgram partition();
 
-  void diagnoseCopyInIfNotSend(SILValue value, SILInstruction *user);
-  bool diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user);
+  void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user);
+  bool diagnoseCopyToHost(SILValue value, SILInstruction *user,
+                          SILLocation loc);
 
 private:
   // Marking.
@@ -677,8 +682,8 @@ private:
 /// accelerator is our designated "send" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
-void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
-                                                  SILInstruction *user) {
+void TFFunctionPartition::
+diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
@@ -725,13 +730,12 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
   }
 }
 
+/// Check to see if the specified value being copied into a partition for the
+/// accelerator is our designated "receive" operation.  If so, we're fine,
+/// otherwise emit a warning to tell the programmer that they are doing
+/// something that induces an implicit data transfer into their code.
 bool TFFunctionPartition::
-diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
-  /// Check to see if the specified value being copied into a partition for the
-  /// accelerator is our designated "receive" operation.  If so, we're fine,
-  /// otherwise emit a warning to tell the programmer that they are doing
-  /// something that induces an implicit data transfer into their code.
-
+diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(user))
@@ -742,9 +746,6 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
       }
 
   auto &ctx = fn.getModule().getASTContext();
-
-  // Try to determine a good source location to report.
-  auto loc = getUserSourceLocation(value);
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
@@ -759,7 +760,6 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
   }
   return true;
 }
-
 
 
 /// Some instruction in the specified block needs to be split out to the
@@ -1008,9 +1008,11 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // If this BB argument is outside the region dominated by the start point,
   // then we pass its value in as an argument to the tensor function.
   if (!DI.properlyDominates(tensorStartPoint->getParent(), arg->getParent())) {
-    markedBBArguments.insert({arg, Marking::Argument});
+    markedBBArguments.insert({
+      arg, { Marking::Argument, getUserSourceLocation(arg) }
+    });
     tensorFnArguments.push_back(SILValue(arg));
-    diagnoseCopyInIfNotSend(arg, user);
+    diagnoseCopyToAccelerator(arg, user);
     return;
   }
 
@@ -1021,9 +1023,13 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     // dominated region anyway.
     assert(!isa<SILFunctionArgument>(arg) &&
            "Cannot move function parameters!");
-    markedBBArguments.insert({arg, Marking::Move});
+    markedBBArguments.insert({
+      arg, {Marking::Move, getUserSourceLocation(arg)}
+    });
   } else {
-    markedBBArguments.insert({arg, Marking::Copy});
+    markedBBArguments.insert({
+      arg, { Marking::Copy, getUserSourceLocation(arg) }
+    });
   }
 
   // Otherwise, we mark the branches that contribute values to it, then mark
@@ -1183,8 +1189,6 @@ sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
         operand->set(cast<SingleValueInstruction>(inst));
     }
   }
-
-  return;
 }
 
 /// Indicate that the specified value must be available on the accelerator.
@@ -1245,7 +1249,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
-    diagnoseCopyInIfNotSend(value, user);
+    diagnoseCopyToAccelerator(value, user);
     return;
   }
 
@@ -1257,7 +1261,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
 
   // Otherwise, insert a send from the host to the accelerator.
   valuesToSend.insert(value);
-  diagnoseCopyInIfNotSend(value, user);
+  diagnoseCopyToAccelerator(value, user);
 
   // Instead of cloning over this instruction, we'll add a send after it and
   // insert a receive in the accelerator code.
@@ -1573,7 +1577,7 @@ private:
     auto it = FP.markedBBArguments.find(arg);
     if (it == FP.markedBBArguments.end()) return false;
 
-    switch (it->second) {
+    switch (it->second.first) {
     case Marking::Copy:
     case Marking::Move:
       return true;
@@ -1672,23 +1676,30 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 // Transform ops builtin instructions to the one we need in the tensor program.
 void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
                                   SILTensorOpInfo &tfopInfo) {
+  auto &B = getBuilder();
+  auto loc = remapLocation(inst->getLoc());
+
   // Handle special case "ops".
   if (tfopInfo.opName == "tfc.scalarToTensor") {
     assert(tfopInfo.operandDescriptorStr == "s" &&
            tfopInfo.resultDescriptorStr == "t" &&
            "invalid tfc.scalarToTensor!");
-
     // We just lower the result as the input, since the scalar input will have
-    // been promoted to a tensor already.
-    ValueMap[inst] = remapValue(tfopInfo.getScalarOperand(0));
+    // been promoted to a tensor already.  It is possible that the input will
+    // have been lowered to something like TensorHandle<Int64> and we need a
+    // TensorHandle<Int>. If that is the case, we insert an UncheckedRefCast
+    // to get it to the right type.  These are treated as noops by GraphGen.
+    auto result = remapValue(tfopInfo.getScalarOperand(0));
+    if (!inst->getType().getSwiftRValueType()
+          ->isEqual(result->getType().getSwiftRValueType())) {
+      result = B.createUncheckedRefCast(loc, result, inst->getType());
+    }
+
+    ValueMap[inst] = result;
     return;
   }
 
-
-  auto &B = getBuilder();
   SmallVector<SILValue, 4> args;
-  auto loc = remapLocation(inst->getLoc());
-
   auto cloneSingleInst = [&](SILInstruction *inst) -> SILInstruction* {
     auto ourInst = inst->clone();
     ourInst->setDebugLocation(B.getSILDebugLocation(loc));
@@ -1894,7 +1905,7 @@ void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
 
   // Diagnose implicit data transfers.
   for (auto *use : value->getUses()) {
-    FP.diagnoseCopyOutIfNotReceive(value, use->getUser());
+    FP.diagnoseCopyToHost(value, use->getUser(), loc);
   }
 
   // Create the send in the accelerator code.  Each send/receive pair gets
@@ -2061,24 +2072,23 @@ void PartitionCloner::finalizeOriginal() {
   SmallPtrSet<SILBasicBlock*, 4> argsRemovedBlocks;
 
   // We remove arguments with a two-pass approach, first dropping the insts that
-  // feed them, then removing the arg (potentially inserting a receive).  If we
-  // insert a receive, we need the source location info, which is derived from
-  // the arguments that get removed in the first pass.  Solve this by
-  // remembering the location info in that first pass.
-  SmallVector<std::pair<SILArgument*, SILLocation>, 4> argsToRemove;
+  // feed them, then removing the arg (potentially inserting a receive).
+  SmallVector<SILArgument*, 4> argsToRemove;
 
-  // For BBArguments, we remove the uses from the branches first (which breaks
+  // For BB arguments, we remove the uses from the branches first (which breaks
   // interdependent references) and delete the actual arguments later.
-  for (auto arg : FP.markedBBArguments) {
-    // If the argument is copied over, obviously don't zap it.
-    if (arg.second != Marking::Move) {
-      assert((arg.second == Marking::Copy || arg.second == Marking::Argument) &&
+  for (auto argInfo : FP.markedBBArguments) {
+    // We delete arguments that are moved over to the accelerator.
+    auto marking = argInfo.second.first;
+    if (marking != Marking::Move) {
+      assert((marking == Marking::Copy || marking == Marking::Argument) &&
              "Only move/copy/argument supported for arguments right now");
       continue;
     }
 
     // Check to see if we already processed the block this argument lives in.
-    auto *bb = arg.first->getParent();
+    auto arg = argInfo.first;
+    auto *bb = arg->getParent();
     if (!argsRemovedBlocks.insert(bb).second)
       continue;
 
@@ -2091,10 +2101,9 @@ void PartitionCloner::finalizeOriginal() {
     unsigned argNo = 0;
     for (auto arg : bb->getArguments()) {
       auto it = FP.markedBBArguments.find(arg);
-      if (it != FP.markedBBArguments.end() && it->second == Marking::Move) {
+      if (it != FP.markedBBArguments.end() &&
+          it->second.first == Marking::Move) {
         argsToRemoveMask[argNo] = true;
-        // Remember the argument and its location.
-        argsToRemove.push_back({ arg, getUserSourceLocation(arg) });
       }
       ++argNo;
     };
@@ -2116,9 +2125,13 @@ void PartitionCloner::finalizeOriginal() {
   // uses of values that we moved over to the accelerator, then we must insert
   // a receive from the accelerator of the computed value.  Regardless, we can
   // now delete the defining instruction/argument.
-  for (auto argToRemove : argsToRemove) {
-    auto arg = argToRemove.first;
-    auto loc = argToRemove.second;
+  for (auto argInfo : FP.markedBBArguments) {
+    auto marking = argInfo.second.first;
+    if (marking != Marking::Move)
+      continue;
+
+    auto arg = argInfo.first;
+    auto loc = argInfo.second.second;
 
     // If the argument has any non-debug-non-retain/release instructions using
     // it, then we need to insert a copy.
