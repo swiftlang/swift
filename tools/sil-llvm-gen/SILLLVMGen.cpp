@@ -163,8 +163,6 @@ int main(int argc, char **argv) {
 
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
-  Opts.MainInputFilename = InputFilename;
-  Opts.OutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;
@@ -206,8 +204,10 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  std::unique_ptr<llvm::Module> Mod = performIRGeneration(
-      Opts, CI.getMainModule(), CI.takeSILModule(),
-      CI.getMainModule()->getName().str(), getGlobalLLVMContext());
+  std::unique_ptr<llvm::Module> Mod =
+      performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
+                          CI.getMainModule()->getName().str(),
+                          CI.getPrimarySpecificPathsForAtMostOnePrimary(),
+                          getGlobalLLVMContext(), ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

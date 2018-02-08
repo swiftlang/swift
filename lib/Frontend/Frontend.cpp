@@ -53,6 +53,16 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
+PrimarySpecificPaths
+CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() {
+  return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
+}
+
+PrimarySpecificPaths
+CompilerInvocation::getPrimarySpecificPathsForPrimary(StringRef filename) {
+  return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
+}
+
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.
@@ -824,3 +834,16 @@ void CompilerInstance::freeASTContext() {
 }
 
 void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
+
+PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode() {
+  return getPrimarySpecificPathsForAtMostOnePrimary();
+}
+PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() {
+  return Invocation.getPrimarySpecificPathsForAtMostOnePrimary();
+}
+PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) {
+  return Invocation.getPrimarySpecificPathsForPrimary(filename);
+}

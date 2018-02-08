@@ -275,6 +275,9 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
+  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef);
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitObjCHeader(ActionType);

@@ -386,3 +386,13 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
     return true;
   }
 }
+
+PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() {
+  return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
+}
+
+PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) {
+  return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
+}

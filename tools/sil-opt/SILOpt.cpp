@@ -422,7 +422,9 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      auto T = irgen::createIRGenModule(SILMod, getGlobalLLVMContext());
+      auto T = irgen::createIRGenModule(
+          SILMod, CI.getPrimarySpecificPathsForAtMostOnePrimary(),
+          getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }
