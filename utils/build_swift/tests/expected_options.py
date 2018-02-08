@@ -14,15 +14,16 @@ from swift_build_support.swift_build_support import targets
 
 from .. import argparse
 from .. import defaults
+from .. import utils
 
 
 __all__ = [
     'HelpOption',
-    'SetOption',
-    'SetTrueOption',
-    'SetFalseOption',
-    'DisableOption',
-    'EnableOption',
+    'ConstOption',
+    'TrueOption',
+    'FalseOption',
+    'ToggleTrueOption',
+    'ToggleFalseOption',
     'ChoicesOption',
     'IntOption',
     'StrOption',
@@ -30,6 +31,7 @@ __all__ = [
     'AppendOption',
     'UnsupportedOption',
     'IgnoreOption',
+
     'EXPECTED_OPTIONS',
     'EXPECTED_DEFAULTS',
 ]
@@ -211,27 +213,39 @@ class _BaseOption(object):
         self.dest = dest
         self.default = default
 
+        self._repr_args = {
+            'option_string': self.option_string,
+            'dest': self.dest,
+            'default': self.default,
+        }
+
     def sanitized_string(self):
         return _sanitize_option_string(self.option_string)
 
+    def __repr__(self):
+        return utils.repr_class(self, self._repr_args)
+
 
 class HelpOption(_BaseOption):
-    """Option that prints the help message and exits."""
+    """Option that prints the help message and exits.
+    """
 
     pass
 
 
-class SetOption(_BaseOption):
+class ConstOption(_BaseOption):
     """Option that accepts no arguments, setting the destination to a
     hard-coded value or None.
     """
 
     def __init__(self, *args, **kwargs):
-        self.value = kwargs.pop('value', None)
-        super(SetOption, self).__init__(*args, **kwargs)
+        self.const = kwargs.pop('const', None)
+        super(ConstOption, self).__init__(*args, **kwargs)
+
+        self._repr_args['const'] = self.const
 
 
-class SetTrueOption(_BaseOption):
+class TrueOption(_BaseOption):
     """Option that accepts no arguments, setting the destination value to True
     if parsed and defaulting to False otherwise.
     """
@@ -239,7 +253,7 @@ class SetTrueOption(_BaseOption):
     pass
 
 
-class SetFalseOption(_BaseOption):
+class FalseOption(_BaseOption):
     """Option that accepts no arguments, setting the destination value to False
     if parsed and defaulting to True otherwise.
     """
@@ -247,7 +261,7 @@ class SetFalseOption(_BaseOption):
     pass
 
 
-class EnableOption(_BaseOption):
+class ToggleTrueOption(_BaseOption):
     """Option that sets the destination to True when parsed and False by default.
     Can be toggled True or False with an optional bool argument.
     """
@@ -255,7 +269,7 @@ class EnableOption(_BaseOption):
     pass
 
 
-class DisableOption(_BaseOption):
+class ToggleFalseOption(_BaseOption):
     """Option that sets the destination to False when parsed and True by default.
     Can be toggled True or False with an optional bool argument, which is then
     negated. Thus if an option is passed the value 'True' it will set the
@@ -266,27 +280,33 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predifined list of choices.
+    """
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
         super(ChoicesOption, self).__init__(*args, **kwargs)
 
+        self._repr_args['choices'] = self.choices
+
 
 class IntOption(_BaseOption):
-    """Option that accepts an int argument."""
+    """Option that accepts an int argument.
+    """
 
     pass
 
 
 class StrOption(_BaseOption):
-    """Option that accepts a str argument."""
+    """Option that accepts a str argument.
+    """
 
     pass
 
 
 class PathOption(_BaseOption):
-    """Option that accepts a path argument."""
+    """Option that accepts a path argument.
+    """
 
     pass
 
@@ -300,7 +320,8 @@ class AppendOption(_BaseOption):
 
 
 class UnsupportedOption(_BaseOption):
-    """Option that is not supported."""
+    """Option that is not supported.
+    """
 
     pass
 
@@ -321,150 +342,150 @@ EXPECTED_OPTIONS = [
     HelpOption('-h', dest='help', default=argparse.SUPPRESS),
     HelpOption('--help', dest='help', default=argparse.SUPPRESS),
 
-    SetOption('--debug', dest='build_variant', value='Debug'),
-    SetOption('--debug-cmark', dest='cmark_build_variant', value='Debug'),
-    SetOption('--debug-foundation',
-              dest='foundation_build_variant', value='Debug'),
-    SetOption('--debug-libdispatch',
-              dest='libdispatch_build_variant', value='Debug'),
-    SetOption('--debug-libicu', dest='libicu_build_variant', value='Debug'),
-    SetOption('--debug-lldb', dest='lldb_build_variant', value='Debug'),
-    SetOption('--lldb-build-with-xcode', dest='lldb_build_with_xcode',
-              value='1'),
-    SetOption('--lldb-build-with-cmake', dest='lldb_build_with_xcode',
-              value='0'),
-    SetOption('--debug-llvm', dest='llvm_build_variant', value='Debug'),
-    SetOption('--debug-swift', dest='swift_build_variant', value='Debug'),
-    SetOption('--debug-swift-stdlib',
-              dest='swift_stdlib_build_variant', value='Debug'),
-    SetOption('--eclipse',
-              dest='cmake_generator', value='Eclipse CDT4 - Ninja'),
-    SetOption('--make', dest='cmake_generator', value='Unix Makefiles'),
-    SetOption('--release', dest='build_variant', value='Release'),
-    SetOption('--release-debuginfo',
-              dest='build_variant', value='RelWithDebInfo'),
-    SetOption('--xcode', dest='cmake_generator', value='Xcode'),
-    SetOption('-R', dest='build_variant', value='Release'),
-    SetOption('-d', dest='build_variant', value='Debug'),
-    SetOption('-e', dest='cmake_generator', value='Eclipse CDT4 - Ninja'),
-    SetOption('-m', dest='cmake_generator', value='Unix Makefiles'),
-    SetOption('-r', dest='build_variant', value='RelWithDebInfo'),
-    SetOption('-x', dest='cmake_generator', value='Xcode'),
+    ConstOption('--debug', dest='build_variant', const='Debug'),
+    ConstOption('--debug-cmark', dest='cmark_build_variant', const='Debug'),
+    ConstOption('--debug-foundation',
+                dest='foundation_build_variant', const='Debug'),
+    ConstOption('--debug-libdispatch',
+                dest='libdispatch_build_variant', const='Debug'),
+    ConstOption('--debug-libicu', dest='libicu_build_variant', const='Debug'),
+    ConstOption('--debug-lldb', dest='lldb_build_variant', const='Debug'),
+    ConstOption('--lldb-build-with-xcode', dest='lldb_build_with_xcode',
+                const='1'),
+    ConstOption('--lldb-build-with-cmake', dest='lldb_build_with_xcode',
+                const='0'),
+    ConstOption('--debug-llvm', dest='llvm_build_variant', const='Debug'),
+    ConstOption('--debug-swift', dest='swift_build_variant', const='Debug'),
+    ConstOption('--debug-swift-stdlib',
+                dest='swift_stdlib_build_variant', const='Debug'),
+    ConstOption('--eclipse',
+                dest='cmake_generator', const='Eclipse CDT4 - Ninja'),
+    ConstOption('--make', dest='cmake_generator', const='Unix Makefiles'),
+    ConstOption('--release', dest='build_variant', const='Release'),
+    ConstOption('--release-debuginfo',
+                dest='build_variant', const='RelWithDebInfo'),
+    ConstOption('--xcode', dest='cmake_generator', const='Xcode'),
+    ConstOption('-R', dest='build_variant', const='Release'),
+    ConstOption('-d', dest='build_variant', const='Debug'),
+    ConstOption('-e', dest='cmake_generator', const='Eclipse CDT4 - Ninja'),
+    ConstOption('-m', dest='cmake_generator', const='Unix Makefiles'),
+    ConstOption('-r', dest='build_variant', const='RelWithDebInfo'),
+    ConstOption('-x', dest='cmake_generator', const='Xcode'),
 
     # FIXME: Convert these options to set_true actions
-    SetOption('--assertions', value=True),
-    SetOption('--cmark-assertions', value=True),
-    SetOption('--lldb-assertions', value=True),
-    SetOption('--llvm-assertions', value=True),
-    SetOption('--swift-assertions', value=True),
-    SetOption('--swift-stdlib-assertions', value=True),
-    SetOption('-T', dest='validation_test', value=True),
-    SetOption('-o', dest='test_optimized', value=True),
-    SetOption('-s', dest='test_optimize_for_size', value=True),
-    SetOption('-t', dest='test', value=True),
+    ConstOption('--assertions', const=True),
+    ConstOption('--cmark-assertions', const=True),
+    ConstOption('--lldb-assertions', const=True),
+    ConstOption('--llvm-assertions', const=True),
+    ConstOption('--swift-assertions', const=True),
+    ConstOption('--swift-stdlib-assertions', const=True),
+    ConstOption('-T', dest='validation_test', const=True),
+    ConstOption('-o', dest='test_optimized', const=True),
+    ConstOption('-s', dest='test_optimize_for_size', const=True),
+    ConstOption('-t', dest='test', const=True),
 
     # FIXME: Convert these options to set_false actions
-    SetOption('--no-assertions', dest='assertions', value=False),
-    SetOption('--no-lldb-assertions', dest='lldb_assertions', value=False),
-    SetOption('--no-llvm-assertions', dest='llvm_assertions', value=False),
-    SetOption('--no-swift-assertions', dest='swift_assertions', value=False),
-    SetOption('--no-swift-stdlib-assertions',
-              dest='swift_stdlib_assertions', value=False),
-    SetOption('--skip-ios', dest='ios', value=False),
-    SetOption('--skip-tvos', dest='tvos', value=False),
-    SetOption('--skip-watchos', dest='watchos', value=False),
+    ConstOption('--no-assertions', dest='assertions', const=False),
+    ConstOption('--no-lldb-assertions', dest='lldb_assertions', const=False),
+    ConstOption('--no-llvm-assertions', dest='llvm_assertions', const=False),
+    ConstOption('--no-swift-assertions', dest='swift_assertions', const=False),
+    ConstOption('--no-swift-stdlib-assertions',
+                dest='swift_stdlib_assertions', const=False),
+    ConstOption('--skip-ios', dest='ios', const=False),
+    ConstOption('--skip-tvos', dest='tvos', const=False),
+    ConstOption('--skip-watchos', dest='watchos', const=False),
 
-    SetTrueOption('--benchmark'),
-    SetTrueOption('--clean'),
-    SetTrueOption('--dry-run'),
-    SetTrueOption('--enable-sil-ownership'),
-    SetTrueOption('--enable-guaranteed-normal-arguments'),
-    SetTrueOption('--force-optimized-typechecker'),
-    SetTrueOption('--ios'),
-    SetTrueOption('--llbuild', dest='build_llbuild'),
-    SetTrueOption('--lldb', dest='build_lldb'),
-    SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
-    SetTrueOption('--skip-build'),
-    SetTrueOption('--swiftpm', dest='build_swiftpm'),
-    SetTrueOption('-B', dest='benchmark'),
-    SetTrueOption('-S', dest='skip_build'),
-    SetTrueOption('-b', dest='build_llbuild'),
-    SetTrueOption('-c', dest='clean'),
-    SetTrueOption('-i', dest='ios'),
-    SetTrueOption('-l', dest='build_lldb'),
-    SetTrueOption('-n', dest='dry_run'),
-    SetTrueOption('-p', dest='build_swiftpm'),
+    TrueOption('--benchmark'),
+    TrueOption('--clean'),
+    TrueOption('--dry-run'),
+    TrueOption('--enable-sil-ownership'),
+    TrueOption('--enable-guaranteed-normal-arguments'),
+    TrueOption('--force-optimized-typechecker'),
+    TrueOption('--ios'),
+    TrueOption('--llbuild', dest='build_llbuild'),
+    TrueOption('--lldb', dest='build_lldb'),
+    TrueOption('--playgroundsupport', dest='build_playgroundsupport'),
+    TrueOption('--skip-build'),
+    TrueOption('--swiftpm', dest='build_swiftpm'),
+    TrueOption('-B', dest='benchmark'),
+    TrueOption('-S', dest='skip_build'),
+    TrueOption('-b', dest='build_llbuild'),
+    TrueOption('-c', dest='clean'),
+    TrueOption('-i', dest='ios'),
+    TrueOption('-l', dest='build_lldb'),
+    TrueOption('-n', dest='dry_run'),
+    TrueOption('-p', dest='build_swiftpm'),
 
-    SetFalseOption('--no-legacy-impl', dest='legacy_impl'),
+    FalseOption('--no-legacy-impl', dest='legacy_impl'),
 
-    EnableOption('--android'),
-    EnableOption('--build-external-benchmarks'),
-    EnableOption('--build-ninja'),
-    EnableOption('--build-runtime-with-host-compiler'),
-    EnableOption('--build-swift-dynamic-sdk-overlay'),
-    EnableOption('--build-swift-dynamic-stdlib'),
-    EnableOption('--build-swift-static-sdk-overlay'),
-    EnableOption('--build-swift-static-stdlib'),
-    EnableOption('--build-swift-stdlib-unittest-extra'),
-    EnableOption('--distcc'),
-    EnableOption('--enable-asan'),
-    EnableOption('--enable-lsan'),
-    EnableOption('--enable-tsan'),
-    EnableOption('--enable-tsan-runtime'),
-    EnableOption('--enable-ubsan'),
-    EnableOption('--export-compile-commands'),
-    EnableOption('--foundation', dest='build_foundation'),
-    EnableOption('--host-test'),
-    EnableOption('--libdispatch', dest='build_libdispatch'),
-    EnableOption('--libicu', dest='build_libicu'),
-    EnableOption('--long-test'),
-    EnableOption('--show-sdks'),
-    EnableOption('--test'),
-    EnableOption('--test-optimize-for-size'),
-    EnableOption('--test-optimized'),
-    EnableOption('--tvos'),
-    EnableOption('--validation-test'),
-    EnableOption('--verbose-build'),
-    EnableOption('--watchos'),
-    EnableOption('--xctest', dest='build_xctest'),
+    ToggleTrueOption('--android'),
+    ToggleTrueOption('--build-external-benchmarks'),
+    ToggleTrueOption('--build-ninja'),
+    ToggleTrueOption('--build-runtime-with-host-compiler'),
+    ToggleTrueOption('--build-swift-dynamic-sdk-overlay'),
+    ToggleTrueOption('--build-swift-dynamic-stdlib'),
+    ToggleTrueOption('--build-swift-static-sdk-overlay'),
+    ToggleTrueOption('--build-swift-static-stdlib'),
+    ToggleTrueOption('--build-swift-stdlib-unittest-extra'),
+    ToggleTrueOption('--distcc'),
+    ToggleTrueOption('--enable-asan'),
+    ToggleTrueOption('--enable-lsan'),
+    ToggleTrueOption('--enable-tsan'),
+    ToggleTrueOption('--enable-tsan-runtime'),
+    ToggleTrueOption('--enable-ubsan'),
+    ToggleTrueOption('--export-compile-commands'),
+    ToggleTrueOption('--foundation', dest='build_foundation'),
+    ToggleTrueOption('--host-test'),
+    ToggleTrueOption('--libdispatch', dest='build_libdispatch'),
+    ToggleTrueOption('--libicu', dest='build_libicu'),
+    ToggleTrueOption('--long-test'),
+    ToggleTrueOption('--show-sdks'),
+    ToggleTrueOption('--test'),
+    ToggleTrueOption('--test-optimize-for-size'),
+    ToggleTrueOption('--test-optimized'),
+    ToggleTrueOption('--tvos'),
+    ToggleTrueOption('--validation-test'),
+    ToggleTrueOption('--verbose-build'),
+    ToggleTrueOption('--watchos'),
+    ToggleTrueOption('--xctest', dest='build_xctest'),
 
-    DisableOption('--skip-build-android', dest='build_android'),
-    DisableOption('--skip-build-benchmarks', dest='build_benchmarks'),
-    DisableOption('--skip-build-cygwin', dest='build_cygwin'),
-    DisableOption('--skip-build-freebsd', dest='build_freebsd'),
-    DisableOption('--skip-build-ios', dest='build_ios'),
-    DisableOption('--skip-build-ios-device', dest='build_ios_device'),
-    DisableOption('--skip-build-ios-simulator',
-                  dest='build_ios_simulator'),
-    DisableOption('--skip-build-linux', dest='build_linux'),
-    DisableOption('--skip-build-osx', dest='build_osx'),
-    DisableOption('--skip-build-tvos', dest='build_tvos'),
-    DisableOption('--skip-build-tvos-device', dest='build_tvos_device'),
-    DisableOption('--skip-build-tvos-simulator',
-                  dest='build_tvos_simulator'),
-    DisableOption('--skip-build-watchos', dest='build_watchos'),
-    DisableOption('--skip-build-watchos-device',
-                  dest='build_watchos_device'),
-    DisableOption('--skip-build-watchos-simulator',
-                  dest='build_watchos_simulator'),
-    DisableOption('--skip-test-android-host', dest='test_android_host'),
-    DisableOption('--skip-test-cygwin', dest='test_cygwin'),
-    DisableOption('--skip-test-freebsd', dest='test_freebsd'),
-    DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-ios-32bit-simulator',
-                  dest='test_ios_32bit_simulator'),
-    DisableOption('--skip-test-ios-host', dest='test_ios_host'),
-    DisableOption('--skip-test-ios-simulator', dest='test_ios_simulator'),
-    DisableOption('--skip-test-linux', dest='test_linux'),
-    DisableOption('--skip-test-osx', dest='test_osx'),
-    DisableOption('--skip-test-tvos', dest='test_tvos'),
-    DisableOption('--skip-test-tvos-host', dest='test_tvos_host'),
-    DisableOption('--skip-test-tvos-simulator',
-                  dest='test_tvos_simulator'),
-    DisableOption('--skip-test-watchos', dest='test_watchos'),
-    DisableOption('--skip-test-watchos-host', dest='test_watchos_host'),
-    DisableOption('--skip-test-watchos-simulator',
-                  dest='test_watchos_simulator'),
+    ToggleFalseOption('--skip-build-android', dest='build_android'),
+    ToggleFalseOption('--skip-build-benchmarks', dest='build_benchmarks'),
+    ToggleFalseOption('--skip-build-cygwin', dest='build_cygwin'),
+    ToggleFalseOption('--skip-build-freebsd', dest='build_freebsd'),
+    ToggleFalseOption('--skip-build-ios', dest='build_ios'),
+    ToggleFalseOption('--skip-build-ios-device', dest='build_ios_device'),
+    ToggleFalseOption('--skip-build-ios-simulator',
+                      dest='build_ios_simulator'),
+    ToggleFalseOption('--skip-build-linux', dest='build_linux'),
+    ToggleFalseOption('--skip-build-osx', dest='build_osx'),
+    ToggleFalseOption('--skip-build-tvos', dest='build_tvos'),
+    ToggleFalseOption('--skip-build-tvos-device', dest='build_tvos_device'),
+    ToggleFalseOption('--skip-build-tvos-simulator',
+                      dest='build_tvos_simulator'),
+    ToggleFalseOption('--skip-build-watchos', dest='build_watchos'),
+    ToggleFalseOption('--skip-build-watchos-device',
+                      dest='build_watchos_device'),
+    ToggleFalseOption('--skip-build-watchos-simulator',
+                      dest='build_watchos_simulator'),
+    ToggleFalseOption('--skip-test-android-host', dest='test_android_host'),
+    ToggleFalseOption('--skip-test-cygwin', dest='test_cygwin'),
+    ToggleFalseOption('--skip-test-freebsd', dest='test_freebsd'),
+    ToggleFalseOption('--skip-test-ios', dest='test_ios'),
+    ToggleFalseOption('--skip-test-ios-32bit-simulator',
+                      dest='test_ios_32bit_simulator'),
+    ToggleFalseOption('--skip-test-ios-host', dest='test_ios_host'),
+    ToggleFalseOption('--skip-test-ios-simulator', dest='test_ios_simulator'),
+    ToggleFalseOption('--skip-test-linux', dest='test_linux'),
+    ToggleFalseOption('--skip-test-osx', dest='test_osx'),
+    ToggleFalseOption('--skip-test-tvos', dest='test_tvos'),
+    ToggleFalseOption('--skip-test-tvos-host', dest='test_tvos_host'),
+    ToggleFalseOption('--skip-test-tvos-simulator',
+                      dest='test_tvos_simulator'),
+    ToggleFalseOption('--skip-test-watchos', dest='test_watchos'),
+    ToggleFalseOption('--skip-test-watchos-host', dest='test_watchos_host'),
+    ToggleFalseOption('--skip-test-watchos-simulator',
+                      dest='test_watchos_simulator'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
@@ -524,7 +545,7 @@ EXPECTED_OPTIONS = [
 
     # NOTE: LTO flag is a special case that acts both as an option and has
     # valid choices
-    SetOption('--lto', dest='lto_type'),
+    ConstOption('--lto', dest='lto_type'),
     ChoicesOption('--lto', dest='lto_type', choices=['thin', 'full']),
 
     # NOTE: We'll need to manually test the behavior of these since they

@@ -9,79 +9,22 @@
 
 import os
 import sys
-import unittest
-from contextlib import contextmanager
-from io import StringIO
-
-from swift_build_support.swift_build_support import migration
-from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    get_all_preset_names,
-    get_preset_options,
-)
 
 from . import expected_options as eo
+from .utils import TestCase, UTILS_PATH, redirect_stdout
 from .. import argparse
 from .. import driver_arguments
+from .. import migration
+from .. import presets
 
 
-FILE_PATH = os.path.abspath(__file__)
-TESTS_PATH = os.path.abspath(os.path.join(FILE_PATH, os.pardir))
-BUILD_SWIFT_PATH = os.path.abspath(os.path.join(TESTS_PATH, os.pardir))
-UTILS_PATH = os.path.abspath(os.path.join(BUILD_SWIFT_PATH, os.pardir))
-
-BUILD_SCRIPT_IMPL = os.path.join(UTILS_PATH, 'build-script-impl')
-
-PRESETS_FILES = [
+PRESET_FILES = [
     os.path.join(UTILS_PATH, 'build-presets.ini'),
 ]
 
 
 class ParserError(Exception):
     pass
-
-
-@contextmanager
-def redirect_stderr(stream=None):
-    stream = stream or StringIO()
-    old_stderr, sys.stderr = sys.stderr, stream
-    try:
-        yield stream
-    finally:
-        sys.stderr = old_stderr
-
-
-@contextmanager
-def redirect_stdout(stream=None):
-    stream = stream or StringIO()
-    old_stdout, sys.stdout = sys.stdout, stream
-    try:
-        yield stream
-    finally:
-        sys.stdout = old_stdout
-
-
-def _load_all_presets(presets_files):
-    preset_names = get_all_preset_names(presets_files)
-
-    # Hack to filter out mixins which are not expected to be valid presets
-    preset_names = [n for n in preset_names if not n.startswith('mixin')]
-
-    substitutions = {
-        'install_destdir': '/tmp/install',
-        'install_symroot': '/tmp/symroot',
-        'installable_package': '/tmp/xcode-xyz-root.tar.gz',
-    }
-
-    presets = dict()
-    for name in preset_names:
-        try:
-            # Attempt to parse preset
-            presets[name] = get_preset_options(substitutions,
-                                               presets_files, name)
-        except SystemExit:
-            continue
-
-    return presets
 
 
 class TestDriverArgumentParserMeta(type):
@@ -102,11 +45,12 @@ class TestDriverArgumentParserMeta(type):
             attrs[test_name] = cls.generate_option_test(option)
 
         # Generate tests for each preset
-        presets = _load_all_presets(PRESETS_FILES)
+        parser = presets.PresetParser()
+        parser.read(PRESET_FILES)
 
-        for name, args in presets.items():
-            test_name = 'test_preset_' + name
-            attrs[test_name] = cls.generate_preset_test(name, args)
+        for preset_name in parser.preset_names():
+            test_name = 'test_preset_' + preset_name
+            attrs[test_name] = cls.generate_preset_test(parser, preset_name)
 
         return super(TestDriverArgumentParserMeta, cls).__new__(
             cls, name, bases, attrs)
@@ -118,12 +62,10 @@ class TestDriverArgumentParserMeta(type):
                 parsed_values = self.parse_default_args([])
 
             parsed_value = getattr(parsed_values, dest)
-            if default_value.__class__ is str:
-                parsed_value = str(parsed_value)
 
-            self.assertEqual(default_value, parsed_value,
-                             'Invalid default value for "{}": {} != {}'
-                             .format(dest, default_value, parsed_value))
+            error_msg = 'Invalid default value for "{}": expected {}, got {}' \
+                .format(dest, default_value, parsed_value)
+            self.assertEqual(default_value, parsed_value, error_msg)
 
         return test
 
@@ -137,11 +79,11 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
-    def _generate_set_option_test(cls, option):
+    def _generate_const_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
                 namespace = self.parse_args([option.option_string])
-                self.assertEqual(getattr(namespace, option.dest), option.value)
+                self.assertEqual(getattr(namespace, option.dest), option.const)
 
             with self.assertRaises(ParserError):
                 self.parse_args([option.option_string, 'foo'])
@@ -149,7 +91,7 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
-    def _generate_set_true_option_test(cls, option):
+    def _generate_true_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
                 # TODO: Move to unit-tests for the action class
@@ -162,7 +104,7 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
-    def _generate_set_false_option_test(cls, option):
+    def _generate_false_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
                 # TODO: Move to unit-tests for the action class
@@ -175,7 +117,7 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
-    def _generate_enable_option_test(cls, option):
+    def _generate_toggle_true_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
                 # TODO: Move to unit-tests for the action class
@@ -208,7 +150,7 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
-    def _generate_disable_option_test(cls, option):
+    def _generate_toggle_false_option_test(cls, option):
         def test(self):
             with self.assertNotRaises(ParserError):
                 # TODO: Move to unit-tests for the action class
@@ -316,11 +258,11 @@ class TestDriverArgumentParserMeta(type):
     def generate_option_test(cls, option):
         generate_test_funcs = {
             eo.HelpOption: cls._generate_help_option_test,
-            eo.SetOption: cls._generate_set_option_test,
-            eo.SetTrueOption: cls._generate_set_true_option_test,
-            eo.SetFalseOption: cls._generate_set_false_option_test,
-            eo.EnableOption: cls._generate_enable_option_test,
-            eo.DisableOption: cls._generate_disable_option_test,
+            eo.ConstOption: cls._generate_const_option_test,
+            eo.TrueOption: cls._generate_true_option_test,
+            eo.FalseOption: cls._generate_false_option_test,
+            eo.ToggleTrueOption: cls._generate_toggle_true_option_test,
+            eo.ToggleFalseOption: cls._generate_toggle_false_option_test,
             eo.ChoicesOption: cls._generate_choices_option_test,
             eo.IntOption: cls._generate_int_option_test,
             eo.StrOption: cls._generate_str_option_test,
@@ -341,8 +283,13 @@ class TestDriverArgumentParserMeta(type):
             self.fail('unexpected option "{}"'.format(option.option_string))
 
     @classmethod
-    def generate_preset_test(cls, preset_name, preset_args):
+    def generate_preset_test(cls, preset_parser, preset_name):
         def test(self):
+            # Get the raw, uninterpolated presets since we aren't actually
+            # building
+            preset = preset_parser.get_preset(preset_name, raw=True)
+            preset_args = migration.migrate_swift_sdks(preset.format_args())
+
             try:
                 self.parse_default_args(preset_args, check_impl_args=True)
             except ParserError as e:
@@ -352,15 +299,9 @@ class TestDriverArgumentParserMeta(type):
         return test
 
 
-class TestDriverArgumentParser(unittest.TestCase):
+class TestDriverArgumentParser(TestCase):
 
     __metaclass__ = TestDriverArgumentParserMeta
-
-    @contextmanager
-    def _quiet_output(self):
-        with open(os.devnull, 'w') as devnull:
-            with redirect_stderr(devnull), redirect_stdout(devnull):
-                yield
 
     def _parse_args(self, args):
         try:
@@ -370,11 +311,10 @@ class TestDriverArgumentParser(unittest.TestCase):
                               str(args), e)
 
     def _check_impl_args(self, namespace):
-        assert hasattr(namespace, 'build_script_impl_args')
+        self.assertTrue(hasattr(namespace, 'build_script_impl_args'))
 
         try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL,
-                                      namespace.build_script_impl_args)
+            migration.check_impl_args(namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
             raise ParserError('failed to parse impl arguments: ' +
                               str(namespace.build_script_impl_args), e)
@@ -383,11 +323,11 @@ class TestDriverArgumentParser(unittest.TestCase):
         if namespace is None:
             namespace = argparse.Namespace()
 
-        with self._quiet_output():
+        supercls = super(self.parser.__class__, self.parser)
+        with self.quietOutput():
             try:
-                namespace, unknown_args =\
-                    super(self.parser.__class__, self.parser)\
-                    .parse_known_args(args, namespace)
+                namespace, unknown_args = \
+                    supercls.parse_known_args(args, namespace)
             except (SystemExit, argparse.ArgumentError) as e:
                 raise ParserError('failed to parse arguments: ' + str(args), e)
 
@@ -397,22 +337,13 @@ class TestDriverArgumentParser(unittest.TestCase):
         return namespace
 
     def parse_default_args(self, args, check_impl_args=False):
-        with self._quiet_output():
+        with self.quietOutput():
             namespace = self._parse_args(args)
 
             if check_impl_args:
                 self._check_impl_args(namespace)
 
             return namespace
-
-    @contextmanager
-    def assertNotRaises(self, exception):
-        assert issubclass(exception, BaseException)
-
-        try:
-            yield
-        except exception as e:
-            self.fail(str(e))
 
     def setUp(self):
         self.parser = driver_arguments.create_argument_parser()
@@ -689,7 +620,3 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_tvos_host)
             self.assertFalse(namespace.test_watchos_host)
             self.assertFalse(namespace.test_android_host)
-
-
-if __name__ == '__main__':
-    unittest.main()
