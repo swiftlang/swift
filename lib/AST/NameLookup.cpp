@@ -1273,7 +1273,7 @@ static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
     IterableDeclContext *IDC) {
   for (auto m : IDC->getCurrentMembersWithoutLoading()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getFullName().matchesRef(name)) {
+      if (v->getFullName().matchesRef(name.getBaseName())) {
         LookupTable.addMember(m);
       }
     }
