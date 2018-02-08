@@ -665,7 +665,7 @@ static void initLLVMModule(const IRGenModule &IGM) {
 }
 
 std::pair<IRGenerator *, IRGenModule *>
-swift::irgen::createIRGenModule(SILModule *SILMod,
+swift::irgen::createIRGenModule(SILModule *SILMod, PrimarySpecificPaths PSPs,
                                 llvm::LLVMContext &LLVMContext) {
 
   IRGenOptions Opts;
@@ -675,9 +675,8 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
     return std::make_pair(nullptr, nullptr);
 
   // Create the IR emitter.
-  IRGenModule *IGM =
-      new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.getSingleOutputFilename());
+  IRGenModule *IGM = new IRGenModule(*irgen, std::move(targetMachine), nullptr,
+                                     LLVMContext, "", PSPs);
 
   initLLVMModule(*IGM);
 
@@ -712,14 +711,11 @@ static void runIRGenPreparePasses(SILModule &Module,
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
-static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                         swift::ModuleDecl *M,
-                                            std::unique_ptr<SILModule> SILMod,
-                                                         StringRef ModuleName,
-                                                 llvm::LLVMContext &LLVMContext,
-                                                       SourceFile *SF = nullptr,
-                                 llvm::GlobalVariable **outModuleHash = nullptr,
-                                                       unsigned StartElem = 0) {
+static std::unique_ptr<llvm::Module> performIRGeneration(
+    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths PSPs,
+    llvm::LLVMContext &LLVMContext, SourceFile *SF = nullptr,
+    llvm::GlobalVariable **outModuleHash = nullptr, unsigned StartElem = 0) {
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
 
@@ -729,8 +725,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  LLVMContext, ModuleName, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
+                  ModuleName, PSPs);
 
   initLLVMModule(IGM);
 
@@ -830,7 +826,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
                     IGM.Context.LangOpts.EffectiveLanguageVersion,
-                    IGM.OutputFilename, IGM.Context.Stats))
+                    IGM.PSPs.OutputFilename, IGM.Context.Stats))
       return nullptr;
   }
 
@@ -840,17 +836,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
   while (IRGenModule *IGM = irgen->fetchFromQueue()) {
-    DEBUG(
-      DiagMutex->lock();
-      dbgs() << "thread " << ThreadIdx << ": fetched " << IGM->OutputFilename <<
-          "\n";
-      DiagMutex->unlock();
-    );
+    DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx << ": fetched "
+                                    << IGM->PSPs.OutputFilename << "\n";
+          DiagMutex->unlock(););
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, &IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
                 IGM->getModule(), IGM->TargetMachine.get(),
                 IGM->Context.LangOpts.EffectiveLanguageVersion,
-                IGM->OutputFilename, IGM->Context.Stats);
+                IGM->PSPs.OutputFilename, IGM->Context.Stats);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -866,7 +859,9 @@ static void ThreadEntryPoint(IRGenerator *irgen,
 static void performParallelIRGeneration(IRGenOptions &Opts,
                                         swift::ModuleDecl *M,
                                         std::unique_ptr<SILModule> SILMod,
-                                        StringRef ModuleName, int numThreads) {
+                                        const PrimarySpecificPaths PSPs,
+                                        StringRef ModuleName, int numThreads,
+                                        ArrayRef<std::string> outputFilenames) {
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -884,8 +879,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       }
     }
   } _igmDeleter(irgen);
-  
-  auto OutputIter = Opts.OutputFilenames.begin();
+
+  auto OutputIter = outputFilenames.begin();
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
@@ -898,7 +893,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
-    if (OutputIter == Opts.OutputFilenames.end()) {
+    if (OutputIter == outputFilenames.end()) {
       // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
@@ -912,9 +907,10 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
-                                       nextSF, *Context,
-                                       ModuleName, *OutputIter++);
+    IRGenModule *IGM = new IRGenModule(
+        irgen, std::move(targetMachine), nextSF, *Context, ModuleName,
+        PrimarySpecificPaths(*OutputIter++, nextSF->getFilename(),
+                             PSPs.SupplementaryOutputs));
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -1074,38 +1070,37 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
 }
 
-
-std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
-                    std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, llvm::LLVMContext &LLVMContext,
-                    llvm::GlobalVariable **outModuleHash) {
-  if (SILMod->getOptions().shouldPerformIRGenerationInParallel()) {
+std::unique_ptr<llvm::Module> swift::performIRGeneration(
+    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths PSPs,
+    llvm::LLVMContext &LLVMContext,
+    ArrayRef<std::string> parallelOutputFilenames,
+    llvm::GlobalVariable **outModuleHash) {
+  if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
+      !parallelOutputFilenames.empty()) {
     auto NumThreads = SILMod->getOptions().NumThreads;
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  NumThreads);
+    ::performParallelIRGeneration(Opts, M, std::move(SILMod), PSPs, ModuleName,
+                                  NumThreads, parallelOutputFilenames);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;
   }
-  return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName,
+  return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
                                LLVMContext, nullptr, outModuleHash);
 }
 
-std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
-                    std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, llvm::LLVMContext &LLVMContext,
-                    unsigned StartElem,
-                    llvm::GlobalVariable **outModuleHash) {
-  return ::performIRGeneration(Opts, SF.getParentModule(),
-                               std::move(SILMod), ModuleName,
-                               LLVMContext, &SF, outModuleHash, StartElem);
+std::unique_ptr<llvm::Module> swift::performIRGeneration(
+    IRGenOptions &Opts, SourceFile &SF, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths PSPs,
+    llvm::LLVMContext &LLVMContext, unsigned StartElem,
+    llvm::GlobalVariable **outModuleHash) {
+  return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
+                               ModuleName, PSPs, LLVMContext, &SF,
+                               outModuleHash, StartElem);
 }
 
-void
-swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
-                                   StringRef OutputPath) {
+void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+                                        StringRef OutputPath) {
   LLVMContext VMContext;
 
   auto &Ctx = SILMod.getASTContext();
@@ -1118,8 +1113,9 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return;
 
+  PrimarySpecificPaths PSPs(OutputPath);
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, Opts.getSingleOutputFilename());
+                  OutputPath, PSPs);
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -1148,13 +1144,12 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(),
-                Ctx.LangOpts.EffectiveLanguageVersion,
+                IGM.TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
                 OutputPath);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module,
+                        llvm::Module *Module, StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
@@ -1163,9 +1158,8 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(),
-                    Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleOutputFilename(), Stats))
+                    TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
+                    OutputFilename, Stats))
     return true;
   return false;
 }
