@@ -523,6 +523,13 @@ extension StrideTo: CustomReflectable {
   }
 }
 
+extension StrideTo: CustomStringConvertible {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var description: String {
+    return "StrideTo(start: \(_start), end: \(_end), stride: \(_stride))"
+  }
+}
+
 extension StrideTo: Collection
 where Element.Stride: BinaryInteger {
   public typealias Index = Int
@@ -742,6 +749,13 @@ extension StrideThrough: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])
+  }
+}
+
+extension StrideThrough: CustomStringConvertible {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var description: String {
+    return "StrideThrough(start: \(_start), end: \(_end), stride: \(_stride))"
   }
 }
 
