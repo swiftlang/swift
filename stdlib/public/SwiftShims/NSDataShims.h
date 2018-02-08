@@ -21,7 +21,7 @@ FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorFree;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorNone;
 
 @interface NSData (FoundationSPI)
-- (BOOL)_isCompact;
+- (BOOL)_isCompact API_AVAILABLE(macos(10.10), ios(8.0), watchos(2.0), tvos(9.0));
 @end
 
 NS_END_DECLS
