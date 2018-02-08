@@ -144,14 +144,6 @@ RankedTensorTests.testCPUAndGPU("Transpose") {
   expectEqual([1, 3, 5, 2, 4, 6], xT.units)
 }
 
-RankedTensorTests.testCPUAndGPU("Reverse") {
-  // Shape: 3 x 2
-  let reversed = Tensor2D([[1, 2], [3, 4], [5, 6]]).reversed(alongAxes: [1])
-  expectEqual(2, reversed.rank)
-  expectEqual([3, 2], reversed.shape)
-  expectEqual([2, 1, 4, 3, 6, 5], reversed.units)
-}
-
 // FIXME: The While op doesn't work on the CPU.
 RankedTensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100

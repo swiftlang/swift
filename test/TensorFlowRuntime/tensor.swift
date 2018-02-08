@@ -138,15 +138,6 @@ TensorTests.testCPUAndGPU("Transpose") {
   expectEqual([1, 3, 5, 2, 4, 6], xTArray.units)
 }
 
-TensorTests.testCPUAndGPU("Reverse") {
-  // Shape: 3 x 2
-  let reversed = Tensor([[1, 2], [3, 4], [5, 6]]).reversed(alongAxes: [1])
-  let reversedArray = reversed.array
-  expectEqual(2, reversedArray.rank)
-  expectEqual([3, 2], reversedArray.shape)
-  expectEqual([2, 1, 4, 3, 6, 5], reversedArray.units)
-}
-
 // FIXME: The While op doesn't work on the CPU.
 TensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
@@ -163,6 +154,8 @@ TensorTests.testGPU("simpleCounterLoop") {
   expectEqual(8, a.scalar)
 }
 
+// FIXME: Partitioner bug (b/72997202)
+#if false // Remove #if when fixed.
 // This is derived from a TF Eager testcase.
 TensorTests.testGPU("loopsAndConditions") {
   var a = Tensor<Int>(6)
@@ -177,6 +170,7 @@ TensorTests.testGPU("loopsAndConditions") {
   }
   expectEqual(8, count.scalar)
 }
+#endif
 
 @inline(never)
 func testXORInference() {
@@ -250,11 +244,11 @@ TensorTests.testCPUAndGPU("ReshapeScalar") {
   expectEqual([], z.shape)
 }
 
-#if false // FIXME: Fix transpose/zeros issue.
-TensorTests.testCPUAndGPU("StraightLineXORTraining") {
+TensorTests.testGPU("StraightLineXORTraining") {
   // Hyper-parameters
   let iterationCount = 1000
   let learningRate: Float = 0.2
+  var loss = Float.infinity
 
   // Parameters
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
@@ -263,54 +257,38 @@ TensorTests.testCPUAndGPU("StraightLineXORTraining") {
   var b2 = Tensor<Float>(shape: [1, 1], repeating: 0.0)
 
   // Training data
-  let inputBatch = Tensor<Float>(
+  let x = Tensor<Float>(
     shape: [4, 2],
     units: [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
   )
-  let outputBatch = Tensor<Float>(
+  let y = Tensor<Float>(
     shape: [4, 1],
     units: [0.0, 1.0, 1.0, 0.0]
   )
 
   // Training loop
-  for _ in 0..<iterationCount {
-    let mmul1 = inputBatch ⊗ w1
-    let l1 = mmul1 + b1
-    // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
-    // `sigmoid` is @_inlineable, and it should not need send/receive.
-    let o1 = sigmoid(l1)
-    let mmul2 = o1 ⊗ w2
-    let l2 = mmul2 + b2
-    // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
-    // `sigmoid` is @_inlineable, and it should not need send/receive.
-    let pred = sigmoid(l2)
+  // FIXME: Partitioner bug (b/72997202)
+  // Uncomment for loop when fixed.
+  // for _ in 0..<iterationCount {
+    let z1 = x.dot(w1) + b1
+    let h1 = sigmoid(z1)
+    let z2 = h1.dot(w2) + b2
+    let pred = sigmoid(z2)
 
-    // Loss
-    let sub = outputBatch - pred
-    let sqr = sub * sub
-
-    // Gradient
-    let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
-    let dSub = 2 * sub * dSqr
-    let dPred = -dSub
-    let dL2 = dPred * pred * (1 - pred)
-    let dMmul2 = dL2
-    let dB2 = dL2
-    let dO1 = dMmul2 ⊗ w2.transposed()
-    let dW2 = o1.transposed() ⊗ dMmul2
-    let dL1 = dO1 * l1 * (1 - l1)
-    let dMmul1 = dL1
-    let dB1 = dL1
-    let dW1 = inputBatch ⊗ dMmul1
+    let dz2 = pred - y
+    let dw2 = h1.transposed(withPermutations: 1, 0).dot(dz2)
+    let db2 = dz2.sum(alongAxes: [0])
+    let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+    let dw1 = x.transposed(withPermutations: 1, 0).dot(dz1)
+    let db1 = dz1.sum(alongAxes: [0])
 
     // Descent
-    w1 -= (dW1 * learningRate)
-    b1 -= (dB1 * learningRate)
-    w2 -= (dW2 * learningRate)
-    b2 -= (dB2 * learningRate)
-  }
+    w1 -= (dw1 * learningRate)
+    b1 -= (db1 * learningRate)
+    w2 -= (dw2 * learningRate)
+    b2 -= (db2 * learningRate)
+  // }
 }
-#endif
 
 // FIXME: Partitioner unreachable: Unmapped value while cloning?
 #if false
