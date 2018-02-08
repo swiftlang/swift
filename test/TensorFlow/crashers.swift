@@ -43,7 +43,7 @@ public func sinking_crash(w1: Tensor<Float>) {
   // expected-warning @-1 {{'w1' implicitly copied to the accelerator}}
   for _ in 0..<1000 {
     let pred = w1+w1  // expected-note {{value used here}}
-    let _ = 1.0 / Tensor<Float>(pred.unitCountTensor)
+    let _ = 1.0 / Tensor<Float>(pred.scalarCountTensor)
   }
 }
 
@@ -104,7 +104,7 @@ public func testStraightLineXORTraining() {
     let _ = sub * sub
 
     // Gradient
-    let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
+    let dSqr = 1 / Tensor<Float>(pred.scalarCountTensor)
     let dSub = 2 * sub * dSqr
     let dPred = -dSub
     let dL2 = dPred * pred * (1 - pred)
