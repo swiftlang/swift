@@ -1516,3 +1516,14 @@ do {
   takeFn(fn: { (pair: (Int, Int?)) in } )
   takeFn { (pair: (Int, Int?)) in }
 }
+
+// https://bugs.swift.org/browse/SR-6796
+do {
+  func f(a: (() -> Void)? = nil) {}
+  func log<T>() -> ((T) -> Void)? { return nil }
+
+  f(a: log() as ((()) -> Void)?) // Allow ((()) -> Void)? to be passed in place of (() -> Void)?
+
+  func logNoOptional<T>() -> (T) -> Void { }
+  f(a: logNoOptional() as ((()) -> Void)) // Also allow the optional-injected form.
+}
