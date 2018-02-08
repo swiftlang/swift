@@ -3843,6 +3843,12 @@ public:
     return getExtInfo().isNoEscape();
   }
 
+  /// Thick swift noescape function types are trivial.
+  bool isTrivialNoEscape() const {
+    return isNoEscape() &&
+           getRepresentation() == SILFunctionTypeRepresentation::Thick;
+  }
+
   bool isNoReturnFunction(); // Defined in SILType.cpp
 
   class ABICompatibilityCheckResult {
