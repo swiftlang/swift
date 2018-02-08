@@ -46,6 +46,7 @@ import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
 import DictTest3
+import DictTest4
 import DictionaryBridge
 import DictionaryGroup
 import DictionaryLiteral
@@ -189,6 +190,7 @@ registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
+registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
