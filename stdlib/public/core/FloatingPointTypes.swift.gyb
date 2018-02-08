@@ -1488,18 +1488,6 @@ extension ${Self} {
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
   }
-
-  // FIXME(integers): implement properly
-  /// Creates a value that exactly represents the given integer.
-  ///
-  /// If the given integer is outside the representable range of this type or
-  /// can't be represented exactly, the result is `nil`.
-  ///
-  /// - Parameter source: The integer to represent as a floating-point value.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init?<T : BinaryInteger>(exactly source: T) {
-    fatalError()
-  }
 }
 
 extension ${Self} {

@@ -175,10 +175,12 @@ public:
   }
 
   void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.SerializedDiagnosticsPath = Path;
+    FrontendOpts.InputsAndOutputs.supplementaryOutputs()
+        .SerializedDiagnosticsPath = Path;
   }
   StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.SerializedDiagnosticsPath;
+    return FrontendOpts.InputsAndOutputs.supplementaryOutputs()
+        .SerializedDiagnosticsPath;
   }
 
   LangOptions &getLangOptions() {
