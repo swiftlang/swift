@@ -43,7 +43,7 @@ public:
         Diags(diags) {}
 
   bool convert(std::vector<std::string> &mainOutputs,
-               SupplementaryOutputPaths &supplementaryOutputs);
+               std::vector<SupplementaryOutputPaths> &supplementaryOutputs);
 
   /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.

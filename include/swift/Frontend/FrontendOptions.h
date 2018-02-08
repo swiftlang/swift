@@ -39,7 +39,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(const std::string &)> fn) const;
+                         std::function<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -199,7 +199,8 @@ public:
   bool ImportUnderlyingModule = false;
 
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
-  /// by the Clang importer as part of semantic analysis.
+  /// by the Clang importer as part of semantic analysis if the ModuleOutputPath
+  /// for the primary input being compiled is not empty.
   bool SerializeBridgingHeader = false;
 
   /// Indicates whether or not the frontend should print statistics upon
@@ -282,8 +283,10 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
 private:
   static bool canActionEmitDependencies(ActionType);

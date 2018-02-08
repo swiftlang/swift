@@ -441,7 +441,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
 bool ArgsToFrontendOptionsConverter::
     computeMainAndSupplementaryOutputFilenames() {
   std::vector<std::string> mainOutputs;
-  SupplementaryOutputPaths supplementaryOutputs;
+  std::vector<SupplementaryOutputPaths> supplementaryOutputs;
   const bool hadError = ArgsToFrontendOutputsConverter(
                             Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
                             .convert(mainOutputs, supplementaryOutputs);
@@ -487,9 +487,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-        !Opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {

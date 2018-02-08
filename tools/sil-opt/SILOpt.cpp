@@ -427,9 +427,9 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
       auto T = irgen::createIRGenModule(
-          SILMod, PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
+          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
           getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);

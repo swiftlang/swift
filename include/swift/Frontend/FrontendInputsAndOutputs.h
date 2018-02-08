@@ -35,8 +35,9 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
+  llvm::StringMap<unsigned> InputsByName;
 
-  llvm::StringMap<unsigned> PrimaryInputs;
+  std::vector<unsigned> PrimaryInputs;
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
@@ -45,24 +46,9 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
-  SupplementaryOutputPaths SupplementaryOutputs;
-
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
-
-  const SupplementaryOutputPaths &supplementaryOutputs() const {
-    return SupplementaryOutputs;
-  }
-  SupplementaryOutputPaths &supplementaryOutputs() {
-    return SupplementaryOutputs;
-  }
-
-  /// When performing a compilation for zero or one primary input file,
-  /// this will hold the PrimarySpecificPaths.
-  /// In a future PR, each InputFile will hold its own PrimarySpecificPaths and
-  /// this will go away.
-  PrimarySpecificPaths PrimarySpecificPathsForAtMostOnePrimary;
 
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
@@ -88,6 +74,8 @@ public:
 
   std::vector<std::string> getInputFilenames() const;
 
+  const InputFile &inputNamed(StringRef name) const;
+
   unsigned inputCount() const { return AllInputs.size(); }
 
   bool hasInputs() const { return !AllInputs.empty(); }
@@ -103,15 +91,17 @@ public:
 
   bool isReadingFromStdin() const;
 
-  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const;
+  /// If \p fn returns true, exits early and returns true;
+  bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   // Primaries:
 
   const InputFile &firstPrimaryInput() const;
   const InputFile &lastPrimaryInput() const;
 
-  void
-  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const;
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
@@ -143,11 +133,10 @@ public:
 
   const InputFile &getRequiredUniquePrimaryInput() const;
 
-  /// \return the name of the unique primary input, or an empty StrinRef if
-  /// there isn't one.
-  StringRef getNameOfUniquePrimaryInputFile() const;
-
-  /// Combines all primaries for stats reporter
+  /// Should combine all primaries for stats reporter
+  /// Today, just answers "batch" if > 1, so it could
+  /// return a StringRef, but someday will have to fabricate
+  /// a temporary string.
   std::string getStatsFileMangledInputName() const;
 
   bool isInputPrimary(StringRef file) const;
@@ -181,9 +170,9 @@ public:
 private:
   friend class ArgsToFrontendOptionsConverter;
 
-  void
-  setMainAndSupplementaryOutputs(ArrayRef<std::string> outputFiles,
-                                 SupplementaryOutputPaths supplementaryOutputs);
+  void setMainAndSupplementaryOutputs(
+      ArrayRef<std::string> outputFiles,
+      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
@@ -198,13 +187,14 @@ public:
   /// Under single-threaded WMO, we pretend that the first input
   /// generates the main output, even though it will include code
   /// generated from all of them.
-  void forEachInputProducingAMainOutputFile(
-      llvm::function_ref<void(const InputFile &)> fn) const;
+  ///
+  /// If \pfn returns true, return early and return true.
+  bool forEachInputProducingAMainOutputFile(
+      llvm::function_ref<bool(const InputFile &)> fn) const;
 
   std::vector<std::string> copyOutputFilenames() const;
 
-  void
-  forEachOutputFilename(llvm::function_ref<void(const std::string &)> fn) const;
+  void forEachOutputFilename(llvm::function_ref<void(StringRef)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
@@ -218,17 +208,22 @@ public:
 
   unsigned countOfFilesProducingSupplementaryOutput() const;
 
-  void forEachInputProducingSupplementaryOutput(
-      llvm::function_ref<void(const InputFile &)> fn) const;
+  /// If \p fn returns true, exit early and return true.
+  bool forEachInputProducingSupplementaryOutput(
+      llvm::function_ref<bool(const InputFile &)> fn) const;
 
   /// Assumes there is not more than one primary input file, if any.
   /// Otherwise, you would need to call getPrimarySpecificPathsForPrimary
   /// to tell it which primary input you wanted the outputs for.
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
-  PrimarySpecificPaths
-  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  bool hasSupplementaryOutputPath(
+      llvm::function_ref<const std::string &(const SupplementaryOutputPaths &)>
+          extractorFn) const;
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
@@ -236,7 +231,6 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
-  bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
 };
