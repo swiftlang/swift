@@ -132,16 +132,22 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
-  llvm::sys::fs::rename(opts.ReferenceDependenciesFilePath,
-                        opts.ReferenceDependenciesFilePath + "~");
+  llvm::sys::fs::rename(opts.InputsAndOutputs.supplementaryOutputs()
+                            .ReferenceDependenciesFilePath,
+                        opts.InputsAndOutputs.supplementaryOutputs()
+                                .ReferenceDependenciesFilePath +
+                            "~");
 
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(opts.InputsAndOutputs.supplementaryOutputs()
+                               .ReferenceDependenciesFilePath,
+                           EC, llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.ReferenceDependenciesFilePath, EC.message());
+                   opts.InputsAndOutputs.supplementaryOutputs()
+                       .ReferenceDependenciesFilePath,
+                   EC.message());
     out.clear_error();
     return true;
   }

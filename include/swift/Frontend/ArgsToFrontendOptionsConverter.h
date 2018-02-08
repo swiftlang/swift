@@ -37,7 +37,7 @@ private:
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
-  bool computeOutputFilenames();
+  bool computeMainAndSupplementaryOutputFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -52,7 +52,7 @@ private:
 
   bool setUpForSILOrLLVM();
 
-  void determineSupplementaryOutputFilenames();
+  bool checkUnusedSupplementaryOutputPaths() const;
 
   /// \returns the output filenames on the command line or in the output
   /// filelist, or an empty vector if there were neither -o's nor an output

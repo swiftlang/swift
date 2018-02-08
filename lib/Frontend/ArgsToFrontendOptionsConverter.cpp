@@ -111,16 +111,17 @@ bool ArgsToFrontendOptionsConverter::convert() {
   if (computeModuleName())
     return true;
 
-  if (computeOutputFilenames())
-    return true;
-  determineSupplementaryOutputFilenames();
-
-  if (checkForUnusedOutputPaths())
+  if (computeMainAndSupplementaryOutputFilenames())
     return true;
 
-  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
+  if (checkUnusedSupplementaryOutputPaths())
+    return true;
+
+  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path))
+    Opts.FixitsOutputPath = A->getValue();
+
+  if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
-  }
 
   Opts.AlwaysSerializeDebuggingOptions |=
       Args.hasArg(OPT_serialize_debugging_options);
@@ -431,108 +432,45 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   return false;
 }
 
-bool ArgsToFrontendOptionsConverter::computeOutputFilenames() {
-  Optional<std::vector<std::string>> outs =
-      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
-                                     Opts.InputsAndOutputs, Diags)
-          .convert();
-  if (!outs)
+bool ArgsToFrontendOptionsConverter::
+    computeMainAndSupplementaryOutputFilenames() {
+  std::vector<std::string> mainOutputs;
+  SupplementaryOutputPaths supplementaryOutputs;
+  const bool hadError = ArgsToFrontendOutputsConverter(
+                            Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
+                            .convert(mainOutputs, supplementaryOutputs);
+  if (hadError)
     return true;
-  if (FrontendOptions::doesActionProduceOutput(Opts.RequestedAction))
-    Opts.InputsAndOutputs.setMainOutputs(*outs);
-  else
-    assert(outs->empty() &&
-           "cannot have main outputs for actions that don't produce outputs");
+  Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
+                                                       supplementaryOutputs);
   return false;
 }
 
-void ArgsToFrontendOptionsConverter::determineSupplementaryOutputFilenames() {
-  using namespace options;
-  auto determineOutputFilename =
-      [&](std::string &output, OptSpecifier optWithoutPath,
-          OptSpecifier optWithPath, const char *extension, bool useMainOutput) {
-        if (const Arg *A = Args.getLastArg(optWithPath)) {
-          Args.ClaimAllArgs(optWithoutPath);
-          output = A->getValue();
-          return;
-        }
-
-        if (!Args.hasArg(optWithoutPath))
-          return;
-
-        if (useMainOutput &&
-            !Opts.InputsAndOutputs.getSingleOutputFilename().empty()) {
-          output = Opts.InputsAndOutputs.getSingleOutputFilename();
-          return;
-        }
-
-        if (!output.empty())
-          return;
-
-        llvm::SmallString<128> path(Opts.originalPath());
-        llvm::sys::path::replace_extension(path, extension);
-        output = path.str();
-      };
-
-  determineOutputFilename(Opts.DependenciesFilePath, OPT_emit_dependencies,
-                          OPT_emit_dependencies_path, "d", false);
-  determineOutputFilename(
-      Opts.ReferenceDependenciesFilePath, OPT_emit_reference_dependencies,
-      OPT_emit_reference_dependencies_path, "swiftdeps", false);
-  determineOutputFilename(Opts.SerializedDiagnosticsPath,
-                          OPT_serialize_diagnostics,
-                          OPT_serialize_diagnostics_path, "dia", false);
-  determineOutputFilename(Opts.ObjCHeaderOutputPath, OPT_emit_objc_header,
-                          OPT_emit_objc_header_path, "h", false);
-  determineOutputFilename(
-      Opts.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
-      OPT_emit_loaded_module_trace_path, "trace.json", false);
-
-  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
-                          false);
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
-    Opts.FixitsOutputPath = A->getValue();
-  }
-
-  bool isSIB = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ||
-               Opts.RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
-  bool canUseMainOutputForModule =
-      Opts.RequestedAction == FrontendOptions::ActionType::MergeModules ||
-      Opts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
-      isSIB;
-  auto ext = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
-  auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
-                    ? OPT_emit_sib
-                    : OPT_emit_sibgen;
-  determineOutputFilename(Opts.ModuleOutputPath,
-                          isSIB ? sibOpt : OPT_emit_module,
-                          OPT_emit_module_path, ext, canUseMainOutputForModule);
-
-  determineOutputFilename(Opts.ModuleDocOutputPath, OPT_emit_module_doc,
-                          OPT_emit_module_doc_path,
-                          SERIALIZED_MODULE_DOC_EXTENSION, false);
-}
-
-bool ArgsToFrontendOptionsConverter::checkForUnusedOutputPaths() const {
-  if (Opts.hasUnusedDependenciesFilePath()) {
+bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
+    const {
+  if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasDependenciesPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusedLoadedModuleTracePath()) {
+  if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusedModuleOutputPath()) {
+  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusedModuleDocOutputPath()) {
+  if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
@@ -543,8 +481,9 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-                                    !Opts.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |=
+        !Opts.InputsAndOutputs.hasPrimaryInputs() &&
+        !Opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
