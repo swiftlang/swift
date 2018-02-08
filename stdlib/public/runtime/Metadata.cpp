@@ -2739,8 +2739,7 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // The number of mandatory requirements, i.e. requirements lacking
   // default implementations.
-  size_t numMandatoryRequirements = protocol->NumMandatoryRequirements;
-  assert(numPatternWitnesses >= numMandatoryRequirements);
+  assert(numPatternWitnesses >= protocol->NumMandatoryRequirements);
 
   // The total number of requirements.
   size_t numRequirements = protocol->NumRequirements;
