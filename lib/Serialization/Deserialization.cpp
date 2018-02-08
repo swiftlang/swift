@@ -1264,18 +1264,22 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
   case XREF_TYPE_PATH_PIECE:
   case XREF_VALUE_PATH_PIECE: {
     IdentifierID IID;
+    IdentifierID privateDiscriminator = 0;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool inProtocolExt = false;
     bool isStatic = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
+      XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
+                                          inProtocolExt);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                            isStatic);
 
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
+    if (privateDiscriminator)
+      pathTrace.addValue(getIdentifier(privateDiscriminator));
 
     Type filterTy;
     if (!isType) {
@@ -1290,9 +1294,14 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
-    baseModule->lookupQualified(ModuleType::get(baseModule), name,
-                                NL_QualifiedDefault | NL_KnownNoDependency,
-                                /*typeResolver=*/nullptr, values);
+    if (privateDiscriminator) {
+      baseModule->lookupMember(values, baseModule, name,
+                               getIdentifier(privateDiscriminator));
+    } else {
+      baseModule->lookupQualified(ModuleType::get(baseModule), name,
+                                  NL_QualifiedDefault | NL_KnownNoDependency,
+                                  /*typeResolver=*/nullptr, values);
+    }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
                  None, values);
     break;
@@ -1348,7 +1357,7 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, None);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None);
         result = getIdentifier(IID);
         break;
       }
@@ -1405,8 +1414,13 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         // Fast path for nested types that avoids deserializing all
         // members of the parent type.
         IdentifierID IID;
+        IdentifierID privateDiscriminator;
         bool onlyInNominal = false;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
+                                            onlyInNominal);
+        if (privateDiscriminator)
+          goto giveUpFastPath;
+
         Identifier memberName = getIdentifier(IID);
         pathTrace.addValue(memberName);
 
@@ -1449,21 +1463,25 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
 
         pathTrace.removeLast();
       }
+giveUpFastPath:
       LLVM_FALLTHROUGH;
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
       DeclBaseName memberName;
+      Identifier privateDiscriminator;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool inProtocolExt = false;
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
-        IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
+        IdentifierID IID, discriminatorID;
+        XRefTypePathPieceLayout::readRecord(scratch, IID, discriminatorID,
+                                            inProtocolExt);
         memberName = getDeclBaseName(IID);
+        privateDiscriminator = getIdentifier(discriminatorID);
         isType = true;
         break;
       }
@@ -1490,6 +1508,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       }
 
       pathTrace.addValue(memberName);
+      if (!privateDiscriminator.empty())
+        pathTrace.addPrivateDiscriminator(privateDiscriminator);
 
       Type filterTy;
       if (!isType) {
@@ -1519,8 +1539,17 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
                                            getXRefDeclNameForError());
       }
 
-      auto members = nominal->lookupDirect(memberName);
-      values.append(members.begin(), members.end());
+      if (!privateDiscriminator.empty()) {
+        ModuleDecl *searchModule = M;
+        if (!searchModule)
+          searchModule = nominal->getModuleContext();
+        searchModule->lookupMember(values, nominal, memberName,
+                                   privateDiscriminator);
+
+      } else {
+        auto members = nominal->lookupDirect(memberName);
+        values.append(members.begin(), members.end());
+      }
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
                    ctorInit, values);
       break;

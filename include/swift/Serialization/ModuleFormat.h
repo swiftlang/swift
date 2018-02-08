@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 391; // Last change: normal protocol conformance
+const uint16_t VERSION_MINOR = 392; // Private discriminators for type xrefs
 
 using DeclIDField = BCFixed<31>;
 
@@ -1263,6 +1263,7 @@ namespace decls_block {
   using XRefTypePathPieceLayout = BCRecordLayout<
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
+    IdentifierIDField, // private discriminator
     BCFixed<1>         // restrict to protocol extension
   >;
 
