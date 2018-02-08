@@ -12,15 +12,70 @@ Temporary module with functionaly used to migrate away from build-script-impl.
 """
 
 
+import os
+import sys
+
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
+from . import shell
+
 
 __all__ = [
+    'BUILD_SCRIPT_IMPL_PATH',
+    'parse_args',
+    'check_impl_args',
+
     'UnknownSDKError',
     'migrate_swift_sdks',
 ]
 
+
+BUILD_SCRIPT_IMPL_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__),
+    os.pardir,
+    'build-script-impl',
+))
+
+
+def parse_args(parser, argv=None):
+    """Parse arguments list with given argparse.ArgumentParser.argv
+
+    Returns a preprocessed list of arguments. Unknown arguments are stored on
+    the resulting namespace in the attribute `build_script_impl_args`. The
+    deprecated '--' argument separator is removed from the parsed argument
+    list.
+    """
+
+    if argv is None:
+        argv = sys.argv
+
+    # Remove the '--' separator, which is no longer needed
+    argv = [arg for arg in argv if arg != '--']
+
+    args, unknown_args = parser.parse_known_args(argv)
+    args.build_script_impl_args = unknown_args
+
+    return args
+
+
+def check_impl_args(args, command_executor=None):
+    """Verifies that args are kown `build-script-impl` arguments. Raises a
+    ValueError if an invalid argument is encountered.
+    """
+
+    sh = command_executor or shell.CommandExecutor()
+
+    command = [BUILD_SCRIPT_IMPL_PATH, '--check-args-only=1'] + args
+    pipe = sh.popen(command, stdin=shell.PIPE, stderr=shell.PIPE)
+    _, err = pipe.communicate()
+
+    if pipe.returncode != 0:
+        message = err.splitlines()[0].strip()
+        raise ValueError(message)
+
+
+# -----------------------------------------------------------------------------
 
 _SDK_TARGETS = {
     'OSX': StdlibDeploymentTarget.OSX.targets,
@@ -32,8 +87,6 @@ _SDK_TARGETS = {
     'WATCHOS_SIMULATOR': StdlibDeploymentTarget.AppleWatchSimulator.targets,
 }
 
-
-# -----------------------------------------------------------------------------
 
 class UnknownSDKError(Exception):
     """Error indicating an unknown SDK was encountered when migrating to target

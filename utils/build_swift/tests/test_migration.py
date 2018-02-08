@@ -9,6 +9,7 @@
 
 from .utils import TestCase
 from .. import migration
+from .. import shell
 
 
 def _get_sdk_targets(sdk_names):
@@ -25,7 +26,7 @@ def _get_sdk_target_names(sdk_names):
 
 # -----------------------------------------------------------------------------
 
-class TestMigrateSwiftSDKsMeta(type):
+class TestMigrationMeta(type):
     """Metaclass used to dynamically generate test methods.
     """
 
@@ -35,7 +36,7 @@ class TestMigrateSwiftSDKsMeta(type):
             test_name = 'test_migrate_swift_sdk_' + sdk_name
             attrs[test_name] = cls.generate_migrate_swift_sdks_test(sdk_name)
 
-        return super(TestMigrateSwiftSDKsMeta, cls).__new__(
+        return super(TestMigrationMeta, cls).__new__(
             cls, name, bases, attrs)
 
     @classmethod
@@ -52,11 +53,29 @@ class TestMigrateSwiftSDKsMeta(type):
         return test
 
 
-class TestMigrateSwiftSDKs(TestCase):
+class TestMigration(TestCase):
 
-    __metaclass__ = TestMigrateSwiftSDKsMeta
+    __metaclass__ = TestMigrationMeta
 
-    def test_multiple_swift_sdk_flags(self):
+    def test_parse_args(self):
+        pass
+
+    def test_check_impl_args_calls_build_script_impl(self):
+        sh = shell.NullExecutor()
+
+        migration.check_impl_args([], command_executor=sh)
+        self.assertListEqual(sh.history(), [
+            [migration.BUILD_SCRIPT_IMPL_PATH, '--check-args-only=1'],
+        ])
+
+    def test_check_impl_args_known_arg(self):
+        migration.check_impl_args(['--reconfigure'])
+
+    def test_check_impl_args_unknown_arg(self):
+        with self.assertRaises(ValueError):
+            migration.check_impl_args(['--unknown-arg'])
+
+    def test_migrate_multiple_swift_sdk_flags(self):
         args = [
             '--swift-sdks=OSX',
             '--swift-sdks=OSX;IOS;IOS_SIMULATOR'
