@@ -89,6 +89,7 @@ bool Parser::isStartOfStmt() {
 
 ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::semi)) {
+    SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
@@ -112,6 +113,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
       CodeCompletion->completeStmtOrExpr();
+    SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -228,7 +230,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConditionalBlockKind) {
-  SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+  SyntaxParsingContext ItemListContext(SyntaxContext,
+                                       SyntaxKind::CodeBlockItemList);
 
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
@@ -264,9 +267,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
-    SyntaxParsingContext StmtContext(SyntaxContext, SyntaxContextKind::Stmt);
+    SyntaxParsingContext NodeContext(SyntaxContext, SyntaxKind::CodeBlockItem);
 
     if (Tok.is(tok::r_brace)) {
+      SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
       assert(IsTopLevel);
       diagnose(Tok, diag::extra_rbrace)
         .fixItRemove(Tok.getLoc());
@@ -275,8 +279,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     // Eat invalid tokens instead of allowing them to produce downstream errors.
-    if (consumeIf(tok::unknown))
+    if (Tok.is(tok::unknown)) {
+      SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
+      consumeToken();
       continue;
+    }
            
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
@@ -411,6 +418,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (NeedParseErrorRecovery) {
+      SyntaxContext->createNodeInPlace(SyntaxKind::CodeBlockItem);
+      SyntaxContext->setTransparent();
+
+      SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+      SyntaxParsingContext StmtCtxt(SyntaxContext, SyntaxContextKind::Stmt);
       // If we had a parse error, skip to the start of the next stmt, decl or
       // '{'.
       //

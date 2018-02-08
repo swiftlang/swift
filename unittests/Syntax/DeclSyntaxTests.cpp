@@ -506,10 +506,10 @@ CodeBlockSyntax getCannedBody() {
   auto ReturnKW =
     SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(2),
                                      {});
-  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One, None);
+  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One);
+  auto ReturnItem = SyntaxFactory::makeCodeBlockItem(Return, None);
 
-  auto Stmts = SyntaxFactory::makeBlankStmtList()
-    .appending(Return);
+  auto Stmts = SyntaxFactory::makeCodeBlockItemList({ReturnItem});
 
   auto LBrace = SyntaxFactory::makeLeftBraceToken({}, {});
   auto RBrace = SyntaxFactory::makeRightBraceToken(Trivia::newlines(1), {});
