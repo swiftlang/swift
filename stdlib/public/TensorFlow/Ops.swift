@@ -371,35 +371,12 @@ public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @_inlineable @inline(__always)
   func transposed() -> Self {
-    let defaultPermutations = Tensor<Int>(
-      rangeFrom: Tensor<Int>(_TFMakeScalarTensor(0)),
-      to: rankTensor,
-      stride: Tensor<Int>(_TFMakeScalarTensor(1))
-    ).reversed(alongAxes: [0])
-    return transposed(withPermutations: defaultPermutations)
-  }
-
-  /// Reverses a tensor along the specified axes.
-  /// - Note: Does not work on tensors with rank greater than 8.
-  @_inlineable @inline(__always)
-  func reversed(alongAxes axes: Tensor<Int>) -> Self {
-    return Self(#tfop("ReverseV2", "tt:t", handle, axes.handle, Tidx: Int.self))
-  }
-
-  /// Reverses a tensor along the specified axes.
-  /// - Note: Does not work on tensors with rank greater than 8.
-  @_inlineable @inline(__always)
-  func reversed(alongAxes axes: [Int]) -> Self {
-    return reversed(alongAxes: Tensor<Int>(axes))
-  }
-
-  /// Reverses a tensor along the specified axes.
-  /// - Note: Does not work on tensors with rank greater than 8.
-  @_inlineable @inline(__always)
-  func reversed(alongAxes axes: Int...) -> Self {
-    precondition(axes.count != 0,
-                 "At least one axis for reversal must be specified.")
-    return reversed(alongAxes: axes)
+    let defaultPermutations = (rankTensorOriginal - 1) - Tensor<Int32>(
+      rangeFrom: Tensor<Int32>(_TFMakeScalarTensor(0)),
+      to: rankTensorOriginal,
+      stride: Tensor<Int32>(_TFMakeScalarTensor(1))
+    )
+    return transposed(withPermutations: Tensor<Int>(defaultPermutations))
   }
 }
 
