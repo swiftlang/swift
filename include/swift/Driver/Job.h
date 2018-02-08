@@ -175,6 +175,9 @@ public:
 
   /// Return the BaseInput numbered by \p Index.
   StringRef getBaseInput(size_t Index) const;
+
+  void print(raw_ostream &Stream) const;
+  void dump() const LLVM_ATTRIBUTE_USED;
 };
 
 class Job {

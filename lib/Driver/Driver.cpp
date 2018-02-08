@@ -30,6 +30,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/OutputFileMap.h"
+#include "swift/Driver/PrettyStackTrace.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -2013,6 +2014,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                 const OutputFileMap *OFM,
                                 const ToolChain &TC, bool AtTopLevel,
                                 JobCacheMap &JobCache) const {
+
+  PrettyStackTraceDriverAction CrashInfo("building jobs", JA);
+
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(JA, &TC);
   {
@@ -2066,6 +2070,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   std::unique_ptr<CommandOutput> Output(
       new CommandOutput(JA->getType(), C.getDerivedOutputFileMap()));
+
+  PrettyStackTraceDriverCommandOutput CrashInfo2("determining output",
+                                                 Output.get());
   llvm::SmallString<128> Buf;
   computeMainOutput(C, JA, OI, OFM, TC, AtTopLevel, InputActions, InputJobs,
                     OutputMap, BaseInput, PrimaryInput, Buf, Output.get());

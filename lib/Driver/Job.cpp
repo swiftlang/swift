@@ -12,6 +12,7 @@
 
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
@@ -62,6 +63,8 @@ types::ID CommandOutput::getPrimaryOutputType() const {
 void CommandOutput::addPrimaryOutput(CommandInputPair Input,
                                      StringRef PrimaryOutputFile) {
   Inputs.push_back(Input);
+  PrettyStackTraceDriverCommandOutputAddition CrashInfo(
+      "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
   ensureEntry(Input.Primary, PrimaryOutputType, PrimaryOutputFile, false);
 }
 
@@ -81,6 +84,8 @@ SmallVector<StringRef, 16> CommandOutput::getPrimaryOutputFilenames() const {
 
 void CommandOutput::setAdditionalOutputForType(types::ID Type,
                                                StringRef OutputFilename) {
+  PrettyStackTraceDriverCommandOutputAddition CrashInfo(
+      "additional", this, Inputs[0].Primary, Type, OutputFilename);
   assert(Inputs.size() >= 1);
 
   // If we're given an "additional" output with the same type as the primary,
@@ -145,6 +150,37 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
   }
   os << '"';
 }
+
+void
+CommandOutput::print(raw_ostream &out) const {
+  out
+    << "{\n"
+    << "    PrimaryOutputType = " << types::getTypeName(PrimaryOutputType)
+    << ";\n"
+    << "    Inputs = [\n";
+  interleave(Inputs,
+             [&](CommandInputPair const &P) {
+             out << "        CommandInputPair {\n"
+                 << "            Base = ";
+             escapeAndPrintString(out, P.Base);
+             out << ", \n"
+                 << "            Primary = ";
+             escapeAndPrintString(out, P.Primary);
+             out << "\n        }";
+           },
+           [&] { out << ",\n"; });
+  out << "];\n"
+      << "    DerivedOutputFileMap = {\n";
+  DerivedOutputMap.dump(out, true);
+  out << "\n    };\n}";
+}
+
+void
+CommandOutput::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
 
 void Job::printArguments(raw_ostream &os,
                          const llvm::opt::ArgStringList &Args) {
