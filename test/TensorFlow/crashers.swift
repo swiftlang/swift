@@ -72,12 +72,16 @@ public func lowerGraphCrash(x: Tensor<Int>) {
 
 // This was a prototype runtime test that crashed due to bb arg invalidation
 // problems.
-// FIXME: Remove #if when fixed
-#if false
 public func testStraightLineXORTraining() {
   // Hyper-parameters
   let iterationCount = 1000
   let learningRate: Float = 0.2
+
+  // Training data
+  let inputBatch = Tensor<Float>(
+    [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+    ).toDevice()
+  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
 
   // Parameters
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
@@ -85,12 +89,6 @@ public func testStraightLineXORTraining() {
 
   var b1 = Tensor<Float>.zeros(shape: [1, 4])
   var b2 = Tensor<Float>.zeros(shape: [1, 1])
-
-  // Training data
-  let inputBatch = Tensor<Float>(
-    [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-  ).toDevice()
-  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
 
   // Training loop
   for _ in 0..<iterationCount {
@@ -103,7 +101,7 @@ public func testStraightLineXORTraining() {
 
     // Loss
     let sub = outputBatch - pred
-    let sqr = sub * sub
+    let _ = sub * sub
 
     // Gradient
     let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
@@ -126,4 +124,20 @@ public func testStraightLineXORTraining() {
     b2 -= (dB2 * learningRate)
   }
 }
-#endif
+
+
+// This testcase exposed bb argument and source location manipulation problems.
+public func testEagerLoop() -> Int { // expected-note 4 {{value used here}}
+  var a = Tensor<Int>(6)
+  var count = Tensor<Int>(0)
+  while (a != 1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
+    if (a % 2 == 0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
+      a = a / 2
+    } else {
+      a = 3 * a + 1
+    }
+    // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
+    count += 1  // expected-warning 6 {{implicitly copied}}
+  }
+  return count.scalar!  // expected-note {{value used here}}
+}
