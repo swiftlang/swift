@@ -33,14 +33,14 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-NEXT:}
 */
 
-public func testEmptyUnitsArray() {
-  let y = Tensor<Int>(shape: [0, 20, 30], units: [])
+public func testEmptyScalarsArray() {
+  let y = Tensor<Int>(shape: [0, 20, 30], scalars: [])
   _ = y+y
 }
 
 /*
- CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyUnitsArray
- CHECK: sil private @{{.*}}testEmptyUnitsArray{{.*}} : $@callee_owned () -> () {
+ CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
+ CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
  CHECK: integer_literal $Builtin.Int64, 0
  CHECK: integer_literal $Builtin.Int64, 20

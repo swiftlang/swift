@@ -67,7 +67,7 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 // SWIFT_ENABLE_TENSORFLOW
-PROTOCOL(AccelerableTensorUnit)
+PROTOCOL(AccelerableByTensorFlow)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)

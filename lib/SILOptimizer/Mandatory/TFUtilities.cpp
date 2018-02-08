@@ -37,7 +37,7 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 
 static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
-                    llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+              llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
 
 /// This returns true if we should dump out intermediate results to standard
 /// out.  This is used for integration unit tests.
@@ -441,11 +441,11 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
   if (auto *applyInst = dyn_cast<ApplyInst>(inst))
     if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
       auto callee = fnRef->getReferencedFunction()->getName();
-      if (callee == "__tf_tensor_from_units" &&
-          toiInfo.decodeTensorFromUnits(applyInst))
+      if (callee == "__tf_tensor_from_scalars" &&
+          toiInfo.decodeTensorFromScalars(applyInst))
         return toiInfo;
-      if (callee == "__tf_tensor_from_units_1d" &&
-          toiInfo.decodeTensorFromUnits1D(applyInst))
+      if (callee == "__tf_tensor_from_scalars_1d" &&
+          toiInfo.decodeTensorFromScalars1D(applyInst))
         return toiInfo;
     }
 
@@ -569,22 +569,22 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   return true;
 }
 
-/// If all the operands to a call to __tf_tensor_from_units are constants, we
+/// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 ///
-/// It takes a 1D array of units, a shape as a 1D array of integers, and a
-/// metatype that corresponds to the Unit type.  This has been carefully set up
-/// to align with what the Const op wants to see.
+/// It takes a 1D array of scalars, a shape as a 1D array of integers, and a
+/// metatype that corresponds to the Scalar type.  This has been carefully set
+/// up to align with what the Const op wants to see.
 ///
-bool SILTensorOpInfo::decodeTensorFromUnits(ApplyInst *inst) {
+bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   assert(inst->getNumOperands() == 3 &&
          isTensorHandle(inst->getType().getSwiftRValueType()) &&
-         "Unexpected type signature for __tf_tensor_from_units");
+         "Unexpected type signature for __tf_tensor_from_scalars");
 
   // If we can't analyze the operands as arrays of constants, give up.
-  auto unitsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
+  auto scalarsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
   auto shapeArray = dyn_cast_or_null<StructInst>(getAttrOperand(2));
-  if (!unitsArray || !shapeArray)
+  if (!scalarsArray || !shapeArray)
     return false;
 
   // Otherwise, good news everyone!  We can treat this as a Const op.  The first
@@ -599,22 +599,22 @@ bool SILTensorOpInfo::decodeTensorFromUnits(ApplyInst *inst) {
   return true;
 }
 
-/// If all the operands to a call to __tf_tensor_from_units_1d are constants,
+/// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
 /// we can promote this to a 'Const' node with an attached TF_Tensor attribute.
-/// This is a specialized form of __tf_tensor_from_units, because the later is
-/// defined in terms of a shape of "[units.count]" but the performance optimizer
-/// is not reliably constant propagating this.  When we have a reliable
-/// deabstraction pass we can re-evaluate this and hopefully eliminate it in
-/// favor of library code in the TensorFlow module.
+/// This is a specialized form of __tf_tensor_from_scalars, because the later is
+/// defined in terms of a shape of "[scalars.count]" but the performance
+/// optimizer is not reliably constant propagating this.  When we have a
+/// reliable deabstraction pass we can re-evaluate this and hopefully eliminate
+/// it in favor of library code in the TensorFlow module.
 ///
-bool SILTensorOpInfo::decodeTensorFromUnits1D(ApplyInst *inst) {
+bool SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   assert(inst->getNumOperands() == 2 &&
          isTensorHandle(inst->getType().getSwiftRValueType()) &&
-         "Unexpected type signature for __tf_tensor_from_units_1d");
+         "Unexpected type signature for __tf_tensor_from_Scalars_1d");
 
   // If we can't analyze the operands as arrays of constants, give up.
-  auto unitsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
-  if (!unitsArray)
+  auto scalarsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
+  if (!scalarsArray)
     return false;
 
   // Otherwise, good news everyone!  We can treat this as a Const op.
@@ -673,9 +673,9 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
       // Otherwise, if it is an array, it should be decodable and should be
       // followed by a shape.
       if (isa<StructInst>(operand)) {
-        Type unitsElementType;
-        SmallVector<SingleValueInstruction*, 16> units;
-        if (!decodeArrayElements(operand, units, unitsElementType)) {
+        Type scalarsElementType;
+        SmallVector<SingleValueInstruction*, 16> scalars;
+        if (!decodeArrayElements(operand, scalars, scalarsElementType)) {
           return "attribute '" + attr.first.str() +
                  "' requires an array of constant values";
         }
@@ -704,14 +704,14 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
         if (!decodeArrayElements(shapeOperand, shape, shapeElementType))
           return "attribute '" + attr.first.str() + "' has non-constant shape";
 
-        // Verify we have the right number of units.
-        uint64_t unitCount = 1;
+        // Verify we have the right number of scalars.
+        uint64_t scalarCount = 1;
         for (auto elt : shape)
-          unitCount *= cast<IntegerLiteralInst>(elt)
+          scalarCount *= cast<IntegerLiteralInst>(elt)
                                                 ->getValue().getLimitedValue();
-        if (unitCount != units.size())
-          return "tensor literal should have " + llvm::utostr(unitCount) +
-                 " units for this shape, but has " + llvm::utostr(units.size());
+        if (scalarCount != scalars.size())
+          return "tensor literal should have " + llvm::utostr(scalarCount) +
+             " scalars for this shape, but has " + llvm::utostr(scalars.size());
 
         // If everything is ok, then we're good to go.
         break;
@@ -837,17 +837,17 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   if (auto *applyInst = dyn_cast<ApplyInst>(inst)) {
     auto *fnRef = cast<FunctionRefInst>(applyInst->getCallee());
     auto callee = fnRef->getReferencedFunction()->getName();
-    if (callee == "__tf_tensor_from_units") {
+    if (callee == "__tf_tensor_from_scalars") {
       // This takes a Tensor and a Shape operand, but needs a DType added.  The
       // dtype is the type of the Tensor elements, which we conveniently already
       // have available as the first operand.
       operands.push_back(operands[0]);
       name += ",dtype";
-    } else if (callee == "__tf_tensor_from_units_1d") {
+    } else if (callee == "__tf_tensor_from_scalars_1d") {
       // This takes a Tensor operand, but needs a Shape and a DType added.  At
       // this point, the operands list will have a metatype for the tensor as
       // the first operand then all the elements.
-      uint64_t unitCount = operands.size()-1;
+      uint64_t scalarCount = operands.size()-1;
 
       // The shape needs a metatype to be well formed, but nothing actually
       // cares what it is.  Just re-push the metatype for the tensor elements,
@@ -858,11 +858,11 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
 
       // The shape of a 1d tensor is just the count of elements.
       auto &ctx = inst->getFunction()->getASTContext();
-      auto unitCountVal =
+      auto scalarCountVal =
         B.createIntegerLiteral(inst->getLoc(),
                                SILType::getBuiltinIntegerType(64, ctx),
-                               unitCount);
-      operands.push_back(unitCountVal);
+                               scalarCount);
+      operands.push_back(scalarCountVal);
       name += ",";
       name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
 
@@ -957,4 +957,3 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
 
   return getUserSourceLocation(inst->getDebugLocation());
 }
-

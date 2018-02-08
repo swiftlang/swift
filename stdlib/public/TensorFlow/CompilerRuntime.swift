@@ -521,9 +521,9 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
 ///   - value: The scalar value.
 ///   - dtype: The TF data type of the tensor handle to create.
 /// - Returns: A new CTensorHandle representing the scalar.
-/// - Precondition: T must conform to AccelerableTensorUnit and 'dtype' must be
+/// - Precondition: T must conform to AccelerableByTensorFlow and 'dtype' must be
 ///   equal to T's corresponding data type.
-/// - TODO(rxwei): Constrain T to AccelerableTensorUnit and remove the
+/// - TODO(rxwei): Constrain T to AccelerableByTensorFlow and remove the
 ///   precondition. This requires the compiler to emit a call to the generic
 ///   function.
 @_inlineable

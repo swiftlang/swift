@@ -28,13 +28,13 @@ import CTensorFlow
 // Tensor type
 //===----------------------------------------------------------------------===//
 
-public struct Tensor<Unit : AccelerableTensorUnit> {
+public struct Tensor<Scalar : AccelerableByTensorFlow> {
   /// A tensor just contains a TensorHandle under the covers.  This is public to
   /// allow user defined ops, but shouldn't normally be used otherwise.
-  public let handle: TensorHandle<Unit>
+  public let handle: TensorHandle<Scalar>
 
   @_inlineable
-  public init(_ handle: TensorHandle<Unit>) {
+  public init(_ handle: TensorHandle<Scalar>) {
     self.handle = handle
   }
 }
@@ -54,20 +54,20 @@ public struct Tensor<Unit : AccelerableTensorUnit> {
 @_versioned @inline(never)
 @_silgen_name("__tf_send")
 @effects(readnone)
-func _TFSend<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
+func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_receive")
 @effects(readnone)
-func _TFReceive<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
+func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_scalarize")
-func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
+func _TFScalarize<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
   return handle.makeHostCopy().scalar
 }
 
@@ -77,8 +77,8 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
 /// where it is known that the Op always returns a 0d tensor, it is not for use
 /// in general code.
 @_versioned @_inlineable @inline(__always)
-func _TFGetScalarOrDie<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
-  return Unit._getScalarOrDie(handle)
+func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
+  return Scalar._getScalarOrDie(handle)
 }
 
 
@@ -86,30 +86,30 @@ func _TFGetScalarOrDie<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
 /// and promotes calls to it to being in graph when it can.  This signature was
 /// designed to align with the requirements of the 'Const' Tensorflow operation.
 @_versioned @inline(never)
-@_silgen_name("__tf_tensor_from_units")
-func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int])
-    -> TensorHandle<Unit> {
+@_silgen_name("__tf_tensor_from_scalars")
+func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int])
+    -> TensorHandle<Scalar> {
   let contiguousSize = shape.reduce(1, *)
-  precondition(units.count == contiguousSize,
-               "The number of units doesn't match the shape.")
+  precondition(scalars.count == contiguousSize,
+               "The number of scalars doesn't match the shape.")
   return TensorHandle(
       shape: shape,
-      unitsInitializer: { addr in
-        units.withUnsafeBufferPointer { ptr in
+      scalarsInitializer: { addr in
+        scalars.withUnsafeBufferPointer { ptr in
           addr.assign(from: ptr.baseAddress!, count: contiguousSize)
         }
     })
 }
 
 @_versioned @_inlineable @inline(__always)
-func _TFMakeScalarTensor<Unit>(_ scalar: Unit) -> TensorHandle<Unit> {
-  return Unit._makeScalarTensor(scalar)
+func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
+  return Scalar._makeScalarTensor(scalar)
 }
 
 @_versioned @inline(never)
-@_silgen_name("__tf_tensor_from_units_1d")
-func _TFTensorFromUnits1D<Unit>(_ units: [Unit]) -> TensorHandle<Unit> {
-  return _TFTensorFromUnits(units, shape: [units.count])
+@_silgen_name("__tf_tensor_from_scalars_1d")
+func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar]) -> TensorHandle<Scalar> {
+  return _TFTensorFromScalars(scalars, shape: [scalars.count])
 }
 
 //===----------------------------------------------------------------------===//
@@ -133,25 +133,25 @@ public extension Tensor {
 // Initialization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Unit : Numeric {
+extension Tensor where Scalar : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
   @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
-    self.init(#tfop("Cast", "t:t", other.handle, DstT: Unit.self))
+    self.init(#tfop("Cast", "t:t", other.handle, DstT: Scalar.self))
   }
 }
 
 public extension Tensor {
-  /// Initialize a tensor with a unit representing a scalar value.
+  /// Initialize a tensor with a scalar representing a scalar value.
   @_inlineable @inline(__always)
-  init(_ value: Unit) {
+  init(_ value: Scalar) {
     self.init(_TFMakeScalarTensor(value))
   }
 
   /// Initialize a tensor with an array representing a vector.
   @_inlineable @inline(__always)
-  init(_ vector: [Unit]) {
-    self.init(_TFTensorFromUnits1D(vector))
+  init(_ vector: [Scalar]) {
+    self.init(_TFTensorFromScalars1D(vector))
   }
 
   /// Initialize a tensor with an array of arrays representing a matrix.
@@ -159,7 +159,7 @@ public extension Tensor {
   /// - Precondition: The number of elements in each sub-dimensional array in
   ///   the array must be equal.
   @_inlineable
-  init(_ literal: [[Unit]]) {
+  init(_ literal: [[Scalar]]) {
     /// Sanity checks.
     let dim0 = literal.count
     let dim1 = literal.first?.count ?? 0
@@ -168,11 +168,11 @@ public extension Tensor {
         Each dimension must have an equal number of subdimensions.
         """)
     }
-    // We don't want to delegate initialization to `init(shape:units:)`
+    // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `matrix` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Unit>(
+    let tensorHandle = TensorHandle<Scalar>(
       shape: [dim0, dim1],
-      unitsInitializer: { addr in
+      scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one row at a time.
         for (i, subArray) in literal.enumerated() {
           subArray.withUnsafeBufferPointer { ptr in
@@ -192,7 +192,7 @@ public extension Tensor {
   ///   the array must be equal.
   /// - TODO: improve description
   @_inlineable
-  init(_ literal: [[[Unit]]]) {
+  init(_ literal: [[[Scalar]]]) {
     /// Sanity checks.
     let dim0 = literal.count
     let dim1 = literal.first?.count ?? 0
@@ -207,11 +207,11 @@ public extension Tensor {
           """)
       }
     }
-    // We don't want to delegate initialization to `init(shape:units:)`
+    // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `literal` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Unit>(
+    let tensorHandle = TensorHandle<Scalar>(
       shape: [dim0, dim1, dim2],
-      unitsInitializer: { addr in
+      scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one innermost array at a time.
         for (i, subArray) in literal.enumerated() {
           for (j, subSubArray) in subArray.enumerated() {
@@ -233,7 +233,7 @@ public extension Tensor {
   ///   the array must be equal.
   /// - TODO: improve description
   @_inlineable
-  init(_ literal: [[[[Unit]]]]) {
+  init(_ literal: [[[[Scalar]]]]) {
     /// Sanity checks.
     let dim0 = literal.count
     let dim1 = literal.first?.count ?? 0
@@ -254,11 +254,11 @@ public extension Tensor {
         }
       }
     }
-    // We don't want to delegate initialization to `init(shape:units:)`
+    // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `literal` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Unit>(
+    let tensorHandle = TensorHandle<Scalar>(
       shape: [dim0, dim1, dim2, dim3],
-      unitsInitializer: { addr in
+      scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one innermost array at a time.
         for (i, subArray) in literal.enumerated() {
           for (j, subSubArray) in subArray.enumerated() {
@@ -276,16 +276,16 @@ public extension Tensor {
   }
 
   /// Initialize a tensor with arbitrary shape.
-  /// - Precondition: The number of units should be the same as the
+  /// - Precondition: The number of scalars should be the same as the
   ///   product of all of shape's dimensions.
   @_inlineable @inline(__always)
-  init(shape: [Int], units: [Unit]) {
-    self.init(_TFTensorFromUnits(units, shape: shape))
+  init(shape: [Int], scalars: [Scalar]) {
+    self.init(_TFTensorFromScalars(scalars, shape: shape))
   }
 
   /// Initialize a tensor of a specified shape, filled with a single value.
   @_inlineable @inline(__always)
-  init(shape: [Int], repeating repeatedValue: Unit) {
+  init(shape: [Int], repeating repeatedValue: Scalar) {
     let valueTensor = Tensor(repeatedValue).handle
     let shapeTensor = Tensor<Int32>(Tensor<Int>(shape)).handle
     self.init(#tfop("Fill", "tt:t", shapeTensor, valueTensor))
@@ -304,7 +304,7 @@ public extension Tensor {
     // big to want to do so for performance reasons.
     @inline(__always)
     get {
-      return shapeTensor.units
+      return shapeTensor.scalars
     }
   }
 
@@ -317,10 +317,10 @@ public extension Tensor {
   }
 
   @_inlineable
-  var unitCount: Int {
+  var scalarCount: Int {
     @inline(__always)
     get {
-      return unitCountTensor.scalar!
+      return scalarCountTensor.scalar!
     }
   }
 }
@@ -329,7 +329,7 @@ public extension Tensor {
 // Factory initializers for numeric tensors
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit : Numeric {
+public extension Tensor where Scalar : Numeric {
   /// Returns a tensor with all elements set to zero.
   ///
   /// - Parameter shape: the dimensions of the tensor.
@@ -384,7 +384,7 @@ public extension Tensor where Unit : Numeric {
   @_inlineable @inline(__always)
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
     self.init(#tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
-                    Tidx: Unit.self))
+                    Tidx: Scalar.self))
   }
 
   /// Initialize a 1-D tensor representing a sequence from a starting value to,
@@ -399,7 +399,7 @@ public extension Tensor where Unit : Numeric {
   ///     positive.
   ///
   @_inlineable @inline(__always)
-  init(rangeFrom start: Unit, to end: Unit, stride: Unit) {
+  init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
     self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
   }
 }
@@ -408,7 +408,7 @@ public extension Tensor where Unit : Numeric {
 // Factory methods for floating point tensors
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit : FloatingPoint {
+public extension Tensor where Scalar : FloatingPoint {
   // def tf.random_normal(shape, mean=0.0, stddev=1.0, dtype=dtypes.float32,
   //                      seed=None, name=None):
   @inline(never) // make @_inlineable when implemented.
@@ -423,7 +423,7 @@ public extension Tensor where Unit : FloatingPoint {
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-public extension AccelerableTensorUnit {
+public extension AccelerableByTensorFlow {
   /// Broadcast the specified scalar value to be a tensor with the same rank as
   /// the specified other tensor, but with dimension=1 for each rank.
   @inline(never) // make @_inlineable when implemented.
@@ -464,14 +464,14 @@ public extension Tensor {
   }
 
   /// Reshape to the specified shape.
-  /// - Precondition: The number of units matches the new shape.
+  /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped(_ newShape: [Int]) -> Tensor {
     return reshaped(Tensor<Int>(newShape))
   }
 
   /// Reshape to the specified Tensor representing a shape.
-  /// - Precondition: The number of units matches the new shape.
+  /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped(_ newShape: Tensor<Int>) -> Tensor {
     return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
@@ -491,20 +491,20 @@ public extension Tensor {
   }
 
   /// Reshape to scalar.
-  /// - Precondition: The tensor has exactly one unit.
+  /// - Precondition: The tensor has exactly one scalar.
   @_inlineable @inline(__always)
-  func scalarized() -> Unit {
+  func scalarized() -> Scalar {
 #if false // FIXME: The partitioner needs to promote array literals.
     guard let scalar = reshaped([]).scalar else {
       preconditionFailure(
-        "Only tensors with exactly one unit can be scalarized.")
+        "Only tensors with exactly one scalar can be scalarized.")
     }
 #else
     // FIXME: This is the inefficient implementation. When the partitioner
     // can promote array literals, replace this with the implementation above.
     guard let scalar = array.scalar else {
       preconditionFailure(
-        "Only tensors with exactly one unit can be scalarized.")
+        "Only tensors with exactly one scalar can be scalarized.")
     }
 #endif
     return scalar
@@ -515,7 +515,7 @@ public extension Tensor {
 // Safe data type conversion
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit : Numeric {
+public extension Tensor where Scalar : Numeric {
   @inline(never)
   init(_ other: Tensor<Bool>) {
     fatalError("FIXME: implement boolean conversion")
@@ -538,15 +538,15 @@ public extension Tensor {
   /// Returns the underlying scalar from a 0-ranked Tensor.
   /// - precondition: Tensor is 0-ranked.
   @_inlineable
-  var scalar: Unit? {
+  var scalar: Scalar? {
     @inline(__always)
     get {
-      return Unit(self)
+      return Scalar(self)
     }
   }
 }
 
-public extension AccelerableTensorUnit {
+public extension AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   init?(_ tensor: Tensor<Self>) {
     guard let scalar = _TFScalarize(tensor.handle) else {
@@ -580,7 +580,7 @@ extension Tensor : CustomPlaygroundQuickLookable {
 
 public extension Tensor {
   @_inlineable
-  var array: ShapedArray<Unit> {
+  var array: ShapedArray<Scalar> {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
@@ -591,7 +591,7 @@ public extension Tensor {
   }
 
   @_inlineable
-  var units: [Unit] {
-    return array.units
+  var scalars: [Scalar] {
+    return array.scalars
   }
 }

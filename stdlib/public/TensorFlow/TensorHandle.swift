@@ -16,11 +16,11 @@
 
 import CTensorFlow
 
-/// TensorHandle<Unit> is the type used by "ops" and the #tfop() syntax
+/// TensorHandle<Scalar> is the type used by "ops" and the #tfop() syntax
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
-public final class TensorHandle<Unit : AccelerableTensorUnit> {
+public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   /// This is the underlying "TF_TensorHandle*" which this TensorHandle
   /// represents.
   ///
@@ -41,25 +41,25 @@ public final class TensorHandle<Unit : AccelerableTensorUnit> {
   /// Create a tensor handle with a closure that initializes the underlying
   /// buffer.
   ///
-  /// - Note: `unitsInitializer` must initialize all units in the underlying
+  /// - Note: `scalarsInitializer` must initialize all scalars in the underlying
   /// buffer.
   @_versioned
   convenience init(
     shape: [Int],
-    unitsInitializer: (UnsafeMutablePointer<Unit>) -> Void
+    scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
-    let byteCount = shape.reduce(1, *) * MemoryLayout<Unit>.stride
+    let byteCount = shape.reduce(1, *) * MemoryLayout<Scalar>.stride
     // Initialize tensor and copy data.
     // TF_AllocateTensor() never returns nil.
     let cTensor = TF_AllocateTensor(
-      Unit.cDataType,
+      Scalar.cDataType,
       shape.map(Int64.init),
       Int32(shape.count),
       byteCount
     )!
     assert(TF_TensorByteSize(cTensor) == byteCount)
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
-    unitsInitializer(addr)
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Scalar.self)
+    scalarsInitializer(addr)
 
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
@@ -78,7 +78,7 @@ internal extension TensorHandle {
   /// - Returns: A shaped array.
   @_versioned
   @inline(never)
-  func makeHostCopy() -> ShapedArray<Unit> {
+  func makeHostCopy() -> ShapedArray<Scalar> {
     let status = TF_NewStatus()
     // If the tensor is on the accelerator, we need to copy it to the host.
     // NOTE: This will not perform a copy if the handle is already on the host.

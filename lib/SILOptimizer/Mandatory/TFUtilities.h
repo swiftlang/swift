@@ -105,8 +105,8 @@ namespace tf {
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
     bool decodeBuiltin(BuiltinInst *inst);
-    bool decodeTensorFromUnits(ApplyInst *inst);
-    bool decodeTensorFromUnits1D(ApplyInst *inst);
+    bool decodeTensorFromScalars(ApplyInst *inst);
+    bool decodeTensorFromScalars1D(ApplyInst *inst);
   };
 
 
@@ -147,5 +147,3 @@ namespace tf {
 } // end namespace tf
 } // end namespace swift
 #endif
-
-

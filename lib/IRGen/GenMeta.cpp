@@ -3472,7 +3472,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::AccelerableTensorUnit:
+  case KnownProtocolKind::AccelerableByTensorFlow:
     return SpecialProtocol::None;
   }
 
