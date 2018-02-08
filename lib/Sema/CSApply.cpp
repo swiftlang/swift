@@ -4482,9 +4482,6 @@ namespace {
     /// Diagnose an optional injection that is probably not what the
     /// user wanted, because it comes from a forced downcast.
     void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
-      // Don't diagnose when we're injecting into 
-      auto toOptionalType = cs.getType(injection);
-
       // Check whether we have a forced downcast.
       auto &tc = cs.getTypeChecker();
       auto *cast = findForcedDowncast(tc.Context, injection->getSubExpr());
