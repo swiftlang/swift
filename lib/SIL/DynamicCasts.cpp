@@ -239,14 +239,13 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
   return false;
 }
 
-/// Given that a type is not statically known to be an optional type, check whether
-/// it might dynamically be an optional type.
-static bool canDynamicallyBeOptionalType(CanType type) {
+/// Given that a type is not statically known to be an optional type, check
+/// whether it might dynamically be able to store an optional.
+static bool canDynamicallyStoreOptional(CanType type) {
   assert(!type.getOptionalObjectType());
-  return (isa<ArchetypeType>(type) || type.isExistentialType())
-      && !type.isAnyClassReferenceType();
+  return type->canDynamicallyBeOptionalType(/* includeExistential */ true);
 }
-
+  
 /// Given two class types, check whether there's a hierarchy relationship
 /// between them.
 static DynamicCastFeasibility
@@ -326,7 +325,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
     auto result = classifyDynamicCast(M, source, targetObject,
                                       /* isSourceTypeExact */ false,
                                       isWholeModuleOpts);
-    if (canDynamicallyBeOptionalType(source))
+    if (canDynamicallyStoreOptional(source))
       result = atWorst(result, DynamicCastFeasibility::MaySucceed);
     return result;
 
