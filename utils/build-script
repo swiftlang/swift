@@ -988,9 +988,8 @@ def main_preset():
 
     try:
         preset_parser.read(args.preset_file_names)
-    except presets.UnparsedFilesError as e:
-        diagnostics.fatal('unable to parse preset files {}'
-                          .format(e.message))
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
 
     if args.show_presets:
         for name in sorted(preset_parser.preset_names(),
@@ -1009,14 +1008,8 @@ def main_preset():
     try:
         preset = preset_parser.get_preset(args.preset,
                                           vars=args.preset_substitutions)
-    except presets.InterpolationError as e:
-        diagnostics.fatal('missing value for substitution "{}" in preset "{}"'
-                          .format(e.message, args.preset))
-    except presets.MissingOptionError as e:
-        diagnostics.fatal('missing option(s) for preset "{}": {}'
-                          .format(args.preset, e.message))
-    except presets.PresetNotFoundError:
-        diagnostics.fatal('preset "{}" not found'.format(args.preset))
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
 
     preset_args = migrate_swift_sdks(preset.format_args())
 

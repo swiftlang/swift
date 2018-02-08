@@ -7,7 +7,9 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from .utils import TestCase
+from __future__ import absolute_import, unicode_literals
+
+from .utils import TestCase, add_metaclass
 from .. import migration
 
 
@@ -52,9 +54,8 @@ class TestMigrateSwiftSDKsMeta(type):
         return test
 
 
+@add_metaclass(TestMigrateSwiftSDKsMeta)
 class TestMigrateSwiftSDKs(TestCase):
-
-    __metaclass__ = TestMigrateSwiftSDKsMeta
 
     def test_multiple_swift_sdk_flags(self):
         args = [

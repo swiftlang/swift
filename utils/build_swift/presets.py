@@ -11,30 +11,36 @@
 Swift preset parsing and handling functionality.
 """
 
+from __future__ import absolute_import, unicode_literals
 
 from collections import namedtuple
+from contextlib import contextmanager
 
 try:
-    # Python 3
-    import configparser
-    from io import StringIO
-except ImportError:
+    # Python 2
     import ConfigParser as configparser
     from StringIO import StringIO
+except ImportError:
+    import configparser
+    from io import StringIO
 
 
 __all__ = [
-    'Preset',
-    'PresetParser',
-
+    'Error',
+    'DuplicatePresetError',
+    'DuplicateOptionError',
     'InterpolationError',
-    'MissingOptionError',
     'PresetNotFoundError',
     'UnparsedFilesError',
+
+    'Preset',
+    'PresetParser',
 ]
 
 
 # -----------------------------------------------------------------------------
+
+_PRESET_PREFIX = 'preset: '
 
 _Mixin = namedtuple('_Mixin', ['name'])
 _Argument = namedtuple('_Argument', ['name', 'value'])
@@ -45,10 +51,7 @@ def _interpolate_string(string, values):
     if string is None:
         return string
 
-    try:
-        return string % values
-    except KeyError as e:
-        raise InterpolationError(e.message)
+    return string % values
 
 
 def _remove_prefix(string, prefix):
@@ -57,36 +60,118 @@ def _remove_prefix(string, prefix):
     return string
 
 
+@contextmanager
+def _catch_duplicate_option_error():
+    """Shim context object used for catching and rethrowing configparser's
+    DuplicateOptionError, which was added in the Python 3 refactor.
+    """
+
+    if hasattr(configparser, 'DuplicateOptionError'):
+        try:
+            yield
+        except configparser.DuplicateOptionError as e:
+            preset_name = _remove_prefix(e.section, _PRESET_PREFIX)
+            raise DuplicateOptionError(preset_name, e.option)
+
+    else:
+        yield
+
+
+@contextmanager
+def _catch_duplicate_section_error():
+    """Shim context object used for catching and rethrowing configparser's
+    DuplicateSectionError.
+    """
+
+    try:
+        yield
+    except configparser.DuplicateSectionError as e:
+        preset_name = _remove_prefix(e.section, _PRESET_PREFIX)
+        raise DuplicatePresetError(preset_name)
+
+
+@contextmanager
+def _convert_configparser_errors():
+    with _catch_duplicate_option_error(), _catch_duplicate_section_error():
+        yield
+
+
 # -----------------------------------------------------------------------------
+# Error classes
 
-class InterpolationError(Exception):
-    """Error indicating a filaure while interpolating variables in preset
-    argument values.
+class Error(Exception):
+    """Base class for preset errors.
     """
 
-    pass
+    def __init__(self, message=''):
+        super(Error, self).__init__(self, message)
+
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+    __repr__ = __str__
 
 
-class MissingOptionError(Exception):
-    """Error indicating a missing option while parsing presets.
+class DuplicatePresetError(Error):
+    """Raised when an existing preset would be overriden.
     """
 
-    pass
+    def __init__(self, preset_name):
+        Error.__init__(self, '{} already exists'.format(preset_name))
+
+        self.preset_name = preset_name
 
 
-class PresetNotFoundError(Exception):
-    """Error indicating failure when attempting to get a preset.
+class DuplicateOptionError(Error):
+    """Raised when an option is repeated in a single preset.
     """
 
-    pass
+    def __init__(self, preset_name, option):
+        Error.__init__(self, '{} already exists in preset {}'.format(
+            option, preset_name))
+
+        self.preset_name = preset_name
+        self.option = option
 
 
-class UnparsedFilesError(Exception):
-    """Error indicating failure when parsing preset files.
+class InterpolationError(Error):
+    """Raised when an error is encountered while interpolating use-provided
+    values in preset arguments.
     """
 
-    pass
+    def __init__(self, preset_name, option, rawval, reference):
+        Error.__init__(self, 'no value found for {} in "{}"'.format(
+            reference, rawval))
 
+        self.preset_name = preset_name
+        self.option = option
+        self.rawval = rawval
+        self.reference = reference
+
+
+class PresetNotFoundError(Error):
+    """Raised when a requested preset cannot be found.
+    """
+
+    def __init__(self, preset_name):
+        Error.__init__(self, '{} not found'.format(preset_name))
+
+        self.preset_name = preset_name
+
+
+class UnparsedFilesError(Error):
+    """Raised when an error was encountered parsing one or more preset files.
+    """
+
+    def __init__(self, filenames):
+        Error.__init__(self, 'unable to parse files: {}'.format(filenames))
+
+        self.filenames = filenames
+
+
+# -----------------------------------------------------------------------------
 
 class Preset(namedtuple('Preset', ['name', 'args'])):
     """Container class used to wrap preset names and expanded argument lists.
@@ -109,47 +194,44 @@ class Preset(namedtuple('Preset', ['name', 'args'])):
         return args
 
 
-# -----------------------------------------------------------------------------
-
 class PresetParser(object):
     """Parser class used to read and manipulate Swift preset files.
     """
-
-    _PRESET_PREFIX = 'preset: '
 
     def __init__(self):
         self._parser = configparser.RawConfigParser(allow_no_value=True)
         self._presets = {}
 
     def _parse_raw_preset(self, section):
-        preset_name = _remove_prefix(section, PresetParser._PRESET_PREFIX)
+        preset_name = _remove_prefix(section, _PRESET_PREFIX)
 
         try:
             section_items = self._parser.items(section)
         except configparser.InterpolationMissingOptionError as e:
-            raise MissingOptionError(e)
+            raise InterpolationError(preset_name, e.option, e.rawval,
+                                     e.reference)
 
         args = []
-        for (name, value) in section_items:
+        for (option, value) in section_items:
             # Ignore the '--' separator, it's no longer necessary
-            if name == 'dash-dash':
+            if option == 'dash-dash':
                 continue
 
-            # Parse out mixin names
-            if name == 'mixin-preset':
+            # Parse out mixin options
+            if option == 'mixin-preset':
                 lines = value.strip().splitlines()
-                args += [_Mixin(name.strip()) for name in lines]
+                args += [_Mixin(option.strip()) for option in lines]
                 continue
 
-            name = '--' + name  # Format as an option name
-            args.append(_Argument(name, value))
+            option = '--' + option  # Format as a command-line option
+            args.append(_Argument(option, value))
 
         return _RawPreset(preset_name, args)
 
     def _parse_raw_presets(self):
         for section in self._parser.sections():
             # Skip all non-preset sections
-            if not section.startswith(PresetParser._PRESET_PREFIX):
+            if not section.startswith(_PRESET_PREFIX):
                 continue
 
             raw_preset = self._parse_raw_preset(section)
@@ -160,7 +242,8 @@ class PresetParser(object):
         of the files couldn't be read.
         """
 
-        parsed_files = self._parser.read(filenames)
+        with _convert_configparser_errors():
+            parsed_files = self._parser.read(filenames)
 
         unparsed_files = set(filenames) - set(parsed_files)
         if len(unparsed_files) > 0:
@@ -178,13 +261,14 @@ class PresetParser(object):
         """Reads and parses a string containing preset definintions.
         """
 
-        fp = StringIO(unicode(string))
+        fp = StringIO(string)
 
-        # ConfigParser changes drastically from Python 2 to 3
-        if hasattr(self._parser, 'read_file'):
-            self._parser.read_file(fp)
-        else:
-            self._parser.readfp(fp)
+        with _convert_configparser_errors():
+            # ConfigParser changes drastically from Python 2 to 3
+            if hasattr(self._parser, 'read_file'):
+                self._parser.read_file(fp)
+            else:
+                self._parser.readfp(fp)
 
         self._parse_raw_presets()
 
@@ -215,6 +299,7 @@ class PresetParser(object):
             elif isinstance(option, _Argument):
                 args.append((option.name, option.value))
             else:
+                # Should be unreachable
                 raise ValueError('invalid argument type: {}', option.__class__)
 
         return Preset(raw_preset.name, args)
@@ -222,7 +307,11 @@ class PresetParser(object):
     def _interpolate_preset_vars(self, preset, vars):
         interpolated_args = []
         for (name, value) in preset.args:
-            value = _interpolate_string(value, vars)
+            try:
+                value = _interpolate_string(value, vars)
+            except KeyError as e:
+                raise InterpolationError(preset.name, name, value, e.args[0])
+
             interpolated_args.append((name, value))
 
         return Preset(preset.name, interpolated_args)

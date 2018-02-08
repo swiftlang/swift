@@ -11,6 +11,7 @@
 Temporary module with functionaly used to migrate away from build-script-impl.
 """
 
+from __future__ import absolute_import, unicode_literals
 
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget

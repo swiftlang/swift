@@ -7,17 +7,19 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import unicode_literals
+
 import os
 
-from .utils import TestCase, UTILS_PATH
-from ..presets import (InterpolationError, Preset, PresetNotFoundError,
-                       PresetParser, UnparsedFilesError)
+from .utils import TestCase, UTILS_PATH, add_metaclass
+from .. import presets
+from ..presets import Preset, PresetParser
 
 try:
-    # Python 3
-    import configparser
-except ImportError:
+    # Python 2
     import ConfigParser as configparser
+except ImportError:
+    import configparser
 
 
 PRESET_FILES = [
@@ -63,13 +65,6 @@ build-ninja
 install-symroot=%(install_symroot)s
 """
 
-INVALID_PRESET = """
-[preset: invalid]
-
-ios
-ios
-"""
-
 IGNORED_SECTION = """
 [section_name]
 
@@ -86,6 +81,28 @@ second-opt=1
 first-opt=1
 mixin-preset=test_mixin
 second-opt=2
+"""
+
+INTERPOLATED_PRESET = """
+[preset: test]
+
+install-symroot=%(install_symroot)s
+"""
+
+DUPLICATE_PRESET_NAMES = """
+[preset: test]
+ios
+
+
+[preset: test]
+tvos
+"""
+
+DUPLICATE_PRESET_OPTIONS = """
+[preset: test]
+
+ios
+ios
 """
 
 
@@ -122,27 +139,26 @@ class TestPresetParserMeta(type):
     @classmethod
     def generate_get_preset_test(cls, preset_parser, preset_name):
         def test(self):
-            with self.assertNotRaises():
-                preset_parser.get_preset(preset_name, vars=PRESET_DEFAULTS)
+            preset_parser.get_preset(preset_name, vars=PRESET_DEFAULTS)
 
         return test
 
 
+@add_metaclass(TestPresetParserMeta)
 class TestPresetParser(TestCase):
-
-    __metaclass__ = TestPresetParserMeta
 
     def test_read(self):
         parser = PresetParser()
-
-        with self.assertNotRaises():
-            parser.read(PRESET_FILES)
+        parser.read(PRESET_FILES)
 
     def test_read_invalid_files(self):
         parser = PresetParser()
 
-        with self.assertRaises(UnparsedFilesError):
+        with self.assertRaises(presets.UnparsedFilesError) as cm:
             parser.read(['nonsense-presets.ini'])
+
+        e = cm.exception
+        self.assertListEqual(e.filenames, ['nonsense-presets.ini'])
 
     def test_read_file(self):
         parser = PresetParser()
@@ -152,24 +168,22 @@ class TestPresetParser(TestCase):
 
     def test_read_string(self):
         parser = PresetParser()
-
-        with self.assertNotRaises():
-            parser.read_string(SAMPLE_PRESET)
+        parser.read_string(SAMPLE_PRESET)
 
         preset = parser.get_preset('sample', vars={'install_symroot': '/tmp'})
         self.assertIsNotNone(preset)
         self.assertEqual(preset.name, 'sample')
         self.assertListEqual(preset.args, [
-            (u'--ios', None),
-            (u'--tvos', None),
-            (u'--watchos', None),
-            (u'--test', None),
-            (u'--validation-test', None),
-            (u'--lit-args', u'-v'),
-            (u'--compiler-vendor', u'apple'),
-            (u'--verbose-build', None),
-            (u'--build-ninja', None),
-            (u'--install-symroot', u'/tmp')
+            ('--ios', None),
+            ('--tvos', None),
+            ('--watchos', None),
+            ('--test', None),
+            ('--validation-test', None),
+            ('--lit-args', '-v'),
+            ('--compiler-vendor', 'apple'),
+            ('--verbose-build', None),
+            ('--build-ninja', None),
+            ('--install-symroot', '/tmp')
         ])
 
     def test_parser_ignores_non_preset_sections(self):
@@ -197,33 +211,70 @@ class TestPresetParser(TestCase):
             '--second-opt=2',
         ])
 
-    def test_duplicate_option_error(self):
+    def test_interpolation_error(self):
         parser = PresetParser()
+        parser.read_string(INTERPOLATED_PRESET)
 
-        # Skip this test if using the Python 2 ConfigParser module
+        with self.assertRaises(presets.InterpolationError) as cm:
+            parser.get_preset('test')
+
+        e = cm.exception
+        self.assertEqual(e.preset_name, 'test')
+        self.assertEqual(e.option, '--install-symroot')
+        self.assertEqual(e.rawval, '%(install_symroot)s')
+        self.assertEqual(e.reference, 'install_symroot')
+
+    def test_duplicate_option_error(self):
+        # Skip test if using the Python 2 ConfigParser module
         if not hasattr(configparser, 'DuplicateOptionError'):
             return
 
-        with self.assertRaises(configparser.DuplicateOptionError):
-            parser.read_string(INVALID_PRESET)
-
-    def test_interpolation_error(self):
         parser = PresetParser()
-        parser.read_string(SAMPLE_PRESET)
 
-        with self.assertRaises(InterpolationError):
-            parser.get_preset('sample')
+        with self.assertRaises(presets.DuplicateOptionError) as cm:
+            parser.read_string(DUPLICATE_PRESET_OPTIONS)
+
+        e = cm.exception
+        self.assertEqual(e.preset_name, 'test')
+        self.assertEqual(e.option, 'ios')
+
+    def test_duplicate_preset_error(self):
+        # Skip test if using the Python 2 ConfigParser module
+        if not hasattr(configparser, 'DuplicateOptionError'):
+            return
+
+        parser = PresetParser()
+
+        with self.assertRaises(presets.DuplicatePresetError) as cm:
+            parser.read_string(DUPLICATE_PRESET_NAMES)
+
+        e = cm.exception
+        self.assertEqual(e.preset_name, 'test')
+
+    def test_get_preset_raw(self):
+        parser = PresetParser()
+        parser.read_string(INTERPOLATED_PRESET)
+
+        preset = parser.get_preset('test', raw=True)
+        self.assertEqual(preset.args, [
+            ('--install-symroot', '%(install_symroot)s')
+        ])
 
     def test_get_missing_preset(self):
         parser = PresetParser()
 
-        with self.assertRaises(PresetNotFoundError):
-            parser.get_preset('preset')
+        with self.assertRaises(presets.PresetNotFoundError) as cm:
+            parser.get_preset('test')
+
+        e = cm.exception
+        self.assertEqual(e.preset_name, 'test')
 
     def test_preset_names(self):
         parser = PresetParser()
 
-        parser.read_string(SAMPLE_PRESET)
-        parser.read_string('[preset: test]\nios\n')
+        parser.read_string('[preset: foo]')
+        parser.read_string('[preset: bar]')
+        parser.read_string('[preset: baz]')
 
-        self.assertListEqual(parser.preset_names(), ['sample', 'test'])
+        self.assertEqual(set(parser.preset_names()),
+                         set(['foo', 'bar', 'baz']))
