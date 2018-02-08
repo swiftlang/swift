@@ -475,7 +475,7 @@ extension StrideTo: Sequence {
 
     @discardableResult
     func appendSubsequence(_ knownEmpty: Bool? = nil) -> Bool {
-      let isEmpty = knownEmpty ?? (subEnd - subStart < _stride)
+      let isEmpty = knownEmpty ?? (subStart.distance(to: subEnd) < _stride)
       if isEmpty && omittingEmptySubsequences {
         return false
       }
@@ -530,16 +530,54 @@ extension StrideTo: CustomStringConvertible {
   }
 }
 
+extension StrideTo {
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Index {
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _value: Element
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_value: Element) {
+      self._value = _value
+    }
+  }
+}
+
+extension StrideTo.Index: Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (lhs: StrideTo.Index, rhs: StrideTo.Index) -> Bool {
+    return lhs._value == rhs._value
+  }
+}
+
+extension StrideTo.Index: Comparable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (lhs: StrideTo.Index, rhs: StrideTo.Index) -> Bool {
+    return lhs._value < rhs._value
+  }
+}
+
+extension StrideTo.Index: Hashable where Element: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int { return _value.hashValue }
+}
+
 extension StrideTo: Collection
 where Element.Stride: BinaryInteger {
-  public typealias Index = Int
-  public typealias Indices = Range<Int>
+  // FIXME: if Index is Strideable this can be Range<Index>
+  // public typealias Indices = Range<Int>
 
   @_inlineable
-  public var startIndex: Index { return 0 }
+  public var startIndex: Index { return Index(_value: _start) }
 
   @_inlineable
-  public var endIndex: Index { return count }
+  public var endIndex: Index {
+    // let's generate `endIndex` that is exactly `count` `_stride`s away from
+    // `_start`, even if it is not necessarily equal to `_end`
+    return Index(_value:
+      _start.advanced(by: numericCast(count * Int(_stride))))
+  }
 
   @_inlineable
   public var count: Int {
@@ -550,32 +588,36 @@ where Element.Stride: BinaryInteger {
 
   public subscript(position: Index) -> Element {
     _failEarlyRangeCheck(position, bounds: startIndex..<endIndex)
-    return _start.advanced(by: Element.Stride(position) * _stride)
+    return position._value
   }
 
-  public subscript(bounds: Range<Index>) -> Slice<StrideTo<Element>> {
+  public subscript(bounds: Range<Index>) -> StrideTo<Element> {
     _failEarlyRangeCheck(bounds, bounds: startIndex ..< endIndex)
-    return Slice(base: self, bounds: bounds)
+    let start = bounds.lowerBound._value
+    let end = bounds.upperBound._value
+    return StrideTo( _start: start, end: end, stride: _stride)
   }
 
   @_inlineable
-  public func index(before i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex + 1...endIndex)
-    return i - 1
+  public func index(after i: Index) -> Index {
+    let lowerBound = Index(_value: startIndex._value.advanced(by: -_stride))
+    _failEarlyRangeCheck(i, bounds: lowerBound..<endIndex)
+    return Index(_value: i._value.advanced(by: _stride))
   }
 }
 
 extension StrideTo: BidirectionalCollection
 where Element.Stride: BinaryInteger {
   @_inlineable
-  public func index(after i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex - 1..<endIndex)
-    return i + 1
+  public func index(before i: Index) -> Index {
+    let lowerBound = Index(_value: startIndex._value.advanced(by: _stride))
+    _failEarlyRangeCheck(i, bounds: lowerBound...endIndex)
+    return Index(_value: i._value.advanced(by: -_stride))
   }
 }
 
 extension StrideTo: RandomAccessCollection
-where Element.Stride: BinaryInteger {}
+where Element.Stride: BinaryInteger { }
 
 /// Returns a sequence from a starting value to, but not including, an end
 /// value, stepping by the specified amount.

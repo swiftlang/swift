@@ -16,13 +16,13 @@ StrideTestSuite.test("through") {
   checkSequence(Array(0...5).reversed(), stride(from: 5, through: 0, by: -1))
 }
 
-#if false
 StrideTestSuite.test("StrideToCollection/Int") {
   let odds = stride(from: 1, to: 10, by: 2)
   let expected = (1..<10).filter { $0 % 2 != 0 }
-  checkForwardCollection(expected, odds)
+  checkRandomAccessCollection(expected, odds)
 }
 
+#if false
 StrideTestSuite.test("StrideThroughCollection/Int") {
   let odds = stride(from: 1, through: 10, by: 2)
   let expected = (1...10).filter { $0 % 2 != 0 }
