@@ -298,7 +298,6 @@ public:
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
-  llvm::SmallVector<const clang::Module*, 2> DeferredHeaderImports;
 
   const Version CurrentVersion;
 
@@ -491,7 +490,7 @@ public:
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
   /// The modules re-exported by imported headers.
-  llvm::SmallVector<ModuleDecl::ImportedModule, 8> ImportedHeaderExports;
+  llvm::SmallVector<clang::Module *, 8> ImportedHeaderExports;
 
   /// The modules that requested imported headers.
   ///
