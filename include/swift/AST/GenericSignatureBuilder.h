@@ -809,21 +809,11 @@ public:
   /// Determine whether the two given types are in the same equivalence class.
   bool areInSameEquivalenceClass(Type type1, Type type2);
 
-  /// Simplify the given type, which is described by a base parameter
-  /// followed by a sequence of associated types.
-  ///
-  /// \param path is updated to describe the best path from the given base
-  /// to the same equivalence class.
-  ///
-  /// \returns true if the path was simplified at all.
-  bool simplifyType(GenericParamKey base,
-                    SmallVectorImpl<AssociatedTypeDecl *> &path);
-
-  /// Simplify the given type down to its anchor.
+  /// Simplify the given dependent type down to its canonical representation.
   ///
   /// \returns null if the type involved dependent member types that
   /// don't have associated types.
-  Type simplifyType(Type type);
+  Type getCanonicalTypeParameter(Type type);
 
   /// Verify the correctness of the given generic signature.
   ///

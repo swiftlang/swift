@@ -111,6 +111,76 @@ STATISTIC(NumComponentsCollapsedViaRewriting,
           "# of same-type components collapsed via term rewriting");
 
 namespace  {
+
+/// A purely-relative rewrite path consisting of a (possibly empty)
+/// sequence of associated type references.
+using RelativeRewritePath = ArrayRef<AssociatedTypeDecl *>;
+
+/// Describes a rewrite path, which contains an optional base (generic
+/// parameter) followed by a sequence of associated type references.
+class RewritePath {
+  Optional<GenericParamKey> base;
+  TinyPtrVector<AssociatedTypeDecl *> path;
+
+public:
+  RewritePath() { }
+
+  enum PathOrder {
+    Forward,
+    Reverse,
+  };
+
+  /// Form a rewrite path given an optional base and a relative rewrite path.
+  RewritePath(Optional<GenericParamKey> base, RelativeRewritePath path,
+              PathOrder order);
+
+  /// Retrieve the base of the given rewrite path.
+  ///
+  /// When present, it indicates that the entire path will be rebased on
+  /// the given base generic parameter. This is required for describing
+  /// rewrites on type parameters themselves, e.g., T == U.
+  Optional<GenericParamKey> getBase() const { return base; }
+
+  /// Retrieve the sequence of associated type references that describes
+  /// the path.
+  ArrayRef<AssociatedTypeDecl *> getPath() const { return path; }
+
+  /// Decompose a type into a path.
+  ///
+  /// \returns the path, or None if it contained unresolved dependent member
+  /// types.
+  Optional<RewritePath> static createPath(Type type);
+
+  /// Decompose a potential archetype into a patch.
+  ///
+  /// \returns the path, or None if it contained potential archetypes
+  /// with concrete declarations.
+  Optional<RewritePath> static createPath(PotentialArchetype *pa);
+
+  /// Compute the common path between this path and \c other, if one exists.
+  Optional<RewritePath> commonPath(const RewritePath &other) const;
+
+  /// Form a canonical, dependent type.
+  ///
+  /// This requires that the rewrite path have a base.
+  CanType formDependentType(ASTContext &ctx) const;
+
+  /// Compare the given rewrite paths.
+  int compare(const RewritePath &other) const;
+
+  /// Print this path.
+  void print(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    print(llvm::errs());
+  }
+
+  friend bool operator==(const RewritePath &lhs, const RewritePath &rhs) {
+    return lhs.getBase() == rhs.getBase() && lhs.getPath() == rhs.getPath();
+  }
+};
+
 /// A node within the prefix tree that is used to match associated type
 /// references.
 class RewriteTreeNode {
@@ -135,7 +205,7 @@ class RewriteTreeNode {
   ///         (assocType: C, rewrite: [C], children: [])
   ///       ])
   ///   ])
-  llvm::TinyPtrVector<AssociatedTypeDecl *> rewrite;
+  RewritePath rewrite;
 
   /// The child nodes, which extend the sequence to be matched.
   ///
@@ -144,9 +214,6 @@ class RewriteTreeNode {
   llvm::TinyPtrVector<RewriteTreeNode *> children;
 
 public:
-  /// A path consisting of a sequence of associated type references.
-  using Path = ArrayRef<AssociatedTypeDecl *>;
-
   ~RewriteTreeNode();
 
   RewriteTreeNode(AssociatedTypeDecl *assocType)
@@ -165,14 +232,14 @@ public:
 
   /// Set a new rewrite rule for this particular node. This can only be
   /// performed once.
-  void setRewriteRule(Path replacementPath) {
+  void setRewriteRule(RewritePath replacementPath) {
     assert(!hasRewriteRule());
     assocTypeAndHasRewrite.setInt(true);
-    rewrite = TinyPtrVector<AssociatedTypeDecl *>(replacementPath);
+    rewrite = replacementPath;
   }
 
   /// Retrieve the path to which this node will be rewritten.
-  ArrayRef<AssociatedTypeDecl *> getRewriteRule() const {
+  const RewritePath &getRewriteRule() const {
     assert(hasRewriteRule());
     return rewrite;
   }
@@ -184,7 +251,8 @@ public:
   ///
   /// \param replacementPath The sequence of associated type declarations
   /// with which a match will be replaced.
-  void addRewriteRule(Path matchPath, Path replacementPath);
+  void addRewriteRule(RelativeRewritePath matchPath,
+                      RewritePath replacementPath);
 
   /// Enumerate all of the paths to which the given matched path can be
   /// rewritten.
@@ -196,12 +264,17 @@ public:
   /// \c matchPath that matched and \c rewrite is the path to which it can
   /// be rewritten.
   void enumerateRewritePaths(
-                         Path matchPath,
-                         llvm::function_ref<void(unsigned, Path)> callback,
-                         unsigned depth = 0) const;
+                       RelativeRewritePath matchPath,
+                       llvm::function_ref<void(unsigned, RewritePath)> callback,
+                       unsigned depth = 0) const;
 
   /// Find the best rewrite rule to match the given path.
-  std::pair<unsigned, Path> bestMatch(Path path);
+  ///
+  /// \param path The path to match.
+  /// \param prefixLength The length of the prefix leading up to \c path.
+  Optional<std::pair<unsigned, RewritePath>>
+  bestMatch(GenericParamKey base, RelativeRewritePath path,
+            unsigned prefixLength);
 
   /// Merge the given rewrite tree into \c other.
   void mergeInto(RewriteTreeNode *other);
@@ -2090,7 +2163,7 @@ Type EquivalenceClass::getAnchor(
   // Form the anchor.
   for (auto member : members) {
     auto anchorType =
-      builder.simplifyType(member->getDependentType(genericParams));
+      builder.getCanonicalTypeParameter(member->getDependentType(genericParams));
     if (!anchorType) continue;
 
     // Record the cache miss and update the cache.
@@ -2621,7 +2694,6 @@ static int compareDependentPaths(ArrayRef<AssociatedTypeDecl *> path1,
   if (path1.size() != path2.size())
     return path1.size() < path2.size() ? -1 : 1;
 
-
   // The paths are the same length, so order by comparing the associted
   // types.
   for (unsigned index : indices(path1)) {
@@ -2994,6 +3066,128 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
 }
 
 #pragma mark Rewrite tree
+RewritePath::RewritePath(Optional<GenericParamKey> base,
+                         RelativeRewritePath path,
+                         PathOrder order)
+  : base(base)
+{
+  switch (order) {
+  case Forward:
+    this->path.insert(this->path.begin(), path.begin(), path.end());
+    break;
+
+  case Reverse:
+    this->path.insert(this->path.begin(), path.rbegin(), path.rend());
+    break;
+  }
+}
+
+Optional<RewritePath> RewritePath::createPath(PotentialArchetype *pa) {
+  SmallVector<AssociatedTypeDecl *, 4> path;
+  while (auto parent = pa->getParent()) {
+    auto assocType = pa->getResolvedAssociatedType();
+    if (!assocType) return None;
+
+    path.push_back(assocType);
+    pa = parent;
+  }
+
+  return RewritePath(pa->getGenericParamKey(), path, Reverse);
+}
+
+Optional<RewritePath> RewritePath::createPath(Type type) {
+  SmallVector<AssociatedTypeDecl *, 4> path;
+  while (auto depMemTy = type->getAs<DependentMemberType>()) {
+    auto assocType = depMemTy->getAssocType();
+    if (!assocType) return None;
+
+    path.push_back(assocType);
+    type = depMemTy->getBase();
+  }
+
+  auto genericParam = type->getAs<GenericTypeParamType>();
+  if (!genericParam) return None;
+
+  return RewritePath(GenericParamKey(genericParam), path, Reverse);
+}
+
+Optional<RewritePath> RewritePath::commonPath(const RewritePath &other) const {
+  assert(getBase().hasValue() && other.getBase().hasValue());
+
+  if (*getBase() != *other.getBase()) return None;
+
+  // Find the longest common prefix.
+  RelativeRewritePath path1 = getPath();
+  RelativeRewritePath path2 = other.getPath();
+  if (path1.size() > path2.size())
+    std::swap(path1, path2);
+  unsigned prefixLength =
+    std::mismatch(path1.begin(), path1.end(), path2.begin()).first
+      - path1.begin();
+
+  // Form the common path.
+  return RewritePath(getBase(), path1.slice(0, prefixLength), Forward);
+}
+
+/// Form a dependent type with the given generic parameter, then following the
+/// path of associated types.
+static Type formDependentType(GenericTypeParamType *base,
+                              RelativeRewritePath path) {
+  return std::accumulate(path.begin(), path.end(), Type(base),
+                         [](Type type, AssociatedTypeDecl *assocType) -> Type {
+                           return DependentMemberType::get(type, assocType);
+                         });
+}
+
+/// Form a dependent type with the (canonical) generic parameter for the given
+/// parameter key, then following the path of associated types.
+static Type formDependentType(ASTContext &ctx, GenericParamKey genericParam,
+                              RelativeRewritePath path) {
+  return formDependentType(GenericTypeParamType::get(genericParam.Depth,
+                                                     genericParam.Index,
+                                                     ctx),
+                           path);
+}
+
+CanType RewritePath::formDependentType(ASTContext &ctx) const {
+  assert(getBase());
+  return CanType(::formDependentType(ctx, *getBase(), getPath()));
+}
+
+int RewritePath::compare(const RewritePath &other) const {
+  // Prefer relative to absolute paths.
+  if (getBase().hasValue() != other.getBase().hasValue()) {
+    return other.getBase().hasValue() ? -1 : 1;
+  }
+
+  // Order based on the bases.
+  if (getBase() && *getBase() != *other.getBase())
+    return (*getBase() < *other.getBase()) ? -1 : 1;
+
+  // Order based on the path contents.
+  return compareDependentPaths(getPath(), other.getPath());
+}
+
+void RewritePath::print(llvm::raw_ostream &out) const {
+  out << "[";
+
+  if (getBase()) {
+    out << "(" << getBase()->Depth << ", " << getBase()->Index << ")";
+    if (!getPath().empty()) out << " -> ";
+  }
+
+  interleave(getPath().begin(), getPath().end(),
+             [&](AssociatedTypeDecl *assocType) {
+               out.changeColor(raw_ostream::BLUE);
+               out << assocType->getProtocol()->getName() << "."
+               << assocType->getName();
+               out.resetColor();
+             }, [&] {
+               out << " -> ";
+             });
+  out << "]";
+}
+
 RewriteTreeNode::~RewriteTreeNode() {
   for (auto child : children)
     delete child;
@@ -3027,9 +3221,8 @@ public:
 };
 }
 
-void RewriteTreeNode::addRewriteRule(
-                             ArrayRef<AssociatedTypeDecl *> matchPath,
-                             ArrayRef<AssociatedTypeDecl *> replacementPath) {
+void RewriteTreeNode::addRewriteRule(RelativeRewritePath matchPath,
+                                     RewritePath replacementPath) {
   // If the match path is empty, we're adding the rewrite rule to this node.
   if (matchPath.empty()) {
     // If we don't already have a rewrite rule, add it.
@@ -3073,9 +3266,9 @@ void RewriteTreeNode::addRewriteRule(
 }
 
 void RewriteTreeNode::enumerateRewritePaths(
-                         Path matchPath,
-                         llvm::function_ref<void(unsigned, Path)> callback,
-                         unsigned depth) const {
+                       RelativeRewritePath matchPath,
+                       llvm::function_ref<void(unsigned, RewritePath)> callback,
+                       unsigned depth) const {
   // Determine whether we know anything about the next step in the path.
   auto childPos =
     depth < matchPath.size()
@@ -3101,16 +3294,34 @@ void RewriteTreeNode::enumerateRewritePaths(
   }
 }
 
-auto RewriteTreeNode::bestMatch(Path path) -> std::pair<unsigned, Path> {
-  std::pair<unsigned, Path> result(0, Path());
+Optional<std::pair<unsigned, RewritePath>>
+RewriteTreeNode::bestMatch(GenericParamKey base, RelativeRewritePath path,
+                           unsigned prefixLength) {
+  Optional<std::pair<unsigned, RewritePath>> best;
+  unsigned bestAdjustedLength = 0;
   enumerateRewritePaths(path,
-                        [&result](unsigned length, Path path) {
-    if (length > result.first ||
-        (length == result.first &&
-         compareDependentPaths(path, result.second) < 0))
-      result = { length, path };
+                        [&](unsigned length, RewritePath path) {
+    // Determine how much of the original path will be replaced by the rewrite.
+    unsigned adjustedLength = length;
+    if (auto newBase = path.getBase()) {
+      adjustedLength += prefixLength;
+
+      // If the base is unchanged, make sure we're reducing the length.
+      if (*newBase == base && adjustedLength <= path.getPath().size())
+        return;
+    }
+
+    if (adjustedLength == 0) return;
+
+    if (adjustedLength > bestAdjustedLength ||
+        (adjustedLength == bestAdjustedLength &&
+         path.compare(best->second) < 0)) {
+      best = { length, path };
+      bestAdjustedLength = adjustedLength;
+    }
   });
-  return result;
+
+  return best;
 }
 
 void RewriteTreeNode::mergeInto(RewriteTreeNode *other) {
@@ -3159,17 +3370,8 @@ void RewriteTreeNode::dump(llvm::raw_ostream &out, bool lastChild) const {
 
     // Print the rewrite, if there is one.
     if (node->hasRewriteRule()) {
-      out << " --> [";
-      interleave(node->rewrite.begin(), node->rewrite.end(),
-                 [&](AssociatedTypeDecl *assocType) {
-                   out.changeColor(raw_ostream::BLUE);
-                   out << assocType->getProtocol()->getName() << "."
-                      << assocType->getName();
-                   out.resetColor();
-                 }, [&] {
-                   out << " -> ";
-                 });
-      out << "]";
+      out << " --> ";
+      node->rewrite.print(out);
     }
 
     out << "\n";
@@ -3187,69 +3389,6 @@ void RewriteTreeNode::dump(llvm::raw_ostream &out, bool lastChild) const {
   };
 
   print(this, lastChild);
-}
-
-/// Unpack the given potential archetype into a path from a generic parameter
-/// through a sequence of associated type declarations.
-///
-/// \returns the generic parameter at the root of the type, or \c None if
-/// a potential archetype along the path doesn't have an associated type.
-static Optional<GenericParamKey>
-unpackPath(PotentialArchetype *type,
-           SmallVectorImpl<AssociatedTypeDecl *> &path) {
-  if (auto parent = type->getParent()) {
-    auto result = unpackPath(parent, path);
-    if (!result) return None;
-    auto assocType = type->getResolvedAssociatedType();
-    if (!assocType) return None;
-
-    path.push_back(assocType);
-    return result;
-  }
-
-  return type->getGenericParamKey();
-}
-
-/// Unpack the given dependent type into a path from a generic parameter
-/// through a sequence of associated type declarations.
-///
-/// \returns the generic parameter at the root of the type, or NULL if
-/// this is not a well-formed dependent member type. along the path doesn't
-/// have an associated type.
-static GenericTypeParamType *
-unpackPath(Type type, SmallVectorImpl<AssociatedTypeDecl *> &path) {
-  if (auto depMemTy = type->getAs<DependentMemberType>()) {
-    auto result = unpackPath(depMemTy->getBase(), path);
-    if (!result) return nullptr;
-
-    auto assocType = depMemTy->getAssocType();
-    if (!assocType) return nullptr;
-
-    path.push_back(assocType);
-    return result;
-  }
-
-  return type->getAs<GenericTypeParamType>();
-}
-
-/// Form a dependent type with the given generic parameter, then following the
-/// path of associated types.
-static Type formDependentType(GenericTypeParamType *base,
-                              ArrayRef<AssociatedTypeDecl *> path) {
-  return std::accumulate(path.begin(), path.end(), Type(base),
-                         [](Type type, AssociatedTypeDecl *assocType) -> Type {
-                           return DependentMemberType::get(type, assocType);
-                         });
-}
-
-/// Form a dependent type with the (canonical) generic parameter for the given
-/// parameter key, then following the path of associated types.
-static Type formDependentType(ASTContext &ctx, GenericParamKey genericParam,
-                              ArrayRef<AssociatedTypeDecl *> path) {
-  return formDependentType(GenericTypeParamType::get(genericParam.Depth,
-                                                     genericParam.Index,
-                                                     ctx),
-                           path);
 }
 
 RewriteTreeNode *
@@ -3272,88 +3411,137 @@ GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
   return root;
 }
 
-void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *type1,
-                                                     PotentialArchetype *type2){
-  SmallVector<AssociatedTypeDecl *, 4> pathVec1;
-  auto baseOpt1 = unpackPath(type1, pathVec1);
-  if (!baseOpt1) return;
-  ArrayRef<AssociatedTypeDecl *> path1(pathVec1);
+void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *pa1,
+                                                     PotentialArchetype *pa2){
+  auto pathOpt1 = RewritePath::createPath(pa1);
+  if (!pathOpt1) return;
 
-  SmallVector<AssociatedTypeDecl *, 4> pathVec2;
-  auto baseOpt2 = unpackPath(type2, pathVec2);
-  if (!baseOpt2) return;
-  ArrayRef<AssociatedTypeDecl *> path2(pathVec2);
+  auto pathOpt2 = RewritePath::createPath(pa2);
+  if (!pathOpt2) return;
 
-  // FIXME: These could land in the same equivalence class, in which case
-  // we won't need to bail out.
-  if (*baseOpt1 != *baseOpt2)
-    return;
+  auto path1 = std::move(pathOpt1).getValue();
+  auto path2 = std::move(pathOpt2).getValue();
 
-  // Make sure path1 is no longer than path2.
-  if (path1.size() > path2.size()) {
-    std::swap(path1, path2);
+  // Look for a common path.
+  auto prefix = path1.commonPath(path2);
+
+  // If we didn't find a common path, try harder.
+  Type simplifiedType1;
+  Type simplifiedType2;
+  if (!prefix) {
+    // Simplify both sides in the hope of uncovering a common path.
+    simplifiedType1 = getCanonicalTypeParameter(pa1->getDependentType({ }));
+    simplifiedType2 = getCanonicalTypeParameter(pa2->getDependentType({ }));
+    if (simplifiedType1->isEqual(simplifiedType2)) return;
+
+    // Create new paths from the simplified types.
+    path1 = *RewritePath::createPath(simplifiedType1);
+    path2 = *RewritePath::createPath(simplifiedType2);
+
+    // Find a common path.
+    prefix = path1.commonPath(path2);
   }
 
-  // Find the length of the common prefix.
-  unsigned prefixLength =
-    std::mismatch(path1.begin(), path1.end(), path2.begin()).first
-      - path1.begin();
+  // When we have a common prefix, form a rewrite rule using relative paths.
+  if (prefix) {
+    // Find the better relative rewrite path.
+    RelativeRewritePath relPath1
+      = path1.getPath().slice(prefix->getPath().size());
+    RelativeRewritePath relPath2
+      = path2.getPath().slice(prefix->getPath().size());
+    // Order the paths so that we go to the more-canonical path.
+    if (compareDependentPaths(relPath1, relPath2) < 0)
+      std::swap(relPath1, relPath2);
 
-  // Find the equivalence class that corresponds to the common prefix.
-  auto commonPrefixType = formDependentType(getASTContext(), *baseOpt1,
-                                            path1.slice(0, prefixLength));
-  auto equivClass =
-    resolveEquivalenceClass(commonPrefixType,
-                            ArchetypeResolutionKind::WellFormed);
-  if (!equivClass)
+    // Find the equivalence class for the prefix.
+    CanType commonType = prefix->formDependentType(getASTContext());
+    auto equivClass =
+      resolveEquivalenceClass(commonType, ArchetypeResolutionKind::WellFormed);
+    assert(equivClass && "Prefix cannot be resolved?");
+
+    // Add the rewrite rule.
+    auto root = Impl->getOrCreateRewriteTreeRoot(equivClass);
+    root->addRewriteRule(relPath1,
+                         RewritePath(None, relPath2, RewritePath::Forward));
+
     return;
+  }
 
-  // Chop off the common prefix; these are the paths we'll take from the
-  // equivalence class.
-  path1 = path1.slice(prefixLength);
-  path2 = path2.slice(prefixLength);
+  // Otherwise, form a rewrite rule with absolute paths.
 
-  // Order the paths so that we go to the more-canonical path.
-  if (compareDependentPaths(path1, path2) < 0)
+  // Find the better path and make sure it's in path2.
+  if (compareDependentTypes(simplifiedType1, simplifiedType2) < 0) {
     std::swap(path1, path2);
+    std::swap(simplifiedType1, simplifiedType2);
+  }
 
   // Add the rewrite rule.
+  Type firstBase =
+    GenericTypeParamType::get(path1.getBase()->Depth, path1.getBase()->Index,
+                              getASTContext());
+  auto equivClass =
+    resolveEquivalenceClass(firstBase, ArchetypeResolutionKind::WellFormed);
+  assert(equivClass && "Base cannot be resolved?");
+
   auto root = Impl->getOrCreateRewriteTreeRoot(equivClass);
-  root->addRewriteRule(path1, path2);
+  root->addRewriteRule(path1.getPath(), path2);
 }
 
-bool GenericSignatureBuilder::simplifyType(
-                                 GenericParamKey base,
-                                 SmallVectorImpl<AssociatedTypeDecl *> &path) {
+Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
+  auto initialPath = RewritePath::createPath(type);
+  if (!initialPath) return nullptr;
 
-  Type genericParamType =
-    GenericTypeParamType::get(base.Depth, base.Index, getASTContext());
-
+  auto genericParamType =
+    GenericTypeParamType::get(initialPath->getBase()->Depth,
+                              initialPath->getBase()->Index,
+                              getASTContext());
   auto initialEquivClass =
-    resolveEquivalenceClass(genericParamType, ArchetypeResolutionKind::WellFormed);
-  if (!initialEquivClass) return false;
+    resolveEquivalenceClass(genericParamType,
+                            ArchetypeResolutionKind::WellFormed);
+  if (!initialEquivClass) return nullptr;
 
   unsigned startIndex = 0;
   auto equivClass = initialEquivClass;
   Type currentType = genericParamType;
+  SmallVector<AssociatedTypeDecl *, 4> path(initialPath->getPath().begin(),
+                                            initialPath->getPath().end());
   bool simplified = false;
   do {
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(equivClass)) {
       // Find the best rewrite rule for the path starting at startIndex.
       auto match =
-        rootNode->bestMatch(llvm::makeArrayRef(path).slice(startIndex));
+        rootNode->bestMatch(genericParamType,
+                            llvm::makeArrayRef(path).slice(startIndex),
+                            startIndex);
 
       // If we have a match, replace the matched path with the replacement
       // path.
-      if (match.first > 0) {
+      if (match) {
+        // Determine the range in the path which we'll be replacing.
+        unsigned replaceStartIndex = match->second.getBase() ? 0 : startIndex;
+        unsigned replaceEndIndex = startIndex + match->first;
+
         // Overwrite the beginning of the match.
-        assert(match.first >= match.second.size());
-        auto pathStartPos = path.begin() + startIndex;
-        std::copy(match.second.begin(), match.second.end(), pathStartPos);
+        auto replacementPath = match->second.getPath();
+        assert((replaceEndIndex - replaceStartIndex) >= replacementPath.size());
+        auto replacementStartPos = path.begin() + replaceStartIndex;
+        std::copy(replacementPath.begin(), replacementPath.end(),
+                  replacementStartPos);
 
         // Erase the rest.
-        path.erase(pathStartPos + match.second.size(),
-                   pathStartPos + match.first);
+        path.erase(replacementStartPos + replacementPath.size(),
+                   path.begin() + replaceEndIndex);
+
+        // If this is an absolute path, use the new base.
+        if (auto newBase = match->second.getBase()) {
+          genericParamType =
+            GenericTypeParamType::get(newBase->Depth, newBase->Index,
+                                      getASTContext());
+          initialEquivClass =
+            resolveEquivalenceClass(genericParamType,
+                                    ArchetypeResolutionKind::WellFormed);
+          assert(initialEquivClass && "Must have an equivalence class");
+        }
 
         // Move back to the beginning; we may have opened up other rewrites.
         simplified = true;
@@ -3364,25 +3552,18 @@ bool GenericSignatureBuilder::simplifyType(
       }
     }
 
+    // If we've hit the end of the path, we're done.
+    if (startIndex >= path.size()) break;
+
     // FIXME: It would be nice if there were a better way to get the equivalence
     // class of a named nested type.
     currentType = DependentMemberType::get(currentType, path[startIndex++]);
     equivClass =
       resolveEquivalenceClass(currentType, ArchetypeResolutionKind::WellFormed);
     if (!equivClass) break;
-  } while (startIndex < path.size());
+  } while (true);
 
-  return simplified;
-}
-
-Type GenericSignatureBuilder::simplifyType(Type type) {
-  SmallVector<AssociatedTypeDecl *, 4> path;
-  auto base = unpackPath(type, path);
-  if (!base) return nullptr;
-
-  if (!simplifyType(base, path)) return type;
-
-  return formDependentType(base, path);
+  return formDependentType(genericParamType, path);
 }
 
 #pragma mark Equivalence classes
