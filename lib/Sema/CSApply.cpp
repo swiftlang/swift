@@ -3299,14 +3299,21 @@ namespace {
       auto destValueType
         = finalResultType->lookThroughAllOptionalTypes(destOptionals);
 
-      // When performing a bridging operation, if the destination value type
-      // is 'AnyObject', leave any extra optionals on the source in place.
-      if (castKind == OptionalBindingsCastKind::Bridged &&
-          srcOptionals.size() > destOptionals.size() &&
-          destValueType->isAnyObject()) {
-        srcType = srcOptionals[destOptionals.size()];
-        srcOptionals.erase(srcOptionals.begin() + destOptionals.size(),
-                           srcOptionals.end());
+      auto isBridgeToAnyObject =
+        castKind == OptionalBindingsCastKind::Bridged &&
+        destValueType->isAnyObject();
+
+      // If the destination value type is 'AnyObject' when performing a
+      // bridging operation, or if the destination value type could dynamically
+      // be an optional type, leave any extra optionals on the source in place.
+      if (isBridgeToAnyObject || destValueType->canDynamicallyBeOptionalType(
+                                              /* includeExistential */ false)) {
+        auto destOptionalsCount = destOptionals.size() - destExtraOptionals;
+        if (srcOptionals.size() > destOptionalsCount) {
+          srcType = srcOptionals[destOptionalsCount];
+          srcOptionals.erase(srcOptionals.begin() + destOptionalsCount,
+                             srcOptionals.end());
+        }
       }
 
       // When performing a bridging operation, if the destination type
