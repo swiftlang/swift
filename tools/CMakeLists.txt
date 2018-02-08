@@ -16,9 +16,15 @@ add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
 add_swift_tool_subdirectory(swift-refactor)
 
+if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  set(BUILD_FOUNDATION TRUE)
+else()
+  set(BUILD_FOUNDATION FALSE)
+endif()
+
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
-  if(BUILD_SOURCEKIT_FRAMEWORK AND SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  if(BUILD_SOURCEKIT_FRAMEWORK AND BUILD_FOUNDATION)
     set(BUILD_SOURCEKIT_SWIFT_CLIENT TRUE)
   else()
     set(BUILD_SOURCEKIT_SWIFT_CLIENT FALSE)
@@ -35,7 +41,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # SwiftSyntax depends on both the standard library (because it's a
   # Swift module), and the SDK overlays (because it depends on Foundation).
   # Ensure we only build SwiftSyntax when we're building both.
-  if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  if(BUILD_FOUNDATION)
     add_subdirectory(SwiftSyntax)
   endif()
 endif()
