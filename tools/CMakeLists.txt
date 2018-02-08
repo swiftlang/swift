@@ -1,3 +1,14 @@
+include(CheckIncludeFiles)
+check_include_files("xpc/xpc.h" HAVE_XPC_H)
+
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
+
+if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT AND NOT SOURCEKIT_INSTALLING_INPROC)
+  set(BUILD_SOURCEKIT_XPC_SERVICE TRUE)
+else()
+  set(BUILD_SOURCEKIT_XPC_SERVICE FALSE)
+endif()
+
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
 
@@ -24,7 +35,7 @@ endif()
 
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
-  if(BUILD_SOURCEKIT_FRAMEWORK AND BUILD_FOUNDATION)
+  if(BUILD_SOURCEKIT_XPC_SERVICE AND BUILD_FOUNDATION)
     set(BUILD_SOURCEKIT_SWIFT_CLIENT TRUE)
   else()
     set(BUILD_SOURCEKIT_SWIFT_CLIENT FALSE)

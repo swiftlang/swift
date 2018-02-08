@@ -16,9 +16,6 @@ ENABLE_LANGUAGE(C)
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
-include(CheckIncludeFiles)
-
-check_include_files("xpc/xpc.h" HAVE_XPC_H)
 
 #
 # User-configurable options that control the inclusion and default build
@@ -397,12 +394,6 @@ option(SWIFT_BUILD_SOURCEKIT
 option(SWIFT_ENABLE_SOURCEKIT_TESTS
     "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
-
-if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT)
-  set(BUILD_SOURCEKIT_FRAMEWORK TRUE)
-else()
-  set(BUILD_SOURCEKIT_FRAMEWORK FALSE)
-endif()
 
 #
 # Assume a new enough ar to generate the index at construction time. This avoids

@@ -1,4 +1,4 @@
   add_subdirectory(InProc)
-if(BUILD_SOURCEKIT_FRAMEWORK)
+if(HAVE_XPC_H)
   add_subdirectory(XPC)
 endif()
