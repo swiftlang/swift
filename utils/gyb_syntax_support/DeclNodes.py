@@ -88,7 +88,7 @@ DECL_NODES = [
          children=[
              Child('PoundElseif', kind='PoundElseifToken'),
              Child('Condition', kind='Expr'),
-             Child('Body', kind='StmtList'),
+             Child('Body', kind='CodeBlockItemList'),
          ]),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
@@ -97,7 +97,7 @@ DECL_NODES = [
          children=[
              Child('PoundIf', kind='PoundIfToken'),
              Child('Condition', kind='Expr'),
-             Child('Body', kind='StmtList'),
+             Child('Body', kind='CodeBlockItemList'),
              Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
                    is_optional=True),
              Child('ElseClause', kind='ElseDirectiveClause',
@@ -245,17 +245,11 @@ DECL_NODES = [
     Node('DeclList', kind='SyntaxCollection',
          element='Decl'),
 
-    # source-file = decl-list eof
+    # source-file = code-block-item-list eof
     Node('SourceFile', kind='Syntax',
          children=[
-             Child('TopLevelDecls', kind='DeclList'),
+             Child('Items', kind='CodeBlockItemList'),
              Child('EOFToken', kind='EOFToken')
-         ]),
-
-    # top-level-code-decl = stmt-list
-    Node('TopLevelCodeDecl', kind='Decl',
-         children=[
-             Child('Body', kind='StmtList')
          ]),
 
     # initializer -> '=' expr
@@ -408,7 +402,7 @@ DECL_NODES = [
     Node('ElseDirectiveClause', kind='Syntax',
          children=[
              Child('PoundElse', kind='PoundElseToken'),
-             Child('Body', kind='StmtList'),
+             Child('Body', kind='CodeBlockItemList'),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
@@ -476,7 +470,7 @@ DECL_NODES = [
              Child('AccessorListOrStmtList', kind='Syntax',
                    node_choices=[
                       Child('Accessors', kind='AccessorList'),
-                      Child('Statements', kind='StmtList')]),
+                      Child('Statements', kind='CodeBlockItemList')]),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 

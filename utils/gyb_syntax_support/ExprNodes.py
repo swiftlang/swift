@@ -387,7 +387,7 @@ EXPR_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
-             Child('Statements', kind='StmtList'),
+             Child('Statements', kind='CodeBlockItemList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
