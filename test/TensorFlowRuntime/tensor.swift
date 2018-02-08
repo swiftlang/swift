@@ -39,7 +39,7 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
   _ lhs: C1, _ rhs: C2, byError error: T = 0.000001
 ) where T : FloatingPoint & ExpressibleByFloatLiteral,
   C1 : Collection, C2 : Collection, C1.Element == T, C1.Element == C2.Element {
-  precondition(lhs.count == rhs.count, "Unit count mismatch.")
+  precondition(lhs.count == rhs.count, "Scalar count mismatch.")
   for (l, r) in zip(lhs, rhs) {
     expectNearlyEqual(l, r, byError: error)
   }
@@ -47,13 +47,13 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 
 TensorTests.testCPUAndGPU("Initializers") {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
-  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.units)
+  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.scalars)
 }
 
 TensorTests.testCPUAndGPU("FactoryInitializers") {
   let x = Tensor<Float>.ones(shape: [1, 10])
   expectEqual([1, 10], x.shape)
-  expectEqual(Array(repeating: 1, count: 10), x.units)
+  expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
@@ -69,24 +69,24 @@ TensorTests.testCPUAndGPU("DataTypeCast") {
 TensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxes: [0], keepingDimensions: true)
-  expectEqual(ShapedArray(shape: [1, 5], units: [2, 4, 6, 8, 10]), sum.array)
+  expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]), sum.array)
 }
 
 TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
-  expectPointwiseNearlyEqual([0.833655, 0.833655], array.units, byError: 0.0001)
+  expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars, byError: 0.0001)
 }
 
 TensorTests.testCPUAndGPU("Convolution") {
   let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
-                             units: [0, 1, 0, 1, 1, 1, 0, 1, 0])
+                             scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
   let y = x.convolved2D(withFilter: filter,
                         strides: [1, 1, 1, 1], padding: .same)
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
-                          units: [0.5, 1.5, 0.5,
+                          scalars: [0.5, 1.5, 0.5,
                                   0.5, 1.5, 0.5,
                                   0.5, 1.5, 0.5]),
               y.array)
@@ -98,7 +98,7 @@ TensorTests.testCPUAndGPU("3Adds") {
   let c = Tensor([3])
 
   let o = a + b + c
-  expectEqual([6], o.units)
+  expectEqual([6], o.scalars)
 }
 
 TensorTests.testCPUAndGPU("MultiOpMath") {
@@ -111,9 +111,9 @@ TensorTests.testCPUAndGPU("MultiOpMath") {
   // expectEqual([2], sum.shape)
   // expectEqual([2], squared.shape)
   // expectEqual([2], squareRooted.shape)
-  expectPointwiseNearlyEqual([3.6, 3.6], sum.units)
-  expectPointwiseNearlyEqual([12.96, 12.96], squared.units)
-  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.units)
+  expectPointwiseNearlyEqual([3.6, 3.6], sum.scalars)
+  expectPointwiseNearlyEqual([12.96, 12.96], squared.scalars)
+  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.scalars)
 }
 
 TensorTests.testCPUAndGPU("XWPlusB") {
@@ -126,7 +126,7 @@ TensorTests.testCPUAndGPU("XWPlusB") {
   // Do xW+b!
   let result = x ⊗ w + b
   expectEqual([1, 2], result.shape)
-  expectEqual([12.5, 6.5], result.units)
+  expectEqual([12.5, 6.5], result.scalars)
 }
 
 TensorTests.testCPUAndGPU("Transpose") {
@@ -135,7 +135,7 @@ TensorTests.testCPUAndGPU("Transpose") {
   let xTArray = xT.array
   expectEqual(2, xTArray.rank)
   expectEqual([2, 3], xTArray.shape)
-  expectEqual([1, 3, 5, 2, 4, 6], xTArray.units)
+  expectEqual([1, 3, 5, 2, 4, 6], xTArray.scalars)
 }
 
 // FIXME: The While op doesn't work on the CPU.
@@ -192,7 +192,7 @@ func testXORInference() {
     let x = Tensor([[x, y]]).toDevice()
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
-    return y.array.units[0] // TODO: use better scalar getter
+    return y.array.scalars[0] // TODO: use better scalar getter
   }
   expectNearlyEqual(0.0, xor(0.0, 0.0), byError: 0.1)
   expectNearlyEqual(1.0, xor(0.0, 1.0), byError: 0.1)
@@ -259,11 +259,11 @@ TensorTests.testGPU("StraightLineXORTraining") {
   // Training data
   let x = Tensor<Float>(
     shape: [4, 2],
-    units: [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+    scalars: [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
   )
   let y = Tensor<Float>(
     shape: [4, 1],
-    units: [0.0, 1.0, 1.0, 0.0]
+    scalars: [0.0, 1.0, 1.0, 0.0]
   )
 
   // Training loop
@@ -350,7 +350,7 @@ func testXORClassifierTraining() {
 
         // Gradient
         let
-          dSqr = 1 / Tensor<Float>(pred.unitCountTensor),
+          dSqr = 1 / Tensor<Float>(pred.scalarCountTensor),
           dSub = 2 * sub * dSqr,
           dPred = -dSub,
           dL2 = dPred * pred * (1 - pred),

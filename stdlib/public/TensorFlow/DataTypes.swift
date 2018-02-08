@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the AccelerableTensorUnit and related helpers.
+// This file defines the AccelerableByTensorFlow and related helpers.
 //
 // TODO:
 // - Many ops that support int32 and int64 don't support int8 and int16.
 //   Consider removing Int8's and Int16's conformance to
-//   AccelerableTensorUnit.
+//   AccelerableByTensorFlow.
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,10 +29,9 @@ public struct _TensorDataType {
   }
 }
 
-public protocol AccelerableTensorUnit {
-  // FIXME: This should be an underscored requirement (because it is not meant
-  // to be visible to clients) and should probably be changed to return a
-  // TF_DataType.
+public protocol AccelerableByTensorFlow {
+  /// The underlying TensorFlow data type.
+  /// - Note: This is not intended for general use.
   static var _tensorFlowDataType: _TensorDataType { get }
 
   // Hooks used by the TFPartition pass for primitive operations on tensors.
@@ -53,18 +52,18 @@ public protocol AccelerableTensorUnit {
 // global _TFGetScalarOrDie function in order to ensure that the noinline
 // SIL functions below have non-generic type signatures.  This is important for
 // the inner workings of the partitioning pass.
-private func _TFGetScalarOrDieImpl<Unit>(_ handle: TensorHandle<Unit>) -> Unit {
+private func _TFGetScalarOrDieImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
   return handle.makeHostCopy().scalar!
 }
 
-internal extension AccelerableTensorUnit {
+internal extension AccelerableByTensorFlow {
   @_versioned
   static var cDataType: TF_DataType {
     return _tensorFlowDataType.cDataType
   }
 }
 
-extension Bool : AccelerableTensorUnit {
+extension Bool : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_BOOL)
   }
@@ -80,7 +79,7 @@ extension Bool : AccelerableTensorUnit {
   }
 }
 
-extension Int8 : AccelerableTensorUnit {
+extension Int8 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT8)
   }
@@ -94,7 +93,7 @@ extension Int8 : AccelerableTensorUnit {
   }
 }
 
-extension UInt8 : AccelerableTensorUnit {
+extension UInt8 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT8)
   }
@@ -108,7 +107,7 @@ extension UInt8 : AccelerableTensorUnit {
   }
 }
 
-extension Int16 : AccelerableTensorUnit {
+extension Int16 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT16)
   }
@@ -122,7 +121,7 @@ extension Int16 : AccelerableTensorUnit {
   }
 }
 
-extension UInt16 : AccelerableTensorUnit {
+extension UInt16 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT16)
   }
@@ -137,7 +136,7 @@ extension UInt16 : AccelerableTensorUnit {
   }
 }
 
-extension Int32 : AccelerableTensorUnit {
+extension Int32 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT32)
   }
@@ -151,7 +150,7 @@ extension Int32 : AccelerableTensorUnit {
   }
 }
 
-extension UInt32 : AccelerableTensorUnit {
+extension UInt32 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT32)
   }
@@ -166,7 +165,7 @@ extension UInt32 : AccelerableTensorUnit {
   }
 }
 
-extension Int64 : AccelerableTensorUnit {
+extension Int64 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT64)
   }
@@ -180,7 +179,7 @@ extension Int64 : AccelerableTensorUnit {
   }
 }
 
-extension UInt64 : AccelerableTensorUnit {
+extension UInt64 : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT64)
   }
@@ -195,7 +194,7 @@ extension UInt64 : AccelerableTensorUnit {
   }
 }
 
-extension Int : AccelerableTensorUnit {
+extension Int : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT64)
   }
@@ -209,7 +208,7 @@ extension Int : AccelerableTensorUnit {
   }
 }
 
-extension UInt : AccelerableTensorUnit {
+extension UInt : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT64)
   }
@@ -223,7 +222,7 @@ extension UInt : AccelerableTensorUnit {
   }
 }
 
-extension Float : AccelerableTensorUnit {
+extension Float : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_FLOAT)
   }
@@ -237,7 +236,7 @@ extension Float : AccelerableTensorUnit {
   }
 }
 
-extension Double : AccelerableTensorUnit {
+extension Double : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_DOUBLE)
   }
