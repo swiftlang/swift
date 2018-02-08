@@ -18,6 +18,7 @@ import re
 import shlex
 
 from . import ArgumentTypeError
+from .. import utils
 
 
 __all__ = [
@@ -56,19 +57,13 @@ class CompilerVersion(object):
     def __str__(self):
         return '.'.join([str(part) for part in self.components])
 
+    def __repr__(self):
+        return utils.repr_class(self, {
+            'components': self.components
+        })
+
 
 # -----------------------------------------------------------------------------
-
-def _repr(cls, args):
-    """Helper function for implementing __repr__ methods on *Type classes.
-    """
-
-    _args = []
-    for key, value in args.viewitems():
-        _args.append('{}={}'.format(key, repr(value)))
-
-    return '{}({})'.format(type(cls).__name__, ', '.join(_args))
-
 
 class BoolType(object):
     """Argument type used to validate an input string as a bool-like type.
@@ -94,7 +89,7 @@ class BoolType(object):
             raise ArgumentTypeError('{} is not a boolean value'.format(value))
 
     def __repr__(self):
-        return _repr(self, {
+        return utils.repr_class(self, {
             'true_values': self._true_values,
             'false_values': self._false_values,
         })
@@ -123,7 +118,7 @@ class PathType(object):
         return path
 
     def __repr__(self):
-        return _repr(self, {
+        return utils.repr_class(self, {
             'assert_exists': self._assert_exists,
             'assert_executable': self._assert_executable,
         })
@@ -150,7 +145,7 @@ class RegexType(object):
         return matches
 
     def __repr__(self):
-        return _repr(self, {
+        return utils.repr_class(self, {
             'regex': self._regex,
             'error_message': self._error_message,
         })
@@ -217,4 +212,4 @@ class ShellSplitType(object):
         return list(lex)
 
     def __repr__(self):
-        return _repr(self, {})
+        return utils.repr_class(self, {})
