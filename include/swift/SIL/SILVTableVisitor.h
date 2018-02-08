@@ -81,6 +81,8 @@ protected:
     // Imported classes do not have a vtable.
     if (!theClass->hasKnownSwiftImplementation())
       return;
+    
+    asDerived().addCanaryPlaceholder();
 
     for (auto member : theClass->getMembers()) {
       if (auto *fd = dyn_cast<FuncDecl>(member))

@@ -1031,6 +1031,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
         : IGM(IGM), D(D) {
         addVTableEntries(D);
       }
+      
+      void addCanaryPlaceholder() {}
 
       void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
 
