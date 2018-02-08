@@ -1168,6 +1168,35 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  // https://bugs.swift.org/browse/SR-6796
+  // Add a super-narrow hack to allow:
+  //   (()) -> T to be passed in place of () -> T
+  if (getASTContext().isSwiftVersionAtLeast(4) &&
+      !getASTContext().isSwiftVersionAtLeast(5)) {
+    SmallVector<LocatorPathElt, 4> path;
+    locator.getLocatorParts(path);
+
+    // Find the last path element, skipping GenericArgument elements
+    // so that we allow this exception in cases of optional types, and
+    // skipping OptionalPayload elements so that we allow this
+    // exception in cases of optional injection.
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() != ConstraintLocator::GenericArgument &&
+                 elt.getKind() != ConstraintLocator::OptionalPayload;
+        });
+
+    if (last != path.rend()) {
+      if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
+        if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer())) {
+          auto innerTy = paren1->getUnderlyingType();
+          if (func2Input->isVoid() && innerTy->isVoid())
+            func1Input = innerTy;
+        }
+      }
+    }
+  }
+
   // Input types can be contravariant (or equal).
   SmallVector<AnyFunctionType::Param, 4> func1Params;
   SmallVector<AnyFunctionType::Param, 4> func2Params;
