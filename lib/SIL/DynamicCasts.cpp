@@ -858,9 +858,7 @@ namespace {
         return emitSameType(source, target);
 
       // Handle subtype conversions involving optionals.
-      OptionalTypeKind sourceOptKind;
-      if (auto sourceObjectType =
-              source.FormalType.getOptionalObjectType(sourceOptKind)) {
+      if (auto sourceObjectType = source.FormalType.getOptionalObjectType()) {
         return emitOptionalToOptional(source, sourceObjectType, target);
       }
       assert(!target.FormalType.getOptionalObjectType());

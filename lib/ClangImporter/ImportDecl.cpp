@@ -6106,18 +6106,21 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
-  OptionalTypeKind failability;
-  (void)oldFnType->getResult()->getOptionalObjectType(failability);
+  bool resultIsOptional;
+  (void)oldFnType->getResult()->getOptionalObjectType(resultIsOptional);
 
   // Update the failability appropriately based on the imported method type.
-  if (importedType.isImplicitlyUnwrapped()) {
-    assert(failability != OTK_None);
-    failability = OTK_ImplicitlyUnwrappedOptional;
+  assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());
+  OptionalTypeKind failability = OTK_None;
+  if (resultIsOptional) {
+    failability = OTK_Optional;
+    if (importedType.isImplicitlyUnwrapped())
+      failability = OTK_ImplicitlyUnwrappedOptional;
   }
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
-  if (failability != OTK_None)
+  if (resultIsOptional)
     resultTy = OptionalType::get(resultTy);
 
   type = FunctionType::get(oldFnType->getInput(), resultTy,

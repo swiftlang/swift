@@ -2047,11 +2047,10 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     Type newOverrideTy = baseTy;
 
     // Preserve optionality if we're dealing with a simple type.
-    OptionalTypeKind OTK;
     if (Type unwrappedTy = newOverrideTy->getOptionalObjectType())
       newOverrideTy = unwrappedTy;
-    if (overrideTy->getOptionalObjectType(OTK))
-      newOverrideTy = OptionalType::get(OTK, newOverrideTy);
+    if (overrideTy->getOptionalObjectType())
+      newOverrideTy = OptionalType::get(newOverrideTy);
 
     SmallString<32> baseTypeBuf;
     llvm::raw_svector_ostream baseTypeStr(baseTypeBuf);
