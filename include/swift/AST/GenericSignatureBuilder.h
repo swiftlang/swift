@@ -258,11 +258,13 @@ public:
     Type getTypeInContext(GenericSignatureBuilder &builder,
                           GenericEnvironment *genericEnv);
 
-    /// Dump a debugging representation of this equivalence class.
-    void dump(llvm::raw_ostream &out) const;
+    /// Dump a debugging representation of this equivalence class,
+    void dump(llvm::raw_ostream &out,
+              GenericSignatureBuilder *builder = nullptr) const;
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                              "only for use in the debugger");
+    LLVM_ATTRIBUTE_DEPRECATED(
+                  void dump(GenericSignatureBuilder *builder = nullptr) const,
+                  "only for use in the debugger");
 
     /// Caches.
 
@@ -271,9 +273,8 @@ public:
       /// The cached anchor itself.
       Type anchor;
 
-      /// The number of members of the equivalence class when the archetype
-      /// anchor was cached.
-      unsigned numMembers;
+      /// The generation at which the anchor was last computed.
+      unsigned lastGeneration;
     } archetypeAnchorCache;
 
     /// Describes a cached nested type.
@@ -443,6 +444,11 @@ private:
 
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
+
+  /// Add a rewrite rule for a same-type constraint between the given
+  /// types.
+  void addSameTypeRewriteRule(PotentialArchetype *type1,
+                              PotentialArchetype *type2);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
@@ -801,6 +807,12 @@ public:
 
   /// Determine whether the two given types are in the same equivalence class.
   bool areInSameEquivalenceClass(Type type1, Type type2);
+
+  /// Simplify the given dependent type down to its canonical representation.
+  ///
+  /// \returns null if the type involved dependent member types that
+  /// don't have associated types.
+  Type getCanonicalTypeParameter(Type type);
 
   /// Verify the correctness of the given generic signature.
   ///

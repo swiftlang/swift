@@ -212,23 +212,16 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
     return llvm::make_unique<toolchains::Darwin>(*this, target);
-    break;
   case llvm::Triple::Linux:
-    if (target.isAndroid()) {
+    if (target.isAndroid())
       return llvm::make_unique<toolchains::Android>(*this, target);
-    } else {
-      return llvm::make_unique<toolchains::GenericUnix>(*this, target);
-    }
-    break;
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::FreeBSD:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
-    break;
   case llvm::Triple::Win32:
     return llvm::make_unique<toolchains::Cygwin>(*this, target);
-    break;
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
-    break;
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
