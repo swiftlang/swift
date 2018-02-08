@@ -298,6 +298,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
+  // Serialization requires all diagnostic passes. Don't rerun them.
+  if (isMandatoryPipeline && F->wasDeserialized())
+    return;
+
   auto *SFT = cast<SILFunctionTransform>(Transformations[TransIdx]);
   SFT->injectPassManager(this);
   SFT->injectFunction(F);

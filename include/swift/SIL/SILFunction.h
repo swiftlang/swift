@@ -215,6 +215,10 @@ private:
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
 
+  /// Set if the function body was deserialized. This implies that the
+  /// function's home module performed SIL diagnostics prior to serialization.
+  bool WasDeserialized = false;
+
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
@@ -335,6 +339,14 @@ public:
   void setUnqualifiedOwnership() {
     HasQualifiedOwnership = false;
   }
+
+  /// Returns true if this function was deserialized from another .swiftmodule
+  /// (not a .sib file). If so, it must have been serialized in the canonical
+  /// stage, so should not have diagnostics reapplied. (.sib is serialized IR
+  /// from any SIL stage).
+  bool wasDeserialized() const { return WasDeserialized; }
+
+  void setWasDeserialized() { WasDeserialized = true; }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
