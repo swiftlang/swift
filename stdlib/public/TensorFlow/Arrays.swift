@@ -19,20 +19,20 @@ import CTensorFlow
 
 /// `TensorBuffer` is the internal storage of ShapedArray. This buffer has
 /// two modes of storage: 'native' and 'tensorFlow'. In 'native' mode, the
-/// buffer object stores a pointer to contiguous units; in 'tensorFlow'
+/// buffer object stores a pointer to contiguous scalars; in 'tensorFlow'
 /// mode, the buffer object stores a `TF_Tensor*` and bridges to TensorFlow.
 /// In either mode, the buffer object owns the memory and will deallocate it
 /// on `deinit`.
-fileprivate final class TensorBuffer<Unit> {
+fileprivate final class TensorBuffer<Scalar> {
   typealias Shape = [Int]
 
   enum Allocation {
-    case native(UnsafeMutablePointer<Unit>)
+    case native(UnsafeMutablePointer<Scalar>)
     case tensorFlow(CTensor)
   }
 
   let allocation: Allocation
-  private let bufferPointer: UnsafeMutableBufferPointer<Unit>
+  private let bufferPointer: UnsafeMutableBufferPointer<Scalar>
 
   deinit {
     debugLog("De-initializing tensor buffer.")
@@ -58,20 +58,20 @@ fileprivate final class TensorBuffer<Unit> {
     case let .tensorFlow(cTensor):
       debugLog("Initializing TensorBuffer with a cTensor.")
       let startAddress = TF_TensorData(cTensor)
-        .assumingMemoryBound(to: Unit.self)
+        .assumingMemoryBound(to: Scalar.self)
       bufferPointer = UnsafeMutableBufferPointer(
         start: startAddress, count: count)
     }
   }
 
-  convenience init(owning startAddress: UnsafeMutablePointer<Unit>,
+  convenience init(owning startAddress: UnsafeMutablePointer<Scalar>,
                    count: Int) {
     self.init(allocation: .native(startAddress), count: count)
   }
 }
 
 /// TF Tensor-specific initializer
-extension TensorBuffer where Unit : AccelerableTensorUnit {
+extension TensorBuffer where Scalar : AccelerableByTensorFlow {
   /// Initialize a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
   convenience init(owning cTensor: CTensor, count: Int) {
@@ -86,8 +86,8 @@ extension TensorBuffer where Unit : AccelerableTensorUnit {
 
 /// Factory methods
 extension TensorBuffer {
-  static func createUninitialized(count: Int) -> TensorBuffer<Unit> {
-    let pointer = UnsafeMutablePointer<Unit>.allocate(capacity: count)
+  static func createUninitialized(count: Int) -> TensorBuffer<Scalar> {
+    let pointer = UnsafeMutablePointer<Scalar>.allocate(capacity: count)
     return TensorBuffer(owning: pointer, count: count)
   }
 }
@@ -101,15 +101,15 @@ extension TensorBuffer {
 
 /// Unsafe address accessor
 extension TensorBuffer {
-  func withUnsafeMutablePointerToUnits<R>(
-    _ body: (UnsafeMutablePointer<Unit>) throws -> R
+  func withUnsafeMutablePointerToScalars<R>(
+    _ body: (UnsafeMutablePointer<Scalar>) throws -> R
   ) rethrows -> R {
     // `baseAddress` is guaranteed non-nil
     return try body(bufferPointer.baseAddress!)
   }
 
   func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> R
   ) rethrows -> R {
     var bufferPointer = self.bufferPointer
     return try body(&bufferPointer)
@@ -123,27 +123,27 @@ extension TensorBuffer {
 
 public protocol _ShapedArrayProtocol
   : RandomAccessCollection, MutableCollection {
-  associatedtype Unit
+  associatedtype Scalar
   associatedtype Shape
 
   /// Number of dimensions in this array.
   var rank: Int { get }
   /// Shape of this array.
   var shape: Shape { get }
-  /// The total number of units in this array.
-  var unitCount: Int { get }
+  /// The total number of scalars in this array.
+  var scalarCount: Int { get }
 
-  /// Initialize an array using specific shape and contiguous units in
+  /// Initialize an array using specific shape and contiguous scalars in
   /// row-major order.
-  /// - Precondition: The number of `units` must be equal to the product of
+  /// - Precondition: The number of `scalars` must be equal to the product of
   ///   all dimensions of the shape.
-  init(shape: Shape, units: [Unit])
+  init(shape: Shape, scalars: [Scalar])
 
-  /// Initialize an array using specific shape and a sequence of units in
+  /// Initialize an array using specific shape and a sequence of scalars in
   /// row-major order.
-  /// - Precondition: The number of `units` must be equal to the product of
+  /// - Precondition: The number of `scalars` must be equal to the product of
   ///   all dimensions of the shape.
-  init<S : Sequence>(shape: Shape, units: S) where S.Element == Unit
+  init<S : Sequence>(shape: Shape, scalars: S) where S.Element == Scalar
 
   /// Calls a closure with a pointer to the array’s contiguous storage.
   /// - Parameter body: A closure with an UnsafeBufferPointer parameter that
@@ -153,7 +153,7 @@ public protocol _ShapedArrayProtocol
   ///   pointer argument is valid only for the duration of the method’s
   ///   execution.
   func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Unit>) throws -> R
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> R
   ) rethrows -> R
 
   /// Calls the given closure with a pointer to the array’s mutable contiguous
@@ -165,18 +165,18 @@ public protocol _ShapedArrayProtocol
   ///   method. The pointer argument is valid only for the duration of the
   ///   method’s execution.
   mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> R
   ) rethrows -> R
 }
 
 public extension _ShapedArrayProtocol {
-  /// The units of the shaped array in row-major order.
-  var units: [Unit] {
+  /// The scalars of the shaped array in row-major order.
+  var scalars: [Scalar] {
     get {
       return withUnsafeBufferPointer(Array.init)
     }
     set {
-      precondition(newValue.count == unitCount, "Unit count mismatch")
+      precondition(newValue.count == scalarCount, "Scalar count mismatch")
       withUnsafeMutableBufferPointer { ptr in
         ptr.baseAddress!.assign(from: newValue, count: newValue.count)
       }
@@ -190,20 +190,20 @@ public extension _ShapedArrayProtocol {
 
   /// Returns the underlying scalar from a 0-ranked ShapedArray.
   /// - precondition: ShapedArray is 0-ranked.
-  var scalar: Unit? {
+  var scalar: Scalar? {
     guard rank == 0 else { return nil }
-    return units.first
+    return scalars.first
   }
 }
 
 public extension _ShapedArrayProtocol
-  where Unit : Equatable, Shape : Equatable {
+  where Scalar : Equatable, Shape : Equatable {
   static func == <Other>(lhs: Self, rhs: Other) -> Bool
     where Shape == Other.Shape,
           Other : _ShapedArrayProtocol,
-          Unit == Other.Unit {
+          Scalar == Other.Scalar {
     return lhs.shape == rhs.shape &&
-      lhs.units.elementsEqual(rhs.units)
+      lhs.scalars.elementsEqual(rhs.scalars)
   }
 }
 
@@ -211,8 +211,8 @@ public extension _ShapedArrayProtocol
   where Shape : Collection, Shape.Element == Int {
   /// Returns the number of element tensors in a ShapedArray (equivalent to the
   /// first dimension).
-  /// - Note: `count` is distinct from `unitCount`, which represents the total
-  ///   number of units.
+  /// - Note: `count` is distinct from `scalarCount`, which represents the total
+  ///   number of scalars.
   var count: Int {
     return shape.first ?? 0
   }
@@ -220,24 +220,24 @@ public extension _ShapedArrayProtocol
 
 fileprivate extension _ShapedArrayProtocol
   where Shape : Collection, Shape.Element == Int {
-  /// Returns the unit count for an element in a ShapedArray.
-  var unitCountPerElement: Int {
+  /// Returns the scalar count for an element in a ShapedArray.
+  var scalarCountPerElement: Int {
     return shape.isEmpty ? 0 : shape.dropFirst().reduce(1, *)
   }
 
-  /// Returns the unit index corresponding to an index in the leading dimension
+  /// Returns the scalar index corresponding to an index in the leading dimension
   /// of a ShapedArray.
-  func unitIndex(fromIndex index: Int) -> Int {
-    return unitCountPerElement * index
+  func scalarIndex(fromIndex index: Int) -> Int {
+    return scalarCountPerElement * index
   }
 
-  /// Returns the range of units corresponding to a range in the leading
+  /// Returns the range of scalars corresponding to a range in the leading
   /// dimension of a ShapedArray.
-  func unitSubrange(
+  func scalarSubrange(
     from tensorSubrange: CountableRange<Int>
   ) -> CountableRange<Int> {
-    return unitIndex(fromIndex: tensorSubrange.lowerBound)
-      ..< unitIndex(fromIndex: tensorSubrange.upperBound)
+    return scalarIndex(fromIndex: tensorSubrange.lowerBound)
+      ..< scalarIndex(fromIndex: tensorSubrange.upperBound)
   }
 }
 
@@ -253,7 +253,7 @@ fileprivate extension _ShapedArrayProtocol
 }
 
 fileprivate extension _ShapedArrayProtocol
-  where Shape : Equatable, Unit : Equatable {
+  where Shape : Equatable, Scalar : Equatable {
   func _isEqual(to other: Self) -> Bool {
     return shape == other.shape && withUnsafeBufferPointer { selfBuf in
       other.withUnsafeBufferPointer { otherBuf in
@@ -270,17 +270,17 @@ fileprivate extension _ShapedArrayProtocol
 /// `ShapedArray` is a representation of a multidimensional array. It has a
 /// shape, which has type `[Int]` and defines the array dimensions, and uses
 /// `TensorBuffer` internally as storage.
-public struct ShapedArray<Unit> : _ShapedArrayProtocol {
+public struct ShapedArray<Scalar> : _ShapedArrayProtocol {
   public typealias Shape = [Int]
 
-  /// Contiguous memory storing units.
-  fileprivate var buffer: TensorBuffer<Unit>
+  /// Contiguous memory storing scalars.
+  fileprivate var buffer: TensorBuffer<Scalar>
 
   /// The shape of this array.
   public private(set) var shape: [Int]
 
   /// Initialize a shaped array from an existing buffer and a shape.
-  fileprivate init(buffer: TensorBuffer<Unit>, shape: [Int]) {
+  fileprivate init(buffer: TensorBuffer<Scalar>, shape: [Int]) {
     precondition(buffer.count == shape.reduce(1, *))
     self.buffer = buffer
     self.shape = shape
@@ -293,19 +293,19 @@ internal extension ShapedArray {
   mutating func ensureUniquelyReferenced() {
     if isKnownUniquelyReferenced(&buffer) { return }
     let oldBuffer = buffer
-    buffer = TensorBuffer.createUninitialized(count: unitCount)
-    oldBuffer.withUnsafeMutablePointerToUnits { oldPtr in
-      buffer.withUnsafeMutablePointerToUnits { ptr in
-        ptr.initialize(from: oldPtr, count: unitCount)
+    buffer = TensorBuffer.createUninitialized(count: scalarCount)
+    oldBuffer.withUnsafeMutablePointerToScalars { oldPtr in
+      buffer.withUnsafeMutablePointerToScalars { ptr in
+        ptr.initialize(from: oldPtr, count: scalarCount)
       }
     }
   }
 }
 
-internal extension ShapedArray where Unit : AccelerableTensorUnit {
+internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
   @_versioned
   init(owning cTensor: CTensor) {
-    // Including \(Unit.self) into the message would cause non-deterministic
+    // Including \(Scalar.self) into the message would cause non-deterministic
     // crashes.
     debugLog("Initializing ShapedArray from CTensor.")
     shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
@@ -326,7 +326,7 @@ public extension ShapedArray {
     return shape.count
   }
 
-  var unitCount: Int {
+  var scalarCount: Int {
     return buffer.count
   }
 
@@ -335,42 +335,42 @@ public extension ShapedArray {
     self.init(buffer: other.buffer, shape: other.shape)
   }
 
-  init(shape: [Int], units: [Unit]) {
-    let unitCount = shape.reduce(1, *)
-    precondition(unitCount == units.count)
-    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+  init(shape: [Int], scalars: [Scalar]) {
+    let scalarCount = shape.reduce(1, *)
+    precondition(scalarCount == scalars.count)
+    let buffer = TensorBuffer<Scalar>.createUninitialized(count: scalarCount)
     self.init(buffer: buffer, shape: shape)
-    buffer.withUnsafeMutablePointerToUnits { ptr in
-      units.withUnsafeBufferPointer { arrayBuf in
-        ptr.initialize(from: arrayBuf.baseAddress!, count: unitCount)
+    buffer.withUnsafeMutablePointerToScalars { ptr in
+      scalars.withUnsafeBufferPointer { arrayBuf in
+        ptr.initialize(from: arrayBuf.baseAddress!, count: scalarCount)
       }
     }
   }
 
-  init<S : Sequence>(shape: [Int], units: S) where S.Element == Unit {
-    let unitCount = shape.reduce(1, *)
-    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+  init<S : Sequence>(shape: [Int], scalars: S) where S.Element == Scalar {
+    let scalarCount = shape.reduce(1, *)
+    let buffer = TensorBuffer<Scalar>.createUninitialized(count: scalarCount)
     self.init(buffer: buffer, shape: shape)
-    buffer.withUnsafeMutablePointerToUnits { ptr in
+    buffer.withUnsafeMutablePointerToScalars { ptr in
       // TODO: Refactor with better pointer initializers in Swift 4.1.
       var i = 0
-      for unit in units {
-        guard i < unitCount else { break }
-        ptr.advanced(by: i).initialize(to: unit)
+      for scalar in scalars {
+        guard i < scalarCount else { break }
+        ptr.advanced(by: i).initialize(to: scalar)
         i += 1
       }
       // If the sequence has fewer elements than the shape needs, this is a
       // precondition failure.
-      precondition(i == unitCount,
+      precondition(i == scalarCount,
                    "The sequence has fewer elements than needed by the shape.")
     }
   }
 
   /// Initialize a scalar tensor.
-  init(_ scalar: Unit) {
-    let buffer = TensorBuffer<Unit>.createUninitialized(count: 1)
+  init(_ scalar: Scalar) {
+    let buffer = TensorBuffer<Scalar>.createUninitialized(count: 1)
     self.init(buffer: buffer, shape: [])
-    buffer.withUnsafeMutablePointerToUnits { ptr in
+    buffer.withUnsafeMutablePointerToScalars { ptr in
       ptr.initialize(to: scalar)
     }
   }
@@ -378,20 +378,20 @@ public extension ShapedArray {
   /// Allocate and initialize a tensor to a repeated value.
   /// - Parameter shape: tensor shape
   /// - Parameter repeating: repeated value
-  init(shape: Shape, repeating repeatedValue: Unit) {
-    let unitCount = shape.reduce(1, *)
-    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+  init(shape: Shape, repeating repeatedValue: Scalar) {
+    let scalarCount = shape.reduce(1, *)
+    let buffer = TensorBuffer<Scalar>.createUninitialized(count: scalarCount)
     self.init(buffer: buffer, shape: shape)
-    buffer.withUnsafeMutablePointerToUnits { ptr in
-      ptr.initialize(repeating: repeatedValue, count: unitCount)
+    buffer.withUnsafeMutablePointerToScalars { ptr in
+      ptr.initialize(repeating: repeatedValue, count: scalarCount)
     }
   }
 }
 
 extension ShapedArray : RandomAccessCollection, MutableCollection {
   public typealias Index = Int
-  public typealias Element = ShapedArraySlice<Unit>
-  public typealias SubSequence = ShapedArraySlice<Unit>
+  public typealias Element = ShapedArraySlice<Scalar>
+  public typealias SubSequence = ShapedArraySlice<Scalar>
 
   public var indices: CountableRange<Int> {
     return 0..<count
@@ -424,9 +424,9 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
                    "Negative ShapedArray index is out of range")
       precondition(shape.dropFirst().elementsEqual(newValue.shape),
                    "Element shape mismatch")
-      let unitIndex = self.unitIndex(fromIndex: index)
+      let scalarIndex = self.scalarIndex(fromIndex: index)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
+        let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -453,9 +453,9 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
         "ShapedArray indices are out of range")
       let subTensorShape = [bounds.count] + shape.dropFirst()
       precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
-      let unitIndex = self.unitIndex(fromIndex: bounds.lowerBound)
+      let scalarIndex = self.scalarIndex(fromIndex: bounds.lowerBound)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
+        let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -466,7 +466,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
 
 public extension ShapedArray {
   func withUnsafeBufferPointer<Result>(
-    _ body: (UnsafeBufferPointer<Unit>) throws -> Result
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
     return try buffer.withUnsafeMutableBufferPointer { ptr in
       try body(UnsafeBufferPointer(ptr))
@@ -474,7 +474,7 @@ public extension ShapedArray {
   }
 
   mutating func withUnsafeMutableBufferPointer<Result>(
-    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> Result
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
     ensureUniquelyReferenced()
     return try buffer.withUnsafeMutableBufferPointer { ptr in
@@ -484,20 +484,20 @@ public extension ShapedArray {
 }
 
 /// Tensor conversion
-extension ShapedArray where Unit : AccelerableTensorUnit {
+extension ShapedArray where Scalar : AccelerableByTensorFlow {
   var byteCount: Int {
-    return MemoryLayout<Unit>.stride * unitCount
+    return MemoryLayout<Scalar>.stride * scalarCount
   }
 
-  func makeTensorHandle() -> TensorHandle<Unit> {
+  func makeTensorHandle() -> TensorHandle<Scalar> {
     // This initializer is designed to optimize conversion from TF-allocated
     // `ShapedArray` instances.
     switch buffer.allocation {
     case let .native(bufAddr):
-      return TensorHandle<Unit>(
+      return TensorHandle<Scalar>(
         shape: shape,
-        unitsInitializer: { addr in
-          addr.initialize(from: bufAddr, count: unitCount)
+        scalarsInitializer: { addr in
+          addr.initialize(from: bufAddr, count: scalarCount)
         }
       )
 
@@ -508,14 +508,14 @@ extension ShapedArray where Unit : AccelerableTensorUnit {
 }
 
 /// Tensor conversion
-public extension Tensor where Unit : AccelerableTensorUnit {
-  init(_ other: ShapedArray<Unit>) {
+public extension Tensor where Scalar : AccelerableByTensorFlow {
+  init(_ other: ShapedArray<Scalar>) {
     self.init(other.makeTensorHandle())
   }
 }
 
 /// Equatable conformance
-extension ShapedArray : Equatable where Unit : Equatable {
+extension ShapedArray : Equatable where Scalar : Equatable {
   static public func == (lhs: ShapedArray, rhs: ShapedArray) -> Bool {
     return lhs._isEqual(to: rhs)
   }
@@ -546,14 +546,14 @@ extension ShapedArray : CustomStringConvertible {
 ///
 /// For example:
 ///
-///     let matrix = ShapedArray(shape: [2, 2], units: [0, 1, 2, 3])
+///     let matrix = ShapedArray(shape: [2, 2], scalars: [0, 1, 2, 3])
 ///     // `matrix` represents [[0, 1], [2, 3]].
 ///
 ///     let element = matrix[0]
 ///     // `element` is a `ShapedArraySlice` with shape [2]. It is an element
 ///     // tensor, specifically the first element in `matrix`: [0, 1].
 ///
-///     matrix[1] = ShapedArraySlice(shape: [2], units: [4, 8])
+///     matrix[1] = ShapedArraySlice(shape: [2], scalars: [4, 8])
 ///     // The second element in `matrix` has been mutated.
 ///     // `matrix` now represents [[0, 1, 4, 8]].
 ///
@@ -567,7 +567,7 @@ extension ShapedArray : CustomStringConvertible {
 /// For example:
 ///
 ///     let zeros = ShapedArray(shape: [3, 2], repeating: 0)
-///     var matrix = ShapedArray(shape: [3, 2], units: Array(0..<6))
+///     var matrix = ShapedArray(shape: [3, 2], scalars: Array(0..<6))
 ///     // `zeros` represents [[0, 0], [0, 0], [0, 0]].
 ///     // `matrix` represents [[0, 1], [2, 3], [4, 5]].
 ///
@@ -579,11 +579,11 @@ extension ShapedArray : CustomStringConvertible {
 ///     // The first 2 elements in `matrix` have been mutated.
 ///     // `matrix` now represents [[0, 0], [0, 0], [4, 5]].
 
-public struct ShapedArraySlice<Unit> : _ShapedArrayProtocol {
+public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   public typealias Shape = [Int]
 
   /// The underlying `ShapedArray` of a slice.
-  private var base: ShapedArray<Unit>
+  private var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
   private var baseIndices: [Int]
   /// The subtensor bounds of a slice.
@@ -592,7 +592,7 @@ public struct ShapedArraySlice<Unit> : _ShapedArrayProtocol {
   /// Initialize a shaped array slice from a shaped array as base, with
   /// specified subdimensional inwards indices and subtensor bounds.
   fileprivate init(
-    base: ShapedArray<Unit>,
+    base: ShapedArray<Scalar>,
     baseIndices indices: [Int] = [],
     bounds: CountableRange<Int>? = nil
   ) {
@@ -624,41 +624,41 @@ public extension ShapedArraySlice {
     return Array(base.shape.dropFirst(indexingDepth))
   }
 
-  var unitCount: Int {
+  var scalarCount: Int {
     return shape.reduce(1, *)
   }
 }
 
 /// Slice initializers
 public extension ShapedArraySlice {
-  init(shape: [Int], units: [Unit]) {
-    self.init(base: ShapedArray(shape: shape, units: units))
+  init(shape: [Int], scalars: [Scalar]) {
+    self.init(base: ShapedArray(shape: shape, scalars: scalars))
   }
 
-  init<S : Sequence>(shape: [Int], units: S) where S.Element == Unit {
-    self.init(base: ShapedArray(shape: shape, units: units))
+  init<S : Sequence>(shape: [Int], scalars: S) where S.Element == Scalar {
+    self.init(base: ShapedArray(shape: shape, scalars: scalars))
   }
 
   /// Initialize a scalar tensor.
-  init(_ scalar: Unit) {
+  init(_ scalar: Scalar) {
     self.init(base: ShapedArray(scalar))
   }
 
   /// Allocate and initialize a tensor to a repeated value.
   /// - Parameter shape: tensor shape
   /// - Parameter repeating: repeated value
-  init(shape: Shape, repeating repeatedValue: Unit) {
+  init(shape: Shape, repeating repeatedValue: Scalar) {
     self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
   }
 }
 
 private extension ShapedArraySlice {
-  /// The range of units from the base ShapedArray represented by a
+  /// The range of scalars from the base ShapedArray represented by a
   /// ShapedArraySlice.
-  var unitRange: CountableRange<Int> {
+  var scalarRange: CountableRange<Int> {
     let trimmedShape = base.shape.dropFirst()
     var (start, end) = baseIndices.enumerated()
-      .reduce((0, base.unitCount)) { (acc, next) in
+      .reduce((0, base.scalarCount)) { (acc, next) in
       let stride = trimmedShape.dropFirst(next.offset).reduce(1, *)
       if next.offset == indexingDepth - 1 {
         let temp = acc.0 + next.element * stride
@@ -678,23 +678,23 @@ private extension ShapedArraySlice {
 
 public extension ShapedArraySlice {
   func withUnsafeBufferPointer<Result>(
-    _ body: (UnsafeBufferPointer<Unit>) throws -> Result
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
-    return try base.buffer.withUnsafeMutablePointerToUnits { basePtr in
+    return try base.buffer.withUnsafeMutablePointerToScalars { basePtr in
       let ptr = UnsafeBufferPointer(
-        start: basePtr.advanced(by: unitRange.startIndex),
-        count: unitRange.count)
+        start: basePtr.advanced(by: scalarRange.startIndex),
+        count: scalarRange.count)
       return try body(ptr)
     }
   }
 
   mutating func withUnsafeMutableBufferPointer<Result>(
-    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> Result
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
-    return try base.buffer.withUnsafeMutablePointerToUnits { basePtr in
+    return try base.buffer.withUnsafeMutablePointerToScalars { basePtr in
       var ptr = UnsafeMutableBufferPointer(
-        start: basePtr.advanced(by: unitRange.startIndex),
-        count: unitRange.count)
+        start: basePtr.advanced(by: scalarRange.startIndex),
+        count: scalarRange.count)
       return try body(&ptr)
     }
   }
@@ -743,9 +743,9 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
                    "ShapeArraySlice index is out of range (before startIndex)")
       precondition(shape.dropFirst().elementsEqual(newValue.shape),
                    "Element shape mismatch")
-      let unitIndex = self.unitIndex(fromIndex: index)
+      let scalarIndex = self.scalarIndex(fromIndex: index)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
+        let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -774,9 +774,9 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
         "ShapedArraySlice indices are out of range")
       let subTensorShape = [bounds.count] + shape.dropFirst()
       precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
-      let unitIndex = self.unitIndex(fromIndex: bounds.lowerBound)
+      let scalarIndex = self.scalarIndex(fromIndex: bounds.lowerBound)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
+        let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -786,14 +786,14 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
 }
 
 /// Tensor conversion
-public extension ShapedArraySlice where Unit : AccelerableTensorUnit {
-  init(_ other: Tensor<Unit>) {
+public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
+  init(_ other: Tensor<Scalar>) {
     self.init(base: other.array)
   }
 }
 
 /// Equatable conformance
-extension ShapedArraySlice : Equatable where Unit : Equatable {
+extension ShapedArraySlice : Equatable where Scalar : Equatable {
   static public func == (lhs: ShapedArraySlice, rhs: ShapedArraySlice) -> Bool {
     return lhs._isEqual(to: rhs)
   }

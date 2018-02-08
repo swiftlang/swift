@@ -34,21 +34,21 @@ infix operator ⊗ : MultiplicationPrecedence
          return 'four'
 
   def _elementArrayLiteral(rank):
-    return 'Unit' if rank == 1 else '[' + _elementArrayLiteral(rank - 1) + ']'
+    return 'Scalar' if rank == 1 else '[' + _elementArrayLiteral(rank - 1) + ']'
 }%
 
 % for rank in ranks:
 %   elementRank = rank - 1
 %   liftedRank = rank + 1
 %   Self = 'Tensor{}D'.format(rank)
-%   ElementTensor = 'Tensor{}D<Unit>'.format(elementRank)
-%   LiftedTensor = 'Tensor{}D<Unit>'.format(liftedRank)
+%   ElementTensor = 'Tensor{}D<Scalar>'.format(elementRank)
+%   LiftedTensor = 'Tensor{}D<Scalar>'.format(liftedRank)
 %   elementArrayLiteral = _elementArrayLiteral(rank)
 %   arrayLiteral = '[' + elementArrayLiteral + ']'
 
 /// A ${rankName(rank)}-dimensional tensor.
-public struct ${Self}<Unit : AccelerableTensorUnit> {
-  public var base: Tensor<Unit>
+public struct ${Self}<Scalar : AccelerableByTensorFlow> {
+  public var base: Tensor<Scalar>
 
   @_inlineable
   public static var rank: Int {
@@ -69,23 +69,23 @@ public struct ${Self}<Unit : AccelerableTensorUnit> {
   /// - TODO(danielzheng): Add an 'array' property, which returns a RankedArray
   /// (to be implemented in Arrays.swift.gyb).
   @_inlineable
-  public var units: [Unit] {
+  public var scalars: [Scalar] {
     @inline(__always)
     get {
-      return base.units
+      return base.scalars
     }
   }
 
   @_inlineable
-  public var unitCount: Int {
+  public var scalarCount: Int {
     @inline(__always)
     get {
-      return base.unitCount
+      return base.scalarCount
     }
   }
 
   @_inlineable
-  public var handle: TensorHandle<Unit> {
+  public var handle: TensorHandle<Scalar> {
     @inline(__always)
     get {
       return base.handle
@@ -102,23 +102,23 @@ public struct ${Self}<Unit : AccelerableTensorUnit> {
 
   @_versioned
   @_inlineable @inline(__always)
-  internal init(base: Tensor<Unit>) {
+  internal init(base: Tensor<Scalar>) {
     self.base = base
   }
 
   @_inlineable @inline(__always)
-  public init(_ handle: TensorHandle<Unit>) {
+  public init(_ handle: TensorHandle<Scalar>) {
     self.init(base: Tensor(handle))
   }
 
   @_inlineable @inline(__always)
-  public init?(_ other: Tensor<Unit>) {
+  public init?(_ other: Tensor<Scalar>) {
     guard other.rank == ${Self}.rank else { return nil }
     self.init(base: other)
   }
 
   @_inlineable @inline(__always)
-  public init(identicallyRanked other: Tensor<Unit>) {
+  public init(identicallyRanked other: Tensor<Scalar>) {
     // Assertion disabled because "x.rank" causes a copy of X
     // back to the host. TODO(clattner): need a better way of
     // exposing rank information in our model.
@@ -137,10 +137,10 @@ extension ${Self} : ExpressibleByArrayLiteral {
 }
 
 /// Perform an element-wise type conversion from `${Self}<T>`.
-extension ${Self} where Unit : Numeric {
+extension ${Self} where Scalar : Numeric {
   @_inlineable @inline(__always)
   public init<T : Numeric>(_ other: ${Self}<T>) {
-    self.init(base: Tensor<Unit>(other.base))
+    self.init(base: Tensor<Scalar>(other.base))
   }
 }
 
@@ -149,32 +149,32 @@ public extension ${Self} {
   /// Convert from a ShapedArray. Returns nil when the ShapedArray has the wrong
   /// rank.
   @_inlineable @inline(__always)
-  init?(_ other: ShapedArray<Unit>) {
+  init?(_ other: ShapedArray<Scalar>) {
     self.init(Tensor(other))
   }
 
   /// Convert from a ShapedArray.
   /// - Precondition: The ShapedArray must have rank ${rank}.
   @_inlineable @inline(__always)
-  init(identicallyRanked other: ShapedArray<Unit>) {
+  init(identicallyRanked other: ShapedArray<Scalar>) {
     self.init(identicallyRanked: Tensor(other))
   }
 
   /// Creates an instance initialized with the given element literals.
   @_inlineable @inline(__always)
-  init(_ units: [${elementArrayLiteral}]) {
-    self.init(base: Tensor<Unit>(units))
+  init(_ scalars: [${elementArrayLiteral}]) {
+    self.init(base: Tensor<Scalar>(scalars))
   }
 
   /// Creates an instance initialized with the given element literals.
   @_inlineable @inline(__always)
-  init(_ units: ${elementArrayLiteral}...) {
-    self.init(units)
+  init(_ scalars: ${elementArrayLiteral}...) {
+    self.init(scalars)
   }
 
-  /// Creates an instance initialized with a unit representing a scalar value.
+  /// Creates an instance initialized with a scalar representing a scalar value.
   @_inlineable @inline(__always)
-  init(_ value: Unit) {
+  init(_ value: Scalar) {
     base = Tensor(value)
   }
 }
@@ -196,27 +196,27 @@ public extension ${Self} {
 }
 
 /// Factories
-public extension ${Self} where Unit : Numeric {
+public extension ${Self} where Scalar : Numeric {
   /// Returns a ${rank}D tensor with all elements set to zero.
   ///
   /// - Parameter shape: the sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
-  static func zeros(shape: [Int]) -> ${Self}<Unit> {
+  static func zeros(shape: [Int]) -> ${Self}<Scalar> {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
     // precondition(shape.count == ${Self}.rank,
     //              "Rank is not ${rank}")
-    return ${Self}(base: Tensor<Unit>.zeros(shape: shape))
+    return ${Self}(base: Tensor<Scalar>.zeros(shape: shape))
   }
 
   /// Returns a ${rank}D tensor with all elements set to one.
   ///
   /// - Parameter shape: the sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
-  static func ones(shape: [Int]) -> ${Self}<Unit> {
+  static func ones(shape: [Int]) -> ${Self}<Scalar> {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
     // precondition(shape.count == ${Self}.rank,
     //              "Rank is not ${rank}")
-    return ${Self}(base: Tensor<Unit>.ones(shape: shape))
+    return ${Self}(base: Tensor<Scalar>.ones(shape: shape))
   }
 
   // TODO(danielzheng): these factory methods will be refactored into
@@ -224,13 +224,13 @@ public extension ${Self} where Unit : Numeric {
   // accept either an [Int] or ${rank} number of Int arguments for shape.
 }
 
-public extension ${Self} where Unit : FloatingPoint {
+public extension ${Self} where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   static func randomNormal(
     shape: [Int], mean: Double = 0, stddev: Double = 1
   ) -> ${Self} {
     return ${Self}(base:
-      Tensor<Unit>.randomNormal(
+      Tensor<Scalar>.randomNormal(
         shape: shape,
         mean: mean,
         stddev: stddev
@@ -262,13 +262,13 @@ public extension ${Self} {
 
 public extension ${Self} {
 % if rank == 1:
-  /// Returns the number of units in a ${Self} (equivalent to the first
-  /// dimension). Equivalent to `unitCount` for ${Self}.
+  /// Returns the number of scalars in a ${Self} (equivalent to the first
+  /// dimension). Equivalent to `scalarCount` for ${Self}.
 % else:
   /// Returns the number of element tensors in a ${Self} (equivalent to the
   /// first dimension).
-  /// - Note: `count` is distinct from `unitCount`, which represents the total
-  ///   number of units.
+  /// - Note: `count` is distinct from `scalarCount`, which represents the total
+  ///   number of scalars.
 % end
   @_inlineable
   var count: Int {
@@ -304,9 +304,9 @@ public extension ${Self} {
 
 % if rank == 1:
   @_inlineable
-  /// Access the scalar unit specified by a given index.
-  /// - Parameter index: index of the unit
-  subscript(index: Int) -> Unit {
+  /// Access the scalar scalar specified by a given index.
+  /// - Parameter index: index of the scalar
+  subscript(index: Int) -> Scalar {
     @inline(never) get {
       fatalError("Unimplemented")
     }
@@ -348,7 +348,7 @@ public extension ${Self} {
 // Reduction
 //===----------------------------------------------------------------------===//
 
-public extension ${Self} where Unit : Numeric {
+public extension ${Self} where Scalar : Numeric {
 % if rank > 1:
   @_inlineable @inline(__always)
   func min(alongAxis axis: Int) -> ${ElementTensor} {
@@ -411,7 +411,7 @@ public extension Tensor {
 % for rank in ranks:
 %   Self = 'Tensor{}D'.format(rank)
   @_inlineable @inline(__always)
-  init(_ tensor: ${Self}<Unit>) {
+  init(_ tensor: ${Self}<Scalar>) {
     self = tensor.base
   }
 % end

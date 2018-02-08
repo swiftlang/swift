@@ -833,7 +833,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_CoreFoundation);
     break;
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::AccelerableTensorUnit:
+  case KnownProtocolKind::AccelerableByTensorFlow:
     M = getLoadedModule(getIdentifier("TensorFlow"));
     assert(M && "TensorFlow module does not exist.");
     break;

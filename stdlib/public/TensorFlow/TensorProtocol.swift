@@ -23,27 +23,27 @@
 //===----------------------------------------------------------------------===//
 
 public protocol TensorProtocol {
-  /// Unit type.
-  associatedtype Unit : AccelerableTensorUnit
-  /// Tensor type of the same rank with unit type Bool.
-  associatedtype BoolTensor : TensorProtocol where BoolTensor.Unit == Bool
+  /// Scalar type.
+  associatedtype Scalar : AccelerableByTensorFlow
+  /// Tensor type of the same rank with scalar type Bool.
+  associatedtype BoolTensor : TensorProtocol where BoolTensor.Scalar == Bool
 
-  /// Rank: the number of dimensions of the tensor.
+  /// The number of dimensions of the tensor.
   var rank: Int { get }
 
-  /// Shape: the sizes of the tensor along each dimension.
+  /// The sizes of the tensor along each dimension.
   var shape: [Int] { get }
 
-  /// The number of units in the tensor.
+  /// The number of scalars in the tensor.
   /// Always equal to the product of the elements of `shape`.
-  var unitCount: Int { get }
+  var scalarCount: Int { get }
 
-  /// Units of the tensor, in row-major order.
-  var units: [Unit] { get }
+  /// Scalars of the tensor, in row-major order.
+  var scalars: [Scalar] { get }
 
   /// Underlying tensor handle.
-  var handle: TensorHandle<Unit> { get }
+  var handle: TensorHandle<Scalar> { get }
 
   /// Initialize from a TensorHandle.
-  init(_ handle: TensorHandle<Unit>)
+  init(_ handle: TensorHandle<Scalar>)
 }
