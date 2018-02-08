@@ -71,7 +71,7 @@ class _FakePopen():
     def wait(self):
         return self.returncode
 
-    def communicate(**kwargs):
+    def communicate(self, **kwargs):
         return (None, None)
 
     def send_signal(self, signal):
@@ -149,7 +149,7 @@ class CommandExecutor(object):
 
         return kwargs
 
-    def _fake_popen(self, command):
+    def _fake_popen(self, command, **kwargs):
         self._exec_actions(command)
         return _FakePopen()
 
