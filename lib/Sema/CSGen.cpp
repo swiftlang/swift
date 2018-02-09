@@ -1341,81 +1341,34 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
 
-      // Loop over all of the argument constraints, building the expected list
-      // of parameter types.
-      for (auto descriptor : opInfo.operandDescriptors) {
-        switch (descriptor) {
-        case tf::OpDescriptor::Tensor: {   // TensorHandle<T> with an unbound T.
-          Type tensorType =
-            CS.openUnboundGenericType(tensorHandle->getDeclaredType(), locator);
-          argTypes.push_back(TupleTypeElt(tensorType));
-          break;
+      // The #tfop list is a list of inputs (with no keyword arguments) followed
+      // by a list of attributes (with keyword arguments).  Add type constraints
+      // for each of them, and make sure there is no intermixing between the
+      // two lists.
+      bool sawAttribute = false;
+      for (unsigned i = 2, e = tt->getNumElements(); i != e; ++i) {
+        if (!tt->getElementName(i).empty()) {
+          sawAttribute = true;
+        } else if (sawAttribute) {
+          tc.diagnose(tt->getElement(i)->getStartLoc(), diag::invalid_tfop,
+                      "expected keyword argument for attribute name, "
+                      "or an additional letter in constraint string");
+          return nullptr;
         }
-        case tf::OpDescriptor::Scalar:       // Scalar operand.
-          auto ty = CS.createTypeVariable(locator, 0);
-          argTypes.push_back(TupleTypeElt(ty));
-          break;
-        }
-      }
 
-      // Check to see if we have any keyword arguments: these are attributes.
-      // If so, add them as well.  We have no type constraints on these
-      // attributes since we just know their name.
-      if (tt->getNumElements() > argTypes.size()) {
-        for (unsigned i = argTypes.size(), e = tt->getNumElements(); i != e;
-             ++i) {
-          // We have to have a keyword argument name for attributes.
-          if (tt->getElementName(i).empty()) {
-            tc.diagnose(tt->getElement(i)->getStartLoc(), diag::invalid_tfop,
-                        "expected keyword argument for attribute name, "
-                        "or an additional letter in constraint string");
-            return nullptr;
-          }
-
-          auto ty = CS.createTypeVariable(locator, 0);
-          argTypes.push_back(TupleTypeElt(ty, tt->getElementName(i)));
-        }
+        // We infer the type of inputs from context.
+        auto ty = CS.createTypeVariable(locator, 0);
+        argTypes.push_back(TupleTypeElt(ty, tt->getElementName(i)));
       }
 
       // Now that we know what all of the arguments are supposed to be, add a
-      // constraint to the constraint system to check this for us.
+      // constraint to the constraint system.
       auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
                        CS.getType(tt), desiredArgTypes,
                        CS.getConstraintLocator(expr,
                                          ConstraintLocator::ApplyArgument));
-
-      // Determine the types of the results.
-      SmallVector<TupleTypeElt, 2> resultTypes;
-      unsigned resultNo = 0;
-      for (auto descriptor : opInfo.resultDescriptors) {
-        switch (descriptor) {
-        case tf::OpDescriptor::Tensor: {   // TensorHandle<T> with an unbound T.
-          Type tensorType =
-            CS.openUnboundGenericType(tensorHandle->getDeclaredType(), locator);
-          resultTypes.push_back(TupleTypeElt(tensorType));
-          break;
-        }
-        default:
-          // Point to the exact character in question.
-          auto charLoc =
-            constraints->getLoc().getAdvancedLoc(resultNo);
-          tc.diagnose(charLoc, diag::invalid_tfop,
-                      "tensor ops may only return tensor values with 't'");
-          return nullptr;
-        }
-        ++resultNo;
-      }
-
-      // Map the list of result types into a single result type for the op.
-      switch (resultTypes.size()) {
-      case 1:
-        return resultTypes[0].getRawType();
-      case 0:
-        return tc.Context.TheEmptyTupleType;
-      default:
-        return TupleType::get(resultTypes, tc.Context);
-      }
+      return CS.createTypeVariable(locator, 0);
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

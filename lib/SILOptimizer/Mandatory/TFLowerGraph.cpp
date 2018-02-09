@@ -465,17 +465,13 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
 
   // Each function argument for the op is a parameter that is passed in.
   unsigned nextOperand = 0;
-  for (auto operandInfo : tfopInfo.operandDescriptors) {
-    switch (operandInfo) {
-    case OpDescriptor::Tensor: {
-      auto opValue = getOperandValue(inst->getOperand(nextOperand++));
-      if (!opValue.oper) return;  // Error occurred.
-      TF_AddInput(op, opValue);
-      break;
-    }
-    case OpDescriptor::Scalar:
-      llvm_unreachable("Scalar operands should never reach graphgen");
-    }
+  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
+    auto operand = inst->getOperand(nextOperand++);
+    assert(isTensorHandle(operand->getType()) &&
+           "all op inputs should be tensors");
+    auto opValue = getOperandValue(operand);
+    if (!opValue.oper) return;  // Error occurred.
+    TF_AddInput(op, opValue);
   }
 
   // Process attributes as well.
