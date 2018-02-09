@@ -24,47 +24,8 @@
 
 namespace swift {
 namespace tf {
-/// This is the interpretation of the operand or result value passed into a
-/// Tensor op.
-enum class OpDescriptor {
-  /// 't' - This is a tensor operand and result type, whose Unit type is
-  /// inferred from context.
-  Tensor,
 
-  /// 's' - This is a scalar (non-tensor) operand or result value, whose type
-  /// is inferred from context.
-  Scalar,
-};
-
-/// Represent decoded information about a TensorFlow operation.
-struct TensorOpInfo {
-
-  /// This is the string representation of the operand & result descriptors.
-  StringRef operandDescriptorStr, resultDescriptorStr;
-
-  /// These are decoded descriptors for operands and results.
-  SmallVector<OpDescriptor, 4> operandDescriptors, resultDescriptors;
-
-  /// This little struct represents an error parsing the constraint string for
-  /// an operation.  If parsing is successful, the location is null.
-  struct ParseErrorInfo {
-    const char *loc;
-    std::string message;
-
-    bool isSuccess() const { return loc == nullptr; }
-    bool isError() const { return loc != nullptr; }
-
-    static ParseErrorInfo getSuccess() {
-      return { nullptr, "" };
-    }
-  };
-
-  /// This decodes the specified string as an operand & result constraint string
-  /// which looks something like "tt:t".  It fills in the operand/result
-  /// descriptor strings and decoded forms.
-  ParseErrorInfo decodeDescriptorString(StringRef operandAndResult);
-};
-
+  // Nothing right now, but this will probably be useful later.
 
 } // end namespace tf
 } // end namespace swift

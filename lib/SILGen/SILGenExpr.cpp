@@ -2958,9 +2958,9 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   auto tuple = cast<TupleExpr>(E->getArg());
   auto opName = cast<StringLiteralExpr>(tuple->getElement(0))->getValue();
   auto constraints = cast<StringLiteralExpr>(tuple->getElement(1))->getValue();
+  (void)constraints; // FIXME: remove syntax.
 
-  std::string name =
-    "__tfop_" + opName.str() + "," + constraints.str();
+  std::string name = "__tfop_" + opName.str();
 
   // Attribute names are specified with keyword arguments.  Add these attribute
   // names to the end of our builtin name, separated by commas.

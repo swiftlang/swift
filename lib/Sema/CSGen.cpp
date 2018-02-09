@@ -1319,17 +1319,8 @@ namespace {
 
       auto constraintStr = constraints->getValue();
 
-      // Parse the constraint characters into a more semantic form.
-      tf::TensorOpInfo opInfo;
-      auto errorInfo = opInfo.decodeDescriptorString(constraintStr);
-
-      // Emit errors if any occurred.
-      if (errorInfo.isError()) {
-        auto loc = constraints->getLoc();
-        loc = loc.getAdvancedLoc(errorInfo.loc-constraintStr.data());
-        tc.diagnose(loc, diag::invalid_tfop, errorInfo.message);
-        return nullptr;
-      }
+      // FIXME: Remove constraint string from concrete syntax.
+      (void)constraintStr;
 
       // Infer the argument types based on the constraint characters.
       SmallVector<TupleTypeElt, 4> argTypes;
