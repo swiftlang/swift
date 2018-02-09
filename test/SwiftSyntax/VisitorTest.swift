@@ -3,10 +3,12 @@
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
+// FIXME: This test fails occassionally in CI with invalid json.
+// REQUIRES: disabled
+
 import StdlibUnittest
 import Foundation
 import SwiftSyntax
-import SwiftSourceKit
 
 func getInput(_ file: String) -> URL {
   var result = URL(fileURLWithPath: #file)
@@ -27,8 +29,7 @@ VisitorTests.test("Basic") {
     }
   }
   expectDoesNotThrow({
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SourceKitdService.encodeSourceFileSyntax(getInput("visitor.swift")))
+    let parsed = try SourceFileSyntax.parse(getInput("visitor.swift"))
     let counter = FuncCounter()
     let hashBefore = parsed.hashValue
     counter.visit(parsed)

@@ -6,7 +6,6 @@
 import StdlibUnittest
 import Foundation
 import SwiftSyntax
-import SwiftSourceKit
 
 func getInput(_ file: String) -> URL {
   var result = URL(fileURLWithPath: #file)
