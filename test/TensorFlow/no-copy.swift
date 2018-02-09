@@ -42,10 +42,10 @@ public func testEmptyScalarsArray() {
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
- CHECK: integer_literal $Builtin.Int64, 0
- CHECK: integer_literal $Builtin.Int64, 20
- CHECK: integer_literal $Builtin.Int64, 30
- CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int.Type, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
+ CHECK: integer_literal $Builtin.Int32, 0
+ CHECK: integer_literal $Builtin.Int32, 20
+ CHECK: integer_literal $Builtin.Int32, 30
+ CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
  CHECK:  builtin "__tfop_Add,tt:t"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
  */
 
@@ -105,8 +105,8 @@ public func testMeanMax(x: Tensor<Float>) -> Float {
 }
 
 public func testZeros() -> Tensor<Float> {
-  let b1 = Tensor<Float>.zeros(shape: [1, 4])
-  let b2 = Tensor<Float>.zeros(shape: [1, 4])
+  let b1 = Tensor<Float>(zeros: [1, 4])
+  let b2 = Tensor<Float>(zeros: [1, 4])
   return (b1+b2).toHost()
 }
 
@@ -119,5 +119,3 @@ public func tensorToScalarToTensor(a : Tensor<Int>) -> Tensor<Int> {
   let b = Tensor(scalar)
   return (b+b).toHost()
 }
-
-

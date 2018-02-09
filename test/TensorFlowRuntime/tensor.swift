@@ -54,13 +54,13 @@ TensorTests.testCPUAndGPU("Initializers") {
 }
 
 TensorTests.testCPUAndGPU("FactoryInitializers") {
-  let x = Tensor<Float>.ones(shape: [1, 10])
+  let x = Tensor<Float>(ones: [1, 10])
   expectEqual([1, 10], x.shape)
   expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
-  let x = Tensor<Int32>.ones(shape: [5, 5])
+  let x = Tensor<Int32>(ones: [5, 5])
   let ints = Tensor<Int>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
@@ -214,8 +214,8 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
                             [0.4],
                             [0.3],
                             [0.9]]).toDevice()
-    var b1 = Tensor<Float>.zeros(shape: [1, 4])
-    var b2 = Tensor<Float>.zeros(shape: [1, 1])
+    var b1 = Tensor<Float>(zeros: [1, 4])
+    var b2 = Tensor<Float>(zeros: [1, 1])
 
     /// - NOTE: This initializer must be manually declared, because the initializer
     /// logic for the variables declared above is large, and we need to mark
@@ -301,8 +301,8 @@ func testXORClassifierTraining() {
     // TODO: randomize weights once we have Tensor.random() implemented.
     var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
     var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
-    var b1 = Tensor<Float>.zeros(shape: [1, 4])
-    var b2 = Tensor<Float>.zeros(shape: [1, 1])
+    var b1 = Tensor<Float>(zeros: [1, 4])
+    var b2 = Tensor<Float>(zeros: [1, 1])
 
     /// - TODO: Remove when deabstraction is implemented.
     @inline(__always)
@@ -402,7 +402,7 @@ TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 // sends.
 @inline(never)
 func testRankGetter2() {
-  let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+  let y = Tensor<Int>(ones: [1, 2, 2, 2, 2, 2, 1])
   expectEqual(7, y.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter2", testRankGetter2)
@@ -416,7 +416,7 @@ TensorTests.testCPUAndGPU("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
-  let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+  let y = Tensor<Int>(ones: [1, 2, 2, 2, 2, 2, 1])
   expectEqual([1, 2, 2, 2, 2, 2, 1], y.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter2", testShapeGetter2)
