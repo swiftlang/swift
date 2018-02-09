@@ -280,8 +280,9 @@ func _TFConv2DBackpropInput<T : FloatingPoint>(
   padding: Padding
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
-  return Tensor(#tfop("Conv2DBackpropInput", "ttt:t",
-                      shape.handle, filter.handle, backpropOutput.handle))
+  return Tensor(handle:
+    #tfop("Conv2DBackpropInput", "ttt:t",
+          shape.handle, filter.handle, backpropOutput.handle))
 }
 
 /// TensorFlow builtin conv2d gradient helper for the filter.
@@ -299,8 +300,9 @@ func _TFConv2DBackpropFilter<T : FloatingPoint>(
   padding: Padding
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
-  return Tensor(#tfop("Conv2DBackpropFilter", "ttt:t",
-                      input.handle, filterSizes.handle, backpropOutput.handle))
+  return Tensor(handle:
+    #tfop("Conv2DBackpropFilter", "ttt:t",
+          input.handle, filterSizes.handle, backpropOutput.handle))
 }
 
 @_inlineable
@@ -377,12 +379,10 @@ func _adjointMaxPooled<T>(
   // TODO: Currently this is not higher order differentiable. Redefine in closed
   // form.
   // FIXME: handle attributes (padding)
-  return Tensor(#tfop("MaxPoolGradV2", "ttttt:t",
-                      input.shapeTensor.handle,
-                      primal.handle,
-                      seed.handle,
-                      kernelSize.handle,
-                      strides.handle))
+  return Tensor(handle:
+    #tfop("MaxPoolGradV2", "ttttt:t",
+          input.shapeTensor.handle, primal.handle, seed.handle,
+          kernelSize.handle, strides.handle))
 }
 
 @_inlineable
@@ -398,7 +398,6 @@ func _adjointAveragePooled<T>(
   // TODO: Currently this is not higher order differentiable. Redefine in closed
   // form.
   // FIXME: handle attributes (ksize, strides, padding)
-  return Tensor(#tfop("AvgPoolGrad", "tt:t",
-                      input.shapeTensor.handle,
-                      seed.handle))
+  return Tensor(handle:
+    #tfop("AvgPoolGrad", "tt:t", input.shapeTensor.handle, seed.handle))
 }

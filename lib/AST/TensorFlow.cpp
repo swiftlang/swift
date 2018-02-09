@@ -42,33 +42,6 @@ decodeDescriptorString(StringRef operandAndResult) -> ParseErrorInfo {
 
   operandDescriptorStr = operandAndResult.take_front(colonLoc);
   resultDescriptorStr = operandAndResult.drop_front(colonLoc+1);
-
-  auto decode = [&](StringRef str,
-                    SmallVectorImpl<OpDescriptor> &result) -> ParseErrorInfo {
-    result.clear();
-    for (auto c : str) {
-      OpDescriptor kind;
-      switch (c) {
-        case 't': kind = OpDescriptor::Tensor; break;
-        case 's': kind = OpDescriptor::Scalar; break;
-        default:
-          return {
-            str.data()+str.find(c),
-            "unknown #tfop constraint character '" + std::string(1, c) + "'"
-          };
-      }
-      result.push_back(kind);
-    }
-
-    return ParseErrorInfo::getSuccess();
-  };
-
-  // Decode the operands and the results.
-  auto errInfo = decode(operandDescriptorStr, operandDescriptors);
-  if (!errInfo.isSuccess())
-    return errInfo;
-
-  errInfo = decode(resultDescriptorStr, resultDescriptors);
-  return errInfo;
+  return ParseErrorInfo::getSuccess();
 }
 
