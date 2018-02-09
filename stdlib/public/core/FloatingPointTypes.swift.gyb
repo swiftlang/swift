@@ -480,9 +480,21 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // y > x
   @_inlineable // FIXME(sil-serialize-all)
   public static var infinity: ${Self} {
+%if bits == 32:
+    return ${Self}(bitPattern: 0b0_11111111_00000000000000000000000)
+%elif bits == 64:
+    return ${Self}(
+      bitPattern: 0b0_11111111111_0000000000000000000000000000000000000000000000000000)
+%elif bits == 80:
+    let rep = _Float80Representation(
+      explicitSignificand: ${Self}._explicitBitMask,
+      signAndExponent: 0b0_111111111111111)
+    return unsafeBitCast(rep, to: ${Self}.self)
+%else:
     return ${Self}(sign: .plus,
       exponentBitPattern: _infinityExponent,
       significandBitPattern: 0)
+%end
   }
 
   /// A quiet NaN ("not a number").
@@ -507,7 +519,19 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // Prints "true"
   @_inlineable // FIXME(sil-serialize-all)
   public static var nan: ${Self} {
+%if bits == 32:
+    return ${Self}(bitPattern: 0b0_11111111_10000000000000000000000)
+%elif bits == 64:
+    return ${Self}(
+      bitPattern: 0b0_11111111111_1000000000000000000000000000000000000000000000000000)
+%elif bits == 80:
+    let rep = _Float80Representation(
+      explicitSignificand: ${Self}._explicitBitMask | ${Self}._quietNaNMask,
+      signAndExponent: 0b0_111111111111111)
+    return unsafeBitCast(rep, to: ${Self}.self)
+%else:
     return ${Self}(nan: 0, signaling: false)
+%end
   }
 
   /// A signaling NaN ("not a number").
@@ -531,7 +555,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @available(*, unavailable, renamed: "nan")
-  public static var quietNaN: ${Self} { Builtin.unreachable()}
+  public static var quietNaN: ${Self} { Builtin.unreachable() }
 
   /// The greatest finite number representable by this type.
   ///
@@ -543,9 +567,17 @@ extension ${Self}: BinaryFloatingPoint {
   /// `infinity` is greater than this value.
   @_inlineable // FIXME(sil-serialize-all)
   public static var greatestFiniteMagnitude: ${Self} {
+%if bits == 32:
+    return 0x1.fffffep127
+%elif bits == 64:
+    return 0x1.fffffffffffffp1023
+%elif bits == 80:
+    return 0x1.fffffffffffffffep16383
+%else:
     return ${Self}(sign: .plus,
       exponentBitPattern: _infinityExponent - 1,
       significandBitPattern: _significandMask)
+%end
   }
 
   /// The mathematical constant pi.
@@ -627,9 +659,17 @@ extension ${Self}: BinaryFloatingPoint {
   /// subnormals, zeros, and negative numbers are smaller than this value.
   @_inlineable // FIXME(sil-serialize-all)
   public static var leastNormalMagnitude: ${Self} {
+%if bits == 32:
+    return 0x1p-126
+%elif bits == 64:
+    return 0x1p-1022
+%elif bits == 80:
+    return 0x1p-16382
+%else:
     return ${Self}(sign: .plus,
       exponentBitPattern: 1,
       significandBitPattern: 0)
+%end
   }
 
   /// The least positive number.
@@ -643,10 +683,34 @@ extension ${Self}: BinaryFloatingPoint {
 #if arch(arm)
     return leastNormalMagnitude
 #else
+%if bits == 32:
+    return 0x1p-149
+%elif bits == 64:
+    return 0x1p-1074
+%elif bits == 80:
+    return 0x1p-16445
+%else:
     return ${Self}(sign: .plus,
       exponentBitPattern: 0,
       significandBitPattern: 1)
+%end
 #endif
+  }
+
+  /// The unit in the last place of 1.0.
+  ///
+  /// The positive difference between 1.0 and the next greater representable
+  /// number. The `ulpOfOne` constant corresponds to the C macros
+  /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
+  @_inlineable // FIXME(sil-serialize-all)
+  public static var ulpOfOne: ${Self} {
+%if bits == 32:
+    return 0x1p-23
+%elif bits == 64:
+    return 0x1p-52
+%elif bits == 80:
+    return 0x1p-63
+%end
   }
 
   /// The exponent of the floating-point value.
