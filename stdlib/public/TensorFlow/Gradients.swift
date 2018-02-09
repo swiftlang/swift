@@ -276,7 +276,7 @@ func _TFConv2DBackpropInput<T : FloatingPoint>(
   shape: Tensor<Int32>,
   filter: Tensor<T>,
   backpropOutput: Tensor<T>,
-  strides: [Int],
+  strides: [Int32],
   padding: Padding
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
@@ -296,7 +296,7 @@ func _TFConv2DBackpropFilter<T : FloatingPoint>(
   input: Tensor<T>,
   filterSizes: Tensor<Int32>,
   backpropOutput: Tensor<T>,
-  strides: [Int],
+  strides: [Int32],
   padding: Padding
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
@@ -311,7 +311,7 @@ func _adjointTFConv2DBackpropInput<T : FloatingPoint>(
   _ shape: Tensor<Int32>,
   _ filter: Tensor<T>,
   _ backpropOutput: Tensor<T>,
-  _ strides: [Int],
+  _ strides: [Int32],
   _ padding: Padding,
   _ primal: Tensor<T>,
   _ seed: Tensor<T>
@@ -330,7 +330,7 @@ func _adjointTFConv2DBackpropFilter<T : FloatingPoint>(
   _ input: Tensor<T>,
   _ filterSizes: Tensor<Int32>,
   _ backpropOutput: Tensor<T>,
-  _ strides: [Int],
+  _ strides: [Int32],
   _ padding: Padding,
   _ primal: Tensor<T>,
   _ seed: Tensor<T>
@@ -348,7 +348,7 @@ func _adjointTFConv2DBackpropFilter<T : FloatingPoint>(
 func _adjointConvolved2D<T : FloatingPoint>(
   input: Tensor<T>,
   filter: Tensor<T>,
-  strides: [Int],
+  strides: [Int32],
   padding: Padding,
   primal: Tensor<T>,
   seed: Tensor<T>
@@ -386,8 +386,8 @@ func _adjointMaxPooled<T>(
 @_versioned
 func _adjointAveragePooled<T>(
   input: Tensor<T>,
-  kernelSize: [Int],
-  strides: [Int],
+  kernelSize: [Int32],
+  strides: [Int32],
   padding: Padding,
   primal: Tensor<T>,
   seed: Tensor<T>
