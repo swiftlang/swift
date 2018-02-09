@@ -371,9 +371,9 @@ public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @_inlineable @inline(__always)
   func transposed() -> Self {
-    let defaultPermutations = (rankTensorOriginal - 1) - Tensor<Int32>(
+    let defaultPermutations = (rankTensor - 1) - Tensor<Int32>(
       rangeFrom: Tensor<Int32>(_TFMakeScalarTensor(0)),
-      to: rankTensorOriginal,
+      to: rankTensor,
       stride: Tensor<Int32>(_TFMakeScalarTensor(1))
     )
     return transposed(withPermutations: Tensor<Int>(defaultPermutations))
@@ -642,58 +642,28 @@ public extension Tensor {
 // Tensor properties
 //===----------------------------------------------------------------------===//
 
-/// Internal getters that return Int32 tensors.
-internal extension TensorProtocol {
-  @_versioned
+public extension TensorProtocol {
   @_inlineable
-  var shapeTensorOriginal: Tensor<Int32> {
+  var shapeTensor: Tensor<Int32> {
     @inline(__always)
     get {
       return Tensor<Int32>(#tfop("Shape", "t:t", handle))
     }
   }
 
-  @_versioned
   @_inlineable
-  var rankTensorOriginal: Tensor<Int32> {
+  var rankTensor: Tensor<Int32> {
     @inline(__always)
     get {
       return Tensor<Int32>(#tfop("Rank", "t:t", handle))
     }
   }
 
-  @_versioned
   @_inlineable
-  var scalarCountTensorOriginal: Tensor<Int32> {
+  var scalarCountTensor: Tensor<Int32> {
     @inline(__always)
     get {
       return Tensor<Int32>(#tfop("Size", "t:t", handle))
-    }
-  }
-}
-
-public extension TensorProtocol {
-  @_inlineable
-  var shapeTensor: Tensor<Int> {
-    @inline(__always)
-    get {
-      return Tensor<Int>(shapeTensorOriginal)
-    }
-  }
-
-  @_inlineable
-  var rankTensor: Tensor<Int> {
-    @inline(__always)
-    get {
-      return Tensor<Int>(rankTensorOriginal)
-    }
-  }
-
-  @_inlineable
-  var scalarCountTensor: Tensor<Int> {
-    @inline(__always)
-    get {
-      return Tensor<Int>(scalarCountTensorOriginal)
     }
   }
 }
@@ -711,7 +681,7 @@ public extension Tensor {
   var count: Int {
     @inline(__always)
     get {
-      return shape.first ?? 0
+      return Int(shape.dimensions.first ?? 0)
     }
   }
 

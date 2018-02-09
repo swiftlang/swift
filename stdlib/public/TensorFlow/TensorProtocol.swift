@@ -32,7 +32,7 @@ public protocol TensorProtocol {
   var rank: Int { get }
 
   /// The sizes of the tensor along each dimension.
-  var shape: [Int] { get }
+  var shape: TensorShape { get }
 
   /// The number of scalars in the tensor.
   /// Always equal to the product of the elements of `shape`.

@@ -45,10 +45,11 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   /// buffer.
   @_versioned
   convenience init(
-    shape: [Int],
+    shape: [Int32],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
-    let byteCount = shape.reduce(1, *) * MemoryLayout<Scalar>.stride
+    let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
+    let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
     // Initialize tensor and copy data.
     // TF_AllocateTensor() never returns nil.
     let cTensor = TF_AllocateTensor(

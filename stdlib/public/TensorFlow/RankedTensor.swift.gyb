@@ -93,7 +93,7 @@ public struct ${Self}<Scalar : AccelerableByTensorFlow> {
   }
 
   @_inlineable
-  public var shape: [Int] {
+  public var shape: TensorShape {
     @inline(__always)
     get {
       return base.shape
@@ -172,7 +172,7 @@ public extension ${Self} {
     self.init(scalars)
   }
 
-  /// Creates an instance initialized with a scalar representing a scalar value.
+  /// Creates an instance initialized with a scalar.
   @_inlineable @inline(__always)
   init(_ value: Scalar) {
     base = Tensor(value)
@@ -197,31 +197,27 @@ public extension ${Self} {
 
 /// Factories
 public extension ${Self} where Scalar : Numeric {
-  /// Returns a ${rank}D tensor with all elements set to zero.
+  /// Initialize a ${rank}D tensor with all elements set to zero.
   ///
   /// - Parameter shape: the sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
-  static func zeros(shape: [Int]) -> ${Self}<Scalar> {
+  init(zeros shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
     // precondition(shape.count == ${Self}.rank,
     //              "Rank is not ${rank}")
-    return ${Self}(base: Tensor<Scalar>.zeros(shape: shape))
+    self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
-  /// Returns a ${rank}D tensor with all elements set to one.
+  /// Initialize a ${rank}D tensor with all elements set to one.
   ///
   /// - Parameter shape: the sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
-  static func ones(shape: [Int]) -> ${Self}<Scalar> {
+  init(ones shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
     // precondition(shape.count == ${Self}.rank,
     //              "Rank is not ${rank}")
-    return ${Self}(base: Tensor<Scalar>.ones(shape: shape))
+    self.init(base: Tensor<Scalar>(ones: shape))
   }
-
-  // TODO(danielzheng): these factory methods will be refactored into
-  // improved, Swifty initializers. The initializers will have versions that
-  // accept either an [Int] or ${rank} number of Int arguments for shape.
 }
 
 public extension ${Self} where Scalar : FloatingPoint {
@@ -274,7 +270,7 @@ public extension ${Self} {
   var count: Int {
     @inline(__always)
     get {
-      return shape.first ?? 0
+      return Int(shape.dimensions.first ?? 0)
     }
   }
 
@@ -304,7 +300,7 @@ public extension ${Self} {
 
 % if rank == 1:
   @_inlineable
-  /// Access the scalar scalar specified by a given index.
+  /// Access the scalar specified by a given index.
   /// - Parameter index: index of the scalar
   subscript(index: Int) -> Scalar {
     @inline(never) get {

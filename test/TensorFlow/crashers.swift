@@ -87,8 +87,8 @@ public func testStraightLineXORTraining() {
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
   var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
 
-  var b1 = Tensor<Float>.zeros(shape: [1, 4])
-  var b2 = Tensor<Float>.zeros(shape: [1, 1])
+  var b1 = Tensor<Float>(zeros: [1, 4])
+  var b2 = Tensor<Float>(zeros: [1, 1])
 
   // Training loop
   for _ in 0..<iterationCount {

@@ -495,7 +495,7 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
     switch buffer.allocation {
     case let .native(bufAddr):
       return TensorHandle<Scalar>(
-        shape: shape,
+        shape: shape.map(Int32.init),
         scalarsInitializer: { addr in
           addr.initialize(from: bufAddr, count: scalarCount)
         }

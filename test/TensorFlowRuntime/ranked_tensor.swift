@@ -54,13 +54,13 @@ RankedTensorTests.testCPUAndGPU("Initializers") {
 }
 
 RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
-  let x = Tensor2D<Float>.ones(shape: [1, 10])
+  let x = Tensor2D<Float>(ones: [1, 10])
   expectEqual([1, 10], x.shape)
   expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
 RankedTensorTests.testCPUAndGPU("DataTypeCast") {
-  let x: Tensor2D<Int32> = .ones(shape: [5, 5])
+  let x = Tensor2D<Int32>(ones: [5, 5])
   let ints = Tensor2D<Int>(x)
   let floats = Tensor2D<Float>(x)
   let i8s = Tensor2D<Int8>(floats)
