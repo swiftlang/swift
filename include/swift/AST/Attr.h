@@ -45,6 +45,7 @@ class ASTContext;
 struct PrintOptions;
 class Decl;
 class ClassDecl;
+class FuncDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class TrailingWhereClause;
@@ -1349,6 +1350,8 @@ private:
   DeclNameLoc GradFuncNameLoc;
   /// The constraint clauses for generic types.
   TrailingWhereClause *WhereClause;
+  /// The adjoint function, to be resolved by the type checker.
+  FuncDecl *adjointFunction = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                               ArrayRef<Argument> arguments,
@@ -1386,6 +1389,14 @@ public:
 
   MutableArrayRef<Argument> getArguments() {
     return { getArgumentsData(), NumArguments };
+  }
+
+  FuncDecl *getAdjointFunction() const {
+    return adjointFunction;
+  }
+
+  void setAdjointFunction(FuncDecl *decl) {
+    adjointFunction = decl;
   }
 
   static bool classof(const DeclAttribute *DA) {
