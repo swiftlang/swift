@@ -87,9 +87,9 @@ func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
 /// designed to align with the requirements of the 'Const' Tensorflow operation.
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
-func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int])
+func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int32])
     -> TensorHandle<Scalar> {
-  let contiguousSize = shape.reduce(1, *)
+  let contiguousSize = shape.map(Int.init).reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars doesn't match the shape.")
   return TensorHandle(
@@ -109,7 +109,7 @@ func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
 func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar]) -> TensorHandle<Scalar> {
-  return _TFTensorFromScalars(scalars, shape: [scalars.count])
+  return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
 
 //===----------------------------------------------------------------------===//
@@ -171,7 +171,7 @@ public extension Tensor {
     // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `matrix` to an array is an unnecessary cost.
     let tensorHandle = TensorHandle<Scalar>(
-      shape: [dim0, dim1],
+      shape: [Int32(dim0), Int32(dim1)],
       scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one row at a time.
         for (i, subArray) in literal.enumerated() {
@@ -210,7 +210,7 @@ public extension Tensor {
     // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `literal` to an array is an unnecessary cost.
     let tensorHandle = TensorHandle<Scalar>(
-      shape: [dim0, dim1, dim2],
+      shape: [Int32(dim0), Int32(dim1), Int32(dim2)],
       scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one innermost array at a time.
         for (i, subArray) in literal.enumerated() {
@@ -257,7 +257,7 @@ public extension Tensor {
     // We don't want to delegate initialization to `init(shape:scalars:)`
     // because flattening `literal` to an array is an unnecessary cost.
     let tensorHandle = TensorHandle<Scalar>(
-      shape: [dim0, dim1, dim2, dim3],
+      shape: [Int32(dim0), Int32(dim1), Int32(dim2), Int32(dim3)],
       scalarsInitializer: { addr in
         // Copy to TF_Tensor memory, one innermost array at a time.
         for (i, subArray) in literal.enumerated() {
@@ -279,15 +279,15 @@ public extension Tensor {
   /// - Precondition: The number of scalars should be the same as the
   ///   product of all of shape's dimensions.
   @_inlineable @inline(__always)
-  init(shape: [Int], scalars: [Scalar]) {
-    self.init(_TFTensorFromScalars(scalars, shape: shape))
+  init(shape: TensorShape, scalars: [Scalar]) {
+    self.init(_TFTensorFromScalars(scalars, shape: shape.dimensions))
   }
 
   /// Initialize a tensor of a specified shape, filled with a single value.
   @_inlineable @inline(__always)
-  init(shape: [Int], repeating repeatedValue: Scalar) {
+  init(shape: TensorShape, repeating repeatedValue: Scalar) {
     let valueTensor = Tensor(repeatedValue).handle
-    let shapeTensor = Tensor<Int32>(Tensor<Int>(shape)).handle
+    let shapeTensor = Tensor<Int32>(shape.dimensions).handle
     self.init(#tfop("Fill", "tt:t", shapeTensor, valueTensor))
   }
 }
@@ -298,13 +298,10 @@ public extension Tensor {
 
 public extension Tensor {
   @_inlineable
-  var shape: [Int] {
-    // TODO: Until we have mandatory deabstraction, we need to force the
-    // performance inliner to inline this, even though it is apparently too
-    // big to want to do so for performance reasons.
+  var shape: TensorShape {
     @inline(__always)
     get {
-      return shapeTensor.scalars
+      return TensorShape(shapeTensor.scalars)
     }
   }
 
@@ -312,7 +309,7 @@ public extension Tensor {
   var rank: Int {
     @inline(__always)
     get {
-      return rankTensor.scalar!
+      return Int(rankTensor.scalar!)
     }
   }
 
@@ -320,7 +317,7 @@ public extension Tensor {
   var scalarCount: Int {
     @inline(__always)
     get {
-      return scalarCountTensor.scalar!
+      return Int(scalarCountTensor.scalar!)
     }
   }
 }
@@ -330,36 +327,20 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
-  /// Returns a tensor with all elements set to zero.
+  /// Initialize a tensor with all elements set to zero.
   ///
   /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
-  static func zeros(shape: [Int]) -> Tensor {
-    return Tensor(shape: shape, repeating: 0)
+  init(zeros shape: TensorShape) {
+    self.init(shape: shape, repeating: 0)
   }
 
-  /// Returns a tensor with all elements set to zero.
+  /// Initialize a tensor with all elements set to one.
   ///
   /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
-  static func zeros(shape: Int...) -> Tensor {
-    return zeros(shape: shape)
-  }
-
-  /// Returns a tensor with all elements set to one.
-  ///
-  /// - Parameter shape: the dimensions of the tensor.
-  @_inlineable @inline(__always)
-  static func ones(shape: [Int]) -> Tensor {
-    return Tensor(shape: shape, repeating: 1)
-  }
-
-  /// Returns a tensor with all elements set to one.
-  ///
-  /// - Parameter shape: the dimensions of the tensor.
-  @_inlineable @inline(__always)
-  static func ones(shape: Int...) -> Tensor {
-    return ones(shape: shape)
+  init(ones shape: TensorShape) {
+    self.init(shape: shape, repeating: 1)
   }
 
   @inline(never) // make @_inlineable when implemented.
