@@ -510,7 +510,7 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
 /// Tensor conversion
 public extension Tensor where Scalar : AccelerableByTensorFlow {
   init(_ other: ShapedArray<Scalar>) {
-    self.init(other.makeTensorHandle())
+    self.init(handle: other.makeTensorHandle())
   }
 }
 

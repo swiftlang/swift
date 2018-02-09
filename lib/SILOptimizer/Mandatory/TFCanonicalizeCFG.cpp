@@ -257,6 +257,10 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
   SmallVector<SILBasicBlock *, 8> exitingBlocks;
   loop->getExitingBlocks(exitingBlocks);
 
+  if (exitingBlocks.size() != 1) {
+    llvm_unreachable("SESE FIXME: Loops with multiple exits not handled yet!");
+  }
+
   // Loop canonicalization also gives us the property that exits out of the loop
   // have critical edges split, and that any exit block jumps to a block
   // (outside the loop) that is *only* targeted by blocks inside the loop.

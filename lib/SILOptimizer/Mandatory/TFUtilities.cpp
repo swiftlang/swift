@@ -58,6 +58,10 @@ Type tf::isTensorHandle(Type ty) {
   return Type();
 }
 
+bool tf::isTensorHandle(SILType ty) {
+  return (bool)isTensorHandle(ty.getSwiftRValueType());
+}
+
 static bool is64(Type ty) {
   return ty->getASTContext().LangOpts.Target.isArch64Bit();
 }
@@ -498,31 +502,26 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
     return inst->getOperand(nextOperand++);
   };
 
-  for (auto opInfo : operandDescriptors) {
-    switch (opInfo) {
-    case OpDescriptor::Tensor: {
-      auto op = getNextOperand();
-      if (!op) return false;  // diagnostic already emitted.
-      if (!isTensorHandle(op->getType().getSwiftRValueType())) {
-        diagInvalid("expected " +
-                    llvm::utostr(nextOperand-2) + " to be a tensor");
-        return false;
-      }
-      break;
-    }
-    case OpDescriptor::Scalar: {
-      // This requires a scalar value.
-      auto op = getNextOperand();
-      if (!op) return false; // diagnostic already emitted.
+  assert(inst->getNumOperands() >= attributes.size() && "malformed builtin");
+  numInputs = inst->getNumOperands()-attributes.size();
 
-      if (isTensorHandle(op->getType().getSwiftRValueType())) {
-        diagInvalid("'s' operand requires a scalar value");
-        return false;
-      }
+  // Inputs are either TensorHandle values or scalars.  Check for both.
+  for (unsigned i = 0; i != numInputs; ++i) {
+    auto op = getNextOperand();
+    if (!op) return false;  // diagnostic already emitted.
 
-      assert(getScalarOperand(op) && "Invalid scalar operand");
-      break;
-    }
+    // TensorHandle's are fine.
+    if (isTensorHandle(op->getType()))
+      continue;
+
+    // If it isn't a TensorHandle, it is a scalar.
+    op = getScalarOperand(op);
+
+    auto scalarType = op->getType().getSwiftRValueType();
+    if (convertSwiftTypeToTF(scalarType) == 0) {
+      diagInvalid("scalar operand has unrecognized type '" +
+                  scalarType->getString() + "'");
+      return SILValue();
     }
   }
 
@@ -560,12 +559,6 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
     attr = { attr.first.substr(0, dollarLoc), suffixKind };
   }
 
-  // Diagnose when the type descriptor didn't specify the right number of args.
-  if (nextOperand != inst->getNumOperands()) {
-    diagInvalid("more arguments present than type descriptors specified");
-    return false;
-  }
-
   return true;
 }
 
@@ -577,8 +570,7 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 /// up to align with what the Const op wants to see.
 ///
 bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
-  assert(inst->getNumOperands() == 3 &&
-         isTensorHandle(inst->getType().getSwiftRValueType()) &&
+  assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars");
 
   // If we can't analyze the operands as arrays of constants, give up.
@@ -594,6 +586,7 @@ bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   operandDescriptorStr = "";
   resultDescriptorStr = "t";
   builtinName = "__tfop_Const,:t";
+  numInputs = 0;
   attributes.push_back({"value", AttributeModifier::Tensor });
   attributes.push_back({"value", AttributeModifier::Shape });
   return true;
@@ -608,8 +601,7 @@ bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
 /// it in favor of library code in the TensorFlow module.
 ///
 bool SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
-  assert(inst->getNumOperands() == 2 &&
-         isTensorHandle(inst->getType().getSwiftRValueType()) &&
+  assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_Scalars_1d");
 
   // If we can't analyze the operands as arrays of constants, give up.
@@ -621,6 +613,7 @@ bool SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   opName = "Const";
   operandDescriptorStr = "";
   resultDescriptorStr = "t";
+  numInputs = 0;
   builtinName = "__tfop_Const,:t";
   attributes.push_back({"value", AttributeModifier::Tensor });
   return true;
@@ -735,7 +728,7 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
 /// Replace any indirect memory operands with direct references to the
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
-// TODO(clattner): Remove this when deabstraction exists.
+// TODO(clattner): Move this into deabstraction when it exists.
 SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   SmallVector<SILValue, 8> operands;
 
@@ -753,18 +746,15 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     nextOperand = 1;  // Skip the callee argument.
   }
 
-  for (auto op: operandDescriptors) {
-    switch (op) {
-    case OpDescriptor::Tensor:
-      operands.push_back(inst->getOperand(nextOperand++));
-      break;
-    case OpDescriptor::Scalar:
-      auto operand = inst->getOperand(nextOperand++);
+  for (unsigned i = 0; i != numInputs; ++i) {
+    auto operand = inst->getOperand(nextOperand++);
+
+    if (!isTensorHandle(operand->getType())) {
       auto scalar = getScalarOperand(operand);
-      operands.push_back(scalar);
       changed |= operand != scalar;
-      break;
+      operand = scalar;
     }
+    operands.push_back(operand);
   }
 
   SILBuilder B(inst);
@@ -949,8 +939,7 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   // standard library like "+", and we want the source of the parameter.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto outerType = sei->getType().getSwiftRValueType();
-    if (outerType->is<BuiltinType>() ||
-        isTensorHandle(outerType)) {
+    if (outerType->is<BuiltinType>() || isTensorHandle(outerType)) {
       return getUserSourceLocation(sei->getOperand());
     }
   }

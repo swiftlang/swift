@@ -982,18 +982,9 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
-  unsigned nextOperand = 0;
-  for (auto operandInfo : tfopInfo.operandDescriptors) {
-    switch (operandInfo) {
-    case OpDescriptor::Tensor:
-      // Tensor operands are recursively marked.
-      markValue(inst.getOperand(nextOperand++), &inst);
-      break;
-    case OpDescriptor::Scalar:
-      // Scalar operands are recursively marked.
-      markValue(tfopInfo.getScalarOperand(nextOperand++), &inst);
-      break;
-    }
+  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
+    // Tensor and scalar input operands are recursively marked.
+    markValue(inst.getOperand(i), &inst);
   }
 }
 
@@ -1713,15 +1704,11 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   };
 
   unsigned nextOperand = isa<ApplyInst>(inst);  // Skip callee.
-  for (auto operandInfo : tfopInfo.operandDescriptors) {
-    switch (operandInfo) {
-    case OpDescriptor::Tensor:
-      // Tensor operands just become operands.
-      args.push_back(remapValue(inst->getOperand(nextOperand++)));
-      break;
-    case OpDescriptor::Scalar:
-      llvm_unreachable("scalar operands should always be handled specially");
-    }
+  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
+    auto opValue = inst->getOperand(nextOperand++);
+    assert(isTensorHandle(opValue->getType()) && "expected tensor input");
+    // Tensor operands just become operands.
+    args.push_back(remapValue(opValue));
   }
 
   for (auto attrInfo : tfopInfo.attributes) {

@@ -107,8 +107,8 @@ public struct ${Self}<Scalar : AccelerableByTensorFlow> {
   }
 
   @_inlineable @inline(__always)
-  public init(_ handle: TensorHandle<Scalar>) {
-    self.init(base: Tensor(handle))
+  public init(handle: TensorHandle<Scalar>) {
+    self.init(base: Tensor(handle: handle))
   }
 
   @_inlineable @inline(__always)
@@ -244,9 +244,9 @@ public extension ${Self} {
   @_inlineable @inline(__always)
   func transposed() -> ${Self} {
     let defaultPermutations = (rank - 1) - Tensor<Int>(
-      rangeFrom: Tensor<Int>(_TFMakeScalarTensor(0)),
-      to: Tensor<Int>(_TFMakeScalarTensor(rank)),
-      stride: Tensor<Int>(_TFMakeScalarTensor(1))
+    rangeFrom: Tensor<Int>(handle: _TFMakeScalarTensor(0)),
+      to: Tensor<Int>(handle: _TFMakeScalarTensor(rank)),
+      stride: Tensor<Int>(handle: _TFMakeScalarTensor(1))
     )
     return transposed(withPermutations: defaultPermutations)
   }

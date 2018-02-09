@@ -34,7 +34,7 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> {
   public let handle: TensorHandle<Scalar>
 
   @_inlineable
-  public init(_ handle: TensorHandle<Scalar>) {
+  public init(handle: TensorHandle<Scalar>) {
     self.handle = handle
   }
 }
@@ -120,12 +120,12 @@ func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar]) -> TensorHandle<Scalar>
 public extension Tensor {
   @_inlineable @inline(__always)
   func toDevice() -> Tensor {
-    return Tensor(_TFSend(handle))
+    return Tensor(handle: _TFSend(handle))
   }
 
   @_inlineable @inline(__always)
   func toHost() -> Tensor {
-    return Tensor(_TFReceive(handle))
+    return Tensor(handle: _TFReceive(handle))
   }
 }
 
@@ -137,7 +137,7 @@ extension Tensor where Scalar : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
   @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
-    self.init(#tfop("Cast", "t:t", other.handle, DstT: Scalar.self))
+    self.init(handle: #tfop("Cast", "t:t", other.handle, DstT: Scalar.self))
   }
 }
 
@@ -145,13 +145,13 @@ public extension Tensor {
   /// Initialize a tensor with a scalar representing a scalar value.
   @_inlineable @inline(__always)
   init(_ value: Scalar) {
-    self.init(_TFMakeScalarTensor(value))
+    self.init(handle: _TFMakeScalarTensor(value))
   }
 
   /// Initialize a tensor with an array representing a vector.
   @_inlineable @inline(__always)
   init(_ vector: [Scalar]) {
-    self.init(_TFTensorFromScalars1D(vector))
+    self.init(handle: _TFTensorFromScalars1D(vector))
   }
 
   /// Initialize a tensor with an array of arrays representing a matrix.
@@ -182,7 +182,7 @@ public extension Tensor {
         }
       }
     )
-    self.init(tensorHandle)
+    self.init(handle: tensorHandle)
   }
 
   /// Initialize a tensor with an array of arrays of arrays representing a
@@ -223,7 +223,7 @@ public extension Tensor {
         }
       }
     )
-    self.init(tensorHandle)
+    self.init(handle: tensorHandle)
   }
 
   /// Initialize a tensor with an array of array of arrays of arrays
@@ -272,7 +272,7 @@ public extension Tensor {
         }
       }
     )
-    self.init(tensorHandle)
+    self.init(handle: tensorHandle)
   }
 
   /// Initialize a tensor with arbitrary shape.
@@ -280,7 +280,7 @@ public extension Tensor {
   ///   product of all of shape's dimensions.
   @_inlineable @inline(__always)
   init(shape: TensorShape, scalars: [Scalar]) {
-    self.init(_TFTensorFromScalars(scalars, shape: shape.dimensions))
+    self.init(handle: _TFTensorFromScalars(scalars, shape: shape.dimensions))
   }
 
   /// Initialize a tensor of a specified shape, filled with a single value.
@@ -288,7 +288,7 @@ public extension Tensor {
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     let valueTensor = Tensor(repeatedValue).handle
     let shapeTensor = Tensor<Int32>(shape.dimensions).handle
-    self.init(#tfop("Fill", "tt:t", shapeTensor, valueTensor))
+    self.init(handle: #tfop("Fill", "tt:t", shapeTensor, valueTensor))
   }
 }
 
@@ -364,8 +364,9 @@ public extension Tensor where Scalar : Numeric {
   ///
   @_inlineable @inline(__always)
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
-    self.init(#tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
-                    Tidx: Scalar.self))
+    self.init(handle:
+      #tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
+            Tidx: Scalar.self))
   }
 
   /// Initialize a 1-D tensor representing a sequence from a starting value to,
@@ -424,8 +425,9 @@ public extension Tensor {
   /// index.
   @_inlineable @inline(__always)
   func shapePadded(atIndex index: Int) -> Tensor {
-    return Tensor(#tfop("ExpandDims", "tt:t", handle,
-                        Tensor<Int>(index).handle, Tdim: Int.self))
+    return Tensor(handle:
+      #tfop("ExpandDims", "tt:t",
+            handle, Tensor<Int>(index).handle, Tdim: Int.self))
   }
 
   /// Broadcast the specified Tensor to a rank greater than or equal to its
@@ -455,13 +457,13 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped(_ newShape: Tensor<Int>) -> Tensor {
-    return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
+    return Tensor(handle: #tfop("Reshape", "tt:t", handle, newShape.handle))
   }
 
   /// Remove dimensions of size 1 from the shape of a tensor.
   @_inlineable @inline(__always)
   func squeezed() -> Tensor {
-    return Tensor(#tfop("Squeeze", "t:t", handle))
+    return Tensor(handle: #tfop("Squeeze", "t:t", handle))
   }
 
   /// Concatenates tensors along a dimension.

@@ -45,5 +45,5 @@ public protocol TensorProtocol {
   var handle: TensorHandle<Scalar> { get }
 
   /// Initialize from a TensorHandle.
-  init(_ handle: TensorHandle<Scalar>)
+  init(handle: TensorHandle<Scalar>)
 }
