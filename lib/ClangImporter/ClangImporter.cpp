@@ -83,7 +83,8 @@ namespace {
     void handleImport(const clang::Module *imported) {
       if (!imported)
         return;
-      Impl.DeferredHeaderImports.push_back(imported);
+      Impl.ImportedHeaderExports.push_back(
+          const_cast<clang::Module *>(imported));
     }
 
     void InclusionDirective(clang::SourceLocation HashLoc,
@@ -1596,16 +1597,15 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 void ClangImporter::Implementation::handleDeferredImports()
 {
   clang::ASTReader &R = *Instance->getModuleManager();
+  llvm::SmallSet<clang::serialization::SubmoduleID, 32> seenSubmodules;
   for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
-    DeferredHeaderImports.push_back(R.getSubmodule(ID));
+    if (!seenSubmodules.insert(ID).second)
+      continue;
+    ImportedHeaderExports.push_back(R.getSubmodule(ID));
   }
   PCHImportedSubmodules.clear();
-  for (const clang::Module *M : DeferredHeaderImports) {
-    ModuleDecl *nativeImported =
-      finishLoadingClangModule(M, /*preferAdapter=*/true);
-    ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
-  }
-  DeferredHeaderImports.clear();
+  for (const clang::Module *M : ImportedHeaderExports)
+    (void)finishLoadingClangModule(M, /*preferAdapter=*/true);
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
@@ -3015,45 +3015,44 @@ void ClangModuleUnit::getImportedModules(
   if (filter != ModuleDecl::ImportFilter::Public)
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
 
+  SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
     if (filter != ModuleDecl::ImportFilter::Private) {
-      imports.append(owner.ImportedHeaderExports.begin(),
-                     owner.ImportedHeaderExports.end());
+      imported.append(owner.ImportedHeaderExports.begin(),
+                      owner.ImportedHeaderExports.end());
     }
-    return;
+
+  } else {
+    clangModule->getExportedModules(imported);
+    if (filter != ModuleDecl::ImportFilter::Public) {
+      if (filter == ModuleDecl::ImportFilter::All) {
+        llvm::SmallPtrSet<clang::Module *, 8> knownModules;
+        imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+        imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                      [&](clang::Module *mod) -> bool {
+                                        return !knownModules.insert(mod).second;
+                                      }),
+                       imported.end());
+      } else {
+        llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                           imported.end());
+        SmallVector<clang::Module *, 8> privateImports;
+        std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                     std::back_inserter(privateImports), [&](clang::Module *mod) {
+                       return knownModules.count(mod) == 0;
+        });
+        imported.swap(privateImports);
+      }
+
+      // FIXME: The parent module isn't exactly a private import, but it is
+      // needed for link dependencies.
+      if (clangModule->Parent)
+        imported.push_back(clangModule->Parent);
+    }
   }
 
   auto topLevelAdapter = getAdapterModule();
-
-  SmallVector<clang::Module *, 8> imported;
-  clangModule->getExportedModules(imported);
-  if (filter != ModuleDecl::ImportFilter::Public) {
-    if (filter == ModuleDecl::ImportFilter::All) {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                    [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod).second;
-                                    }),
-                     imported.end());
-    } else {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
-                                                         imported.end());
-      SmallVector<clang::Module *, 8> privateImports;
-      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(privateImports), [&](clang::Module *mod) {
-                     return knownModules.count(mod) == 0;
-      });
-      imported.swap(privateImports);
-    }
-
-    // FIXME: The parent module isn't exactly a private import, but it is
-    // needed for link dependencies.
-    if (clangModule->Parent)
-      imported.push_back(clangModule->Parent);
-  }
-
   for (auto importMod : imported) {
     auto wrapper = owner.getWrapperForModule(importMod);
 
@@ -3062,11 +3061,12 @@ void ClangModuleUnit::getImportedModules(
       // HACK: Deal with imports of submodules by importing the top-level module
       // as well.
       auto importTopLevel = importMod->getTopLevelModule();
-      if (importTopLevel != importMod &&
-          importTopLevel != clangModule->getTopLevelModule()) {
-        auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
-        imports.push_back({ ModuleDecl::AccessPathTy(),
-                            topLevelWrapper->getParentModule() });
+      if (importTopLevel != importMod) {
+        if (!clangModule || importTopLevel != clangModule->getTopLevelModule()){
+          auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
+          imports.push_back({ ModuleDecl::AccessPathTy(),
+                              topLevelWrapper->getParentModule() });
+        }
       }
       actualMod = wrapper->getParentModule();
     } else if (actualMod == topLevelAdapter) {
@@ -3081,13 +3081,6 @@ void ClangModuleUnit::getImportedModules(
 void ClangModuleUnit::getImportedModulesForLookup(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
 
-  if (!clangModule) {
-    // This is the special "imported headers" module.
-    imports.append(owner.ImportedHeaderExports.begin(),
-                   owner.ImportedHeaderExports.end());
-    return;
-  }
-
   // Reuse our cached list of imports if we have one.
   if (!importedModulesForLookup.empty()) {
     imports.append(importedModulesForLookup.begin(),
@@ -3096,11 +3089,20 @@ void ClangModuleUnit::getImportedModulesForLookup(
   }
 
   size_t firstImport = imports.size();
-  auto topLevel = clangModule->getTopLevelModule();
-  auto topLevelAdapter = getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
-  clangModule->getExportedModules(imported);
+  const clang::Module *topLevel;
+  ModuleDecl *topLevelAdapter = getAdapterModule();
+  if (!clangModule) {
+    // This is the special "imported headers" module.
+    imported.append(owner.ImportedHeaderExports.begin(),
+                    owner.ImportedHeaderExports.end());
+    topLevel = nullptr;
+  } else {
+    clangModule->getExportedModules(imported);
+    topLevel = clangModule->getTopLevelModule();
+  }
+
   if (imported.empty())
     return;
 
