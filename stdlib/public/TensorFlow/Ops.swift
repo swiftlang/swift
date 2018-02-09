@@ -767,7 +767,7 @@ public extension Tensor where Scalar : FloatingPoint {
   // )
   func convolved2D(
     withFilter filter: Tensor,
-    strides: [Int],
+    strides: [Int32],
     padding: Padding
   ) -> Tensor {
     return Tensor(handle:
@@ -782,8 +782,8 @@ public extension Tensor where Scalar : FloatingPoint {
   //     _adjointMaxPooled2D(input:kernelSize:strides:padding:primal:seed:)
   // )
   func maxPooled(
-    kernelSize: Tensor<Int>,
-    strides: Tensor<Int>,
+    kernelSize: Tensor<Int32>,
+    strides: Tensor<Int32>,
     padding: Padding
   ) -> Tensor {
     return Tensor(handle:
@@ -793,12 +793,12 @@ public extension Tensor where Scalar : FloatingPoint {
 
   @_inlineable @inline(__always)
   func maxPooled(
-    kernelSize: [Int],
-    strides: [Int],
+    kernelSize: [Int32],
+    strides: [Int32],
     padding: Padding
   ) -> Tensor {
-    return maxPooled(kernelSize: Tensor<Int>(kernelSize),
-                     strides: Tensor<Int>(strides),
+    return maxPooled(kernelSize: Tensor<Int32>(kernelSize),
+                     strides: Tensor<Int32>(strides),
                      padding: padding)
   }
 
@@ -809,8 +809,8 @@ public extension Tensor where Scalar : FloatingPoint {
   //     _adjointAveragePooled2D(input:kernelSize:strides:padding:primal:seed:)
   // )
   func averagePooled(
-    kernelSize: [Int],
-    strides: [Int],
+    kernelSize: [Int32],
+    strides: [Int32],
     padding: Padding
   ) -> Tensor {
     // FIXME: handle attributes (ksize, strides, padding)
