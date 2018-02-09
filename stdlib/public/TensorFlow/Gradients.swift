@@ -281,7 +281,7 @@ func _TFConv2DBackpropInput<T : FloatingPoint>(
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
   return Tensor(handle:
-    #tfop("Conv2DBackpropInput", "ttt:t",
+    #tfop("Conv2DBackpropInput",
           shape.handle, filter.handle, backpropOutput.handle))
 }
 
@@ -301,7 +301,7 @@ func _TFConv2DBackpropFilter<T : FloatingPoint>(
 ) -> Tensor<T> {
   // FIXME: handle attributes (strides and padding)
   return Tensor(handle:
-    #tfop("Conv2DBackpropFilter", "ttt:t",
+    #tfop("Conv2DBackpropFilter",
           input.handle, filterSizes.handle, backpropOutput.handle))
 }
 
@@ -354,12 +354,10 @@ func _adjointConvolved2D<T : FloatingPoint>(
   seed: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   return (
-    _TFConv2DBackpropInput(shape: input.shapeTensor,
-                           filter: filter,
+    _TFConv2DBackpropInput(shape: input.shapeTensor, filter: filter,
                            backpropOutput: seed, strides: strides,
                            padding: padding),
-    _TFConv2DBackpropFilter(input: input,
-                            filterSizes: filter.shapeTensor,
+    _TFConv2DBackpropFilter(input: input, filterSizes: filter.shapeTensor,
                             backpropOutput: seed, strides: strides,
                             padding: padding
     )
@@ -380,9 +378,8 @@ func _adjointMaxPooled<T>(
   // form.
   // FIXME: handle attributes (padding)
   return Tensor(handle:
-    #tfop("MaxPoolGradV2", "ttttt:t",
-          input.shapeTensor.handle, primal.handle, seed.handle,
-          kernelSize.handle, strides.handle))
+    #tfop("MaxPoolGradV2", input.shapeTensor.handle, primal.handle,
+          seed.handle, kernelSize.handle, strides.handle))
 }
 
 @_inlineable
@@ -399,5 +396,5 @@ func _adjointAveragePooled<T>(
   // form.
   // FIXME: handle attributes (ksize, strides, padding)
   return Tensor(handle:
-    #tfop("AvgPoolGrad", "tt:t", input.shapeTensor.handle, seed.handle))
+    #tfop("AvgPoolGrad", input.shapeTensor.handle, seed.handle))
 }
