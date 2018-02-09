@@ -120,6 +120,8 @@ internal func _defaultHashValue<T : Hashable>(for value: T) -> Int {
 }
 
 extension Hashable {
+  @_inlineable
+  @inline(__always)
   public func _hash(into hasher: _Hasher) -> _Hasher {
     return hasher.appending(self.hashValue)
   }
