@@ -99,25 +99,25 @@ struct ${Self} {
 
   @inline(never)
   public mutating func append(_ m: Int) {
-    append_alwaysInline(m)
+    _append_alwaysInline(m)
   }
 
   @inline(never)
   public mutating func append(_ m: UInt64) {
-    append_alwaysInline(m)
+    _append_alwaysInline(m)
   }
 
   @_inlineable
   @_versioned
   @inline(__always)
-  internal mutating func append_alwaysInline(_ m: Int) {
-    append_alwaysInline(UInt64(truncatingIfNeeded: UInt(bitPattern: m)))
+  internal mutating func _append_alwaysInline(_ m: Int) {
+    _append_alwaysInline(UInt64(truncatingIfNeeded: UInt(bitPattern: m)))
   }
 
   @_inlineable
   @_versioned
   @inline(__always)
-  internal mutating func append_alwaysInline(_ m: UInt64) {
+  internal mutating func _append_alwaysInline(_ m: UInt64) {
     v3 ^= m
     for _ in 0..<${c_rounds} {
       _SipHashDetail._sipRound(v0: &v0, v1: &v1, v2: &v2, v3: &v3)

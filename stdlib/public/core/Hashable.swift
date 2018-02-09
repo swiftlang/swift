@@ -238,4 +238,4 @@ public struct _QuickHasher {
   }
 }
 
-public typealias _Hasher = _QuickHasher
+public typealias _Hasher = _SipHash13
