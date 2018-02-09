@@ -20,6 +20,9 @@ StrideTestSuite.test("StrideToCollection/Int") {
   let odds = stride(from: 1, to: 10, by: 2)
   let expected = (1..<10).filter { $0 % 2 != 0 }
   checkRandomAccessCollection(expected, odds)
+
+  let reversedOdds = stride(from: 9, to: 0, by: -2)
+  checkRandomAccessCollection(Array(expected.reversed()), reversedOdds)
 }
 
 #if false
