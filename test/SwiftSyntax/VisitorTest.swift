@@ -6,7 +6,7 @@
 import StdlibUnittest
 import Foundation
 import SwiftSyntax
-import SwiftSourceKit
+import SwiftLang
 
 func getInput(_ file: String) -> URL {
   var result = URL(fileURLWithPath: #file)
@@ -28,7 +28,7 @@ VisitorTests.test("Basic") {
   }
   expectDoesNotThrow({
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SourceKitdService.encodeSourceFileSyntax(getInput("visitor.swift")))
+      SwiftLang.parse(getInput("visitor.swift")))
     let counter = FuncCounter()
     let hashBefore = parsed.hashValue
     counter.visit(parsed)
