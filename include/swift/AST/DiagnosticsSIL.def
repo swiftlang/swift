@@ -223,9 +223,8 @@ NOTE(designated_init_c_struct_fix,none,
 // TensorFlow Support Diagnostics.
 ERROR(tf_internal_error, none,
       "internal error: %0", (StringRef))
-ERROR(tfop_incorrect_operandinfo, none,
-      "tfop type descriptor %0: %1",
-      (StringRef, StringRef))
+ERROR(tfop_invalid_tfop, none,
+      "#tfop invalid: %0", (StringRef))
 ERROR(tfop_incorrect_definition, none,
       "tfop function doesn't align with TensorFlow op definition:\n%0",
       (StringRef))

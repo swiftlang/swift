@@ -26,9 +26,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
- CHECK-NEXT:  %3 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT:  %4 = builtin "__tfop_Select,ttt:t"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT: %5 = builtin "__tfop_Mul,tt:t"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT:  %3 = builtin "__tfop_Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT:  %4 = builtin "__tfop_Select"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT: %5 = builtin "__tfop_Mul"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
  CHECK-NEXT:  return %5 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
@@ -45,8 +45,8 @@ public func testEmptyScalarsArray() {
  CHECK: integer_literal $Builtin.Int32, 0
  CHECK: integer_literal $Builtin.Int32, 20
  CHECK: integer_literal $Builtin.Int32, 30
- CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
- CHECK:  builtin "__tfop_Add,tt:t"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
+ CHECK:  builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
+ CHECK:  builtin "__tfop_Add"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
  */
 
 
@@ -65,7 +65,7 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 3
 // CHECK-NEXT:  %6 = integer_literal $Builtin.Int64, 4
 // CHECK-NEXT:  %7 = string_literal utf8 "SAME"
-// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,tt:t,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int.Type, %3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int.Type, %3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
 // CHECK-NEXT:  return %8 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
@@ -85,7 +85,7 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %3 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
 // CHECK-NEXT:  %4 = metatype $@thin Int.Type
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
-// CHECK-NEXT:  %6 = builtin "__tfop_Const,:t,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
+// CHECK-NEXT:  %6 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
 // CHECK-NEXT:  return %6 : $TensorHandle<Float>
 
 

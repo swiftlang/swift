@@ -188,8 +188,6 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 
 
-  // Perform a final boolean validity check and add the "(t,t)->t" signature
-  // for a tensor op.
   auto binary = [&](const char *name)
        -> std::pair<const char*, PromotedScalarKind> {
     return { name, PromotedScalarKind::Binary };
@@ -1672,9 +1670,7 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 
   // Handle special case "ops".
   if (tfopInfo.opName == "tfc.scalarToTensor") {
-    assert(tfopInfo.operandDescriptorStr == "s" &&
-           tfopInfo.resultDescriptorStr == "t" &&
-           "invalid tfc.scalarToTensor!");
+    assert(tfopInfo.numInputs == 1 && "invalid tfc.scalarToTensor!");
     // We just lower the result as the input, since the scalar input will have
     // been promoted to a tensor already.  It is possible that the input will
     // have been lowered to something like TensorHandle<Int64> and we need a
@@ -1747,17 +1743,6 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   }
   
   std::string opName = "__tfop_" + std::string(opInfo.first);
-
-  switch (opKind) {
-  case PromotedScalarKind::Invalid:
-    llvm_unreachable("Invalid scalar operation to promote");
-  case PromotedScalarKind::TensorToScalar: assert(0 && "handled above");
-  case PromotedScalarKind::Literal:           opName += ",:t"; break;
-  case PromotedScalarKind::Conversion:        opName += ",t:t"; break;
-  case PromotedScalarKind::Binary:            opName += ",tt:t"; break;
-  case PromotedScalarKind::OverflowingBinary: opName += ",tt:t"; break;
-  }
-
 
   // Start remapping the operand list.
   auto operandRange = inst->getAllOperands();
@@ -2026,10 +2011,10 @@ void PartitionCloner::finalizeOriginal() {
     // TA. Recall the calling convention of TO is that TO consumes TA at +1.
     //
     // For example, before removing instruction
-    // %r1 = builtin "__tfop_Add,tt:t"(%arg1, %arg2),
+    // %r1 = builtin "__tfop_Add"(%arg1, %arg2),
     // we first emit strong_release'es on %arg1 and %arg2.
     // If there is a subsequent instruction
-    // %r2 = builtin "__tfop_Add,tt:t"(%r1, %arg3),
+    // %r2 = builtin "__tfop_Add"(%r1, %arg3),
     // we only emit strong_release on %arg3, and not on %r1, since the
     // strong_retain on %r1 will be removed when all references of the first Add
     // instruction are dropped along with that instruction itself.

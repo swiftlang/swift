@@ -23,8 +23,6 @@
 
 namespace swift {
 namespace tf {
-  struct SILTensorOpInfo;
-
   /// This returns true if we should dump out intermediate results to standard
   /// out.  This is used for integration unit tests.
   bool shouldDumpIntermediates();
@@ -40,7 +38,7 @@ namespace tf {
 
   /// Represent information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
-  struct SILTensorOpInfo : public TensorOpInfo {
+  struct SILTensorOpInfo {
     /// The instruction being analyzed.
     SILInstruction *inst;
 
