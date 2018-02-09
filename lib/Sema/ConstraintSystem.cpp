@@ -1394,6 +1394,29 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     return;
   }
 
+  // Performance hack: if there are two generic overloads, and one is
+  // more specialized than the other, prefer the more-specialized one.
+  if (!favoredChoice && choices.size() == 2 &&
+      choices[0].isDecl() && choices[1].isDecl() &&
+      isa<AbstractFunctionDecl>(choices[0].getDecl()) &&
+      cast<AbstractFunctionDecl>(choices[0].getDecl())->isGeneric() &&
+      isa<AbstractFunctionDecl>(choices[1].getDecl()) &&
+      cast<AbstractFunctionDecl>(choices[1].getDecl())->isGeneric()) {
+    switch (TC.compareDeclarations(DC, choices[0].getDecl(),
+                                   choices[1].getDecl())) {
+    case Comparison::Better:
+      favoredChoice = const_cast<OverloadChoice *>(&choices[0]);
+      break;
+
+    case Comparison::Worse:
+      favoredChoice = const_cast<OverloadChoice *>(&choices[1]);
+      break;
+
+    case Comparison::Unordered:
+      break;
+    }
+  }
+
   SmallVector<Constraint *, 4> overloads;
   
   // As we do for other favored constraints, if a favored overload has been
