@@ -9,10 +9,10 @@ add_swift_library(swiftSwiftLang SHARED
   SourceKitdResponse.swift
   SourceKitdUID.swift
 
-  DEPENDS SourceKitService sourcekitd
+  FRAMEWORK_DEPENDS sourcekitd
   SWIFT_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS}
   LINK_FLAGS ${EXTRA_LINKER_FLAGS}
   SWIFT_MODULE_DEPENDS Foundation
-  INSTALL_IN_COMPONENT swift-syntax
+  INSTALL_IN_COMPONENT sourcekit-xpc-service
   TARGET_SDKS OSX
   IS_STDLIB)
