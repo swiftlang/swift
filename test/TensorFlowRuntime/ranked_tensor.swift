@@ -8,11 +8,14 @@ import StdlibUnittest
 
 extension TestSuite {
   func testCPUAndGPU(_ name: String, _ body: @escaping () -> Void) {
+    testCPU(name, body)
+    testGPU(name, body)
+  }
+  func testCPU(_ name: String, _ body: @escaping () -> Void) {
     test(name + "_CPU") {
       _RuntimeConfig.runsOnGPU = false
       body()
     }
-    testGPU(name, body)
   }
   func testGPU(_ name: String, _ body: @escaping () -> Void) {
 #if CUDA
@@ -144,6 +147,8 @@ RankedTensorTests.testCPUAndGPU("Transpose") {
   expectEqual([1, 3, 5, 2, 4, 6], xT.scalars)
 }
 
+// FIXME: Partitioner bug (b/72997202)
+#if false // Remove #if when fixed.
 // FIXME: The While op doesn't work on the CPU.
 RankedTensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
@@ -159,6 +164,7 @@ RankedTensorTests.testGPU("simpleCounterLoop") {
   a -= b
   expectEqual([8], a.scalars)
 }
+#endif
 
 @inline(never)
 func testXORInference() {
