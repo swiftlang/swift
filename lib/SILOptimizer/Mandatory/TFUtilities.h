@@ -32,6 +32,7 @@ namespace tf {
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
   Type isTensorHandle(Type ty);
+  bool isTensorHandle(SILType ty);
 
   /// This function maps a Swift type (either a language type like Float or an
   /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
@@ -48,6 +49,9 @@ namespace tf {
 
     /// This is the TensorFlow name for the op.
     StringRef opName;
+
+    /// This is the number of input operands that exist before any attributes.
+    unsigned numInputs = ~0U;
 
     enum class AttributeModifier {
       Normal,       // No modifier.
