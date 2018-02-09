@@ -26,7 +26,7 @@ class LogicalPathComponent;
 
 class FormalAccess {
 public:
-  enum Kind { Shared, Exclusive, Owned };
+  enum Kind { Shared, Exclusive, Owned, Unenforced };
 
 private:
   unsigned allocatedSize;
@@ -71,6 +71,10 @@ protected:
   virtual void finishImpl(SILGenFunction &SGF) = 0;
 };
 
+// FIXME: Misnomer. This is not used for borrowing a formal memory location
+// (ExclusiveBorrowFormalAccess is always used for that). This is only used for
+// formal access from a +0 value, which requires producing a "borrowed"
+// SILValue.
 class SharedBorrowFormalAccess : public FormalAccess {
   SILValue originalValue;
   SILValue borrowedValue;
