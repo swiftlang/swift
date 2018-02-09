@@ -959,14 +959,14 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 
   // Now we can create the actual operation itself.  This is the Tensorflow
   // op description that we are generating:
-  // REGISTER_OP("While")
+  // REGISTER_OP("_While")
   //   .Input("input: T")
   //   .Output("output: T")
   //   .Attr("T: list(type) >= 0")
   //   .Attr("cond: func")
   //   .Attr("body: func")
   auto opLocString = getUniqueName(loc, "op");
-  auto *op = TF_NewOperation(graphFn.getGraph(), "While", opLocString.c_str());
+  auto *op = TF_NewOperation(graphFn.getGraph(), "_While", opLocString.c_str());
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "T", inputTypes.data(), inputTypes.size());
   TF_SetAttrFuncName(op, "cond", condFnName.c_str(), condFnName.size());
@@ -1027,7 +1027,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   });
   if (errorOccurred) return;
 
-  // We are generating the "If" TensorFlow node, which takes an input
+  // We are generating the "_If" TensorFlow node, which takes an input
   // condition as a bool, and functions to run for the true/false branch that
   // are controlled by the condition.  The operation takes a type list for the
   // inputs that are fed into both the true/false functions - this is the union
@@ -1141,7 +1141,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
   // Finally, we can create the actual operation itself.  This is the Tensorflow
   // op description that we are generating:
-  // REGISTER_OP("If")
+  // REGISTER_OP("_If")
   //   .Input("cond: Tcond")
   //   .Input("inputs: Tin")
   //   .Output("output: Tout")
@@ -1151,7 +1151,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   //   .Attr("Tin: list(type) >= 0")
   //   .Attr("Tout: list(type) >= 0")
   auto opLocString = getUniqueName(loc, "op");
-  auto *op = TF_NewOperation(graphFn.getGraph(), "If", opLocString.c_str());
+  auto *op = TF_NewOperation(graphFn.getGraph(), "_If", opLocString.c_str());
   TF_AddInput(op, condValue);
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "Tin", inputTypes.data(), inputTypes.size());
