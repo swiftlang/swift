@@ -2,8 +2,7 @@ set(EXTRA_COMPILE_FLAGS "-F" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
 set(EXTRA_LINKER_FLAGS "-Xlinker" "-rpath" "-Xlinker" "${SWIFT_LIBRARY_OUTPUT_INTDIR}"
     "-Xlinker" "-F" "-Xlinker" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
 
-add_swift_library(swiftSwiftLang SHARED
-  SwiftLang.swift
+add_swift_library(swiftSwiftSourceKit SHARED
   SourceKitdClient.swift
   SourceKitdRequest.swift
   SourceKitdResponse.swift

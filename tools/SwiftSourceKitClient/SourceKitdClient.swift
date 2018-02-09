@@ -27,3 +27,22 @@ public class SourceKitdService {
     return SourceKitdResponse(resp: sourcekitd_send_request_sync(request.rawRequest))
   }
 }
+
+extension SourceKitdService {
+  /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
+  /// serialization format by querying SourceKitd service.
+  /// - Parameter url: The URL you wish to parse.
+  /// - Returns: The syntax tree in Json format string.
+  public static func encodeSourceFileSyntax(_ url: URL) throws -> String {
+    let Service = SourceKitdService()
+    let Request = SourceKitdRequest(uid: .source_request_editor_open)
+    let Path = url.path
+    Request.addParameter(.key_sourcefile, value: Path)
+    Request.addParameter(.key_name, value: Path)
+    Request.addParameter(.key_enable_syntax_tree, value: 1)
+
+    // FIXME: SourceKitd error handling.
+    let Resp = Service.sendSyn(request: Request)
+    return Resp.value.getString(.key_serialized_syntax_tree)
+  }
+}

@@ -6,7 +6,7 @@
 import Foundation
 import StdlibUnittest
 import SwiftSyntax
-import SwiftLang
+import SwiftSourceKit
 
 var ParseFile = TestSuite("ParseFile")
 
@@ -32,7 +32,7 @@ ParseFile.test("ParseSingleFile") {
   expectDoesNotThrow({
     let currentFileContents = try String(contentsOf: currentFile)
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(currentFile))
+      SourceKitdService.encodeSourceFileSyntax(currentFile))
     expectEqual("\(parsed)", currentFileContents)
   })
 }
