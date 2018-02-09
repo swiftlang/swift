@@ -73,7 +73,7 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", ":t", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
+  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray

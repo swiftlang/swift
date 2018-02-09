@@ -9,9 +9,9 @@ import TensorFlow
 @_transparent
 func testInferredElementResult() -> TensorHandle<Int> {
   // expected-warning @+1 {{immutable value 'x' was never used}}
-  let x : TensorHandle<Int> = #tfop("foo", ":t")
+  let x : TensorHandle<Int> = #tfop("foo")
 
-  _ = #tfop("bar", ":t") as TensorHandle<Int>
+  _ = #tfop("bar") as TensorHandle<Int>
 }
 
 // This shows passing a non-constant value into an attribute.

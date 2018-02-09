@@ -108,7 +108,8 @@ func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
 
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
-func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar]) -> TensorHandle<Scalar> {
+func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
+  -> TensorHandle<Scalar> {
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
 
@@ -137,7 +138,7 @@ extension Tensor where Scalar : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
   @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
-    self.init(handle: #tfop("Cast", "t:t", other.handle, DstT: Scalar.self))
+    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
   }
 }
 
@@ -288,7 +289,7 @@ public extension Tensor {
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     let valueTensor = Tensor(repeatedValue).handle
     let shapeTensor = Tensor<Int32>(shape.dimensions).handle
-    self.init(handle: #tfop("Fill", "tt:t", shapeTensor, valueTensor))
+    self.init(handle: #tfop("Fill", shapeTensor, valueTensor))
   }
 }
 
@@ -365,7 +366,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
     self.init(handle:
-      #tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
+      #tfop("Range", start.handle, end.handle, stride.handle,
             Tidx: Scalar.self))
   }
 
@@ -426,8 +427,7 @@ public extension Tensor {
   @_inlineable @inline(__always)
   func shapePadded(atIndex index: Int) -> Tensor {
     return Tensor(handle:
-      #tfop("ExpandDims", "tt:t",
-            handle, Tensor<Int>(index).handle, Tdim: Int.self))
+      #tfop("ExpandDims", handle, Tensor<Int>(index).handle, Tdim: Int.self))
   }
 
   /// Broadcast the specified Tensor to a rank greater than or equal to its
@@ -457,13 +457,13 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped(_ newShape: Tensor<Int>) -> Tensor {
-    return Tensor(handle: #tfop("Reshape", "tt:t", handle, newShape.handle))
+    return Tensor(handle: #tfop("Reshape", handle, newShape.handle))
   }
 
   /// Remove dimensions of size 1 from the shape of a tensor.
   @_inlineable @inline(__always)
   func squeezed() -> Tensor {
-    return Tensor(handle: #tfop("Squeeze", "t:t", handle))
+    return Tensor(handle: #tfop("Squeeze", handle))
   }
 
   /// Concatenates tensors along a dimension.
