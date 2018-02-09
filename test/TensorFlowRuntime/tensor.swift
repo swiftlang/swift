@@ -90,8 +90,8 @@ TensorTests.testCPUAndGPU("Convolution") {
                         strides: [1, 1, 1, 1], padding: .same)
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
-                                  0.5, 1.5, 0.5,
-                                  0.5, 1.5, 0.5]),
+                                    0.5, 1.5, 0.5,
+                                    0.5, 1.5, 0.5]),
               y.array)
 }
 
