@@ -1215,6 +1215,10 @@ public:
 
 private:
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     SILFunction *Fn = getFunction();
     // This is a staging flag. Eventually the ability to turn off static
     // enforcement will be removed.
