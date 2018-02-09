@@ -137,7 +137,6 @@ typedef std::pair<StringRef, SILTensorOpInfo::AttributeModifier> AttributeEntry;
 /// returns the op name and operand description and returns true.  If the
 /// function name doesn't correspond to an op, this returns false.
 static bool decodeTensorOpName(StringRef name, StringRef &opName,
-                               StringRef &typeDescriptorStr,
                                SmallVectorImpl<AttributeEntry> &attributes) {
   // Op functions are expected to be of the form:
   //  __tfop_<OPNAME>,<OPERANDDESC>,<ATTRIBUTES>
@@ -145,14 +144,8 @@ static bool decodeTensorOpName(StringRef name, StringRef &opName,
   name = name.substr(strlen("__tfop_"));
 
   auto pos = name.find(",");
-  if (pos == StringRef::npos) return false;
   opName = name.substr(0, pos);
-  name = name.substr(pos+strlen(","));
-
-  pos = name.find(",");
-  typeDescriptorStr = name.substr(0, pos);
-  if (pos == StringRef::npos)
-    return true;
+  if (pos == StringRef::npos) return true;
   name = name.substr(pos);
 
   // Parse out any attribute names.
@@ -462,9 +455,7 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   builtinName = inst->getName().str();
 
   // If the name is valid, it isn't an op.
-  StringRef typeDescriptorStr;
-  if (!decodeTensorOpName(builtinName, opName, typeDescriptorStr,
-                          attributes))
+  if (!decodeTensorOpName(builtinName, opName, attributes))
     return false;
 
   // This helper emits a diagnostic if the #tfop descriptor is malformed in a
@@ -473,22 +464,8 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   // the location information is far more important to get right there.
   auto diagInvalid = [&](std::string problem) {
     diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
-             diag::tfop_incorrect_operandinfo,
-             operandDescriptorStr, problem);
+             diag::tfop_invalid_tfop, problem);
   };
-
-  // The type descriptor has operand and result info separated by a colon.
-  auto colonLoc = typeDescriptorStr.find(':');
-  if (colonLoc == StringRef::npos) {
-    diagInvalid("no colon in type descriptor");
-    return false;
-  }
-
-  auto errInfo = decodeDescriptorString(typeDescriptorStr);
-  if (errInfo.isError()) {
-    diagInvalid(errInfo.message);
-    return false;
-  }
 
   // Validate that this instruction is ok.
   unsigned nextOperand = 0;
@@ -583,9 +560,7 @@ bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   // operand is the $tensor value, the second is the $shape for it, and the
   // third is the dtype for the result (which gets added later).
   opName = "Const";
-  operandDescriptorStr = "";
-  resultDescriptorStr = "t";
-  builtinName = "__tfop_Const,:t";
+  builtinName = "__tfop_Const";
   numInputs = 0;
   attributes.push_back({"value", AttributeModifier::Tensor });
   attributes.push_back({"value", AttributeModifier::Shape });
@@ -611,10 +586,8 @@ bool SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
 
   // Otherwise, good news everyone!  We can treat this as a Const op.
   opName = "Const";
-  operandDescriptorStr = "";
-  resultDescriptorStr = "t";
   numInputs = 0;
-  builtinName = "__tfop_Const,:t";
+  builtinName = "__tfop_Const";
   attributes.push_back({"value", AttributeModifier::Tensor });
   return true;
 }
@@ -732,8 +705,7 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
 SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   SmallVector<SILValue, 8> operands;
 
-  std::string name = "__tfop_" + opName.str() + "," +
-    operandDescriptorStr.str()+":"+resultDescriptorStr.str();
+  std::string name = "__tfop_" + opName.str();
 
   // Handle normal operands.
   bool changed = false;
