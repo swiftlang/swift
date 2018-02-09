@@ -81,14 +81,22 @@ func test8(_ x : AnyObject?) {
 
 
 // Partial ordering with optionals
-func test9_helper<T>(_ x: T) -> Int { }
-func test9_helper<T>(_ x: T?) -> Double { }
+func test9_helper<T: P>(_ x: T) -> Int { }
+func test9_helper<T: P>(_ x: T?) -> Double { }
+
+func test9_helper2<T>(_ x: T) -> Int { }
+func test9_helper2<T>(_ x: T?) -> Double { }
 
 func test9(_ i: Int, io: Int?) {
   let result = test9_helper(i)
   var _: Int = result
   let result2 = test9_helper(io)
   let _: Double = result2
+
+  let result3 = test9_helper2(i)
+  var _: Double = result3
+  let result4 = test9_helper2(io)
+  let _: Double = result4
 }
 
 protocol P { }
