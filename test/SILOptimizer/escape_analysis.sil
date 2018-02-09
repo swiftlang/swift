@@ -1477,3 +1477,25 @@ sil_vtable X {
 sil_vtable Z {
   #Z.deinit!deallocator: @$S4main1ZCfD
 }
+
+
+sil public_external @public_external_func : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  strong_release %0 : $X
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: CG of call_public_external_func
+// CHECK:        Val %0 Esc: G, Succ: (%0.1)
+// CHECK:        Con %0.1 Esc: G, Succ: 
+// CHECKL:      End
+sil @call_public_external_func : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = function_ref @public_external_func : $@convention(thin) (@owned X) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@owned X) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
