@@ -1291,53 +1291,60 @@ namespace {
     Type visitTFOpExpr(ObjectLiteralExpr *expr) {
       assert(expr->isTFOp() && "Unexpected expression");
       auto &tc = CS.getTypeChecker();
-      auto *tt = dyn_cast<TupleExpr>(expr->getArg());
-      if (!tt || tt->getNumElements() < 2) {
-        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes two string literals and a list of operands");
-        return nullptr;
-      }
-
-      // Check that we have two string literals.
-      auto opname = dyn_cast<StringLiteralExpr>(tt->getElement(0));
-      auto constraints = dyn_cast<StringLiteralExpr>(tt->getElement(1));
-      if (!opname || !constraints) {
-        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes two string literals and a list of operands");
-        return nullptr;
-      }
+      auto locator = CS.getConstraintLocator(expr);
 
       // The TensorFlow module defines the "TensorHandle" type, which is the
       // representation of a tensor value.  If we can't find it, then we reject
       // uses of #tfop.
-      auto tensorHandle = tc.Context.getTensorHandleDecl();
-      if (!tensorHandle) {
+      if (!tc.Context.getTensorHandleDecl()) {
         tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                "#tfop() may only be used in a module that imports TensorFlow");
+                    "#tfop() may only be used in a module that imports TensorFlow");
         return nullptr;
       }
 
-      auto constraintStr = constraints->getValue();
+      auto *tt = dyn_cast<TupleExpr>(expr->getArg());
+      if (!tt) {
+        // A one-element #tfop just takes an op name.
+        auto arg = expr->getArg()->getSemanticsProvidingExpr();
+        auto opname = dyn_cast<StringLiteralExpr>(arg);
+        if (!opname) {
+          tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                      "#tfop() takes a string literal and a list of inputs "
+                      "and attributes");
+          return nullptr;
+        }
+        return CS.createTypeVariable(locator, 0);
+      }
 
-      // FIXME: Remove constraint string from concrete syntax.
-      (void)constraintStr;
+      if (tt->getNumElements() == 0) {
+        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                    "#tfop() takes a string literal and a list of inputs and"
+                    " attributes");
+        return nullptr;
+      }
+
+      // Check that we have a string literal.
+      auto opname = dyn_cast<StringLiteralExpr>(tt->getElement(0));
+      if (!opname) {
+        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                    "#tfop() takes a string literal and a list of inputs "
+                    "and attributes");
+        return nullptr;
+      }
 
       // Infer the argument types based on the constraint characters.
       SmallVector<TupleTypeElt, 4> argTypes;
 
-      // The first two operands should type check as strings.
+      // The first operand should type check as strings.
       auto stringType = tc.Context.getStringDecl()->getDeclaredType();
       argTypes.push_back(TupleTypeElt(stringType));
-      argTypes.push_back(TupleTypeElt(stringType));
-
-      auto locator = CS.getConstraintLocator(expr);
 
       // The #tfop list is a list of inputs (with no keyword arguments) followed
       // by a list of attributes (with keyword arguments).  Add type constraints
       // for each of them, and make sure there is no intermixing between the
       // two lists.
       bool sawAttribute = false;
-      for (unsigned i = 2, e = tt->getNumElements(); i != e; ++i) {
+      for (unsigned i = 1, e = tt->getNumElements(); i != e; ++i) {
         if (!tt->getElementName(i).empty()) {
           sawAttribute = true;
         } else if (sawAttribute) {

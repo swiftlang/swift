@@ -2953,26 +2953,29 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
     return visit(E->getSemanticExpr(), C);
 
   // If this is a tensorflow operation, we have a bit more work to do: we emit
-  // a builtin instruction with the operation name and the constraint characters
-  // name mangled into the basename.
-  auto tuple = cast<TupleExpr>(E->getArg());
-  auto opName = cast<StringLiteralExpr>(tuple->getElement(0))->getValue();
-  auto constraints = cast<StringLiteralExpr>(tuple->getElement(1))->getValue();
-  (void)constraints; // FIXME: remove syntax.
+  // a builtin instruction with the operation name and the attribute names
+  // name mangled together.
+  auto tuple = dyn_cast<TupleExpr>(E->getArg());
+
+  auto opNameArg = tuple ? tuple->getElement(0) : E->getArg();
+  opNameArg = opNameArg->getSemanticsProvidingExpr();
+  auto opName = cast<StringLiteralExpr>(opNameArg)->getValue();
 
   std::string name = "__tfop_" + opName.str();
+  SmallVector<SILValue, 4> args;
 
   // Attribute names are specified with keyword arguments.  Add these attribute
   // names to the end of our builtin name, separated by commas.
-  for (unsigned i = 2, e = tuple->getNumElements(); i != e; ++i) {
-    if (!tuple->getElementName(i).empty())
-      name += "," + tuple->getElementName(i).str().str();
-  }
+  if (tuple) {
+    for (unsigned i = 1, e = tuple->getNumElements(); i != e; ++i) {
+      if (!tuple->getElementName(i).empty())
+        name += "," + tuple->getElementName(i).str().str();
+    }
 
-  // Emit the tensor arguments as well as the attribute values.
-  SmallVector<SILValue, 4> args;
-  for (auto &elt : tuple->getElements().drop_front(2)) {
-    args.push_back(visit(elt).getScalarValue().forward(SGF));
+    // Emit the tensor arguments as well as the attribute values.
+    for (auto &elt : tuple->getElements().drop_front()) {
+      args.push_back(visit(elt).getScalarValue().forward(SGF));
+    }
   }
   auto &resultTL = SGF.getTypeLowering(E->getType());
   auto resultTy = resultTL.getLoweredType();
