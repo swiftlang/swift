@@ -906,8 +906,8 @@ extension ${Self}: Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: (Int) -> Void) {
-    hasher(Int(bitPattern: self))
+  public func _hash(into hasher: _Hasher) -> _Hasher {
+    return hasher.appending(Int(bitPattern: self))
   }
 }
 

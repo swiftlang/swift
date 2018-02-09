@@ -53,18 +53,20 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: (Int) -> Void) {
-    withBuffer {
+  public func _hash(into hasher: _Hasher) -> _Hasher {
+    return withBuffer {
+      var hasher = hasher
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        component.value._hash(into: hasher)
+        hasher = hasher.appending(component.value)
         if let type = type {
-          hasher(unsafeBitCast(type, to: Int.self))
+          hasher = hasher.appending(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
       }
+      return hasher
     }
   }
   
@@ -460,10 +462,11 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: (Int) -> Void) {
-    hasher(value)
-    isStoredProperty._hash(into: hasher)
-    isTableOffset._hash(into: hasher)
+  public func _hash(into hasher: _Hasher) -> _Hasher {
+    return hasher
+      .appending(value)
+      .appending(isStoredProperty)
+      .appending(isTableOffset)
   }
 
 }

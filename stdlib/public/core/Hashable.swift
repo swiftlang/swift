@@ -109,21 +109,19 @@ public protocol Hashable : Equatable {
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
 
-  func _hash(into hasher: (Int) -> Void)
+  func _hash(into hasher: _Hasher) -> _Hasher
 }
 
 @_versioned
 @_inlineable
 @inline(__always)
 internal func _defaultHashValue<T : Hashable>(for value: T) -> Int {
-  var hasher = _DefaultHasher(_inlineable: ())
-  value._hash(into: { hasher.append($0) })
-  return hasher._finalize_alwaysInline()
+  return _Hasher(_inlineable: ()).appending(value).finalized()
 }
 
 extension Hashable {
-  public func _hash(into hasher: (Int) -> Void) {
-    hasher(self.hashValue)
+  public func _hash(into hasher: _Hasher) -> _Hasher {
+    return hasher.appending(self.hashValue)
   }
 }
 
@@ -162,6 +160,21 @@ public struct _QuickHasher {
   }
 
   @inline(never)
+  @effects(readonly)
+  public func appending(_ value: Int) -> _QuickHasher {
+    var hasher = self
+    hasher._append_alwaysInline(value)
+    return hasher
+  }
+
+  //@inline(__always)
+  @_inlineable
+  @_transparent
+  public func appending<H: Hashable>(_ value: H) -> _QuickHasher {
+    return value._hash(into: self)
+  }
+
+  @inline(never)
   public mutating func append(_ value: Int) {
     _append_alwaysInline(value)
   }
@@ -177,6 +190,12 @@ public struct _QuickHasher {
     _hash = _combineHashValues(_hash, value)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public func finalized() -> Int {
+    var hasher = self
+    return hasher._finalize_alwaysInline()
+  }
+
   @inline(never)
   public mutating func finalize() -> Int {
     return _finalize_alwaysInline()
@@ -190,4 +209,4 @@ public struct _QuickHasher {
   }
 }
 
-public typealias _DefaultHasher = _QuickHasher
+public typealias _Hasher = _QuickHasher

@@ -40,7 +40,7 @@ extension Unicode {
     _ string: UnsafeBufferPointer<UInt8>
   ) -> Int {
     let collationTable = _swift_stdlib_unicode_getASCIICollationTable()
-    var hasher = _DefaultHasher()
+    var hasher = _Hasher()
     for c in string {
       _precondition(c <= 127)
       let element = collationTable[Int(c)]
@@ -64,7 +64,7 @@ extension Unicode {
       UInt32(string.count))
     defer { _swift_stdlib_unicodeCollationIterator_delete(collationIterator) }
 
-    var hasher = _DefaultHasher()
+    var hasher = _Hasher()
     while true {
       var hitEnd = false
       let element =

@@ -1444,7 +1444,7 @@ extension ${Self} : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: (Int) -> Void) {
+  public func _hash(into hasher: _Hasher) -> _Hasher {
     var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to
@@ -1452,10 +1452,11 @@ extension ${Self} : Hashable {
       v = 0
     }
   %if bits == 80:
-    v._representation.signAndExponent._hash(into: hasher)
-    v.significandBitPattern._hash(into: hasher)
+    return hasher
+      .appending(v._representation.signAndExponent)
+      .appending(v.significandBitPattern)
   %else:
-    v.bitPattern._hash(into: hasher)
+    return hasher.appending(v.bitPattern)
   %end
   }
 

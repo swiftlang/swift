@@ -3608,11 +3608,13 @@ extension ${Self} : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: (Int) -> Void) {
+  public func _hash(into hasher: _Hasher) -> _Hasher {
     % if bits <= word_bits:
-    hasher(Int(bitPattern: _lowWord))
+    return hasher.appending(Int(bitPattern: _lowWord))
     % else:
-    words.forEach { hasher(Int(bitPattern: $0)) }
+    var hasher = hasher
+    words.forEach { hasher = hasher.appending(Int(bitPattern: $0)) }
+    return hasher
     % end
   }
 }
