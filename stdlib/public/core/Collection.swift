@@ -1034,18 +1034,43 @@ extension Collection {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20", perhaps
-  @_inlineable
-  public func random(
-    using generator: RandomNumberGenerator = Random.default
+  @inlinable
+  public func random<T: RandomNumberGenerator>(
+    using generator: T
   ) -> Element? {
     guard !isEmpty else { return nil }
-    let random = generator.next(upperBound: UInt(self.count))
+    let random = generator.next(upperBound: UInt(count))
     let index = self.index(
       self.startIndex,
       offsetBy: IndexDistance(random),
       limitedBy: self.endIndex
     )
     return self[index]
+  }
+
+  /// Returns a random element from this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element from this collection.
+  ///
+  /// A good example of this is getting a random greeting from an array:
+  ///
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random()
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random() {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20", perhaps
+  ///
+  /// This uses the standard library's default random number generator.
+  @inlinable
+  public func random() -> Element? {
+    return random(using: Random.default)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.
