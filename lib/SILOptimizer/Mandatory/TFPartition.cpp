@@ -1307,6 +1307,11 @@ bool TFFunctionPartition::markFunction() {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
       auto *inst = &*I++;
 
+      // If this is a well known function that can be decoded into an op, so do.
+      if (auto apply = dyn_cast<ApplyInst>(inst))
+        if (auto fn = apply->getCalleeFunction())
+          inst = SILTensorOpInfo::decodeApply(apply, fn->getName());
+
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
