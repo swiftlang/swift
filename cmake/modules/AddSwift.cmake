@@ -1656,13 +1656,8 @@ function(add_swift_library name)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
             if (NOT "${DEP}" STREQUAL "icucore")
-              # Avoid appending SDK kinds after sourcekit
-              if ("${DEP}" MATCHES "^sourcekitd")
-                add_dependencies(${VARIANT_NAME} "sourcekitd")
-              else()
               add_dependencies(${VARIANT_NAME}
                 "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-            endif()
             endif()
           endforeach()
 

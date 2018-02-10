@@ -9,7 +9,7 @@ add_swift_library(swiftSwiftLang SHARED
   SourceKitdResponse.swift
   SourceKitdUID.swift
 
-  LINK_LIBRARIES sourcekitd
+  PRIVATE_LINK_LIBRARIES sourcekitd
   SWIFT_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS}
   LINK_FLAGS ${EXTRA_LINKER_FLAGS}
   SWIFT_MODULE_DEPENDS Foundation
