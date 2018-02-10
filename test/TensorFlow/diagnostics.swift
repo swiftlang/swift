@@ -7,11 +7,11 @@ import TensorFlow
 // exposed a SILGen bug handling cleanup generation when emitting into let
 // declarations.
 @_transparent
-func testInferredElementResult() -> TensorHandle<Int> {
+func testInferredElementResult() -> TensorHandle<Int32> {
   // expected-warning @+1 {{immutable value 'x' was never used}}
-  let x : TensorHandle<Int> = #tfop("foo")
+  let x : TensorHandle<Int32> = #tfop("foo")
 
-  _ = #tfop("bar") as TensorHandle<Int>
+  _ = #tfop("bar") as TensorHandle<Int32>
 }
 
 // This shows passing a non-constant value into an attribute.

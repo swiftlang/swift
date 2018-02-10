@@ -241,42 +241,6 @@ extension UInt64 : AccelerableByTensorFlow {
   }
 }
 
-extension Int : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_INT64)
-  }
-  @_silgen_name("__tf_get_scalar_or_die_Int") @inline(never)
-  public static func _getScalarOrDie(_ handle: TensorHandle<Int>) -> Int {
-    return _TFGetScalarOrDieImpl(handle)
-  }
-  @_silgen_name("__tf_get_scalar_Int") @inline(never)
-  public static func _getScalar(_ handle: TensorHandle<Int>) -> Int? {
-    return _TFGetScalarImpl(handle)
-  }
-  @_inlineable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Int) -> TensorHandle<Int> {
-    return #tfop("tfc.scalarToTensor", scalar)
-  }
-}
-
-extension UInt : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_UINT64)
-  }
-  @_silgen_name("__tf_get_scalar_or_die_UInt") @inline(never)
-  public static func _getScalarOrDie(_ handle: TensorHandle<UInt>) -> UInt {
-    return _TFGetScalarOrDieImpl(handle)
-  }
-  @_silgen_name("__tf_get_scalar_UInt") @inline(never)
-  public static func _getScalar(_ handle: TensorHandle<UInt>) -> UInt? {
-    return _TFGetScalarImpl(handle)
-  }
-  @_inlineable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: UInt) -> TensorHandle<UInt> {
-    return #tfop("tfc.scalarToTensor", scalar)
-  }
-}
-
 extension Float : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_FLOAT)
