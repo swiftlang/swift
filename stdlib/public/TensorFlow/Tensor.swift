@@ -395,7 +395,7 @@ public extension Tensor where Scalar : FloatingPoint {
   //                      seed=None, name=None):
   @inline(never) // make @_inlineable when implemented.
   static func randomNormal(
-    shape: [Int], mean: Double = 0, stddev: Double = 1
+    shape: [Int32], mean: Double = 0, stddev: Double = 1
   ) -> Tensor {
     fatalError("FIXME: implement randomNormal")
   }
@@ -409,7 +409,7 @@ public extension AccelerableByTensorFlow {
   /// Broadcast the specified scalar value to be a tensor with the same rank as
   /// the specified other tensor, but with dimension=1 for each rank.
   @inline(never) // make @_inlineable when implemented.
-  func broadcast(toRank rank: Int) -> Tensor<Self> {
+  func broadcast(toRank rank: Int32) -> Tensor<Self> {
     fatalError("FIXME: implement scalar broadcast")
   }
 }
@@ -424,9 +424,9 @@ public extension Tensor {
   /// Returns a shape-padded Tensor, inserting a dimension of 1 at a given
   /// index.
   @_inlineable @inline(__always)
-  func shapePadded(atIndex index: Int) -> Tensor {
+  func shapePadded(atIndex index: Int32) -> Tensor {
     return Tensor(handle:
-      #tfop("ExpandDims", handle, Tensor<Int>(index).handle, Tdim: Int.self))
+      #tfop("ExpandDims", handle, Tensor<Int32>(index).handle, Tdim: Int32.self))
   }
 
   /// Broadcast the specified Tensor to a rank greater than or equal to its
@@ -435,7 +435,7 @@ public extension Tensor {
   // it the leading or the trailing dimensions that are filled with 1? Consider
   // removing.
   @inline(never)
-  func broadcast(toRank rank: Int) -> Tensor {
+  func broadcast(toRank rank: Int32) -> Tensor {
     fatalError("FIXME: implement broadcast")
   }
 
@@ -448,14 +448,14 @@ public extension Tensor {
   /// Reshape to the specified shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  func reshaped(_ newShape: [Int]) -> Tensor {
-    return reshaped(Tensor<Int>(newShape))
+  func reshaped(_ newShape: [Int32]) -> Tensor {
+    return reshaped(Tensor<Int32>(newShape))
   }
 
   /// Reshape to the specified Tensor representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  func reshaped(_ newShape: Tensor<Int>) -> Tensor {
+  func reshaped(_ newShape: Tensor<Int32>) -> Tensor {
     return Tensor(handle: #tfop("Reshape", handle, newShape.handle))
   }
 

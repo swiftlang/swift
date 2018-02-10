@@ -337,22 +337,22 @@ public extension TensorProtocol {
   //   withRespectTo: (self),
   //   gradient: _adjointTransposed(_:_:primal:seed:)
   // )
-  func transposed(withPermutations permutations: Tensor<Int>) -> Self {
+  func transposed(withPermutations permutations: Tensor<Int32>) -> Self {
     return Self(handle:
-      #tfop("Transpose", handle, permutations.handle, Tperm: Int.self))
+      #tfop("Transpose", handle, permutations.handle, Tperm: Int32.self))
   }
 
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @_inlineable @inline(__always)
-  func transposed(withPermutations permutations: [Int]) -> Self {
-    return transposed(withPermutations: Tensor<Int>(permutations))
+  func transposed(withPermutations permutations: [Int32]) -> Self {
+    return transposed(withPermutations: Tensor<Int32>(permutations))
   }
 
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @_inlineable @inline(__always)
-  func transposed(withPermutations permutations: Int...) -> Self {
+  func transposed(withPermutations permutations: Int32...) -> Self {
     return transposed(withPermutations: permutations)
   }
 
@@ -364,7 +364,7 @@ public extension TensorProtocol {
       to: rankTensor,
       stride: Tensor<Int32>(handle: _TFMakeScalarTensor(1))
     )
-    return transposed(withPermutations: Tensor<Int>(defaultPermutations))
+    return transposed(withPermutations: defaultPermutations)
   }
 }
 
@@ -556,25 +556,25 @@ public extension TensorProtocol {
   @_inlineable @inline(__always)
   func mean() -> Scalar {
     return _TFGetScalarOrDie(#tfop("Mean", handle,
-                                   Tensor<Int>([] as [Int]).handle))
+                                   Tensor<Int32>([] as [Int32]).handle))
   }
 
   @_inlineable @inline(__always)
   func min() -> Scalar {
     return _TFGetScalarOrDie(#tfop("Min", handle,
-                                   Tensor<Int>([] as [Int]).handle))
+                                   Tensor<Int32>([] as [Int32]).handle))
   }
 
   @_inlineable @inline(__always)
   func max() -> Scalar {
     return _TFGetScalarOrDie(#tfop("Max", handle,
-                                   Tensor<Int>([] as [Int]).handle))
+                                   Tensor<Int32>([] as [Int32]).handle))
   }
 
   @_inlineable @inline(__always)
   func sum() -> Scalar {
     return _TFGetScalarOrDie(#tfop("Sum", handle,
-                                   Tensor<Int>([] as [Int]).handle))
+                                   Tensor<Int32>([] as [Int32]).handle))
   }
 
   @inline(never) // make @_inlineable when implemented.
@@ -591,42 +591,42 @@ public extension TensorProtocol {
 public extension Tensor {
   @_inlineable @inline(__always)
   func mean(
-    alongAxes axes: [Int],
+    alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Scalar>(handle:
-      #tfop("Mean", handle, Tensor<Int>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int.self))
+      #tfop("Mean", handle, Tensor<Int32>(axes).handle,
+            keep_dims: keepingDimensions, Tidx: Int32.self))
   }
 
   @_inlineable @inline(__always)
   func min(
-    alongAxes axes: [Int],
+    alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Scalar>(handle:
-      #tfop("Min", handle, Tensor<Int>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int.self))
+      #tfop("Min", handle, Tensor<Int32>(axes).handle,
+            keep_dims: keepingDimensions, Tidx: Int32.self))
   }
 
   @_inlineable @inline(__always)
   func max(
-    alongAxes axes: [Int],
+    alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Scalar>(handle:
-      #tfop("Max", handle, Tensor<Int>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int.self))
+      #tfop("Max", handle, Tensor<Int32>(axes).handle,
+            keep_dims: keepingDimensions, Tidx: Int32.self))
   }
 
   @_inlineable @inline(__always)
   func sum(
-    alongAxes axes: [Int],
+    alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Scalar>(handle:
-      #tfop("Sum", handle, Tensor<Int>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int.self))
+      #tfop("Sum", handle, Tensor<Int32>(axes).handle,
+            keep_dims: keepingDimensions, Tidx: Int32.self))
   }
 }
 
@@ -666,42 +666,6 @@ public extension TensorProtocol {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  /// Returns the number of elements in a Tensor (equivalent to the first
-  /// dimension).
-  /// - Note: `count` is distinct from `scalarCount`, which represents the total
-  ///   number of scalars.
-  @_inlineable
-  var count: Int {
-    @inline(__always)
-    get {
-      return Int(shape.dimensions.first ?? 0)
-    }
-  }
-
-  @_inlineable
-  var indices: CountableRange<Int> {
-    @inline(__always)
-    get {
-      return 0..<count
-    }
-  }
-
-  @_inlineable
-  var startIndex: Int {
-    @inline(__always)
-    get {
-      return 0
-    }
-  }
-
-  @_inlineable
-  var endIndex: Int {
-    @inline(__always)
-    get {
-      return count
-    }
-  }
-
   /// Access the element tensor specified by an index in the leading dimension.
   /// - Parameter index: index of the element tensor
   subscript(index: Int) -> Tensor {

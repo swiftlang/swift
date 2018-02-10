@@ -223,7 +223,7 @@ public extension ${Self} where Scalar : Numeric {
 public extension ${Self} where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   static func randomNormal(
-    shape: [Int], mean: Double = 0, stddev: Double = 1
+    shape: [Int32], mean: Double = 0, stddev: Double = 1
   ) -> ${Self} {
     return ${Self}(base:
       Tensor<Scalar>.randomNormal(
@@ -243,10 +243,10 @@ public extension ${Self} {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @_inlineable @inline(__always)
   func transposed() -> ${Self} {
-    let defaultPermutations = (rank - 1) - Tensor<Int>(
-    rangeFrom: Tensor<Int>(handle: _TFMakeScalarTensor(0)),
-      to: Tensor<Int>(handle: _TFMakeScalarTensor(rank)),
-      stride: Tensor<Int>(handle: _TFMakeScalarTensor(1))
+    let defaultPermutations = (rankTensor - 1) - Tensor<Int32>(
+    rangeFrom: Tensor<Int32>(handle: _TFMakeScalarTensor(0)),
+      to: rankTensor,
+      stride: Tensor<Int32>(handle: _TFMakeScalarTensor(1))
     )
     return transposed(withPermutations: defaultPermutations)
   }
@@ -257,47 +257,6 @@ public extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 public extension ${Self} {
-% if rank == 1:
-  /// Returns the number of scalars in a ${Self} (equivalent to the first
-  /// dimension). Equivalent to `scalarCount` for ${Self}.
-% else:
-  /// Returns the number of element tensors in a ${Self} (equivalent to the
-  /// first dimension).
-  /// - Note: `count` is distinct from `scalarCount`, which represents the total
-  ///   number of scalars.
-% end
-  @_inlineable
-  var count: Int {
-    @inline(__always)
-    get {
-      return Int(shape.dimensions.first ?? 0)
-    }
-  }
-
-  @_inlineable
-  var indices: CountableRange<Int> {
-    @inline(__always)
-    get {
-      return 0..<count
-    }
-  }
-
-  @_inlineable
-  var startIndex: Int {
-    @inline(__always)
-    get {
-      return 0
-    }
-  }
-
-  @_inlineable
-  var endIndex: Int {
-    @inline(__always)
-    get {
-      return count
-    }
-  }
-
 % if rank == 1:
   @_inlineable
   /// Access the scalar specified by a given index.
@@ -347,22 +306,22 @@ public extension ${Self} {
 public extension ${Self} where Scalar : Numeric {
 % if rank > 1:
   @_inlineable @inline(__always)
-  func min(alongAxis axis: Int) -> ${ElementTensor} {
+  func min(alongAxis axis: Int32) -> ${ElementTensor} {
     return ${ElementTensor}(base: base.min(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
-  func max(alongAxis axis: Int) -> ${ElementTensor} {
+  func max(alongAxis axis: Int32) -> ${ElementTensor} {
     return ${ElementTensor}(base: base.max(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
-  func sum(alongAxis axis: Int) -> ${ElementTensor} {
+  func sum(alongAxis axis: Int32) -> ${ElementTensor} {
     return ${ElementTensor}(base: base.sum(alongAxes: [axis]))
   }
 
   @_inlineable @inline(__always)
-  func mean(alongAxis axis: Int) -> ${ElementTensor} {
+  func mean(alongAxis axis: Int32) -> ${ElementTensor} {
     return ${ElementTensor}(base: base.mean(alongAxes: [axis]))
   }
 % end
@@ -395,7 +354,7 @@ public extension ${Self} {
   /// Returns a shape-padded Tensor${liftedRank}D, inserting a dimension of 1
   /// at a given index.
   @_inlineable @inline(__always)
-  func shapePadded(atIndex index: Int) -> ${LiftedTensor} {
+  func shapePadded(atIndex index: Int32) -> ${LiftedTensor} {
     return ${LiftedTensor}(base: base.shapePadded(atIndex: index))
   }
 % end

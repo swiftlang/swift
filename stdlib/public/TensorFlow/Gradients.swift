@@ -251,7 +251,7 @@ func _adjointDot<T : Numeric>(
 @_inlineable
 @_versioned
 func _adjointTransposed<T : Numeric>(
-  _ x: Tensor<T>, _ permutations: Tensor<Int>, primal: Tensor<T>, seed: Tensor<T>
+  _ x: Tensor<T>, _ permutations: Tensor<Int32>, primal: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {
   return seed.transposed(withPermutations: permutations)
 }
