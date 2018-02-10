@@ -61,7 +61,7 @@ RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
 
 RankedTensorTests.testCPUAndGPU("DataTypeCast") {
   let x = Tensor2D<Int32>(ones: [5, 5])
-  let ints = Tensor2D<Int>(x)
+  let ints = Tensor2D<Int64>(x)
   let floats = Tensor2D<Float>(x)
   let i8s = Tensor2D<Int8>(floats)
   /// TODO(danielzheng): compare `.array` instead after it is implemented.
@@ -152,8 +152,8 @@ RankedTensorTests.testCPUAndGPU("Transpose") {
 // FIXME: The While op doesn't work on the CPU.
 RankedTensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
-  var a = Tensor1D<Int>(0)
-  let b = Tensor1D<Int>(1)
+  var a = Tensor1D<Int32>(0)
+  let b = Tensor1D<Int32>(1)
   var count = 0
 
   a -= b

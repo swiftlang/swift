@@ -61,7 +61,7 @@ TensorTests.testCPUAndGPU("FactoryInitializers") {
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
   let x = Tensor<Int32>(ones: [5, 5])
-  let ints = Tensor<Int>(x)
+  let ints = Tensor<Int64>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
   expectEqual(ShapedArray(shape: [5, 5], repeating: 1), ints.array)
@@ -146,8 +146,8 @@ TensorTests.testCPUAndGPU("Transpose") {
 // FIXME: The While op doesn't work on the CPU.
 TensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
-  var a = Tensor<Int>(0)
-  let b = Tensor<Int>(1)
+  var a = Tensor<Int32>(0)
+  let b = Tensor<Int32>(1)
   var count = 0
 
   a -= b
@@ -161,8 +161,8 @@ TensorTests.testGPU("simpleCounterLoop") {
 
 // This is derived from a TF Eager testcase.
 TensorTests.testGPU("loopsAndConditions") {
-  var a = Tensor<Int>(6)
-  var count = Tensor<Int>(0)
+  var a = Tensor<Int32>(6)
+  var count = Tensor<Int32>(0)
   while (a != 1).scalar! {
     if (a % 2 == 0).scalar! {
       a = a / 2
@@ -402,7 +402,7 @@ TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 // sends.
 @inline(never)
 func testRankGetter2() {
-  let y = Tensor<Int>(ones: [1, 2, 2, 2, 2, 2, 1])
+  let y = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
   expectEqual(7, y.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter2", testRankGetter2)
@@ -416,7 +416,7 @@ TensorTests.testCPUAndGPU("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
-  let y = Tensor<Int>(ones: [1, 2, 2, 2, 2, 2, 1])
+  let y = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
   expectEqual([1, 2, 2, 2, 2, 2, 1], y.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter2", testShapeGetter2)
