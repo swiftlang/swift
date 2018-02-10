@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,6 +12,7 @@
 
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
@@ -22,26 +23,97 @@
 using namespace swift;
 using namespace swift::driver;
 
-void CommandOutput::setAdditionalOutputForType(types::ID type,
+StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
+                                                  types::ID Type) const {
+  auto const *M = DerivedOutputMap.getOutputMapForInput(PrimaryInputFile);
+  if (!M)
+    return StringRef();
+  auto const Out = M->find(Type);
+  if (Out == M->end())
+    return StringRef();
+  return StringRef(Out->second);
+}
+
+void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
+                                types::ID Type,
+                                StringRef OutputFile,
+                                bool Overwrite) {
+  auto &M = DerivedOutputMap.getOrCreateOutputMapForInput(PrimaryInputFile);
+  if (Overwrite) {
+    M[Type] = OutputFile;
+  } else {
+    auto res = M.insert(std::make_pair(Type, OutputFile));
+    if (res.second) {
+      // New entry, no need to compare.
+    } else {
+      // Existing entry, check equality with request.
+      assert(res.first->getSecond() == OutputFile);
+    }
+  }
+}
+
+CommandOutput::CommandOutput(types::ID PrimaryOutputType,
+                             OutputFileMap &Derived)
+    : PrimaryOutputType(PrimaryOutputType), DerivedOutputMap(Derived) {}
+
+types::ID CommandOutput::getPrimaryOutputType() const {
+  return PrimaryOutputType;
+}
+
+void CommandOutput::addPrimaryOutput(CommandInputPair Input,
+                                     StringRef PrimaryOutputFile) {
+  Inputs.push_back(Input);
+  PrettyStackTraceDriverCommandOutputAddition CrashInfo(
+      "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
+  ensureEntry(Input.Primary, PrimaryOutputType, PrimaryOutputFile, false);
+}
+
+StringRef CommandOutput::getPrimaryOutputFilename() const {
+  assert(Inputs.size() >= 1);
+  return getOutputForInputAndType(Inputs[0].Primary, PrimaryOutputType);
+}
+
+SmallVector<StringRef, 16> CommandOutput::getPrimaryOutputFilenames() const {
+  SmallVector<StringRef, 16> V;
+  for (auto const &I : Inputs) {
+    auto Out = getOutputForInputAndType(I.Primary, PrimaryOutputType);
+    V.push_back(Out);
+  }
+  return V;
+}
+
+void CommandOutput::setAdditionalOutputForType(types::ID Type,
                                                StringRef OutputFilename) {
-  AdditionalOutputsMap[type] = OutputFilename;
+  PrettyStackTraceDriverCommandOutputAddition CrashInfo(
+      "additional", this, Inputs[0].Primary, Type, OutputFilename);
+  assert(Inputs.size() >= 1);
+
+  // If we're given an "additional" output with the same type as the primary,
+  // and we've not yet had such an additional type added, we treat it as a
+  // request to overwrite the primary choice (which happens early and is
+  // sometimes just inferred) with a refined value (eg. -emit-module-path).
+  bool Overwrite = (Type == PrimaryOutputType &&
+                    AdditionalOutputTypes.count(Type) == 0);
+  ensureEntry(Inputs[0].Primary, Type, OutputFilename, Overwrite);
+  AdditionalOutputTypes.insert(Type);
 }
 
-const std::string &
-CommandOutput::getAdditionalOutputForType(types::ID type) const {
-  auto iter = AdditionalOutputsMap.find(type);
-  if (iter != AdditionalOutputsMap.end())
-    return iter->second;
-
-  static const std::string empty;
-  return empty;
+StringRef CommandOutput::getAdditionalOutputForType(types::ID Type) const {
+  if (AdditionalOutputTypes.count(Type) == 0)
+    return StringRef();
+  assert(Inputs.size() >= 1);
+  return getOutputForInputAndType(Inputs[0].Primary, Type);
 }
 
-const std::string &
-CommandOutput::getAnyOutputForType(types::ID type) const {
-  if (PrimaryOutputType == type)
-    return PrimaryOutputFilenames[0];
-  return getAdditionalOutputForType(type);
+StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
+  if (PrimaryOutputType == Type)
+    return getPrimaryOutputFilename();
+  return getAdditionalOutputForType(Type);
+}
+
+StringRef CommandOutput::getBaseInput(size_t Index) const {
+  assert(Index < Inputs.size());
+  return Inputs[Index].Base;
 }
 
 static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
@@ -78,6 +150,37 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
   }
   os << '"';
 }
+
+void
+CommandOutput::print(raw_ostream &out) const {
+  out
+    << "{\n"
+    << "    PrimaryOutputType = " << types::getTypeName(PrimaryOutputType)
+    << ";\n"
+    << "    Inputs = [\n";
+  interleave(Inputs,
+             [&](CommandInputPair const &P) {
+             out << "        CommandInputPair {\n"
+                 << "            Base = ";
+             escapeAndPrintString(out, P.Base);
+             out << ", \n"
+                 << "            Primary = ";
+             escapeAndPrintString(out, P.Primary);
+             out << "\n        }";
+           },
+           [&] { out << ",\n"; });
+  out << "];\n"
+      << "    DerivedOutputFileMap = {\n";
+  DerivedOutputMap.dump(out, true);
+  out << "\n    };\n}";
+}
+
+void
+CommandOutput::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
 
 void Job::printArguments(raw_ostream &os,
                          const llvm::opt::ArgStringList &Args) {

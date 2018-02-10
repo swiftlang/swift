@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,10 +72,15 @@ private:
 
   /// The ToolChain this Compilation was built with, that it may reuse to build
   /// subsequent BatchJobs.
-  const ToolChain &TheToolChain;
+  LLVM_ATTRIBUTE_UNUSED const ToolChain &TheToolChain;
 
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
+
+  /// The OutputFileMap describing the Compilation's outputs, populated both by
+  /// the user-provided output file map (if it exists) and inference rules that
+  /// derive otherwise-unspecified output filenames from context.
+  OutputFileMap DerivedOutputFileMap;
 
   /// The Actions which were used to build the Jobs.
   ///
@@ -217,6 +222,11 @@ public:
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
   ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
+
+  OutputFileMap &getDerivedOutputFileMap() { return DerivedOutputFileMap; }
+  const OutputFileMap &getDerivedOutputFileMap() const {
+    return DerivedOutputFileMap;
+  }
 
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
