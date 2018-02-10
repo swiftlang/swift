@@ -761,21 +761,23 @@ extension DictionaryLiteral : RandomAccessCollection {
   }
 }
 
-extension DictionaryLiteral : Equatable where Key: Equatable, Value : Equatable {
+extension DictionaryLiteral: Equatable where Key: Equatable, Value: Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ==(lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>) -> Bool {
+  public static func == (
+    lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>
+  ) -> Bool {
     if lhs.count != rhs.count {
       return false
     }
-
     return lhs.elementsEqual(rhs, by: ==)
   }
 }
 
-extension DictionaryLiteral : Hashable where Key: Hashable, Value : Hashable {
+extension DictionaryLiteral: Hashable where Key: Hashable, Value: Hashable {
   /// The hash value for the collection.
   ///
-  /// Two `DictionaryLiteral` values that are equal will always have equal hash values.
+  /// Two `DictionaryLiteral` values that are equal will always have equal hash
+  /// values.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
@@ -784,7 +786,8 @@ extension DictionaryLiteral : Hashable where Key: Hashable, Value : Hashable {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
     var result: Int = 0
     for element in self {
-      let elementHashValue = _combineHashValues(element.key.hashValue, element.value.hashValue)
+      let elementHashValue =
+        _combineHashValues(element.key.hashValue, element.value.hashValue)
       result = _combineHashValues(result, elementHashValue)
     }
     return result

@@ -1246,8 +1246,9 @@ extension ${Self}: _AnyCollectionProtocol {
 
 extension AnyCollection : Equatable where Element : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ==(lhs: AnyCollection<Element>, rhs: AnyCollection<Element>) -> Bool {
-    let lhsCount = lhs.count
+  public static func == (
+    lhs: AnyCollection<Element>, rhs: AnyCollection<Element>
+  ) -> Bool {
     if lhs.count != rhs.count {
       return false
     }
@@ -1258,7 +1259,8 @@ extension AnyCollection : Equatable where Element : Equatable {
 extension AnyCollection : Hashable where Element : Hashable {
   /// The hash value for the collection.
   ///
-  /// Two `AnyCollection` values that are equal will always have equal hash values.
+  /// Two `AnyCollection` values that are equal will always have equal hash
+  /// values.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
