@@ -27,18 +27,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 builtinIntLiteralBits = 2048
 }%
 
-// TODO: remove once integer proposal is available ----------------------------
-// FIXME(integers): ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-%for bits in [32,64]:
-extension UInt${bits} {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var signBitIndex: Int {
-    return ${bits-1} - leadingZeroBitCount
-  }
-}
-%end
-
 % for self_type in all_floating_point_types():
 %{
 Self = self_type.stdlib_name
@@ -318,35 +306,46 @@ extension ${Self}: BinaryFloatingPoint {
   // Internal implementation details of x86 Float80
   @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal struct _Float80Representation {
+  internal struct _Representation {
     @_versioned // FIXME(sil-serialize-all)
-    internal var explicitSignificand: UInt64
-    @_versioned // FIXME(sil-serialize-all)
-    internal var signAndExponent: UInt16
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _padding: (UInt16, UInt16, UInt16) = (0, 0, 0)
+    internal var _storage: (UInt64, UInt16, /* pad */ UInt16, UInt16, UInt16)
+
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    @_transparent
+    internal var explicitSignificand: UInt64 { return _storage.0 }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    @_transparent
+    internal var signAndExponent: UInt16 { return _storage.1 }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    @_transparent
     internal var sign: FloatingPointSign {
       return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
+
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
     }
+
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
+    @_transparent
     internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
-      self.explicitSignificand = explicitSignificand
-      self.signAndExponent = signAndExponent
+      _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
     }
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _representation: _Float80Representation {
-    return unsafeBitCast(self, to: _Float80Representation.self)
+  internal var _representation: _Representation {
+    return unsafeBitCast(self, to: _Representation.self)
   }
 
   /// The sign of the floating-point value.
@@ -441,8 +440,8 @@ extension ${Self}: BinaryFloatingPoint {
     let exponent = UInt16(exponentBitPattern)
     var significand = significandBitPattern
     if exponent != 0 { significand |= Float80._explicitBitMask }
-    let rep = _Float80Representation(explicitSignificand: significand,
-      signAndExponent: signBit|exponent)
+    let rep = _Representation(
+      explicitSignificand: significand, signAndExponent: signBit|exponent)
     self = unsafeBitCast(rep, to: Float80.self)
   }
 
@@ -486,7 +485,7 @@ extension ${Self}: BinaryFloatingPoint {
     return ${Self}(
       bitPattern: 0b0_11111111111_0000000000000000000000000000000000000000000000000000)
 %elif bits == 80:
-    let rep = _Float80Representation(
+    let rep = _Representation(
       explicitSignificand: ${Self}._explicitBitMask,
       signAndExponent: 0b0_111111111111111)
     return unsafeBitCast(rep, to: ${Self}.self)
@@ -525,7 +524,7 @@ extension ${Self}: BinaryFloatingPoint {
     return ${Self}(
       bitPattern: 0b0_11111111111_1000000000000000000000000000000000000000000000000000)
 %elif bits == 80:
-    let rep = _Float80Representation(
+    let rep = _Representation(
       explicitSignificand: ${Self}._explicitBitMask | ${Self}._quietNaNMask,
       signAndExponent: 0b0_111111111111111)
     return unsafeBitCast(rep, to: ${Self}.self)
@@ -745,8 +744,10 @@ extension ${Self}: BinaryFloatingPoint {
     if isZero { return .min }
     let provisional = Int(exponentBitPattern) - Int(${Self}._exponentBias)
     if isNormal { return provisional }
-    let shift = ${Self}.significandBitCount - significandBitPattern.signBitIndex
-    return provisional + 1 - Int(shift)
+    let shift =
+      ${Self}.significandBitCount -
+        Int(significandBitPattern._binaryLogarithm())
+    return provisional + 1 - shift
   }
 
   /// The significand of the floating-point value.
@@ -786,10 +787,12 @@ extension ${Self}: BinaryFloatingPoint {
         significandBitPattern: significandBitPattern)
     }
     if isSubnormal {
-      let shift = ${Self}.significandBitCount - significandBitPattern.signBitIndex
+      let shift =
+        ${RawSignificand}(${Self}.significandBitCount) -
+          significandBitPattern._binaryLogarithm()
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
-        significandBitPattern: significandBitPattern &<< ${RawSignificand}(shift))
+        significandBitPattern: significandBitPattern &<< shift)
     }
     // zero or infinity.
     return ${Self}(sign: .plus,
@@ -1373,9 +1376,9 @@ extension ${Self}: BinaryFloatingPoint {
     }
     if significandBitPattern == 0 { return self }
     // For subnormals, we isolate the leading significand bit.
-    let index = significandBitPattern.signBitIndex
+    let index = significandBitPattern._binaryLogarithm()
     return ${Self}(sign: sign, exponentBitPattern: 0,
-      significandBitPattern: 1 &<< RawSignificand(index))
+      significandBitPattern: 1 &<< index)
   }
 
   /// The number of bits required to represent the value's significand.
@@ -1397,10 +1400,11 @@ extension ${Self}: BinaryFloatingPoint {
     let trailingZeroBits = significandBitPattern.trailingZeroBitCount
     if isNormal {
       guard significandBitPattern != 0 else { return 0 }
-      return ${Self}.significandBitCount - trailingZeroBits
+      return ${Self}.significandBitCount &- trailingZeroBits
     }
     if isSubnormal {
-      return significandBitPattern.signBitIndex - trailingZeroBits
+      let leadingZeroBits = significandBitPattern.leadingZeroBitCount
+      return ${RawSignificand}.bitWidth &- (trailingZeroBits &+ leadingZeroBits &+ 1)
     }
     return -1
   }
