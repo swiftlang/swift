@@ -15,7 +15,7 @@ RandomTests.test("basic random numbers") {
   let randomDouble1 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble1 < 1 && randomDouble1 >= 0)
   let randomDouble2 = Double.random(in: 0 ..< 1)
-  expectTrue(randomDouble1 < 1 && randomDouble2 >= 0)
+  expectTrue(randomDouble2 < 1 && randomDouble2 >= 0)
   expectTrue(randomDouble1 != randomDouble2)
 }
 

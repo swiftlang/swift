@@ -368,7 +368,7 @@ extension MutableCollection where Self : BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// shuffled()
+// shuffled()/shuffle()
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
@@ -377,13 +377,25 @@ extension Sequence {
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the sequence.
   /// - Returns: A shuffled array of this sequence's elements.
-  @_inlineable
-  public func shuffled(
-    using generator: RandomNumberGenerator = Random.default
+  @inlinable
+  public func shuffled<T: RandomNumberGenerator>(
+    using generator: T
   ) -> [Element] {
     var result = ContiguousArray(self)
     result.shuffle(using: generator)
     return Array(result)
+  }
+  
+  /// Returns the elements of the sequence, shuffled.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the sequence.
+  /// - Returns: A shuffled array of this sequence's elements.
+  ///
+  /// This uses the standard library's default random number generator.
+  @inlinable
+  public func shuffled() -> [Element] {
+    return shuffled(using: Random.default)
   }
 }
 
@@ -392,9 +404,9 @@ extension MutableCollection {
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
-  @_inlineable
-  public mutating func shuffle(
-    using generator: RandomNumberGenerator = Random.default
+  @inlinable
+  public mutating func shuffle<T: RandomNumberGenerator>(
+    using generator: T
   ) {
     guard count > 1 else { return }
     var amount = count
@@ -408,6 +420,17 @@ extension MutableCollection {
       )
       formIndex(after: &currentIndex)
     }
+  }
+  
+  /// Shuffles the collection in place.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection.
+  ///
+  /// This uses the standard library's default random number generator.
+  @inlinable
+  public mutating func shuffle() {
+    shuffle(using: Random.default)
   }
 }
 
