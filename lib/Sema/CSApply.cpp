@@ -2422,6 +2422,12 @@ namespace {
       llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    Expr *visitGradientExpr(GradientExpr *expr) {
+      // FIXME: Implement this.
+      llvm_unreachable("Unhandled GradientExpr");
+    }
+
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
         return expr;
