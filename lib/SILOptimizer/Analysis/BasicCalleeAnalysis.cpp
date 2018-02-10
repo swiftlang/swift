@@ -31,6 +31,11 @@ bool CalleeList::allCalleesVisible() {
   for (SILFunction *Callee : *this) {
     if (Callee->isExternalDeclaration())
       return false;
+    // Do not consider functions in other modules (libraries) because of library
+    // evolution: such function may behave differently in future/past versions
+    // of the library.
+    if (Callee->isAvailableExternally())
+      return false;
   }
   return true;
 }
