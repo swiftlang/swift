@@ -1243,3 +1243,32 @@ extension ${Self}: _AnyCollectionProtocol {
   }
 }
 % end
+
+extension AnyCollection : Equatable where Element : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: AnyCollection<Element>, rhs: AnyCollection<Element>) -> Bool {
+    let lhsCount = lhs.count
+    if lhs.count != rhs.count {
+      return false
+    }
+    return lhs.elementsEqual(rhs)
+  }
+}
+
+extension AnyCollection : Hashable where Element : Hashable {
+  /// The hash value for the collection.
+  ///
+  /// Two `AnyCollection` values that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to AnyCollection too
+    var result: Int = 0
+    for element in self {
+      result = _combineHashValues(result, element.hashValue)
+    }
+    return result
+  }
+}
