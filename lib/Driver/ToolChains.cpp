@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,29 +55,31 @@ static void addInputsOfType(ArgStringList &Arguments,
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Job *> Jobs,
+                            const llvm::opt::ArgList &Args,
                             types::ID InputType,
                             const char *PrefixArgument = nullptr) {
   for (const Job *Cmd : Jobs) {
-    auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
+    auto output = Cmd->getOutput().getAnyOutputForType(InputType);
     if (!output.empty()) {
       if (PrefixArgument)
         Arguments.push_back(PrefixArgument);
-      Arguments.push_back(output.c_str());
+      Arguments.push_back(Args.MakeArgString(output));
     }
   }
 }
 
 static void addPrimaryInputsOfType(ArgStringList &Arguments,
                                    ArrayRef<const Job *> Jobs,
+                                   const llvm::opt::ArgList &Args,
                                    types::ID InputType,
                                    const char *PrefixArgument = nullptr) {
   for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
     if (outputInfo.getPrimaryOutputType() == InputType) {
-      for (const std::string &Output : outputInfo.getPrimaryOutputFilenames()) {
+      for (auto Output : outputInfo.getPrimaryOutputFilenames()) {
         if (PrefixArgument)
           Arguments.push_back(PrefixArgument);
-        Arguments.push_back(Output.c_str());
+        Arguments.push_back(Args.MakeArgString(Output));
       }
     }
   }
@@ -181,21 +183,22 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
 
-  const std::string &moduleDocOutputPath =
+  auto moduleDocOutputPath =
       output.getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
   if (!moduleDocOutputPath.empty()) {
     arguments.push_back("-emit-module-doc-path");
-    arguments.push_back(moduleDocOutputPath.c_str());
+    arguments.push_back(inputArgs.MakeArgString(moduleDocOutputPath));
   }
 
   if (llvm::sys::Process::StandardErrHasColors())
     arguments.push_back("-color-diagnostics");
 
-  const std::string &SerializedDiagnosticsPath =
+  auto SerializedDiagnosticsPath =
     output.getAdditionalOutputForType(types::TY_SerializedDiagnostics);
   if (!SerializedDiagnosticsPath.empty()) {
     arguments.push_back("-serialize-diagnostics-path");
-    arguments.push_back(SerializedDiagnosticsPath.c_str());
+    arguments.push_back(
+        inputArgs.MakeArgString(SerializedDiagnosticsPath));
   }
 }
 
@@ -397,7 +400,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       for (auto *IJ : context.Inputs) {
         if (!IJ->getOutput().getAnyOutputForType(types::TY_PCH).empty()) {
           Arguments.push_back("-import-objc-header");
-          addInputsOfType(Arguments, context.Inputs, types::TY_PCH);
+          addInputsOfType(Arguments, context.Inputs, context.Args, types::TY_PCH);
           ForwardAsIs = false;
           break;
         }
@@ -426,14 +429,14 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  const std::string &ModuleOutputPath =
+  auto ModuleOutputPath =
     context.Output.getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
   if (!ModuleOutputPath.empty()) {
     Arguments.push_back("-emit-module-path");
-    Arguments.push_back(ModuleOutputPath.c_str());
+    Arguments.push_back(context.Args.MakeArgString(ModuleOutputPath));
   }
 
-  const std::string &ObjCHeaderOutputPath =
+  auto ObjCHeaderOutputPath =
     context.Output.getAdditionalOutputForType(types::ID::TY_ObjCHeader);
   if (!ObjCHeaderOutputPath.empty()) {
     assert(context.OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
@@ -441,53 +444,56 @@ ToolChain::constructInvocation(const CompileJobAction &job,
            "mode!");
 
     Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(ObjCHeaderOutputPath.c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(ObjCHeaderOutputPath));
   }
 
-  const std::string &DependenciesPath =
+  auto DependenciesPath =
     context.Output.getAdditionalOutputForType(types::TY_Dependencies);
   if (!DependenciesPath.empty()) {
     Arguments.push_back("-emit-dependencies-path");
-    Arguments.push_back(DependenciesPath.c_str());
+    Arguments.push_back(context.Args.MakeArgString(DependenciesPath));
   }
 
-  const std::string &ReferenceDependenciesPath =
+  auto ReferenceDependenciesPath =
     context.Output.getAdditionalOutputForType(types::TY_SwiftDeps);
   if (!ReferenceDependenciesPath.empty()) {
     Arguments.push_back("-emit-reference-dependencies-path");
-    Arguments.push_back(ReferenceDependenciesPath.c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(ReferenceDependenciesPath));
   }
 
-  const std::string &LoadedModuleTracePath =
+  auto LoadedModuleTracePath =
       context.Output.getAdditionalOutputForType(types::TY_ModuleTrace);
   if (!LoadedModuleTracePath.empty()) {
     Arguments.push_back("-emit-loaded-module-trace-path");
-    Arguments.push_back(LoadedModuleTracePath.c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(LoadedModuleTracePath));
   }
 
-  const std::string &TBDPath =
+  auto TBDPath =
       context.Output.getAdditionalOutputForType(types::TY_TBD);
   if (!TBDPath.empty()) {
     Arguments.push_back("-emit-tbd-path");
-    Arguments.push_back(TBDPath.c_str());
+    Arguments.push_back(context.Args.MakeArgString(TBDPath));
   }
 
-  const std::string &OptRecordPath =
+  auto OptRecordPath =
       context.Output.getAdditionalOutputForType(types::TY_OptRecord);
   if (!OptRecordPath.empty()) {
     Arguments.push_back("-save-optimization-record-path");
-    Arguments.push_back(OptRecordPath.c_str());
+    Arguments.push_back(context.Args.MakeArgString(OptRecordPath));
   }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
   }
 
-  const std::string &FixitsPath =
+  auto FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {
     Arguments.push_back("-emit-remap-file-path");
-    Arguments.push_back(FixitsPath.c_str());
+    Arguments.push_back(context.Args.MakeArgString(FixitsPath));
   }
 
   if (context.OI.numThreads > 0) {
@@ -506,9 +512,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                   context.Output.getPrimaryOutputType(),
                                   FilelistInfo::WhichFiles::Output});
     } else {
-      for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+      for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
-        Arguments.push_back(FileName.c_str());
+        Arguments.push_back(context.Args.MakeArgString(FileName));
       }
     }
   }
@@ -640,8 +646,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
     const Job *Cmd = context.Inputs.front();
-    Arguments.push_back(
-      Cmd->getOutput().getPrimaryOutputFilename().c_str());
+    Arguments.push_back(context.Args.MakeArgString(
+        Cmd->getOutput().getPrimaryOutputFilename()));
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -652,7 +658,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     // In multi-threaded compilation, the backend job must select the correct
     // output file of the compilation job.
     auto OutNames = Cmd->getOutput().getPrimaryOutputFilenames();
-    Arguments.push_back(OutNames[job.getInputIndex()].c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(OutNames[job.getInputIndex()]));
     break;
   }
   case OutputInfo::Mode::BatchModeCompile:
@@ -688,9 +695,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+    for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
       Arguments.push_back("-o");
-      Arguments.push_back(FileName.c_str());
+      Arguments.push_back(context.Args.MakeArgString(FileName));
     }
   }
 
@@ -719,7 +726,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   } else {
     size_t origLen = Arguments.size();
     (void)origLen;
-    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.Inputs, context.Args, types::TY_SwiftModuleFile);
     addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
     assert(Arguments.size() - origLen >=
            context.Inputs.size() + context.InputActions.size());
@@ -750,16 +757,17 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
 
-  const std::string &ObjCHeaderOutputPath =
+  auto ObjCHeaderOutputPath =
     context.Output.getAdditionalOutputForType(types::TY_ObjCHeader);
   if (!ObjCHeaderOutputPath.empty()) {
     Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(ObjCHeaderOutputPath.c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(ObjCHeaderOutputPath));
   }
 
   Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return II;
 }
@@ -771,7 +779,7 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
 
   Arguments.push_back("-modulewrap");
 
-  addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, context.Inputs, context.Args, types::TY_SwiftModuleFile);
   addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
   assert(Arguments.size() == 2 &&
          "ModuleWrap expects exactly one merged swiftmodule as input");
@@ -783,8 +791,8 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
     
   Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
@@ -846,13 +854,13 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
 
   ArgStringList Arguments;
 
-  StringRef inputPath =
+  auto inputPath =
       context.Inputs.front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(context.Args.MakeArgString(inputPath));
 
   Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return {"dsymutil", Arguments};
 }
@@ -870,7 +878,7 @@ ToolChain::constructInvocation(const VerifyDebugInfoJobAction &job,
   Arguments.push_back("--eh-frame");
   Arguments.push_back("--quiet");
 
-  StringRef inputPath =
+  auto inputPath =
       context.Inputs.front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(context.Args.MakeArgString(inputPath));
 
@@ -905,8 +913,8 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
   } else {
     Arguments.push_back("-emit-pch");
     Arguments.push_back("-o");
-    Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+    Arguments.push_back(context.Args.MakeArgString(
+        context.Output.getPrimaryOutputFilename()));
   }
 
   return {SWIFT_EXECUTABLE_NAME, Arguments};
@@ -1271,16 +1279,17 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     II.FilelistInfos.push_back(
         {Arguments.back(), types::TY_Object, FilelistInfo::WhichFiles::Input});
   } else {
-    addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           types::TY_Object);
   }
 
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile,
-                    "-add_ast_path");
+    addInputsOfType(Arguments, context.Inputs, context.Args,
+                    types::TY_SwiftModuleFile, "-add_ast_path");
   else
-    addPrimaryInputsOfType(Arguments, context.Inputs,
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            types::TY_SwiftModuleFile, "-add_ast_path");
 
   // Add all .swiftmodule file inputs as arguments, preceded by the
@@ -1488,7 +1497,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
-  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return II;
 }
@@ -1514,12 +1524,13 @@ toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job
   assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
 
   ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return {"swift-autolink-extract", Arguments};
 }
@@ -1654,7 +1665,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   llvm::sys::path::append(swiftrtPath, "swiftrt.o");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   for (const Arg *arg : context.Args.filtered(options::OPT_F,
@@ -1676,7 +1688,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     auto &OutputInfo = Cmd->getOutput();
     if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
       Arguments.push_back(context.Args.MakeArgString(
-        Twine("@") + OutputInfo.getPrimaryOutputFilename()));
+          Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
   // Link the standard library.
@@ -1750,7 +1762,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
-  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
+  Arguments.push_back(context.Args.MakeArgString(
+      context.Output.getPrimaryOutputFilename()));
 
   return {Clang, Arguments};
 }

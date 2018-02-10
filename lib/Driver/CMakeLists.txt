@@ -7,6 +7,7 @@ set(swiftDriver_sources
   Job.cpp
   OutputFileMap.cpp
   ParseableOutput.cpp
+  PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
   Types.cpp
