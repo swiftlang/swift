@@ -1187,9 +1187,6 @@ void TFGraphLowering::lowerRegion(SESERegionTree *region) {
   llvm_unreachable("unknown region kind");
 }
 
-
-#endif // SWIFT_ENABLE_TENSORFLOW
-
 //===----------------------------------------------------------------------===//
 // Top Level driver
 //===----------------------------------------------------------------------===//
@@ -1333,6 +1330,9 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
   auto bufPtr = (const char*)buffer->data;
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
 }
+
+#endif // SWIFT_ENABLE_TENSORFLOW
+
 
 /// Lower the specified SIL function (which was formed by the partitioner)
 /// into a TensorFlow graph, and encode into a vector of bytes.
