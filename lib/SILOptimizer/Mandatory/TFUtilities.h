@@ -67,6 +67,11 @@ namespace tf {
     /// These are the names of any attribute operands at the end of the list.
     SmallVector<std::pair<StringRef, AttributeModifier>, 4> attributes;
 
+    /// If the specified call is to a function that we can promote to an op,
+    /// rewrite the instruction and return a new one that does so.  Otherwise,
+    /// return the same instruction.
+    static SILInstruction *decodeApply(ApplyInst *apply, StringRef name);
+
     /// Analyze the specified SIL instruction and return a SILTensorOpInfo
     /// result if the instruction is a valid tensor operation.  This is the
     /// way that SILTensorOpInfo's are created.
@@ -86,7 +91,7 @@ namespace tf {
     SILValue getScalarOperand(unsigned operandNumber) const {
       return getScalarOperand(inst->getOperand(operandNumber));
     }
-    SILValue getScalarOperand(SILValue v) const;
+    static SILValue getScalarOperand(SILValue v);
 
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
@@ -94,21 +99,13 @@ namespace tf {
     SingleValueInstruction *getAttrOperand(unsigned operandNumber) const {
       return getAttrOperand(inst->getOperand(operandNumber));
     }
-    SingleValueInstruction *getAttrOperand(SILValue v) const;
-
-    /// Given a SILValue that may be an array, attempt to decode it into the
-    /// literal constant values that make up its elements.  If this fails or if
-    /// the value is not an array, this returns false.  Otherwise it decodes the
-    /// array and returns the element initializer in elements.
-    bool decodeArrayElements(SILValue value,
-                             SmallVectorImpl<SingleValueInstruction*> &elements,
-                             Type &elementType) const;
+    static SingleValueInstruction *getAttrOperand(SILValue v);
 
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
     bool decodeBuiltin(BuiltinInst *inst);
-    bool decodeTensorFromScalars(ApplyInst *inst);
-    bool decodeTensorFromScalars1D(ApplyInst *inst);
+    static SILInstruction *decodeTensorFromScalars(ApplyInst *inst);
+    static SILInstruction *decodeTensorFromScalars1D(ApplyInst *inst);
   };
 
 
