@@ -74,7 +74,7 @@ private:
 
   /// The ToolChain this Compilation was built with, that it may reuse to build
   /// subsequent BatchJobs.
-  LLVM_ATTRIBUTE_UNUSED const ToolChain &TheToolChain;
+  const ToolChain &TheToolChain;
 
   /// The OutputInfo, which the Compilation stores a copy of upon
   /// construction, and which it may use to build subsequent batch
@@ -202,6 +202,10 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
+
+  ToolChain const &getToolChain() const {
+    return TheToolChain;
+  }
 
   OutputInfo const &getOutputInfo() const {
     return TheOutputInfo;
