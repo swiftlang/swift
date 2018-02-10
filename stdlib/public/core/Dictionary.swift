@@ -1446,6 +1446,25 @@ extension Dictionary: Equatable where Value: Equatable {
   }
 }
 
+extension Dictionary: Hashable where Value: Hashable {
+  /// The hash value for the dictionary.
+  ///
+  /// Two dictionaries that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Dictionary too
+    var result: Int = 0
+    for (k, v) in self {
+      let combined = _combineHashValues(k.hashValue, v.hashValue)
+      result ^= _mixInt(combined)
+    }
+    return result
+  }
+}
+
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

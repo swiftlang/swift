@@ -136,6 +136,27 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+extension CollectionOfOne : Equatable where Element : Equatable {
+  /// Returns a Boolean value indicating whether two collections are equal.
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (lhs: CollectionOfOne, rhs: CollectionOfOne) -> Bool {
+    return lhs._element == rhs._element
+  }
+}
+
+extension CollectionOfOne : Hashable where Element : Hashable {
+  /// The hash value for the collection.
+  ///
+  /// Two collection that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _element.hashValue
+  }
+}
+
 extension CollectionOfOne : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)

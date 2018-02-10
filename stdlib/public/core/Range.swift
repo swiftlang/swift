@@ -398,6 +398,19 @@ extension Range: Equatable {
   }
 }
 
+extension Range : Hashable where Bound : Hashable {
+  /// The hash value for the range.
+  ///
+  /// Two ranges that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _combineHashValues(lowerBound.hashValue, upperBound.hashValue)
+  }
+}
+
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range
