@@ -130,168 +130,24 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
-typedef std::pair<StringRef, SILTensorOpInfo::AttributeModifier> AttributeEntry;
-
-
-/// Given a function name that might refer to a tensorflow op function, this
-/// returns the op name and operand description and returns true.  If the
-/// function name doesn't correspond to an op, this returns false.
-static bool decodeTensorOpName(StringRef name, StringRef &opName,
-                               SmallVectorImpl<AttributeEntry> &attributes) {
-  // Op functions are expected to be of the form:
-  //  __tfop_<OPNAME>,<OPERANDDESC>,<ATTRIBUTES>
-  if (!name.startswith("__tfop_")) return false;
-  name = name.substr(strlen("__tfop_"));
-
-  auto pos = name.find(",");
-  opName = name.substr(0, pos);
-  if (pos == StringRef::npos) return true;
-  name = name.substr(pos);
-
-  // Parse out any attribute names.
-  while (!name.empty()) {
-    assert(name[0] == ',');
-    name = name.drop_front(1);
-
-    pos = name.find(",");
-    if (pos == StringRef::npos) pos = name.size();
-
-    auto attrName = name.substr(0, pos);
-    attributes.push_back({
-      attrName, SILTensorOpInfo::AttributeModifier::Normal
-    });
-    name = name.substr(pos);
-  }
-
-  return true;
-}
-
-
-SILValue SILTensorOpInfo::getScalarOperand(SILValue v) const {
-  // We have to handle two kinds of operands: SIL address operands and normal
-  // values.
-  if (!v->getType().isAddress()) {
-    // If we have a normal operand, handle the form where a StructInst is
-    // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
-    if (auto *SI = dyn_cast<StructInst>(v))
-      if (SI->getNumOperands() == 1)
-        return SI->getOperand(0);
-
-    return v;
-  }
-
-  // Because we're often coming from generic code, we frequently get a value
-  // passed by-address.  Check for an alloc_stack with a single store to it and
-  // consume the stored value.
-  if (auto *ASI = dyn_cast<AllocStackInst>(v)) {
-    if (auto *store = ASI->getSingleUserOfType<StoreInst>())
-      return getScalarOperand(store->getSrc());
-  }
-
-  // Otherwise this is a by-address value that we can't handle:
-  // FIXME: The proper way to deal with this is with a deabstraction pass,
-  // which will guarantee generic specialization promotes the builtin operand
-  // to never be an address.
-  return SILValue();
-}
-
-/// If the specified value is a valid value for an attribute, return the
-/// instruction that provides the value, otherwise null.
-SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
-  // If the value is a string value, then we need to peel off all the SIL
-  // instructions between the String struct value and the underlying
-  // string_literal instruction.
-  auto &ctx = inst->getFunction()->getASTContext();
-  if (v->getType().getSwiftRValueType()->isEqual(
-                                     ctx.getStringDecl()->getDeclaredType())) {
-    auto str = v;
-    // Strip off the specific set of instructions we expect to form the string
-    // literal.
-    while (1) {
-      if (auto sli = dyn_cast<StringLiteralInst>(str))
-        return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
-                ? sli : nullptr;
-
-      if (auto si = dyn_cast<StructInst>(str)) {
-        assert(si->getNumOperands() >= 1 &&
-               "Expect String, UnsafeMutableRawPointer, and _StringCore types");
-        str = si->getOperand(0);
-        continue;
-      }
-
-      if (auto ei = dyn_cast<EnumInst>(str)) {
-        assert(ei->getNumOperands() == 1 && "expect non-null optional");
-        str = ei->getOperand();
-        continue;
-      }
-
-      if (auto *ubc = dyn_cast<UncheckedBitwiseCastInst>(str)) {
-        str = ubc->getOperand();
-        continue;
-      }
-
-      // Look through the various operands that bit-mangle things into bridged
-      // string representations.  This is gross, Swift should have higher level
-      // operations for bridge values like this.
-      if (auto *bi = dyn_cast<BuiltinInst>(str)) {
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::And:
-        case BuiltinValueKind::Or:
-        case BuiltinValueKind::ZExtOrBitCast:
-        case BuiltinValueKind::PtrToInt:
-          str = bi->getOperand(0);
-          continue;
-        default: break;
-        }
-      }
-
-      // It is possible that we have a variable string, we want to reject it
-      // as a non-constant value.
-      return nullptr;
-    }
-  }
-
-  // Handle cases that create a literal array.
-  if (auto *si = dyn_cast<StructInst>(v)) {
-    SmallVector<SingleValueInstruction*, 8> elements;
-    Type elementType;
-    if (decodeArrayElements(v, elements, elementType))
-      return si;
-  }
-
-  // Simplify scalar operands in general.
-  v = getScalarOperand(v);
-  if (!v) return nullptr;
-
-  // If we have an acceptable values for an attribute, return it.
-  if (auto *fli = dyn_cast<FloatLiteralInst>(v))
-    return fli;
-  if (auto *ili = dyn_cast<IntegerLiteralInst>(v))
-    return ili->getValue().getBitWidth() <= 64 ? ili : nullptr;
-  if (auto *sli = dyn_cast<StringLiteralInst>(v))
-    return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
-           ? sli : nullptr;
-  if (auto *mti = dyn_cast<MetatypeInst>(v)) {
-    auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
-    if (convertSwiftTypeToTF(ty) != 0) return mti;
-  }
-
-  return nullptr;
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
 }
 
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
 /// the value is not an array, this returns false.  Otherwise it decodes the
 /// array and returns the element initializer in elements.
-bool SILTensorOpInfo::
-decodeArrayElements(SILValue value,
-                    SmallVectorImpl<SingleValueInstruction*> &elements,
-                    Type &elementType) const {
-  auto bgst = value->getType().getAs<BoundGenericStructType>();
-  if (!bgst ||
-      bgst->getDecl() != inst->getModule().getASTContext().getArrayDecl())
-    return false;
-  elementType = bgst->getGenericArgs()[0];
+static bool decodeArrayElements(SILValue value,
+                                SmallVectorImpl<SILValue> &elements,
+                                Type &elementType) {
+  elementType = getArrayElementType(value->getType().getSwiftRValueType());
+  if (!elementType) return false;
 
   // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
@@ -322,11 +178,9 @@ decodeArrayElements(SILValue value,
 
       // The initializer elements are the tail elements of the object_inst, see
       // if they are all decodable.
-      for (auto elt : init->getTailElements()) {
-        auto attrElt = getAttrOperand(elt);
-        if (!attrElt) return false;
-        elements.push_back(attrElt);
-      }
+      for (auto elt : init->getTailElements())
+        elements.push_back(elt);
+
       return true;
     } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(value)) {
       // The empty array is specially recognized by the optimizer and
@@ -391,15 +245,11 @@ decodeArrayElements(SILValue value,
     // Check to see if we have a store to a valid index that hasn't been stored
     // to yet.
     auto *si = dyn_cast<StoreInst>(user);
-    if (!si || index >= elements.size() || elements[index] != nullptr)
+    if (!si || index >= elements.size() || elements[index] != SILValue())
       return false;
 
-    // If we got a store to a valid index, check to see if the stored value is
-    // itself a valid constant.
-    auto *elt = getAttrOperand(si->getOperand(0));
-    if (!elt)
-      return false;
-    elements[index] = elt;
+    // If we got a store to a valid index, it must be our element.
+    elements[index] = si->getOperand(0);
 
     // Track how many elements we see so we can know if we got them all.
     --numElements;
@@ -411,6 +261,123 @@ decodeArrayElements(SILValue value,
 
   return true;
 }
+
+SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
+  // We have to handle two kinds of operands: SIL address operands and normal
+  // values.
+  if (!v->getType().isAddress()) {
+    // If we have a normal operand, handle the form where a StructInst is
+    // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
+    if (auto *SI = dyn_cast<StructInst>(v))
+      if (SI->getNumOperands() == 1)
+        return SI->getOperand(0);
+
+    return v;
+  }
+
+  // Because we're often coming from generic code, we frequently get a value
+  // passed by-address.  Check for an alloc_stack with a single store to it and
+  // consume the stored value.
+  if (auto *ASI = dyn_cast<AllocStackInst>(v)) {
+    if (auto *store = ASI->getSingleUserOfType<StoreInst>())
+      return getScalarOperand(store->getSrc());
+  }
+
+  // Otherwise this is a by-address value that we can't handle:
+  // FIXME: The proper way to deal with this is with a deabstraction pass,
+  // which will guarantee generic specialization promotes the builtin operand
+  // to never be an address.
+  return SILValue();
+}
+
+/// If the specified value is a valid value for an attribute, return the
+/// instruction that provides the value, otherwise null.
+SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
+  // If the value is a string value, then we need to peel off all the SIL
+  // instructions between the String struct value and the underlying
+  // string_literal instruction.
+  auto &ctx = v->getType().getSwiftRValueType()->getASTContext();
+  if (v->getType().getSwiftRValueType()->isEqual(
+                                     ctx.getStringDecl()->getDeclaredType())) {
+    auto str = v;
+    // Strip off the specific set of instructions we expect to form the string
+    // literal.
+    while (1) {
+      if (auto sli = dyn_cast<StringLiteralInst>(str))
+        return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
+                ? sli : nullptr;
+
+      if (auto si = dyn_cast<StructInst>(str)) {
+        assert(si->getNumOperands() >= 1 &&
+               "Expect String, UnsafeMutableRawPointer, and _StringCore types");
+        str = si->getOperand(0);
+        continue;
+      }
+
+      if (auto ei = dyn_cast<EnumInst>(str)) {
+        assert(ei->getNumOperands() == 1 && "expect non-null optional");
+        str = ei->getOperand();
+        continue;
+      }
+
+      if (auto *ubc = dyn_cast<UncheckedBitwiseCastInst>(str)) {
+        str = ubc->getOperand();
+        continue;
+      }
+
+      // Look through the various operands that bit-mangle things into bridged
+      // string representations.  This is gross, Swift should have higher level
+      // operations for bridge values like this.
+      if (auto *bi = dyn_cast<BuiltinInst>(str)) {
+        switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::And:
+        case BuiltinValueKind::Or:
+        case BuiltinValueKind::ZExtOrBitCast:
+        case BuiltinValueKind::PtrToInt:
+          str = bi->getOperand(0);
+          continue;
+        default: break;
+        }
+      }
+
+      // It is possible that we have a variable string, we want to reject it
+      // as a non-constant value.
+      return nullptr;
+    }
+  }
+
+  // Handle cases that create a literal array.
+  if (auto *si = dyn_cast<StructInst>(v)) {
+    SmallVector<SILValue, 8> elements;
+    Type elementType;
+    if (decodeArrayElements(v, elements, elementType)) {
+      for (auto elt : elements)
+        if (!getAttrOperand(elt))
+          return nullptr;
+      return si;
+    }
+  }
+
+  // Simplify scalar operands in general.
+  v = getScalarOperand(v);
+  if (!v) return nullptr;
+
+  // If we have an acceptable values for an attribute, return it.
+  if (auto *fli = dyn_cast<FloatLiteralInst>(v))
+    return fli;
+  if (auto *ili = dyn_cast<IntegerLiteralInst>(v))
+    return ili->getValue().getBitWidth() <= 64 ? ili : nullptr;
+  if (auto *sli = dyn_cast<StringLiteralInst>(v))
+    return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
+           ? sli : nullptr;
+  if (auto *mti = dyn_cast<MetatypeInst>(v)) {
+    auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
+    if (convertSwiftTypeToTF(ty) != 0) return mti;
+  }
+
+  return nullptr;
+}
+
 
 /// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
 /// the instruction is a valid tensor operation.  This is the way that
@@ -431,22 +398,42 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
     if (toiInfo.decodeBuiltin(builtinInst))
       return toiInfo;
 
-  // Operations which can conditionally run on the host or the accelerator are
-  // modeled as well-known function calls.  If they satisfy the requirements
-  // (e.g. that their parameters are constants we can analyze) then they get
-  // promoted to notional "ops".
-  if (auto *applyInst = dyn_cast<ApplyInst>(inst))
-    if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
-      auto callee = fnRef->getReferencedFunction()->getName();
-      if (callee == "__tf_tensor_from_scalars" &&
-          toiInfo.decodeTensorFromScalars(applyInst))
-        return toiInfo;
-      if (callee == "__tf_tensor_from_scalars_1d" &&
-          toiInfo.decodeTensorFromScalars1D(applyInst))
-        return toiInfo;
-    }
-
   return None;
+}
+
+typedef std::pair<StringRef, SILTensorOpInfo::AttributeModifier> AttributeEntry;
+
+/// Given a function name that might refer to a tensorflow op function, this
+/// returns the op name and operand description and returns true.  If the
+/// function name doesn't correspond to an op, this returns false.
+static bool decodeTensorOpName(StringRef name, StringRef &opName,
+                               SmallVectorImpl<AttributeEntry> &attributes) {
+  // Op functions are expected to be of the form:
+  //  __tfop_<OPNAME>,<OPERANDDESC>,<ATTRIBUTES>
+  if (!name.startswith("__tfop_")) return false;
+  name = name.substr(strlen("__tfop_"));
+
+  auto pos = name.find(",");
+  opName = name.substr(0, pos);
+  if (pos == StringRef::npos) return true;
+  name = name.substr(pos);
+
+  // Parse out any attribute names.
+  while (!name.empty()) {
+    assert(name[0] == ',');
+    name = name.drop_front(1);
+
+    pos = name.find(",");
+    if (pos == StringRef::npos) pos = name.size();
+
+    auto attrName = name.substr(0, pos);
+    attributes.push_back({
+      attrName, SILTensorOpInfo::AttributeModifier::Normal
+    });
+    name = name.substr(pos);
+  }
+
+  return true;
 }
 
 /// The vast majority of interesting tensor operations are builtin instructions,
@@ -496,7 +483,7 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 
     auto scalarType = op->getType().getSwiftRValueType();
     if (convertSwiftTypeToTF(scalarType) == 0) {
-      diagInvalid("scalar operand has unrecognized type '" +
+      diagInvalid("operand has unrecognized type '" +
                   scalarType->getString() + "'");
       return SILValue();
     }
@@ -539,6 +526,73 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   return true;
 }
 
+typedef SILTensorOpInfo::AttributeModifier AttributeModifier;
+
+/// addTensorOperand - Decode the specified array value (which should be an
+/// array of constant integer or fp values) and add it as a value$tensor operand
+/// to the specified op that is being built up.  This returns false if the
+/// operand is not an array of constant values.
+static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
+                                 AttributeModifier attrKind,
+                                 std::string &name,
+                                 SmallVectorImpl<SILValue> &operands,
+                                 SILInstruction *forInst) {
+  // Otherwise, this is an array attribute, so expand it out.
+  SmallVector<SILValue, 8> elements;
+  Type elementType;
+  bool isArray = decodeArrayElements(arrayVal, elements, elementType);
+  if (!isArray) return false;
+
+  // Verify that we have all constants.
+  for (auto &elt : elements) {
+    elt = SILTensorOpInfo::getAttrOperand(elt);
+    if (!elt) return false;
+  }
+
+  SILBuilder B(forInst);
+
+  // Add the first operand, which is the metatype for the element.  If it was
+  // a 'Normal' operand, change it to an Array so we can distinguish it in the
+  // case of an empty array.
+  if (attrKind == AttributeModifier::Normal)
+    attrKind = AttributeModifier::Array;
+  name += ","+attrName.str();
+  name += SILTensorOpInfo::getAttributeModifierSuffix(attrKind);
+
+  auto metatypeType =
+    MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+      ->getCanonicalType();
+  operands.push_back(B.createMetatype(forInst->getLoc(),
+                              SILType::getPrimitiveObjectType(metatypeType)));
+
+  // Add all of the operands as explicit values.  If the instructions came
+  // from an out of line array initializer, make sure to clone them over to
+  // our function.
+  for (auto eltVal : elements) {
+    auto elt = cast<SingleValueInstruction>(eltVal);
+    if (elt->getFunction() != forInst->getFunction()) {
+      // Make a copy of the instruction.  We can't even use the normal cloning
+      // facilities here, because they don't support cloning across functions.
+      if (auto *eltInt = dyn_cast<IntegerLiteralInst>(elt))
+        elt = B.createIntegerLiteral(eltInt->getLoc(), eltInt->getType(),
+                                     eltInt->getValue());
+      else if (auto *eltFP = dyn_cast<FloatLiteralInst>(elt))
+        elt = B.createFloatLiteral(eltFP->getLoc(), eltFP->getType(),
+                                   eltFP->getValue());
+      else
+        llvm_unreachable("Unknown instruction to initialize array");
+      elt->setDebugLocation(B.getSILDebugLocation(forInst->getLoc()));
+    }
+
+    operands.push_back(elt);
+    name += ",";
+    name += SILTensorOpInfo::getAttributeModifierSuffix(
+                                              AttributeModifier::ArrayElement);
+  }
+
+  return true;
+}
+
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 ///
@@ -546,25 +600,72 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 /// metatype that corresponds to the Scalar type.  This has been carefully set
 /// up to align with what the Const op wants to see.
 ///
-bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
+SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars");
 
   // If we can't analyze the operands as arrays of constants, give up.
-  auto scalarsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
-  auto shapeArray = dyn_cast_or_null<StructInst>(getAttrOperand(2));
-  if (!scalarsArray || !shapeArray)
-    return false;
+  auto scalars = getAttrOperand(inst->getOperand(1));
+  auto shape = getAttrOperand(inst->getOperand(2));
+  if (!scalars || !shape)
+    return inst;
 
-  // Otherwise, good news everyone!  We can treat this as a Const op.  The first
-  // operand is the $tensor value, the second is the $shape for it, and the
-  // third is the dtype for the result (which gets added later).
-  opName = "Const";
-  builtinName = "__tfop_Const";
-  numInputs = 0;
-  attributes.push_back({"value", AttributeModifier::Tensor });
-  attributes.push_back({"value", AttributeModifier::Shape });
-  return true;
+  // We transform this into a __tfop_Const instruction, where the values are
+  // part of the 'value' tensor attribute and the shape is specified as a shape
+  // attribute.
+  SmallVector<SILValue, 8> operands;
+  std::string name = "__tfop_Const";
+
+  // Try to expand the array and the shape into their scalars.
+  if (!expandArrayAttribute(scalars, "value", AttributeModifier::Tensor,
+                            name, operands, inst))
+    return inst;
+
+  unsigned numElements = operands.size()-1;
+
+  if (!expandArrayAttribute(shape, "value", AttributeModifier::Shape,
+                            name, operands, inst))
+    return inst;
+
+  // Verify we have the right number of scalars.  If not, emit an error and
+  // leave the broken code without promoting it to an op.
+  uint64_t scalarCount = 1;
+  std::string errorInfo;
+  for (auto elt : ArrayRef<SILValue>(operands).drop_front(numElements+2)) {
+    auto *eltCst = cast<IntegerLiteralInst>(elt);
+    scalarCount *= eltCst->getValue().getLimitedValue();
+  }
+  if (scalarCount != numElements && errorInfo.empty()) {
+    errorInfo = "tensor literal should have " + llvm::utostr(scalarCount) +
+          " scalars for this shape, but has " + llvm::utostr(numElements);
+  }
+
+  if (!errorInfo.empty()) {
+    auto loc = getUserSourceLocation(inst);
+    diagnose(inst->getType().getSwiftRValueType()->getASTContext(),
+             loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
+      .highlight(loc.getSourceRange());
+    return inst;
+  }
+
+  // This takes a Tensor and a Shape operand, but needs a DType added.  The
+  // dtype is the type of the Tensor elements, which we conveniently already
+  // have available as the first operand.
+  operands.push_back(operands[0]);
+  name += ",dtype";
+
+  SILBuilder B(inst);
+
+  // Finally bbuild a new builtin instruction with the simplified operands.
+  auto newInst =
+    B.createBuiltin(inst->getLoc(),
+                    B.getASTContext().getIdentifier(name),
+                    inst->getResults()[0]->getType(), /*no substitions*/{},
+                    operands);
+  newInst->setDebugLocation(inst->getDebugLocation());
+  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->eraseFromParent();
+  return newInst;
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
@@ -575,21 +676,76 @@ bool SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
 /// reliable deabstraction pass we can re-evaluate this and hopefully eliminate
 /// it in favor of library code in the TensorFlow module.
 ///
-bool SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
+SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_Scalars_1d");
 
   // If we can't analyze the operands as arrays of constants, give up.
-  auto scalarsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
-  if (!scalarsArray)
-    return false;
+  auto scalars = getAttrOperand(inst->getOperand(1));
+  if (!scalars)
+    return inst;
 
-  // Otherwise, good news everyone!  We can treat this as a Const op.
-  opName = "Const";
-  numInputs = 0;
-  builtinName = "__tfop_Const";
-  attributes.push_back({"value", AttributeModifier::Tensor });
-  return true;
+  // We transform this into a __tfop_Const instruction, where the values are
+  // part of the 'value' tensor attribute and the shape is hard coded.
+  SmallVector<SILValue, 8> operands;
+  std::string name = "__tfop_Const";
+
+  // Try to expand the array into its scalars.
+  if (!expandArrayAttribute(scalars, "value", AttributeModifier::Tensor,
+                            name, operands, inst))
+    return inst;
+
+  SILBuilder B(inst);
+
+  // This takes a Tensor operand, but needs a Shape and a DType added.  At
+  // this point, the operands list will have a metatype for the tensor as
+  // the first operand then all the elements.
+  uint64_t scalarCount = operands.size()-1;
+
+  // The shape needs a metatype to be well formed, but nothing actually
+  // cares what it is.  Just re-push the metatype for the tensor elements,
+  // even though it might be floating point or something else weird.
+  operands.push_back(operands[0]);
+  name += ",shape";
+  name += getAttributeModifierSuffix(AttributeModifier::Shape);
+
+  // The shape of a 1d tensor is just the count of elements.
+  auto &ctx = inst->getFunction()->getASTContext();
+  auto scalarCountVal =
+    B.createIntegerLiteral(inst->getLoc(),
+                           SILType::getBuiltinIntegerType(64, ctx),
+                           scalarCount);
+  operands.push_back(scalarCountVal);
+  name += ",";
+  name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
+
+  // The  dtype is the type of the Tensor elements, which we conveniently
+  // already have available as the first operand.
+  operands.push_back(operands[0]);
+  name += ",dtype";
+
+  // Finally bbuild a new builtin instruction with the simplified operands.
+  auto newInst =
+    B.createBuiltin(inst->getLoc(),
+                    B.getASTContext().getIdentifier(name),
+                    inst->getResults()[0]->getType(), /*no substitions*/{},
+                    operands);
+  newInst->setDebugLocation(inst->getDebugLocation());
+  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->eraseFromParent();
+  return newInst;
+}
+
+/// If the specified call is to a function that we can promote to an op,
+/// rewrite the instruction and return a new one that does so.  Otherwise,
+/// return the same instruction.
+SILInstruction *SILTensorOpInfo::decodeApply(ApplyInst *apply, StringRef name) {
+  if (name == "__tf_tensor_from_scalars")
+    return decodeTensorFromScalars(apply);
+  if (name == "__tf_tensor_from_scalars_1d")
+    return decodeTensorFromScalars1D(apply);
+
+  return apply;
 }
 
 
@@ -630,20 +786,49 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
       if (!isa<IntegerLiteralInst>(operand))
         return "attribute '" + attr.first.str()+"' requires a constant integer";
       break;
+    case AttributeModifier::Shape:
+    case AttributeModifier::Array:
+      // Decoded shape values are represented by a metatype, and are optionally
+      // followed by array element values.
+      if (isa<MetatypeInst>(operand))
+        break;
+      return "attribute '" + attr.first.str() +
+        "' requires a constant integer or floating point constant";
+
+    case AttributeModifier::ArrayElement:
+      // Integer and float elements work.
+      if (isa<IntegerLiteralInst>(operand) ||
+          isa<FloatLiteralInst>(operand))
+        break;
+      return "attribute '" + attr.first.str() +
+        "' requires a constant integer or floating point constant";
+
     case AttributeModifier::Tensor:
       // If this an integer or float, it should be turned into a TF_Tensor.
       if (isa<IntegerLiteralInst>(operand) ||
           isa<FloatLiteralInst>(operand))
         break;
 
+      // Decoded tensor value as represented by a metatype, and are optionally
+      // followed by array element values.
+      if (isa<MetatypeInst>(operand))
+        break;
+
       // Otherwise, if it is an array, it should be decodable and should be
       // followed by a shape.
       if (isa<StructInst>(operand)) {
         Type scalarsElementType;
-        SmallVector<SingleValueInstruction*, 16> scalars;
+        SmallVector<SILValue, 16> scalars;
         if (!decodeArrayElements(operand, scalars, scalarsElementType)) {
           return "attribute '" + attr.first.str() +
                  "' requires an array of constant values";
+        }
+
+        // Check that all the elements are constants.
+        for (auto elt : scalars) {
+          if (!getAttrOperand(elt))
+            return "attribute '" + attr.first.str() +
+                   "' requires an array of constant values";
         }
 
         // The next operand must be a shape.
@@ -666,15 +851,20 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
           return "attribute '" + attr.first.str() + "' has invalid shape";
 
         Type shapeElementType;
-        SmallVector<SingleValueInstruction*, 4> shape;
+        SmallVector<SILValue, 4> shape;
         if (!decodeArrayElements(shapeOperand, shape, shapeElementType))
           return "attribute '" + attr.first.str() + "' has non-constant shape";
 
         // Verify we have the right number of scalars.
         uint64_t scalarCount = 1;
-        for (auto elt : shape)
-          scalarCount *= cast<IntegerLiteralInst>(elt)
-                                                ->getValue().getLimitedValue();
+        for (auto elt : shape) {
+          auto *eltCst =
+            dyn_cast_or_null<IntegerLiteralInst>(getAttrOperand(elt));
+          if (!eltCst)
+            return "attribute '" + attr.first.str() + "' has non-constant shape";
+
+          scalarCount *= eltCst->getValue().getLimitedValue();
+        }
         if (scalarCount != scalars.size())
           return "tensor literal should have " + llvm::utostr(scalarCount) +
              " scalars for this shape, but has " + llvm::utostr(scalars.size());
@@ -685,12 +875,6 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
 
       return "attribute '" + attr.first.str() +
         "' requires a constant integer or floating point constant";
-    case AttributeModifier::Shape:
-      // This array of integers is a shape specifier.
-      return "shape modifier not supported yet";
-    case AttributeModifier::Array:
-    case AttributeModifier::ArrayElement:
-      llvm_unreachable("$array and $elt shouldn't be written by users");
     }
   }
 
@@ -708,24 +892,13 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   std::string name = "__tfop_" + opName.str();
 
   // Handle normal operands.
-  bool changed = false;
   unsigned nextOperand = 0;
-
-  // If this is a well-known call we're promoting to a graph operations, always
-  // canonicalize it.
-  if (isa<ApplyInst>(inst)) {
-    changed = true;
-    nextOperand = 1;  // Skip the callee argument.
-  }
-
   for (unsigned i = 0; i != numInputs; ++i) {
     auto operand = inst->getOperand(nextOperand++);
 
-    if (!isTensorHandle(operand->getType())) {
-      auto scalar = getScalarOperand(operand);
-      changed |= operand != scalar;
-      operand = scalar;
-    }
+    if (!isTensorHandle(operand->getType()))
+      operand = getScalarOperand(operand);
+
     operands.push_back(operand);
   }
 
@@ -741,101 +914,26 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     if (!si) {
       // Otherwise, this is a normal operand.
       operands.push_back(attrOperand);
-      changed |= operand != attrOperand;
       name += ","+attr.first.str()+getAttributeModifierSuffix(attr.second);
       continue;
     }
 
-    // Otherwise, this is an array attribute, so expand it out.
-    SmallVector<SingleValueInstruction*, 8> elements;
-    Type elementType;
-    bool isArray = decodeArrayElements(attrOperand, elements, elementType);
-    assert(isArray && "Unexpected attribute operand"); (void)isArray;
-
-    // Add the first operand, which is the metatype for the element.  If it was
-    // a 'Normal' operand, change it to an Array so we can distinguish it in the
-    // case of an empty array.
-    if (attr.second == AttributeModifier::Normal)
-      attr.second = AttributeModifier::Array;
-    name += ","+attr.first.str()+getAttributeModifierSuffix(attr.second);
-
-    auto metatypeType =
-      MetatypeType::get(elementType, MetatypeRepresentation::Thin)
-         ->getCanonicalType();
-    operands.push_back(B.createMetatype(inst->getLoc(),
-                                SILType::getPrimitiveObjectType(metatypeType)));
-
-    // Add all of the operands as explicit values.  If the instructions came
-    // from an out of line array initializer, make sure to clone them over to
-    // our function.
-    for (auto elt : elements) {
-      if (elt->getFunction() != inst->getFunction()) {
-        // Make a copy of the instruction.  We can't even use the normal cloning
-        // facilities here, because they don't support cloning across functions.
-        if (auto *eltInt = dyn_cast<IntegerLiteralInst>(elt))
-          elt = B.createIntegerLiteral(elt->getLoc(), eltInt->getType(),
-                                       eltInt->getValue());
-        else if (auto *eltFP = dyn_cast<FloatLiteralInst>(elt))
-          elt = B.createFloatLiteral(elt->getLoc(), eltFP->getType(),
-                                     eltFP->getValue());
-        else
-          llvm_unreachable("Unknown instruction to initialize array");
-        elt->setDebugLocation(B.getSILDebugLocation(inst->getLoc()));
-      }
-
-      operands.push_back(elt);
-      name += ",";
-      name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
-    }
+    // If this is an array, then we need to expand it out into its constituent
+    // elements.
+    bool isArray = expandArrayAttribute(attrOperand, attr.first, attr.second,
+                                        name, operands, inst);
+    assert(isArray && "array should be validated in earlier pass");
 
     // Emit a release of the array, since we've dropped the consuming use of it.
     B.emitDestroyValueOperation(inst->getLoc(), attrOperand);
-    changed = true;
   }
   assert(nextOperand == inst->getNumOperands() && "Unexpected operands?");
 
-  // Handle special cases that arise from promoting functions into ops.  We
-  // already know they are going to get rewritten.
-  if (auto *applyInst = dyn_cast<ApplyInst>(inst)) {
-    auto *fnRef = cast<FunctionRefInst>(applyInst->getCallee());
-    auto callee = fnRef->getReferencedFunction()->getName();
-    if (callee == "__tf_tensor_from_scalars") {
-      // This takes a Tensor and a Shape operand, but needs a DType added.  The
-      // dtype is the type of the Tensor elements, which we conveniently already
-      // have available as the first operand.
-      operands.push_back(operands[0]);
-      name += ",dtype";
-    } else if (callee == "__tf_tensor_from_scalars_1d") {
-      // This takes a Tensor operand, but needs a Shape and a DType added.  At
-      // this point, the operands list will have a metatype for the tensor as
-      // the first operand then all the elements.
-      uint64_t scalarCount = operands.size()-1;
-
-      // The shape needs a metatype to be well formed, but nothing actually
-      // cares what it is.  Just re-push the metatype for the tensor elements,
-      // even though it might be floating point or something else weird.
-      operands.push_back(operands[0]);
-      name += ",shape";
-      name += getAttributeModifierSuffix(AttributeModifier::Shape);
-
-      // The shape of a 1d tensor is just the count of elements.
-      auto &ctx = inst->getFunction()->getASTContext();
-      auto scalarCountVal =
-        B.createIntegerLiteral(inst->getLoc(),
-                               SILType::getBuiltinIntegerType(64, ctx),
-                               scalarCount);
-      operands.push_back(scalarCountVal);
-      name += ",";
-      name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
-
-      // This needs the dtype of the Tensor.
-      operands.push_back(operands[0]);
-      name += ",dtype";
-    }
-  }
-
-
-
+  // Determine whether canonicalization changed anything.
+  bool changed = name != builtinName ||
+                 operands.size() != inst->getNumOperands();
+  for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
+    changed |= operands[i] != inst->getOperand(i);
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)
