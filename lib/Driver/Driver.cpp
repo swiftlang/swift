@@ -540,6 +540,10 @@ Driver::buildCompilation(const ToolChain &TC,
     Incremental = false;
   }
 
+  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
+                                    options::OPT_disable_batch_mode,
+                                    false);
+
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
     ArgList->hasArg(options::OPT_continue_building_after_errors);
@@ -679,6 +683,7 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  ArgsHash, StartTime,
                                                  NumberOfParallelCommands,
                                                  Incremental,
+                                                 BatchMode,
                                                  DriverSkipExecution,
                                                  SaveTemps,
                                                  ShowDriverTimeCompilation,

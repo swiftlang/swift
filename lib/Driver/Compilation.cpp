@@ -24,6 +24,7 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
+#include "swift/Driver/ToolChain.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -94,6 +95,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
+                         bool EnableBatchMode,
                          bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
@@ -108,6 +110,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
+    EnableBatchMode(EnableBatchMode),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)) {

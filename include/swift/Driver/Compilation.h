@@ -156,6 +156,11 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// Indicates whether groups of parallel frontend jobs should be merged
+  /// together and run in composite "batch jobs" when possible, to reduce
+  /// redundant work.
+  bool EnableBatchMode;
+
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
@@ -197,6 +202,7 @@ public:
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
+              bool EnableBatchMode = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
@@ -254,7 +260,11 @@ public:
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
   }
-  
+
+  bool getBatchModeEnabled() const {
+    return EnableBatchMode;
+  }
+
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
   }
