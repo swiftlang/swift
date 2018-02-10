@@ -1629,6 +1629,23 @@ ERROR(availability_query_repeated_platform, none,
 WARNING(unknown_syntax_entity, PointsToFirstBadToken,
         "unknown %0 syntax exists in the source", (StringRef))
 
+// SWIFT_ENABLE_TENSORFLOW
+//------------------------------------------------------------------------------
+// #gradient expression parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(gradient_expr_expected_lparen,none,
+      "expected '(' in '#gradient' expression", ())
+ERROR(gradient_expr_expected_rparen,none,
+      "expected ')' in '#gradient' expression", ())
+ERROR(gradient_expr_expected_label,none,
+      "expected label '%0' in '#gradient' expression", (StringRef))
+ERROR(gradient_expr_expected_expression,none,
+      "expected an expression representing the function to be differentiated", ())
+ERROR(gradient_expr_expected_argument_list,none,
+      "expected a list of arguments to differentiate with respect to, e.g. '(self, .0, .1)'", ())
+ERROR(gradient_expr_expected_argument,none,
+      "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

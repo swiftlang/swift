@@ -678,7 +678,12 @@ NOTE(object_literal_resolve_import,none,
      (StringRef, StringRef, StringRef))
 
 // SWIFT_ENABLE_TENSORFLOW
+// TensorFlow op literal
 ERROR(invalid_tfop,none, "%0", (StringRef))
+
+// 'gradient(...)' expression for automatic differentiation
+ERROR(gradient_literal_function_not_differentiable,none,
+      "function '%0' is not differentiable", (Identifier))
 
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))

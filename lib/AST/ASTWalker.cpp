@@ -455,6 +455,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  Expr *visitGradientExpr(GradientExpr *E) {
+    if (Expr *arg = E->getPrimalExpr()) {
+      if (Expr *arg2 = doIt(arg)) {
+        E->setPrimalExpr(arg2);
+      } else {
+        return nullptr;
+      }
+    }
+    return E;
+  }
+
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 

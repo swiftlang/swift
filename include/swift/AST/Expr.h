@@ -27,6 +27,8 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
 #include "swift/Basic/InlineBitfield.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/Differentiation.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -3820,9 +3822,77 @@ public:
   }
 };
 
-/// An expression referring to an opaque object of a fixed type.
+/// SWIFT_ENABLE_TENSORFLOW
 ///
-/// Opaque value expressions occur when a particular value within the AST
+/// Gradient expression - An expression that produces the automatically
+/// differentiated adjoint function that computes the gradient or
+/// vector-Jacobian product with respect to specified arguments.
+/// Example:
+///   #gradient(of: baz)
+///   #gradient(of: bar, withRespectTo: (.0, .1))
+///   #gradient(of: foo(_:_:), withRespectTo: (.0))
+class GradientExpr : public Expr {
+public:
+  static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
+                              SourceLoc lParenLoc,
+                              Expr *primalExpr, ArrayRef<AutoDiffArgument>,
+                              SourceLoc rParenLoc);
+
+  Expr *getPrimalExpr() const {
+    return PrimalExpr;
+  }
+
+  void setPrimalExpr(Expr *newPrimal) {
+    PrimalExpr = newPrimal;
+  }
+
+  AutoDiffArgument *getArgumentsData() {
+    return reinterpret_cast<AutoDiffArgument *>(this+1);
+  }
+
+  ArrayRef<AutoDiffArgument> getArguments() const;
+
+  MutableArrayRef<AutoDiffArgument> getArguments() {
+    return { getArgumentsData(), NumArguments };
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(Loc, RParenLoc);
+  }
+
+  FuncDecl *getResolvePrimal() const {
+    return ResolvedPrimal;
+  }
+
+  void setResolvedPrimal(FuncDecl *RP) {
+    ResolvedPrimal = RP;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Gradient;
+  }
+
+private:
+  /// The start location of this expression.
+  SourceLoc Loc;
+  /// The location of '(' right after '#gradient'.
+  SourceLoc LParenLoc;
+  /// The expression representing the function to differentiate.
+  Expr *PrimalExpr;
+  /// The number of arguments in the argument list.
+  unsigned NumArguments;
+  /// The location of ')'.
+  SourceLoc RParenLoc;
+  /// Primal declaration, to be resolved by Sema.
+  FuncDecl *ResolvedPrimal = nullptr;
+
+  GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *primalExpr,
+               ArrayRef<AutoDiffArgument> arguments, SourceLoc rParenLoc);
+
+};
+
+/// An expression referring to an opaque object of a fixed type.
+/// /// Opaque value expressions occur when a particular value within the AST
 /// needs to be re-used without being re-evaluated or for a value that is
 /// a placeholder. OpaqueValueExpr nodes are introduced by some other AST
 /// node (say, a \c DynamicMemberRefExpr) and can only be used within the

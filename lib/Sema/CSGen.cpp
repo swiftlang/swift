@@ -1231,6 +1231,14 @@ namespace {
       llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    Type visitGradientExpr(GradientExpr *expr) {
+      // #gradient already has an assigned type.
+      assert(expr->getType() &&
+             "#gradient expression should already have a type.");
+      return expr->getType();
+    }
+
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType() && !expr->getType()->hasTypeVariable())

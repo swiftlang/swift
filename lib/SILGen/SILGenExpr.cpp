@@ -477,6 +477,8 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+    // SWIFT_ENABLE_TENSORFLOW
+    RValue visitGradientExpr(GradientExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -2944,6 +2946,13 @@ RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
   return visit(E->getSemanticExpr(), C);
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+RValue RValueEmitter::
+visitGradientExpr(GradientExpr *E, SGFContext C) {
+  // FIXME: Handle this.
+  llvm_unreachable("Unhandled GradientExpr");
 }
 
 RValue RValueEmitter::

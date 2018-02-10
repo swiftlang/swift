@@ -1790,6 +1790,11 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case tok::pound_gradient:
+    Result = parseExprGradient();
+    break;
+
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
     // context.
@@ -3640,4 +3645,96 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
   return makeParserResult(
            new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
                                          subExpr.get(), rParenLoc, Type()));
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// parseExprGradient
+///
+///   expr-gradient:
+///     'gradient' '('
+///       'of' ':' expr
+///       (',' 'withRespectTo' ':' '(' expr-gradient-arg-list ')')?
+///     ')'
+///   expr-gradient-arg-list:
+///     expr-gradient-arg-index (',' expr-gradient-arg-index)*
+///   expr-gradient-arg-index:
+///     'self' | '.' [0-9]+
+///
+ParserResult<Expr> Parser::parseExprGradient() {
+  auto poundGradLoc = consumeToken(tok::pound_gradient);
+  SourceLoc lParenLoc;
+  SourceLoc rParenLoc;
+
+  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserResult<Expr> {
+    for (int i = 0; i < parenDepth; i++) {
+      skipUntilDeclStmtRBrace(tok::r_paren);
+      parseToken(tok::r_paren, rParenLoc, diag::gradient_expr_expected_rparen);
+    }
+    return makeParserResult<Expr>(
+      new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
+  };
+
+  // Parse '(' 'of' ':'.
+  if (parseToken(tok::l_paren, lParenLoc, diag::gradient_expr_expected_lparen)
+   || parseSpecificIdentifier("of", diag::gradient_expr_expected_label, "of:")
+   || parseToken(tok::colon, diag::expected_parameter_colon)) {
+    return errorAndSkipToEnd();
+  }
+  // Parse an expression, hopefully a DeclRefExpr. Sema will check this.
+  auto primalParseResult = parseExpr(diag::gradient_expr_expected_expression);
+  if (primalParseResult.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  if (primalParseResult.isParseError())
+    return errorAndSkipToEnd();
+  // If found comma, parse 'withRespectTo:'.
+  SmallVector<AutoDiffArgument, 8> args;
+  if (consumeIf(tok::comma)) {
+    // Parse 'withRespectTo' ':' '('.
+    if (parseSpecificIdentifier("withRespectTo",
+                                diag::gradient_expr_expected_label,
+                                "withRespectTo:") ||
+        parseToken(tok::colon, diag::expected_parameter_colon) ||
+        parseToken(tok::l_paren, diag::gradient_expr_expected_argument_list))
+      return errorAndSkipToEnd();
+    // Function that parses one argument.
+    auto parseArg = [&]() -> bool {
+      SourceLoc argLoc;
+      switch (Tok.getKind()) {
+      case tok::period_prefix:
+        consumeToken(tok::period_prefix);
+        unsigned index;
+        if (parseUnsignedInteger(index, argLoc,
+                                 diag::gradient_expr_expected_argument))
+          return true;
+        args.push_back(
+          AutoDiffArgument::getIndexArgument(argLoc, index));
+        break;
+      case tok::kw_self:
+        argLoc = consumeToken(tok::kw_self);
+        args.push_back(AutoDiffArgument::getSelfArgument(argLoc));
+        break;
+      default:
+        diagnose(Tok, diag::gradient_expr_expected_argument);
+        return true;
+      }
+      return false;
+    };
+    // Parse first argument.
+    if (parseArg())
+      return errorAndSkipToEnd(2);
+    // Parse the rest of arguments, ending with ')'.
+    while (!consumeIf(tok::r_paren))
+      if (parseToken(tok::comma, diag::gradient_expr_expected_rparen) ||
+          parseArg())
+        return errorAndSkipToEnd(2);
+  }
+  // Parse the closing ')'.
+  if (parseToken(tok::r_paren, rParenLoc, diag::gradient_expr_expected_rparen))
+    return makeParserResult<Expr>(
+      new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
+
+  // Successfully parsed a #gradient expression.
+  return makeParserResult<Expr>(
+    GradientExpr::create(Context, poundGradLoc, lParenLoc,
+                         primalParseResult.get(), args, rParenLoc));
 }

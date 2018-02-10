@@ -374,6 +374,8 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(KeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
+    // SWIFT_ENABLE_TENSORFLOW
+    NON_LVALUE_EXPR(Gradient)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -405,6 +407,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(BooleanLiteral);
   NO_REFERENCE(StringLiteral);
   NO_REFERENCE(InterpolatedStringLiteral);
+  // SWIFT_ENABLE_TENSORFLOW
+  NO_REFERENCE(Gradient);
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
@@ -681,6 +685,11 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
+    return true;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case ExprKind::Gradient:
+    // Legal but pointless.
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -1250,6 +1259,31 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 
   return arg;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+GradientExpr::GradientExpr(SourceLoc loc, SourceLoc lParenLoc,
+                           Expr *primalExpr,
+                           ArrayRef<AutoDiffArgument> arguments,
+                           SourceLoc rParenLoc)
+  : Expr(ExprKind::OpaqueValue, /*Implicit=*/true),
+      Loc(loc), LParenLoc(lParenLoc), PrimalExpr(primalExpr),
+      NumArguments(arguments.size()),
+      RParenLoc(rParenLoc) {
+  std::copy(arguments.begin(), arguments.end(), getArgumentsData());
+}
+
+GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
+                                   SourceLoc lParenLoc, Expr *primalExpr,
+                                   ArrayRef<AutoDiffArgument> arguments,
+                                   SourceLoc rParenLoc) {
+  unsigned numArgs = arguments.size();
+  unsigned size = sizeof(GradientExpr) + numArgs * sizeof(AutoDiffArgument);
+  void *memory = ctx.Allocate(size, alignof(GradientExpr));
+  return new (memory) GradientExpr(loc, lParenLoc, primalExpr, arguments,
+                                   rParenLoc);
+}
+
+
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                                      Expr *Arg,

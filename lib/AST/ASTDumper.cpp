@@ -1792,6 +1792,31 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitGradientExpr(GradientExpr *E) {
+    printCommon(E, "gradient_expr");
+    OS << " primal=";
+    E->getPrimalExpr()->dump(OS);
+    auto arguments = E->getArguments();
+    if (!arguments.empty()) {
+      OS << " wrt=(";
+      interleave(arguments, [&](const AutoDiffArgument &arg) {
+        switch (arg.getKind()) {
+        case AutoDiffArgument::Kind::Index:
+          OS << '.' << arg.getIndex();
+          break;
+        case AutoDiffArgument::Kind::Self:
+          OS << 'self';
+          break;
+        }
+      }, [&]{
+        OS << ", ";
+      });
+      OS << ")";
+    }
+    OS << ")";
+  }
+
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
       << " kind='" << E->getLiteralKindPlainName() << "'";
