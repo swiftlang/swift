@@ -32,6 +32,7 @@
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/Differentiation.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1271,45 +1272,6 @@ public:
 ///   @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
 ///   @differentiable(withRespectTo: (self, .0, .1), gradient: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
-public:
-  enum class ArgumentKind { Index, Self };
-  class Argument {
-  private:
-    SourceLoc Loc;
-    ArgumentKind Kind;
-    union Value {
-      struct { unsigned Index; }; // Index
-      struct {};                  // Self
-      // TODO: Other argument kinds, e.g. identifier?
-      Value(unsigned index) : Index(index) {}
-      Value() {}
-    } V;
-  public:
-    Argument(SourceLoc loc, ArgumentKind kind, Value value)
-      : Loc(loc), Kind(kind), V(value) {}
-
-    static Argument getIndexArgument(SourceLoc loc, unsigned index) {
-      return { loc, ArgumentKind::Index, { index } };
-    }
-
-    static Argument getSelfArgument(SourceLoc loc) {
-      return { loc, ArgumentKind::Self, {} };
-    }
-
-    unsigned getIndex() const {
-      assert(Kind == ArgumentKind::Index);
-      return V.Index;
-    }
-
-    ArgumentKind getKind() const {
-      return Kind;
-    }
-
-    SourceLoc getLoc() const {
-      return Loc;
-    }
-  };
-
 private:
   /// The number of arguments specified in 'withRespectTo:'.
   size_t NumArguments;
@@ -1322,7 +1284,7 @@ private:
   FuncDecl *adjointFunction = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<Argument> arguments,
+                              ArrayRef<AutoDiffArgument> arguments,
                               DeclName gradFuncName,
                               DeclNameLoc gradFuncNameLoc,
                               TrailingWhereClause *clause);
@@ -1330,7 +1292,7 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
                                     SourceRange baseRange,
-                                    ArrayRef<Argument> arguments,
+                                    ArrayRef<AutoDiffArgument> arguments,
                                     DeclName gradFuncName,
                                     DeclNameLoc gradFuncNameLoc,
                                     TrailingWhereClause *clause);
@@ -1347,15 +1309,15 @@ public:
     return WhereClause;
   }
 
-  Argument *getArgumentsData() {
-    return reinterpret_cast<Argument *>(this+1);
+  AutoDiffArgument *getArgumentsData() {
+    return reinterpret_cast<AutoDiffArgument *>(this+1);
   }
 
   /// The list of arguments marking that the function is only differentiable
   /// with respect to specific arguments.
-  ArrayRef<Argument> getArguments() const;
+  ArrayRef<AutoDiffArgument> getArguments() const;
 
-  MutableArrayRef<Argument> getArguments() {
+  MutableArrayRef<AutoDiffArgument> getArguments() {
     return { getArgumentsData(), NumArguments };
   }
 

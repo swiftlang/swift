@@ -526,7 +526,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   // Parse optional 'withRespectTo:' label.
-  SmallVector<DifferentiableAttr::Argument, 8> args;
+  SmallVector<AutoDiffArgument, 8> args;
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
@@ -551,11 +551,11 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  diag::attr_differentiable_expected_argument))
           return true;
         args.push_back(
-          DifferentiableAttr::Argument::getIndexArgument(argLoc, index));
+          AutoDiffArgument::getIndexArgument(argLoc, index));
         break;
       case tok::kw_self:
         argLoc = consumeToken(tok::kw_self);
-        args.push_back(DifferentiableAttr::Argument::getSelfArgument(argLoc));
+        args.push_back(AutoDiffArgument::getSelfArgument(argLoc));
         break;
       default:
         diagnose(Tok, diag::attr_differentiable_expected_argument);

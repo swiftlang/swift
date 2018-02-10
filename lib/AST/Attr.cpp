@@ -929,7 +929,7 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                                       ArrayRef<Argument> arguments,
+                                       ArrayRef<AutoDiffArgument> arguments,
                                        DeclName gradFuncName,
                                        DeclNameLoc gradFuncNameLoc,
                                        TrailingWhereClause *clause)
@@ -939,22 +939,23 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   std::copy(arguments.begin(), arguments.end(), getArgumentsData());
 }
 
-DifferentiableAttr *DifferentiableAttr::create(ASTContext &context,
-                                               SourceLoc atLoc,
-                                               SourceRange baseRange,
-                                               ArrayRef<Argument> arguments,
-                                               DeclName gradFuncName,
-                                               DeclNameLoc gradFuncNameLoc,
-                                               TrailingWhereClause *clause) {
+DifferentiableAttr *
+DifferentiableAttr::create(ASTContext &context,
+                           SourceLoc atLoc,
+                           SourceRange baseRange,
+                           ArrayRef<AutoDiffArgument> arguments,
+                           DeclName gradFuncName,
+                           DeclNameLoc gradFuncNameLoc,
+                           TrailingWhereClause *clause) {
   unsigned numArgs = arguments.size();
-  unsigned size = sizeof(DifferentiableAttr) + numArgs * sizeof(Argument);
+  unsigned size = sizeof(DifferentiableAttr) + numArgs * sizeof(AutoDiffArgument);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, arguments,
                                       gradFuncName, gradFuncNameLoc,
                                       clause);
 }
 
-ArrayRef<DifferentiableAttr::Argument>
+ArrayRef<AutoDiffArgument>
 DifferentiableAttr::getArguments() const {
   return const_cast<DifferentiableAttr *>(this)->getArguments();
 }
