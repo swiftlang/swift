@@ -65,13 +65,6 @@ func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> 
   return handle
 }
 
-@_versioned @inline(never)
-@_silgen_name("__tf_scalarize")
-func _TFScalarize<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
-  return handle.makeHostCopy().scalar
-}
-
-
 /// This function converts a TensorHandle that is known to have a 0d value into
 /// the scalar that it produces.  This is intended for use in op definitions
 /// where it is known that the Op always returns a 0d tensor, it is not for use
@@ -81,6 +74,12 @@ func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
+/// This function converts a TensorHandle into a scalar if it is 0d, or returns
+/// nil otherwise.
+@_versioned @_inlineable @inline(__always)
+func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
+  return Scalar._getScalar(handle)
+}
 
 /// This compiler builtin is known by the partitioning pass, which recognizes it
 /// and promotes calls to it to being in graph when it can.  This signature was
@@ -532,7 +531,7 @@ public extension Tensor {
 public extension AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   init?(_ tensor: Tensor<Self>) {
-    guard let scalar = _TFScalarize(tensor.handle) else {
+    guard let scalar = _TFGetScalar(tensor.handle) else {
       return nil
     }
     self = scalar
