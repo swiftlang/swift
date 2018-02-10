@@ -35,9 +35,6 @@ endif()
 
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
-  if(BUILD_SOURCEKIT_XPC_SERVICE AND BUILD_FOUNDATION)
-    add_subdirectory(SwiftSourceKitClient)
-  endif()
 endif()
 
 if(SWIFT_HOST_VARIANT STREQUAL "macosx")
