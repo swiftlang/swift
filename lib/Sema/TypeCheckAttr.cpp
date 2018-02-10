@@ -2155,7 +2155,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     for (size_t i = 0; i < wrtArgs.size(); i++) {
       auto argLoc = wrtArgs[i].getLoc();
       switch (wrtArgs[i].getKind()) {
-      case DifferentiableAttr::ArgumentKind::Index: {
+      case AutoDiffArgument::Kind::Index: {
         unsigned index = wrtArgs[i].getIndex();
         if ((int)index <= lastIndex) {
           TC.diagnose(argLoc,
@@ -2179,7 +2179,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         retElts.push_back(param->getType());
         break;
       }
-      case DifferentiableAttr::ArgumentKind::Self: {
+      case AutoDiffArgument::Kind::Self: {
         // 'self' is only applicable to instance methods.
         if (!isInstanceMethod) {
           TC.diagnose(argLoc,
