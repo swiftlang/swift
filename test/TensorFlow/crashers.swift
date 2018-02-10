@@ -4,9 +4,9 @@
 
 import TensorFlow
 
-var someGlobal = Tensor<Int>(1)
+var someGlobal = Tensor<Int32>(1)
 
-public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<Int> {
+public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tensor<Int32> {
   // expected-warning @-1 {{'c' implicitly copied to the accelerator}}
   // expected-warning @-2 {{'z' implicitly copied to the accelerator}}
 
@@ -59,7 +59,7 @@ public func endpointComputationCrash() {
 
 // This crashed lower graph because it produced an error about not being able
 // to lower a send and there wasn't enough error recovery to handle it well.
-public func lowerGraphCrash(x: Tensor<Int>) {
+public func lowerGraphCrash(x: Tensor<Int32>) {
   // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
 
   _ = x*x  // expected-note {{value used here}}
@@ -127,9 +127,9 @@ public func testStraightLineXORTraining() {
 
 
 // This testcase exposed bb argument and source location manipulation problems.
-public func testEagerLoop() -> Int { // expected-note 4 {{value used here}}
-  var a = Tensor<Int>(6)
-  var count = Tensor<Int>(0)
+public func testEagerLoop() -> Int32 { // expected-note 4 {{value used here}}
+  var a = Tensor<Int32>(6)
+  var count = Tensor<Int32>(0)
   while (a != 1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
     if (a % 2 == 0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
       a = a / 2

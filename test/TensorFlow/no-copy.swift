@@ -34,7 +34,7 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
 */
 
 public func testEmptyScalarsArray() {
-  let y = Tensor<Int>(shape: [0, 20, 30], scalars: [])
+  let y = Tensor<Int32>(shape: [0, 20, 30], scalars: [])
   _ = y+y
 }
 
@@ -45,8 +45,8 @@ public func testEmptyScalarsArray() {
  CHECK: integer_literal $Builtin.Int32, 0
  CHECK: integer_literal $Builtin.Int32, 20
  CHECK: integer_literal $Builtin.Int32, 30
- CHECK:  builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
- CHECK:  builtin "__tfop_Add"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
+ CHECK:  builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type) : $TensorHandle<Int32>
+ CHECK:  builtin "__tfop_Add"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) : $TensorHandle<Int32>
  */
 
 
@@ -114,7 +114,7 @@ public func testZeros() -> Tensor<Float> {
 // scalar back to a tensor.  This checks to make sure that tf-partition can pull
 // this whole mess in graph without leaving anything on the host that will cause
 // a send/receive.
-public func tensorToScalarToTensor(a : Tensor<Int>) -> Tensor<Int> {
+public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
   let scalar = a.toDevice().mean()
   let b = Tensor(scalar)
   return (b+b).toHost()
