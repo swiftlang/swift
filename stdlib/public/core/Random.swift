@@ -125,4 +125,23 @@ public struct Random : RandomNumberGenerator {
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
+  
+  /// Produces the next randomly generated number
+  ///
+  /// - Returns: A number that was randomly generated
+  ///
+  /// This differs from next() as this function has the ability to transform the
+  /// generated number to any unsigned integer.
+  public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
+    var random: T = 0
+    _stdlib_random(&random, MemoryLayout<T>.size)
+    return random
+  }
+}
+
+public // @testable
+func _stdlib_random(_ bytes: UnsafeMutableRawBufferPointer) {
+  if !bytes.isEmpty {
+    _stdlib_random(bytes.baseAddress!, bytes.count)
+  }
 }

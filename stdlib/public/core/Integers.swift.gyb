@@ -2346,6 +2346,99 @@ ${assignmentOperatorComment(x.operator, False)}
 
 % for Range in ['Range', 'ClosedRange']:
 
+extension ${Range}
+where Bound: FixedWidthInteger,
+      Bound.Magnitude: UnsignedInteger {
+      
+  /// Returns a random element from this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element from this collection.
+  ///
+  /// A good example of this is getting a random greeting from an array:
+  ///
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random()
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random() {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20", perhaps
+  @_inlineable
+  public func random<T: RandomNumberGenerator>(
+    using generator: T
+  ) -> Element? {
+%   if 'Closed' not in Range:
+    guard lowerBound != upperBound else {
+      return nil
+    }
+%   end
+    let isLowerNegative = Bound.isSigned && lowerBound < 0
+    let sameSign = !Bound.isSigned || isLowerNegative == (upperBound < 0)
+%   if 'Closed' not in Range:
+    let delta: Bound.Magnitude
+%   else:
+    var delta: Bound.Magnitude
+%   end
+    if isLowerNegative {
+      delta = sameSign
+        ? lowerBound.magnitude - upperBound.magnitude
+        : lowerBound.magnitude + upperBound.magnitude
+    } else {
+      delta = upperBound.magnitude - lowerBound.magnitude
+    }
+%   if 'Closed' in Range:
+    if delta == Bound.Magnitude.max {
+      return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
+    }
+    delta += 1
+%   end
+    let randomMagnitude = generator.next(upperBound: delta)
+    if sameSign {
+      return lowerBound + Bound(randomMagnitude)
+    } else {
+%     if 'Closed' not in Range:
+      return randomMagnitude < upperBound.magnitude
+        ? Bound(randomMagnitude)
+        : -1 - Bound(randomMagnitude - upperBound.magnitude)
+%     else:
+      return Bound.isSigned && randomMagnitude <= upperBound.magnitude
+        ? Bound(randomMagnitude)
+        : 0 - Bound(randomMagnitude - upperBound.magnitude)
+%     end
+    }
+  }
+  
+  /// Returns a random element from this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element from this collection.
+  ///
+  /// A good example of this is getting a random greeting from an array:
+  ///
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random()
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random() {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20", perhaps
+  ///
+  /// This uses the standard library's default random number generator.
+  @_inlineable
+  public func random() -> Element? {
+    return self.random(using: Random.default)
+  }
+}
+
 extension FixedWidthInteger
 where Self.Stride : SignedInteger,
       Self.Magnitude : UnsignedInteger {
@@ -2358,9 +2451,9 @@ where Self.Stride : SignedInteger,
   ///   the random integer.
   /// - Returns: A random representation of this integer.
   @_inlineable
-  public static func random(
+  public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
-    using generator: RandomNumberGenerator = Random.default
+    using generator: T
   ) -> Self {
 %   if 'Closed' not in Range:
     _precondition(
@@ -2369,6 +2462,20 @@ where Self.Stride : SignedInteger,
     )
 %   end
     return range.random(using: generator)!
+  }
+  
+  /// Returns a random representation of this integer within the range.
+  ///
+  /// - Parameter range: A ${Range} to determine the bounds to get a random value
+  ///   from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random integer.
+  /// - Returns: A random representation of this integer.
+  ///
+  /// This uses the standard library's default random number generator.
+  @_inlineable
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return Self.random(in: range, using: Random.default)
   }
 }
 

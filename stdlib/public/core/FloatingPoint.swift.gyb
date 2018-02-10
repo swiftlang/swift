@@ -2390,9 +2390,9 @@ where Self.RawSignificand : FixedWidthInteger,
   ///   the random floating point.
   /// - Returns: A random representation of this floating point.
   @_inlineable
-  public static func random(
+  public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
-    using generator: RandomNumberGenerator = Random.default
+    using generator: T
   ) -> Self {
 %   if 'Closed' not in Range:
     _precondition(
@@ -2418,6 +2418,19 @@ where Self.RawSignificand : FixedWidthInteger,
     return delta * unitRandom + range.lowerBound
   }
 
+  /// Returns a random representation of this floating point within the range.
+  ///
+  /// - Parameter range: A ${Range} to determine the bounds to get a random value
+  ///   from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random floating point.
+  /// - Returns: A random representation of this floating point.
+  ///
+  /// This uses the standard library's default random number generator.
+  @_inlineable
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return Self.random(in: range, using: Random.default)
+  }
 }
 
 % end

@@ -459,57 +459,6 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   }
 }
 
-extension ClosedRange
-where Bound : FixedWidthInteger,
-      Bound.Magnitude : UnsignedInteger {
-
-  /// Returns a random element from this collection.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element from this collection.
-  ///
-  /// A good example of this is getting a random greeting from an array:
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20", perhaps
-  @_inlineable
-  public func random(
-    using generator: RandomNumberGenerator = Random.default
-  ) -> Element? {
-    let isLowerNegative = Bound.isSigned && lowerBound < 0
-    let sameSign = !Bound.isSigned || isLowerNegative == (upperBound < 0)
-    var delta: Bound.Magnitude
-    if isLowerNegative {
-      delta = sameSign
-        ? lowerBound.magnitude - upperBound.magnitude
-        : lowerBound.magnitude + upperBound.magnitude
-    } else {
-      delta = upperBound.magnitude - lowerBound.magnitude
-    }
-    if delta == Bound.Magnitude.max {
-      return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
-    }
-    delta += 1
-    let randomMagnitude = generator.next(upperBound: delta)
-    if sameSign {
-      return lowerBound + Bound(randomMagnitude)
-    } else {
-      return Bound.isSigned && randomMagnitude <= upperBound.magnitude
-        ? Bound(randomMagnitude)
-        : 0 - Bound(randomMagnitude - upperBound.magnitude)
-    }
-  }
-}
-
 extension ClosedRange {
   @_inlineable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
