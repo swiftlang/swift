@@ -5,5 +5,5 @@ add_swift_library(swiftDemangle SHARED
 
 swift_install_in_component(compiler
     TARGETS swiftDemangle
-    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}")
+    LIBRARY DESTINATION "${SWIFT_LIBDIR}"
+    ARCHIVE DESTINATION "${SWIFT_LIBDIR}")

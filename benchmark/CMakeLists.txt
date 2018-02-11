@@ -191,7 +191,7 @@ endif()
 if(NOT SWIFT_LIBRARY_PATH)
   get_filename_component(tmp_dir "${SWIFT_EXEC}" DIRECTORY)
   get_filename_component(tmp_dir "${tmp_dir}" DIRECTORY)
-  set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib${SWIFT_LIBDIR_SUFFIX}/swift")
+  set(SWIFT_LIBRARY_PATH "${tmp_dir}/${SWIFT_LIBDIR}/swift")
 endif()
 
 # If the CMAKE_C_COMPILER is already clang, don't find it again,
@@ -306,8 +306,8 @@ else()
 endif()
 
 set(benchmark-bin-dir "${CMAKE_CURRENT_BINARY_DIR}/bin")
-set(benchmark-lib-dir "${CMAKE_CURRENT_BINARY_DIR}/lib${SWIFT_LIBDIR_SUFFIX}")
-set(benchmark-lib-swift-dir "${CMAKE_CURRENT_BINARY_DIR}/lib${SWIFT_LIBDIR_SUFFIX}/swift")
+set(benchmark-lib-dir "${CMAKE_CURRENT_BINARY_DIR}/${SWIFT_LIBDIR}")
+set(benchmark-lib-swift-dir "${CMAKE_CURRENT_BINARY_DIR}/${SWIFT_LIBDIR}/swift")
 
 file(MAKE_DIRECTORY "${swift-bin-dir}")
 file(MAKE_DIRECTORY "${benchmark-bin-dir}")
