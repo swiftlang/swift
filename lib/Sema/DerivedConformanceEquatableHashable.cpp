@@ -326,7 +326,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
 static void
-deriveBodyEquatable_enumWithoutAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -381,7 +381,7 @@ deriveBodyEquatable_enumWithoutAssociatedValues_eq(AbstractFunctionDecl *eqDecl)
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
 static void
-deriveBodyEquatable_enumWithAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -555,8 +555,8 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   //
   //   @derived
   //   @_implements(Equatable, ==(_:_:))
-  //   func __derived_conformance__equals(a: SomeEnum<T...>,
-  //                                      b: SomeEnum<T...>) -> Bool {
+  //   func __derived_enum_equals(a: SomeEnum<T...>,
+  //                              b: SomeEnum<T...>) -> Bool {
   //     switch (a, b) {
   //     case (.A, .A):
   //       return true
@@ -577,8 +577,8 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   //
   //   @derived
   //   @_implements(Equatable, ==(_:_:))
-  //   func __derived_conformance__equals(a: SomeStruct<T...>,
-  //                                      b: SomeStruct<T...>) -> Bool {
+  //   func __derived_struct_equals(a: SomeStruct<T...>,
+  //                                b: SomeStruct<T...>) -> Bool {
   //     guard a.x == b.x else { return false; }
   //     guard a.y == b.y else { return false; }
   //     return true;
@@ -712,15 +712,15 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
     if (theEnum) {
       auto bodySynthesizer =
           theEnum->hasOnlyCasesWithoutAssociatedValues()
-              ? &deriveBodyEquatable_enumWithoutAssociatedValues_eq
-              : &deriveBodyEquatable_enumWithAssociatedValues_eq;
+              ? &deriveBodyEquatable_enum_noAssociatedValues_eq
+              : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
       return deriveEquatable_eq(tc, parentDecl, theEnum,
-                                tc.Context.Id_derived_conformance__equals,
+                                tc.Context.Id_derived_enum_equals,
                                 bodySynthesizer);
     }
     else if (auto theStruct = dyn_cast<StructDecl>(type))
       return deriveEquatable_eq(tc, parentDecl, theStruct,
-                                tc.Context.Id_derived_conformance__equals,
+                                tc.Context.Id_derived_struct_equals,
                                 &deriveBodyEquatable_struct_eq);
     else
       llvm_unreachable("todo");
