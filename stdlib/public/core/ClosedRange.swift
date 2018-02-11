@@ -385,7 +385,10 @@ extension ClosedRange: Equatable {
 extension ClosedRange : Hashable where Bound : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _combineHashValues(lowerBound.hashValue, upperBound.hashValue)
+    var result = 0
+    result = _combineHashValues(result, lowerBound.hashValue)
+    result = _combineHashValues(result, upperBound.hashValue)
+    return result
   }
 }
 
