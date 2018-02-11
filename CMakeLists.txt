@@ -11,6 +11,8 @@ set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
 # Put linking in that category
 set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
 
+ENABLE_LANGUAGE(C)
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
