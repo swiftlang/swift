@@ -37,9 +37,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +------------------------------------------------+
-//   |  _VariantDictionaryBuffer<K,V> (an enum)      |
+//   |  _VariantDictionaryBuffer<K,V> (an enum)       |
 //   | +--------------------------------------------+ |
-//   | | [_NativeDictionaryBuffer<K,V> (a struct)] | |
+//   | | [_NativeDictionaryBuffer<K,V> (a struct)]  | |
 //   | +---|----------------------------------------+ |
 //   +----/-------------------------------------------+
 //       /
@@ -61,9 +61,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +----------------------------------------------+
-//   | _VariantDictionaryBuffer<K,V> (an enum)     |
+//   | _VariantDictionaryBuffer<K,V> (an enum)      |
 //   | +----------------------------------------+   |
-//   | | [ _CocoaDictionaryBuffer (a struct) ] |   |
+//   | | [ _CocoaDictionaryBuffer (a struct) ]  |   |
 //   | +---|------------------------------------+   |
 //   +-----|----------------------------------------+
 //         |
