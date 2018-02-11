@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
+  const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
   std::unique_ptr<llvm::Module> Mod =
       performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
                           CI.getMainModule()->getName().str(),

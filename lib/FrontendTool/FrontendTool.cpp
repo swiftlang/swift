@@ -298,7 +298,7 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool writeSIL(SILModule &SM, const PrimarySpecificPaths PSPs,
+static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      CompilerInstance &Instance,
                      CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
@@ -482,10 +482,12 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
     C.NumDependencies = D->getDependencies().size();
   }
 
-  if (auto *R = Instance.getReferencedNameTracker()) {
-    C.NumReferencedTopLevelNames = R->getTopLevelNames().size();
-    C.NumReferencedDynamicNames = R->getDynamicLookupNames().size();
-    C.NumReferencedMemberNames = R->getUsedMembers().size();
+  for (auto SF : Instance.getPrimarySourceFiles()) {
+    if (auto *R = SF->getReferencedNameTracker()) {
+      C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
+      C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
+      C.NumReferencedMemberNames += R->getUsedMembers().size();
+    }
   }
 
   if (!Instance.getPrimarySourceFiles().empty()) {
@@ -734,8 +736,8 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
-static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
+static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
+    CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.supplementaryOutputs()
           .ReferenceDependenciesFilePath.empty())
@@ -746,9 +748,12 @@ static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                              *Instance.getDependencyTracker(),
-                              Invocation.getFrontendOptions());
+    std::string referenceDependenciesFilePath =
+        Invocation.getPrimarySpecificPathsForSourceFile(*SF)
+            .SupplementaryOutputs.ReferenceDependenciesFilePath;
+    emitReferenceDependenciesIfNeeded(Instance.getASTContext().Diags, SF,
+                                      *Instance.getDependencyTracker(),
+                                      referenceDependenciesFilePath);
   }
 }
 
@@ -804,7 +809,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
     auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
     std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForPrimary(PrimaryFile->getFilename());
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
     return PSGIs;
   }
@@ -826,16 +831,12 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return PSGIs;
 }
 
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          PrimarySpecificPaths PSPs,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats);
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -860,13 +861,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-    if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
-      return compileLLVMIR(Invocation, Instance, Stats);
-
-  ReferencedNameTracker nameTracker;
-  if (!opts.InputsAndOutputs.supplementaryOutputs()
-           .ReferenceDependenciesFilePath.empty())
-    Instance.setReferencedNameTracker(&nameTracker);
+  if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
+    return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action))
     Instance.performParseOnly();
@@ -914,7 +910,7 @@ static bool performCompile(CompilerInstance &Instance,
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
-  emitReferenceDependenciesIfNeeded(Invocation, Instance);
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   (void)emitLoadedModuleTraceIfNeeded(Context, Instance.getDependencyTracker(),
                                       opts);
@@ -1177,16 +1173,12 @@ static bool generateCode(CompilerInvocation &Invocation,
                      EffectiveLanguageVersion, OutputFilename, Stats);
 }
 
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          const PrimarySpecificPaths PSPs,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats) {
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
