@@ -1831,8 +1831,6 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
-      auto *module = cs.DC->getParentModule();
-
       if (lookupBaseType->mayHaveMembers()) {
         auto subs = lookupBaseType->getContextSubstitutionMap(
           cs.DC->getParentModule(),
