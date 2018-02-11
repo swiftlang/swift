@@ -136,8 +136,10 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   // dispatch (viz. objc_msgSend for now).
   if (methodConstant.hasDecl()
       && methodConstant.getDecl()->isDynamic()) {
-    methodValue = emitDynamicMethodRef(loc, methodConstant,
-                           SGM.Types.getConstantInfo(methodConstant).SILFnType);
+    methodValue = emitDynamicMethodRef(
+                      loc, methodConstant,
+                      SGM.Types.getConstantInfo(methodConstant).SILFnType)
+                      .getValue();
   } else {
     methodValue = emitGlobalFunctionRef(loc, methodConstant);
   }
