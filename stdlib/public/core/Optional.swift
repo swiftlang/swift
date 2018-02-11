@@ -409,6 +409,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   }
 }
 
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension Optional : Hashable where Wrapped : Hashable {
   /// The hash value for the optional.
   ///
@@ -417,6 +418,7 @@ extension Optional : Hashable where Wrapped : Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     var result: Int
     switch self {
