@@ -908,9 +908,9 @@ extension DictionaryLiteral : RandomAccessCollection {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension DictionaryLiteral: Equatable where Key: Equatable, Value: Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
-  public static func == (
-    lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>
+  @_implements(Equatable, ==(_:_:))
+  public static func __conditional_conformance__equals(
+    _ lhs: DictionaryLiteral<Key, Value>, _ rhs: DictionaryLiteral<Key, Value>
   ) -> Bool {
     if lhs.count != rhs.count {
       return false
@@ -929,7 +929,6 @@ extension DictionaryLiteral: Hashable where Key: Hashable, Value: Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
     var result: Int = 0

@@ -367,7 +367,6 @@ extension Range : Hashable where Bound : Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     return _combineHashValues(lowerBound.hashValue, upperBound.hashValue)
   }

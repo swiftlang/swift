@@ -1255,8 +1255,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       auto &ctx = callee->getASTContext();
       if (callee->isImplicit()) {
         // Translate calls to implicit functions to their user-facing names
-        if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
-            callee->getBaseName() == ctx.Id_derived_struct_equals) {
+        if (callee->getBaseName() == ctx.Id_derived_conformance__equals ||
+            callee->getBaseName() == ctx.Id_conditional_conformance__equals) {
           diagnose(fn->getLoc(), diag::expression_unused_result_operator,
                    ctx.Id_EqualsOperator)
             .highlight(SR1).highlight(SR2);
