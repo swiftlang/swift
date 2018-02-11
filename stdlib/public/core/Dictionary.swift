@@ -1452,7 +1452,7 @@ extension Dictionary: Hashable where Value: Hashable {
   @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Dictionary too
-    var result: Int = 0
+    var result = 0
     for (k, v) in self {
       let combined = _combineHashValues(k.hashValue, v.hashValue)
       result ^= _mixInt(combined)

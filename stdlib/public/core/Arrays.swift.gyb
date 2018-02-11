@@ -2303,7 +2303,7 @@ extension ${Self} : Hashable where Element : Hashable {
   @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Array too
-    var result: Int = 0
+    var result = 0
     for element in self {
       result = _combineHashValues(result, element.hashValue)
     }

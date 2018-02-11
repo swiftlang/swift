@@ -781,7 +781,7 @@ extension DictionaryLiteral: Hashable where Key: Hashable, Value: Hashable {
   @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
-    var result: Int = 0
+    var result = 0
     for element in self {
       let elementHashValue =
         _combineHashValues(element.key.hashValue, element.value.hashValue)
