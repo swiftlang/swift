@@ -50,8 +50,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
   // TODO: honor +0 contexts?
   if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
     ManagedValue objectResult = generator(SGFContext());
-    auto some = B.createEnum(loc, objectResult.forward(*this), someDecl, optTy);
-    return emitManagedRValueWithCleanup(some, optTL);
+    return B.createEnum(loc, objectResult, someDecl, optTy);
   }
 
   // Otherwise it's address-only; try to avoid spurious copies by
@@ -131,10 +130,8 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
 
   assert(formalOptType.getOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
-  
-  SILValue result =
-    B.createEnum(loc, value.forward(*this), someDecl, optTL.getLoweredType());
-  return emitManagedRValueWithCleanup(result, optTL);
+
+  return B.createEnum(loc, value, someDecl, optTL.getLoweredType());
 }
 
 auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
@@ -864,22 +861,16 @@ SILGenFunction::emitOpenExistential(
   }
   case ExistentialRepresentation::Metatype:
     assert(existentialType.isObject());
-    archetypeMV =
-        ManagedValue::forUnmanaged(
-            B.createOpenExistentialMetatype(
-                       loc, existentialValue.forward(*this),
-                       loweredOpenedType));
+    archetypeMV = B.createOpenExistentialMetatype(
+        loc, existentialValue, loweredOpenedType);
     // Metatypes are always trivial. Consuming would be a no-op.
     canConsume = false;
     break;
   case ExistentialRepresentation::Class: {
     assert(existentialType.isObject());
-    SILValue archetypeValue = B.createOpenExistentialRef(
-                       loc, existentialValue.forward(*this),
-                       loweredOpenedType);
-    canConsume = existentialValue.hasCleanup();
-    archetypeMV = (canConsume ? emitManagedRValueWithCleanup(archetypeValue)
-                              : ManagedValue::forUnmanaged(archetypeValue));
+    archetypeMV =
+        B.createOpenExistentialRef(loc, existentialValue, loweredOpenedType);
+    canConsume = archetypeMV.hasCleanup();
     break;
   }
   case ExistentialRepresentation::Boxed:

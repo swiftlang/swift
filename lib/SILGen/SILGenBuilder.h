@@ -313,6 +313,11 @@ public:
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
+  using SILBuilder::createOpenExistentialMetatype;
+  ManagedValue createOpenExistentialMetatype(SILLocation loc,
+                                             ManagedValue value,
+                                             SILType openedType);
+
   /// Convert a @convention(block) value to AnyObject.
   ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
                                       SILType type);
