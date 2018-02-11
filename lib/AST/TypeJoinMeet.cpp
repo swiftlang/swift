@@ -67,8 +67,7 @@ public:
 
     // Until we handle all the combinations of joins, we need to make
     // sure we visit the optional side.
-    OptionalTypeKind otk;
-    if (second->getOptionalObjectType(otk))
+    if (second->getOptionalObjectType())
       return TypeJoin(first).visit(second);
 
     return TypeJoin(second).visit(first);
@@ -160,12 +159,17 @@ CanType TypeJoin::visitBoundGenericEnumType(CanType second) {
   if (First->getKind() != second->getKind())
     return First->getASTContext().TheAnyType;
 
-  OptionalTypeKind otk1, otk2;
-  auto firstObject = First->getOptionalObjectType(otk1);
-  auto secondObject = second->getOptionalObjectType(otk2);
-  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
-    auto canFirst = firstObject->getCanonicalType();
-    auto canSecond = secondObject->getCanonicalType();
+  bool firstIsOptional, secondIsOptional;
+  auto firstObject = First->getOptionalObjectType(firstIsOptional);
+  auto secondObject = second->getOptionalObjectType(secondIsOptional);
+  if (firstIsOptional || secondIsOptional) {
+    CanType canFirst;
+    CanType canSecond;
+
+    if (firstObject)
+      canFirst = firstObject->getCanonicalType();
+    if (secondObject)
+      canSecond = secondObject->getCanonicalType();
 
     // Compute the join of the unwrapped type. If there is none, we're done.
     auto unwrappedJoin =

@@ -1736,14 +1736,12 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 }
 
 static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
-  OptionalTypeKind OTK;
   if (auto metatypeTy = ty->getAs<MetatypeType>()) {
     return MetatypeType::get(
         rebuildWithDynamicSelf(Context, metatypeTy->getInstanceType()),
         metatypeTy->getRepresentation());
-  } else if (auto optionalTy = ty->getOptionalObjectType(OTK)) {
-    return OptionalType::get(
-        OTK, rebuildWithDynamicSelf(Context, optionalTy));
+  } else if (auto optionalTy = ty->getOptionalObjectType()) {
+    return OptionalType::get(rebuildWithDynamicSelf(Context, optionalTy));
   } else {
     return DynamicSelfType::get(ty, Context);
   }
