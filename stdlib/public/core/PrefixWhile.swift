@@ -206,7 +206,9 @@ extension LazyPrefixWhileCollection.Index: Comparable {
   }
 }
 
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
+  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
