@@ -193,9 +193,8 @@ extension ReversedCollection.Index: Comparable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
-  @available(swift, introduced: 4.1)
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
   }

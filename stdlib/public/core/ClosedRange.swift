@@ -167,11 +167,9 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension ClosedRange.Index: Hashable
   where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     switch self {
     case .inRange(let value):
@@ -379,10 +377,8 @@ extension ClosedRange: Equatable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension ClosedRange : Hashable where Bound : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     var result = 0
     result = _combineHashValues(result, lowerBound.hashValue)
