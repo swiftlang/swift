@@ -788,20 +788,13 @@ void RValue::verify(SILGenFunction &SGF) const & {
 }
 
 bool RValue::isPlusOne(SILGenFunction &SGF) const & {
-  return llvm::all_of(values, [&SGF](ManagedValue mv) -> bool {
-    // Ignore trivial values and objects with trivial value ownership kind.
-    if (mv.getType().isTrivial(SGF.F.getModule()) ||
-        (mv.getType().isObject() &&
-         mv.getOwnershipKind() == ValueOwnershipKind::Trivial))
-      return true;
-    return mv.hasCleanup();
-  });
+  return llvm::all_of(
+      values, [&SGF](ManagedValue mv) -> bool { return mv.isPlusOne(SGF); });
 }
 
 bool RValue::isPlusZero(SILGenFunction &SGF) const & {
-  return llvm::none_of(values, [](ManagedValue mv) -> bool {
-    return mv.hasCleanup();
-  });
+  return llvm::none_of(values,
+                       [](ManagedValue mv) -> bool { return mv.isPlusZero(); });
 }
 
 const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
