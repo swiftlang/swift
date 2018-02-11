@@ -1448,12 +1448,6 @@ extension Dictionary: Equatable where Value: Equatable {
 
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension Dictionary: Hashable where Value: Hashable {
-  /// The hash value for the dictionary.
-  ///
-  /// Two dictionaries that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4.1)
   public var hashValue: Int {

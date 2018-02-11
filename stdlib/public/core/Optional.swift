@@ -411,7 +411,7 @@ extension Optional : Equatable where Wrapped : Equatable {
 
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension Optional : Hashable where Wrapped : Hashable {
-  /// The hash value for the optional.
+  /// The hash value for the optional instance.
   ///
   /// Two optionals that are equal will always have equal hash values.
   ///
