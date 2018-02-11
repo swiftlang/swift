@@ -2297,7 +2297,8 @@ extension ${Self} : Equatable where Element : Equatable {
   }
 }
 
-extension ${Self} : Hashable where Element : Hashable {
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
+extension ${Self}: Hashable where Element : Hashable {
   /// The hash value for the array.
   ///
   /// Two arrays that are equal will always have equal hash values.
@@ -2305,6 +2306,7 @@ extension ${Self} : Hashable where Element : Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Array too
     var result: Int = 0

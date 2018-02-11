@@ -166,8 +166,10 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable 
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
+extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     switch self {
     case .inRange(let value):

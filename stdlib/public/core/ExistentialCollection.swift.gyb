@@ -1244,8 +1244,10 @@ extension ${Self}: _AnyCollectionProtocol {
 }
 % end
 
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension AnyCollection : Equatable where Element : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 4.1)
   public static func == (
     lhs: AnyCollection<Element>, rhs: AnyCollection<Element>
   ) -> Bool {
@@ -1256,6 +1258,7 @@ extension AnyCollection : Equatable where Element : Equatable {
   }
 }
 
+@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension AnyCollection : Hashable where Element : Hashable {
   /// The hash value for the collection.
   ///
@@ -1265,6 +1268,7 @@ extension AnyCollection : Hashable where Element : Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to AnyCollection too
     var result: Int = 0
