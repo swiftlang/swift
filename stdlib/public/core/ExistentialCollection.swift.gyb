@@ -1244,21 +1244,14 @@ extension ${Self}: _AnyCollectionProtocol {
 }
 % end
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
-extension AnyCollection : Equatable where Element : Equatable {
+extension AnyCollection : Equatable, _Equatable where Element : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1) // FIXME(conformance-availability)
-  public static func == (
-    lhs: AnyCollection<Element>, rhs: AnyCollection<Element>
-  ) -> Bool {
-    if lhs.count != rhs.count {
-      return false
-    }
-    return lhs.elementsEqual(rhs)
+  public func _isEqual(to other: AnyCollection) -> Bool {
+    if count != other.count { return false }
+    return elementsEqual(other)
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension AnyCollection : Hashable where Element : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {

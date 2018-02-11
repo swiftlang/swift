@@ -905,22 +905,16 @@ extension DictionaryLiteral : RandomAccessCollection {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
-extension DictionaryLiteral: Equatable where Key: Equatable, Value: Equatable {
+extension DictionaryLiteral : Equatable, _Equatable
+  where Key : Equatable, Value : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1) // FIXME(conformance-availability)
-  public static func == (
-    lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>
-  ) -> Bool {
-    if lhs.count != rhs.count {
-      return false
-    }
-    return lhs.elementsEqual(rhs, by: ==)
+  public func _isEqual(to other: DictionaryLiteral) -> Bool {
+    if count != other.count { return false }
+    return elementsEqual(other, by: ==)
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
-extension DictionaryLiteral: Hashable where Key: Hashable, Value: Hashable {
+extension DictionaryLiteral : Hashable where Key : Hashable, Value : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
