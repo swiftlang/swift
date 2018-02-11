@@ -233,7 +233,7 @@ extension FlattenCollection.Index : Comparable {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
-  @available(swift, introduced: 4.1)
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
   }

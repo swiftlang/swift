@@ -140,8 +140,10 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 extension CollectionOfOne : Equatable where Element : Equatable {
   /// Returns a Boolean value indicating whether two collections are equal.
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
-  public static func == (lhs: CollectionOfOne, rhs: CollectionOfOne) -> Bool {
+  @_implements(Equatable, ==(_:_:))
+  public static func __conditional_conformance__equals(
+    _ lhs: CollectionOfOne, _ rhs: CollectionOfOne
+  ) -> Bool {
     return lhs._element == rhs._element
   }
 }
@@ -155,7 +157,6 @@ extension CollectionOfOne : Hashable where Element : Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     return _element.hashValue
   }
