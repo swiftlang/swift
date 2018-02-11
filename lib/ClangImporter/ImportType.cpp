@@ -998,7 +998,14 @@ namespace {
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              if (!Impl.matchesHashableBound(keyType)) {
+              if (!Impl.matchesHashableBound(keyType) ||
+                  // Dictionary and Array conditionally conform to Hashable,
+                  // but the conformance doesn't necessarily apply with the
+                  // imported versions of their type arguments.
+                  // FIXME: Import their non-Hashable type parameters as
+                  // AnyHashable in this context.
+                  keyType->getStructOrBoundGenericStruct() == Impl.SwiftContext.getDictionaryDecl() ||
+                  keyType->getStructOrBoundGenericStruct() == Impl.SwiftContext.getArrayDecl()) {
                 if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
                   keyType = anyHashable->getDeclaredType();
                 else
