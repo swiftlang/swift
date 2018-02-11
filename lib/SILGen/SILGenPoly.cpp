@@ -3282,7 +3282,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   case WitnessDispatchKind::Static:
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
+    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
