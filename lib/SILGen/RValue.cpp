@@ -570,6 +570,7 @@ static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
 void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         SILValue destAddr) && {
   assert(isComplete() && "rvalue is not complete");
+  assert(isPlusOne(SGF) && "Can not assign borrowed RValues");
   ArrayRef<ManagedValue> srcValues = values;
   assignRecursive(SGF, loc, type, srcValues, destAddr);
   assert(srcValues.empty() && "didn't claim all elements!");
