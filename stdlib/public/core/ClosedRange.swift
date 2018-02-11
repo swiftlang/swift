@@ -169,7 +169,8 @@ extension ClosedRange.Index : Comparable {
 
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension ClosedRange.Index: Hashable
-where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4.1)
   public var hashValue: Int {
     switch self {
@@ -395,7 +396,7 @@ extension ClosedRange : Hashable where Bound : Hashable {
 
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @_inlineable // FIXME(sil-serialize-all)...\(
+  @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }
