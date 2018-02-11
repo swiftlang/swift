@@ -3365,7 +3365,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  
+  return;
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
