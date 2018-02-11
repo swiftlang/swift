@@ -302,8 +302,11 @@ public:
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
+  const PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  const PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -322,7 +325,6 @@ class CompilerInstance {
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
-  ReferencedNameTracker *NameTracker = nullptr;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -391,14 +393,6 @@ public:
   }
   DependencyTracker *getDependencyTracker() {
     return DepTracker;
-  }
-
-  void setReferencedNameTracker(ReferencedNameTracker *tracker) {
-    assert(PrimarySourceFiles.empty() && "must be called before performSema()");
-    NameTracker = tracker;
-  }
-  ReferencedNameTracker *getReferencedNameTracker() {
-    return NameTracker;
   }
 
   /// Set the SIL module for this compilation instance.
@@ -583,9 +577,13 @@ private:
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
 public:
-  PrimarySpecificPaths getPrimarySpecificPathsForWholeModuleOptimizationMode();
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
+  const PrimarySpecificPaths
+  getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
+  const PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  const PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 } // namespace swift

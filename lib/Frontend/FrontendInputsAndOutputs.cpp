@@ -397,13 +397,13 @@ bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
          hasLoadedModuleTracePath();
 }
 
-PrimarySpecificPaths &
-FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() {
+const PrimarySpecificPaths
+FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return PrimarySpecificPathsForAtMostOnePrimary;
 }
 
-PrimarySpecificPaths &
+const PrimarySpecificPaths
 FrontendInputsAndOutputs::getPrimarySpecificPathsForPrimary(
-    StringRef filename) {
+    StringRef filename) const {
   return getPrimarySpecificPathsForAtMostOnePrimary(); // just a stub for now
 }

@@ -53,14 +53,21 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
-PrimarySpecificPaths
-CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() {
+const PrimarySpecificPaths
+CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths
-CompilerInvocation::getPrimarySpecificPathsForPrimary(StringRef filename) {
+const PrimarySpecificPaths
+CompilerInvocation::getPrimarySpecificPathsForPrimary(
+    StringRef filename) const {
   return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
+}
+
+const PrimarySpecificPaths
+CompilerInvocation::getPrimarySpecificPathsForSourceFile(
+    const SourceFile &SF) const {
+  return getPrimarySpecificPathsForPrimary(SF.getFilename());
 }
 
 void CompilerInstance::createSILModule() {
@@ -78,7 +85,7 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
   PrimarySourceFiles.push_back(SF);
-  SF->setReferencedNameTracker(NameTracker);
+  SF->createReferencedNameTracker();
   if (SF->getBufferID().hasValue())
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
@@ -836,15 +843,21 @@ void CompilerInstance::freeASTContext() {
 
 void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
 
-PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode() {
+const PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode()
+    const {
   return getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() {
+const PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return Invocation.getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) {
+const PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return Invocation.getPrimarySpecificPathsForPrimary(filename);
+}
+const PrimarySpecificPaths
+CompilerInstance::getPrimarySpecificPathsForSourceFile(
+    const SourceFile &SF) const {
+  return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }

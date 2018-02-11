@@ -123,30 +123,28 @@ swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
   return tmp;
 }
 
-bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
-                                      SourceFile *SF,
-                                      DependencyTracker &depTracker,
-                                      const FrontendOptions &opts) {
+bool swift::emitReferenceDependenciesIfNeeded(DiagnosticEngine &diags,
+                                              SourceFile *SF,
+                                              DependencyTracker &depTracker,
+                                              StringRef outputPath) {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
+
+  const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
+  if (!tracker)
+    return false;
+
+  assert(!outputPath.empty());
 
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
-  llvm::sys::fs::rename(opts.InputsAndOutputs.supplementaryOutputs()
-                            .ReferenceDependenciesFilePath,
-                        opts.InputsAndOutputs.supplementaryOutputs()
-                                .ReferenceDependenciesFilePath +
-                            "~");
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
 
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.InputsAndOutputs.supplementaryOutputs()
-                               .ReferenceDependenciesFilePath,
-                           EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.InputsAndOutputs.supplementaryOutputs()
-                       .ReferenceDependenciesFilePath,
+    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
                    EC.message());
     out.clear_error();
     return true;
@@ -329,8 +327,6 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       out << "- \"" << escape(name) << "\"\n";
     }
   }
-
-  ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
   auto sortedByName =
       [](const llvm::DenseMap<DeclBaseName, bool> map) ->

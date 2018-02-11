@@ -387,12 +387,12 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   }
 }
 
-PrimarySpecificPaths
-FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() {
+const PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths
-FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) {
+const PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
 }
