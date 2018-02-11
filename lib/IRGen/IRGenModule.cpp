@@ -35,6 +35,7 @@
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Frontend/CodeGenOptions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -851,19 +852,20 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
-    auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
+    auto ForceImportThunk =
+        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
     if (useDllStorage())
-      cast<llvm::GlobalVariable>(symbolAddr)
+      cast<llvm::GlobalValue>(ForceImportThunk)
           ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);
 
     if (!Module.getGlobalVariable(buf.str())) {
-      auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
+      auto ref = new llvm::GlobalVariable(Module, ForceImportThunk->getType(),
                                           /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
-                                          symbolAddr, buf.str());
+                                          ForceImportThunk, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
@@ -953,13 +955,17 @@ void IRGenModule::emitAutolinkInfo() {
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
-    auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
-                                 llvm::GlobalValue::CommonLinkage,
-                                 llvm::Constant::getNullValue(Int1Ty),
-                                 buf.str());
+    auto ForceImportThunk =
+        llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
+                               llvm::GlobalValue::WeakODRLinkage, buf,
+                               &Module);
     if (useDllStorage())
-      symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+      ForceImportThunk
+          ->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+
+    auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
+    llvm::IRBuilder<> IRB(BB);
+    IRB.CreateRetVoid();
   }
 }
 
