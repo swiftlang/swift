@@ -572,10 +572,7 @@ public:
     }
 
     // Optionals should have had their objects lowered.
-    OptionalTypeKind optKind;
-    if (auto objectType = rvalueType.getOptionalObjectType(optKind)) {
-      require(optKind == OTK_Optional,
-              "ImplicitlyUnwrappedOptional is not legal in SIL values");
+    if (auto objectType = rvalueType.getOptionalObjectType()) {
       return checkLegalSILType(F, objectType, I);
     }
 

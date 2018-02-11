@@ -152,12 +152,6 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
-  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
-
-  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
-  
   /// The declaration of Swift.UnsafeMutableRawPointer.memory.
   VarDecl *UnsafeMutableRawPointerMemoryDecl = nullptr;
 
@@ -642,43 +636,6 @@ CanType ASTContext::getExceptionType() const {
 
 ProtocolDecl *ASTContext::getErrorDecl() const {
   return getProtocol(KnownProtocolKind::Error);
-}
-
-EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_None:
-    llvm_unreachable("not optional");
-  case OTK_ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should no longer have IUOs");
-  case OTK_Optional:
-    return getOptionalDecl();
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
-}
-
-EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_Optional:
-    return getOptionalSomeDecl();
-  case OTK_ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should not have IUOs.");
-  case OTK_None:
-    llvm_unreachable("getting Some decl for non-optional type?");
-  }
-  llvm_unreachable("bad OTK");
-}
-
-EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_Optional:
-    return getOptionalNoneDecl();
-  case OTK_ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should not have IUOs.");
-  case OTK_None:
-    llvm_unreachable("getting None decl for non-optional type?");
-  }
-  llvm_unreachable("bad OTK");
 }
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
@@ -4023,18 +3980,6 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
 
   return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
                                                properties);
-}
-
-Type OptionalType::get(OptionalTypeKind which, Type valueType) {
-  switch (which) {
-  // It wouldn't be unreasonable for this method to just ignore
-  // OTK_None if we made code more convenient to write.
-  case OTK_None: llvm_unreachable("building a non-optional type!");
-  case OTK_Optional: return OptionalType::get(valueType);
-  case OTK_ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should no longer have IUOs");
-  }
-  llvm_unreachable("bad optional type kind");
 }
 
 OptionalType *OptionalType::get(Type base) {

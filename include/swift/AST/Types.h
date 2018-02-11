@@ -69,7 +69,6 @@ namespace swift {
   class ModuleDecl;
   class ModuleType;
   class ProtocolConformance;
-  enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
 
@@ -1002,7 +1001,7 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null
   /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
   /// otherwise.
-  Type getOptionalObjectType(OptionalTypeKind &kind);
+  Type getOptionalObjectType(bool &isOptional);
 
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
@@ -4091,16 +4090,6 @@ class OptionalType : public UnarySyntaxSugarType {
 public:
   /// Return a uniqued optional type with the specified base type.
   static OptionalType *get(Type baseTy);
-
-  /// Build one of the optional type sugar kinds.
-  ///
-  /// It's a bit unnatural to have this on OptionalType, but we don't
-  /// have an abstract common class, and polluting TypeBase with it
-  /// would be unfortunate.  If we ever make an AnyOptionalType,
-  /// we can move it there.
-  ///
-  /// \param kind - can't be OTK_None
-  static Type get(OptionalTypeKind kind, Type baseTy);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

@@ -2102,8 +2102,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
-      OptionalTypeKind type2OptionalKind;
-      if (Type unwrapped = type2->getOptionalObjectType(type2OptionalKind))
+      bool type2IsOptional;
+      if (Type unwrapped = type2->getOptionalObjectType(type2IsOptional))
         unwrappedType2 = unwrapped;
       PointerTypeKind pointerKind;
       if (Type pointeeTy =
@@ -2142,9 +2142,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             // We can potentially convert from an UnsafeMutablePointer
             // of a different type, if we're a void pointer.
             Type unwrappedType1 = type1;
-            OptionalTypeKind type1OptionalKind;
+            bool type1IsOptional;
             if (Type unwrapped =
-                    type1->getOptionalObjectType(type1OptionalKind)) {
+                    type1->getOptionalObjectType(type1IsOptional)) {
               unwrappedType1 = unwrapped;
             }
 
@@ -2155,8 +2155,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             PointerTypeKind type1PointerKind;
             bool type1IsPointer{
                 unwrappedType1->getAnyPointerElementType(type1PointerKind)};
-            bool optionalityMatches =
-                type1OptionalKind == OTK_None || type2OptionalKind != OTK_None;
+            bool optionalityMatches = !type1IsOptional || type2IsOptional;
             if (type1IsPointer && optionalityMatches) {
               if (type1PointerKind == PTK_UnsafeMutablePointer) {
                 // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
@@ -2606,23 +2605,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Error;
 
   // See if there's anything we can do to fix the conformance:
-  OptionalTypeKind optionalKind;
-  if (auto optionalObjectType = type->getOptionalObjectType(optionalKind)) {
-    if (optionalKind == OTK_Optional) {
-      TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-      // The underlying type of an optional may conform to the protocol if the
-      // optional doesn't; suggest forcing if that's the case.
-      auto result = simplifyConformsToConstraint(
+  if (auto optionalObjectType = type->getOptionalObjectType()) {
+    TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+    // The underlying type of an optional may conform to the protocol if the
+    // optional doesn't; suggest forcing if that's the case.
+    auto result = simplifyConformsToConstraint(
         optionalObjectType, protocol, kind,
         locator.withPathElement(LocatorPathElt::getGenericArgument(0)),
         subflags);
-      if (result == SolutionKind::Solved) {
-        if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator))) {
-          return SolutionKind::Error;
-        }
+    if (result == SolutionKind::Solved) {
+      if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator))) {
+        return SolutionKind::Error;
       }
-      return result;
     }
+    return result;
   }
   
   // There's nothing more we can do; fail.

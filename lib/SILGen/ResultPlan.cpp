@@ -312,7 +312,7 @@ class ForeignErrorInitializationPlan : public ResultPlan {
   ManagedValue managedErrorTemp;
   CanType unwrappedPtrType;
   PointerTypeKind ptrKind;
-  OptionalTypeKind optKind;
+  bool isOptional;
   CanType errorPtrType;
 
 public:
@@ -328,7 +328,7 @@ public:
     // of optional.
     errorPtrType = errorParameter.getType();
     unwrappedPtrType = errorPtrType;
-    if (Type unwrapped = errorPtrType->getOptionalObjectType(optKind))
+    if (Type unwrapped = errorPtrType->getOptionalObjectType(isOptional))
       unwrappedPtrType = unwrapped->getCanonicalType();
 
     auto errorType =
@@ -371,7 +371,7 @@ public:
         SGF.emitLValueToPointer(loc, std::move(lvalue), pointerInfo);
 
     // Wrap up in an Optional if called for.
-    if (optKind != OTK_None) {
+    if (isOptional) {
       auto &optTL = SGF.getTypeLowering(errorPtrType);
       pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
     }

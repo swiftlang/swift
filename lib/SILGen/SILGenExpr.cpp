@@ -4073,14 +4073,14 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
   
   auto newSelfTy = E->getSubExpr()->getType();
-  OptionalTypeKind failability;
-  if (auto objTy = newSelfTy->getOptionalObjectType(failability))
+  bool outerIsOptional;
+  if (auto objTy = newSelfTy->getOptionalObjectType(outerIsOptional))
     newSelfTy = objTy;
 
   // "try? self.init()" can give us two levels of optional if the initializer
   // we delegate to is failable.
-  OptionalTypeKind extraFailability;
-  if (auto objTy = newSelfTy->getOptionalObjectType(extraFailability))
+  bool innerIsOptional;
+  if (auto objTy = newSelfTy->getOptionalObjectType(innerIsOptional))
     newSelfTy = objTy;
 
   // The subexpression consumes the current 'self' binding.
@@ -4099,12 +4099,12 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                           AccessKind::Write).getLValueAddress();
 
   // Handle a nested optional case (see above).
-  if (extraFailability != OTK_None)
+  if (innerIsOptional)
     newSelf = flattenOptional(SGF, E, newSelf);
 
   // If both the delegated-to initializer and our enclosing initializer can
   // fail, deal with the failure.
-  if (failability != OTK_None && ctorDecl->getFailability() != OTK_None) {
+  if (outerIsOptional && ctorDecl->getFailability() != OTK_None) {
     SILBasicBlock *someBB = SGF.createBasicBlock();
 
     auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());

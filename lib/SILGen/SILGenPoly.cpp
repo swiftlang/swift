@@ -377,13 +377,15 @@ ManagedValue Transform::transform(ManagedValue v,
   if (v.getType() == loweredResultTy)
     return v;
 
-  OptionalTypeKind outputOTK, inputOTK;
-  CanType inputObjectType = inputSubstType.getOptionalObjectType(inputOTK);
-  CanType outputObjectType = outputSubstType.getOptionalObjectType(outputOTK);
+  bool inputIsOptional, outputIsOptional;
+  CanType inputObjectType =
+      inputSubstType.getOptionalObjectType(inputIsOptional);
+  CanType outputObjectType =
+      outputSubstType.getOptionalObjectType(outputIsOptional);
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
-  if (outputOTK != OTK_None && inputOTK == OTK_None) {
+  if (outputIsOptional && !inputIsOptional) {
     return SGF.emitInjectOptional(
         Loc, expectedTL, ctxt, [&](SGFContext objectCtxt) {
           return transform(v, inputOrigType, inputSubstType,
@@ -394,8 +396,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // If the value is an optional, but the desired formal type isn't an
   // optional or Any, force it.
-  if (inputOTK != OTK_None && outputOTK == OTK_None
-      && !outputSubstType->isExistentialType()) {
+  if (inputIsOptional && !outputIsOptional &&
+      !outputSubstType->isExistentialType()) {
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
@@ -404,11 +406,11 @@ ManagedValue Transform::transform(ManagedValue v,
     if (v.getType() == loweredResultTy)
       return v;
 
-    inputOTK = OTK_None;
+    inputIsOptional = false;
   }
 
   // Optional-to-optional conversion.
-  if (inputOTK != OTK_None && outputOTK != OTK_None) {
+  if (inputIsOptional && outputIsOptional) {
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {

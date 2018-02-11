@@ -203,14 +203,12 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
   CanType OptionalTy;
-  OptionalTypeKind OTK;
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    OptionalTy.getOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
     InOutOptionalParam = Tmp;
@@ -255,7 +253,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   if (isConditional) {
     // Copy the temporary into Dest.
     // Load from the optional.
-    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl(OTK);
+    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
     SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
