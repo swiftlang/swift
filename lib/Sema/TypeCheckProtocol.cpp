@@ -141,87 +141,54 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
   OptionalAdjustmentKind optAdjustment = OptionalAdjustmentKind::None;
-  if (reqt->isObjC()) {
-    OptionalTypeKind reqtOptKind;
-    if (Type reqtValueType = reqtType->getOptionalObjectType(reqtOptKind))
-      reqtType = reqtValueType;
-    OptionalTypeKind witnessOptKind;
-    if (Type witnessValueType =
-            witnessType->getOptionalObjectType(witnessOptKind))
-      witnessType = witnessValueType;
 
-    switch (reqtOptKind) {
-    case OTK_None:
-      switch (witnessOptKind) {
-      case OTK_None:
-        // Exact match is always okay.
-        break;
+  if (!reqt->isObjC())
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-      case OTK_Optional:
-        if (witnessTypeIsIUO) {
-          optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-          break;
-        }
+  bool reqtIsOptional;
+  if (Type reqtValueType = reqtType->getOptionalObjectType(reqtIsOptional))
+    reqtType = reqtValueType;
+  bool witnessIsOptional;
+  if (Type witnessValueType =
+          witnessType->getOptionalObjectType(witnessIsOptional))
+    witnessType = witnessValueType;
 
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
-          break;
+  // When the requirement is an IUO, all is permitted, because we
+  // assume that the user knows more about the signature than we
+  // have information in the protocol.
+  if (reqtTypeIsIUO)
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
-          break;
-        }
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-        break;
-      }
-      break;
-
-    case OTK_Optional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      if (reqtTypeIsIUO)
-        break;
-
-      if (witnessTypeIsIUO) {
+  if (reqtIsOptional) {
+    if (witnessIsOptional) {
+      if (witnessTypeIsIUO)
         optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
+        break;
+
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
         break;
       }
-
-      switch (witnessOptKind) {
-      case OTK_None:
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
-          break;
-
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
-          break;
-        }
+    }
+  } else if (witnessIsOptional) {
+    if (witnessTypeIsIUO) {
+      optAdjustment = OptionalAdjustmentKind::RemoveIUO;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
         break;
 
-      case OTK_Optional:
-        // Exact match is always okay.
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
         break;
       }
-      break;
-
-    case OTK_ImplicitlyUnwrappedOptional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      break;
     }
   }
 

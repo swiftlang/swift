@@ -90,7 +90,6 @@ namespace swift {
   class PrecedenceGroupDecl;
   class TupleTypeElt;
   class EnumElementDecl;
-  enum OptionalTypeKind : unsigned;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -410,17 +409,11 @@ public:
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
-  /// Retrieve the declaration of Swift.Optional.
-  EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
-
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
-
-  EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
-  EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
