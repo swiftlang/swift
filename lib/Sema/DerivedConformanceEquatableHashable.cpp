@@ -775,29 +775,6 @@ static Expr* combineHashValuesAssignmentExpr(ASTContext &C,
   return assignExpr;
 }
 
-/// Returns a new assignment expression that invokes _mixInt on a variable and
-/// assigns the result back to the same variable.
-/// \p C The AST context.
-/// \p resultVar The integer variable to be mixed.
-/// \return The expression that mixes the integer value.
-static Expr* mixIntAssignmentExpr(ASTContext &C, VarDecl* resultVar) {
-  auto mixinFunc = C.getMixIntDecl();
-  auto mixinFuncExpr = new (C) DeclRefExpr(mixinFunc, DeclNameLoc(),
-                                           /*implicit*/ true);
-  auto rhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                          /*implicit*/ true);
-  // _mixInt(result)
-  auto mixedResultExpr = CallExpr::createImplicit(C, mixinFuncExpr,
-                                                  { rhsResultRef }, {});
-
-  // result = _mixInt(result)
-  auto lhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                          /*implicit*/ true);
-  auto assignExpr = new (C) AssignExpr(lhsResultRef, SourceLoc(),
-                                       mixedResultExpr, /*implicit*/ true);
-  return assignExpr;
-}
-
 static void
 deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto parentDC = hashValueDecl->getDeclContext();
