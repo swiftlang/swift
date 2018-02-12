@@ -2639,6 +2639,9 @@ private:
       if (!x.hasNonDefaultableBindings())
         return false;
 
+      if (x.FullyBound || x.SubtypeOfExistentialType)
+        return false;
+
       llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
       llvm::set_intersect(intersection, y.Sources);
 
@@ -2655,7 +2658,9 @@ private:
           return x.TypeVar == typeVar;
       }
 
-      return false;
+      // If the only difference is default types,
+      // prioritize bindings with fewer of them.
+      return x.NumDefaultableBindings < y.NumDefaultableBindings;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
