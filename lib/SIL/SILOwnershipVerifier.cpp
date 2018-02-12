@@ -1035,9 +1035,16 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitEnumArgument(
   // The operand has a non-trivial ownership kind. It must match the argument
   // convention.
   auto ownership = getOwnershipKind();
-  auto lifetimeConstraint = (ownership == ValueOwnershipKind::Owned)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
+  UseLifetimeConstraint lifetimeConstraint;
+  if (ownership == ValueOwnershipKind::Owned) {
+    if (RequiredKind != ValueOwnershipKind::Owned) {
+      lifetimeConstraint = UseLifetimeConstraint::MustBeLive;
+    } else {
+      lifetimeConstraint = UseLifetimeConstraint::MustBeInvalidated;
+    }
+  } else {
+    lifetimeConstraint = UseLifetimeConstraint::MustBeLive;
+  }
   return {compatibleOwnershipKinds(ownership, RequiredKind),
           lifetimeConstraint};
 }
