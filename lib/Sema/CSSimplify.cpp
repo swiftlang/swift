@@ -2873,23 +2873,33 @@ static bool isDynamicMemberLookupable(Type ty) {
   auto nominal = ty->getAnyNominal();
   if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
 
-  // If this type has the attribute on it, then yes!
-  if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
-    return true;
-  
-  // If any of the protocols this type conforms to has the attribute, then yes.
-  for (auto p : nominal->getAllProtocols())
-    if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
-      return true;
+  llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
 
-  // If this is a class with a super class, check super classes as well.
-  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-    if (auto superClass = cd->getSuperclass())
-      if (isDynamicMemberLookupable(superClass))
+  // Walk superclasses, if present.
+  while (1) {
+    // If we found a circular parent class chain, reject this.
+    if (!visitedDecls.insert(nominal).second)
+      return false;
+    
+    // If this type has the attribute on it, then yes!
+    if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+      return true;
+    
+    // If any of the protocols this type conforms to has the attribute, then yes.
+    for (auto p : nominal->getAllProtocols())
+      if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
         return true;
-  }
+
+    // If this is a class with a super class, check super classes as well.
+    if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+      if (auto superClass = cd->getSuperclassDecl()) {
+        nominal = superClass;
+        continue;
+      }
+    }
   
-  return false;
+    return false;
+  }
 }
 
 
