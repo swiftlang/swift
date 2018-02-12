@@ -329,6 +329,7 @@ public:
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy);
 
+  using SILBuilder::createStore;
   /// Forward \p value into \p address.
   ///
   /// This will forward value's cleanup (if it has one) into the equivalent
