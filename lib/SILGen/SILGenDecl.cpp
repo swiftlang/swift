@@ -1272,12 +1272,15 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 }
 
 PostponedCleanup::PostponedCleanup(SILGenFunction &sgf, bool recursive)
-    : SGF(sgf), previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
+    : depth(sgf.Cleanups.innermostScope), SGF(sgf),
+      previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
       active(true), applyRecursively(recursive) {
   SGF.CurrentlyActivePostponedCleanup = this;
 }
+
 PostponedCleanup::PostponedCleanup(SILGenFunction &sgf)
-    : SGF(sgf), previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
+    : depth(sgf.Cleanups.innermostScope), SGF(sgf),
+      previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
       active(true),
       applyRecursively(previouslyActiveCleanup
                            ? previouslyActiveCleanup->applyRecursively
@@ -1292,6 +1295,12 @@ PostponedCleanup::~PostponedCleanup() {
 }
 
 void PostponedCleanup::end() {
+  if (previouslyActiveCleanup && applyRecursively &&
+      previouslyActiveCleanup->applyRecursively) {
+    previouslyActiveCleanup->deferredCleanups.append(deferredCleanups.begin(),
+                                                     deferredCleanups.end());
+  }
+
   SGF.CurrentlyActivePostponedCleanup = previouslyActiveCleanup;
   active = false;
 }

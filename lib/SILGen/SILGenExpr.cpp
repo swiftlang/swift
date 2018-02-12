@@ -366,6 +366,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
+    PostponedCleanup postpone(*this);
     auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
     emitCopyLValueInto(E, std::move(lv), I);
     return;
@@ -917,6 +918,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(*this);
+  PostponedCleanup postpone(*this);
 
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
@@ -1366,6 +1368,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // Any writebacks here are tightly scoped.
   FormalEvaluationScope writeback(SGF);
+  PostponedCleanup postpone(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   // We can't load at immediate +0 from the lvalue without deeper analysis,
   // since the access will be immediately ended and might invalidate the value
@@ -2518,6 +2521,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
+  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2539,6 +2543,7 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
+  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2595,8 +2600,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ArgumentScope argScope(*this, loc);
   PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C,
-                   std::move(postpone));
+                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2620,8 +2624,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ArgumentScope argScope(*this, loc);
   PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C,
-                   std::move(postpone));
+                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -2778,6 +2781,7 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
 
   Scope S(SGF, loc);
   Optional<FormalEvaluationScope> FES;
+
   // If we have not exclusively borrowed self, we need to do so now.
   if (SGF.SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
     // We need to use a full scope here to ensure that any underlying
@@ -3467,7 +3471,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
                            loc, ManagedValue::forUnmanaged(equalsWitness),
                            equatableSub, {lhsArg, rhsArg, metatyValue},
                            equalsInfo, ApplyOptions::None, SGFContext(),
-                           std::move(postpone))
+                           postpone)
                 .getUnmanagedSingleValue(subSGF, loc);
       }
       
@@ -3603,7 +3607,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
                            ManagedValue::forUnmanaged(hashWitness), hashableSub,
                            {arg}, hashInfo, ApplyOptions::None, SGFContext(),
-                           std::move(postpone))
+                           postpone)
                 .getUnmanagedSingleValue(subSGF, loc);
       }
     }
@@ -4057,6 +4061,7 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
   FormalEvaluationScope Scope(SGF);
+  PostponedCleanup postpone(SGF);
   ManagedValue newSelfWithCleanup =
       SGF.emitRValueAsSingleValue(E->getSubExpr());
 
@@ -4604,6 +4609,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
       assert(!dest->getType()->is<TupleType>());
       FormalEvaluationScope writeback(SGF);
+      PostponedCleanup postpone(SGF);
       auto destLV = SGF.emitLValue(dest, AccessKind::Write);
       auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(), AccessKind::Read);
       SGF.emitAssignLValueToLValue(loc, std::move(srcLV), std::move(destLV));
@@ -4625,12 +4631,14 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     }
     
     FormalEvaluationScope writeback(SGF);
+    PostponedCleanup postpone(SGF);
     LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
     SGF.emitAssignToLValue(loc, src, std::move(destLV));
     return;
   }
 
   FormalEvaluationScope writeback(SGF);
+  PostponedCleanup postpone(SGF);
 
   // Produce a flattened queue of LValues.
   SmallVector<Optional<LValue>, 4> destLVs;
@@ -5358,6 +5366,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
   FormalEvaluationScope writeback(SGF);
+  PostponedCleanup postpone(SGF);
 
   auto subExpr = E->getSubExpr();
   auto accessInfo = SGF.getArrayAccessInfo(E->getType(),
@@ -5542,6 +5551,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
     FormalEvaluationScope scope(*this);
+    PostponedCleanup postpone(*this);
     emitLValue(E, AccessKind::Read);
     return;
   }
@@ -5550,6 +5560,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope scope(*this);
+    PostponedCleanup postpone(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
     // If the lvalue is purely physical, then it won't have any side effects,
     // and we don't need to drill into it.

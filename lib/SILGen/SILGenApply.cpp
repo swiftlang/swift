@@ -1643,7 +1643,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext,
-                                 PostponedCleanup &&postponedCleanup) {
+                                 PostponedCleanup &postponedCleanup) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -1825,8 +1825,7 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
   ArgumentScope argScope(*this, loc);
   PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
-                   args, calleeTypeInfo, options, evalContext,
-                   std::move(postpone));
+                   args, calleeTypeInfo, options, evalContext, postpone);
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -4009,7 +4008,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
-      uncurriedContext, std::move(postpone));
+      uncurriedContext, postpone);
   firstLevelResult.foreignSelf = calleeTypeInfo.foreignSelf;
   return firstLevelResult;
 }
@@ -4343,7 +4342,7 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
 
     result = SGF.emitApply(std::move(resultPtr), std::move(argScope), loc,
                            functionMV, {}, siteArgs, calleeTypeInfo,
-                           ApplyOptions::None, context, std::move(postpone));
+                           ApplyOptions::None, context, postpone);
   }
 
   return std::move(result);
@@ -4438,7 +4437,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx,
-                   std::move(postpone));
+                   postpone);
 }
 
 static StringRef

@@ -242,11 +242,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
   ArgumentScope argScope(SGF, loc);
   PostponedCleanup postpone(SGF);
-  RValue result = SGF.emitApply(
-      std::move(resultPlan), std::move(argScope), loc,
-      ManagedValue::forUnmanaged(witnessRef), subs,
-      {objcValue, ManagedValue::forUnmanaged(metatypeValue)}, calleeTypeInfo,
-      ApplyOptions::None, context, std::move(postpone));
+  RValue result =
+      SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
+                    ManagedValue::forUnmanaged(witnessRef), subs,
+                    {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
+                    calleeTypeInfo, ApplyOptions::None, context, postpone);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -1732,7 +1732,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context, std::move(postpone))
+                  ApplyOptions::None, context, postpone)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

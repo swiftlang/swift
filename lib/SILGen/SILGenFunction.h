@@ -1315,7 +1315,7 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext, PostponedCleanup &&cleanup);
+                   SGFContext evalContext, PostponedCleanup &cleanup);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1873,6 +1873,7 @@ class PostponedCleanup {
   friend Scope;
 
   SmallVector<std::pair<CleanupHandle, SILValue>, 16> deferredCleanups;
+  CleanupsDepth depth;
   SILGenFunction &SGF;
   PostponedCleanup *previouslyActiveCleanup;
   bool active;
@@ -1884,19 +1885,13 @@ public:
   PostponedCleanup(SILGenFunction &SGF, bool applyRecursively);
   ~PostponedCleanup();
 
-  PostponedCleanup(PostponedCleanup &&other)
-      : deferredCleanups(std::move(other.deferredCleanups)), SGF(other.SGF),
-        previouslyActiveCleanup(other.previouslyActiveCleanup),
-        active(other.active), applyRecursively(other.applyRecursively) {
-    other.active = false;
-  }
-
   void end();
 
   PostponedCleanup() = delete;
   PostponedCleanup(const PostponedCleanup &) = delete;
   PostponedCleanup &operator=(const PostponedCleanup &) = delete;
   PostponedCleanup &operator=(PostponedCleanup &&other) = delete;
+  PostponedCleanup(PostponedCleanup &&) = delete;
 };
 
 } // end namespace Lowering
