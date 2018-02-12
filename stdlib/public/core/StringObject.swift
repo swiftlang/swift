@@ -261,7 +261,8 @@ extension _StringObject {
   internal
   static var _variantMask: UInt {
     @inline(__always)
-    get { return _isValueBit | _subVariantBit }
+    get { return UInt(Builtin.stringObjectOr_Int64(
+      _isValueBit._value, _subVariantBit._value)) }
   }
 
   @_versioned
@@ -364,7 +365,8 @@ extension _StringObject {
   internal
   static var _emptyStringBitPattern: UInt {
     @inline(__always)
-    get { return _isValueBit | _emptyStringAddressBits }
+    get { return UInt(Builtin.stringObjectOr_Int64(
+      _isValueBit._value, _emptyStringAddressBits._value)) }
   }
 
   @_versioned
@@ -784,20 +786,32 @@ extension _StringObject {
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
     var rawBits = _payloadBits & _StringObject._payloadMask
     if isValue {
-      rawBits |= _StringObject._isValueBit
-    }
-    if isSmallOrObjC {
-      rawBits |= _StringObject._subVariantBit
-    }
-    if isOpaque {
-      rawBits |= _StringObject._isOpaqueBit
-    }
-    if isTwoByte {
-      rawBits |= _StringObject._twoByteBit
-    }
-    if isValue {
+      var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+        rawBits._value, _StringObject._isValueBit._value)
+      if isSmallOrObjC {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._subVariantBit._value)
+      }
+      if isOpaque {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._isOpaqueBit._value)
+      }
+      if isTwoByte {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._twoByteBit._value)
+      }
+      rawBits = UInt(rawBitsBuiltin)
       self.init(taggedRawBits: rawBits)
     } else {
+      if isSmallOrObjC {
+        rawBits |= _StringObject._subVariantBit
+      }
+      if isOpaque {
+        rawBits |= _StringObject._isOpaqueBit
+      }
+      if isTwoByte {
+        rawBits |= _StringObject._twoByteBit
+      }
       self.init(nonTaggedRawBits: rawBits)
     }
 #endif

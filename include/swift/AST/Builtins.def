@@ -448,6 +448,8 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// StringObjectOr has type (T,T) -> T.
+BUILTIN_MISC_OPERATION(StringObjectOr,     "stringObjectOr",      "n", Integer)
 
 /// Special truncation builtins that check for sign and overflow errors. These
 /// take an integer as an input and return a tuple of the truncated result and

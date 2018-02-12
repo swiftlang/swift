@@ -265,6 +265,10 @@ static ValueDecl *getGepRawOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getStringObjectOrOperation(Identifier Id, Type ArgType) {
+  return getBuiltinFunction(Id, {ArgType, ArgType}, ArgType);
+}
+
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, { ArgType, ArgType }, ArgType);
@@ -1627,6 +1631,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GepRaw:
     if (Types.size() != 1) return nullptr;
     return getGepRawOperation(Id, Types[0]);
+
+  case BuiltinValueKind::StringObjectOr:
+    if (Types.size() != 1)
+      return nullptr;
+    return getStringObjectOrOperation(Id, Types[0]);
 
   case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
