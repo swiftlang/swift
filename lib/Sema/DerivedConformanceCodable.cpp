@@ -598,15 +598,15 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // Now need to generate `try container.encode(x, forKey: .x)` for all
   // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
-    // Only ill-formed code would produce multiple results for this lookup.
-    // This would get diagnosed later anyway, so we're free to only look at
-    // the first result here.
-    auto matchingVars = targetDecl->lookupDirect(DeclName(elt->getName()));
+    VarDecl *varDecl;
+    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
+      if ((varDecl = dyn_cast<VarDecl>(decl)))
+        break;
 
     // self.x
     auto *selfRef = createSelfDeclRef(encodeDecl);
     auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                          ConcreteDeclRef(matchingVars[0]),
+                                          ConcreteDeclRef(varDecl),
                                           DeclNameLoc(), /*Implicit=*/true);
 
     // CodingKeys.x
@@ -616,7 +616,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = C.Id_encode;
-    auto varType = cast<VarDecl>(matchingVars[0])->getType();
+    auto varType = varDecl->getType();
     if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
       // This is a weak/unowned/unmanaged var. Get the inner type before
       // checking optionality.
@@ -866,11 +866,10 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // Now need to generate `x = try container.decode(Type.self, forKey: .x)`
     // for all existing properties. Optional properties get `decodeIfPresent`.
     for (auto *elt : enumElements) {
-      // Only ill-formed code would produce multiple results for this lookup.
-      // This would get diagnosed later anyway, so we're free to only look at
-      // the first result here.
-      auto matchingVars = targetDecl->lookupDirect(DeclName(elt->getName()));
-      auto *varDecl = cast<VarDecl>(matchingVars[0]);
+      VarDecl *varDecl;
+      for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
+        if ((varDecl = dyn_cast<VarDecl>(decl)))
+          break;
 
       // Don't output a decode statement for a var let with a default value.
       if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
