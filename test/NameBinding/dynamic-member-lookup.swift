@@ -1,11 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 var global = 42
 
-func testXXXXX(a : PyVal, b : MyType) -> PyVal {
-  a[dynamicMember: "x"] = b
-  a.x = b
-}
-
 @dynamicMemberLookup
 struct Gettable {
   subscript(dynamicMember member: StaticString) -> Int {
@@ -169,10 +164,9 @@ struct MyType : PyVal {
 
 
 func testMutableExistential(a : PyVal, b : MyType) -> PyVal {
-  a.x = b
-//  a.x.y = b
-//  b.x.y = b
-//  return a.foo.bar.baz
+  a.x.y = b
+  b.x.y = b
+  return a.foo.bar.baz
 }
 
 //===----------------------------------------------------------------------===//
