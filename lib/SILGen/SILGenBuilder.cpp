@@ -49,6 +49,11 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
 //===----------------------------------------------------------------------===//
 //              Instruction Emission + Conformance Endowed APIs
 //===----------------------------------------------------------------------===//
+//
+// This section contains wrappers around SILBuilder SILValue APIs that add extra
+// conformances. These are the only places where we should be accessing
+// SILBuilder APIs directly.
+//
 
 MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   auto theMetatype = metatype.castTo<MetatypeType>();
@@ -173,6 +178,10 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
+//
+// *NOTE* Please use SILGenBuilder SILValue APIs below. Otherwise, we
+// potentially do not get all of the conformances that we need.
+//
 
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SILType substFnTy,
@@ -183,8 +192,8 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
   transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
-  SILValue result = SILGenBuilder::createPartialApply(loc, fn, substFnTy, subs,
-                                                      values, closureTy);
+  SILValue result =
+      createPartialApply(loc, fn, substFnTy, subs, values, closureTy);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -193,8 +202,8 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
                                                   ManagedValue fn,
                                                   SILType resultTy) {
   CleanupCloner cloner(*this, fn);
-  SILValue result = SILBuilder::createConvertFunction(
-      loc, fn.forward(getSILGenFunction()), resultTy);
+  SILValue result =
+      createConvertFunction(loc, fn.forward(getSILGenFunction()), resultTy);
   return cloner.clone(result);
 }
 
@@ -224,8 +233,7 @@ ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
                                                 ManagedValue base,
                                                 VarDecl *decl) {
   ManagedValue borrowedBase = base.borrow(SGF, loc);
-  SILValue extract =
-      SILBuilder::createStructExtract(loc, borrowedBase.getValue(), decl);
+  SILValue extract = createStructExtract(loc, borrowedBase.getValue(), decl);
   return ManagedValue::forUnmanaged(extract);
 }
 
@@ -270,8 +278,7 @@ ManagedValue SILGenBuilder::createCopyUnownedValue(SILLocation loc,
   assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
   (void)unownedType;
 
-  SILValue result =
-      SILBuilder::createCopyUnownedValue(loc, originalValue.getValue());
+  SILValue result = createCopyUnownedValue(loc, originalValue.getValue());
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -282,10 +289,10 @@ SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation loc,
   // unconditionally retaining, rather than before converting from
   // unmanaged->ref checking that our value is not yet uninitialized.
   auto unmanagedType = originalValue.getType().getAs<UnmanagedStorageType>();
-  SILValue result = SILBuilder::createUnmanagedToRef(
+  SILValue result = createUnmanagedToRef(
       loc, originalValue.getValue(),
       SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-  result = SILBuilder::createCopyValue(loc, result);
+  result = createCopyValue(loc, result);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -313,8 +320,8 @@ ManagedValue SILGenBuilder::createAllocRef(
                  std::back_inserter(elementCountOperands),
                  [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
-  AllocRefInst *i = SILBuilder::createAllocRef(
-      loc, refType, objc, canAllocOnStack, elementTypes, elementCountOperands);
+  AllocRefInst *i = createAllocRef(loc, refType, objc, canAllocOnStack,
+                                   elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
 
@@ -331,8 +338,8 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
                  [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefDynamicInst *i =
-      SILBuilder::createAllocRefDynamic(loc, operand.getValue(), refType, objc,
-                                        elementTypes, elementCountOperands);
+      createAllocRefDynamic(loc, operand.getValue(), refType, objc,
+                            elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
 
@@ -341,7 +348,7 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
                                                unsigned index, SILType type) {
   ManagedValue borrowedBase = SGF.emitManagedBeginBorrow(loc, base.getValue());
   SILValue extract =
-      SILBuilder::createTupleExtract(loc, borrowedBase.getValue(), index, type);
+      createTupleExtract(loc, borrowedBase.getValue(), index, type);
   return ManagedValue::forUnmanaged(extract);
 }
 
@@ -355,25 +362,23 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
 ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
                                              ManagedValue base) {
   if (SGF.getTypeLowering(base.getType()).isTrivial()) {
-    auto *i = SILBuilder::createLoad(loc, base.getValue(),
-                                     LoadOwnershipQualifier::Trivial);
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
   }
 
-  auto *i = SILBuilder::createLoadBorrow(loc, base.getValue());
+  auto *i = createLoadBorrow(loc, base.getValue());
   return SGF.emitManagedBorrowedRValueWithCleanup(base.getValue(), i);
 }
 
 ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
                                                          ManagedValue base) {
   if (SGF.getTypeLowering(base.getType()).isTrivial()) {
-    auto *i = SILBuilder::createLoad(loc, base.getValue(),
-                                     LoadOwnershipQualifier::Trivial);
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
   }
 
   SILValue baseValue = base.getValue();
-  auto *i = SILBuilder::createLoadBorrow(loc, baseValue);
+  auto *i = createLoadBorrow(loc, baseValue);
   return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                                   baseValue, i);
 }
@@ -402,8 +407,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
 ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
     SILLocation loc, ManagedValue originalAddr, SILValue newAddr,
     IsTake_t isTake, IsInitialization_t isInit) {
-  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, isTake,
-                             isInit);
+  createCopyAddr(loc, originalAddr.getValue(), newAddr, isTake, isInit);
   return SGF.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
 }
 
@@ -533,8 +537,7 @@ ManagedValue
 SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
                                        MarkUninitializedInst::Kind muKind) {
   // We either have an owned or trivial value.
-  SILValue value =
-      SILBuilder::createMarkUninitialized(decl, operand.forward(SGF), muKind);
+  SILValue value = createMarkUninitialized(decl, operand.forward(SGF), muKind);
   assert(value->getType().isObject() && "Expected only objects here");
 
   // If we have a trivial value, just return without a cleanup.
@@ -548,8 +551,7 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 
 ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
                                        EnumElementDecl *decl, SILType type) {
-  SILValue result =
-      SILBuilder::createEnum(loc, payload.forward(SGF), decl, type);
+  SILValue result = createEnum(loc, payload.forward(SGF), decl, type);
   if (result.getOwnershipKind() != ValueOwnershipKind::Owned)
     return ManagedValue::forUnmanaged(result);
   return SGF.emitManagedRValueWithCleanup(result);
@@ -557,16 +559,16 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
     SILLocation loc, ManagedValue operand, SILType type) {
-  SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
-      loc, operand.forward(SGF), type);
+  SILValue result =
+      createUnconditionalCheckedCastValue(loc, operand.forward(SGF), type);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
                                                            ManagedValue operand,
                                                            SILType type) {
-  SILValue result = SILBuilder::createUnconditionalCheckedCast(
-      loc, operand.forward(SGF), type);
+  SILValue result =
+      createUnconditionalCheckedCast(loc, operand.forward(SGF), type);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -576,9 +578,8 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
-  SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(SGF), type,
-                                      trueBlock, falseBlock, Target1Count,
-                                      Target2Count);
+  createCheckedCastBranch(loc, isExact, operand.forward(SGF), type, trueBlock,
+                          falseBlock, Target1Count, Target2Count);
 }
 
 void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
@@ -586,15 +587,14 @@ void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
                                                  SILType type,
                                                  SILBasicBlock *trueBlock,
                                                  SILBasicBlock *falseBlock) {
-  SILBuilder::createCheckedCastValueBranch(loc, operand.forward(SGF), type,
-                                           trueBlock, falseBlock);
+  createCheckedCastValueBranch(loc, operand.forward(SGF), type, trueBlock,
+                               falseBlock);
 }
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
                                          SILType type) {
   CleanupCloner cloner(*this, original);
-  SILValue convertedValue =
-      SILBuilder::createUpcast(loc, original.forward(SGF), type);
+  SILValue convertedValue = createUpcast(loc, original.forward(SGF), type);
   return cloner.clone(convertedValue);
 }
 
@@ -605,7 +605,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
-        SILBuilder::createOptionalSome(loc, arg.forward(SGF), optionalType);
+        createOptionalSome(loc, arg.forward(SGF), optionalType);
     return cloner.clone(someValue);
   }
 
@@ -621,7 +621,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
 ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
                                                       SILType type) {
   if (!type.isAddressOnly(getModule()) || !SGF.silConv.useLoweredAddresses()) {
-    SILValue noneValue = SILBuilder::createOptionalNone(loc, type);
+    SILValue noneValue = createOptionalNone(loc, type);
     return ManagedValue::forUnmanaged(noneValue);
   }
 
@@ -633,7 +633,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedFunctionRef(SILLocation loc,
                                                      SILFunction *f) {
-  return ManagedValue::forUnmanaged(SILBuilder::createFunctionRef(loc, f));
+  return ManagedValue::forUnmanaged(createFunctionRef(loc, f));
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
@@ -641,7 +641,7 @@ ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
                                                    unsigned Index,
                                                    SILType Type) {
   SILValue TupleEltAddr =
-      SILBuilder::createTupleElementAddr(Loc, Base.getValue(), Index, Type);
+      createTupleElementAddr(Loc, Base.getValue(), Index, Type);
   return ManagedValue::forUnmanaged(TupleEltAddr);
 }
 
@@ -656,8 +656,7 @@ ManagedValue SILGenBuilder::createUncheckedRefCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast =
-      SILBuilder::createUncheckedRefCast(loc, value.forward(SGF), type);
+  SILValue cast = createUncheckedRefCast(loc, value.forward(SGF), type);
   return cloner.clone(cast);
 }
 
@@ -665,8 +664,7 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast =
-      SILBuilder::createUncheckedBitCast(loc, value.forward(SGF), type);
+  SILValue cast = createUncheckedBitCast(loc, value.forward(SGF), type);
   return cloner.clone(cast);
 }
 
@@ -675,7 +673,7 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
                                                      SILType type) {
   CleanupCloner cloner(*this, original);
   SILValue openedExistential =
-      SILBuilder::createOpenExistentialRef(loc, original.forward(SGF), type);
+      createOpenExistentialRef(loc, original.forward(SGF), type);
   return cloner.clone(openedExistential);
 }
 
@@ -683,8 +681,8 @@ ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,
                                                        ManagedValue original,
                                                        SILType type) {
   ManagedValue borrowedExistential = original.borrow(SGF, loc);
-  SILValue openedExistential = SILBuilder::createOpenExistentialValue(
-      loc, borrowedExistential.getValue(), type);
+  SILValue openedExistential =
+      createOpenExistentialValue(loc, borrowedExistential.getValue(), type);
   return ManagedValue::forUnmanaged(openedExistential);
 }
 
@@ -692,8 +690,8 @@ ManagedValue SILGenBuilder::createOpenExistentialBoxValue(SILLocation loc,
                                                           ManagedValue original,
                                                           SILType type) {
   ManagedValue borrowedExistential = original.borrow(SGF, loc);
-  SILValue openedExistential = SILBuilder::createOpenExistentialBoxValue(
-      loc, borrowedExistential.getValue(), type);
+  SILValue openedExistential =
+      createOpenExistentialBoxValue(loc, borrowedExistential.getValue(), type);
   return ManagedValue::forUnmanaged(openedExistential);
 }
 
@@ -712,7 +710,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
   CleanupCloner cloner(*this, value);
   if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Trivial)
     qualifier = StoreOwnershipQualifier::Trivial;
-  SILBuilder::createStore(loc, value.forward(SGF), address, qualifier);
+  createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
 }
 
@@ -720,8 +718,7 @@ ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
                                               ManagedValue operand,
                                               SILDeclRef member,
                                               SILType methodTy) {
-  SILValue v = SILBuilder::createSuperMethod(loc, operand.getValue(), member,
-                                             methodTy);
+  SILValue v = createSuperMethod(loc, operand.getValue(), member, methodTy);
   return ManagedValue::forUnmanaged(v);
 }
 
@@ -729,8 +726,7 @@ ManagedValue SILGenBuilder::createObjCSuperMethod(SILLocation loc,
                                                   ManagedValue operand,
                                                   SILDeclRef member,
                                                   SILType methodTy) {
-  SILValue v = SILBuilder::createObjCSuperMethod(loc, operand.getValue(), member,
-                                                 methodTy);
+  SILValue v = createObjCSuperMethod(loc, operand.getValue(), member, methodTy);
   return ManagedValue::forUnmanaged(v);
 }
 
