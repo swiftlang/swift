@@ -276,7 +276,7 @@ extension Character
   internal init(_unverified guts: _StringGuts) {
     defer { _fixLifetime(guts) }
     if _slowPath(guts._isOpaque) {
-      self.init(_unverified: guts._asOpaque())
+      self.init(_opaqueUnverified: guts)
       return
     }
 
@@ -302,6 +302,12 @@ extension Character
     }
   }
 
+  @_versioned // @opaque
+  internal init(_opaqueUnverified guts: _StringGuts) {
+    _sanityCheck(guts._isOpaque)
+    self.init(_unverified: guts._asOpaque())
+  }
+
   /// Construct a Character from a slice of a _StringGuts, assuming
   /// the specified range covers exactly one extended grapheme cluster.
   @_inlineable // FIXME(sil-serialize-all)
@@ -319,6 +325,11 @@ extension Character
       }
       return
     }
+    if _slowPath(guts._isOpaque) {
+      self.init(_opaqueUnverifiedFixedLifetime: guts, range: range)
+      return
+    }
+
     if guts.isASCII {
       let ascii = guts._unmanagedASCIIView
       // The only multi-scalar ASCII grapheme cluster is CR/LF.
@@ -327,13 +338,21 @@ extension Character
       _sanityCheck(ascii.start[range.lowerBound] == _CR)
       _sanityCheck(ascii.start[range.lowerBound + 1] == _LF)
       self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
-    } else if guts._isContiguous {
-      let utf16 = guts._unmanagedUTF16View.checkedSlice(range)
-      self.init(_unverified: utf16)
-    } else {
-      let opaque = guts._asOpaque().checkedSlice(range)
-      self.init(_unverified: opaque._copyToNativeStorage())
+      return
     }
+
+    _sanityCheck(guts._object.isContiguousUTF16)
+    let utf16 = guts._unmanagedUTF16View.checkedSlice(range)
+    self.init(_unverified: utf16)
+  }
+
+  @_versioned // @opaque
+  internal init(
+    _opaqueUnverifiedFixedLifetime guts: _StringGuts, range: Range<Int>
+  ) {
+    _sanityCheck(guts._isOpaque)
+    let opaque = guts._asOpaque().checkedSlice(range)
+    self.init(_unverified: opaque._copyToNativeStorage())
   }
 
   @_inlineable

@@ -57,9 +57,11 @@ extension String {
     defer { _fixLifetime(repeatedValue) }
     // TODO (TODO: JIRA): Small string detection, micro-benchmarking, etc.
     if _slowPath(repeatedValue._guts._isOpaque) {
-      let opaque = repeatedValue._guts._asOpaque()
-      self.init(_StringGuts(_large: opaque._repeated(count)))
-    } else if repeatedValue._guts.isASCII {
+      self.init(_opaqueRepeating: repeatedValue, count: count)
+      return
+    }
+
+    if repeatedValue._guts.isASCII {
       let ascii = repeatedValue._guts._unmanagedASCIIView
       self.init(_StringGuts(_large: ascii._repeated(count)))
     } else {
@@ -67,6 +69,15 @@ extension String {
       self.init(_StringGuts(_large: utf16._repeated(count)))
     }
   }
+
+  @_versioned // @opaque
+  init(_opaqueRepeating repeatedValue: String, count: Int) {
+    _sanityCheck(repeatedValue._guts._isOpaque)
+    defer { _fixLifetime(repeatedValue) }
+    let opaque = repeatedValue._guts._asOpaque()
+    self.init(_StringGuts(_large: opaque._repeated(count)))
+  }
+
 
   /// A Boolean value indicating whether a string has no characters.
   @_inlineable // FIXME(sil-serialize-all)

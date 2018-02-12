@@ -278,14 +278,11 @@ extension _StringGuts {
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
     if _slowPath(_isOpaque) {
-      let opaque = _asOpaque()[bounds]
-      return try Swift._withCStringAndLength(
-        encodedAs: targetEncoding,
-        from: opaque,
-        encodedAs: Unicode.UTF16.self,
-        execute: body
-      )
+      return try _opaqueWithCStringAndLength(
+        in: bounds, encoding: targetEncoding, body)
     }
+
+    defer { _fixLifetime(self) }
     if isASCII {
       let ascii = _unmanagedASCIIView[bounds]
       return try Swift._withCStringAndLength(
@@ -302,6 +299,24 @@ extension _StringGuts {
       encodedAs: Unicode.UTF16.self,
       execute: body
     )
+  }
+
+  @_versioned // @opaque
+  func _opaqueWithCStringAndLength<
+    Result, TargetEncoding: Unicode.Encoding
+  >(
+    in bounds: Range<Int>,
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
+  ) rethrows -> Result {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    let opaque = _asOpaque()[bounds]
+    return try Swift._withCStringAndLength(
+      encodedAs: targetEncoding,
+      from: opaque,
+      encodedAs: Unicode.UTF16.self,
+      execute: body)
   }
 }
 
@@ -965,13 +980,11 @@ extension String {
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
     if _slowPath(_guts._isOpaque) {
-      let opaque = _guts._asOpaque()
-      var i = opaque.makeIterator()
-      Unicode.UTF16.ForwardParser._parse(&i) {
-        Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
-      }
+      _opaqueEncode(encoding, into: processCodeUnit)
       return
     }
+
+    defer { _fixLifetime(self) }
     if _guts.isASCII {
       let ascii = _guts._unmanagedASCIIView
       if encoding == Unicode.ASCII.self
@@ -992,6 +1005,20 @@ extension String {
     }
     let utf16 = _guts._unmanagedUTF16View
     var i = utf16.makeIterator()
+    Unicode.UTF16.ForwardParser._parse(&i) {
+      Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
+    }
+  }
+
+  @_versioned // @opaque
+  internal func _opaqueEncode<Encoding: Unicode.Encoding>(
+    _ encoding: Encoding.Type,
+    into processCodeUnit: (Encoding.CodeUnit) -> Void
+  ) {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    let opaque = _guts._asOpaque()
+    var i = opaque.makeIterator()
     Unicode.UTF16.ForwardParser._parse(&i) {
       Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
     }
