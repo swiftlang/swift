@@ -48,6 +48,7 @@ class ReflectionContext
 
 public:
   using super::getBuilder;
+  using super::readDemanglingForContextDescriptor;
   using super::readIsaMask;
   using super::readTypeFromMetadata;
   using super::readGenericArgFromMetadata;
@@ -55,7 +56,9 @@ public:
   using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
-    : super(std::move(reader)) {}
+    : super(std::move(reader)) {
+    getBuilder().setSymbolicReferenceResolverReader(*this);
+  }
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;

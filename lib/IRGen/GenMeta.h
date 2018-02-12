@@ -30,6 +30,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
@@ -125,6 +126,11 @@ namespace irgen {
   llvm::Constant *emitForeignTypeMetadataInitializer(IRGenModule &IGM,
                                                      CanType type,
                                                      Size &addressPointOffset);
+
+  /// Emit a type context descriptor that was demanded by a reference from
+  /// other generated definitions.
+  void emitLazyTypeContextDescriptor(IRGenModule &IGM,
+                                     NominalTypeDecl *theStruct);
 
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);

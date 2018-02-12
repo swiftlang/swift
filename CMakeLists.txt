@@ -376,6 +376,10 @@ if(SWIFT_BUILT_STANDALONE)
   project(Swift C CXX ASM)
 endif()
 
+if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
+  include(ClangClCompileRules)
+endif()
+
 precondition(CMAKE_SYSTEM_NAME)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_BUILD_SOURCEKIT_default TRUE)
