@@ -42,8 +42,10 @@ public protocol TensorProtocol {
   var scalars: [Scalar] { get }
 
   /// Underlying tensor handle.
+  /// - Note: Do NOT remove this. This is a compiler requirement.
   var handle: TensorHandle<Scalar> { get }
 
   /// Initialize from a TensorHandle.
+  /// - Note: Do NOT remove this. This is a compiler requirement.
   init(handle: TensorHandle<Scalar>)
 }
