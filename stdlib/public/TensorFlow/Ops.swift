@@ -94,14 +94,14 @@ extension TensorProtocol /*: Numeric*/ where Scalar : Numeric {
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
-  static func +(lhs: Self, rhs: Scalar) -> Self {
-    return lhs + Self(handle: _TFMakeScalarTensor(rhs))
+  static func +(lhs: Scalar, rhs: Self) -> Self {
+    return #tfop("Add", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
-  static func +(lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) + rhs
+  static func +(lhs: Self, rhs: Scalar) -> Self {
+    return #tfop("Add", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
@@ -111,7 +111,7 @@ public extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @inline(__always)
   static func +=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs + Self(handle: _TFMakeScalarTensor(rhs))
+    lhs = lhs + rhs
   }
 
   @_inlineable @inline(__always)
@@ -121,13 +121,13 @@ public extension TensorProtocol where Scalar : Numeric {
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Self, rhs: Scalar) -> Self {
-    return lhs - Self(handle: _TFMakeScalarTensor(rhs))
+  static func -(lhs: Scalar, rhs: Self) -> Self {
+    return #tfop("Sub", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) - rhs
+  static func -(lhs: Self, rhs: Scalar) -> Self {
+    return #tfop("Sub", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
@@ -142,12 +142,22 @@ public extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @inline(__always)
   static func *(lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) * rhs
+    return #tfop("Mul", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
   static func *(lhs: Self, rhs: Scalar) -> Self {
-    return lhs * Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("Mul", lhs, _TFMakeScalarTensor(rhs))
+  }
+
+  @_inlineable @inline(__always)
+  static func *=(lhs: inout Self, rhs: Self) {
+    lhs = lhs * rhs
+  }
+
+  @_inlineable @inline(__always)
+  static func *=(lhs: inout Self, rhs: Scalar) {
+    lhs = lhs * rhs
   }
 
   @_inlineable @inline(__always)
@@ -156,13 +166,14 @@ public extension TensorProtocol where Scalar : Numeric {
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Self, rhs: Scalar) -> Self {
-    return lhs / Self(handle: _TFMakeScalarTensor(rhs))
+
+  static func /(lhs: Scalar, rhs: Self) -> Self {
+    return #tfop("Div", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) / rhs
+  static func /(lhs: Self, rhs: Scalar) -> Self {
+    return #tfop("Div", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
@@ -182,12 +193,12 @@ public extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @inline(__always)
   static func %(lhs: Self, rhs: Scalar) -> Self {
-    return lhs % Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("Mod", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func %(lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) % rhs
+    return #tfop("Mod", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
@@ -215,16 +226,6 @@ public extension TensorProtocol where Scalar : Numeric {
   static func ⊗ (lhs: Self, rhs: Self) -> Self {
     return lhs.dot(rhs)
   }
-
-  @_inlineable @inline(__always)
-  static func ⊗ (lhs: Scalar, rhs: Self) -> Self {
-    return Self(handle: _TFMakeScalarTensor(lhs)) ⊗ rhs
-  }
-
-  @_inlineable @inline(__always)
-  static func ⊗ (lhs: Self, rhs: Scalar) -> Self {
-    return lhs ⊗ Self(handle: _TFMakeScalarTensor(rhs))
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -239,12 +240,12 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func < (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs < Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("Less", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func < (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) < rhs
+    return #tfop("Less", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
@@ -254,12 +255,12 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func <= (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs <= Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("LessEqual", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func <= (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) <= rhs
+    return #tfop("LessEqual", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
@@ -269,12 +270,12 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func > (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs > Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("Greater", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func > (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) > rhs
+    return #tfop("Greater", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
@@ -284,12 +285,12 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func >= (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs >= Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("GreaterEqual", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func >= (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) >= rhs
+    return #tfop("GreaterEqual", _TFMakeScalarTensor(lhs), rhs)
   }
 }
 
@@ -301,12 +302,12 @@ public extension TensorProtocol where Scalar : Equatable {
 
   @_inlineable @inline(__always)
   static func == (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs == Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("Equal", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func == (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) == rhs
+    return #tfop("Equal", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
@@ -316,12 +317,49 @@ public extension TensorProtocol where Scalar : Equatable {
 
   @_inlineable @inline(__always)
   static func != (lhs: Self, rhs: Scalar) -> BoolTensor {
-    return lhs != Self(handle: _TFMakeScalarTensor(rhs))
+    return #tfop("NotEqual", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   static func != (lhs: Scalar, rhs: Self) -> BoolTensor {
-    return Self(handle: _TFMakeScalarTensor(lhs)) != rhs
+    return #tfop("NotEqual", _TFMakeScalarTensor(lhs), rhs)
+  }
+}
+
+public extension TensorProtocol where Scalar == Bool {
+  @_inlineable @inline(__always)
+  static prefix func ! (x: Self) -> Self {
+    return #tfop("LogicalNot", x)
+  }
+
+  @_inlineable @inline(__always)
+  static func && (lhs: Self, rhs: Self) -> Self {
+    return #tfop("LogicalAnd", lhs, rhs)
+  }
+
+  @_inlineable @inline(__always)
+  static func && (lhs: Self, rhs: Scalar) -> Self {
+    return #tfop("LogicalAnd", lhs, _TFMakeScalarTensor(rhs))
+  }
+
+  @_inlineable @inline(__always)
+  static func && (lhs: Scalar, rhs: Self) -> Self {
+    return #tfop("LogicalAnd", _TFMakeScalarTensor(lhs), rhs)
+  }
+
+  @_inlineable @inline(__always)
+  static func || (lhs: Self, rhs: Self) -> Self {
+    return #tfop("LogicalOr", lhs, rhs)
+  }
+
+  @_inlineable @inline(__always)
+  static func || (lhs: Self, rhs: Scalar) -> Self {
+    return #tfop("LogicalOr", lhs, _TFMakeScalarTensor(rhs))
+  }
+
+  @_inlineable @inline(__always)
+  static func || (lhs: Scalar, rhs: Self) -> Self {
+    return #tfop("LogicalOr", _TFMakeScalarTensor(lhs), rhs)
   }
 }
 
