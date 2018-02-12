@@ -113,6 +113,7 @@ class TypeDecoder {
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    case NodeKind::SymbolicReference:
     {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
@@ -471,27 +472,32 @@ private:
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
-    if (node->getNumChildren() < 2)
-      return false;
+    Demangle::NodePointer nominalNode;
+    if (node->getKind() == NodeKind::SymbolicReference) {
+      // A symbolic reference can be directly resolved to a nominal type.
+      nominalNode = node;
+    } else {
+      if (node->getNumChildren() < 2)
+        return false;
 
-    auto moduleOrParentType = node->getChild(0);
+      auto moduleOrParentType = node->getChild(0);
 
-    // Nested types are handled a bit funny here because a
-    // nominal typeref always stores its full mangled name,
-    // in addition to a reference to the parent type. The
-    // mangled name already includes the module and parent
-    // types, if any.
-    Demangle::NodePointer nominalNode = node;
-    if (moduleOrParentType->getKind() != NodeKind::Module) {
-      parent = decodeMangledType(moduleOrParentType);
-      if (!parent) return false;
+      // Nested types are handled a bit funny here because a
+      // nominal typeref always stores its full mangled name,
+      // in addition to a reference to the parent type. The
+      // mangled name already includes the module and parent
+      // types, if any.
+      nominalNode = node;
+      if (moduleOrParentType->getKind() != NodeKind::Module) {
+        parent = decodeMangledType(moduleOrParentType);
+        if (!parent) return false;
 
-      // Remove any generic arguments from the context node, producing a
-      // node that reference the nominal type declaration.
-      nominalNode =
-        stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+        // Remove any generic arguments from the context node, producing a
+        // node that reference the nominal type declaration.
+        nominalNode =
+          stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+      }
     }
-
     typeDecl = Builder.createNominalTypeDecl(nominalNode);
     if (!typeDecl) return false;
 

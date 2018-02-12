@@ -521,6 +521,10 @@ bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
+/// Form a StringRef around the mangled name starting at base, if the name may
+/// contain symbolic references.
+llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
+
 } // end namespace Demangle
 } // end namespace swift
 

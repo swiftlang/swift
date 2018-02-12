@@ -101,14 +101,95 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
                                          offset);
 }
 
+llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str) {
+  return getAddrOfStringForTypeRef(SymbolicMangling{str,{}});
+}
+
+llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
+                                             const SymbolicMangling &mangling) {
+  // Create a symbol name for the symbolic mangling. This is used as the
+  // uniquing key both for ODR coalescing and within this TU.
+  IRGenMangler mangler;
+  std::string symbolName =
+    mangler.mangleSymbolNameForSymbolicMangling(mangling);
+
+  // See if we emitted the constant already.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second)
+    return entry.second;
+  
+  ConstantInitBuilder B(*this);
+  auto S = B.beginStruct();
+  S.setPacked(true);
+  
+  unsigned pos = 0;
+  for (auto &symbolic : mangling.SymbolicReferences) {
+    assert(symbolic.second >= pos
+           && "references should be ordered");
+    if (symbolic.second != pos) {
+      // Emit the preceding literal chunk.
+      auto literalChunk = StringRef(mangling.String.data() + pos,
+                                    symbolic.second - pos);
+      assert(literalChunk.back() == '\1' && "should be prefixed with \\1");
+      auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
+                                                        literalChunk,
+                                                        /*null*/ false);
+      S.add(literal);
+    }
+    
+    // The symbolic reference is to the type context descriptor of the
+    // referenced type.
+    // We currently only allow symbolic references to nominal type contexts.
+    auto nominal = cast<NominalTypeDecl>(symbolic.first);
+    S.addRelativeAddress(
+         getAddrOfTypeContextDescriptor(const_cast<NominalTypeDecl*>(nominal)));
+    
+    pos = symbolic.second + 4;
+  }
+  
+  // Add the last literal bit, if any.
+  if (pos != mangling.String.size()) {
+    auto literalChunk = StringRef(mangling.String.data() + pos,
+                                  mangling.String.size() - pos);
+    auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
+                                                      literalChunk,
+                                                      /*null*/ false);
+    S.add(literal);
+  }
+  
+  // And a null terminator!
+  S.addInt(Int8Ty, 0);
+  
+  auto finished = S.finishAndCreateFuture();
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+  var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  var->setAlignment(1);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+  
+  finished.installInGlobal(var);
+  
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+  entry = {var, addr};
+  
+  return addr;
+}
+
 // FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 // resolving relative references to coalesceable symbols.
 // It should be removed when fixed. rdar://problem/22674524
-static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
-                                      bool willBeRelativelyAddressed = false) {
+static llvm::Constant *getTypeRef(IRGenModule &IGM, CanType type) {
   IRGenMangler Mangler;
-  std::string Name = Mangler.mangleTypeForMetadata(type);
-  return IGM.getAddrOfGlobalString(Name, willBeRelativelyAddressed);
+  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type,
+                                                    IGM.getSwiftModule(),
+                                                    /*single-field box*/ false);
+  
+  return IGM.getAddrOfStringForTypeRef(SymbolicName);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -2302,7 +2383,8 @@ namespace {
     
     void addGenericRequirements() {
       auto metadata =
-        irgen::addGenericRequirements(IGM, B, asImpl().getGenericSignature(),
+        irgen::addGenericRequirements(IGM, B,
+                            asImpl().getGenericSignature(),
                             asImpl().getGenericSignature()->getRequirements());
 
       // Fill in the final requirement count.
@@ -2404,9 +2486,8 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = getMangledTypeName(IGM,
-                                 E->getSelfInterfaceType()->getCanonicalType(),
-                                 /*relatively addressed*/ true);
+      auto string = getTypeRef(IGM,
+                               E->getSelfInterfaceType()->getCanonicalType());
       B.addRelativeAddress(string);
     }
     
@@ -2496,6 +2577,8 @@ namespace {
   
   protected:
     NominalTypeDecl *Type;
+    bool Lazy;
+    
     using super::IGM;
     using super::B;
     using super::asImpl;
@@ -2503,8 +2586,9 @@ namespace {
   public:
     using super::addGenericSignature;
   
-    TypeContextDescriptorBuilderBase(IRGenModule &IGM, NominalTypeDecl *Type)
-      : super(IGM), Type(Type)
+    TypeContextDescriptorBuilderBase(IRGenModule &IGM, NominalTypeDecl *Type,
+                                     bool isLazy)
+      : super(IGM), Type(Type), Lazy(isLazy)
     {}
     
     void layout() {
@@ -2533,6 +2617,13 @@ namespace {
     }
       
     void addAccessFunction() {
+      // Don't emit the access function if we're only lazily emitting the
+      // context descriptor.
+      if (Lazy) {
+        B.addInt32(0);
+        return;
+      }
+    
       llvm::Constant *accessFn =
         getRequiredTypeMetadataAccessFunction(IGM, Type, NotForDefinition);
       B.addRelativeAddressOrNull(accessFn);
@@ -2696,8 +2787,9 @@ namespace {
     Size FieldVectorOffset, GenericParamsOffset;
 
   public:
-    StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type)
-      : super(IGM, Type)
+    StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type,
+                                   bool Lazy)
+      : super(IGM, Type, Lazy)
     {
       auto &layout = IGM.getMetadataLayout(getType());
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
@@ -2723,12 +2815,18 @@ namespace {
       B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
                                            /*willBeRelativelyAddressed*/ true));
       
-      // Build the field type accessor function.
-      llvm::Function *fieldTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 getType()->getStoredProperties());
-      
-      B.addRelativeAddress(fieldTypeVectorAccessor);
+      // Don't emit the field type accessor function if we're only lazily
+      // emitting the context descriptor.
+      if (Lazy) {
+        B.addInt32(0);
+      } else {
+        // Build the field type accessor function.
+        llvm::Function *fieldTypeVectorAccessor
+          = getFieldTypeAccessorFn(IGM, getType(),
+                                   getType()->getStoredProperties());
+        
+        B.addRelativeAddress(fieldTypeVectorAccessor);
+      }
     }
     
     uint16_t getKindSpecificFlags() {
@@ -2749,8 +2847,8 @@ namespace {
     Size PayloadSizeOffset;
     
   public:
-    EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type)
-      : super(IGM, Type)
+    EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type, bool Lazy)
+      : super(IGM, Type, Lazy)
     {
       auto &layout = IGM.getMetadataLayout(getType());
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
@@ -2786,12 +2884,18 @@ namespace {
 
       B.addRelativeAddressOrNull(strategy.emitCaseNames());
 
-      // Build the case type accessor.
-      llvm::Function *caseTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 strategy.getElementsWithPayload());
-      
-      B.addRelativeAddress(caseTypeVectorAccessor);
+      // Don't emit the field type accessor function if we're only lazily
+      // emitting the context descriptor.
+      if (Lazy) {
+        B.addInt32(0);
+      } else {
+        // Build the case type accessor.
+        llvm::Function *caseTypeVectorAccessor
+          = getFieldTypeAccessorFn(IGM, getType(),
+                                   strategy.getElementsWithPayload());
+        
+        B.addRelativeAddress(caseTypeVectorAccessor);
+      }
     }
     
     uint16_t getKindSpecificFlags() {
@@ -2818,8 +2922,8 @@ namespace {
     unsigned VTableSize;
 
   public:
-    ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type)
-      : super(IGM, Type)
+    ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type, bool Lazy)
+      : super(IGM, Type, Lazy)
     {
       if (getType()->isForeign()) {
         VTable = nullptr;
@@ -2935,15 +3039,38 @@ namespace {
       B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
                                            /*willBeRelativelyAddressed*/ true));
       
-      // Build the field type accessor function.
-      llvm::Function *fieldTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 getType()->getStoredProperties());
-      
-      B.addRelativeAddress(fieldTypeVectorAccessor);
+      // Don't emit the field type accessor function if we're only lazily
+      // emitting the context descriptor.
+      if (Lazy) {
+        B.addInt32(0);
+      } else {
+        // Build the field type accessor function.
+        llvm::Function *fieldTypeVectorAccessor
+          = getFieldTypeAccessorFn(IGM, getType(),
+                                   getType()->getStoredProperties());
+
+        B.addRelativeAddress(fieldTypeVectorAccessor);
+      }
     }
   };
 } // end anonymous namespace
+
+void
+irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
+                                     NominalTypeDecl *Nominal) {
+  if (auto Struct = dyn_cast<StructDecl>(Nominal)) {
+    StructContextDescriptorBuilder(IGM, Struct, /*lazy*/ true)
+      .emit();
+  } else if (auto Enum = dyn_cast<EnumDecl>(Nominal)) {
+    EnumContextDescriptorBuilder(IGM, Enum, /*lazy*/ true)
+      .emit();
+  } else if (auto Class = dyn_cast<ClassDecl>(Nominal)) {
+    ClassContextDescriptorBuilder(IGM, Class, /*lazy*/ true)
+      .emit();
+  } else {
+    llvm_unreachable("type does not have a context descriptor");
+  }
+}
 
 llvm::Constant *
 IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
@@ -3703,7 +3830,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = ClassContextDescriptorBuilder(IGM, Target).emit();
+      auto descriptor =
+        ClassContextDescriptorBuilder(IGM, Target, /*lazy*/ false).emit();
       B.add(descriptor);
     }
 
@@ -4979,7 +5107,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto *descriptor = StructContextDescriptorBuilder(IGM, Target).emit();
+      auto *descriptor =
+        StructContextDescriptorBuilder(IGM, Target, /*lazy*/ false).emit();
       B.add(descriptor);
     }
 
@@ -5151,7 +5280,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = EnumContextDescriptorBuilder(IGM, Target).emit();
+      auto descriptor =
+        EnumContextDescriptorBuilder(IGM, Target, /*lazy*/ false).emit();
       B.add(descriptor);
     }
 
@@ -5342,8 +5472,12 @@ namespace {
 
     void addForeignName() {
       CanType targetType = asImpl().getTargetType();
-      B.addRelativeAddress(getMangledTypeName(IGM, targetType,
-                                              /*relative addressed?*/ true));
+      IRGenMangler mangler;
+      std::string Name =
+        mangler.mangleTypeForForeignMetadataUniquing(targetType);
+      llvm::Constant *nameStr = IGM.getAddrOfGlobalString(Name,
+                                                 /*relatively addressed*/ true);
+      B.addRelativeAddress(nameStr);
     }
 
     void addInitializationFunction() {
@@ -5469,7 +5603,7 @@ namespace {
 
     void addNominalTypeDescriptor() {
       auto descriptor =
-        ClassContextDescriptorBuilder(this->IGM, Target).emit();
+        ClassContextDescriptorBuilder(this->IGM, Target, /*lazy*/false).emit();
       B.add(descriptor);
     }
 
@@ -6124,9 +6258,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        getMangledTypeName(IGM,
-                           requirement.getSecondType()->getCanonicalType(),
-                           /*willBeRelativelyAddressed*/ true);
+        getTypeRef(IGM, requirement.getSecondType()->getCanonicalType());
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

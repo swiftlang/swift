@@ -240,7 +240,7 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
-      const std::pair<const FieldDescriptor *, uintptr_t> FD =
+      std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
           TC.getBuilder().getFieldTypeInfo(P);
       if (FD.first == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; P->dump())
@@ -921,7 +921,7 @@ public:
 
   const TypeInfo *
   build(const TypeRef *TR,
-        const std::pair<const FieldDescriptor *, uintptr_t> &FD) {
+        const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD) {
     // Sort enum into payload and no-payload cases.
     unsigned NoPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
@@ -1304,7 +1304,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
-  const std::pair<const FieldDescriptor *, uintptr_t> &FD =
+  std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
       getBuilder().getFieldTypeInfo(TR);
   if (FD.first == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());

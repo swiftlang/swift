@@ -14,13 +14,21 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {
+
+/// A mangling string that includes embedded symbolic references.
+struct SymbolicMangling {
+  std::string String;
+  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+};
 
 /// The mangler for all kind of symbols produced in IRGen.
 class IRGenMangler : public Mangle::ASTMangler {
@@ -298,11 +306,7 @@ public:
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
-
-  std::string mangleTypeForMetadata(Type type) {
-    return mangleTypeWithoutPrefix(type);
-  }
-
+  
   std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
     beginMangling();
     appendProtocolName(Proto->getDecl());
@@ -310,13 +314,21 @@ public:
     return finalize();
   }
 
-  std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
-                                      bool isSingleFieldOfBox);
+  std::string mangleTypeForForeignMetadataUniquing(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
+
+  SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
+                                           Type Ty,
+                                           ModuleDecl *Module,
+                                           bool isSingleFieldOfBox);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 
   std::string mangleProtocolForLLVMTypeName(ProtocolCompositionType *type);
 
+  std::string mangleSymbolNameForSymbolicMangling(
+                                              const SymbolicMangling &mangling);
 protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {

@@ -24,7 +24,7 @@
 // CHECK-DAG: @"$S4test7StructAVMn" =
 // CHECK-DAG: @"$S4test7StructBVMn" =
 // CHECK-DAG: @"$S4test7StructCVMn" =
-// CHECK-DEAD-NOT: @"$S4test7StructDVMn"
+// CHECK-DAG: @"$S4test7StructDVMn"
 // CHECK-DAG: @"$S4test7StructEVMn" =
 
 // full type metadata

@@ -39,6 +39,8 @@ static bool isDeclName(Node::Kind kind) {
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
     case Node::Kind::InfixOperator:
+    case Node::Kind::UnresolvedSymbolicReference:
+    case Node::Kind::SymbolicReference:
       return true;
     default:
       return false;
@@ -116,6 +118,21 @@ static bool isFunctionAttr(Node::Kind kind) {
 //////////////////////////////////
 // Public utility functions    //
 //////////////////////////////////
+
+llvm::StringRef
+swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
+  if (!base)
+    return {};
+
+  auto end = base;
+  while (*end != '\0') {
+    // Skip over symbolic references.
+    if (*end == '\1')
+      end += 4;
+    ++end;
+  }
+  return StringRef(base, end - base);
+}
 
 int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   if (mangledName.empty()) return 0;
@@ -428,9 +445,32 @@ NodePointer Demangler::demangleTypeMangling() {
   TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
+  
+NodePointer Demangler::demangleSymbolicReference(const void *at) {
+  // The symbolic reference is a 4-byte machine integer encoded in the following
+  // four bytes.
+  int32_t value;
+  memcpy(&value, Text.data() + Pos, 4);
+  Pos += 4;
+  
+  // Use the resolver, if any, to produce the demangling tree the symbolic
+  // reference represents.
+  NodePointer resolved = nullptr;
+  if (SymbolicReferenceResolver)
+    resolved = SymbolicReferenceResolver(value, at);
+  // With no resolver, or a resolver that failed, simply preserve the raw
+  // information in the node.
+  if (!resolved)
+    resolved = createNode(Node::Kind::UnresolvedSymbolicReference, value);
+  
+  // Register the result as a substitution.
+  addSubstitution(resolved);
+  return resolved;
+}
 
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
+    case '\1': return demangleSymbolicReference(Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);

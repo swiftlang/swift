@@ -260,7 +260,7 @@ public:
 
     return start;
   }
-
+  
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
@@ -454,6 +454,17 @@ public:
     Demangle::NodePointer Demangled =
       Dem.demangleSymbol(StringRef(MangledTypeName, Length));
     return decodeMangledType(Demangled);
+  }
+  
+  /// Read a context descriptor from the given address and build a mangling
+  /// tree representing it.
+  Demangle::NodePointer
+  readDemanglingForContextDescriptor(StoredPointer contextAddress,
+                                     Demangler &Dem) {
+    auto context = readContextDescriptor(contextAddress);
+    if (!context)
+      return nullptr;
+    return buildNominalTypeMangling(context, Dem);
   }
 
   /// Read the isa pointer of a class or closure context instance and apply
@@ -1023,12 +1034,11 @@ private:
     return nullptr;
   }
 
-  /// Given a read nominal type descriptor, attempt to build a
-  /// nominal type decl from it.
-  BuiltNominalTypeDecl
-  buildNominalTypeDecl(ContextDescriptorRef descriptor) {
-    // Build the demangling tree from the context tree.
-    Demangle::NodeFactory nodeFactory;
+  /// Given a read nominal type descriptor, attempt to build a demangling tree
+  /// for it.
+  Demangle::NodePointer
+  buildNominalTypeMangling(ContextDescriptorRef descriptor,
+                           Demangle::NodeFactory &nodeFactory) {
     std::vector<std::pair<Demangle::Node::Kind, std::string>>
       nameComponents;
     ContextDescriptorRef parent = descriptor;
@@ -1048,27 +1058,27 @@ private:
       switch (auto contextKind = parent->getKind()) {
       case ContextDescriptorKind::Class:
         if (!getTypeName())
-          return BuiltNominalTypeDecl();
+          return nullptr;
         nodeKind = Demangle::Node::Kind::Class;
         break;
       case ContextDescriptorKind::Struct:
         if (!getTypeName())
-          return BuiltNominalTypeDecl();
+          return nullptr;
         nodeKind = Demangle::Node::Kind::Structure;
         break;
       case ContextDescriptorKind::Enum:
         if (!getTypeName())
-          return BuiltNominalTypeDecl();
+          return nullptr;
         nodeKind = Demangle::Node::Kind::Enum;
         break;
 
       case ContextDescriptorKind::Extension:
         // TODO: Remangle something about the extension context here.
-        return BuiltNominalTypeDecl();
+        return nullptr;
         
       case ContextDescriptorKind::Anonymous:
         // TODO: Remangle something about the anonymous context here.
-        return BuiltNominalTypeDecl();
+        return nullptr;
 
       case ContextDescriptorKind::Module: {
         nodeKind = Demangle::Node::Kind::Module;
@@ -1078,13 +1088,13 @@ private:
         auto nameAddress
           = resolveRelativeField(parent, moduleBuffer->Name);
         if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-          return BuiltNominalTypeDecl();
+          return nullptr;
         break;
       }
       
       default:
         // Not a kind of context we know about.
-        return BuiltNominalTypeDecl();
+        return nullptr;
       }
 
       // Override the node kind if this was a Clang-imported type.
@@ -1101,9 +1111,9 @@ private:
     
     // We should have made our way up to a module context.
     if (nameComponents.empty())
-      return BuiltNominalTypeDecl();
+      return nullptr;
     if (nameComponents.back().first != Node::Kind::Module)
-      return BuiltNominalTypeDecl();
+      return nullptr;
     auto moduleInfo = std::move(nameComponents.back());
     nameComponents.pop_back();
     auto demangling =
@@ -1119,7 +1129,19 @@ private:
     
     auto top = nodeFactory.createNode(Node::Kind::Type);
     top->addChild(demangling, nodeFactory);
-    BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(top);
+    return top;
+  }
+
+  /// Given a read nominal type descriptor, attempt to build a
+  /// nominal type decl from it.
+  BuiltNominalTypeDecl
+  buildNominalTypeDecl(ContextDescriptorRef descriptor) {
+    // Build the demangling tree from the context tree.
+    Demangle::NodeFactory nodeFactory;
+    auto node = buildNominalTypeMangling(descriptor, nodeFactory);
+    if (!node)
+      return BuiltNominalTypeDecl();
+    BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(node);
     return decl;
   }
 
