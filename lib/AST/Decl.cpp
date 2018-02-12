@@ -1972,6 +1972,10 @@ void ValueDecl::setInterfaceType(Type type) {
   TypeAndAccess.setPointer(type);
 }
 
+bool ValueDecl::hasValidSignature() const {
+  return hasInterfaceType() && !isBeingValidated();
+}
+
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->getObjCSelector();
