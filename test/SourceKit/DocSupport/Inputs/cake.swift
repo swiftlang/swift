@@ -83,3 +83,17 @@ extension C1 : P4 {
     public func C1S1foo(a : P4) {}
   }
 }
+
+// rdar://problem/36553066
+
+public protocol P5 {
+    associatedtype Element
+}
+public protocol P6: P5 {}
+extension P6 {
+    public var null: Element? { return nil }
+}
+public struct S3<Wrapped: P5>: P5 {
+    public typealias Element = Wrapped.Element
+}
+extension S3: P6 where Wrapped: P6 {}
