@@ -76,6 +76,7 @@ public:
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
+  IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
@@ -838,6 +839,8 @@ public:
   
   void visitCDeclAttr(CDeclAttr *attr);
 
+  void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
+  
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
@@ -917,6 +920,78 @@ static bool iswatchOS(TypeChecker &TC) {
 static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
 }
+
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the DynamicMemberLookupProtocol
+/// requirement.
+bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                     DeclContext *DC,
+                                                     TypeChecker &TC) {
+  // The only thing that we care about is that the index list has exactly one
+  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+  auto indices = decl->getIndices();
+  
+  auto EBSL =
+  TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  
+  return indices->size() == 1 &&
+  !indices->get(0)->isVariadic() &&
+  TC.conformsToProtocol(indices->get(0)->getType(),
+                        EBSL, DC, ConformanceCheckOptions());
+}
+
+/// The @dynamicMemberLookup attribute is only allowed on types that have at
+/// least one subscript member declared like this:
+///
+/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
+///   (dynamicMember name: KeywordType) -> LookupValue { get }
+///
+/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
+/// manually check the requirements here.
+///
+void AttributeChecker::
+visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
+  // This attribute is only allowed on nominal types.
+  auto decl = cast<NominalTypeDecl>(D);
+  auto type = decl->getDeclaredType();
+  
+  // Lookup our subscript.
+  auto subscriptName =
+    DeclName(TC.Context, DeclBaseName::createSubscript(),
+             TC.Context.getIdentifier("dynamicMember"));
+  
+  auto lookupOptions = defaultMemberTypeLookupOptions;
+  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+  
+  // Lookup the implementations of our subscript.
+  auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
+  
+  // If we have none, then there is no conformance.
+  if (candidates.empty()) {
+    TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
+    attr->setInvalid();
+    return;
+  }
+
+  
+  // If none of the ones we find are acceptable, then reject one.
+  auto oneCandidate = candidates.front();
+  candidates.filter([&](LookupResultEntry entry)->bool {
+    auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
+  });
+  
+  if (candidates.empty()) {
+    TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
+                diag::type_invalid_dml, type);
+    attr->setInvalid();
+  }
+}
+#if 0
+ERROR(invalid_retroactive_conformance_dmlp,none,
+      "retroactive conformance of %0 to 'DynamicMemberLookupProtocol' is not "
+      "allowed, only primary type declarations may conform", (Type))
+#endif
 
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().

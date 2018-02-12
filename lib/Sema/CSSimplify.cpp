@@ -2863,6 +2863,36 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   return known->second;
 }
 
+
+/// Return true if the specified type or a super-class/super-protocol has the
+/// @dynamicMemberLookup attribute on it.  This implementation is not
+/// particularly fast in the face of deep class hierarchies or lots of protocol
+/// conformances, but this is fine because it doesn't get invoked in the normal
+/// name lookup path (only when lookup is about to fail).
+static bool isDynamicMemberLookupable(Type ty) {
+  auto nominal = ty->getAnyNominal();
+  if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
+
+  // If this type has the attribute on it, then yes!
+  if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+    return true;
+  
+  // If any of the protocols this type conforms to has the attribute, then yes.
+  for (auto p : nominal->getAllProtocols())
+    if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+      return true;
+
+  // If this is a class with a super class, check super classes as well.
+  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+    if (auto superClass = cd->getSuperclass())
+      if (isDynamicMemberLookupable(superClass))
+        return true;
+  }
+  
+  return false;
+}
+
+
 /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
 /// perform a lookup into the specified base type to find a candidate list.
 /// The list returned includes the viable candidates as well as the unviable
@@ -3237,6 +3267,41 @@ retry_after_fail:
           addChoice(getOverloadChoice(result.getValueDecl(),
                                       /*bridged*/false,
                                       /*isUnwrappedOptional=*/true));
+      }
+    }
+  }
+  
+  // If we're about to fail lookup, but we are looking for members in a type
+  // that has the @dynamicMemberLookup attribute, then we resolve the reference
+  // to the subscript(dynamicMember:) member, and pass the member name as a
+  // string.
+  if (constraintKind == ConstraintKind::ValueMember &&
+      memberName.isSimpleName() && !memberName.isSpecial()) {
+    auto name = memberName.getBaseIdentifier();
+    if (isDynamicMemberLookupable(instanceTy)) {
+      auto &ctx = getASTContext();
+      // Recursively look up the subscript(dynamicMember:)'s in this type.
+      auto subscriptName =
+        DeclName(ctx, DeclBaseName::createSubscript(),
+                 ctx.getIdentifier("dynamicMember"));
+
+      auto subscripts = performMemberLookup(constraintKind,
+                                            subscriptName,
+                                            baseTy, functionRefKind,
+                                            memberLocator,
+                                            includeInaccessibleMembers);
+        
+      // Reflect the candidates found as DynamicMemberLookup results.
+      for (auto candidate : subscripts.ViableCandidates) {
+        auto decl = cast<SubscriptDecl>(candidate.getDecl());
+        if (isAcceptableDynamicMemberLookupSubscript(decl, DC, TC))
+          result.addViable(OverloadChoice::getDynamicMemberLookup(baseTy,
+                                                                  decl, name));
+      }
+      for (auto candidate : subscripts.UnviableCandidates) {
+        auto decl = candidate.first.getDecl();
+        auto choice = OverloadChoice::getDynamicMemberLookup(baseTy, decl,name);
+        result.addUnviable(choice, candidate.second);
       }
     }
   }

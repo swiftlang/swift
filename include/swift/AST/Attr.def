@@ -111,7 +111,8 @@ SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
 SIMPLE_DECL_ATTR(_exported, Exported, OnImport | UserInaccessible, 8)
 
-/// NOTE: 9 is unused.
+SIMPLE_DECL_ATTR(dynamicMemberLookup, DynamicMemberLookup,
+                 OnClass | OnStruct | OnEnum | OnProtocol, 9)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
                  OnVar, 10)

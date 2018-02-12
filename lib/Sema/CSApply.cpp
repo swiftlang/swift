@@ -1370,13 +1370,15 @@ namespace {
                          ArrayRef<Identifier> argLabels,
                          bool hasTrailingClosure,
                          ConstraintLocatorBuilder locator, bool isImplicit,
-                         AccessSemantics semantics) {
+                         AccessSemantics semantics,
+                         Optional<SelectedOverload> selected = None) {
 
       // Determine the declaration selected for this subscript operation.
-      auto selected = getOverloadChoiceIfAvailable(
-                        cs.getConstraintLocator(
-                          locator.withPathElement(
-                            ConstraintLocator::SubscriptMember)));
+      if (!selected)
+        selected = getOverloadChoiceIfAvailable(
+                          cs.getConstraintLocator(
+                            locator.withPathElement(
+                              ConstraintLocator::SubscriptMember)));
 
       // Handles situation where there was a solution available but it didn't
       // have a proper overload selected from subscript call, might be because
@@ -1528,30 +1530,45 @@ namespace {
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
 
-      // Figure out the index and result types.
-      auto subscriptTy = simplifyType(selected.openedType);
-      auto subscriptFnTy = subscriptTy->castTo<AnyFunctionType>();
-      auto resultTy = subscriptFnTy->getResult();
-
+      // Use the correct kind of locator depending on how this subscript came
+      // to be.
+      auto locatorKind = ConstraintLocator::SubscriptMember;
+      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+        locatorKind = ConstraintLocator::Member;
+      
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
       auto knownOpened = solution.OpenedExistentialTypes.find(
                            getConstraintSystem().getConstraintLocator(
-                             locator.withPathElement(
-                               ConstraintLocator::SubscriptMember)));
+                             locator.withPathElement(locatorKind)));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
       }
+ 
+      // Figure out the index and result types.
+      Type resultTy;
+      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup) {
+        auto subscriptTy = simplifyType(selected.openedType);
+        auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
+        resultTy = subscriptFnTy->getResult();
 
-      // Coerce the index argument.
-      index = coerceCallArguments(index, subscriptFnTy, nullptr,
-                                  argLabels, hasTrailingClosure,
-                                  locator.withPathElement(
-                                    ConstraintLocator::SubscriptIndex));
-      if (!index)
-        return nullptr;
+        // Coerce the index argument.
+        index = coerceCallArguments(index, subscriptFnTy, nullptr,
+                                    argLabels, hasTrailingClosure,
+                                    locator.withPathElement(
+                                      ConstraintLocator::SubscriptIndex));
+        if (!index)
+          return nullptr;
 
+      } else {
+        // If this is a @dynamicMemberLookup, then the type of the selection is
+        // actually the property/result type.  That's fine though, and we
+        // already have the index type adjusted to the correct type expected by
+        // the subscript.
+        resultTy = simplifyType(selected.openedType);
+      }
+      
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
       };
@@ -2738,7 +2755,8 @@ namespace {
         // before taking a single element.
         auto baseTy = cs.getType(base);
         if (!toType->hasLValueType() && baseTy->hasLValueType())
-          base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
+          base = coerceToType(base, baseTy->getRValueType(),
+                              cs.getConstraintLocator(base));
 
         return cs.cacheType(new (cs.getASTContext())
                             TupleElementExpr(base, dotLoc,
@@ -2746,15 +2764,50 @@ namespace {
                                              nameLoc.getBaseNameLoc(), toType));
       }
 
-      case OverloadChoiceKind::BaseType: {
+      case OverloadChoiceKind::BaseType:
         return base;
-      }
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
+          
+      case OverloadChoiceKind::DynamicMemberLookup: {
+        // Application of a DynamicMemberLookup result turns a member access of
+        // x.foo into x[dynamicMember: "foo"].
+        auto subscriptDecl = cast<SubscriptDecl>(selected.choice.getDecl());
+        auto &ctx = cs.getASTContext();
+        auto loc = nameLoc.getStartLoc();
+        
+        // Build and type check the string literal index value to the specific
+        // string type expected by the subscript.
+        Expr *nameExpr = new (ctx)
+          StringLiteralExpr(selected.choice.getName().getBaseIdentifier().str(),
+                            loc, /*implicit*/true);
+        auto nameLabel = ctx.getIdentifier("dynamicMember");
+        
+        auto stringType = subscriptDecl->getIndices()->get(0)->getTypeLoc();
+        
+        // Build a tuple so that argument has a label.
+        Expr *tuple = TupleExpr::create(cs.getASTContext(), loc, nameExpr,
+                                        nameLabel, loc, nameLoc.getStartLoc(),
+                                        /*hasTrailingClosure*/false,
+                                        /*implicit*/true);
+        auto tupleTy = TupleType::get(TupleTypeElt(stringType.getType(),
+                                                   nameLabel), ctx);
+        (void)cs.TC.typeCheckExpression(tuple, dc,
+                                        TypeLoc::withoutLoc(tupleTy),
+                                        CTP_CallArgument);
+        cs.cacheExprTypes(tuple);
+
+        // Build and return a subscript that uses this string as the index.
+        return buildSubscript(base, tuple, nameLabel,
+                              /*trailingClosure*/false,
+                              cs.getConstraintLocator(expr),
+                              /*isImplicit*/false,
+                              AccessSemantics::Ordinary, selected);
+      }
       }
 
-    llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+      llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
     
   public:
@@ -6403,7 +6456,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     if (auto *toIO = toType->getAs<InOutType>()) {
-      // In an 'inout' operator like "++i", the operand is converted from
+      // In an 'inout' operator like "i += 1", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
       cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
@@ -8038,7 +8091,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 }
 
 Expr *
-Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
+Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
+                                        ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
 
   // Load lvalues here.
