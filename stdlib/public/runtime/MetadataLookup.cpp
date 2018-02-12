@@ -232,6 +232,11 @@ _findNominalTypeDescriptor(Demangle::NodePointer node) {
   const TypeContextDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
+  // If we have a symbolic reference to a context, resolve it immediately.
+  if (node->getKind() == Node::Kind::SymbolicReference)
+    return cast<TypeContextDescriptor>(
+      (const ContextDescriptor *)node->getIndex());
+
   auto mangledName = Demangle::mangleNode(node);
 
   // Look for an existing entry.
@@ -836,14 +841,33 @@ public:
 TypeInfo
 swift::_getTypeByMangledName(StringRef typeName,
                              SubstGenericParameterFn substGenericParam) {
-
   Demangler demangler;
   NodePointer node;
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
-  size_t dotPos = typeName.find('.');
-  if (dotPos != llvm::StringRef::npos &&
-      typeName.find('.', dotPos + 1) == llvm::StringRef::npos) {
+  auto getDotPosForConvenienceSyntax = [&]() -> size_t {
+    size_t dotPos = typeName.find('.');
+    if (dotPos == llvm::StringRef::npos)
+      return llvm::StringRef::npos;
+    if (typeName.find('.', dotPos + 1) != llvm::StringRef::npos)
+      return llvm::StringRef::npos;
+    if (typeName.find('$') != llvm::StringRef::npos)
+      return llvm::StringRef::npos;
+    return dotPos;
+  };
+
+  // Resolve symbolic references to type contexts into the absolute address of
+  // the type context descriptor, so that if we see a symbolic reference in the
+  // mangled name we can immediately find the associated metadata.
+  demangler.setSymbolicReferenceResolver(
+    [&](int32_t offset, const void *base) -> NodePointer {
+      auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
+      return demangler.createNode(Node::Kind::SymbolicReference,
+                                  absolute_addr);
+    });
+
+  auto dotPos = getDotPosForConvenienceSyntax();
+  if (dotPos != llvm::StringRef::npos) {
     // Form a demangle tree for this class.
     NodePointer classNode = demangler.createNode(Node::Kind::Class);
     NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
@@ -860,7 +884,7 @@ swift::_getTypeByMangledName(StringRef typeName,
     if (!node)
       return TypeInfo();
   }
-
+  
   DecodedMetadataBuilder builder(demangler, substGenericParam,
     [](const Metadata *base, StringRef assocType,
        const ProtocolDescriptor *protocol) -> const Metadata * {

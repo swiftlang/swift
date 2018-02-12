@@ -174,7 +174,7 @@ protected:
     : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {}
 
   virtual ~ReflectionMetadataBuilder() {}
-
+  
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
     type.visit([&](CanType t) {
@@ -221,8 +221,9 @@ protected:
       isSingleFieldOfBox = true;
     }
     IRGenMangler mangler;
-    std::string MangledStr = mangler.mangleTypeForReflection(type,
-                                            ModuleContext, isSingleFieldOfBox);
+    auto MangledStr = mangler.mangleTypeForReflection(IGM, type,
+                                                      ModuleContext,
+                                                      isSingleFieldOfBox);
     auto mangledName = IGM.getAddrOfStringForTypeRef(MangledStr);
     B.addRelativeAddress(mangledName);
   }
@@ -231,13 +232,13 @@ protected:
   /// in the typeref reflection section.
   void addNominalRef(const NominalTypeDecl *nominal) {
     IRGenMangler mangler;
-    std::string mangledStr;
+    SymbolicMangling mangledStr;
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      mangledStr = mangler.mangleBareProtocol(proto);
+      mangledStr.String = mangler.mangleBareProtocol(proto);
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
       mangledStr =
-        mangler.mangleTypeForReflection(type, nominal->getModuleContext(),
+        mangler.mangleTypeForReflection(IGM, type, nominal->getModuleContext(),
                                         /*isSingleFieldOfBox=*/false);
     }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
@@ -302,7 +303,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt32(AssociatedTypeRecordSize);
 
     for (auto AssocTy : AssociatedTypes) {
-      auto NameGlobal = IGM.getAddrOfStringForTypeRef(AssocTy.first);
+      auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addBuiltinTypeRefs(AssocTy.second);
       addTypeRef(M, AssocTy.second);
@@ -311,8 +312,8 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
 public:
   AssociatedTypeMetadataBuilder(IRGenModule &IGM,
-                                const ProtocolConformance *Conformance,
-                                ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes)
+                        const ProtocolConformance *Conformance,
+                        ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes)
     : ReflectionMetadataBuilder(IGM), Conformance(Conformance),
       AssociatedTypes(AssociatedTypes) {}
 
@@ -506,7 +507,7 @@ public:
     ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
         nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
   }
-
+  
   void layout() override {
     addTypeRef(module, type);
 
@@ -552,7 +553,7 @@ class BoxDescriptorBuilder : public ReflectionMetadataBuilder {
 public:
   BoxDescriptorBuilder(IRGenModule &IGM, CanType BoxedType)
     : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
-
+  
   void layout() override {
     B.addInt32(1);
     B.addInt32(0); // Number of sources
@@ -844,16 +845,6 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 
   entry = createStringConstant(Name, /*willBeRelativelyAddressed*/ true,
                                getReflectionStringsSectionName());
-  return entry.second;
-}
-
-llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
-  auto &entry = StringsForTypeRef[Str];
-  if (entry.second)
-    return entry.second;
-
-  entry = createStringConstant(Str, /*willBeRelativelyAddressed*/ true,
-                               getReflectionTypeRefSectionName());
   return entry.second;
 }
 

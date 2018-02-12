@@ -2054,6 +2054,14 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleUnresolvedSymbolicReference(Node *node, EntityContext&) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSymbolicReference(Node *node, EntityContext&) {
+  unreachable("unsupported");
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(const NodePointer &node) {
   if (!node) return "";

@@ -35,6 +35,7 @@
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Runtime/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
@@ -2683,10 +2684,12 @@ using GenericParamRef = TargetGenericParamRef<InProcess>;
 
 template<typename Runtime>
 class TargetGenericRequirementDescriptor {
+public:
   GenericRequirementFlags Flags;
   /// The generic parameter or associated type that's constrained.
   TargetGenericParamRef<Runtime> Param;
-  
+
+private:
   union {
     /// A mangled representation of the same-type or base class the param is
     /// constrained to.
@@ -2733,10 +2736,10 @@ public:
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
-  const char *getMangledTypeName() const {
+  StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||
            getKind() == GenericRequirementKind::BaseClass);
-    return Type;
+    return swift::Demangle::makeSymbolicMangledNameStringRef(Type.get());
   }
 
   /// Retrieve the protocol conformance record for a SameConformance
@@ -2884,9 +2887,6 @@ private:
   using TrailingGenericContextObjects
     = TrailingGenericContextObjects<TargetExtensionContextDescriptor>;
 
-public:
-  using TrailingGenericContextObjects::getGenericContext;
-
   /// A mangling of the `Self` type context that the extension extends.
   /// The mangled name represents the type in the generic context encoded by
   /// this descriptor. For example, a nongeneric nominal type extension will
@@ -2896,6 +2896,13 @@ public:
   /// Note that the Parent of the extension will be the module context the
   /// extension is declared inside.
   RelativeDirectPointer<const char> ExtendedContext;
+
+public:
+  using TrailingGenericContextObjects::getGenericContext;
+
+  StringRef getMangledExtendedContext() const {
+    return Demangle::makeSymbolicMangledNameStringRef(ExtendedContext.get());
+  }
   
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Extension;
