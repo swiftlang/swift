@@ -148,8 +148,7 @@ extension FixedWidthInteger {
     defer { _fixLifetime(guts) }
     let result: Self?
     if _slowPath(guts._isOpaque) {
-      var i = guts._asOpaque()[range].makeIterator()
-      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
+      result = Self._opaqueParseFixedLifetime(guts, range, radix: r)
     } else if guts.isASCII {
       var i = guts._unmanagedASCIIView[range].makeIterator()
       result = _parseASCII(codeUnits: &i, radix: r)
@@ -160,6 +159,16 @@ extension FixedWidthInteger {
     guard _fastPath(result != nil) else { return nil }
     self = result._unsafelyUnwrappedUnchecked
   }
+
+  @_versioned // @opaque
+  static func _opaqueParseFixedLifetime(
+    _ guts: _StringGuts, _ range: Range<Int>, radix r: Self
+  ) -> Self? {
+    _sanityCheck(guts._isOpaque)
+    var i = guts._asOpaque()[range].makeIterator()
+    return Self._parseASCIISlowPath(codeUnits: &i, radix: r)
+  }
+
 
   /// Creates a new integer value from the given string.
   ///

@@ -520,9 +520,15 @@ extension _StringGuts {
   internal
   func _ephemeralCocoaString(_ range: Range<Int>) -> _CocoaString {
     if _slowPath(_isOpaque) {
-      return _asOpaque()[range].cocoaSlice()
+      return _opaqueEphemeralString(range)
     }
     return _NSContiguousString(_unmanaged: self, range: range)
+  }
+
+  @_versioned // @opaque
+  internal func _opaqueEphemeralString(_ range: Range<Int>) -> _CocoaString {
+    _sanityCheck(_isOpaque)
+    return _asOpaque()[range].cocoaSlice()
   }
 
   public // @testable
@@ -876,11 +882,18 @@ extension _StringGuts {
     }
 #else
     if _slowPath(_object.isOpaque) {
-      return _asOpaque().count
+      return _opaqueCount
     }
 #endif
     _sanityCheck(Int(self._otherBits) >= 0)
     return Int(bitPattern: self._otherBits)
+  }
+
+  @_versioned // @opaque
+  internal var _opaqueCount: Int {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    return _asOpaque().count
   }
 
   @_inlineable
@@ -897,9 +910,10 @@ extension _StringGuts {
   public // @testable
   subscript(position: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
-      return _asOpaque()[position]
+      return _opaquePosition(position)
     }
 
+    defer { _fixLifetime(self) }
     if isASCII {
       return _unmanagedASCIIView[position]
     }
@@ -907,18 +921,33 @@ extension _StringGuts {
     return _unmanagedUTF16View[position]
   }
 
+  @_versioned // @opaque
+  internal func _opaquePosition(_ position: Int) -> UTF16.CodeUnit {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    return _asOpaque()[position]
+  }
+
   /// Get the UTF-16 code unit stored at the specified position in this string.
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   func codeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
-      return _asOpaque().codeUnit(atCheckedOffset: offset)
+      return _opaqueCodeUnit(atCheckedOffset: offset)
     } else if isASCII {
       return _unmanagedASCIIView.codeUnit(atCheckedOffset: offset)
     } else {
       return _unmanagedUTF16View.codeUnit(atCheckedOffset: offset)
     }
   }
+
+  @_versioned // @opaque
+  func _opaqueCodeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    return _asOpaque().codeUnit(atCheckedOffset: offset)
+  }
+
 
   // Copy code units from a slice of this string into a buffer.
   @_versioned
@@ -930,15 +959,26 @@ extension _StringGuts {
     _sanityCheck(CodeUnit.bitWidth == 8 || CodeUnit.bitWidth == 16)
     _sanityCheck(dest.count >= range.count)
     if _slowPath(_isOpaque) {
-      _asOpaque()[range]._copy(into: dest)
+      _opaqueCopy(range: range, into: dest)
       return
     }
 
+    defer { _fixLifetime(self) }
     if isASCII {
       _unmanagedASCIIView[range]._copy(into: dest)
     } else {
       _unmanagedUTF16View[range]._copy(into: dest)
     }
+  }
+
+  @_versioned // @opaque
+  internal func _opaqueCopy<CodeUnit>(
+    range: Range<Int>,
+    into dest: UnsafeMutableBufferPointer<CodeUnit>)
+  where CodeUnit : FixedWidthInteger & UnsignedInteger {
+    _sanityCheck(_isOpaque)
+    defer { _fixLifetime(self) }
+    _asOpaque()[range]._copy(into: dest)
   }
 
   @_inlineable
@@ -1049,14 +1089,24 @@ extension _StringGuts {
       return
     }
 
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      self.append(other._asOpaque())
-    } else if other.isASCII {
+      _opaqueAppend(opaqueOther: other)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       self.append(other._unmanagedASCIIView)
     } else {
       self.append(other._unmanagedUTF16View)
     }
+  }
+
+  @_versioned // @opaque
+  mutating func _opaqueAppend(opaqueOther other: _StringGuts) {
+    _sanityCheck(other._isOpaque)
+    defer { _fixLifetime(other) }
+    self.append(other._asOpaque())
   }
 
   @_inlineable
@@ -1068,16 +1118,25 @@ extension _StringGuts {
       self = other
       return
     }
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      self.append(other._asOpaque()[range])
-    } else if other.isASCII {
+      _opaqueAppend(opaqueOther: other, range: range)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       self.append(other._unmanagedASCIIView[range])
     } else {
       self.append(other._unmanagedUTF16View[range])
     }
   }
 
+  @_versioned // @opaque
+  mutating func _opaqueAppend(opaqueOther other: _StringGuts, range: Range<Int>) {
+    _sanityCheck(other._isOpaque)
+    defer { _fixLifetime(other) }
+    self.append(other._asOpaque()[range])
+  }
 
   //
   // FIXME (TODO JIRA): Appending a character onto the end of a string should

@@ -504,10 +504,18 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   @inline(never)
   internal mutating func _fillBuffer() -> Unicode.UTF8.CodeUnit {
     _sanityCheck(!_guts.isASCII, "next() already checks for known ASCII")
-    defer { _fixLifetime(_guts) }
-    if _fastPath(_guts._isContiguous) {
-      return _fillBuffer(from: _guts._unmanagedUTF16View)
+    if _slowPath(_guts._isOpaque) {
+      return _opaqueFillBuffer()
     }
+
+    defer { _fixLifetime(_guts) }
+    return _fillBuffer(from: _guts._unmanagedUTF16View)
+  }
+
+  @_versioned // @opaque
+  internal mutating func _opaqueFillBuffer() -> Unicode.UTF8.CodeUnit {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(_guts) }
     return _fillBuffer(from: _guts._asOpaque())
   }
 
@@ -542,9 +550,19 @@ extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
   public var count: Int {
     if _fastPath(_guts.isASCII) { return _guts.count }
-    if _guts._isContiguous {
-      return _count(fromUTF16: _guts._unmanagedUTF16View)
+
+    if _slowPath(_guts._isOpaque) {
+      return _opaqueCount
     }
+
+    defer { _fixLifetime(_guts) }
+    return _count(fromUTF16: _guts._unmanagedUTF16View)
+  }
+
+  @_versioned // @opaque
+  internal var _opaqueCount: Int {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(_guts) }
     return _count(fromUTF16: _guts._asOpaque())
   }
 

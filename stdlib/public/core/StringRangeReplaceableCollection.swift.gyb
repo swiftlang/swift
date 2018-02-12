@@ -121,12 +121,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_versioned // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(atOffset: offset)
-    } else if _guts.isASCII {
+      return _opaqueIndex(atEncodedOffset: offset)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterIndex(atOffset: offset)
     } else {
       return _guts._unmanagedUTF16View.characterIndex(atOffset: offset)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueIndex(atEncodedOffset offset: Int) -> Index {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterIndex(atOffset: offset)
   }
 
   /// Returns the position immediately after the given index.
@@ -137,12 +147,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(after: i)
-    } else if _guts.isASCII {
+      return _opaqueIndex(after: i)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterIndex(after: i)
     } else {
       return _guts._unmanagedUTF16View.characterIndex(after: i)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueIndex(after i: Index) -> Index {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterIndex(after: i)
   }
 
   /// Returns the position immediately before the given index.
@@ -153,12 +173,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(before: i)
-    } else if _guts.isASCII {
+      return _opaqueIndex(before: i)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterIndex(before: i)
     } else {
       return _guts._unmanagedUTF16View.characterIndex(before: i)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueIndex(before i: Index) -> Index {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterIndex(before: i)
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -186,12 +216,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(i, offsetBy: n)
-    } else if _guts.isASCII {
+      return _opaqueIndex(i, offsetBy: n)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterIndex(i, offsetBy: n)
     } else {
       return _guts._unmanagedUTF16View.characterIndex(i, offsetBy: n)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueIndex(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterIndex(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -236,18 +276,26 @@ extension String : StringProtocol, RangeReplaceableCollection {
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(i, offsetBy: n, limitedBy: limit)
-    } else if _guts.isASCII {
+      return _opaqueIndex(i, offsetBy: n, limitedBy: limit)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterIndex(
-        i,
-        offsetBy: n,
-        limitedBy: limit)
+        i, offsetBy: n, limitedBy: limit)
     } else {
       return _guts._unmanagedUTF16View.characterIndex(
-        i,
-        offsetBy: n,
-        limitedBy: limit)
+        i, offsetBy: n, limitedBy: limit)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueIndex(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterIndex(i, offsetBy: n, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -262,12 +310,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterDistance(from: start, to: end)
-    } else if _guts.isASCII {
+      return _opaqueDistance(from: start, to: end)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterDistance(from: start, to: end)
     } else {
       return _guts._unmanagedUTF16View.characterDistance(from: start, to: end)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueDistance(from start: Index, to end: Index) -> IndexDistance {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().characterDistance(from: start, to: end)
   }
 
   /// Accesses the character at the given position.
@@ -288,12 +346,22 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().character(at: i)
-    } else if _guts.isASCII {
+      return _opaqueSubscript(i)
+    }
+
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.character(at: i)
     } else {
       return _guts._unmanagedUTF16View.character(at: i)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueSubscript(_ i: Index) -> Character {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    return _guts._asOpaque().character(at: i)
   }
 }
 
@@ -488,14 +556,25 @@ extension String {
       _sanityCheck(stride > 0)
       return Int(stride)
     }
-    let offset = i.encodedOffset
     if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterStride(atOffset: offset)
-    } else if _guts.isASCII {
+      return _opaqueStride(of: i)
+    }
+
+    let offset = i.encodedOffset
+    defer { _fixLifetime(self) }
+    if _guts.isASCII {
       return _guts._unmanagedASCIIView.characterStride(atOffset: offset)
     } else {
       return _guts._unmanagedUTF16View.characterStride(atOffset: offset)
     }
+  }
+
+  @_versioned // @opaque
+  func _opaqueStride(of i: Index) -> Int {
+    _sanityCheck(_guts._isOpaque)
+    defer { _fixLifetime(self) }
+    let offset = i.encodedOffset
+    return _guts._asOpaque().characterStride(atOffset: offset)
   }
 
   /// Removes the characters in the given range.
