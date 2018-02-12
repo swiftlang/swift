@@ -992,8 +992,14 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      if (!witness->hasInterfaceType())
+      if (!witness->hasValidSignature()) {
         TC.validateDecl(witness);
+
+        if (!witness->hasValidSignature()) {
+          doNotDiagnoseMatches = true;
+          continue;
+        }
+      }
 
       auto match = matchWitness(TC, Proto, conformance, DC,
                                 requirement, witness);
