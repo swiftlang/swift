@@ -468,6 +468,28 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       kind = AllowedBindingKind::Exact;
     }
 
+    // If this is T := U? let's attempt both T := U and T := U?
+    if (kind == AllowedBindingKind::Subtypes &&
+        (constraint->getKind() == ConstraintKind::Conversion ||
+         constraint->getKind() == ConstraintKind::Subtype)) {
+      if (auto objTy = type->getOptionalObjectType()) {
+        // If T is a type variable, only attempt this if both the
+        // type variable we are trying bindings for, and the type
+        // variable we will attempt to bind, both have the same
+        // polarity with respect to being able to bind lvalues.
+        if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+          if (typeVar->getImpl().canBindToLValue() ==
+              otherTypeVar->getImpl().canBindToLValue()) {
+            alternateType = type;
+            type = objTy;
+          }
+        } else {
+          alternateType = type;
+          type = objTy;
+        }
+      }
+    }
+
     if (exactTypes.insert(type->getCanonicalType()).second)
       result.addPotentialBinding({type, kind, constraint->getKind()});
   }

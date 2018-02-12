@@ -739,26 +739,6 @@ bool ConstraintSystem::tryTypeVariableBindings(
                   {eltType, binding.Kind, binding.BindingSource});
           }
         }
-
-        // If we were unsuccessful solving for T?, try solving for T.
-        if (auto objTy = type->getOptionalObjectType()) {
-          if (exploredTypes.insert(objTy->getCanonicalType()).second) {
-            // If T is a type variable, only attempt this if both the
-            // type variable we are trying bindings for, and the type
-            // variable we will attempt to bind, both have the same
-            // polarity with respect to being able to bind lvalues.
-            if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
-              if (typeVar->getImpl().canBindToLValue() ==
-                  otherTypeVar->getImpl().canBindToLValue()) {
-                newBindings.push_back(
-                    {objTy, binding.Kind, binding.BindingSource});
-              }
-            } else {
-              newBindings.push_back(
-                  {objTy, binding.Kind, binding.BindingSource});
-            }
-          }
-        }
       }
 
       if (binding.Kind != AllowedBindingKind::Supertypes)
@@ -1433,7 +1413,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
   if (!retainAllSolutions())
-    filterSolutions(solutions, state.ExprWeights);
+    filterSolutions(solutions, state.ExprWeights, /*minimize=*/true);
 
   // We fail if there is no solution.
   return solutions.empty();
