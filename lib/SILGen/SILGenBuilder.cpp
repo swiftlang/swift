@@ -47,7 +47,7 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
     : SILBuilder(insertBB, insertInst), SGF(SGF) {}
 
 //===----------------------------------------------------------------------===//
-//                            Instruction Emission
+//              Instruction Emission + Conformance Endowed APIs
 //===----------------------------------------------------------------------===//
 
 MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
@@ -110,29 +110,6 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
       closureTy.getAs<SILFunctionType>()->getCalleeConvention());
 }
 
-ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
-                                               SILType substFnTy,
-                                               SubstitutionList subs,
-                                               ArrayRef<ManagedValue> args,
-                                               SILType closureTy) {
-  llvm::SmallVector<SILValue, 8> values;
-  transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
-    return mv.forward(getSILGenFunction());
-  });
-  SILValue result = SILGenBuilder::createPartialApply(loc, fn, substFnTy, subs,
-                                                      values, closureTy);
-  // Partial apply instructions create a box, so we need to put on a cleanup.
-  return getSILGenFunction().emitManagedRValueWithCleanup(result);
-}
-
-ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
-                                                  ManagedValue fn,
-                                                  SILType resultTy) {
-  CleanupCloner cloner(*this, fn);
-  SILValue result = SILBuilder::createConvertFunction(
-      loc, fn.forward(getSILGenFunction()), resultTy);
-  return cloner.clone(result);
-}
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
@@ -163,17 +140,6 @@ InitExistentialValueInst *SILGenBuilder::createInitExistentialValue(
       Loc, ExistentialType, FormalConcreteType, Concrete, Conformances);
 }
 
-ManagedValue SILGenBuilder::createInitExistentialValue(
-    SILLocation loc, SILType existentialType, CanType formalConcreteType,
-    ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
-  // *NOTE* we purposely do not use a cleanup cloner here. The reason why is no
-  // matter whether we have a trivial or non-trivial input,
-  // init_existential_value returns a +1 value (the COW box).
-  SILValue v = createInitExistentialValue(
-      loc, existentialType, formalConcreteType, concrete.forward(SGF), conformances);
-  return SGF.emitManagedRValueWithCleanup(v);
-}
-
 InitExistentialMetatypeInst *SILGenBuilder::createInitExistentialMetatype(
     SILLocation loc, SILValue metatype, SILType existentialType,
     ArrayRef<ProtocolConformanceRef> conformances) {
@@ -194,16 +160,6 @@ InitExistentialRefInst *SILGenBuilder::createInitExistentialRef(
       loc, existentialType, formalConcreteType, concreteValue, conformances);
 }
 
-ManagedValue SILGenBuilder::createInitExistentialRef(
-    SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
-    ManagedValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
-  CleanupCloner Cloner(*this, Concrete);
-  InitExistentialRefInst *IERI =
-      createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
-                               Concrete.forward(SGF), Conformances);
-  return Cloner.clone(IERI);
-}
-
 AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
     SILLocation loc, SILType existentialType, CanType concreteType,
     ArrayRef<ProtocolConformanceRef> conformances) {
@@ -212,6 +168,56 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
 
   return SILBuilder::createAllocExistentialBox(loc, existentialType,
                                                concreteType, conformances);
+}
+
+//===----------------------------------------------------------------------===//
+//                             Managed Value APIs
+//===----------------------------------------------------------------------===//
+
+ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
+                                               SILType substFnTy,
+                                               SubstitutionList subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SILType closureTy) {
+  llvm::SmallVector<SILValue, 8> values;
+  transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
+    return mv.forward(getSILGenFunction());
+  });
+  SILValue result = SILGenBuilder::createPartialApply(loc, fn, substFnTy, subs,
+                                                      values, closureTy);
+  // Partial apply instructions create a box, so we need to put on a cleanup.
+  return getSILGenFunction().emitManagedRValueWithCleanup(result);
+}
+
+ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
+                                                  ManagedValue fn,
+                                                  SILType resultTy) {
+  CleanupCloner cloner(*this, fn);
+  SILValue result = SILBuilder::createConvertFunction(
+      loc, fn.forward(getSILGenFunction()), resultTy);
+  return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createInitExistentialValue(
+    SILLocation loc, SILType existentialType, CanType formalConcreteType,
+    ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
+  // *NOTE* we purposely do not use a cleanup cloner here. The reason why is no
+  // matter whether we have a trivial or non-trivial input,
+  // init_existential_value returns a +1 value (the COW box).
+  SILValue v =
+      createInitExistentialValue(loc, existentialType, formalConcreteType,
+                                 concrete.forward(SGF), conformances);
+  return SGF.emitManagedRValueWithCleanup(v);
+}
+
+ManagedValue SILGenBuilder::createInitExistentialRef(
+    SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
+    ManagedValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
+  CleanupCloner Cloner(*this, Concrete);
+  InitExistentialRefInst *IERI =
+      createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
+                               Concrete.forward(SGF), Conformances);
+  return Cloner.clone(IERI);
 }
 
 ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
