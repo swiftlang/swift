@@ -53,7 +53,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _Hasher) -> _Hasher {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return withBuffer {
       var hasher = hasher
       var buffer = $0
@@ -462,7 +462,7 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _Hasher) -> _Hasher {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return hasher
       .appending(value)
       .appending(isStoredProperty)

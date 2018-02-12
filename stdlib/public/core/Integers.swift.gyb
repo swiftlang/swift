@@ -3608,7 +3608,7 @@ extension ${Self} : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _Hasher) -> _Hasher {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     % if bits <= word_bits:
     return hasher.appending(Int(bitPattern: _lowWord))
     % else:

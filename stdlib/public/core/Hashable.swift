@@ -109,20 +109,23 @@ public protocol Hashable : Equatable {
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
 
-  func _hash(into hasher: _Hasher) -> _Hasher
+  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
 }
 
 @_versioned
 @_inlineable
 @inline(__always)
 internal func _defaultHashValue<T : Hashable>(for value: T) -> Int {
-  return _Hasher(_inlineable: ()).appending(value).finalized()
+  var hasher = _Hasher(_inlineable: ())
+  return withUnsafeMutablePointer(to: &hasher) { p in
+    return _UnsafeHasher(p).appending(value).finalized()
+  }
 }
 
 extension Hashable {
   @_inlineable
   @inline(__always)
-  public func _hash(into hasher: _Hasher) -> _Hasher {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return hasher.appending(self.hashValue)
   }
 }
@@ -144,6 +147,51 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
   return value.pointee.hashValue
 }
 
+/// An unsafe wrapper around a stateful hash function, presenting a faux purely
+/// functional interface to eliminate ARC overhead.
+///
+/// This is not a true value type; calling `appending` or `finalized` actually
+/// mutates `self`'s state.
+@_fixed_layout
+public struct _UnsafeHasher {
+  @_versioned
+  internal let _state: UnsafeMutablePointer<_Hasher>
+
+  @_inlineable
+  @_versioned
+  internal init(_ state: UnsafeMutablePointer<_Hasher>) {
+    self._state = state
+  }
+
+  @effects(readonly)
+  @inline(never)
+  public func appending(_ value: Int) -> _UnsafeHasher {
+    // The effects attribute is a lie; however, it enables the compiler to
+    // eliminate unnecessary retain/releases protecting Hashable state around
+    // calls to `_Hasher.append(_:)`.
+    //
+    // We don't have a way to describe the side-effects of an opaque function --
+    // if it doesn't have an @effects attribute, the compiler has no choice but
+    // to assume it may mutate the hashable we're visiting. We know that won't
+    // be the case (the stdlib owns the hash function), but the only way to tell
+    // this to the compiler is to pretend the state update is pure.
+    _state.pointee._append_alwaysInline(value)
+    return self
+  }
+
+  @_inlineable
+  @_transparent
+  public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
+    return value._hash(into: self)
+  }
+
+  @_inlineable
+  @_versioned
+  internal func finalized() -> Int {
+    return _state.pointee.finalize()
+  }
+}
+
 // FIXME: This is purely for benchmarking; to be removed.
 @_fixed_layout
 public struct _QuickHasher {
@@ -162,21 +210,6 @@ public struct _QuickHasher {
   }
 
   @inline(never)
-  @effects(readonly)
-  public func appending(_ value: Int) -> _QuickHasher {
-    var hasher = self
-    hasher._append_alwaysInline(value)
-    return hasher
-  }
-
-  //@inline(__always)
-  @_inlineable
-  @_transparent
-  public func appending<H: Hashable>(_ value: H) -> _QuickHasher {
-    return value._hash(into: self)
-  }
-
-  @inline(never)
   public mutating func append(_ value: Int) {
     _append_alwaysInline(value)
   }
@@ -190,12 +223,6 @@ public struct _QuickHasher {
       return
     }
     _hash = _combineHashValues(_hash, value)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func finalized() -> Int {
-    var hasher = self
-    return hasher._finalize_alwaysInline()
   }
 
   @inline(never)

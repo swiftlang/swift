@@ -161,7 +161,7 @@ extension Bool : Equatable, Hashable {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func _hash(into hasher: _Hasher) -> _Hasher {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return hasher.appending(self ? 1 : 0)
   }
 
