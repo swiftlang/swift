@@ -279,6 +279,10 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
     TrailingTrivia.push_back(TriviaPiece::backtick());
   }
   formToken(tok::identifier, TokStart);
+  // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
+  // this as escaped-identifier in this case.
+  if (NextToken.is(tok::eof))
+    return;
   NextToken.setEscapedIdentifier(true);
 }
 
