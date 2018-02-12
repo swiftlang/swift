@@ -75,19 +75,19 @@ extension TensorProtocol /*: Numeric*/ where Scalar : Numeric {
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
   public static func +(lhs: Self, rhs: Self) -> Self {
-    return Self(handle: #tfop("Add", lhs.handle, rhs.handle))
+    return #tfop("Add", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointSubtract(_:_:primal:seed:))
   public static func -(lhs: Self, rhs: Self) -> Self {
-    return Self(handle: #tfop("Sub", lhs.handle, rhs.handle))
+    return #tfop("Sub", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointMultiply(_:_:primal:seed:))
   public static func *(lhs: Self, rhs: Self) -> Self {
-    return Self(handle: #tfop("Mul", lhs.handle, rhs.handle))
+    return #tfop("Mul", lhs, rhs)
   }
 }
 
@@ -117,7 +117,7 @@ public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointNegate(_:primal:seed:))
   static prefix func -(rhs: Self) -> Self {
-    return Self(handle: #tfop("Neg", rhs.handle))
+    return #tfop("Neg", rhs)
   }
 
   @_inlineable @inline(__always)
@@ -152,7 +152,7 @@ public extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @inline(__always)
   static func /(lhs: Self, rhs: Self) -> Self {
-    return Self(handle: #tfop("Div", lhs.handle, rhs.handle))
+    return #tfop("Div", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -177,7 +177,7 @@ public extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @inline(__always)
   static func %(lhs: Self, rhs: Self) -> Self {
-    return Self(handle: #tfop("Mod", lhs.handle, rhs.handle))
+    return #tfop("Mod", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -208,7 +208,7 @@ public extension TensorProtocol where Scalar : Numeric {
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   func dot(_ other: Self) -> Self {
-    return Self(handle: #tfop("MatMul", self.handle, other.handle))
+    return #tfop("MatMul", self, other)
   }
 
   @_inlineable @inline(__always)
@@ -234,7 +234,7 @@ public extension TensorProtocol where Scalar : Numeric {
 public extension TensorProtocol where Scalar : Comparable {
   @_inlineable @inline(__always)
   static func < (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("Less", lhs.handle, rhs.handle))
+    return #tfop("Less", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -249,7 +249,7 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func <= (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("LessEqual", lhs.handle, rhs.handle))
+    return #tfop("LessEqual", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -264,7 +264,7 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func > (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("Greater", lhs.handle, rhs.handle))
+    return #tfop("Greater", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -279,7 +279,7 @@ public extension TensorProtocol where Scalar : Comparable {
 
   @_inlineable @inline(__always)
   static func >= (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("GreaterEqual", lhs.handle, rhs.handle))
+    return #tfop("GreaterEqual", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -296,7 +296,7 @@ public extension TensorProtocol where Scalar : Comparable {
 public extension TensorProtocol where Scalar : Equatable {
   @_inlineable @inline(__always)
   static func == (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("Equal", lhs.handle, rhs.handle))
+    return #tfop("Equal", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -311,7 +311,7 @@ public extension TensorProtocol where Scalar : Equatable {
 
   @_inlineable @inline(__always)
   static func != (lhs: Self, rhs: Self) -> BoolTensor {
-    return BoolTensor(handle: #tfop("NotEqual", lhs.handle, rhs.handle))
+    return #tfop("NotEqual", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
@@ -338,8 +338,7 @@ public extension TensorProtocol {
   //   gradient: _adjointTransposed(_:_:primal:seed:)
   // )
   func transposed(withPermutations permutations: Tensor<Int32>) -> Self {
-    return Self(handle:
-      #tfop("Transpose", handle, permutations.handle, Tperm: Int32.self))
+    return #tfop("Transpose", handle, permutations, Tperm: Int32.self)
   }
 
   /// Returns a transposed tensor, with dimensions permuted in the specified
@@ -376,7 +375,7 @@ public extension TensorProtocol {
 public func abs<Scalar: Numeric, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Abs", x.handle))
+  return #tfop("Abs", x)
 }
 
 @_inlineable @inline(__always)
@@ -384,7 +383,7 @@ public func abs<Scalar: Numeric, T : TensorProtocol>(
 public func log<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Log", x.handle))
+  return #tfop("Log", x)
 }
 
 @_inlineable @inline(__always)
@@ -392,7 +391,7 @@ public func log<Scalar: FloatingPoint, T : TensorProtocol>(
 public func sin<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Sin", x.handle))
+  return #tfop("Sin", x)
 }
 
 @_inlineable @inline(__always)
@@ -400,7 +399,7 @@ public func sin<Scalar: FloatingPoint, T : TensorProtocol>(
 public func cos<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Cos", x.handle))
+  return #tfop("Cos", x)
 }
 
 @_inlineable @inline(__always)
@@ -408,7 +407,7 @@ public func cos<Scalar: FloatingPoint, T : TensorProtocol>(
 public func tan<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Tan", x.handle))
+  return #tfop("Tan", x)
 }
 
 @_inlineable @inline(__always)
@@ -416,7 +415,7 @@ public func tan<Scalar: FloatingPoint, T : TensorProtocol>(
 public func sinh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Sinh", x.handle))
+  return #tfop("Sinh", x)
 }
 
 @_inlineable @inline(__always)
@@ -424,7 +423,7 @@ public func sinh<Scalar: FloatingPoint, T : TensorProtocol>(
 public func cosh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Cosh", x.handle))
+  return #tfop("Cosh", x)
 }
 
 @_inlineable @inline(__always)
@@ -432,21 +431,21 @@ public func cosh<Scalar: FloatingPoint, T : TensorProtocol>(
 public func tanh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Tanh", x.handle))
+  return #tfop("Tanh", x)
 }
 
 @_inlineable @inline(__always)
 public func sqrt<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Sqrt", x.handle))
+  return #tfop("Sqrt", x)
 }
 
 @_inlineable @inline(__always)
 public func exp<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Exp", x.handle))
+  return #tfop("Exp", x)
 }
 
 @_inlineable @inline(__always)
@@ -454,7 +453,7 @@ public func exp<Scalar: FloatingPoint, T : TensorProtocol>(
 public func pow<Scalar : Numeric, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Pow", lhs.handle, rhs.handle))
+  return #tfop("Pow", lhs, rhs)
 }
 
 @_inlineable @inline(__always)
@@ -476,7 +475,7 @@ public func pow<Scalar : Numeric, T : TensorProtocol>(
 public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Min", lhs.handle, rhs.handle))
+  return #tfop("Min", lhs, rhs)
 }
 
 @_inlineable @inline(__always)
@@ -498,7 +497,7 @@ public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
 public func max<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
-  return T(handle: #tfop("Max", lhs.handle, rhs.handle))
+  return #tfop("Max", lhs, rhs)
 }
 
 @_inlineable @inline(__always)
@@ -518,7 +517,7 @@ public func max<Scalar : Numeric & Comparable, T : TensorProtocol>(
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func squared() -> Self {
-    return Self(handle: #tfop("Square", handle))
+    return #tfop("Square", handle)
   }
 }
 
@@ -530,21 +529,19 @@ public extension TensorProtocol where Scalar == Bool {
   @_inlineable @inline(__always)
   public func selecting<U, T : TensorProtocol>(_ left: T, _ right: T) -> T
     where T.Scalar == U {
-    return T(handle: #tfop("Select", handle, left.handle, right.handle))
+    return #tfop("Select", handle, left, right)
   }
 
   @_inlineable @inline(__always)
   public func selecting<U, T : TensorProtocol>(_ left: U, _ right: T) -> T
   where T.Scalar == U {
-    return T(handle:
-      #tfop("Select", handle, _TFMakeScalarTensor(left), right.handle))
+    return #tfop("Select", handle, _TFMakeScalarTensor(left), right)
   }
 
   @_inlineable @inline(__always)
   public func selecting<U, T : TensorProtocol>(_ left: T, _ right: U) -> T
     where T.Scalar == U {
-    return T(handle:
-      #tfop("Select", handle, left.handle, _TFMakeScalarTensor(right)))
+    return #tfop("Select", handle, left, _TFMakeScalarTensor(right))
   }
 }
 
@@ -594,9 +591,8 @@ public extension Tensor {
     alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
-    return Tensor<Scalar>(handle:
-      #tfop("Mean", handle, Tensor<Int32>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int32.self))
+    return #tfop("Mean", handle, Tensor<Int32>(axes),
+                 keep_dims: keepingDimensions, Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
@@ -604,9 +600,8 @@ public extension Tensor {
     alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
-    return Tensor<Scalar>(handle:
-      #tfop("Min", handle, Tensor<Int32>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int32.self))
+    return #tfop("Min", handle, Tensor<Int32>(axes),
+                 keep_dims: keepingDimensions, Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
@@ -624,9 +619,8 @@ public extension Tensor {
     alongAxes axes: [Int32],
     keepingDimensions: Bool = false
   ) -> Tensor {
-    return Tensor<Scalar>(handle:
-      #tfop("Sum", handle, Tensor<Int32>(axes).handle,
-            keep_dims: keepingDimensions, Tidx: Int32.self))
+    return #tfop("Sum", handle, Tensor<Int32>(axes),
+                 keep_dims: keepingDimensions, Tidx: Int32.self)
   }
 }
 
@@ -639,7 +633,7 @@ public extension TensorProtocol {
   var shapeTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Tensor<Int32>(handle: #tfop("Shape", handle))
+      return #tfop("Shape", handle)
     }
   }
 
@@ -647,7 +641,7 @@ public extension TensorProtocol {
   var rankTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Tensor<Int32>(handle: #tfop("Rank", handle))
+      return #tfop("Rank", handle)
     }
   }
 
@@ -655,7 +649,7 @@ public extension TensorProtocol {
   var scalarCountTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Tensor<Int32>(handle: #tfop("Size", handle))
+      return #tfop("Size", handle)
     }
   }
 }
@@ -734,9 +728,8 @@ public extension Tensor where Scalar : FloatingPoint {
     strides: [Int32],
     padding: Padding
   ) -> Tensor {
-    return Tensor(handle:
-      #tfop("Conv2D", handle, filter.handle, strides: strides,
-            padding: padding.cName))
+    return #tfop("Conv2D", handle, filter, strides: strides,
+                 padding: padding.cName)
   }
 
   @_inlineable @inline(__always)
@@ -750,9 +743,8 @@ public extension Tensor where Scalar : FloatingPoint {
     strides: Tensor<Int32>,
     padding: Padding
   ) -> Tensor {
-    return Tensor(handle:
-      #tfop("MaxPoolV2", handle, Tensor<Int32>(kernelSize).handle,
-            Tensor<Int32>(strides).handle, padding: padding.cName))
+    return #tfop("MaxPoolV2", handle, Tensor<Int32>(kernelSize),
+                 Tensor<Int32>(strides), padding: padding.cName)
   }
 
   @_inlineable @inline(__always)
@@ -778,8 +770,7 @@ public extension Tensor where Scalar : FloatingPoint {
     padding: Padding
   ) -> Tensor {
     // FIXME: handle attributes (ksize, strides, padding)
-    return Tensor(handle:
-      #tfop("AvgPool", handle, ksize: kernelSize, strides: strides,
-            padding: padding.cName))
+    return #tfop("AvgPool", handle, ksize: kernelSize, strides: strides,
+                 padding: padding.cName)
   }
 }
