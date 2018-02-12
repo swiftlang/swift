@@ -92,6 +92,13 @@ public:
                                   SILType substFnTy, SubstitutionList subs,
                                   ArrayRef<ManagedValue> args,
                                   SILType closureTy);
+  ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
+                                  SILType substFnTy, SubstitutionList subs,
+                                  ArrayRef<ManagedValue> args,
+                                  SILType closureTy) {
+    return createPartialApply(loc, fn.getValue(), substFnTy, subs, args,
+                              closureTy);
+  }
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
                              SubstitutionList subs, ArrayRef<SILValue> args);
