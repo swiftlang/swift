@@ -2412,7 +2412,7 @@ namespace {
       // it to return a TensorHandle<T> and then use the init(handle:)
       // initializer of the expected result type to project it back to the type
       // that we want.
-      if (tensorProto &&
+      if (tensorProto && !expr->getType()->is<UnresolvedType>() &&
           tc.conformsToProtocol(expr->getType(), tensorProto, cs.DC,
                                 ConformanceCheckFlags::Used)) {
         auto resultTy = expr->getType();
@@ -2455,7 +2455,7 @@ namespace {
       // value and pass that instead.
       bool changedArg = false;
       for (auto &elt : tuple->getElements().drop_front()) {
-        if (!tensorProto ||
+        if (!tensorProto || elt->getType()->is<UnresolvedType>() ||
             !tc.conformsToProtocol(elt->getType(), tensorProto, cs.DC,
                                    ConformanceCheckFlags::Used))
           continue;
