@@ -2396,6 +2396,101 @@ namespace {
       llvm_unreachable("Unhandled GradientExpr");
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// When we've type checked a #tfop expression, we do some adjustment to
+    /// the argument and result types.  Specifically, if something is a type
+    /// that conforms to TensorProtocol (like Tensor or Tensor2D), we use the
+    /// TensorHandle that they contain instead.
+    Expr *visitTFOp(ObjectLiteralExpr *expr) {
+      auto &ctx = cs.getASTContext();
+      auto &tc = cs.getTypeChecker();
+      Expr *result = expr;
+
+      auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
+
+      // If the #tfop returns a type that conforms to TensorProtocol, we change
+      // it to return a TensorHandle<T> and then use the init(handle:)
+      // initializer of the expected result type to project it back to the type
+      // that we want.
+      if (tensorProto &&
+          tc.conformsToProtocol(expr->getType(), tensorProto, cs.DC,
+                                ConformanceCheckFlags::Used)) {
+        auto resultTy = expr->getType();
+        // Look up the handle member on our type, to get the concrete
+        // TensorHandle<T> type to use for this value.
+        auto handleId = ctx.getIdentifier("handle");
+        auto lookup = tc.lookupMember(cs.DC, expr->getType(),
+                                      DeclName(handleId));
+        assert(lookup && "TensorProtocol didn't have a handle member?");
+        auto decl = lookup.front().getValueDecl();
+        auto handleTy =
+          expr->getType()->getTypeOfMember(cs.DC->getParentModule(), decl);
+
+        // Now that we have the handle type, switch the ObjectLiteralExpr to be
+        // that type, and build the original TensorProtocol type by using the
+        // init(handle:) initializer.
+        expr->setType(handleTy);
+        cs.cacheExprTypes(expr);
+
+        auto funcName = DeclName(ctx, ctx.Id_init, { handleId });
+        result = convertLiteral(expr, resultTy, resultTy,
+                                tensorProto, handleTy, funcName,
+                                tensorProto, handleTy, funcName,
+                                /*no filter*/nullptr,
+                                diag::string_literal_broken_proto,
+                                diag::string_literal_broken_proto);
+        if (!result)
+          return nullptr;
+      }
+
+      // It is theoretically possible for #tfop to have zero operands (other
+      // than the string).  In that case the argument list will not be a tuple
+      // expr, but there are no operands to change anyway.
+      auto *tuple = dyn_cast<TupleExpr>(expr->getArg());
+      if (!tuple) return result;
+
+
+      // Check each argument of the #tfop expression to see if any of them
+      // conforms to the TensorProtocol protocol.  If so, project out the handle
+      // value and pass that instead.
+      bool changedArg = false;
+      for (auto &elt : tuple->getElements().drop_front()) {
+        if (!tensorProto ||
+            !tc.conformsToProtocol(elt->getType(), tensorProto, cs.DC,
+                                   ConformanceCheckFlags::Used))
+          continue;
+
+        auto name = ctx.getIdentifier("handle");
+        Expr *newElt =
+          new (ctx) UnresolvedDotExpr(elt, elt->getEndLoc(),
+                                       DeclName(name),
+                                      DeclNameLoc(elt->getEndLoc()),
+                                       /*implicit*/true);
+
+        cs.cacheSubExprTypes(newElt);
+        cs.setSubExprTypes(newElt);
+        bool failed = tc.typeCheckExpressionShallow(newElt, cs.DC);
+        assert(!failed && "Could not access 'handle' member?"); (void)failed;
+        cs.cacheExprTypes(newElt);
+        elt = newElt;
+        changedArg = true;
+      }
+
+      // If we changed any of the arguments, then we need to recompute the tuple
+      // type.
+      if (changedArg) {
+        Expr *newTuple = tuple;
+        newTuple->setType(Type());
+        bool failed = tc.typeCheckExpressionShallow(newTuple, cs.DC);
+        assert(!failed && "Could not retypecheck tuple?"); (void)failed;
+        cs.cacheExprTypes(newTuple);
+        expr->setArg(newTuple);
+      }
+
+      return result;
+    }
+
+
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
         return expr;
@@ -2409,10 +2504,10 @@ namespace {
       cs.setType(expr, type);
 
       // SWIFT_ENABLE_TENSORFLOW
-      // #tfop() declarations are not like normal object literals, so we don't
-      // need any special type checking after we resolve their result type.
+      // #tfop() declarations are not like normal object literals, so we use
+      // special checking logic.
       if (expr->isTFOp())
-        return expr;
+        return visitTFOp(expr);
 
       if (type->is<UnresolvedType>()) return expr;
 
