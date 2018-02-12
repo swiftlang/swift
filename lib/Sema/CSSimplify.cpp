@@ -2869,7 +2869,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool isDynamicMemberLookupable(Type ty) {
+static bool hasDynamicMemberLookupAttribute(Type ty) {
   auto nominal = ty->getAnyNominal();
   if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
 
@@ -3288,7 +3288,7 @@ retry_after_fail:
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (isDynamicMemberLookupable(instanceTy)) {
+    if (hasDynamicMemberLookupAttribute(instanceTy)) {
       auto &ctx = getASTContext();
       // Recursively look up the subscript(dynamicMember:)'s in this type.
       auto subscriptName =
