@@ -2973,11 +2973,14 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   std::string name = "__tfop_" + opName.str();
   SmallVector<SILValue, 4> args;
 
-  // Attribute names are specified with keyword arguments.  Add these attribute
-  // names to the end of our builtin name, separated by commas.
+  // Attribute names are specified with keyword arguments, and inputs are
+  // unlabeled.  Add markers to the builtin name to mark the inputs and
+  // attributes, separated by commas.
   if (tuple) {
     for (unsigned i = 1, e = tuple->getNumElements(); i != e; ++i) {
-      if (!tuple->getElementName(i).empty())
+      if (tuple->getElementName(i).empty())
+        name += ",$in";
+      else
         name += "," + tuple->getElementName(i).str().str();
     }
 
