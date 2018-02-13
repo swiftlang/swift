@@ -1330,7 +1330,7 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepTokenSyntax, bool BuildSyntaxTree)
+                       bool KeepParsedTokens, bool BuildSyntaxTree)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
     Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo(BuildSyntaxTree)) {
@@ -1342,7 +1342,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepTokenSyntax) {
+  if (KeepParsedTokens) {
     AllCorrectedTokens = std::vector<Token>();
   }
 }
