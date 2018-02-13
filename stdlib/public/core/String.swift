@@ -253,6 +253,12 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
 }
 
 extension _StringGuts {
+  //
+  // TODO:(TODO: JIRA) This is all very bloated code, needs a rewrite given
+  // StringGuts' new design and the potential to run direclty on internal
+  // storage. For now, follow a hand-coded opaque pattern.
+  //
+
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -963,6 +969,12 @@ extension String {
     self._encode(encoding, into: { _ in codeUnitCount += 1 })
     return codeUnitCount
   }
+
+  //
+  // TODO (TODO: JIRA): This needs to be completely rewritten. It's about 12KB
+  // of code, most of which are MOV instructions. Keeping the by-hand opaque
+  // visitation pattern for now.
+  //
 
   // FIXME: this function may not handle the case when a wrapped NSString
   // contains unpaired surrogates.  Fix this before exposing this function as a
