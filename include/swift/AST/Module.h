@@ -888,8 +888,8 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepTokenSyntax,
-             bool KeepSyntaxTree);
+             ImplicitModuleImportKind ModImpKind, bool KeepTokenSyntax = false,
+             bool KeepSyntaxTree = false);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
