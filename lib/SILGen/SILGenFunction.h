@@ -1046,8 +1046,8 @@ public:
   
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
-  SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
-                                CanSILFunctionType constantTy);
+  ManagedValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
+                                    CanSILFunctionType constantTy);
 
   /// Returns a reference to a vtable-dispatched method.
   SILValue emitClassMethodRef(SILLocation loc, SILValue selfPtr,
