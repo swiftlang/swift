@@ -36,16 +36,45 @@ enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
+/// \brief Describes either a nominal type declaration or an extension
+/// declaration.
+struct TypeOrExtensionDecl {
+  llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *> Decl;
+
+  TypeOrExtensionDecl() = default;
+
+  TypeOrExtensionDecl(NominalTypeDecl *D);
+  TypeOrExtensionDecl(ExtensionDecl *D);
+
+  /// \brief Return the contained *Decl as the Decl superclass.
+  class Decl *getAsDecl() const;
+  /// \brief Return the contained *Decl as the DeclContext superclass.
+  DeclContext *getAsDeclContext() const;
+  /// \brief Return the contained NominalTypeDecl or that of the extended type
+  /// in the ExtensionDecl.
+  NominalTypeDecl *getBaseNominal() const;
+
+  /// \brief Is the contained pointer null?
+  bool isNull() const;
+  explicit operator bool() const { return !isNull(); }
+
+  bool operator==(TypeOrExtensionDecl rhs) { return Decl == rhs.Decl; }
+  bool operator!=(TypeOrExtensionDecl rhs) { return Decl != rhs.Decl; }
+  bool operator<(TypeOrExtensionDecl rhs) { return Decl < rhs.Decl; }
+};
+
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
   TypeBase *BaseType;
-  NominalTypeDecl *Nominal = nullptr;
+  TypeOrExtensionDecl Decl;
 
   explicit TypeTransformContext(Type T);
-  explicit TypeTransformContext(NominalTypeDecl* NTD);
+  explicit TypeTransformContext(TypeOrExtensionDecl D);
 
   Type getBaseType() const;
-  NominalTypeDecl *getNominal() const;
+  TypeOrExtensionDecl getDecl() const;
+
+  DeclContext *getDeclContext() const;
 
   bool isPrintingSynthesizedExtension() const;
 };
@@ -421,7 +450,7 @@ struct PrintOptions {
 
   void setBaseType(Type T);
 
-  void initForSynthesizedExtension(NominalTypeDecl *D);
+  void initForSynthesizedExtension(TypeOrExtensionDecl D);
 
   void clearSynthesizedExtension();
 

@@ -173,10 +173,6 @@ public:
 };
 
 class SILLayout; // From SIL
-/// \brief Describes either a nominal type declaration or an extension
-/// declaration.
-typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
-  TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
