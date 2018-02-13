@@ -1026,7 +1026,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       Optional<GenericSignatureBuilder> replacementBuilder;
       if (!source->parent->parent && requirementSignatureProto) {
         // If we have a requirement signature now, we're done.
-        if (source->usesRequirementSignature || true) {
+        if (source->usesRequirementSignature) {
           Type subjectType = source->getStoredType()->getCanonicalType();
           path.path.push_back({subjectType, conformingProto});
           return;
