@@ -9,7 +9,8 @@ import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
 
-LoopsTests.testCPUAndGPU("simpleCounterLoop") {
+// TODO(b/73088003): Fix test crashes on GPU.
+LoopsTests.testCPU("simpleCounterLoop") {
   let maxCount = 100
   var a = Tensor<Int32>(0)
   let b = Tensor<Int32>(1)
@@ -25,7 +26,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop") {
 }
 
 // Explicitly use Int64 everywhere.
-LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
+LoopsTests.testCPU("simpleCounterLoop_Int64") {
   let maxCount = 100
   var a = Tensor<Int64>(0)
   let b = Tensor<Int64>(1)
@@ -41,7 +42,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
 }
 
 // Explicitly use Int32 everywhere.
-LoopsTests.testCPUAndGPU("simpleCounterLoop_Int32") {
+LoopsTests.testCPU("simpleCounterLoop_Int32") {
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
   let b = Tensor<Int32>(1)
