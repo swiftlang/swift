@@ -4,28 +4,8 @@
 // Tensor API tests.
 
 import TensorFlow
+import TestUtils
 import StdlibUnittest
-
-extension TestSuite {
-  func testCPUAndGPU(_ name: String, _ body: @escaping () -> Void) {
-    testCPU(name, body)
-    testGPU(name, body)
-  }
-  func testCPU(_ name: String, _ body: @escaping () -> Void) {
-    test(name + "_CPU") {
-      _RuntimeConfig.runsOnGPU = false
-      body()
-    }
-  }
-  func testGPU(_ name: String, _ body: @escaping () -> Void) {
-#if CUDA
-    test(name + "_GPU") {
-      _RuntimeConfig.runsOnGPU = true
-      body()
-    }
-#endif
-  }
-}
 
 var TensorTests = TestSuite("Tensor")
 
@@ -120,6 +100,9 @@ TensorTests.testCPUAndGPU("MultiOpMath") {
 }
 
 TensorTests.testCPUAndGPU("XWPlusB") {
+  // Exercise debug logging.
+  _RuntimeConfig.printsDebugLog = true
+
   // Shape: 1 x 4
   let x = Tensor([[1.0, 2.0, 2.0, 1.0]]).toDevice()
   // Shape: 4 x 2
@@ -143,22 +126,6 @@ TensorTests.testCPUAndGPU("Transpose") {
 
 // FIXME: Partitioner bug (b/72997202)
 #if false // Remove #if when fixed.
-// FIXME: The While op doesn't work on the CPU.
-TensorTests.testGPU("simpleCounterLoop") {
-  let maxCount = 100
-  var a = Tensor<Int32>(0)
-  let b = Tensor<Int32>(1)
-  var count = 0
-
-  a -= b
-  while count < maxCount {
-    a += b
-    count += 1
-  }
-  a -= b
-  expectEqual(8, a.scalar)
-}
-
 // This is derived from a TF Eager testcase.
 TensorTests.testGPU("loopsAndConditions") {
   var a = Tensor<Int32>(6)

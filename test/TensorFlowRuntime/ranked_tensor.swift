@@ -4,28 +4,8 @@
 // Tensor API tests.
 
 import TensorFlow
+import TestUtils
 import StdlibUnittest
-
-extension TestSuite {
-  func testCPUAndGPU(_ name: String, _ body: @escaping () -> Void) {
-    testCPU(name, body)
-    testGPU(name, body)
-  }
-  func testCPU(_ name: String, _ body: @escaping () -> Void) {
-    test(name + "_CPU") {
-      _RuntimeConfig.runsOnGPU = false
-      body()
-    }
-  }
-  func testGPU(_ name: String, _ body: @escaping () -> Void) {
-#if CUDA
-    test(name + "_GPU") {
-      _RuntimeConfig.runsOnGPU = true
-      body()
-    }
-#endif
-  }
-}
 
 var RankedTensorTests = TestSuite("RankedTensor")
 
