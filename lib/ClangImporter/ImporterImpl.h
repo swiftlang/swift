@@ -357,13 +357,19 @@ private:
 
   /// \brief The fake buffer used to import modules.
   ///
-  /// FIXME: Horrible hack for loadModule().
-  clang::FileID DummyImportBuffer;
+  /// \see getNextIncludeLoc
+  clang::FileID DummyIncludeBuffer;
 
   /// \brief A count of the number of load module operations.
   ///
-  /// FIXME: Horrible, horrible hack for \c loadModule().
-  unsigned ImportCounter = 0;
+  /// \see getNextIncludeLoc
+  unsigned IncludeCounter = 0;
+
+  /// Generate a dummy Clang source location for header includes and module
+  /// imports.
+  ///
+  /// These have to be unique and valid or Clang gets very confused.
+  clang::SourceLocation getNextIncludeLoc();
 
   /// \brief Used to avoid running the AST verifier over the same declarations.
   size_t VerifiedDeclsCounter = 0;
