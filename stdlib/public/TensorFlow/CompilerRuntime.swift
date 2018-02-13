@@ -252,6 +252,13 @@ fileprivate extension _ExecutionContext {
   }
 }
 
+private func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
+  _ inputTensor: CTensorHandle, _ dummy: Scalar.Type) {
+  let sa = TensorHandle<Scalar>.makeHostCopy(inputTensor)
+  debugLog("Rank is \(sa.rank), shape is \(sa.shape).")
+  debugLog("The content of the \(sa.scalars.count) scalars are: \(sa.scalars)")
+}
+
 //===----------------------------------------------------------------------===//
 // - MARK: Tensor computation
 //===----------------------------------------------------------------------===//
@@ -316,9 +323,16 @@ public final class _TensorComputation {
     // Make sure the program is loaded to the context.
     context.loadProgramInBytes(programByteAddress, count: programByteCount)
 
+    if _RuntimeConfig.printsDebugLog {
+      let buffer = UnsafeBufferPointer(
+        start: programByteAddress.assumingMemoryBound(to: UInt8.self),
+        count: programByteCount)
+      debugLog("The program bytes are \(Array(buffer)).")
+    }
+
     // Now that we have them in our context, we can get ready to get the top
     // level function and create an op.
-    debugLog("Creating a new op.")
+    debugLog("Creating a new op with func name \(String(cString: entryFunctionNameAddress)).")
     self.op = context.withMutableCContext { [status] ctx in
       defer { checkOk(status) }
       return TFE_NewOp(ctx, entryFunctionNameAddress, status)
@@ -338,7 +352,26 @@ public final class _TensorComputation {
     }
 
     debugLog("Populating the op's input list.")
-    for inputTensor in inputTensors {
+    for (i, inputTensor) in inputTensors.enumerated() {
+      if _RuntimeConfig.printsDebugLog {
+        let dType: TF_DataType = TFE_TensorHandleDataType(inputTensor)
+        debugLog("Input tensor \(i) has TF data type \(dType).")
+        switch(dType) {
+        case TF_INT8: dumpTensorContent(inputTensor, Int8.self)
+        case TF_UINT8: dumpTensorContent(inputTensor, UInt8.self)
+        case TF_INT16: dumpTensorContent(inputTensor, Int16.self)
+        case TF_UINT16: dumpTensorContent(inputTensor, UInt16.self)
+        case TF_INT16: dumpTensorContent(inputTensor, Int16.self)
+        case TF_UINT32: dumpTensorContent(inputTensor, UInt32.self)
+        case TF_INT32: dumpTensorContent(inputTensor, Int32.self)
+        case TF_UINT64: dumpTensorContent(inputTensor, UInt64.self)
+        case TF_INT64: dumpTensorContent(inputTensor, Int64.self)
+        case TF_FLOAT: dumpTensorContent(inputTensor, Float.self)
+        case TF_DOUBLE: dumpTensorContent(inputTensor, Double.self)
+        default: fatalError("Unsupported dtype \(dType)")
+        }
+      }
+
       TFE_OpAddInput(op, inputTensor, status)
       checkOk(status)
     }

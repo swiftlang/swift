@@ -80,6 +80,16 @@ internal extension TensorHandle {
   @_versioned
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
+    return TensorHandle.makeHostCopy(cTensorHandle)
+  }
+
+  /// Same as above, except the input tensor's content is taken from
+  /// `cTensorHandle`.
+  @_versioned
+  @inline(never)
+  static func makeHostCopy(
+    _ cTensorHandle: CTensorHandle
+  ) -> ShapedArray<Scalar> {
     let status = TF_NewStatus()
     // If the tensor is on the accelerator, we need to copy it to the host.
     // NOTE: This will not perform a copy if the handle is already on the host.
