@@ -296,7 +296,7 @@ extension Bool {
 }
 
 extension Bool {
-  @_inlineable // FIXME(sil-serialize-all)
+  @_inlineable
   /// Toggles the value of the Boolean. 
   ///
   /// Calling this method sets the variable to `true` if it was `false`,
@@ -306,7 +306,7 @@ extension Bool {
   ///
   ///    bools[0].toggle()
   ///    // bools now contains [false, false]
-  mutating func toggle() {
+  public mutating func toggle() {
     self = !self
   }
 }
