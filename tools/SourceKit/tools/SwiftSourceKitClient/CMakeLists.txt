@@ -8,6 +8,7 @@ add_swift_library(swiftSwiftLang SHARED
   SourceKitdRequest.swift
   SourceKitdResponse.swift
   SourceKitdUID.swift
+  UIDs.swift.gyb
 
   DEPENDS sourcekitd-test
   PRIVATE_LINK_LIBRARIES sourcekitd
