@@ -54,30 +54,18 @@ extension String {
     }
 
     precondition(count > 0, "Negative count not allowed")
-    defer { _fixLifetime(repeatedValue) }
-    // TODO (TODO: JIRA): Small string detection, micro-benchmarking, etc.
-    if _slowPath(repeatedValue._guts._isOpaque) {
-      self.init(_opaqueRepeating: repeatedValue, count: count)
-      return
-    }
-
-    if repeatedValue._guts.isASCII {
-      let ascii = repeatedValue._guts._unmanagedASCIIView
-      self.init(_StringGuts(_large: ascii._repeated(count)))
-    } else {
-      let utf16 = repeatedValue._guts._unmanagedUTF16View
-      self.init(_StringGuts(_large: utf16._repeated(count)))
-    }
+    self = _visitGuts(repeatedValue._guts, range: nil, args: count,
+      ascii: { ascii, count in
+        return String(_StringGuts(_large: ascii._repeated(count)))
+      },
+      utf16: { utf16, count in
+        return String(_StringGuts(_large: utf16._repeated(count)))
+      },
+      opaque: { opaque, count in
+        return String(_StringGuts(_large: opaque._repeated(count)))
+      }
+    )
   }
-
-  @_versioned // @opaque
-  init(_opaqueRepeating repeatedValue: String, count: Int) {
-    _sanityCheck(repeatedValue._guts._isOpaque)
-    defer { _fixLifetime(repeatedValue) }
-    let opaque = repeatedValue._guts._asOpaque()
-    self.init(_StringGuts(_large: opaque._repeated(count)))
-  }
-
 
   /// A Boolean value indicating whether a string has no characters.
   @_inlineable // FIXME(sil-serialize-all)

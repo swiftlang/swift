@@ -289,16 +289,14 @@ extension _StringGuts {
         encodedAs: targetEncoding,
         from: ascii.buffer,
         encodedAs: Unicode.ASCII.self,
-        execute: body
-      )
+        execute: body)
     }
     let utf16 = _unmanagedUTF16View[bounds]
     return try Swift._withCStringAndLength(
       encodedAs: targetEncoding,
       from: utf16.buffer,
       encodedAs: Unicode.UTF16.self,
-      execute: body
-    )
+      execute: body)
   }
 
   @_versioned // @opaque
