@@ -233,7 +233,7 @@ extension FlattenCollection.Index : Comparable {
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   public var hashValue: Int {
-    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
+    return _combineHashValues(_inner?.hashValue ?? 0, _outer.hashValue)
   }
 }
 
