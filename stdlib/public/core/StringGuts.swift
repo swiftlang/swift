@@ -519,6 +519,8 @@ extension _StringGuts {
   @_inlineable
   internal
   func _ephemeralCocoaString(_ range: Range<Int>) -> _CocoaString {
+    // Keeping by-hand visit pattern, as this will be removed shortly once
+    // comparison lands.
     if _slowPath(_isOpaque) {
       return _opaqueEphemeralString(range)
     }
@@ -904,6 +906,12 @@ extension _StringGuts {
     }
     return 0
   }
+
+  //
+  // TODO (TODO: JIRA): Remove all of this. StringGuts users need to deal with
+  // the fact that it has multiple representations, otherwise they'll never be
+  // efficient.
+  //
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
   @_inlineable // FIXME(sil-serialize-all)

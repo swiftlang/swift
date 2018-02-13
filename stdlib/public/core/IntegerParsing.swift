@@ -62,6 +62,11 @@ where Rest.Element : UnsignedInteger {
   return result
 }
 
+//
+// TODO (TODO: JIRA): This needs to be completely rewritten. It's about 20KB of
+// always-inline code, most of which are MOV instructions.
+//
+
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @inline(__always)
