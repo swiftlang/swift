@@ -56,7 +56,10 @@ static Demangler getDemanglerForRuntimeTypeResolution() {
   dem.setSymbolicReferenceResolver([&](int32_t offset,
                                        const void *base) -> NodePointer {
     auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
-    return dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
+    auto reference = dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
+    auto type = dem.createNode(Node::Kind::Type);
+    type->addChild(reference, dem);
+    return type;
   });
   return dem;
 }
@@ -286,9 +289,12 @@ _findNominalTypeDescriptor(Demangle::NodePointer node) {
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
-  if (node->getKind() == Node::Kind::SymbolicReference)
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
     return cast<TypeContextDescriptor>(
-      (const ContextDescriptor *)node->getIndex());
+      (const ContextDescriptor *)symbolicNode->getIndex());
 
   auto mangledName = Demangle::mangleNode(node);
 

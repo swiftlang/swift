@@ -1611,18 +1611,21 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Structure:
       case NodeKind::Class:
       case NodeKind::Enum:
+      case NodeKind::OtherNominalType:
         break;
 
       case NodeKind::BoundGenericStructure:
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericOtherNominalType:
         // Base type
         typeNode = node->getFirstChild();
         // Nominal type
         node = typeNode->getFirstChild();
         assert(node->getKind() == NodeKind::Structure ||
                node->getKind() == NodeKind::Class ||
-               node->getKind() == NodeKind::Enum);
+               node->getKind() == NodeKind::Enum ||
+               node->getKind() == NodeKind::OtherNominalType);
         break;
 
       default:
