@@ -125,26 +125,14 @@ extension String {
     /// - Precondition: The next location exists.
     @_inlineable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
-      if _slowPath(_guts._isOpaque) {
-        return _opaqueIndex(after: i)
-      }
-
       let offset = _toCoreIndex(i)
-      let length: Int
-      if _guts.isASCII {
-        length = 1
-      } else {
-        let utf16 = _guts._unmanagedUTF16View
-        length = utf16.unicodeScalarWidth(startingAt: offset)
-      }
-      return _fromCoreIndex(offset + length)
-    }
-
-    @_versioned // @opaque
-    internal func _opaqueIndex(after i: Index) -> Index {
-      _sanityCheck(_guts._isOpaque)
-      let offset = _toCoreIndex(i)
-      let length = _guts._asOpaque().unicodeScalarWidth(startingAt: offset)
+      let length: Int = _visitGuts(_guts, args: offset,
+        ascii: { _ -> Int in return 1 },
+        utf16: { utf16, offset in
+          return utf16.unicodeScalarWidth(startingAt: offset) },
+        opaque: { opaque, offset in
+          return opaque.unicodeScalarWidth(startingAt: offset) }
+      )
       return _fromCoreIndex(offset + length)
     }
 
@@ -153,27 +141,15 @@ extension String {
     /// - Precondition: The previous location exists.
     @_inlineable // FIXME(sil-serialize-all)
     public func index(before i: Index) -> Index {
-      if _slowPath(_guts._isOpaque) {
-        return _opaqueIndex(before: i)
-      }
-
       let offset = _toCoreIndex(i)
-      let length: Int
-      if _guts.isASCII {
-        length = 1
-      } else {
-        let utf16 = _guts._unmanagedUTF16View
-        length = utf16.unicodeScalarWidth(endingAt: offset)
-      }
+      let length: Int = _visitGuts(_guts, args: offset,
+        ascii: { _ -> Int in return 1 },
+        utf16: { utf16, offset in
+          return utf16.unicodeScalarWidth(endingAt: offset) },
+        opaque: { opaque, offset in
+          return opaque.unicodeScalarWidth(endingAt: offset) }
+      )
       return _fromCoreIndex(offset - length)
-    }
-
-    @_versioned // @opaque
-    internal func _opaqueIndex(before i: Index) -> Index {
-      _sanityCheck(_guts._isOpaque)
-      let offset = _toCoreIndex(i)
-      let length = _guts._asOpaque().unicodeScalarWidth(endingAt: offset)
-      return _fromCoreIndex(offset + length)
     }
 
     /// Accesses the Unicode scalar value at the given position.
@@ -314,41 +290,27 @@ extension _StringGuts {
   @_inlineable
   @_versioned
   internal func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
-    if _slowPath(_isOpaque) {
-      return opaqueUnicodeScalar(startingAt: offset)
-    }
-    if isASCII {
-      let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset)
-      return Unicode.Scalar(_unchecked: UInt32(u))
-    }
-    return _unmanagedUTF16View.unicodeScalar(startingAt: offset)
-  }
-
-  @_versioned // @opaque
-  internal func opaqueUnicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
-    _sanityCheck(_isOpaque)
-    defer { _fixLifetime(self) }
-    return _asOpaque().unicodeScalar(startingAt: offset)
+    return _visitGuts(self, args: offset,
+      ascii: { ascii, offset in
+        let u = ascii.codeUnit(atCheckedOffset: offset)
+        return Unicode.Scalar(_unchecked: UInt32(u)) },
+      utf16: { utf16, offset in
+        return utf16.unicodeScalar(startingAt: offset) },
+      opaque: { opaque, offset in
+        return opaque.unicodeScalar(startingAt: offset) })
   }
 
   @_inlineable
   @_versioned
   internal func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
-    if _slowPath(_isOpaque) {
-      return opaqueUnicodeScalar(endingAt: offset)
-    }
-    if isASCII {
-      let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset - 1)
-      return Unicode.Scalar(_unchecked: UInt32(u))
-    }
-    return _unmanagedUTF16View.unicodeScalar(endingAt: offset)
-  }
-
-  @_versioned // @opaque
-  internal func opaqueUnicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
-    _sanityCheck(_isOpaque)
-    defer { _fixLifetime(self) }
-    return _asOpaque().unicodeScalar(endingAt: offset)
+    return _visitGuts(self, args: offset,
+      ascii: { ascii, offset in
+        let u = ascii.codeUnit(atCheckedOffset: offset &- 1)
+        return Unicode.Scalar(_unchecked: UInt32(u)) },
+      utf16: { utf16, offset in
+        return utf16.unicodeScalar(endingAt: offset) },
+      opaque: { opaque, offset in
+        return opaque.unicodeScalar(endingAt: offset) })
   }
 }
 

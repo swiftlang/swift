@@ -30,6 +30,7 @@ func _stdlib_binary_CFStringCreateCopy(
 }
 
 @_inlineable // FIXME(sil-serialize-all)
+@effects(readonly)
 public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString

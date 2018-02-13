@@ -285,7 +285,7 @@ extension String {
     @inline(__always)
     internal func _forwardDistance(from i: Index, to j: Index) -> Int {
       return j._transcodedOffset - i._transcodedOffset +
-        _count(fromUTF16: IteratorSequence(_guts.makeIterator(
+        String.UTF8View._count(fromUTF16: IteratorSequence(_guts.makeIterator(
           in: i.encodedOffset..<j.encodedOffset)))
     }
 
@@ -548,27 +548,8 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 
 extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
-  public var count: Int {
-    if _fastPath(_guts.isASCII) { return _guts.count }
-
-    if _slowPath(_guts._isOpaque) {
-      return _opaqueCount
-    }
-
-    defer { _fixLifetime(_guts) }
-    return _count(fromUTF16: _guts._unmanagedUTF16View)
-  }
-
-  @_versioned // @opaque
-  internal var _opaqueCount: Int {
-    _sanityCheck(_guts._isOpaque)
-    defer { _fixLifetime(_guts) }
-    return _count(fromUTF16: _guts._asOpaque())
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
+  internal static func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
   where Source.Element == Unicode.UTF16.CodeUnit
   {
     var result = 0
@@ -584,6 +565,15 @@ extension String.UTF8View {
       prev = u
     }
     return result
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var count: Int {
+    if _fastPath(_guts.isASCII) { return _guts.count }
+    return _visitGuts(_guts,
+      ascii: { ascii in return ascii.count },
+      utf16: { utf16 in return String.UTF8View._count(fromUTF16: utf16) },
+      opaque: { opaque in return String.UTF8View._count(fromUTF16: opaque) })
   }
 }
 
