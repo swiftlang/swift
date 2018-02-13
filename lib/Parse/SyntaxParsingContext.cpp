@@ -39,7 +39,7 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            BufferID)),
       CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
-      Enabled(SF.shouldKeepSyntaxInfo()) {
+      Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
   Storage.reserve(128);
 }

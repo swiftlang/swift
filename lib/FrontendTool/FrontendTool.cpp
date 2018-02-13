@@ -838,7 +838,7 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
   if (Action == FrontendOptions::ActionType::EmitSyntax) {
-    Instance.getASTContext().LangOpts.KeepSyntaxInfoInSourceFile = true;
+    Instance.getASTContext().LangOpts.BuildSyntaxTree = true;
     Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
   }
 
