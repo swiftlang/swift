@@ -1107,6 +1107,27 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
   return false;
 }
 
+clang::SourceLocation
+ClangImporter::Implementation::getNextIncludeLoc() {
+  clang::SourceManager &srcMgr = getClangInstance()->getSourceManager();
+
+  if (!DummyIncludeBuffer.isValid()) {
+    clang::SourceLocation includeLoc =
+        srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    DummyIncludeBuffer = srcMgr.createFileID(
+        llvm::make_unique<ZeroFilledMemoryBuffer>(
+          256*1024, StringRef(moduleImportBufferName)),
+        clang::SrcMgr::C_User, /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
+  }
+
+  clang::SourceLocation clangImportLoc =
+      srcMgr.getLocForStartOfFile(DummyIncludeBuffer)
+            .getLocWithOffset(IncludeCounter++);
+  assert(srcMgr.isInFileID(clangImportLoc, DummyIncludeBuffer) &&
+         "confused Clang's source manager with our fake locations");
+  return clangImportLoc;
+}
+
 bool ClangImporter::Implementation::importHeader(
     ModuleDecl *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -1124,22 +1145,17 @@ bool ClangImporter::Implementation::importHeader(
 
   bool hadError = clangDiags.hasErrorOccurred();
 
-  clang::ASTContext &ClangCtx = getClangASTContext();
-  clang::Preprocessor &pp = getClangPreprocessor();
-
-  clang::SourceManager &sourceMgr = ClangCtx.getSourceManager();
-
-  clang::SourceLocation includeLoc =
-    sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
+  clang::SourceManager &sourceMgr = getClangInstance()->getSourceManager();
   clang::FileID bufferID = sourceMgr.createFileID(std::move(sourceBuffer),
                                                   clang::SrcMgr::C_User,
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
-                                                  includeLoc);
+                                                  getNextIncludeLoc());
   auto &consumer =
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
+  clang::Preprocessor &pp = getClangPreprocessor();
   pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
@@ -1452,7 +1468,6 @@ ModuleDecl *ClangImporter::loadModule(
                           Impl.exportSourceLoc(component.second) } );
   }
 
-  auto &srcMgr = clangContext.getSourceManager();
   auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
@@ -1475,27 +1490,7 @@ ModuleDecl *ClangImporter::loadModule(
       }
     }
 
-    // FIXME: The source location here is completely bogus. It can't be
-    // invalid, it can't be the same thing twice in a row, and it has to come
-    // from an actual buffer, so we make a fake buffer and just use a counter.
-    if (!Impl.DummyImportBuffer.isValid()) {
-      clang::SourceLocation includeLoc =
-          srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
-      // Zero offset is reserved for the bridging header. Increase the offset
-      // so that headers from the bridging header are considered as coming
-      // before headers that are imported from swift code.
-      includeLoc = includeLoc.getLocWithOffset(1);
-      Impl.DummyImportBuffer = srcMgr.createFileID(
-          llvm::make_unique<ZeroFilledMemoryBuffer>(
-              256*1024, StringRef(Implementation::moduleImportBufferName)),
-          clang::SrcMgr::C_User,
-          /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
-    }
-    clang::SourceLocation clangImportLoc
-      = srcMgr.getLocForStartOfFile(Impl.DummyImportBuffer)
-              .getLocWithOffset(Impl.ImportCounter++);
-    assert(srcMgr.isInFileID(clangImportLoc, Impl.DummyImportBuffer) &&
-           "confused Clang's source manager with our fake locations");
+    clang::SourceLocation clangImportLoc = Impl.getNextIncludeLoc();
 
     clang::ModuleLoadResult result =
         Impl.Instance->loadModule(clangImportLoc, path, visibility,
