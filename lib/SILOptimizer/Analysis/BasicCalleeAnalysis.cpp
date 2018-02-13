@@ -34,7 +34,11 @@ bool CalleeList::allCalleesVisible() {
     // Do not consider functions in other modules (libraries) because of library
     // evolution: such function may behave differently in future/past versions
     // of the library.
-    if (Callee->isAvailableExternally())
+    // TODO: exclude functions which are deserialized from modules in the same
+    // resilience domain.
+    if (Callee->isAvailableExternally() &&
+        // shared_external functions are always emitted in the client.
+        Callee->getLinkage() != SILLinkage::SharedExternal)
       return false;
   }
   return true;
