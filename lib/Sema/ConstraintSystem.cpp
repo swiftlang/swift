@@ -1074,7 +1074,7 @@ void ConstraintSystem::openGeneric(
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto contextTy = genericEnv->mapTypeIntoContext(gp);
+    auto contextTy = GenericEnvironment::mapTypeIntoContext(genericEnv, gp);
     if (auto *archetype = contextTy->getAs<ArchetypeType>())
       locatorPtr = getConstraintLocator(
           locator.withPathElement(LocatorPathElt(archetype)));
