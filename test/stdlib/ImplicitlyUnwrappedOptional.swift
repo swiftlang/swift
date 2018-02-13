@@ -57,5 +57,18 @@ ImplicitlyUnwrappedOptionalTests.test("flatMap") {
   // expectNil((3 as Int!).flatMap(half))
 }
 
-runAllTests()
+infix operator *^* : ComparisonPrecedence
 
+func *^*(lhs: Int?, rhs: Int?) -> Bool { return true }
+func *^*(lhs: Int, rhs: Int) -> Bool { return true }
+
+ImplicitlyUnwrappedOptionalTests.test("preferOptional") {
+  let i: Int! = nil
+  let j: Int = 1
+  if i != j {} // we should choose != for Optionals rather than forcing i
+  if i == j {} // we should choose == for Optionals rather than forcing i
+  // FIXME: https://bugs.swift.org/browse/SR-6988
+  //  if i *^* j {} // we should choose *^* for Optionals rather than forcing i
+}
+
+runAllTests()
