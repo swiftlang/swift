@@ -16,6 +16,7 @@
     "StringComparable.swift",
     "StringObject.swift",
     "StringGuts.swift",
+    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",  
     "StringHashable.swift",
     "StringIndex.swift",
