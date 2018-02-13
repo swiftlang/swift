@@ -286,8 +286,7 @@ extension Character
         return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
       },
       utf16: { utf16 in return Character(_unverified: utf16) },
-      opaque: { opaque in return Character(_unverified: opaque) }
-    )
+      opaque: { opaque in return Character(_unverified: opaque) })
   }
 
   /// Construct a Character from a slice of a _StringGuts, assuming
@@ -308,8 +307,7 @@ extension Character
         return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
       },
       utf16: { utf16 in return Character(_unverified: utf16) },
-      opaque: { opaque in return Character(_unverified: opaque) }
-    )
+      opaque: { opaque in return Character(_unverified: opaque) })
   }
 
   @_inlineable
