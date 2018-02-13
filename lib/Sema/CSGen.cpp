@@ -3451,6 +3451,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
                                     SmallVectorImpl<Type> &PossibleTypes) {
   PrettyStackTraceExpr stackTrace(DC.getASTContext(),
                                   "type-checking unresolved member", Parent);
+
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3468,7 +3469,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   }
 
   SmallVector<Solution, 3> solutions;
-  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::Allow)) {
+  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::UnresolvedType)) {
     return false;
   }
 

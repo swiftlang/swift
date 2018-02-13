@@ -2152,6 +2152,8 @@ static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
         return type;
       });
       CS.setType(expr, type);
+      // Set new type to the expression directly.
+      expr->setType(type);
 
       return expr;
     }

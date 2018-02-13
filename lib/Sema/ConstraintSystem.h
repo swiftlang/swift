@@ -1302,8 +1302,8 @@ private:
       if (ExcludeRoot && expr == RootExpr)
         return expr;
 
-      assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
-             && "Mismatched types!");
+      //assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
+      //       && "Mismatched types!");
       assert(!CS.getType(expr)->hasTypeVariable() &&
              "Should not write type variable into expression!");
       expr->setType(CS.getType(expr));
@@ -1593,10 +1593,6 @@ public:
     //        "Expected type to be invariant!");
 
     ExprTypes[E] = T.getPointer();
-
-    // FIXME: Temporary until all references to expression types are
-    //        updated.
-    E->setType(T);
   }
 
   /// Check to see if we have a type for an expression.

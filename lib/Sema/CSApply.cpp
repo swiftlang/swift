@@ -4451,11 +4451,11 @@ namespace {
         bool allIndexesHashable = true;
         ArrayRef<TupleTypeElt> indexTypes;
         TupleTypeElt singleIndexTypeBuf;
-        if (auto tup = component.getIndexExpr()->getType()
+        if (auto tup = cs.getType(component.getIndexExpr())
                                                ->getAs<TupleType>()) {
           indexTypes = tup->getElements();
         } else {
-          singleIndexTypeBuf = component.getIndexExpr()->getType();
+          singleIndexTypeBuf = cs.getType(component.getIndexExpr());
           indexTypes = singleIndexTypeBuf;
         }
       
@@ -6192,13 +6192,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // swap the order so that we load first and force the result.
       cs.propagateLValueAccessKind(expr, AccessKind::Read);
       if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
-        fromType = forceExpr->getSubExpr()->getType()->getRValueType();
+        fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
         auto *loadExpr = cs.cacheType(
             new (tc.Context) LoadExpr(forceExpr->getSubExpr(), fromType));
         auto *newForceValue = new (tc.Context)
             ForceValueExpr(loadExpr, forceExpr->getLoc(),
                            forceExpr->isForceOfImplicitlyUnwrappedOptional());
-        cs.setType(newForceValue, loadExpr->getType()->getOptionalObjectType());
+        cs.setType(newForceValue,
+                   cs.getType(loadExpr)->getOptionalObjectType());
         expr = newForceValue;
       } else {
         expr = cs.cacheType(new (tc.Context)
@@ -7542,6 +7543,7 @@ namespace {
         } else {
           // For other closures, type-check the body once we've finished with
           // the expression.
+          cs.setExprTypes(closure);
           ClosuresToTypeCheck.push_back(closure);
         }
 
