@@ -22,14 +22,14 @@ public class SwiftLang {
   /// - Returns: The syntax tree in Json format string.
   public static func parse(_ url: URL) throws -> String {
     let Service = SourceKitdService()
-    let Request = SourceKitdRequest(uid: .source_request_editor_open)
+    let Request = SourceKitdRequest(uid: .request_EditorOpen)
     let Path = url.path
-    Request.addParameter(.key_sourcefile, value: Path)
-    Request.addParameter(.key_name, value: Path)
-    Request.addParameter(.key_enable_syntax_tree, value: 1)
+    Request.addParameter(.key_SourceFile, value: Path)
+    Request.addParameter(.key_Name, value: Path)
+    Request.addParameter(.key_EnableSyntaxTree, value: 1)
 
     // FIXME: SourceKitd error handling.
     let Resp = Service.sendSyn(request: Request)
-    return Resp.value.getString(.key_serialized_syntax_tree)
+    return Resp.value.getString(.key_SerializedSyntaxTree)
   }
 }
