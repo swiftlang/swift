@@ -8,7 +8,8 @@ struct CErrorOr<T>
     // CHECK: define hidden {{.*}}void @"$S20generic_enum_closure8CErrorOrV1xACyxGAA14__CurrentErrnoV_tcfC"
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
-    // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !DIExpression())
+    // CHECK: call void @llvm.dbg.declare
+    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[SELF:.*]], metadata !DIExpression())
     // CHECK: ![[T1:.*]] = !DICompositeType({{.*}}, identifier: "$S20generic_enum_closure8CErrorOrVyACQq_GD")
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope: {{.*}}, type: ![[T1]])
     value = .none

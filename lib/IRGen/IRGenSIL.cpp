@@ -3885,6 +3885,11 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
         RealType, type, false);
     bool IsAnonymous = false;
     StringRef Name = getVarName(i, IsAnonymous);
+    // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
+    // is used, which is valid for the entire lifetime of the alloca.
+    if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr))
+      if (auto *Alloca = dyn_cast<llvm::AllocaInst>(BitCast->getOperand(0)))
+        addr = Alloca;
     if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
                                    i->getVarInfo().ArgNo);
