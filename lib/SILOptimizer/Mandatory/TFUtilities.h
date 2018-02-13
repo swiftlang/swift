@@ -40,7 +40,7 @@ namespace tf {
   /// as Builtin instructions.
   struct SILTensorOpInfo {
     /// The instruction being analyzed.
-    SILInstruction *inst;
+    BuiltinInst *inst;
 
     /// This is the name for the entire builtin that we'll partition out.
     StringRef builtinName;
@@ -48,10 +48,18 @@ namespace tf {
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
-    /// This is the number of input operands that exist before any attributes.
-    unsigned numInputs = ~0U;
+    /// One of these records exists for every operand that the BuiltinInst has,
+    /// classifying the operand into a couple of buckets.  The most coarse grain
+    /// classification is "input" vs "attribute": the inputs come first,
+    /// followed by the attributes.  However, we need to be able to model the
+    /// fact that some input arguments are aggregated together into a single
+    /// input that is an array of tensors.  An integer attribute may be either
+    /// a Tensor value or an integer-encoded DType, etc.
+    enum class OperandClass {
+      /// This is a tensor input, or if the value is a metatype, then the start
+      /// of an array of tensor inputs.
+      Input,
 
-    enum class AttributeModifier {
       Normal,       // No modifier.
       DType,        // This integer value is a dtype.
       Tensor,       // This array or scalar should be turned into a TF_Tensor.
@@ -62,10 +70,19 @@ namespace tf {
     };
 
     /// Return the string suffix for the specified attribute modifier.
-    static const char *getAttributeModifierSuffix(AttributeModifier modifier);
+    static const char *getOperandClassSuffix(OperandClass opClass);
+
+    /// Return the operand class of the specified string form like "tensor"
+    static llvm::Optional<OperandClass> getOperandClass(StringRef suffix);
 
     /// These are the names of any attribute operands at the end of the list.
-    SmallVector<std::pair<StringRef, AttributeModifier>, 4> attributes;
+    SmallVector<std::pair<StringRef, OperandClass>, 4> operandClasses;
+
+    /// Return true if the specified operand is an input (not an attribute).
+    bool isInput(unsigned operandNumber) const {
+      return operandClasses[operandNumber].second == OperandClass::Input;
+    }
+
 
     /// If the specified call is to a function that we can promote to an op,
     /// rewrite the instruction and return a new one that does so.  Otherwise,
@@ -102,10 +119,11 @@ namespace tf {
     static SingleValueInstruction *getAttrOperand(SILValue v);
 
   private:
-    SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
-    bool decodeBuiltin(BuiltinInst *inst);
+    SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
+    bool decodeBuiltin();
     static SILInstruction *decodeTensorFromScalars(ApplyInst *inst);
     static SILInstruction *decodeTensorFromScalars1D(ApplyInst *inst);
+    static SILInstruction *decodeTensorFromScalarsND(ApplyInst *inst);
   };
 
 

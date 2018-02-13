@@ -26,9 +26,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
- CHECK-NEXT:  %3 = builtin "__tfop_Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT:  %4 = builtin "__tfop_Select"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT: %5 = builtin "__tfop_Mul"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT:  %3 = builtin "__tfop_Add,$in,$in"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT:  %4 = builtin "__tfop_Select,$in,$in,$in"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK-NEXT: %5 = builtin "__tfop_Mul,$in,$in"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
  CHECK-NEXT:  return %5 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
@@ -46,7 +46,7 @@ public func testEmptyScalarsArray() {
  CHECK: integer_literal $Builtin.Int32, 20
  CHECK: integer_literal $Builtin.Int32, 30
  CHECK:  builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type) : $TensorHandle<Int32>
- CHECK:  builtin "__tfop_Add"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) : $TensorHandle<Int32>
+ CHECK:  builtin "__tfop_Add,$in,$in"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) : $TensorHandle<Int32>
  */
 
 
@@ -65,7 +65,7 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int32, 3
 // CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 4
 // CHECK-NEXT:  %7 = string_literal utf8 "SAME"
-// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int32.Type, %3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,$in,$in,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int32.Type, %3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
 // CHECK-NEXT:  return %8 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
