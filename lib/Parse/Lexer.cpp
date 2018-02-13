@@ -34,6 +34,7 @@
 #include <limits>
 
 using namespace swift;
+using namespace swift::syntax;
 
 // clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
 // this list as a reminder that they are using C rules for identifiers.
@@ -267,6 +268,23 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
 
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
+}
+
+void Lexer::formEscapedIdentifierToken(const char *TokStart) {
+  assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
+  assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
+  assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    LeadingTrivia.push_back(TriviaPiece::backtick());
+    assert(TrailingTrivia.size() == 0 && "TrailingTrivia is empty here");
+    TrailingTrivia.push_back(TriviaPiece::backtick());
+  }
+  formToken(tok::identifier, TokStart);
+  // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
+  // this as escaped-identifier in this case.
+  if (NextToken.is(tok::eof))
+    return;
+  NextToken.setEscapedIdentifier(true);
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -1795,8 +1813,7 @@ void Lexer::lexEscapedIdentifier() {
     // If we have the terminating "`", it's an escaped identifier.
     if (*CurPtr == '`') {
       ++CurPtr;
-      formToken(tok::identifier, Quote);
-      NextToken.setEscapedIdentifier(true);
+      formEscapedIdentifierToken(Quote);
       return;
     }
   }
@@ -1804,8 +1821,7 @@ void Lexer::lexEscapedIdentifier() {
   // Special case; allow '`$`'.
   if (Quote[1] == '$' && Quote[2] == '`') {
     CurPtr = Quote + 3;
-    formToken(tok::identifier, Quote);
-    NextToken.setEscapedIdentifier(true);
+    formEscapedIdentifierToken(Quote);
     return;
   }
 
