@@ -647,6 +647,10 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
       // on the caller side.
       return SourceAccess::getStaticAccess();
 
+    case SILArgumentConvention::Indirect_Out:
+      // We use an initialized 'out' argument as a parameter.
+      return SourceAccess::getStaticAccess();
+
     default:
       llvm_unreachable("Expecting an inout argument.");
     }
