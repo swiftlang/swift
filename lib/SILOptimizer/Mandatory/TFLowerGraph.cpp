@@ -467,16 +467,6 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     auto operand = inst->getOperand(i);
     auto opInfo = tfopInfo.operandClasses[i];
 
-    // Handle inputs first.
-    if (opInfo.second == SILTensorOpInfo::OperandClass::Input) {
-      assert(isTensorHandle(operand->getType()) &&
-             "all op inputs should be tensors");
-      auto opValue = getOperandValue(operand);
-      if (!opValue.oper) return;  // Error occurred.
-      TF_AddInput(op, opValue);
-      continue;
-    }
-
     // Helper function to collect subsequent elements that contribute to an
     // array value.
     auto collectArrayElements =
@@ -513,8 +503,38 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     std::string name = opInfo.first.str();
 
     switch (opInfo.second) {
-    case SILTensorOpInfo::OperandClass::Input:
-      llvm_unreachable("handled above");
+    case SILTensorOpInfo::OperandClass::Input: {
+      // There are two things we support here: simple tensor inputs, and arrays
+      // of tensors that get turned into InputList's.  Arrays are represented
+      // with a metatype operand.
+      if (operand->getType().is<MetatypeType>()) {
+        // We don't actually care about the metatype, it is just a marker.
+        // Collect all of the elements from the following InputElt operands if
+        // any exist.
+        SmallVector<TF_Output, 4> elements;
+
+        while (i+1 < e && tfopInfo.operandClasses[i+1].second ==
+                                   SILTensorOpInfo::OperandClass::InputElt) {
+          auto eltValue = inst->getOperand(++i);
+          assert(isTensorHandle(eltValue->getType()) &&
+                 "all op inputs should be tensors");
+          auto opValue = getOperandValue(eltValue);
+          if (!opValue.oper) return;  // Error occurred.
+          elements.push_back(opValue);
+        }
+        TF_AddInputList(op, elements.data(), elements.size());
+        break;
+      }
+
+      assert(isTensorHandle(operand->getType()) &&
+             "all op inputs should be tensors");
+      auto opValue = getOperandValue(operand);
+      if (!opValue.oper) return;  // Error occurred.
+      TF_AddInput(op, opValue);
+      break;
+    }
+    case SILTensorOpInfo::OperandClass::InputElt:
+      assert(0 && "Handled by the Input that precedes it.");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       // We add attributes based on what the type of the value is.
       if (auto *ili = dyn_cast<IntegerLiteralInst>(operand)) {
