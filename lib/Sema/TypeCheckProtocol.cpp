@@ -4071,6 +4071,11 @@ static bool shouldWarnAboutPotentialWitness(
       isUnlabeledInitializerOrSubscript(witness))
     return false;
 
+  // For non-@objc requirements, only warn if the witness comes from an
+  // extension.
+  if (!req->isObjC() && !isa<ExtensionDecl>(witness->getDeclContext()))
+    return false;
+
   // If the score is relatively high, don't warn: this is probably
   // unrelated.  Allow about one typo for every four properly-typed
   // characters, which prevents completely-wacky suggestions in many
