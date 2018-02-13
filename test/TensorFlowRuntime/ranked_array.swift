@@ -18,8 +18,7 @@ RankedArrayTests.test("AssociatedTypes") {
     iteratorType: Array1D<Float>.Iterator.self,
     subSequenceType: ArraySlice1D<Float>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self
+    indicesType: Range<Int>.self
   )
 
   expectRandomAccessCollectionAssociatedTypes(
@@ -27,8 +26,7 @@ RankedArrayTests.test("AssociatedTypes") {
     iteratorType: Array2D<Float>.Iterator.self,
     subSequenceType: ArraySlice2D<Float>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self
+    indicesType: Range<Int>.self
   )
 }
 

@@ -18,8 +18,7 @@ ShapedArrayTests.test("AssociatedTypes") {
     iteratorType: ShapedArray<Float>.Iterator.self,
     subSequenceType: ShapedArraySlice<Float>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self
+    indicesType: Range<Int>.self
   )
 }
 
