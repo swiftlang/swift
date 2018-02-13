@@ -870,6 +870,13 @@ public:
         getSILDebugLocation(Loc), Op, Ty));
   }
 
+  ValueToBridgeObjectInst *createValueToBridgeObject(SILLocation Loc,
+                                                     SILValue value) {
+    auto Ty = SILType::getBridgeObjectType(getASTContext());
+    return insert(new (getModule()) ValueToBridgeObjectInst(
+        getSILDebugLocation(Loc), value, Ty));
+  }
+
   BridgeObjectToWordInst *createBridgeObjectToWord(SILLocation Loc,
                                                    SILValue Op) {
     auto Ty = SILType::getBuiltinWordType(getASTContext());

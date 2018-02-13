@@ -355,6 +355,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,

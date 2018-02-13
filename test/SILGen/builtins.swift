@@ -922,3 +922,15 @@ func once_helper() {}
 func once(control: Builtin.RawPointer) {
   Builtin.once(control, once_helper)
 }
+
+
+// CHECK-LABEL: sil hidden @$S8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
+// CHECK: bb0([[UINT:%.*]] : @trivial $UInt):
+// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[UINT]] : $UInt
+// CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   return [[RET]] : $Builtin.BridgeObject
+// CHECK: } // end sil function '$S8builtins19valueToBridgeObjectyBbSuF'
+func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
+  return Builtin.valueToBridgeObject(x)
+}
+ 
