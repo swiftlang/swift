@@ -980,9 +980,10 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
-  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
+  for (unsigned i = 0, e = inst.getNumOperands(); i != e; ++i) {
     // Tensor and scalar input operands are recursively marked.
-    markValue(inst.getOperand(i), &inst);
+    if (tfopInfo.isInput(i))
+      markValue(inst.getOperand(i), &inst);
   }
 }
 
@@ -1675,13 +1676,13 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 
   // Handle special case "ops".
   if (tfopInfo.opName == "tfc.scalarToTensor") {
-    assert(tfopInfo.numInputs == 1 && "invalid tfc.scalarToTensor!");
+    assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
     // We just lower the result as the input, since the scalar input will have
     // been promoted to a tensor already.  It is possible that the input will
     // have been lowered to something like TensorHandle<Int64> and we need a
     // TensorHandle<Int>. If that is the case, we insert an UncheckedRefCast
     // to get it to the right type.  These are treated as noops by GraphGen.
-    auto result = remapValue(tfopInfo.getScalarOperand(0));
+    auto result = remapValue(inst->getOperand(0));
     if (!inst->getType().getSwiftRValueType()
           ->isEqual(result->getType().getSwiftRValueType())) {
       result = B.createUncheckedRefCast(loc, result, inst->getType());
@@ -1692,34 +1693,25 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   }
 
   SmallVector<SILValue, 4> args;
-  auto cloneSingleInst = [&](SILInstruction *inst) -> SILInstruction* {
+  auto cloneSingleInst = [&](SingleValueInstruction *inst)
+  -> SingleValueInstruction* {
     auto ourInst = inst->clone();
     ourInst->setDebugLocation(B.getSILDebugLocation(loc));
     B.getInsertionBB()->push_back(ourInst);
     return ourInst;
   };
 
-  // TODO: Attributes should support arrays as well as simple literals.
-  auto cloneAttrInst = [&](SILInstruction *inst) -> SILInstruction* {
-    return cloneSingleInst(inst);
-  };
-
-  unsigned nextOperand = isa<ApplyInst>(inst);  // Skip callee.
-  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
-    auto opValue = inst->getOperand(nextOperand++);
-    assert(isTensorHandle(opValue->getType()) && "expected tensor input");
-    // Tensor operands just become operands.
-    args.push_back(remapValue(opValue));
+  for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands();
+       i != e; ++i) {
+    auto opValue = inst->getOperand(i);
+    if (tfopInfo.isInput(i)) {
+      assert(isTensorHandle(opValue->getType()) && "expected tensor input");
+      // Tensor operands just become operands.
+      args.push_back(remapValue(opValue));
+    } else {
+      args.push_back(cloneSingleInst(cast<SingleValueInstruction>(opValue)));
+    }
   }
-
-  for (auto attrInfo : tfopInfo.attributes) {
-    (void)attrInfo;  // Attrname is already encoded in builtinName.
-    auto attr = tfopInfo.getAttrOperand(nextOperand++);
-    args.push_back(cloneAttrInst(attr)->getResults()[0]);
-  }
-
-  assert(nextOperand == inst->getNumOperands() &&
-         "Some operands not consumed in TFPartition");
 
   auto name = B.getASTContext().getIdentifier(tfopInfo.builtinName);
   auto result = B.createBuiltin(loc, name, inst->getType(),
@@ -1774,8 +1766,16 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
 
-  // Literals take attributes specifying the dtype and value.
-  if (opKind == PromotedScalarKind::Literal) {
+  // Handle opKind-specific issues.
+  switch (opKind) {
+  case PromotedScalarKind::Invalid: assert(0 && "Rejected ealier");
+  case PromotedScalarKind::TensorToScalar: assert(0 && "Handled above");
+  case PromotedScalarKind::Binary:
+  case PromotedScalarKind::OverflowingBinary:
+    opName += ",$in,$in";
+    break;
+  case PromotedScalarKind::Literal: {
+    // Literals take attributes specifying the dtype and value.
     opName += ",dtype$dtype,value$tensor";
 
     auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
@@ -1788,16 +1788,18 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     auto ourCst = inst->clone(dtypeCst);
     ourCst->setDebugLocation(B.getSILDebugLocation(loc));
     operands.push_back(ourCst);
+    break;
   }
-
-  // Conversions get an attribute specifying the result dtype, named "DstT".
-  if (opKind == PromotedScalarKind::Conversion) {
-    opName += ",DstT$dtype";
+  case PromotedScalarKind::Conversion: {
+    // Conversions get an attribute specifying the result dtype, named "DstT".
+    opName += ",$in,DstT$dtype";
     auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
     auto dtypeCst =
       B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
                              dtype);
     operands.push_back(dtypeCst);
+    break;
+  }
   }
 
   auto result =

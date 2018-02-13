@@ -463,21 +463,19 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   auto *op = TF_NewOperation(graphFn.getGraph(), tfopInfo.opName.str().c_str(),
                              opLocString.c_str());
 
-  // Each function argument for the op is a parameter that is passed in.
-  unsigned nextOperand = 0;
-  for (unsigned i = 0, e = tfopInfo.numInputs; i != e; ++i) {
-    auto operand = inst->getOperand(nextOperand++);
-    assert(isTensorHandle(operand->getType()) &&
-           "all op inputs should be tensors");
-    auto opValue = getOperandValue(operand);
-    if (!opValue.oper) return;  // Error occurred.
-    TF_AddInput(op, opValue);
-  }
+  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+    auto operand = inst->getOperand(i);
+    auto opInfo = tfopInfo.operandClasses[i];
 
-  // Process attributes as well.
-  for (unsigned attrIndex = 0, e = tfopInfo.attributes.size(); attrIndex != e;){
-    auto attr = tfopInfo.attributes[attrIndex++];
-    auto attrValue = tfopInfo.getAttrOperand(nextOperand++);
+    // Handle inputs first.
+    if (opInfo.second == SILTensorOpInfo::OperandClass::Input) {
+      assert(isTensorHandle(operand->getType()) &&
+             "all op inputs should be tensors");
+      auto opValue = getOperandValue(operand);
+      if (!opValue.oper) return;  // Error occurred.
+      TF_AddInput(op, opValue);
+      continue;
+    }
 
     // Helper function to collect subsequent elements that contribute to an
     // array value.
@@ -489,12 +487,10 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       auto metatype = cast<MetatypeInst>(attrValue)->getType();
       eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
 
-      while (attrIndex < e &&
-             tfopInfo.attributes[attrIndex].second ==
-                     SILTensorOpInfo::AttributeModifier::ArrayElement) {
-        auto eltValue = tfopInfo.getAttrOperand(nextOperand++);
-        elements.push_back(cast<SingleValueInstruction>(eltValue));
-        ++attrIndex;
+      while (i+1 < e &&
+             tfopInfo.operandClasses[i+1].second ==
+                     SILTensorOpInfo::OperandClass::ArrayElement) {
+        elements.push_back(cast<SingleValueInstruction>(inst->getOperand(++i)));
       }
     };
 
@@ -502,39 +498,40 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
                                    SmallVectorImpl<int64_t> &shape) {
       assert(isa<MetatypeInst>(attrValue) &&
              "$shape should start with a metatype");
-      while (attrIndex < e &&
-             tfopInfo.attributes[attrIndex].second ==
-                     SILTensorOpInfo::AttributeModifier::ArrayElement) {
-        auto eltValue = tfopInfo.getAttrOperand(nextOperand++);
+      while (i+1 < e &&
+             tfopInfo.operandClasses[i+1].second ==
+                     SILTensorOpInfo::OperandClass::ArrayElement) {
+        auto eltValue = inst->getOperand(++i);
         auto intValue = cast<IntegerLiteralInst>(eltValue);
         shape.push_back(intValue->getValue().getLimitedValue());
-        ++attrIndex;
       }
     };
 
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
-    std::string name = attr.first.str();
+    std::string name = opInfo.first.str();
 
-    switch (attr.second) {
-    case SILTensorOpInfo::AttributeModifier::Normal:  // No modifier.
+    switch (opInfo.second) {
+    case SILTensorOpInfo::OperandClass::Input:
+      llvm_unreachable("handled above");
+    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       // We add attributes based on what the type of the value is.
-      if (auto *ili = dyn_cast<IntegerLiteralInst>(attrValue)) {
+      if (auto *ili = dyn_cast<IntegerLiteralInst>(operand)) {
         uint64_t value = ili->getValue().getLimitedValue();
         if (ili->getValue().getBitWidth() == 1)
           TF_SetAttrBool(op, name.c_str(), (unsigned char)value);
         else
           TF_SetAttrInt(op, name.c_str(), (int64_t)value);
-      } else if (auto *fli = dyn_cast<FloatLiteralInst>(attrValue)) {
+      } else if (auto *fli = dyn_cast<FloatLiteralInst>(operand)) {
         auto value = fli->getValue().convertToFloat();
         TF_SetAttrFloat(op, name.c_str(), value);
-      } else if (auto *sli = dyn_cast<StringLiteralInst>(attrValue)) {
+      } else if (auto *sli = dyn_cast<StringLiteralInst>(operand)) {
         assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
                "only byte encodings are supported");
         auto value = sli->getValue();
         TF_SetAttrString(op, name.c_str(), value.data(), value.size());
-      } else if (auto *mti = dyn_cast<MetatypeInst>(attrValue)) {
+      } else if (auto *mti = dyn_cast<MetatypeInst>(operand)) {
         auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
         auto dtype = convertSwiftTypeToTF(ty);
         assert(dtype && "expected a valid tensorflow type");
@@ -543,31 +540,31 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         llvm_unreachable("unexpected attribute instruction");
       }
       break;
-    case SILTensorOpInfo::AttributeModifier::DType: {
+    case SILTensorOpInfo::OperandClass::DType: {
       // This integer value is a dtype.
-      auto val = cast<IntegerLiteralInst>(attrValue)->getValue();
+      auto val = cast<IntegerLiteralInst>(operand)->getValue();
       TF_SetAttrType(op, name.c_str(), (TF_DataType)val.getLimitedValue());
       break;
     }
-    case SILTensorOpInfo::AttributeModifier::Tensor: {
+    case SILTensorOpInfo::OperandClass::Tensor: {
       // Tensor can support two cases: an array case, where 'attrValue' is a
       // metatype, and a scalar case.
       TF_DataType dtype;
       SmallVector<SingleValueInstruction*, 4> elements;
       SmallVector<int64_t, 4> shape;
-      if (!isa<MetatypeInst>(attrValue)) {
+      if (!isa<MetatypeInst>(operand)) {
         // The scalar case is very simple, the shape of a scalar is 0d.
-        dtype = getTensorFlowDataType(attrValue->getType(), inst->getLoc());
-        elements.push_back(cast<LiteralInst>(attrValue));
+        dtype = getTensorFlowDataType(operand->getType(), inst->getLoc());
+        elements.push_back(cast<LiteralInst>(operand));
       } else {
         // Handle the array case by decoding the array itself, then decoding the
         // shape value that follows it.
         Type eltType;
-        collectArrayElements(attrValue, eltType, elements);
+        collectArrayElements(operand, eltType, elements);
 
-        auto shapeAttr = tfopInfo.attributes[attrIndex++]; (void)shapeAttr;
-        assert(shapeAttr.second == SILTensorOpInfo::AttributeModifier::Shape);
-        auto shapeAttrValue = tfopInfo.getAttrOperand(nextOperand++);
+        auto shapeAttr = tfopInfo.operandClasses[++i]; (void)shapeAttr;
+        assert(shapeAttr.second == SILTensorOpInfo::OperandClass::Shape);
+        auto shapeAttrValue = tfopInfo.getAttrOperand(i);
         decodeShapeElements(shapeAttrValue, shape);
 
         auto eltSILType =
@@ -582,17 +579,17 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       if (checkStatus(inst->getLoc())) return;
       break;
     }
-    case SILTensorOpInfo::AttributeModifier::Shape: {
+    case SILTensorOpInfo::OperandClass::Shape: {
       SmallVector<int64_t, 4> shape;
-      decodeShapeElements(attrValue, shape);
+      decodeShapeElements(operand, shape);
       TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
       break;
     }
-    case SILTensorOpInfo::AttributeModifier::Array: {
+    case SILTensorOpInfo::OperandClass::Array: {
       // Get all of the elements that contribute to this array value.
       Type eltType;
       SmallVector<SingleValueInstruction*, 4> elements;
-      collectArrayElements(attrValue, eltType, elements);
+      collectArrayElements(operand, eltType, elements);
 
       if (eltType->getString() == "String") {
         SmallVector<const void*, 4> pointers;
@@ -642,7 +639,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       // TODO: TF_SetAttrTypeList
       llvm_unreachable(("unknown attribute array type: " + typeName).c_str());
     }
-    case SILTensorOpInfo::AttributeModifier::ArrayElement:
+    case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("Array elements are handled by the array that "
                        "precedes them");
     }
