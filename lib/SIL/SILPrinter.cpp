@@ -2571,9 +2571,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
      << "\nimport SwiftShims" << "\n\n";
 
-  // Print the declarations and types from the origin module, unless we're not
-  // in whole-module mode.
-  if (M && AssociatedDeclContext == M && PrintASTDecls) {
+  // Print the declarations and types from the associated context (origin module or
+  // current file).
+  if (M && PrintASTDecls) {
     PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
@@ -2583,10 +2583,13 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
     Options.PrintDefaultParameterPlaceholder = false;
+    bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
+      if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
+          continue;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D)) &&
           !D->isImplicit()) {
