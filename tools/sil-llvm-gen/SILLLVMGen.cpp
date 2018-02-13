@@ -204,10 +204,11 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
+  PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
   std::unique_ptr<llvm::Module> Mod =
       performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
                           CI.getMainModule()->getName().str(),
-                          CI.getPrimarySpecificPathsForAtMostOnePrimary(),
+                          PSPs,
                           getGlobalLLVMContext(), ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }
