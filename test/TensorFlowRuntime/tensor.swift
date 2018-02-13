@@ -214,7 +214,7 @@ TensorTests.testCPUAndGPU("ReshapeScalar") {
   expectEqual([], z.shape)
 }
 
-TensorTests.testGPU("StraightLineXORTraining") {
+TensorTests.testCPU("StraightLineXORTraining") {
   // Hyper-parameters
   let iterationCount = 1000
   let learningRate: Float = 0.2
@@ -237,8 +237,7 @@ TensorTests.testGPU("StraightLineXORTraining") {
   )
 
   // Training loop
-  // FIXME: Partitioner bug (b/72997202)
-  // Uncomment for loop when fixed.
+  // FIXME: Loop crasher b/73088003
   // for _ in 0..<iterationCount {
     let z1 = x.dot(w1) + b1
     let h1 = sigmoid(z1)
@@ -246,10 +245,10 @@ TensorTests.testGPU("StraightLineXORTraining") {
     let pred = sigmoid(z2)
 
     let dz2 = pred - y
-    let dw2 = h1.transposed(withPermutations: 1, 0).dot(dz2)
+    let dw2 = h1.transposed().dot(dz2)
     let db2 = dz2.sum(alongAxes: [0])
-    let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
-    let dw1 = x.transposed(withPermutations: 1, 0).dot(dz1)
+    let dz1 = dz2.dot(w2.transposed()) * h1 * (1 - h1)
+    let dw1 = x.transposed().dot(dz1)
     let db1 = dz1.sum(alongAxes: [0])
 
     // Descent
@@ -257,15 +256,21 @@ TensorTests.testGPU("StraightLineXORTraining") {
     b1 -= (db1 * learningRate)
     w2 -= (dw2 * learningRate)
     b2 -= (db2 * learningRate)
+
+    // Update current loss
+    // FIXME: Partitioner bug (b/73260623) turns this into malformed SIL.
+    // Uncommend when fixed.
+    //
+    // loss = dz2.squared().mean()
   // }
+
+  // Check results
+  // expectLT(loss, 0.00001)
 }
 
-// FIXME: Partitioner unreachable: Unmapped value while cloning?
-#if false
-@inline(never)
-func testXORClassifierTraining() {
+TensorTests.testCPU("XORClassifierTraining") {
   struct MLPClassifier {
-    // TODO: randomize weights once we have Tensor.random() implemented.
+    // TODO: randomize weights once we have Tensor(random:) is implemented.
     var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
     var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
     var b1 = Tensor<Float>(zeros: [1, 4])
@@ -278,8 +283,8 @@ func testXORClassifierTraining() {
     @_versioned
     @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
-      let o1 = tanh(x ⊗ w1 + b1)
-      return tanh(o1 ⊗ w2 + b2)
+      let o1 = sigmoid(x ⊗ w1 + b1)
+      return sigmoid(o1 ⊗ w2 + b2)
     }
 
     @_versioned
@@ -302,50 +307,40 @@ func testXORClassifierTraining() {
     @_versioned
     @inline(__always)
     mutating func train(inputBatch x: Tensor<Float>,
-                        outputBatch expected: Tensor<Float>,
+                        outputBatch y: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
-      for _ in 0..<iterationCount {
-        let
-          mmul1 = x ⊗ w1,
-          l1 = mmul1 + b1,
-          o1 = sigmoid(l1),
-          mmul2 = o1 ⊗ w2,
-          l2 = mmul2 + b2,
-          pred = sigmoid(l2)
+      // FIXME: Loop crasher b/73088003
+      // for _ in 0..<iterationCount {
+        let z1 = x.dot(w1) + b1
+        let h1 = sigmoid(z1)
+        let z2 = h1.dot(w2) + b2
+        let pred = sigmoid(z2)
 
-        // Loss
-        let
-          sub = expected - pred,
-          sqr = pow(sub, 2)
-
-        // Gradient
-        let
-          dSqr = 1 / Tensor<Float>(pred.scalarCountTensor),
-          dSub = 2 * sub * dSqr,
-          dPred = -dSub,
-          dL2 = dPred * pred * (1 - pred),
-          dMmul2 = dL2,
-          dB2 = dL2,
-          dO1 = dMmul2 ⊗ w2.transposed(),
-          dW2 = o1.transposed() ⊗ dMmul2,
-          dL1 = dO1 * l1 * (1 - l1),
-          dMmul1 = dL1,
-          dB1 = dL1,
-          dW1 = x ⊗ dMmul1
+        let dz2 = pred - y
+        let dw2 = h1.transposed().dot(dz2)
+        let db2 = dz2.sum(alongAxes: [0])
+        let dz1 = dz2.dot(w2.transposed()) * h1 * (1 - h1)
+        let dw1 = x.transposed().dot(dz1)
+        let db1 = dz1.sum(alongAxes: [0])
 
         // Descent
-        w1 -= (dW1 * learningRate)
-        b1 -= (dB1 * learningRate)
-        w2 -= (dW2 * learningRate)
-        b2 -= (dB2 * learningRate)
-      }
+        w1 -= (dw1 * learningRate)
+        b1 -= (db1 * learningRate)
+        w2 -= (dw2 * learningRate)
+        b2 -= (db2 * learningRate)
+      // }
     }
   }
 
   var classifier = MLPClassifier()
   classifier.train(
-    inputBatch: Tensor<Float>([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]),
-    outputBatch: Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]),
+    inputBatch: Tensor<Float>(shape: [4, 2],
+                              scalars: [0.0, 0.0,
+                                        0.0, 1.0,
+                                        1.0, 0.0,
+                                        1.0, 1.0]),
+    outputBatch: Tensor<Float>(shape: [4, 1],
+                               scalars: [0.0, 1.0, 1.0, 0.0]),
     iterationCount: 1000,
     learningRate: 0.2
   )
@@ -355,8 +350,6 @@ func testXORClassifierTraining() {
   // expectEqual(classifier.prediction(for: true, false), true)
   // expectEqual(classifier.prediction(for: true, true), false)
 }
-TensorTests.testCPUAndGPU("XORClassifierTraining", testXORClassifierTraining)
-#endif
 
 @inline(never)
 func testRankGetter() {
