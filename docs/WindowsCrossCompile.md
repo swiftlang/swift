@@ -42,6 +42,6 @@ Additionally, the ICU headers and libraries need to be provided for the build.
   -DSWIFT_SDKS=WINDOWS, \
   -DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>, \
   -DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>, \
-  -DSWIFT_WINDOWS_ICU_I18N_LIB=<path to ICU i18n lib>, \
-  -DSWIFT_WINDOWS_ICU_UC_LIB=<path to ICU UC lib>
+  -DSWIFT_WINDOWS_ICU_I18N=<path to ICU i18n lib>, \
+  -DSWIFT_WINDOWS_ICU_UC=<path to ICU UC lib>
 ```
