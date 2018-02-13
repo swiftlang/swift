@@ -749,7 +749,7 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   ModuleDecl *mainModule = getMainModule();
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, importKind,
-                 Invocation.getLangOptions().CollectSyntaxToken,
+                 Invocation.getLangOptions().CollectParsedToken,
                  Invocation.getLangOptions().BuildSyntaxTree);
   MainModule->addFile(*inputFile);
 

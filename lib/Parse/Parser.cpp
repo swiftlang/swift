@@ -982,7 +982,7 @@ struct ParserUnit::Implementation {
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectSyntaxToken,
+            Opts.CollectParsedToken,
             Opts.BuildSyntaxTree)) {
   }
 };

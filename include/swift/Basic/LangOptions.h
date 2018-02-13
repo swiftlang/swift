@@ -253,7 +253,7 @@ namespace swift {
     bool FixStringToSubstringConversions = false;
 
     /// Whether collect tokens during parsing for syntax coloring.
-    bool CollectSyntaxToken = false;
+    bool CollectParsedToken = false;
 
     /// Whether to parse syntax tree.
     bool BuildSyntaxTree = false;
