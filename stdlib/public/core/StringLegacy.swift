@@ -56,15 +56,11 @@ extension String {
     precondition(count > 0, "Negative count not allowed")
     self = _visitGuts(repeatedValue._guts, range: nil, args: count,
       ascii: { ascii, count in
-        return String(_StringGuts(_large: ascii._repeated(count)))
-      },
+        return String(_StringGuts(_large: ascii._repeated(count))) },
       utf16: { utf16, count in
-        return String(_StringGuts(_large: utf16._repeated(count)))
-      },
+        return String(_StringGuts(_large: utf16._repeated(count))) },
       opaque: { opaque, count in
-        return String(_StringGuts(_large: opaque._repeated(count)))
-      }
-    )
+        return String(_StringGuts(_large: opaque._repeated(count))) })
   }
 
   /// A Boolean value indicating whether a string has no characters.

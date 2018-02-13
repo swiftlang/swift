@@ -155,16 +155,13 @@ extension FixedWidthInteger {
       range: (range, false), args: r,
       ascii: { view, radix in
         var i = view.makeIterator()
-        return _parseASCII(codeUnits: &i, radix: radix)
-      },
+        return _parseASCII(codeUnits: &i, radix: radix) },
       utf16: { view, radix in
         var i = view.makeIterator()
-        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix)
-      },
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) },
       opaque: { view, radix in
         var i = view.makeIterator()
-        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix)
-      }
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) }
     )
 
     guard _fastPath(result != nil) else { return nil }
