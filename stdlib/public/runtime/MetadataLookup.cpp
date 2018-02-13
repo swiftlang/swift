@@ -46,6 +46,21 @@ using namespace reflection;
 #include <objc/objc.h>
 #endif
 
+/// Produce a Demangler value suitable for resolving runtime type metadata
+/// strings.
+static Demangler getDemanglerForRuntimeTypeResolution() {
+  Demangler dem;
+  // Resolve symbolic references to type contexts into the absolute address of
+  // the type context descriptor, so that if we see a symbolic reference in the
+  // mangled name we can immediately find the associated metadata.
+  dem.setSymbolicReferenceResolver([&](int32_t offset,
+                                       const void *base) -> NodePointer {
+    auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
+    return dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
+  });
+  return dem;
+}
+
 template <typename T> struct DescriptorCacheEntry {
 private:
   std::string Name;
@@ -162,6 +177,14 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     node = node->getChild(0);
 
   while (context) {
+    // We can directly match symbolic references to the current context.
+    if (node && node->getKind() == Demangle::Node::Kind::SymbolicReference) {
+      if (equalContexts(context, reinterpret_cast<const ContextDescriptor *>(
+                                     node->getIndex()))) {
+        return true;
+      }
+    }
+
     switch (context->getKind()) {
     case ContextDescriptorKind::Module: {
       auto module = cast<ModuleContextDescriptor>(context);
@@ -935,7 +958,7 @@ public:
 TypeInfo
 swift::_getTypeByMangledName(StringRef typeName,
                              SubstGenericParameterFn substGenericParam) {
-  Demangler demangler;
+  auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
@@ -949,16 +972,6 @@ swift::_getTypeByMangledName(StringRef typeName,
       return llvm::StringRef::npos;
     return dotPos;
   };
-
-  // Resolve symbolic references to type contexts into the absolute address of
-  // the type context descriptor, so that if we see a symbolic reference in the
-  // mangled name we can immediately find the associated metadata.
-  demangler.setSymbolicReferenceResolver(
-    [&](int32_t offset, const void *base) -> NodePointer {
-      auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
-      return demangler.createNode(Node::Kind::SymbolicReference,
-                                  absolute_addr);
-    });
 
   auto dotPos = getDotPosForConvenienceSyntax();
   if (dotPos != llvm::StringRef::npos) {
@@ -1081,7 +1094,7 @@ void swift::swift_getFieldAt(
 
   };
 
-  Demangler dem;
+  auto dem = getDemanglerForRuntimeTypeResolution();
   auto &cache = FieldCache.get();
   auto isRequestedDescriptor = [&](const FieldDescriptor &descriptor) {
     assert(descriptor.hasMangledTypeName());
