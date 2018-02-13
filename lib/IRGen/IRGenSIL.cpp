@@ -1056,6 +1056,7 @@ public:
   void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *i);
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *i);
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
+  void visitValueToBridgeObjectInst(ValueToBridgeObjectInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitTailAddrInst(TailAddrInst *i);
@@ -4705,6 +4706,18 @@ visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *i) {
   setLoweredExplosion(i, wordEx);
 }
 
+void IRGenSILFunction::visitValueToBridgeObjectInst(
+    ValueToBridgeObjectInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out;
+
+  emitValueBitwiseCast(
+      *this, i->getLoc().getSourceLoc(), in,
+      cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType())), out,
+      cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
+
+  setLoweredExplosion(i, out);
+}
 
 void IRGenSILFunction::visitBridgeObjectToRefInst(
                                               swift::BridgeObjectToRefInst *i) {

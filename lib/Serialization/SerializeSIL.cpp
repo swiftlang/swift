@@ -1100,6 +1100,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::CopyBlockInst:

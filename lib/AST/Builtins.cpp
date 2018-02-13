@@ -265,6 +265,10 @@ static ValueDecl *getGepRawOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getStringObjectOrOperation(Identifier Id, Type ArgType) {
+  return getBuiltinFunction(Id, {ArgType, ArgType}, ArgType);
+}
+
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, { ArgType, ArgType }, ArgType);
@@ -880,6 +884,13 @@ static ValueDecl *getClassifyBridgeObject(ASTContext &C, Identifier Id) {
   }, C);
 
   return getBuiltinFunction(Id, { C.TheBridgeObjectType }, resultTy);
+}
+
+static ValueDecl *getValueToBridgeObject(ASTContext &C, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(C);
+  builder.addParameter(makeGenericParam(0));
+  builder.setResult(makeConcrete(C.TheBridgeObjectType));
+  return builder.build(Id);
 }
 
 static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
@@ -1621,6 +1632,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepRawOperation(Id, Types[0]);
 
+  case BuiltinValueKind::StringObjectOr:
+    if (Types.size() != 1)
+      return nullptr;
+    return getStringObjectOrOperation(Id, Types[0]);
+
   case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
@@ -1820,6 +1836,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ClassifyBridgeObject:
     if (!Types.empty()) return nullptr;
     return getClassifyBridgeObject(Context, Id);
+  case BuiltinValueKind::ValueToBridgeObject:
+    if (!Types.empty())
+      return nullptr;
+    return getValueToBridgeObject(Context, Id);
   case BuiltinValueKind::UnsafeGuaranteed:
     return getUnsafeGuaranteed(Context, Id);
 

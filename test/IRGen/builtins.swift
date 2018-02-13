@@ -840,6 +840,15 @@ func atomicload(_ p: Builtin.RawPointer) {
   Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
 }
 
+// CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
+// CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: %2 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %2
+func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
+  return UInt(Builtin.stringObjectOr_Int64(
+  x._value, y._value))
+}
+
 func createInt(_ fn: () -> ()) throws {}
 // CHECK-LABEL: define {{.*}}testForceTry
 // CHECK: call swiftcc void @swift_unexpectedError(%swift.error*

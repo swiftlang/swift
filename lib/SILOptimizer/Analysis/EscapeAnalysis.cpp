@@ -1387,6 +1387,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::ClassifyBridgeObjectInst:
+    case SILInstructionKind::ValueToBridgeObjectInst:
       // These instructions don't have any effect on escaping.
       return;
     case SILInstructionKind::StrongReleaseInst:
