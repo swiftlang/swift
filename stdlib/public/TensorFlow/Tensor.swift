@@ -28,6 +28,7 @@ import CTensorFlow
 // Tensor type
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout
 public struct Tensor<Scalar : AccelerableByTensorFlow> {
   /// A tensor just contains a TensorHandle under the covers.  This is public to
   /// allow user defined ops, but shouldn't normally be used otherwise.

@@ -108,6 +108,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   @_versioned
   @_inlineable @inline(__always)
   internal init(base: Tensor<Scalar>) {
+    self.init()
     self.base = base
   }
 
