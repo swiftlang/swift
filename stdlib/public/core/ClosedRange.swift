@@ -167,8 +167,9 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable 
-where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+extension ClosedRange.Index: Hashable
+  where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     switch self {
     case .inRange(let value):
@@ -376,9 +377,19 @@ extension ClosedRange: Equatable {
   }
 }
 
+extension ClosedRange : Hashable where Bound : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    var result = 0
+    result = _combineHashValues(result, lowerBound.hashValue)
+    result = _combineHashValues(result, upperBound.hashValue)
+    return result
+  }
+}
+
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @_inlineable // FIXME(sil-serialize-all)...\(
+  @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }

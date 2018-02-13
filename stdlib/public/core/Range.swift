@@ -358,6 +358,16 @@ extension Range: Equatable {
   }
 }
 
+extension Range : Hashable where Bound : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    var result = 0
+    result = _combineHashValues(result, lowerBound.hashValue)
+    result = _combineHashValues(result, upperBound.hashValue)
+    return result
+  }
+}
+
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range

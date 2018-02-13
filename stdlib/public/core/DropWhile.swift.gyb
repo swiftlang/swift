@@ -141,6 +141,7 @@ public struct LazyDropWhileIndex<Base : Collection> : Comparable {
 }
 
 extension LazyDropWhileIndex : Hashable where Base.Index : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
   }

@@ -194,6 +194,7 @@ extension ReversedCollection.Index: Comparable {
 }
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
   }

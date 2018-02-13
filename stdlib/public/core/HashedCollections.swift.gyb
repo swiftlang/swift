@@ -37,9 +37,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +------------------------------------------------+
-//   |  _VariantDictionaryBuffer<K,V> (an enum)      |
+//   |  _VariantDictionaryBuffer<K,V> (an enum)       |
 //   | +--------------------------------------------+ |
-//   | | [_NativeDictionaryBuffer<K,V> (a struct)] | |
+//   | | [_NativeDictionaryBuffer<K,V> (a struct)]  | |
 //   | +---|----------------------------------------+ |
 //   +----/-------------------------------------------+
 //       /
@@ -61,9 +61,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +----------------------------------------------+
-//   | _VariantDictionaryBuffer<K,V> (an enum)     |
+//   | _VariantDictionaryBuffer<K,V> (an enum)      |
 //   | +----------------------------------------+   |
-//   | | [ _CocoaDictionaryBuffer (a struct) ] |   |
+//   | | [ _CocoaDictionaryBuffer (a struct) ]  |   |
 //   | +---|------------------------------------+   |
 //   +-----|----------------------------------------+
 //         |
@@ -2783,6 +2783,25 @@ extension Dictionary : Equatable where Value : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func != (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
     return !(lhs == rhs)
+  }
+}
+
+extension Dictionary : Hashable where Value : Hashable {
+  /// The hash value for the dictionary.
+  ///
+  /// Two dictionaries that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Dictionary<T> hashValue
+    var result = 0
+    for (k, v) in self {
+      let combined = _combineHashValues(k.hashValue, v.hashValue)
+      result ^= _mixInt(combined)
+    }
+    return result
   }
 }
 

@@ -232,8 +232,12 @@ extension FlattenCollection.Index : Comparable {
 
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
+    var result = 0
+    result = _combineHashValues(result, _inner.hashValue)
+    result = _combineHashValues(result, _outer.hashValue)
+    return result
   }
 }
 

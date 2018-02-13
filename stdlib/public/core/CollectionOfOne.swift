@@ -136,6 +136,20 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+extension CollectionOfOne : Equatable, _Equatable where Element : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _isEqual(to other: CollectionOfOne) -> Bool {
+    return _element == other._element
+  }
+}
+
+extension CollectionOfOne : Hashable where Element : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _element.hashValue
+  }
+}
+
 extension CollectionOfOne : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)

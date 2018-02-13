@@ -2250,6 +2250,18 @@ extension ${Self} : Equatable where Element : Equatable {
   }
 }
 
+extension ${Self} : Hashable where Element : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Array too
+    var result = 0
+    for element in self {
+      result = _combineHashValues(result, element.hashValue)
+    }
+    return result
+  }
+}
+
 extension ${Self} {
   /// Calls the given closure with a pointer to the underlying bytes of the
   /// array's mutable contiguous storage.

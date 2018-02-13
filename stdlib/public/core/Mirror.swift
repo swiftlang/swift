@@ -905,6 +905,29 @@ extension DictionaryLiteral : RandomAccessCollection {
   }
 }
 
+extension DictionaryLiteral : Equatable, _Equatable
+  where Key : Equatable, Value : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _isEqual(to other: DictionaryLiteral) -> Bool {
+    if count != other.count { return false }
+    return elementsEqual(other, by: ==)
+  }
+}
+
+extension DictionaryLiteral : Hashable where Key : Hashable, Value : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
+    var result = 0
+    for element in self {
+      let elementHashValue =
+        _combineHashValues(element.key.hashValue, element.value.hashValue)
+      result = _combineHashValues(result, elementHashValue)
+    }
+    return result
+  }
+}
+
 extension String {
   /// Creates a string representing the given value.
   ///

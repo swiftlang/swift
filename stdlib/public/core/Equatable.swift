@@ -195,6 +195,46 @@ extension Equatable {
   }
 }
 
+// FIXME(ABI): Remove this protocol when `@_implements` is supported in
+// conditional conformances.
+//
+// Ordinarily, we don't have to worry about adding new methods to types in the
+// standard library. If end users have added identically named methods in their
+// own extensions, those will seamlessly shadow our methods without any source
+// breakage.
+//
+// However, if we add new methods that are spelled as _operators_ to types in
+// the standard library, then any identically named methods implemented by end
+// users will cause ambiguity at the call site. This prevents the addition of
+// conditional conformance to `Equatable` to types where users may have already
+// defined `==` for themselves.
+//
+// The underscored attribute `@_implements` was created to work around these
+// limitations for derived conformances. However, at present, we can't use the
+// same attribute for conditional conformances because the attribute doesn't
+// work inside extensions (SR-NNNN).
+//
+// What _does_ work, however, is a conceptually similar design where we add only
+// methods that aren't spelled as operators to the concrete type. Meanwhile, the
+// protocol itself would provide a default implementation of the method that
+// _is_ spelled as an operator, which in turn calls the non-operator method.
+// With such a design, any operator method of the same name defined by the end
+// user is selected preferentially over the protocol's default implementation.
+//
+// Such is the purpose of the following underscored protocol.
+
+public protocol _Equatable: Equatable {
+  func _isEqual(to other: Self) -> Bool
+}
+
+extension _Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs._isEqual(to: rhs)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Reference comparison
 //===----------------------------------------------------------------------===//
