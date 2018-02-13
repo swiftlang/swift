@@ -267,3 +267,8 @@ class Bar {
     let _: Int = result // expected-error{{cannot convert value of type 'X?' to specified type 'Int'}}
   }
 }
+
+// rdar://problem/37508855
+func rdar37508855(_ e1: X?, _ e2: X?) -> [X] {
+  return [e1, e2].filter { $0 == nil }.map { $0! }
+}
