@@ -63,6 +63,41 @@ bool tf::isTensorHandle(SILType ty) {
   return (bool)isTensorHandle(ty.getSwiftRValueType());
 }
 
+/// If the specified type conforms to the TensorProtocol protocol, return the
+/// Scalar type for it.  Otherwise return a null type.
+static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
+  auto nominal = ty->getAnyNominal();
+
+  auto &ctx = ty->getASTContext();
+  auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
+  if (!tensorProto || !nominal) return Type();
+
+  SmallVector<ProtocolConformance*, 2> conformances;
+  nominal->lookupConformance(/*unused module*/nullptr, tensorProto,
+                             conformances);
+  if (conformances.size() != 1)
+    return Type();
+
+  auto scalarMembers =
+    nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
+  if (scalarMembers.size() != 1)
+    return Type();
+  if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
+    return ty->getTypeOfMember(module, member,
+                               member->getDeclaredInterfaceType());
+  return Type();
+}
+
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
+
 static bool is64(Type ty) {
   return ty->getASTContext().LangOpts.Target.isArch64Bit();
 }
@@ -131,14 +166,6 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
-/// If the specified type is a Swift.Array or some element type, then return the
-/// element type.  Otherwise, return a null Type.
-static Type getArrayElementType(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
-  return Type();
-}
 
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
@@ -485,35 +512,10 @@ bool SILTensorOpInfo::decodeBuiltin() {
     return false;
   }
 
-  // Check all the input operands to this builtin to make sure any scalar values
-  // can be resolved.  We don't have to check the actual values passed into
-  // attributes here - they get checked in a separate pass so we can diagnose
-  // errors better.
-  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-    auto op = inst->getOperand(i);
-
-    if (!isInput(i))
-      continue;
-
-    // Input operands can be either a TensorHandle or a scalar.
-    if (isTensorHandle(op->getType()))
-      continue;
-
-    // If it isn't a TensorHandle, it is a scalar.
-    op = getScalarOperand(op);
-
-    auto scalarType = op->getType().getSwiftRValueType();
-    if (convertSwiftTypeToTF(scalarType) == 0) {
-      diagInvalid("operand has unrecognized type '" +
-                  scalarType->getString() + "'");
-      return SILValue();
-    }
-  }
-
   return true;
 }
 
-/// addTensorOperand - Decode the specified array value (which should be an
+/// expandArrayAttribute - Decode the specified array value (which should be an
 /// array of constant integer or fp values) and add it as a value$tensor operand
 /// to the specified op that is being built up.  This returns false if the
 /// operand is not an array of constant values.
@@ -739,6 +741,7 @@ const char *SILTensorOpInfo::
 getOperandClassSuffix(OperandClass opClass) {
   switch (opClass) {
   case OperandClass::Input: return "$in";
+  case OperandClass::InputElt: return "$inelt";
   case OperandClass::Normal: return "";
   case OperandClass::DType: return "$dtype";
   case OperandClass::Tensor: return "$tensor";
@@ -753,6 +756,7 @@ llvm::Optional<OperandClass>
 SILTensorOpInfo::getOperandClass(StringRef suffix) {
   return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
                   .Case("in", OperandClass::Input)
+                  .Case("inelt", OperandClass::InputElt)
                   .Case("", OperandClass::Normal)
                   .Case("tensor", OperandClass::Tensor)
                   .Case("shape", OperandClass::Shape)
@@ -765,27 +769,65 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
 
 /// Verify that any attribute operands are passed acceptable constants,
 /// returning a non-empty error string to emit if that is not the case.
-std::string SILTensorOpInfo::checkAttributeConstants() const {
+std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
   // Attribute values require constant values.  If we don't have one then this
   // op is invalid and must be rejected.
   for (unsigned i = 0, e = operandClasses.size(); i != e; ++i) {
-    auto attr = operandClasses[i];
-    if (attr.second == OperandClass::Input)
-      continue;
+    auto operand = inst->getOperand(i);
+    auto opClass = operandClasses[i];
 
-    auto operand = getAttrOperand(i);
-    if (!operand)
-      return "attribute '" + attr.first.str() +"' requires a constant argument";
+    // If this is an attribute, make sure that it simplifies down according to
+    // our attribute requirements.
+    if (!isInput(i)) {
+      operand = getAttrOperand(operand);
+      if (!operand)
+        return "attribute '" + opClass.first.str() +
+               "' requires a constant argument";
+    }
 
     // Check additional requirements imposed by attribute modifiers.
-    switch (attr.second) {
-    case OperandClass::Input:
-      llvm_unreachable("handled above");
+    switch (opClass.second) {
+    case OperandClass::Input: {
+      auto opTy = operand->getType();
+      // TensorHandle and metatype inputs are ok.
+      if (isTensorHandle(opTy) || opTy.is<MetatypeType>())
+        break;
+
+      // If this is an Array of TensorHandle or TensorProtocol we're good.
+      if (auto elt = getArrayElementType(opTy.getSwiftRValueType())) {
+        if (!isTensorHandle(elt) &&
+            !conformsToTensorProtocol(elt, inst->getModule().getSwiftModule()))
+          return "array element has unrecognized type '" + elt->getString() +
+                 "'";
+        // Ok, the array itself looks fine, try to decode the array constant
+        // value.
+        SmallVector<SILValue, 8> elements;
+        Type elementType;
+        if (!decodeArrayElements(operand, elements, elementType))
+          return "array input is not a constant array of tensors";
+        break;
+      }
+
+      // If it isn't a TensorHandle or metatype, it must be a scalar.
+      auto scalar = getScalarOperand(operand);
+
+      auto scalarType = scalar->getType().getSwiftRValueType();
+      if (convertSwiftTypeToTF(scalarType) == 0)
+        return "operand has unrecognized type '" +
+               operand->getType().getSwiftRValueType()->getString() + "'";
+      break;
+    }
+    case OperandClass::InputElt: // InputList elements must be TensorHandle's.
+      if (!isTensorHandle(operand->getType()))
+        return "input list elements must be TensorHandle";
+      break;
+
     case OperandClass::Normal:  // No modifier.
       break;
     case OperandClass::DType:   // This integer value is a dtype.
       if (!isa<IntegerLiteralInst>(operand))
-        return "attribute '" + attr.first.str()+"' requires a constant integer";
+        return "attribute '" + opClass.first.str() +
+               "' requires a constant integer";
       break;
     case OperandClass::Shape:
     case OperandClass::Array:
@@ -793,7 +835,7 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
       // followed by array element values.
       if (isa<MetatypeInst>(operand))
         break;
-      return "attribute '" + attr.first.str() +
+      return "attribute '" + opClass.first.str() +
         "' requires a constant integer or floating point constant";
 
     case OperandClass::ArrayElement:
@@ -801,7 +843,7 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
       if (isa<IntegerLiteralInst>(operand) ||
           isa<FloatLiteralInst>(operand))
         break;
-      return "attribute '" + attr.first.str() +
+      return "attribute '" + opClass.first.str() +
         "' requires a constant integer or floating point constant";
 
     case OperandClass::Tensor:
@@ -821,20 +863,20 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
         Type scalarsElementType;
         SmallVector<SILValue, 16> scalars;
         if (!decodeArrayElements(operand, scalars, scalarsElementType)) {
-          return "attribute '" + attr.first.str() +
+          return "attribute '" + opClass.first.str() +
                  "' requires an array of constant values";
         }
 
         // Check that all the elements are constants.
         for (auto elt : scalars) {
           if (!getAttrOperand(elt))
-            return "attribute '" + attr.first.str() +
+            return "attribute '" + opClass.first.str() +
                    "' requires an array of constant values";
         }
 
         // The next operand must be a shape.
         if (i+1 >= operandClasses.size() ||
-            attr.first != operandClasses[i].first ||
+            opClass.first != operandClasses[i].first ||
             operandClasses[i+1].second != OperandClass::Shape) {
           // If we have a call to a well-known C function that will be promoted
           // to a tensor op, then we don't need a shape, it will be synthesized
@@ -842,18 +884,19 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
           if (isa<ApplyInst>(inst))
             break;
 
-          return "tensor array attribute '" + attr.first.str() +
+          return "tensor array attribute '" + opClass.first.str() +
                  "' must be followed by a shape";
         }
 
         auto shapeOperand = getAttrOperand(++i);
         if (!shapeOperand || !isa<StructInst>(shapeOperand))
-          return "attribute '" + attr.first.str() + "' has invalid shape";
+          return "attribute '" + opClass.first.str() + "' has invalid shape";
 
         Type shapeElementType;
         SmallVector<SILValue, 4> shape;
         if (!decodeArrayElements(shapeOperand, shape, shapeElementType))
-          return "attribute '" + attr.first.str() + "' has non-constant shape";
+          return "attribute '" + opClass.first.str() +
+                 "' has non-constant shape";
 
         // Verify we have the right number of scalars.
         uint64_t scalarCount = 1;
@@ -861,7 +904,8 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
           auto *eltCst =
             dyn_cast_or_null<IntegerLiteralInst>(getAttrOperand(elt));
           if (!eltCst)
-            return "attribute '" + attr.first.str() + "' has non-constant shape";
+            return "attribute '" + opClass.first.str() +
+                   "' has non-constant shape";
 
           scalarCount *= eltCst->getValue().getLimitedValue();
         }
@@ -873,14 +917,48 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
         break;
       }
 
-      return "attribute '" + attr.first.str() +
-        "' requires a constant integer or floating point constant";
+      return "attribute '" + opClass.first.str() +
+             "' requires a constant integer or floating point constant";
     }
   }
 
   // Otherwise everything is ok.
   return "";
 }
+
+/// Given something that conforms to the TensorProtocol protocol, extract the
+/// 'handle' out of it.
+static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                              SILBuilder &B) {
+  assert(v->getType().getSwiftRValueType()->getStructOrBoundGenericStruct() &&
+         "Support more general conformances to TensorProtocol");
+
+  // TODO(clattner): it would be more correct to generate a call to an accessor
+  // to get the handle out, but for now, we know we're always dealing with types
+  // that store the field by-value so we can dig it out in with an easier
+  // approach.
+  auto decl = v->getType().getNominalOrBoundGenericNominal();
+  assert(decl && "Type must be nominal to conform to TensorProtocol");
+
+  auto fieldIt = decl->getStoredProperties().begin();
+  assert(fieldIt != decl->getStoredProperties().end() &&
+         "Tensor should have one member");
+  VarDecl *field = *fieldIt++;
+  assert(fieldIt == decl->getStoredProperties().end() &&
+         "Expected one stored field in TensorProtocol type");
+
+  // Form TensorHandle<Scalar>.
+  Type scalarTy = v->getType().getSwiftRValueType();
+  scalarTy = conformsToTensorProtocol(scalarTy, B.getModule().getSwiftModule());
+
+  auto handleDecl = scalarTy->getASTContext().getTensorHandleDecl();
+  auto handleType =
+    BoundGenericClassType::get(handleDecl, /*parent*/Type(), scalarTy);
+
+  auto silTy = SILType::getPrimitiveObjectType(handleType->getCanonicalType());
+  return B.createStructExtract(loc, v, field, silTy);
+}
+
 
 /// Replace any indirect memory operands with direct references to the
 /// scalars they reference.  This potentially replaces the builtin
@@ -899,12 +977,62 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
       "," + opInfo.first.str() + getOperandClassSuffix(opInfo.second);
 
     // Handle inputs.
-    if (operandClasses[i].second == OperandClass::Input) {
-      if (!isTensorHandle(operand->getType()))
-        operand = getScalarOperand(operand);
+    if (isInput(i)) {
+      auto opTy = operand->getType();
+      if (isTensorHandle(opTy) || opTy.is<MetatypeType>()) {
+        // TensorHandle's and MetaTypes are already fine.
+        operands.push_back(operand);
+        name += opName;
+        continue;
+      }
 
-      operands.push_back(operand);
-      name += opName;
+      // Non-array values are scalars.
+      auto elt = getArrayElementType(opTy.getSwiftRValueType());
+      if (!elt) {
+        operand = getScalarOperand(operand);
+        operands.push_back(operand);
+        name += opName;
+        continue;
+      }
+
+      // If this is an Array of TensorHandle or TensorProtocol then we need
+      // to flatten this into its component.
+      SmallVector<SILValue, 8> elements;
+      Type elementType;
+      bool isArray = decodeArrayElements(operand, elements, elementType);
+      assert(isArray && "Invalid case got through checking pass?");
+
+
+      // If we have an array of TensorProtocol values, we have to extract the
+      // tensor handle out of them.
+      if (!isTensorHandle(elementType)) {
+        // It is common to have arrays with repeated elements.  These will
+        // generally be uniqued on entry to this routine.  If so, make sure to
+        // reuse them as we project out the .handle members to avoid code bloat.
+        llvm::DenseMap<SILValue, SILValue> loweredElts;
+        for (auto &elt : elements) {
+          auto &eltVal = loweredElts[elt];
+          if (!eltVal)
+            eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
+          elt = eltVal;
+        }
+      }
+
+      // Add the metatype marker so we know that there is an array of elements.
+      auto metatypeType =
+        MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+          ->getCanonicalType();
+      operands.push_back(B.createMetatype(inst->getLoc(),
+                              SILType::getPrimitiveObjectType(metatypeType)));
+      name += ",$in";
+
+      // Add one element operand for each element of the array.
+      for (auto elt : elements) {
+        assert(isTensorHandle(elt->getType()) && "elements should be lowered");
+        operands.push_back(elt);
+        name += ",$inelt";
+      }
+
       continue;
     }
 

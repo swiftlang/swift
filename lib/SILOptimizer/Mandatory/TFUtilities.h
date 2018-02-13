@@ -56,9 +56,15 @@ namespace tf {
     /// input that is an array of tensors.  An integer attribute may be either
     /// a Tensor value or an integer-encoded DType, etc.
     enum class OperandClass {
-      /// This is a tensor input, or if the value is a metatype, then the start
-      /// of an array of tensor inputs.
+      /// This marks three sorts of things:
+      /// 1) A normal tensor input: the value is a TensorHandle.
+      /// 2) A scalar input suitable for scalar promotion, used by the
+      ///    tf.scalarToTensor pseudo-op, the value is a scalar value.
+      /// 3) A tensor array (TensorFlow "InputList").  The value is a metatype
+      ///    marker value (so we can represent empty arrays) followed by
+      ///    InputElt elements that make up the array.
       Input,
+      InputElt,     // Element of an input list.  Always a TensorHandle.
 
       Normal,       // No modifier.
       DType,        // This integer value is a dtype.
@@ -80,7 +86,8 @@ namespace tf {
 
     /// Return true if the specified operand is an input (not an attribute).
     bool isInput(unsigned operandNumber) const {
-      return operandClasses[operandNumber].second == OperandClass::Input;
+      return operandClasses[operandNumber].second == OperandClass::Input ||
+             operandClasses[operandNumber].second == OperandClass::InputElt;
     }
 
 
@@ -94,9 +101,10 @@ namespace tf {
     /// way that SILTensorOpInfo's are created.
     static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
 
-    /// Verify that any attribute operands are passed acceptable constants,
-    /// returning a non-empty error string to emit if that is not the case.
-    std::string checkAttributeConstants() const;
+    /// Verify that all operands to this op are correctly formed, e.g. that
+    /// attribute operands are passed acceptable constants.  This returns a
+    /// non-empty error string to emit if an error is detected.
+    std::string checkAndDiagnoseOperands() const;
 
     /// Replace any indirect memory operands with direct references to the
     /// scalars they reference.  This potentially replaces the builtin

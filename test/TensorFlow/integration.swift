@@ -327,3 +327,25 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 
 
 
+// expected-warning @+1 2 {{implicitly copied to the accelerator}}
+public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> Tensor<Float> {
+  // Pack takes an input list, not multiple inputs.  Here we're checking that
+  // we can pass in an array of Tensor's and an array of TensorHandle's.
+  let x: Tensor<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
+  let y: Tensor<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
+  return (x+y).toHost()
+}
+
+/*
+ CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testInputListArguments
+ CHECK: sil private @{{.*}}testInputListArguments{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+ CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+ CHECK:   %2 = metatype $@thin TensorHandle<Float>.Type
+ CHECK:   %3 = builtin "__tfop_Pack,$in,$inelt,$inelt,$inelt"(%2 : $@thin TensorHandle<Float>.Type, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK:  %4 = metatype $@thin Tensor<Float>.Type
+ CHECK:  %5 = builtin "__tfop_Pack,$in,$inelt,$inelt,$inelt"(%4 : $@thin Tensor<Float>.Type, %1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK:  %6 = builtin "__tfop_Add,$in,$in"(%3 : $TensorHandle<Float>, %5 : $TensorHandle<Float>) : $TensorHandle<Float>
+ CHECK:  return %6 : $TensorHandle<Float>
+ CHECK: }
+*/
+

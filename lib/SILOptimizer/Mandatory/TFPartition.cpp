@@ -982,7 +982,9 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
   for (unsigned i = 0, e = inst.getNumOperands(); i != e; ++i) {
     // Tensor and scalar input operands are recursively marked.
-    if (tfopInfo.isInput(i))
+    if (tfopInfo.isInput(i) &&
+        // Don't mark the array designator.
+        !inst.getOperand(i)->getType().is<MetatypeType>())
       markValue(inst.getOperand(i), &inst);
   }
 }
@@ -1319,7 +1321,7 @@ bool TFFunctionPartition::markFunction() {
 
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
-      auto error = opInfo->checkAttributeConstants();
+      auto error = opInfo->checkAndDiagnoseOperands();
       if (!error.empty()) {
         // TODO: improve the diagnostic to talk about the parameter label in the
         // user code, not the internal op attribute.  The bookkeeping for this
@@ -1704,8 +1706,7 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands();
        i != e; ++i) {
     auto opValue = inst->getOperand(i);
-    if (tfopInfo.isInput(i)) {
-      assert(isTensorHandle(opValue->getType()) && "expected tensor input");
+    if (isTensorHandle(opValue->getType())) {
       // Tensor operands just become operands.
       args.push_back(remapValue(opValue));
     } else {
