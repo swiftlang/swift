@@ -746,9 +746,14 @@ void ClosureSpecCloner::populateCloned() {
       TermInst *TI = OpBB->getTerminator();
       auto Loc = CleanupLocation::get(NewClosure->getLoc());
 
-      // If we have a return, we place the release right before it so we know
+      // If we have a return/throw, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
+        Builder.setInsertionPoint(TI);
+        Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                   Builder.getDefaultAtomicity());
+        continue;
+      } else if (isa<ThrowInst>(TI)) {
         Builder.setInsertionPoint(TI);
         Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                    Builder.getDefaultAtomicity());
