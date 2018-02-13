@@ -11,7 +11,9 @@ endif()
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
-list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
+if(SWIFT_BUILD_SOURCEKIT)
+  list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
+endif()
 
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(sil-opt)
