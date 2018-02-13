@@ -360,3 +360,11 @@ func passesConditionallyNotF7(x21: X2<X1>) {
   // expected-note@-2{{requirement specified as 'X1.A' (aka 'X0') : 'P7'}}
   // expected-note@-3{{requirement from conditional conformance of 'X2<X1>' to 'P7'}}
 }
+
+
+public struct SR6990<T, U> {}
+extension SR6990: Sequence where T == Int {
+    public typealias Element = Float
+    public typealias Iterator = IndexingIterator<[Float]>
+    public func makeIterator() -> Iterator { fatalError() }
+}
