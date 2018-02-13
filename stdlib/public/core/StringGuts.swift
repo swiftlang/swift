@@ -298,16 +298,6 @@ extension _StringGuts {
 }
 #else // !_runtime(_ObjC)
 extension _StringGuts {
-  @_versioned
-  @_inlineable
-  internal
-  var _opaqueCount: Int {
-    @inline(__always) get {
-      _sanityCheck(_object.isOpaque)
-      return Int(bitPattern: _otherBits)
-    }
-  }
-
   // TODO(SSO): consider a small-checking variant
   @inline(never)
   @_versioned
@@ -894,7 +884,11 @@ extension _StringGuts {
   internal var _opaqueCount: Int {
     _sanityCheck(_isOpaque)
     defer { _fixLifetime(self) }
+#if _runtime(_ObjC)
     return _asOpaque().count
+#else
+    return Int(bitPattern: _otherBits)
+#endif
   }
 
   @_inlineable
