@@ -248,8 +248,8 @@ internal extension _ShapedArrayProtocol {
   /// Returns the range of scalars corresponding to a range in the leading
   /// dimension of a ShapedArray.
   func scalarSubrange(
-    from arraySubrange: CountableRange<Int>
-  ) -> CountableRange<Int> {
+    from arraySubrange: Range<Int>
+  ) -> Range<Int> {
     return scalarIndex(fromIndex: arraySubrange.lowerBound)
       ..< scalarIndex(fromIndex: arraySubrange.upperBound)
   }
@@ -408,7 +408,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
   public typealias Element = ShapedArraySlice<Scalar>
   public typealias SubSequence = ShapedArraySlice<Scalar>
 
-  public var indices: CountableRange<Int> {
+  public var indices: Range<Int> {
     return 0..<count
   }
 
@@ -458,7 +458,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
       precondition(
         indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
         "ShapedArray indices are out of range")
-      return ShapedArraySlice(base: self, bounds: CountableRange(bounds))
+      return ShapedArraySlice(base: self, bounds: bounds)
     }
     set {
       precondition(!isScalar,
@@ -607,15 +607,15 @@ public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   internal var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
   internal var baseIndices: [Int]
-  /// The subarray bounds of a slice.
-  internal var bounds: CountableRange<Int>?
+  /// The subtensor bounds of a slice.
+  internal var bounds: Range<Int>?
 
   /// Creates a ShapedArraySlice from a base ShapedArray, with the specified
   /// subdimensional indices and subarray bounds.
   internal init(
     base: ShapedArray<Scalar>,
     baseIndices indices: [Int] = [],
-    bounds: CountableRange<Int>? = nil
+    bounds: Range<Int>? = nil
   ) {
     precondition(indices.count <= base.rank,
                  "Number of base indices exceeds base rank")
@@ -678,7 +678,7 @@ public extension ShapedArraySlice {
 internal extension ShapedArraySlice {
   /// The range of scalars from the base ShapedArray represented by a
   /// ShapedArraySlice.
-  var scalarRange: CountableRange<Int> {
+  var scalarRange: Range<Int> {
     let trimmedShape = base.shape.dropFirst()
     var (start, end) = baseIndices.enumerated()
       .reduce((0, base.scalarCount)) { (acc, next) in
@@ -735,7 +735,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   public typealias Element = ShapedArraySlice
   public typealias SubSequence = ShapedArraySlice
 
-  public var indices: CountableRange<Int> {
+  public var indices: Range<Int> {
     if let bounds = bounds {
       return bounds
     } else if indexingDepth < base.rank {
@@ -794,7 +794,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
         "ShapedArraySlice indices are out of range")
       return ShapedArraySlice(base: base,
                               baseIndices: baseIndices,
-                              bounds: CountableRange(bounds))
+                              bounds: bounds)
     }
     set {
       precondition(!isScalar,

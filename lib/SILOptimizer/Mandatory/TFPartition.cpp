@@ -2843,11 +2843,9 @@ static bool shouldTransformFunction(SILFunction *fn,
 
       // If this is an accessor for a computed property, check the property for
       // @_inlineable as well.
-      if (auto *fd = dyn_cast<FuncDecl>(fnDecl)) {
-        if (fd->isAccessor())
-          if (hasInlinableAttrs(fd->getAccessorStorageDecl()))
-            return false;
-      }
+      if (auto *fd = dyn_cast<AccessorDecl>(fnDecl))
+        if (hasInlinableAttrs(fd->getStorage()))
+          return false;
     }
   }
 
