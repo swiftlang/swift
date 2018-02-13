@@ -30,6 +30,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
   /// - Parameter dimensions: the shape dimensions.
   @_inlineable @inline(__always)
   public init(_ dimensions: [Int32]) {
+    self.init()
     self.dimensions = dimensions
   }
 
@@ -78,7 +79,7 @@ public extension TensorShape {
   }
 
   @_inlineable
-  var indices: CountableRange<Int> {
+  var indices: Range<Int> {
     @inline(__always)
     get {
       return dimensions.indices
