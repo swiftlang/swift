@@ -83,6 +83,7 @@ endif()
 include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/include
   ${SOURCEKIT_SOURCE_DIR}/include
+  ${SOURCEKIT_BINARY_DIR}/tools/SourceKit/include
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
@@ -150,5 +151,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
 endif()
 
+add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
