@@ -572,8 +572,7 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @inline(never)
-  @_versioned
+  // @opaque
   internal func _asOpaque() -> _UnmanagedOpaqueString {
 #if _runtime(_ObjC)
     if _object.isSmall {
