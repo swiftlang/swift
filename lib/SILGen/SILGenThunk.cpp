@@ -65,21 +65,22 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
-SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
-                                              SILDeclRef constant,
-                                              CanSILFunctionType constantTy) {
+ManagedValue
+SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
+                                     CanSILFunctionType constantTy) {
   // If the method is foreign, its foreign thunk will handle the dynamic
   // dispatch for us.
   if (constant.isForeignToNativeThunk()) {
     if (!SGM.hasFunction(constant))
       SGM.emitForeignToNativeThunk(constant);
-    return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
+    return ManagedValue::forUnmanaged(
+        B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition)));
   }
 
   // Otherwise, we need a dynamic dispatch thunk.
   SILFunction *F = SGM.getDynamicThunk(constant, constantTy);
 
-  return B.createFunctionRef(loc, F);
+  return ManagedValue::forUnmanaged(B.createFunctionRef(loc, F));
 }
 
 static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
@@ -107,8 +108,7 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
       if (vd->isDynamic())
-        return ManagedValue::forUnmanaged(
-                 SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType));
+        return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
       SILValue result =
