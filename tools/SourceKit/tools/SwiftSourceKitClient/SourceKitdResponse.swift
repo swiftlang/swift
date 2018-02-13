@@ -200,7 +200,7 @@ public class SourceKitdResponse: CustomStringConvertible {
 
   /// Whether or not this response represents a notification.
   public var isNotification: Bool {
-    return value.getOptional(.key_notification) != nil
+    return value.getOptional(.key_Notification) != nil
   }
 
   /// Whether or not this response represents a connection interruption error.
@@ -212,7 +212,7 @@ public class SourceKitdResponse: CustomStringConvertible {
 
   /// Whether or not this response represents a compiler crash.
   public var isCompilerCrash: Bool {
-    guard let notification = value.getOptional(.key_notification)?.getUID()
+    guard let notification = value.getOptional(.key_Notification)?.getUID()
     else { return false }
     return notification == .compilerCrashedNotification
   }
@@ -221,10 +221,10 @@ public class SourceKitdResponse: CustomStringConvertible {
   /// document to which this update applies. Otherwise, returns `nil`.
   public var documentUpdateNotificationDocumentName: String? {
     let response = value
-    guard let notification = response.getOptional(.key_notification)?.getUID(),
+    guard let notification = response.getOptional(.key_Notification)?.getUID(),
       notification == .source_notification_editor_documentupdate
     else { return nil }
-    return response.getOptional(.key_name)?.getString()
+    return response.getOptional(.key_Name)?.getString()
   }
 
   public init(resp: sourcekitd_response_t) {
