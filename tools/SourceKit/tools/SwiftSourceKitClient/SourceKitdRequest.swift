@@ -100,7 +100,7 @@ public struct SourceKitdRequest: CustomStringConvertible {
   private let req = Dictionary()
 
   public init(uid: SourceKitdUID) {
-    req.add(SourceKitdUID.key_request, value: uid)
+    req.add(SourceKitdUID.key_Request, value: uid)
   }
 
   public func addParameter(_ key: SourceKitdUID, value: String) {
@@ -137,7 +137,7 @@ public struct SourceKitdRequest: CustomStringConvertible {
 
   public func addCompilerArgsToRequest(_ compilerArguments: [String]?,
                                        _ bufferName: String? = nil) {
-    let args = self.addArrayParameter(SourceKitdUID.key_compilerargs)
+    let args = self.addArrayParameter(SourceKitdUID.key_CompilerArgs)
 
     if let compilerArguments = compilerArguments {
       for argument in compilerArguments {
