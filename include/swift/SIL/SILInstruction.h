@@ -4106,6 +4106,18 @@ class BridgeObjectToRefInst
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
 
+/// Sets the BridgeObject to a tagged pointer representation holding its
+/// operands
+class ValueToBridgeObjectInst
+    : public UnaryInstructionBase<SILInstructionKind::ValueToBridgeObjectInst,
+                                  ConversionInst> {
+  friend SILBuilder;
+
+  ValueToBridgeObjectInst(SILDebugLocation DebugLoc, SILValue Operand,
+                          SILType BridgeObjectTy)
+      : UnaryInstructionBase(DebugLoc, Operand, BridgeObjectTy) {}
+};
+
 /// Retrieve the bit pattern of a BridgeObject.
 class BridgeObjectToWordInst
   : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToWordInst,

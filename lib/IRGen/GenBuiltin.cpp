@@ -252,7 +252,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // TODO: A linear series of ifs is suboptimal.
+  if (Builtin.ID == BuiltinValueKind::StringObjectOr) {
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
+    llvm::Value *v = IGF.Builder.CreateOr(lhs, rhs);
+    return out.add(v);
+  }
+
+    // TODO: A linear series of ifs is suboptimal.
 #define BUILTIN_SIL_OPERATION(id, name, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     llvm_unreachable(name " builtin should be lowered away by SILGen!");

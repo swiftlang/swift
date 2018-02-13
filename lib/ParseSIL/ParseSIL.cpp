@@ -2340,6 +2340,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   } break;
 
     UNARY_INSTRUCTION(ClassifyBridgeObject)
+    UNARY_INSTRUCTION(ValueToBridgeObject)
     UNARY_INSTRUCTION(FixLifetime)
     UNARY_INSTRUCTION(EndLifetime)
     UNARY_INSTRUCTION(CopyBlock)

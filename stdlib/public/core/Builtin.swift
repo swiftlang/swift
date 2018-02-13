@@ -493,7 +493,7 @@ public func _bridgeObject(
 @_inlineable
 public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
   _sanityCheck(x & _objCTaggedPointerBits != 0)
-  let object: Builtin.BridgeObject = Builtin.reinterpretCast(x)
+  let object: Builtin.BridgeObject = Builtin.valueToBridgeObject(x)
   _sanityCheck(_isTaggedObject(object))
   return object
 }
