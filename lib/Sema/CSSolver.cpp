@@ -984,6 +984,8 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
+  return;
+
   // Disable the shrink pass when constraint propagation is
   // enabled. They achieve similar effects, and the shrink pass is
   // known to have bad behavior in some cases.
