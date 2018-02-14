@@ -185,10 +185,11 @@ public struct _UnsafeHasher {
     return value._hash(into: self)
   }
 
-  @_inlineable
+  @effects(readonly) // See comment on appending(_:) above
+  @inline(never)
   @_versioned
   internal func finalized() -> Int {
-    return _state.pointee.finalize()
+    return _state.pointee._finalize_alwaysInline()
   }
 }
 
