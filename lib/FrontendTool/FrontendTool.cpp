@@ -1283,7 +1283,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (haveModulePath) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      // FIXME: what if MSF is a module?
+      // What if MSF is a module?
+      // emitIndexDataIfNeeded already handles that case;
+      // it'll index everything.
       return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
                                    Instance) ||
              Context.hadError();
