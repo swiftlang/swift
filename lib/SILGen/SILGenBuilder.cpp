@@ -762,6 +762,14 @@ ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createRefToBridgeObject(SILLocation loc,
+                                                    ManagedValue mv,
+                                                    SILValue bits) {
+  CleanupCloner cloner(*this, mv);
+  SILValue result = createRefToBridgeObject(loc, mv.forward(SGF), bits);
+  return cloner.clone(result);
+}
+
 ManagedValue SILGenBuilder::createBlockToAnyObject(SILLocation loc,
                                                    ManagedValue v,
                                                    SILType destType) {

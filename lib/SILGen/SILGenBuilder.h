@@ -360,6 +360,10 @@ public:
   ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
                                        SILType destType);
 
+  using SILBuilder::createRefToBridgeObject;
+  ManagedValue createRefToBridgeObject(SILLocation loc, ManagedValue mv,
+                                       SILValue bits);
+
   using SILBuilder::createBranch;
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            ArrayRef<ManagedValue> Args);
