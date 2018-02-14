@@ -397,6 +397,10 @@ static SILFunction *getSpecializedWithDeadParams(
       return nullptr;
   }
 
+  auto Rep = Specialized->getLoweredFunctionType()->getRepresentation();
+  if (getSILFunctionLanguage(Rep) != SILFunctionLanguage::Swift)
+    return nullptr;
+
   GenericSpecialized = std::make_pair(nullptr, nullptr);
 
   if (PAI->hasSubstitutions()) {
