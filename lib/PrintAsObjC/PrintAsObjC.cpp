@@ -1119,6 +1119,8 @@ private:
 
     printSwift3ObjCDeprecatedInference(VD);
 
+    printAvailability(VD);
+
     os << ";";
     if (VD->isStatic()) {
       os << ")\n";

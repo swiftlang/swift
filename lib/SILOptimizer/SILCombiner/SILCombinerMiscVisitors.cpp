@@ -691,7 +691,7 @@ static bool isValueToBridgeObjectremovable(ValueToBridgeObjectInst *VTBOI) {
   // If operand is a struct $UInt (% : $Builtin.), fetch the real source
   if (auto *SI = dyn_cast<StructInst>(operand)) {
     assert(SI->SILInstruction::getAllOperands().size() == 1 &&
-           "Excted a single operand");
+           "Expected a single operand");
     operand = SI->getOperand(0);
   }
   if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
