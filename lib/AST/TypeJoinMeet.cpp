@@ -194,5 +194,32 @@ Type Type::join(Type first, Type second) {
     return Type();
   }
 
+  // FIXME: Remove this once all of the cases are implemented.
+  // If one or both of the types are optional types,
+  // look at the underlying object type.
+  OptionalTypeKind firstKind, secondKind;
+  Type objectType1 = first->getAnyOptionalObjectType(firstKind);
+  Type objectType2 = second->getAnyOptionalObjectType(secondKind);
+
+  if (firstKind != OptionalTypeKind::OTK_None ||
+      secondKind != OptionalTypeKind::OTK_None) {
+    auto &ctx = first->getASTContext();
+    // Compute the join of the unwrapped type. If there is none, we're done.
+    Type unwrappedJoin = join(objectType1 ? objectType1 : first,
+                              objectType2 ? objectType2 : second);
+
+    auto isAnyType = [&](Type candidate) -> bool {
+      return candidate && candidate->isEqual(ctx.TheAnyType);
+    };
+
+    // If join produced 'Any' but neither type was itself 'Any',
+    // let's return empty type to indicate that there is no join.
+    if (!unwrappedJoin || (isAnyType(unwrappedJoin) &&
+                          !isAnyType(objectType1) && !isAnyType(objectType2)))
+        return nullptr;
+
+    return OptionalType::get(unwrappedJoin);
+  }
+
   return TypeJoin::join(first->getCanonicalType(), second->getCanonicalType());
 }
