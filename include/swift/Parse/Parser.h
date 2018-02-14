@@ -201,11 +201,11 @@ public:
   Token Tok;
 
   /// \brief leading trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia LeadingTrivia;
 
   /// \brief trailing trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
 
   /// \brief The receiver to collect all consumed tokens.
