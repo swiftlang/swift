@@ -2028,6 +2028,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
+  case Kind::External:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2045,6 +2046,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalChain:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::External:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2063,9 +2065,9 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
       break;
     }
     
-    if (auto equals = component.getComputedPropertyIndexEquals())
+    if (auto equals = component.getSubscriptIndexEquals())
       forFunction(equals);
-    if (auto hash = component.getComputedPropertyIndexHash())
+    if (auto hash = component.getSubscriptIndexHash())
       forFunction(hash);
     return;
   }
@@ -2102,10 +2104,11 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
       break;
-      
+    
+    case KeyPathPatternComponent::Kind::External:
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
-      for (auto &index : component.getComputedPropertyIndices()) {
+      for (auto &index : component.getSubscriptIndices()) {
         maxOperandNo = std::max(maxOperandNo, (int)index.Operand);
       }
     }
@@ -2160,6 +2163,15 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(valueType.getPointer());
   ID.AddString(objcString);
   
+  auto profileIndices = [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
+    for (auto &index : indices) {
+      ID.AddInteger(index.Operand);
+      ID.AddPointer(index.FormalType.getPointer());
+      ID.AddPointer(index.LoweredType.getOpaqueValue());
+      ID.AddPointer(index.Hashable.getOpaqueValue());
+    }
+  };
+  
   for (auto &component : components) {
     ID.AddInteger((unsigned)component.getKind());
     switch (component.getKind()) {
@@ -2171,6 +2183,13 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
+      
+    case KeyPathPatternComponent::Kind::External: {
+      ID.AddPointer(component.getExternalDecl());
+      profileSubstitutionList(ID, component.getExternalSubstitutions());
+      profileIndices(component.getSubscriptIndices());
+      break;
+    }
       
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
@@ -2200,12 +2219,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         break;
       }
       }
-      for (auto &index : component.getComputedPropertyIndices()) {
-        ID.AddInteger(index.Operand);
-        ID.AddPointer(index.FormalType.getPointer());
-        ID.AddPointer(index.LoweredType.getOpaqueValue());
-        ID.AddPointer(index.Hashable.getOpaqueValue());
-      }
+      profileIndices(component.getSubscriptIndices());
       break;
     }
   }

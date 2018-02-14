@@ -121,11 +121,13 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
   return env->mapTypeIntoContext(type);
 }
 
+Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
+  return cast<ArchetypeType>(type)->getInterfaceType();
+}
+
 Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
-  return Type(this).subst([&](SubstitutableType *t) -> Type {
-      return cast<ArchetypeType>(t)->getInterfaceType();
-    },
+  return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
     SubstFlags::AllowLoweredTypes);
 }
