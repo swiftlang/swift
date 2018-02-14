@@ -428,7 +428,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     B.createReturn(ReturnLoc, emitEmptyTuple(Loc));
   } else {
     assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
-    SILValue result = mv.forward(*this);
+    SILValue result = mv.ensurePlusOne(*this, ReturnLoc).forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
   }
