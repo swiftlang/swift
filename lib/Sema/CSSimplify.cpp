@@ -3285,7 +3285,8 @@ retry_after_fail:
   // that has the @dynamicMemberLookup attribute, then we resolve the reference
   // to the subscript(dynamicMember:) member, and pass the member name as a
   // string.
-  if (constraintKind == ConstraintKind::ValueMember &&
+  if (result.ViableCandidates.empty() &&
+      constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
     if (hasDynamicMemberLookupAttribute(instanceTy)) {

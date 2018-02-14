@@ -78,6 +78,10 @@ func test_iuo(a : Gettable!, b : Settable!) {
   bm.universal = global
 }
 
+//===----------------------------------------------------------------------===//
+// Returning a function
+//===----------------------------------------------------------------------===//
+
 @dynamicMemberLookup
 struct FnTest {
   subscript(dynamicMember member: StaticString) -> (_ a : Int)->() {
@@ -89,6 +93,23 @@ func test_function(x : FnTest) {
 }
 func test_function_iuo(x : FnTest!) {
   x.flavor(12)
+}
+
+//===----------------------------------------------------------------------===//
+// Explicitly declared members take precedence
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+struct Dog {
+  public var name = "Kaylee"
+  
+  subscript(dynamicMember member: String) -> String {
+    return "Zoey"
+  }
+}
+
+func testDog(person: Dog) -> String {
+  return person.name + person.otherName
 }
 
 
