@@ -109,6 +109,123 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+typedef enum __swift_stdlib_UProperty {
+  __swift_stdlib_UCHAR_ALPHABETIC = 0,
+  __swift_stdlib_UCHAR_BINARY_START = __swift_stdlib_UCHAR_ALPHABETIC,
+  __swift_stdlib_UCHAR_ASCII_HEX_DIGIT = 1,
+  __swift_stdlib_UCHAR_BIDI_CONTROL = 2,
+  __swift_stdlib_UCHAR_BIDI_MIRRORED = 3,
+  __swift_stdlib_UCHAR_DASH = 4,
+  __swift_stdlib_UCHAR_DEFAULT_IGNORABLE_CODE_POINT = 5,
+  __swift_stdlib_UCHAR_DEPRECATED = 6,
+  __swift_stdlib_UCHAR_DIACRITIC = 7,
+  __swift_stdlib_UCHAR_EXTENDER = 8,
+  __swift_stdlib_UCHAR_FULL_COMPOSITION_EXCLUSION = 9,
+  __swift_stdlib_UCHAR_GRAPHEME_BASE = 10,
+  __swift_stdlib_UCHAR_GRAPHEME_EXTEND = 11,
+  __swift_stdlib_UCHAR_GRAPHEME_LINK = 12,
+  __swift_stdlib_UCHAR_HEX_DIGIT = 13,
+  __swift_stdlib_UCHAR_HYPHEN = 14,
+  __swift_stdlib_UCHAR_ID_CONTINUE = 15,
+  __swift_stdlib_UCHAR_ID_START = 16,
+  __swift_stdlib_UCHAR_IDEOGRAPHIC = 17,
+  __swift_stdlib_UCHAR_IDS_BINARY_OPERATOR = 18,
+  __swift_stdlib_UCHAR_IDS_TRINARY_OPERATOR = 19,
+  __swift_stdlib_UCHAR_JOIN_CONTROL = 20,
+  __swift_stdlib_UCHAR_LOGICAL_ORDER_EXCEPTION = 21,
+  __swift_stdlib_UCHAR_LOWERCASE = 22,
+  __swift_stdlib_UCHAR_MATH = 23,
+  __swift_stdlib_UCHAR_NONCHARACTER_CODE_POINT = 24,
+  __swift_stdlib_UCHAR_QUOTATION_MARK = 25,
+  __swift_stdlib_UCHAR_RADICAL = 26,
+  __swift_stdlib_UCHAR_SOFT_DOTTED = 27,
+  __swift_stdlib_UCHAR_TERMINAL_PUNCTUATION = 28,
+  __swift_stdlib_UCHAR_UNIFIED_IDEOGRAPH = 29,
+  __swift_stdlib_UCHAR_UPPERCASE = 30,
+  __swift_stdlib_UCHAR_WHITE_SPACE = 31,
+  __swift_stdlib_UCHAR_XID_CONTINUE = 32,
+  __swift_stdlib_UCHAR_XID_START = 33,
+  __swift_stdlib_UCHAR_CASE_SENSITIVE = 34,
+  __swift_stdlib_UCHAR_S_TERM = 35,
+  __swift_stdlib_UCHAR_VARIATION_SELECTOR = 36,
+  __swift_stdlib_UCHAR_NFD_INERT = 37,
+  __swift_stdlib_UCHAR_NFKD_INERT = 38,
+  __swift_stdlib_UCHAR_NFC_INERT = 39,
+  __swift_stdlib_UCHAR_NFKC_INERT = 40,
+  __swift_stdlib_UCHAR_SEGMENT_STARTER = 41,
+  __swift_stdlib_UCHAR_PATTERN_SYNTAX = 42,
+  __swift_stdlib_UCHAR_PATTERN_WHITE_SPACE = 43,
+  __swift_stdlib_UCHAR_POSIX_ALNUM = 44,
+  __swift_stdlib_UCHAR_POSIX_BLANK = 45,
+  __swift_stdlib_UCHAR_POSIX_GRAPH = 46,
+  __swift_stdlib_UCHAR_POSIX_PRINT = 47,
+  __swift_stdlib_UCHAR_POSIX_XDIGIT = 48,
+  __swift_stdlib_UCHAR_CASED = 49,
+  __swift_stdlib_UCHAR_CASE_IGNORABLE = 50,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_LOWERCASED = 51,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_UPPERCASED = 52,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_TITLECASED = 53,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_CASEFOLDED = 54,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_CASEMAPPED = 55,
+  __swift_stdlib_UCHAR_CHANGES_WHEN_NFKC_CASEFOLDED = 56,
+  __swift_stdlib_UCHAR_EMOJI = 57,
+  __swift_stdlib_UCHAR_EMOJI_PRESENTATION = 58,
+  __swift_stdlib_UCHAR_EMOJI_MODIFIER = 59,
+  __swift_stdlib_UCHAR_EMOJI_MODIFIER_BASE = 60,
+
+  __swift_stdlib_UCHAR_BIDI_CLASS = 0x1000,
+  __swift_stdlib_UCHAR_INT_START = __swift_stdlib_UCHAR_BIDI_CLASS,
+  __swift_stdlib_UCHAR_BLOCK = 0x1001,
+  __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS = 0x1002,
+  __swift_stdlib_UCHAR_DECOMPOSITION_TYPE = 0x1003,
+  __swift_stdlib_UCHAR_EAST_ASIAN_WIDTH = 0x1004,
+  __swift_stdlib_UCHAR_GENERAL_CATEGORY = 0x1005,
+  __swift_stdlib_UCHAR_JOINING_GROUP = 0x1006,
+  __swift_stdlib_UCHAR_JOINING_TYPE = 0x1007,
+  __swift_stdlib_UCHAR_LINE_BREAK = 0x1008,
+  __swift_stdlib_UCHAR_NUMERIC_TYPE = 0x1009,
+  __swift_stdlib_UCHAR_SCRIPT = 0x100A,
+  __swift_stdlib_UCHAR_HANGUL_SYLLABLE_TYPE = 0x100B,
+  __swift_stdlib_UCHAR_NFD_QUICK_CHECK = 0x100C,
+  __swift_stdlib_UCHAR_NFKD_QUICK_CHECK = 0x100D,
+  __swift_stdlib_UCHAR_NFC_QUICK_CHECK = 0x100E,
+  __swift_stdlib_UCHAR_NFKC_QUICK_CHECK = 0x100F,
+  __swift_stdlib_UCHAR_LEAD_CANONICAL_COMBINING_CLASS = 0x1010,
+  __swift_stdlib_UCHAR_TRAIL_CANONICAL_COMBINING_CLASS = 0x1011,
+  __swift_stdlib_UCHAR_GRAPHEME_CLUSTER_BREAK = 0x1012,
+  __swift_stdlib_UCHAR_SENTENCE_BREAK = 0x1013,
+  __swift_stdlib_UCHAR_WORD_BREAK = 0x1014,
+  __swift_stdlib_UCHAR_BIDI_PAIRED_BRACKET_TYPE = 0x1015,
+
+  __swift_stdlib_UCHAR_GENERAL_CATEGORY_MASK = 0x2000,
+  __swift_stdlib_UCHAR_MASK_START = __swift_stdlib_UCHAR_GENERAL_CATEGORY_MASK,
+
+  __swift_stdlib_UCHAR_NUMERIC_VALUE = 0x3000,
+  __swift_stdlib_UCHAR_DOUBLE_START = __swift_stdlib_UCHAR_NUMERIC_VALUE,
+
+  __swift_stdlib_UCHAR_AGE = 0x4000,
+  __swift_stdlib_UCHAR_STRING_START = __swift_stdlib_UCHAR_AGE,
+  __swift_stdlib_UCHAR_BIDI_MIRRORING_GLYPH = 0x4001,
+  __swift_stdlib_UCHAR_CASE_FOLDING = 0x4002,
+
+  __swift_stdlib_UCHAR_LOWERCASE_MAPPING = 0x4004,
+  __swift_stdlib_UCHAR_NAME = 0x4005,
+  __swift_stdlib_UCHAR_SIMPLE_CASE_FOLDING = 0x4006,
+  __swift_stdlib_UCHAR_SIMPLE_LOWERCASE_MAPPING = 0x4007,
+  __swift_stdlib_UCHAR_SIMPLE_TITLECASE_MAPPING = 0x4008,
+  __swift_stdlib_UCHAR_SIMPLE_UPPERCASE_MAPPING = 0x4009,
+  __swift_stdlib_UCHAR_TITLECASE_MAPPING = 0x400A,
+
+  __swift_stdlib_UCHAR_UPPERCASE_MAPPING = 0x400C,
+  __swift_stdlib_UCHAR_BIDI_PAIRED_BRACKET = 0x400D,
+
+  __swift_stdlib_UCHAR_SCRIPT_EXTENSIONS = 0x7000,
+  __swift_stdlib_UCHAR_OTHER_PROPERTY_START =
+      __swift_stdlib_UCHAR_SCRIPT_EXTENSIONS,
+
+  __swift_stdlib_UCHAR_INVALID_CODE = -1
+} __swift_stdlib_UProperty;
+
 typedef enum __swift_stdlib_UErrorCode {
   __swift_stdlib_U_USING_FALLBACK_WARNING = -128,
   __swift_stdlib_U_ERROR_WARNING_START = -128,
@@ -294,7 +411,10 @@ typedef enum __swift_stdlib_UBreakIteratorType {
 } __swift_stdlib_UBreakIteratorType;
 
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
+typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_uint16_t __swift_stdlib_UChar;
+typedef __swift_int32_t __swift_stdlib_UChar32;
+typedef __swift_int8_t __swift_stdlib_UBool;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_ubrk_close(__swift_stdlib_UBreakIterator *bi);
@@ -320,6 +440,37 @@ __swift_int32_t __swift_stdlib_ubrk_preceding(__swift_stdlib_UBreakIterator *bi,
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t __swift_stdlib_ubrk_following(__swift_stdlib_UBreakIterator *bi,
                                               __swift_int32_t offset);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+__swift_stdlib_unorm2_hasBoundaryBefore(const __swift_stdlib_UNormalizer2 *,
+                                        __swift_stdlib_UChar32);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t
+__swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *,
+                                const __swift_stdlib_UChar *, __swift_int32_t,
+                                __swift_stdlib_UChar *, __swift_int32_t,
+                                __swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t __swift_stdlib_unorm2_spanQuickCheckYes(
+    const __swift_stdlib_UNormalizer2 *, const __swift_stdlib_UChar *,
+    __swift_int32_t, __swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+    __swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32,
+                                       __swift_stdlib_UProperty);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+    __swift_stdlib_u_isdefined(__swift_stdlib_UChar32);
+
+
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
