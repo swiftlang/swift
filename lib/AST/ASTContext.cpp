@@ -4400,6 +4400,13 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
       addTrivial(getIdentifier(#SWIFT_TYPE_NAME), stdlib);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+      // Even though we may never import types directly as Int or UInt
+      // (e.g. on 64-bit Windows, where CLong maps to Int32 and
+      // CLongLong to Int64), it's always possible to convert an Int
+      // or UInt to a C type.
+      addTrivial(getIdentifier("Int"), stdlib);
+      addTrivial(getIdentifier("UInt"), stdlib);
     }
 
     if (auto darwin = getLoadedModule(Id_Darwin)) {

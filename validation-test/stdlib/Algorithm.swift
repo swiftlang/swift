@@ -74,10 +74,7 @@ Algorithm.test("min,max") {
   expectEqual(c1.identity, max(a1, b1, c2, c1).identity)
 }
 
-Algorithm.test("sorted/strings")
-  .xfail(.nativeRuntime("String comparison: ICU vs. Foundation " +
-    "https://bugs.swift.org/browse/SR-530"))
-  .code {
+Algorithm.test("sorted/strings") {
   expectEqual(
     ["Banana", "apple", "cherry"],
     ["apple", "Banana", "cherry"].sorted())
