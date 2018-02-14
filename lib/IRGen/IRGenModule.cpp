@@ -412,8 +412,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
-    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
-        IRGen.Opts, *CI, *this, Module, PSPs.MainInputFilenameForDebugInfo);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
+                                    Module, PSPs.MainInputFilenameForDebugInfo);
 
   initClangTypeConverter();
 

@@ -259,8 +259,9 @@ namespace swift {
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
-                      std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
-                      PrimarySpecificPaths PSPs, llvm::LLVMContext &LLVMContext,
+                      std::unique_ptr<SILModule> SILMod,
+                      StringRef ModuleName, PrimarySpecificPaths PSPs,
+                      llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
@@ -269,8 +270,9 @@ namespace swift {
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
-                      std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
-                      PrimarySpecificPaths PSPs, llvm::LLVMContext &LLVMContext,
+                      std::unique_ptr<SILModule> SILMod,
+                      StringRef ModuleName, PrimarySpecificPaths PSPs,
+                      llvm::LLVMContext &LLVMContext,
                       unsigned StartElem = 0,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
@@ -287,7 +289,7 @@ namespace swift {
   /// Turn the given LLVM module into native code and return true on error.
   bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
                    StringRef OutputFilename,
-                   UnifiedStatsReporter *Stats = nullptr);
+                   UnifiedStatsReporter *Stats=nullptr);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.

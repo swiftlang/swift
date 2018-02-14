@@ -1453,9 +1453,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
-    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M), IGM(IGM),
-      MetadataTypeDecl(nullptr), InternalType(nullptr), LastDebugLoc({}),
-      LastScope(nullptr) {
+    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
+      IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
+      LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
   StringRef SourceFileName = MainOutputFilenameForDebugInfo;

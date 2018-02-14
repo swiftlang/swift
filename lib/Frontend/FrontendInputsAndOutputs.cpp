@@ -309,7 +309,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
   }
   SupplementaryOutputs = supplementaryOutputs;
 
-  if (hasInputs() && primaryInputCount() < 2) {
+  if (hasUniquePrimaryInput() || (hasInputs() && isWholeModule())) {
     // When batch mode is fully implemented, each InputFile will own
     // a PrimarySpecificPaths.
     PrimarySpecificPathsForAtMostOnePrimary.OutputFilename =

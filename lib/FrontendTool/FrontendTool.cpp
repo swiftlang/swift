@@ -826,11 +826,16 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return PSGIs;
 }
 
-static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
-    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
-    ModuleOrSourceFile MSF, PrimarySpecificPaths PSPs, bool moduleIsPublic,
-    int &ReturnValue, FrontendObserver *observer, UnifiedStatsReporter *Stats);
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          bool astGuaranteedToCorrespondToSIL,
+                                          ModuleOrSourceFile MSF,
+                                          PrimarySpecificPaths PSPs,
+                                          bool moduleIsPublic,
+                                          int &ReturnValue,
+                                          FrontendObserver *observer,
+                                          UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -950,10 +955,13 @@ static bool performCompile(CompilerInstance &Instance,
   while (!PSGIs.empty()) {
     auto PSGI = std::move(PSGIs.front());
     PSGIs.pop_front();
-    if (performCompileStepsPostSILGen(
-            Instance, Invocation, std::move(PSGI.TheSILModule),
-            PSGI.ASTGuaranteedToCorrespondToSIL, PSGI.ModuleOrPrimarySourceFile,
-            PSGI.PSPs, moduleIsPublic, ReturnValue, observer, Stats))
+    if (performCompileStepsPostSILGen(Instance, Invocation,
+                                      std::move(PSGI.TheSILModule),
+                                      PSGI.ASTGuaranteedToCorrespondToSIL,
+                                      PSGI.ModuleOrPrimarySourceFile,
+                                      PSGI.PSPs,
+                                      moduleIsPublic,
+                                      ReturnValue, observer, Stats))
       return true;
   }
   return false;
@@ -1074,8 +1082,8 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
 }
 
 static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
-                       PrimarySpecificPaths PSPs, StringRef OutputFilename,
-                       ModuleOrSourceFile MSF,
+                       PrimarySpecificPaths PSPs,
+                       StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
                        llvm::GlobalVariable *&HashGlobal,
                        std::vector<std::string> parallelOutputFilenames) {
@@ -1170,12 +1178,16 @@ static bool generateCode(CompilerInvocation &Invocation,
                      EffectiveLanguageVersion, OutputFilename, Stats);
 }
 
-static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
-    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
-    ModuleOrSourceFile MSF, const PrimarySpecificPaths PSPs,
-    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
-    UnifiedStatsReporter *Stats) {
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          bool astGuaranteedToCorrespondToSIL,
+                                          ModuleOrSourceFile MSF,
+                                          const PrimarySpecificPaths PSPs,
+                                          bool moduleIsPublic,
+                                          int &ReturnValue,
+                                          FrontendObserver *observer,
+                                          UnifiedStatsReporter *Stats) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
