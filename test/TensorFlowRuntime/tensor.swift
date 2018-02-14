@@ -104,9 +104,9 @@ TensorTests.testCPUAndGPU("XWPlusB") {
   _RuntimeConfig.printsDebugLog = true
 
   // Shape: 1 x 4
-  let x = Tensor([[1.0, 2.0, 2.0, 1.0]]).toDevice()
+  let x = Tensor([[1.0, 2.0, 2.0, 1.0]])
   // Shape: 4 x 2
-  let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]]).toDevice()
+  let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
   // Shape: 2
   let b = Tensor([0.5, 0.5])
   // Do xW+b!
@@ -145,21 +145,22 @@ TensorTests.testGPU("loopsAndConditions") {
 @inline(never)
 func testXORInference() {
   func xor(_ x: Double, _ y: Double) -> Double {
+    let x = Tensor([[x, y]])
+
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4
     let w1 = Tensor(
       [[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
-       [-1.83523219, -0.51167348, 0.15490439, 1.91018065]]).toDevice()
+       [-1.83523219, -0.51167348, 0.15490439, 1.91018065]])
     // 1 x 4
     let b1 = Tensor(
-      [[2.54353216, 0.25132703, -0.16503136, -0.85754058]]).toDevice()
+      [[2.54353216, 0.25132703, -0.16503136, -0.85754058]])
     // 4 x 1
     let w2 = Tensor(
-      [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]]).toDevice()
+      [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]])
     // 1 x 1
-    let b2 = Tensor([[-0.74635993]]).toDevice()
+    let b2 = Tensor([[-0.74635993]])
 
-    let x = Tensor([[x, y]]).toDevice()
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
     return y.array.scalars[0] // TODO: use better scalar getter
@@ -175,12 +176,12 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
   struct MLPClassifier {
     // 2 x 4
     var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
-                            [0.4, 0.3, 0.2, 0.1]]).toDevice()
+                            [0.4, 0.3, 0.2, 0.1]])
     // 4 x 1
     var w2 = Tensor<Float>([[0.4],
                             [0.4],
                             [0.3],
-                            [0.9]]).toDevice()
+                            [0.9]])
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -197,20 +198,20 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
       return tanh(o1 ⊗ w2 + b2)
     }
   }
-  let predictFor = Tensor<Float>([[1, 0.5]]).toDevice()
+  let predictFor = Tensor<Float>([[1, 0.5]])
   let classifier = MLPClassifier()
   let _ = classifier.prediction(for: predictFor)
   // TODO: Check result.
 }
 
 TensorTests.testCPUAndGPU("Reshape") {
-  let x = Tensor([[1], [2], [3]]).toDevice() // Shape 3 x 1
+  let x = Tensor([[1], [2], [3]]) // Shape 3 x 1
   let y = x.reshaped([1, 3, 1, 1, 1])
   expectEqual([1, 3, 1, 1, 1], y.shape)
 }
 
 TensorTests.testCPUAndGPU("ReshapeScalar") {
-  let z = Tensor([[10]]).toDevice().reshaped([])
+  let z = Tensor([[10]]).reshaped([])
   expectEqual([], z.shape)
 }
 

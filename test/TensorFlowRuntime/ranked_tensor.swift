@@ -149,21 +149,22 @@ RankedTensorTests.testGPU("simpleCounterLoop") {
 @inline(never)
 func testXORInference() {
   func xor(_ x: Double, _ y: Double) -> Double {
+    let x = Tensor2D([[x, y]])
+
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4
     let w1 = Tensor2D(
       [[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
-       [-1.83523219, -0.51167348, 0.15490439, 1.91018065]]).toDevice()
+       [-1.83523219, -0.51167348, 0.15490439, 1.91018065]])
     // 1 x 4
     let b1 = Tensor2D(
-      [[2.54353216, 0.25132703, -0.16503136, -0.85754058]]).toDevice()
+      [[2.54353216, 0.25132703, -0.16503136, -0.85754058]])
     // 4 x 1
     let w2 = Tensor2D(
-      [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]]).toDevice()
+      [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]])
     // 1 x 1
-    let b2 = Tensor2D([[-0.74635993]]).toDevice()
+    let b2 = Tensor2D([[-0.74635993]])
 
-    let x = Tensor2D([[x, y]]).toDevice()
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
     return y.scalars[0]
