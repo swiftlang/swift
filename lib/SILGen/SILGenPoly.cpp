@@ -1152,13 +1152,13 @@ namespace {
       if (SGF.silConv.useLoweredAddresses()) {
         return ManagedValue(existentialBuf, payload.getCleanup());
       }
+
       // We are under opaque value(s) mode - load the any and init an opaque
-      auto loadedPayload = SGF.emitManagedLoadCopy(Loc, payload.getValue());
+      auto loadedPayload = SGF.B.createLoadCopy(Loc, payload);
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
-      SILValue loadedOpaque = SGF.B.createInitExistentialValue(
-          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
+      return SGF.B.createInitExistentialValue(
+          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload,
           /*Conformances=*/{});
-      return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 
     /// Handle a tuple that has been exploded in both the input and
