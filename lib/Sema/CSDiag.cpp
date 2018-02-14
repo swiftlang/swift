@@ -2152,6 +2152,8 @@ static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
         return type;
       });
       CS.setType(expr, type);
+      // Set new type to the expression directly.
+      expr->setType(type);
 
       return expr;
     }
@@ -6075,7 +6077,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
   auto expr = typeCheckChildIndependently(CE->getSubExpr(),
-                                          CE->getCastTypeLoc().getType(),
+                                          CS.getType(CE->getCastTypeLoc()),
                                           CTP_CoerceOperand);
   if (!expr)
     return true;
@@ -7920,12 +7922,13 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     // `Pair<Any, Any>`.
     // Right now we only handle this when the type that's at fault is the
     // top-level type passed to this function.
-    if (loc.getType().isNull()) {
-      return;
-    }
-    
+    auto type = loc.getType();
+    if (!type)
+      type = cs.getType(loc);
+
     ArrayRef<Type> genericArgs;
-    if (auto *boundGenericTy = loc.getType()->getAs<BoundGenericType>()) {
+
+    if (auto *boundGenericTy = type->getAs<BoundGenericType>()) {
       if (boundGenericTy->getDecl() == FoundDecl)
         genericArgs = boundGenericTy->getGenericArgs();
     }
