@@ -1043,7 +1043,7 @@ public:
               std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName,
-              PrimarySpecificPaths PSPs);
+              const PrimarySpecificPaths &PSPs);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

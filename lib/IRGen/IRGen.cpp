@@ -665,7 +665,8 @@ static void initLLVMModule(const IRGenModule &IGM) {
 }
 
 std::pair<IRGenerator *, IRGenModule *>
-swift::irgen::createIRGenModule(SILModule *SILMod, PrimarySpecificPaths PSPs,
+swift::irgen::createIRGenModule(SILModule *SILMod,
+                                const PrimarySpecificPaths &PSPs,
                                 llvm::LLVMContext &LLVMContext) {
 
   IRGenOptions Opts;
@@ -716,7 +717,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::ModuleDecl *M,
                                             std::unique_ptr<SILModule> SILMod,
                                                          StringRef ModuleName,
-                                              const PrimarySpecificPaths PSPs,
+                                              const PrimarySpecificPaths &PSPs,
                                                  llvm::LLVMContext &LLVMContext,
                                                        SourceFile *SF = nullptr,
                                  llvm::GlobalVariable **outModuleHash = nullptr,
@@ -867,7 +868,7 @@ static void ThreadEntryPoint(IRGenerator *irgen,
 static void performParallelIRGeneration(IRGenOptions &Opts,
                                         swift::ModuleDecl *M,
                                         std::unique_ptr<SILModule> SILMod,
-                                        const PrimarySpecificPaths PSPs,
+                                        const PrimarySpecificPaths &PSPs,
                                         StringRef ModuleName, int numThreads,
                                         ArrayRef<std::string> outputFilenames) {
 
@@ -1083,7 +1084,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 std::unique_ptr<llvm::Module> swift::
 performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, const PrimarySpecificPaths PSPs,
+                    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     llvm::LLVMContext &LLVMContext,
                     ArrayRef<std::string> parallelOutputFilenames,
                     llvm::GlobalVariable **outModuleHash) {
@@ -1103,7 +1104,7 @@ performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
 std::unique_ptr<llvm::Module> swift::
 performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                     std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, const PrimarySpecificPaths PSPs,
+                    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     llvm::LLVMContext &LLVMContext,
                     unsigned StartElem,
                     llvm::GlobalVariable **outModuleHash) {

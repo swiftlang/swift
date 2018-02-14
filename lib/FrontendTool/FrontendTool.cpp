@@ -1082,11 +1082,11 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
 }
 
 static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
-                       PrimarySpecificPaths PSPs,
+                       const PrimarySpecificPaths &PSPs,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
                        llvm::GlobalVariable *&HashGlobal,
-                       std::vector<std::string> parallelOutputFilenames) {
+                       ArrayRef<std::string> parallelOutputFilenames) {
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
@@ -1316,12 +1316,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
-  const std::string OutputFilename = PSPs.OutputFilename;
+  StringRef OutputFilename = PSPs.OutputFilename;
+  std::vector<std::string> ParallelOutputFilenames = Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
   generateIR(
       IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, IRModule, HashGlobal,
-      Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames());
+      ParallelOutputFilenames);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.

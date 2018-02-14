@@ -260,7 +260,7 @@ namespace swift {
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, PrimarySpecificPaths PSPs,
+                      StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr);
@@ -271,7 +271,7 @@ namespace swift {
   std::unique_ptr<llvm::Module>
   performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, PrimarySpecificPaths PSPs,
+                      StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
                       unsigned StartElem = 0,
                       llvm::GlobalVariable **outModuleHash = nullptr);

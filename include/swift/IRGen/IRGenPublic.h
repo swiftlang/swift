@@ -26,7 +26,7 @@ class IRGenModule;
 
 /// Create an IRGen module.
 std::pair<IRGenerator *, IRGenModule *>
-createIRGenModule(SILModule *SILMod, PrimarySpecificPaths PSPs,
+createIRGenModule(SILModule *SILMod, const PrimarySpecificPaths &PSPs,
                   llvm::LLVMContext &LLVMContext);
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.
