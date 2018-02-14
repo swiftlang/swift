@@ -1943,7 +1943,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       };
       auto handleComputedIndices
         = [&](const KeyPathPatternComponent &component) {
-          auto indices = component.getComputedPropertyIndices();
+          auto indices = component.getSubscriptIndices();
           ListOfValues.push_back(indices.size());
           for (auto &index : indices) {
             ListOfValues.push_back(index.Operand);
@@ -1955,9 +1955,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           }
           if (!indices.empty()) {
             ListOfValues.push_back(
-              addSILFunctionRef(component.getComputedPropertyIndexEquals()));
+              addSILFunctionRef(component.getSubscriptIndexEquals()));
             ListOfValues.push_back(
-              addSILFunctionRef(component.getComputedPropertyIndexHash()));
+              addSILFunctionRef(component.getSubscriptIndexHash()));
           }
         };
     
@@ -1991,6 +1991,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       case KeyPathPatternComponent::Kind::OptionalWrap:
         handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
         break;
+      case KeyPathPatternComponent::Kind::External:
+        llvm_unreachable("todo");
       }
     }
     
