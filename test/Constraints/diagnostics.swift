@@ -1097,7 +1097,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
 
