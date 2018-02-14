@@ -88,6 +88,7 @@ set(SWIFTLIB_ESSENTIAL
   Misc.swift
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
+  NormalizedCodeUnitIterator.swift
   ObjCMirrors.swift
   ObjectIdentifier.swift
   Optional.swift
