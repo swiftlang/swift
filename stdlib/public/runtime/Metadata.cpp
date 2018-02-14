@@ -3015,3 +3015,13 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
 void *swift::allocateMetadata(size_t size, size_t alignment) {
   return MetadataAllocator().Allocate(size, alignment);
 }
+
+template<>
+bool Metadata::satisfiesClassConstraint() const {
+  // existential types marked with @objc satisfy class requirement.
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this))
+    return existential->isObjC();
+
+  // or it's a class.
+  return isAnyClass();
+}

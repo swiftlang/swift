@@ -777,8 +777,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::Layout: {
       switch (req.getLayout()) {
       case GenericRequirementLayoutKind::Class:
-        // Check whether the subject type is a class.
-        if (!subjectType->isAnyClass()) return true;
+        if (!subjectType->satisfiesClassConstraint())
+          return true;
         continue;
       }
 
