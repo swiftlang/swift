@@ -235,7 +235,8 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   Invocation.getFrontendOptions().Inputs.addInputFile(options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().Inputs.addInputFile(FileName);

@@ -1060,7 +1060,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
-  
+
   // If the AST Context has no errors but no IRModule is available,
   // parallelIRGen happened correctly, since parallel IRGen produces multiple
   // modules.
