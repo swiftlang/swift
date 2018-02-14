@@ -368,7 +368,12 @@ extension StrideTo: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end <= element {
+    let distance = _start.distance(to: _end)
+    if distance == 0 || (distance > 0) != (_stride > 0) {
+      return false
+    }
+    if distance > 0 && !(_start <= element && element < _end)
+    || distance < 0 && !(_end < element && element <= _start) {
       return false
     }
     return nil
@@ -377,10 +382,12 @@ extension StrideTo: Sequence {
   @_inlineable
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    let distance = _start.distance(to: _end)
     var start = _start
     for _ in 0..<n {
       start = start.advanced(by: _stride)
-      if start > _end {
+      let isPastEnd = distance > 0 ? start > _end : start < _end
+      if isPastEnd {
         break
       }
     }
@@ -390,10 +397,12 @@ extension StrideTo: Sequence {
   @_inlineable
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    let distance = _start.distance(to: _end)
     var end = _end
     for _ in 0..<n {
       end = end.advanced(by: -_stride)
-      if end < _start {
+      let isBeforeStart = distance > 0 ? end < _start : end > _start
+      if isBeforeStart {
         break
       }
     }
@@ -426,10 +435,12 @@ extension StrideTo: Sequence {
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0,
       "Can't take a prefix of negative length from a sequence")
+    let distance = _start.distance(to: _end)
     var end = _start
     for _ in 0..<maxLength {
       end = end.advanced(by: _stride)
-      if end >= _end {
+      let isEndOrPastEnd = distance > 0 ? end >= _end : end <= _end
+      if isEndOrPastEnd {
         end = _end
         break
       }
@@ -475,7 +486,8 @@ extension StrideTo: Sequence {
 
     @discardableResult
     func appendSubsequence(_ knownEmpty: Bool? = nil) -> Bool {
-      let isEmpty = knownEmpty ?? (subStart.distance(to: subEnd) < _stride)
+      let isEmpty = knownEmpty ??
+        (subStart.distance(to: subEnd).magnitude < _stride.magnitude)
       if isEmpty && omittingEmptySubsequences {
         return false
       }

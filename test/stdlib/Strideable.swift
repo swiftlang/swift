@@ -279,6 +279,24 @@ StrideTestSuite.test("StrideTo/underestimatedCount") {
   expectEqual(5, stride(from: 0.1, to: 1.0, by: 0.2).underestimatedCount)
 }
 
+StrideTestSuite.test("StrideTo/contains") {
+  let s = stride(from: 1, to: 10, by: 3)
+  expectTrue(s.contains(1))
+  expectTrue(s.contains(7))
+  expectFalse(s.contains(0))
+  expectFalse(s.contains(2))
+  expectFalse(s.contains(10))
+}
+
+StrideTestSuite.test("StrideTo/contains/negative stride") {
+  let s = stride(from: 7, to: 0, by: -3)
+  expectTrue(s.contains(1))
+  expectTrue(s.contains(7))
+  expectFalse(s.contains(0))
+  expectFalse(s.contains(2))
+  expectFalse(s.contains(10))
+}
+
 StrideTestSuite.test("StrideTo/dropFirst") {
   let getStride = { stride(from: 1, to: 10, by: 3) }
   expectEqualSequence([1, 4, 7], getStride().dropFirst(0))
@@ -289,6 +307,14 @@ StrideTestSuite.test("StrideTo/dropFirst") {
     expectCrashLater()
     _ = getStride().dropFirst(-1)
   }
+}
+
+StrideTestSuite.test("StrideTo/dropFirst/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([7, 4, 1], getStride().dropFirst(0))
+  expectEqualSequence([4, 1], getStride().dropFirst(1))
+  expectEqualSequence([], getStride().dropFirst(3))
+  expectEqualSequence([], getStride().dropFirst(42))
 }
 
 StrideTestSuite.test("StrideTo/dropLast") {
@@ -304,6 +330,15 @@ StrideTestSuite.test("StrideTo/dropLast") {
   }
 }
 
+StrideTestSuite.test("StrideTo/dropLast/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([7, 4, 1], getStride().dropLast(0))
+  expectEqualSequence([7, 4], getStride().dropLast(1))
+  expectEqualSequence([7], getStride().dropLast(2))
+  expectEqualSequence([], getStride().dropLast(3))
+  expectEqualSequence([], getStride().dropLast(42))
+}
+
 StrideTestSuite.test("StrideTo/drop(while:)") {
   let getStride = { stride(from: 1, to: 10, by: 3) }
   expectEqualSequence([1, 4, 7], getStride().drop { _ in false })
@@ -313,15 +348,33 @@ StrideTestSuite.test("StrideTo/drop(while:)") {
   expectEqualSequence([], stride(from: 1, to: 1, by: 1).drop { _ in true })
 }
 
+StrideTestSuite.test("StrideTo/drop(while:)/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([7, 4, 1], getStride().drop { _ in false })
+  expectEqualSequence([], getStride().drop { _ in true })
+  expectEqualSequence([4, 1], getStride().drop { $0 > 4 })
+  expectEqualSequence([], stride(from: 1, to: 1, by: -1).drop { _ in false })
+  expectEqualSequence([], stride(from: 1, to: 1, by: -1).drop { _ in true })
+}
+
 StrideTestSuite.test("StrideTo/prefix(_:)") {
   let getStride = { stride(from: 1, to: 10, by: 3) }
   expectEqualSequence([], getStride().prefix(0))
   expectEqualSequence([1], getStride().prefix(1))
+  expectEqualSequence([1, 4, 7], getStride().prefix(3))
   expectEqualSequence([1, 4, 7], getStride().prefix(42))
   do {
     expectCrashLater()
     _ = getStride().prefix(-1)
   }
+}
+
+StrideTestSuite.test("StrideTo/prefix(_:)/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([], getStride().prefix(0))
+  expectEqualSequence([7], getStride().prefix(1))
+  expectEqualSequence([7, 4, 1], getStride().prefix(3))
+  expectEqualSequence([7, 4, 1], getStride().prefix(42))
 }
 
 StrideTestSuite.test("StrideTo/prefix(while:)") {
@@ -333,10 +386,20 @@ StrideTestSuite.test("StrideTo/prefix(while:)") {
   expectEqualSequence([], stride(from: 1, to: 1, by: 1).prefix { _ in true })
 }
 
+StrideTestSuite.test("StrideTo/prefix(while:)/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([7, 4, 1], getStride().prefix { _ in true })
+  expectEqualSequence([], getStride().prefix { _ in false })
+  expectEqualSequence([7], getStride().prefix { $0 > 4 })
+  expectEqualSequence([], stride(from: 1, to: 1, by: -1).prefix { _ in false })
+  expectEqualSequence([], stride(from: 1, to: 1, by: -1).prefix { _ in true })
+}
+
 StrideTestSuite.test("StrideTo/suffix(_:)") {
   let getStride = { stride(from: 1, to: 10, by: 3) }
   expectEqualSequence([], getStride().suffix(0))
   expectEqualSequence([7], getStride().suffix(1))
+  expectEqualSequence([1, 4, 7], getStride().suffix(3))
   expectEqualSequence([1, 4, 7], getStride().suffix(42))
   do {
     expectCrashLater()
@@ -344,9 +407,15 @@ StrideTestSuite.test("StrideTo/suffix(_:)") {
   }
 }
 
+StrideTestSuite.test("StrideTo/suffix(_:)/negative stride") {
+  let getStride = { stride(from: 7, to: 0, by: -3) }
+  expectEqualSequence([], getStride().suffix(0))
+  expectEqualSequence([1], getStride().suffix(1))
+  expectEqualSequence([7, 4, 1], getStride().suffix(3))
+  expectEqualSequence([7, 4, 1], getStride().suffix(42))
+}
+
 StrideTestSuite.test("StrideTo/split") {
-  let getStride = { stride(from: 1, to: 21, by: 3) }
-  let getArray = { [1, 4, 7, 10, 13, 16, 19] }
   func splitTest(
     _ arr: [Int],
     _ strd: StrideTo<Int>,
@@ -367,43 +436,48 @@ StrideTestSuite.test("StrideTo/split") {
 
     expectEqualSequence(arraySub, strideSub, file: file, line: line)
   }
-  // corner cases
-  splitTest(getArray(), getStride(), 0, false) { _ in true }
-  splitTest(getArray(), getStride(), 1, false) { _ in true }
-  splitTest(getArray(), getStride(), 42, false) { _ in true }
-  splitTest(getArray(), getStride(), 0, true) { _ in true }
-  splitTest(getArray(), getStride(), 1, true) { _ in true }
-  splitTest(getArray(), getStride(), 42, true) { _ in true }
-  splitTest(getArray(), getStride(), 0, false) { _ in false }
-  splitTest(getArray(), getStride(), 1, false) { _ in false }
-  splitTest(getArray(), getStride(), 42, false) { _ in false }
-  splitTest(getArray(), getStride(), 0, true) { _ in false }
-  splitTest(getArray(), getStride(), 1, true) { _ in false }
-  splitTest(getArray(), getStride(), 42, true) { _ in false }
+  for (stride_, array_) in [
+    (stride(from: 1, to: 21, by: 3), [1, 4, 7, 10, 13, 16, 19]),
+    (stride(from: 19, to: -1, by: -3), [19, 16, 13, 10, 7, 4, 1])] {
 
-  // sparse seaparators
-  splitTest(getArray(), getStride(), 0, true) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 1, true) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 3, true) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 42, true) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 0, false) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 1, false) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 3, false) { $0 % 2 == 0 }
-  splitTest(getArray(), getStride(), 42, false) { $0 % 2 == 0 }
+    // corner cases
+    splitTest(array_, stride_, 0, false) { _ in true }
+    splitTest(array_, stride_, 1, false) { _ in true }
+    splitTest(array_, stride_, 42, false) { _ in true }
+    splitTest(array_, stride_, 0, true) { _ in true }
+    splitTest(array_, stride_, 1, true) { _ in true }
+    splitTest(array_, stride_, 42, true) { _ in true }
+    splitTest(array_, stride_, 0, false) { _ in false }
+    splitTest(array_, stride_, 1, false) { _ in false }
+    splitTest(array_, stride_, 42, false) { _ in false }
+    splitTest(array_, stride_, 0, true) { _ in false }
+    splitTest(array_, stride_, 1, true) { _ in false }
+    splitTest(array_, stride_, 42, true) { _ in false }
 
-  // adjacent seaparators
-  splitTest(getArray(), getStride(), 0, true) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 1, true) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 3, true) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 42, true) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 0, false) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 1, false) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 3, false) { 10...13 ~= $0 }
-  splitTest(getArray(), getStride(), 42, false) { 10...13 ~= $0 }
+    // sparse seaparators
+    splitTest(array_, stride_, 0, true) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 1, true) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 3, true) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 42, true) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 0, false) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 1, false) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 3, false) { $0 % 2 == 0 }
+    splitTest(array_, stride_, 42, false) { $0 % 2 == 0 }
+
+    // adjacent seaparators
+    splitTest(array_, stride_, 0, true) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 1, true) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 3, true) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 42, true) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 0, false) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 1, false) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 3, false) { 10...13 ~= $0 }
+    splitTest(array_, stride_, 42, false) { 10...13 ~= $0 }
+  }
 
   do {
     expectCrashLater()
-    _ = getStride().split(
+    _ = stride(from: 1, to: 21, by: 3).split(
       maxSplits: -1, omittingEmptySubsequences: false) { _ in false }
   }
 }
