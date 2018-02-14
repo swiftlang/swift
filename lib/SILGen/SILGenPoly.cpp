@@ -1120,7 +1120,11 @@ namespace {
         SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
 
         auto payload = tupleTemp->getManagedAddress();
-        return ManagedValue(optionalBuf, payload.getCleanup());
+        if (payload.hasCleanup()) {
+          payload.forward(SGF);
+          return SGF.emitManagedBufferWithCleanup(optionalBuf);
+        }
+        return ManagedValue::forUnmanaged(optionalBuf);
       }
     }
 
@@ -1150,7 +1154,12 @@ namespace {
 
       auto payload = tupleTemp->getManagedAddress();
       if (SGF.silConv.useLoweredAddresses()) {
-        return ManagedValue(existentialBuf, payload.getCleanup());
+        // We always need to return the existential buf with a cleanup even if
+        // we stored trivial values, since SILGen maintains the invariant that
+        // forwarding a non-trivial value (i.e. an Any) into memory must be done
+        // at +1.
+        payload.forward(SGF);
+        return SGF.emitManagedBufferWithCleanup(existentialBuf);
       }
 
       // We are under opaque value(s) mode - load the any and init an opaque
