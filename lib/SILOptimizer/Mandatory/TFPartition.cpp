@@ -1674,7 +1674,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
                                   SILTensorOpInfo &tfopInfo) {
   auto &B = getBuilder();
-  auto loc = remapLocation(inst->getLoc());
+  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Handle special case "ops".
   if (tfopInfo.opName == "tfc.scalarToTensor") {
