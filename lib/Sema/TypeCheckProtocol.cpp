@@ -1359,6 +1359,27 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     }
   }
 
+  // Not every protocol/type is compatible with conditional conformances.
+  if (!conformance->getConditionalRequirements().empty()) {
+    auto nestedType = canT;
+    // Obj-C generics cannot be looked up at runtime, so we don't support
+    // conditional conformances involving them. Check the full stack of nested
+    // types for any obj-c ones.
+    while (nestedType) {
+      if (auto clas = nestedType->getClassOrBoundGenericClass()) {
+        if (clas->usesObjCGenericsModel()) {
+          TC.diagnose(ComplainLoc,
+                      diag::objc_generics_cannot_conditionally_conform, T,
+                      Proto->getDeclaredType());
+          conformance->setInvalid();
+          return conformance;
+        }
+      }
+
+      nestedType = nestedType.getNominalParent();
+    }
+  }
+
   // If the protocol contains missing requirements, it can't be conformed to
   // at all.
   if (Proto->hasMissingRequirements()) {
