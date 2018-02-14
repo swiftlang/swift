@@ -130,6 +130,9 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
       } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
         val = cfi->getOperand();
         continue;
+      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
+        val = cvt->getOperand();
+        continue;
       }
       return inst;
     } else if (SILValue param = getParam(val)) {

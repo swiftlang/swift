@@ -283,10 +283,15 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 
 SILValue swift::stripConvertFunctions(SILValue V) {
   while (true) {
-    auto CFI = dyn_cast<ConvertFunctionInst>(V);
-    if (!CFI)
-      return V;
-    V = CFI->getOperand();
+    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
+      V = CFI->getOperand();
+      continue;
+    }
+    else if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(V)) {
+      V = Cvt->getOperand();
+      continue;
+    }
+    break;
   }
   return V;
 }
@@ -435,8 +440,10 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
 
   // The argument should be a closure.
   auto Arg = PAI->getArgument(0);
-  if (!Arg->getType().is<SILFunctionType>()
-      || !Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()))
+  if (!Arg->getType().is<SILFunctionType>() ||
+      (!Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()) &&
+       Arg->getType().getAs<SILFunctionType>()->getRepresentation() !=
+           SILFunctionType::Representation::Thick))
     return SILValue();
 
   return Arg;

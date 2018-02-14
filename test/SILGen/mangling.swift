@@ -107,9 +107,9 @@ struct HasVarInit {
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
-// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXK_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: @autoclosure () -> Int) {}
-// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXE_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden @$S8mangling24autoClosureOverloadCallsyyF : $@convention(thin) () -> () {

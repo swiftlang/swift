@@ -2004,6 +2004,10 @@ static SILValue getActualCallee(SILValue Callee) {
       Callee = CFI->getConverted();
       continue;
     }
+    if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
+      Callee = Cvt->getConverted();
+      continue;
+    }
     if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTI->getConverted();
       continue;
@@ -2019,7 +2023,14 @@ static SILValue getActualCallee(SILValue Callee) {
 static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                               SILValue &Callee,
                                               SILType &CalleeType) {
-  auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
+  auto CalleeOperand = TAI->getCallee();
+
+  // Look through a @noescape conversion.
+  auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeOperand);
+  if (Cvt)
+    CalleeOperand = Cvt->getConverted();
+
+  auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
     return false;
   
