@@ -516,7 +516,7 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
   if (Action == FrontendOptions::ActionType::EmitSyntax)
-    Instance.getASTContext().LangOpts.KeepSyntaxInfoInSourceFile = true;
+    Instance.getASTContext().LangOpts.BuildSyntaxTree = true;
 
   // We've been asked to precompile a bridging header; we want to
   // avoid touching any other inputs and just parse, emit and exit.
@@ -1060,7 +1060,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
-  
+
   // If the AST Context has no errors but no IRModule is available,
   // parallelIRGen happened correctly, since parallel IRGen produces multiple
   // modules.
