@@ -336,7 +336,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
-              SF.shouldKeepSyntaxInfo()
+              SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
           SF, SIL, PersistentState) {}
@@ -465,7 +465,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    TokReceiver(SF.shouldKeepSyntaxInfo() ?
+    TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
@@ -982,7 +982,8 @@ struct ParserUnit::Implementation {
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
-            Opts.KeepSyntaxInfoInSourceFile)) {
+            Opts.CollectParsedToken,
+            Opts.BuildSyntaxTree)) {
   }
 };
 
