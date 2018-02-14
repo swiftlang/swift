@@ -981,7 +981,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
 }
 
 func SR_6272_d() {
@@ -1167,7 +1167,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
 

@@ -402,6 +402,15 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     if (type->hasError())
       continue;
 
+    // If the source of the binding is 'OptionalObject' constraint
+    // and type variable is on the left-hand side, that means
+    // that it _has_ to be of optional type, since the right-hand
+    // side of the constraint is object type of the optional.
+    if (constraint->getKind() == ConstraintKind::OptionalObject &&
+        kind == AllowedBindingKind::Subtypes) {
+      type = OptionalType::get(type);
+    }
+
     // If the type we'd be binding to is a dependent member, don't try to
     // resolve this type variable yet.
     if (type->is<DependentMemberType>()) {
