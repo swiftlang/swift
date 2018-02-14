@@ -941,8 +941,14 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      if (!witness->hasInterfaceType())
+      if (!witness->hasValidSignature()) {
         TC.validateDecl(witness);
+
+        if (!witness->hasValidSignature()) {
+          doNotDiagnoseMatches = true;
+          continue;
+        }
+      }
 
       auto match = matchWitness(TC, Proto, conformance, DC,
                                 requirement, witness);
@@ -4013,6 +4019,11 @@ static bool shouldWarnAboutPotentialWitness(
   // with no argument labels.
   if (isUnlabeledInitializerOrSubscript(req) ||
       isUnlabeledInitializerOrSubscript(witness))
+    return false;
+
+  // For non-@objc requirements, only warn if the witness comes from an
+  // extension.
+  if (!req->isObjC() && !isa<ExtensionDecl>(witness->getDeclContext()))
     return false;
 
   // If the score is relatively high, don't warn: this is probably

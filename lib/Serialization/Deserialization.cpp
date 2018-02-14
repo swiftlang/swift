@@ -738,7 +738,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       // precede SIL linkage, we should be ok.
       assert((genericParam->getDeclContext()->isModuleScopeContext() ||
               DC->isModuleScopeContext() ||
-              genericParam->getDeclContext() == DC) &&
+              genericParam->getDeclContext() == DC ||
+              genericParam->getDeclContext()->isChildContextOf(DC)) &&
              "Mismatched decl context for generic types.");
       params.push_back(genericParam);
       break;
