@@ -2460,7 +2460,9 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
 
         SILType ty = SGF.getLoweredType(V->getType());
 
-        SILValue value;
+        // Initialize mv at +1. We always pass values in at +1 for today into
+        // shared blocks.
+        ManagedValue mv;
         if (ty.isAddressOnly(SGF.F.getModule())) {
           // There's no basic block argument, since we don't allow basic blocks
           // to have address arguments.
@@ -2473,21 +2475,22 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           // been initialized on entry.
           auto found = Temporaries.find(V);
           assert(found != Temporaries.end());
-          value = found->second;
+          mv = SGF.emitManagedRValueWithCleanup(found->second);
         } else {
-          value = caseBB->getArgument(argIndex++);
+          SILValue arg = caseBB->getArgument(argIndex++);
+          assert(arg.getOwnershipKind() == ValueOwnershipKind::Owned ||
+                 arg.getOwnershipKind() == ValueOwnershipKind::Trivial);
+          mv = SGF.emitManagedRValueWithCleanup(arg);
         }
 
         if (V->isLet()) {
-          // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = value;
-          SGF.enterDestroyCleanup(value);
+          // Just emit a let and leave the cleanup alone.
+          SGF.VarLocs[V].value = mv.getValue();
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
           // now we finally alloc a box for the var and forward in the chosen value.
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
-          auto mv = ManagedValue::forUnmanaged(value);
           newVar->copyOrInitValueInto(SGF, V, mv, /*isInit*/ true);
           newVar->finishInitialization(SGF);
         }

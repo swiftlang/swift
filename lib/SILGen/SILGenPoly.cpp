@@ -845,7 +845,7 @@ void SILGenFunction::collectThunkParams(
 static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
                           ManagedValue result, TemporaryInitialization &temp) {
   if (result.isInContext()) return;
-  result.forwardInto(SGF, loc, temp.getAddress());
+  result.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, temp.getAddress());
   temp.finishInitialization(SGF);
 }
 
