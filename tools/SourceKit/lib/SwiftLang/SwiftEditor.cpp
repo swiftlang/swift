@@ -1749,7 +1749,7 @@ void SwiftEditorDocument::updateSemaInfo() {
 }
 
 void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
-                                SwiftLangSupport &Lang) {
+                                SwiftLangSupport &Lang, bool BuildSyntexTree) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   assert(Impl.SemanticInfo && "Impl.SemanticInfo must be set");
@@ -1768,7 +1768,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Lang.getASTManager().
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
-
+  CompInv.getLangOptions().BuildSyntaxTree = BuildSyntexTree;
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
@@ -2081,12 +2081,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-
+  const bool BuildSyntaxTree = false;
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
     if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
@@ -2099,7 +2099,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
   }
 
   if (Consumer.needsSemanticInfo()) {
@@ -2147,7 +2147,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
     assert(Snapshot);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, false);
     EditorDoc->readSyntaxInfo(Consumer);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();
