@@ -5936,11 +5936,28 @@ void GenericSignatureBuilder::checkConformanceConstraints(
   }
 }
 
+/// Compare dependent types for use in anchors.
+///
+/// FIXME: This is a hack that will go away once we eliminate potential
+/// archetypes that refer to concrete type declarations.
+static int compareAnchorDependentTypes(Type type1, Type type2) {
+  // We don't want any unresolved dependent member types to be anchors, so
+  // prefer that they don't get through.
+  bool hasUnresolvedDependentMember1 =
+    type1->findUnresolvedDependentMemberType() != nullptr;
+  bool hasUnresolvedDependentMember2 =
+    type2->findUnresolvedDependentMemberType() != nullptr;
+  if (hasUnresolvedDependentMember1 != hasUnresolvedDependentMember2)
+    return hasUnresolvedDependentMember2 ? -1 : +1;
+
+  return compareDependentTypes(type1, type2);
+}
+
 namespace swift {
   bool operator<(const DerivedSameTypeComponent &lhs,
                  const DerivedSameTypeComponent &rhs) {
-    return compareDependentTypes(getUnresolvedType(lhs.anchor, { }),
-                                 getUnresolvedType(rhs.anchor, { })) < 0;
+    return compareAnchorDependentTypes(getUnresolvedType(lhs.anchor, { }),
+                                       getUnresolvedType(rhs.anchor, { })) < 0;
   }
 } // namespace swift
 
@@ -6076,7 +6093,7 @@ static void computeDerivedSameTypeComponents(
     componentOf[depType] = componentIndex;
 
     // If this is a better anchor, record it.
-    if (compareDependentTypes(
+    if (compareAnchorDependentTypes(
                 depType,
                 getUnresolvedType(components[componentIndex].anchor, { })) < 0)
       components[componentIndex].anchor = pa;
@@ -6395,7 +6412,7 @@ static void collapseSameTypeComponents(
       auto &newComponent = newComponents[newRepresentativeIndex];
 
       // If the old component has a better anchor, keep it.
-      if (compareDependentTypes(
+      if (compareAnchorDependentTypes(
                             getUnresolvedType(oldComponent.anchor, { }),
                             getUnresolvedType(newComponent.anchor, { })) < 0)
         newComponent.anchor = oldComponent.anchor;
@@ -6795,7 +6812,7 @@ static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
       rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].anchor,
       { });
 
-  return compareDependentTypes(lhsType, rhsType);
+  return compareAnchorDependentTypes(lhsType, rhsType);
 }
 
 void GenericSignatureBuilder::enumerateRequirements(
@@ -7023,6 +7040,9 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 
     if (depTy->hasError())
       return;
+
+    assert(!depTy->findUnresolvedDependentMemberType() &&
+           "Unresolved dependent member type in requirements");
 
     Type repTy;
     if (auto concreteTy = type.dyn_cast<Type>()) {
