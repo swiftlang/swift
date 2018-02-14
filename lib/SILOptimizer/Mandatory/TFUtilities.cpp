@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "TFUtilities"
 #include "TFUtilities.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -171,9 +172,14 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 /// literal constant values that make up its elements.  If this fails or if
 /// the value is not an array, this returns false.  Otherwise it decodes the
 /// array and returns the element initializer in elements.
+///
+/// If arrayInsts is non-null and if decoding succeeds, this function adds all
+/// of the instructions relevant to the definition of this array into the set.
+/// If decoding fails, then the contents of this set are undefined.
 static bool decodeArrayElements(SILValue value,
                                 SmallVectorImpl<SILValue> &elements,
-                                Type &elementType) {
+                                Type &elementType,
+                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
   elementType = getArrayElementType(value->getType().getSwiftRValueType());
   if (!elementType) return false;
 
@@ -190,19 +196,27 @@ static bool decodeArrayElements(SILValue value,
   // here.
   AllocRefInst *allocRef = nullptr;
   while (!(allocRef = dyn_cast<AllocRefInst>(value))) {
-    if (auto *si = dyn_cast<StructInst>(value)) {
+    auto *inst = dyn_cast<SILInstruction>((SILNode*)value);
+    if (!inst) return false;
+
+    // Remember this instruction if requested.
+    if (arrayInsts) arrayInsts->insert(inst);
+
+    if (auto *si = dyn_cast<StructInst>(inst)) {
       if (si->getNumOperands() != 1) return false;
       value = si->getOperand(0);
-    } else if (auto *urci = dyn_cast<UncheckedRefCastInst>(value)) {
+    } else if (auto *urci = dyn_cast<UncheckedRefCastInst>(inst)) {
       value = urci->getOperand();
-    } else if (auto *uci = dyn_cast<UpcastInst>(value)) {
+    } else if (auto *uci = dyn_cast<UpcastInst>(inst)) {
       value = uci->getOperand();
-    } else if (auto *globalValue = dyn_cast<GlobalValueInst>(value)) {
+    } else if (auto *globalValue = dyn_cast<GlobalValueInst>(inst)) {
       // If we found a GlobalValueInst, then we're referring to an array that
       // got moved to being a static initializer.
       auto *init = dyn_cast_or_null<ObjectInst>(
               globalValue->getReferencedGlobal()->getStaticInitializerValue());
       if (!init) return false;
+
+      // Do not add "init" to arrayInsts, since it is not in the host function.
 
       // The initializer elements are the tail elements of the object_inst, see
       // if they are all decodable.
@@ -210,7 +224,7 @@ static bool decodeArrayElements(SILValue value,
         elements.push_back(elt);
 
       return true;
-    } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(value)) {
+    } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(inst)) {
       // The empty array is specially recognized by the optimizer and
       // transformed into a well-known global produced by the standard library.
       // Uses of it look like this:
@@ -220,7 +234,11 @@ static bool decodeArrayElements(SILValue value,
       //   %8 = unchecked_ref_cast %7 : $_EmptyArrayStorage to $BridgeObject
       auto a2p = dyn_cast<AddressToPointerInst>(rptr->getOperand());
       if (!a2p) return false;
+      if (arrayInsts) arrayInsts->insert(a2p);
+
+
       auto *ga = dyn_cast<GlobalAddrInst>(a2p->getOperand());
+      if (arrayInsts && ga) arrayInsts->insert(ga);
 
       elements.clear();
       return ga &&
@@ -229,14 +247,16 @@ static bool decodeArrayElements(SILValue value,
       return false;
     }
   }
+  if (arrayInsts) arrayInsts->insert(allocRef);
 
   // The allocation must be of a constant number of elements.
-  if (allocRef->getNumOperands() != 1 ||
-      !isa<IntegerLiteralInst>(allocRef->getOperand(0)))
+  if (allocRef->getNumOperands() != 1) return false;
+
+  auto numElementsInst = dyn_cast<IntegerLiteralInst>(allocRef->getOperand(0));
+  if (!numElementsInst)
     return false;
 
-  uint64_t numElements = cast<IntegerLiteralInst>(allocRef->getOperand(0))
-                                            ->getValue().getLimitedValue();
+  uint64_t numElements = numElementsInst->getValue().getLimitedValue();
 
   // Given the allocation, we then look for stores.  First there is going to be
   // an upcast to _ContiguousArrayStorageBase which is an internal
@@ -250,8 +270,11 @@ static bool decodeArrayElements(SILValue value,
   // store %13 to %49 : $*Int
   auto *uci = allocRef->getSingleUserOfType<UpcastInst>();
   if (!uci) return false;
+  if (arrayInsts) arrayInsts->insert(uci);
+
   auto *rti = uci->getSingleUserOfType<RefTailAddrInst>();
   if (!rti) return false;
+  if (arrayInsts) arrayInsts->insert(rti);
 
   elements.resize(numElements);
 
@@ -260,9 +283,12 @@ static bool decodeArrayElements(SILValue value,
 
     uint64_t index = 0;
     if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(iai);
+
       auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
       if (!ili)
         return false;
+
       index = ili->getValue().getLimitedValue();
       if (auto *iaiUse = iai->getSingleUse())
         user = iaiUse->getUser();
@@ -272,12 +298,14 @@ static bool decodeArrayElements(SILValue value,
 
     // Check to see if we have a store to a valid index that hasn't been stored
     // to yet.
-    auto *si = dyn_cast<StoreInst>(user);
-    if (!si || index >= elements.size() || elements[index] != SILValue())
+    auto *store = dyn_cast<StoreInst>(user);
+    if (!store || index >= elements.size() || elements[index] != SILValue())
       return false;
 
+    if (arrayInsts) arrayInsts->insert(store);
+
     // If we got a store to a valid index, it must be our element.
-    elements[index] = si->getOperand(0);
+    elements[index] = store->getOperand(0);
 
     // Track how many elements we see so we can know if we got them all.
     --numElements;
@@ -288,6 +316,95 @@ static bool decodeArrayElements(SILValue value,
     return false;
 
   return true;
+}
+
+
+/// This method is called when an owning reference to an array value is just
+/// removed.  It checks to see if the array value is now unused: if so, it
+/// removes the array and returns true.  Otherwise it returns false without
+/// modifying the code.
+///
+/// This is important because otherwise the array will look like uses of its
+/// element values.  If these are tensors, it will cause copies to be inserted
+/// from the accelerator program back to the host.
+///
+static bool tryToRemoveArrayValue(SILValue value) {
+  SmallVector<SILValue, 4> elements;
+  Type elementType;
+  SmallPtrSet<SILInstruction*, 8> arrayInsts;
+  // Decode the array, collecting all of the instructions we see that are
+  // relevant to its definition.
+  if (!decodeArrayElements(value, elements, elementType, &arrayInsts))
+    return false;
+
+  // Okay, we've collected all of the core instructions that make up the
+  // array implementation guts.  We can remove the array if we can account for
+  // all uses of these instructions.  If we find any use that we don't know,
+  // then we conservatively leave the array.
+
+  // Iterate over a copy of the set using indexes, to avoid invalidating
+  // iterators.
+  SmallVector<SILInstruction*, 8> instsToCheck(arrayInsts.begin(),
+                                               arrayInsts.end());
+  for (unsigned i = 0; i != instsToCheck.size(); ++i) {
+    auto *inst = instsToCheck[i];
+
+    for (auto result : inst->getResults()) {
+      for (auto use : result->getUses()) {
+        auto *user = use->getUser();
+        // Its ok if the user is something we're planning to remove.
+        if (arrayInsts.count(user))
+          continue;
+
+        // If this is debug info or refcounting logic, we can add it to the set
+        // of instructions to remove.
+        if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user)) {
+          instsToCheck.push_back(user);
+          arrayInsts.insert(user);
+          continue;
+        }
+
+        // The implementation of array does some stores into the array, which
+        // aren't picked up by the array decoding.  We can remove these.
+        if (auto *ref = dyn_cast<RefElementAddrInst>(user)) {
+          if (auto use = ref->getSingleUse())
+            if (auto *store = dyn_cast<StoreInst>(use->getUser()))
+              // Check that this is a store INTO the array, not OF the array.
+              if (store->getDest() == ref) {
+                arrayInsts.insert(store);
+                instsToCheck.push_back(store);
+                arrayInsts.insert(ref);
+                instsToCheck.push_back(ref);
+                continue;
+              }
+        }
+
+        // Otherwise we don't know what this is, conservatively bail out.
+        DEBUG(llvm::errs() << "Could not remove array because of: " << *user);
+        return false;
+      }
+    }
+  }
+
+  // If we can remove all of the instructions then do so!  Start by dropping all
+  // inter-dependent references.
+  for (auto inst : instsToCheck)
+    inst->dropAllReferences();
+
+  // Then delete them.
+  for (auto inst : instsToCheck)
+    inst->eraseFromParent();
+
+  return true;
+}
+
+/// Given an array value on which we recently dropped a consuming use, try to
+/// remove all the computation that produces the array if possible.  If not,
+/// emit a destroy_value instruction to avoid leaking it.
+static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
+                                      SILBuilder &B) {
+  if (!tryToRemoveArrayValue(array))
+    B.emitDestroyValueOperation(loc, array);
 }
 
 SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
@@ -642,6 +759,16 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
 
   SILBuilder B(inst);
 
+  // We are dropping a reference to the element and shape array initializers, so
+  // we need to remove the arrays themselves or at least release them.
+  auto tmp = inst->getOperand(1);
+  inst->getAllOperands()[1].drop();
+  removeOrDestroyArrayValue(tmp, inst->getLoc(), B);
+  // Shape too.
+  tmp = inst->getOperand(2);
+  inst->getAllOperands()[2].drop();
+  removeOrDestroyArrayValue(tmp, inst->getLoc(), B);
+
   // Finally build a new builtin instruction with the simplified operands.
   auto newInst =
     B.createBuiltin(inst->getLoc(),
@@ -710,6 +837,12 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   operands.push_back(operands[0]);
   name += ",dtype";
 
+  // We are dropping a reference to the element initializer, so we need to
+  // remove the array itself or at least release it.
+  auto arrayValue = inst->getOperand(1);
+  inst->getAllOperands()[1].drop();
+  removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
+
   // Finally build a new builtin instruction with the simplified operands.
   auto newInst =
     B.createBuiltin(inst->getLoc(),
@@ -719,6 +852,7 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
+
   return newInst;
 }
 
@@ -933,32 +1067,58 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   assert(v->getType().getSwiftRValueType()->getStructOrBoundGenericStruct() &&
          "Support more general conformances to TensorProtocol");
 
+  auto module = B.getFunction().getModule().getSwiftModule();
+
+  // If this value is just a struct wrapper around a TensorHandle, use the
+  // input of it.  In the case of Tensor2D, we have multiple levels of struct
+  // wrapper.
+  while (1) {
+    auto si = dyn_cast<StructInst>(v);
+    if (!si) break;
+
+    if (si->getNumOperands() != 1)
+      break;
+
+    auto operand = si->getOperand(0);
+    // If we found the TensorHandle itself, then we win - return it.
+    if (isTensorHandle(operand->getType()))
+      return operand;
+
+    // If we found a wrapper around another TensorProtocol, dig deeper.
+    if (!conformsToTensorProtocol(operand->getType().getSwiftRValueType(),
+                                  module))
+      break;
+
+    v = operand;
+  }
+
   // TODO(clattner): it would be more correct to generate a call to an accessor
   // to get the handle out, but for now, we know we're always dealing with types
   // that store the field by-value so we can dig it out in with an easier
-  // approach.
-  auto decl = v->getType().getNominalOrBoundGenericNominal();
-  assert(decl && "Type must be nominal to conform to TensorProtocol");
+  // approach.  This handles structs of TensorHandle (like Tensor) and structs
+  // of structs of TensorHandle (like Tensor2D).
+  while (!isTensorHandle(v->getType())) {
+    auto vTy = v->getType().getSwiftRValueType();
+    auto decl = vTy.getNominalOrBoundGenericNominal();
+    assert(decl && "Type must be nominal to conform to TensorProtocol");
 
-  auto fieldIt = decl->getStoredProperties().begin();
-  assert(fieldIt != decl->getStoredProperties().end() &&
-         "Tensor should have one member");
-  VarDecl *field = *fieldIt++;
-  assert(fieldIt == decl->getStoredProperties().end() &&
-         "Expected one stored field in TensorProtocol type");
+    auto fieldIt = decl->getStoredProperties().begin();
+    assert(fieldIt != decl->getStoredProperties().end() &&
+           "Tensor should have one member");
+    VarDecl *field = *fieldIt++;
+    assert(fieldIt == decl->getStoredProperties().end() &&
+           "Expected one stored field in TensorProtocol type");
 
-  // Form TensorHandle<Scalar>.
-  Type scalarTy = v->getType().getSwiftRValueType();
-  scalarTy = conformsToTensorProtocol(scalarTy, B.getModule().getSwiftModule());
+    // 'vTy' is usually a bound generic type.  Use getTypeOfMember to substitute
+    // the type bound into the member type.
+    auto fieldTy = vTy->getTypeOfMember(module, field);
 
-  auto handleDecl = scalarTy->getASTContext().getTensorHandleDecl();
-  auto handleType =
-    BoundGenericClassType::get(handleDecl, /*parent*/Type(), scalarTy);
+    auto silTy = SILType::getPrimitiveObjectType(fieldTy->getCanonicalType());
+    v = B.createStructExtract(loc, v, field, silTy);
+  }
 
-  auto silTy = SILType::getPrimitiveObjectType(handleType->getCanonicalType());
-  return B.createStructExtract(loc, v, field, silTy);
+  return v;
 }
-
 
 /// Replace any indirect memory operands with direct references to the
 /// scalars they reference.  This potentially replaces the builtin
@@ -1033,6 +1193,13 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
         name += ",$inelt";
       }
 
+      // Drop a reference to the array, making it easy to know if it is
+      // now-unused.
+      inst->getAllOperands()[i].drop();
+
+      // Try to remove the array entirely if it is dead, otherwise emit a
+      // release of it, since we've dropped a consuming use of it.
+      removeOrDestroyArrayValue(operand, inst->getLoc(), B);
       continue;
     }
 
@@ -1054,8 +1221,13 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
                                         opInfo.second, name, operands, inst);
     assert(isArray && "array should be validated in earlier pass");
 
-    // Emit a release of the array, since we've dropped the consuming use of it.
-    B.emitDestroyValueOperation(inst->getLoc(), attrOperand);
+    // Drop a reference to the array, making it easy to know if it is
+    // now-unused.
+    inst->getAllOperands()[i].drop();
+
+    // Try to remove the array entirely if it is dead, otherwise emit a
+    // release of it, since we've dropped a consuming use of it.
+    removeOrDestroyArrayValue(attrOperand, inst->getLoc(), B);
   }
 
   // Determine whether canonicalization changed anything.
@@ -1075,6 +1247,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
                     inst->getType(), /*no substitions*/{}, operands);
   newInst->setDebugLocation(inst->getDebugLocation());
 
+  // Replace the old with the new and delete the old instruction.
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
 

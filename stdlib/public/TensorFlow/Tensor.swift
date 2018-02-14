@@ -148,131 +148,18 @@ public extension Tensor {
     self.init(handle: _TFMakeScalarTensor(value))
   }
 
+  /// Initialize a tensor with an array of tensors (which may themselves be
+  /// scalars).
+  @_inlineable @inline(__always)
+  init<TensorType : TensorProtocol>(_ elements: [TensorType])
+    where TensorType.Scalar == Scalar {
+    self.init(handle: #tfop("Pack", elements))
+  }
+
   /// Initialize a tensor with an array representing a vector.
   @_inlineable @inline(__always)
   init(_ vector: [Scalar]) {
     self.init(handle: _TFTensorFromScalars1D(vector))
-  }
-
-  /// Initialize a tensor with an array of arrays representing a matrix.
-  ///
-  /// - Precondition: The number of elements in each sub-dimensional array in
-  ///   the array must be equal.
-  @_inlineable
-  init(_ literal: [[Scalar]]) {
-    /// Sanity checks.
-    let dim0 = literal.count
-    let dim1 = literal.first?.count ?? 0
-    for subArray in literal {
-      precondition(subArray.count == dim1, """
-        Each dimension must have an equal number of subdimensions.
-        """)
-    }
-    // We don't want to delegate initialization to `init(shape:scalars:)`
-    // because flattening `matrix` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Scalar>(
-      shape: [Int32(dim0), Int32(dim1)],
-      scalarsInitializer: { addr in
-        // Copy to TF_Tensor memory, one row at a time.
-        for (i, subArray) in literal.enumerated() {
-          subArray.withUnsafeBufferPointer { ptr in
-            addr.advanced(by: i * dim1)
-              .assign(from: ptr.baseAddress!, count: dim1)
-          }
-        }
-      }
-    )
-    self.init(handle: tensorHandle)
-  }
-
-  /// Initialize a tensor with an array of arrays of arrays representing a
-  /// 3D tensor.
-  ///
-  /// - Precondition: The number of elements in each sub-dimensional array in
-  ///   the array must be equal.
-  /// - TODO: improve description
-  @_inlineable
-  init(_ literal: [[[Scalar]]]) {
-    /// Sanity checks.
-    let dim0 = literal.count
-    let dim1 = literal.first?.count ?? 0
-    let dim2 = literal.first?.first?.count ?? 0
-    for subArray in literal {
-      precondition(subArray.count == dim1, """
-        Each dimension must have an equal number of subdimensions.
-        """)
-      for subSubArray in subArray {
-        precondition(subSubArray.count == dim2, """
-          Each dimension must have an equal number of subdimensions.
-          """)
-      }
-    }
-    // We don't want to delegate initialization to `init(shape:scalars:)`
-    // because flattening `literal` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Scalar>(
-      shape: [Int32(dim0), Int32(dim1), Int32(dim2)],
-      scalarsInitializer: { addr in
-        // Copy to TF_Tensor memory, one innermost array at a time.
-        for (i, subArray) in literal.enumerated() {
-          for (j, subSubArray) in subArray.enumerated() {
-            subSubArray.withUnsafeBufferPointer { ptr in
-                addr.advanced(by: i * dim1 + j * dim2)
-                  .assign(from: ptr.baseAddress!, count: dim2)
-            }
-          }
-        }
-      }
-    )
-    self.init(handle: tensorHandle)
-  }
-
-  /// Initialize a tensor with an array of array of arrays of arrays
-  /// representing a 4D tensor.
-  ///
-  /// - Precondition: The number of elements in each sub-dimensional array in
-  ///   the array must be equal.
-  /// - TODO: improve description
-  @_inlineable
-  init(_ literal: [[[[Scalar]]]]) {
-    /// Sanity checks.
-    let dim0 = literal.count
-    let dim1 = literal.first?.count ?? 0
-    let dim2 = literal.first?.first?.count ?? 0
-    let dim3 = literal.first?.first?.first?.count ?? 0
-    for subArray in literal {
-      precondition(subArray.count == dim1, """
-        Each dimension must have an equal number of subdimensions.
-        """)
-      for subSubArray in subArray {
-        precondition(subSubArray.count == dim2, """
-          Each dimension must have an equal number of subdimensions.
-          """)
-        for subSubSubArray in subSubArray {
-          precondition(subSubSubArray.count == dim3, """
-            Each dimension must have an equal number of subdimensions.
-            """)
-        }
-      }
-    }
-    // We don't want to delegate initialization to `init(shape:scalars:)`
-    // because flattening `literal` to an array is an unnecessary cost.
-    let tensorHandle = TensorHandle<Scalar>(
-      shape: [Int32(dim0), Int32(dim1), Int32(dim2), Int32(dim3)],
-      scalarsInitializer: { addr in
-        // Copy to TF_Tensor memory, one innermost array at a time.
-        for (i, subArray) in literal.enumerated() {
-          for (j, subSubArray) in subArray.enumerated() {
-            for (k, subSubSubArray) in subSubArray.enumerated() {
-              subSubSubArray.withUnsafeBufferPointer { ptr in
-                addr.advanced(by: i * dim1 + j * dim2 + k * dim3)
-                  .assign(from: ptr.baseAddress!, count: dim3)
-              }
-            }
-          }
-        }
-      }
-    )
-    self.init(handle: tensorHandle)
   }
 
   /// Initialize a tensor with arbitrary shape.
@@ -289,6 +176,20 @@ public extension Tensor {
     let valueTensor = Tensor(repeatedValue).handle
     let shapeTensor = Tensor<Int32>(shape.dimensions).handle
     self.init(handle: #tfop("Fill", shapeTensor, valueTensor))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Initialization Syntax
+//===----------------------------------------------------------------------===//
+
+extension Tensor : ExpressibleByArrayLiteral {
+  /// The type of the elements of an array literal.
+  public typealias ArrayLiteralElement = Tensor<Scalar>
+  /// Creates an instance initialized with the given elements.
+  @inline(__always)
+  public init(arrayLiteral elements: Tensor<Scalar>...) {
+    self.init(elements);
   }
 }
 

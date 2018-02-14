@@ -671,7 +671,8 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   // If the node builder failed, then the tfop definition is wrong, report an
   // error in a way that can hopefully be fixed - pointing to the op definition
   // in the Swift code, and emitting the TensorFlow error information.
-  if (checkStatus(inst->getLoc(), diag::tfop_incorrect_definition))
+  if (checkStatus(getUserSourceLocation(inst->getDebugLocation()),
+                  diag::tfop_incorrect_definition))
     return;
 
   // Check to make sure that the operation produces the number of results we
@@ -992,7 +993,7 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
                      loopBodyFnName.size());
 
   auto *result = graphFn.finishOp(op, status);
-  if (checkStatus(loc.getLocation()))
+  if (checkStatus(getUserSourceLocation(loc)))
     return;
 
   // The live-out value from the while loop was the state of the SILArgument's
@@ -1179,7 +1180,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
                      falseFnName.size());
 
   auto *result = graphFn.finishOp(op, status);
-  if (checkStatus(loc.getLocation()))
+  if (checkStatus(getUserSourceLocation(loc)))
     return;
 
   // Remember each of the results so that any references to the SIL BBArguments

@@ -80,8 +80,8 @@ public func testStraightLineXORTraining() {
   // Training data
   let inputBatch = Tensor<Float>(
     [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-    ).toDevice()
-  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
+    )
+  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]])
 
   // Parameters
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
@@ -115,6 +115,9 @@ public func testStraightLineXORTraining() {
     let dL1 = dO1 * l1 * (1 - l1)
     let dMmul1 = dL1
     let dB1 = dL1
+
+    // Statically detected shape mismatch!
+    // expected-error @+1 {{(op: 'MatMul') with input shapes: [4,2], [4,4]}}
     let dW1 = inputBatch ⊗ dMmul1
 
     // Descent
