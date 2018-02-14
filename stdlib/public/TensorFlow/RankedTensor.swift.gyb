@@ -34,7 +34,7 @@ infix operator ⊗ : MultiplicationPrecedence
          return 'four'
 
   def _elementArrayLiteral(rank):
-    return 'Scalar' if rank == 1 else '[' + _elementArrayLiteral(rank - 1) + ']'
+    return 'Scalar' if rank == 1 else 'Tensor{}D<Scalar>'.format(rank-1)
 }%
 
 % for rank in ranks:
@@ -44,7 +44,6 @@ infix operator ⊗ : MultiplicationPrecedence
 %   ElementTensor = 'Tensor{}D<Scalar>'.format(elementRank)
 %   LiftedTensor = 'Tensor{}D<Scalar>'.format(liftedRank)
 %   elementArrayLiteral = _elementArrayLiteral(rank)
-%   arrayLiteral = '[' + elementArrayLiteral + ']'
 
 /// A ${rankName(rank)}-dimensional tensor.
 public struct ${Self}<Scalar : AccelerableByTensorFlow> {
