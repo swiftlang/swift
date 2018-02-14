@@ -162,6 +162,10 @@ public:
                           unsigned origDepthOrIndex,
                           GenericSignature *genericSig);
 
+  /// Swap archetypes in the substitution map's replacement types with their
+  /// interface types.
+  SubstitutionMap mapReplacementTypesOutOfContext() const;
+
   /// Verify that this substitution map is valid.
   void verify() const;
 

@@ -2501,6 +2501,81 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
         return true;
       
+      auto parseComponentIndices =
+        [&](SmallVectorImpl<KeyPathPatternComponent::Index> &indexes) -> bool {
+          while (true) {
+            unsigned index;
+            CanType formalTy;
+            SILType loweredTy;
+            if (P.parseToken(tok::oper_prefix,
+                             diag::expected_tok_in_sil_instr, "%")
+                || P.parseToken(tok::sil_dollar,
+                                diag::expected_tok_in_sil_instr, "$"))
+              return true;
+            
+            if (!P.Tok.is(tok::integer_literal)
+                || P.Tok.getText().getAsInteger(0, index))
+              return true;
+            
+            P.consumeToken(tok::integer_literal);
+            
+            SourceLoc formalTyLoc;
+            SourceLoc loweredTyLoc;
+            GenericEnvironment *ignoredParsedEnv;
+            if (P.parseToken(tok::colon,
+                             diag::expected_tok_in_sil_instr, ":")
+                || P.parseToken(tok::sil_dollar,
+                                diag::expected_tok_in_sil_instr, "$")
+                || parseASTType(formalTy, formalTyLoc, patternEnv)
+                || P.parseToken(tok::colon,
+                                diag::expected_tok_in_sil_instr, ":")
+                || parseSILType(loweredTy, loweredTyLoc,
+                                ignoredParsedEnv, patternEnv))
+              return true;
+            
+            if (patternEnv)
+              loweredTy = SILType::getPrimitiveType(
+                loweredTy.getSwiftRValueType()->mapTypeOutOfContext()
+                  ->getCanonicalType(),
+                loweredTy.getCategory());
+
+            // Formal type must be hashable.
+            auto proto = P.Context.getProtocol(KnownProtocolKind::Hashable);
+            Type contextFormalTy = formalTy;
+            if (patternEnv)
+              contextFormalTy = patternEnv->mapTypeIntoContext(formalTy);
+            auto lookup = P.SF.getParentModule()->lookupConformance(
+                                                    contextFormalTy, proto);
+            if (!lookup) {
+              P.diagnose(formalTyLoc,
+                         diag::sil_keypath_index_not_hashable,
+                         formalTy);
+              return true;
+            }
+            auto conformance = ProtocolConformanceRef(*lookup);
+            
+            indexes.push_back({index, formalTy, loweredTy, conformance});
+            
+            operandTypes.resize(index+1);
+            if (operandTypes[index] && operandTypes[index] != loweredTy) {
+              P.diagnose(loweredTyLoc,
+                         diag::sil_keypath_index_operand_type_conflict,
+                         index,
+                         operandTypes[index].getSwiftRValueType(),
+                         loweredTy.getSwiftRValueType());
+              return true;
+            }
+            operandTypes[index] = loweredTy;
+            
+            if (P.consumeIf(tok::comma))
+              continue;
+            if (P.consumeIf(tok::r_square))
+              break;
+            return true;
+          }
+          return false;
+        };
+      
       while (true) {
         Identifier componentKind;
         SourceLoc componentLoc;
@@ -2528,17 +2603,71 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           CanType ty;
           if (parseSILDottedPath(prop)
               || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-              || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+              || P.parseToken(tok::sil_dollar,
+                              diag::expected_tok_in_sil_instr, "$")
               || parseASTType(ty, patternEnv))
             return true;
           components.push_back(
             KeyPathPatternComponent::forStoredProperty(cast<VarDecl>(prop), ty));
+        } else if (componentKind.str() == "external") {
+          ValueDecl *externalDecl;
+          SmallVector<ParsedSubstitution, 4> parsedSubs;
+          SmallVector<Substitution, 4> subs;
+          SmallVector<KeyPathPatternComponent::Index, 4> indexes;
+          CanType ty;
+
+          if (parseSILDottedPath(externalDecl)
+              || parseSubstitutions(parsedSubs, patternEnv))
+            return true;
+
+          if (P.consumeIf(tok::l_square)) {
+            if (parseComponentIndices(indexes))
+              return true;
+          }
+          
+          if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+              || P.parseToken(tok::sil_dollar,
+                              diag::expected_tok_in_sil_instr, "$")
+              || parseASTType(ty, patternEnv))
+            return true;
+          
+          if (!parsedSubs.empty()) {
+            auto genericEnv = externalDecl->getInnermostDeclContext()
+                                          ->getGenericEnvironmentOfContext();
+            if (!genericEnv) {
+              P.diagnose(P.Tok,
+                         diag::sil_substitutions_on_non_polymorphic_type);
+              return true;
+            }
+            if (getApplySubstitutionsFromParsed(*this, genericEnv,
+                                                parsedSubs, subs))
+              return true;
+            
+            // Map the substitutions out of the pattern context so that they
+            // use interface types.
+            auto subsMap = genericEnv->getGenericSignature()
+              ->getSubstitutionMap(subs);
+            subsMap = subsMap.mapReplacementTypesOutOfContext();
+            subs.clear();
+            genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
+            
+            for (auto &sub : subs)
+              sub = sub.getCanonicalSubstitution();
+          }
+          
+          auto indexesCopy = P.Context.AllocateCopy(indexes);
+          auto subsCopy = P.Context.AllocateCopy(subs);
+          
+          components.push_back(
+            KeyPathPatternComponent::forExternal(
+              cast<AbstractStorageDecl>(externalDecl),
+              subsCopy, indexesCopy, ty));
         } else if (componentKind.str() == "gettable_property"
                    || componentKind.str() == "settable_property") {
           bool isSettable = componentKind.str()[0] == 's';
           
           CanType componentTy;
-          if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+          if (P.parseToken(tok::sil_dollar,diag::expected_tok_in_sil_instr,"$")
               || parseASTType(componentTy, patternEnv)
               || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
             return true;
@@ -2586,79 +2715,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                 return true;
             } else if (subKind.str() == "indices") {
               if (P.parseToken(tok::l_square,
-                               diag::expected_tok_in_sil_instr, "["))
+                               diag::expected_tok_in_sil_instr, "[")
+                  || parseComponentIndices(indexes))
                 return true;
-              
-              while (true) {
-                unsigned index;
-                CanType formalTy;
-                SILType loweredTy;
-                if (P.parseToken(tok::oper_prefix,
-                                 diag::expected_tok_in_sil_instr, "%")
-                    || P.parseToken(tok::sil_dollar,
-                                    diag::expected_tok_in_sil_instr, "$"))
-                  return true;
-                
-                if (!P.Tok.is(tok::integer_literal)
-                    || P.Tok.getText().getAsInteger(0, index))
-                  return true;
-                
-                P.consumeToken(tok::integer_literal);
-                
-                SourceLoc formalTyLoc;
-                SourceLoc loweredTyLoc;
-                GenericEnvironment *ignoredParsedEnv;
-                if (P.parseToken(tok::colon,
-                                 diag::expected_tok_in_sil_instr, ":")
-                    || P.parseToken(tok::sil_dollar,
-                                    diag::expected_tok_in_sil_instr, "$")
-                    || parseASTType(formalTy, formalTyLoc, patternEnv)
-                    || P.parseToken(tok::colon,
-                                    diag::expected_tok_in_sil_instr, ":")
-                    || parseSILType(loweredTy, loweredTyLoc,
-                                    ignoredParsedEnv, patternEnv))
-                  return true;
-                
-                if (patternEnv)
-                  loweredTy = SILType::getPrimitiveType(
-                    loweredTy.getSwiftRValueType()->mapTypeOutOfContext()
-                      ->getCanonicalType(),
-                    loweredTy.getCategory());
-
-                // Formal type must be hashable.
-                auto proto = P.Context.getProtocol(KnownProtocolKind::Hashable);
-                Type contextFormalTy = formalTy;
-                if (patternEnv)
-                  contextFormalTy = patternEnv->mapTypeIntoContext(formalTy);
-                auto lookup = P.SF.getParentModule()->lookupConformance(
-                                                        contextFormalTy, proto);
-                if (!lookup) {
-                  P.diagnose(formalTyLoc,
-                             diag::sil_keypath_index_not_hashable,
-                             formalTy);
-                  return true;
-                }
-                auto conformance = ProtocolConformanceRef(*lookup);
-                
-                indexes.push_back({index, formalTy, loweredTy, conformance});
-                
-                operandTypes.resize(index+1);
-                if (operandTypes[index] && operandTypes[index] != loweredTy) {
-                  P.diagnose(loweredTyLoc,
-                             diag::sil_keypath_index_operand_type_conflict,
-                             index,
-                             operandTypes[index].getSwiftRValueType(),
-                             loweredTy.getSwiftRValueType());
-                  return true;
-                }
-                operandTypes[index] = loweredTy;
-                
-                if (P.consumeIf(tok::comma))
-                  continue;
-                if (P.consumeIf(tok::r_square))
-                  break;
-                return true;
-              }
             } else if (subKind.str() == "indices_equals") {
               if (parseSILFunctionRef(InstLoc, equals))
                 return true;

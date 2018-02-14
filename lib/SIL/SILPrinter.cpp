@@ -2016,7 +2016,21 @@ public:
       *this << "objc \"" << pattern->getObjCString() << "\"; ";
     
     *this << "root $" << KPI->getPattern()->getRootType();
-    
+
+    auto printComponentIndices =
+      [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
+        *this << '[';
+        interleave(indices,
+          [&](const KeyPathPatternComponent::Index &i) {
+            *this << "%$" << i.Operand << " : $"
+                  << i.FormalType << " : "
+                  << i.LoweredType;
+          }, [&]{
+            *this << ", ";
+          });
+        *this << ']';
+      };
+
     for (auto &component : pattern->getComponents()) {
       *this << "; ";
       
@@ -2064,24 +2078,17 @@ public:
                 << component.getComputedPropertySetter()->getLoweredType();
         }
         
-        if (!component.getComputedPropertyIndices().empty()) {
-          *this << ", indices [";
-          interleave(component.getComputedPropertyIndices(),
-            [&](const KeyPathPatternComponent::Index &i) {
-              *this << "%$" << i.Operand << " : $"
-                    << i.FormalType << " : "
-                    << i.LoweredType;
-            }, [&]{
-              *this << ", ";
-            });
-          *this << "], indices_equals ";
-          component.getComputedPropertyIndexEquals()->printName(PrintState.OS);
+        if (!component.getSubscriptIndices().empty()) {
+          *this << ", indices ";
+          printComponentIndices(component.getSubscriptIndices());
+          *this << ", indices_equals ";
+          component.getSubscriptIndexEquals()->printName(PrintState.OS);
           *this << " : "
-                << component.getComputedPropertyIndexEquals()->getLoweredType();
+                << component.getSubscriptIndexEquals()->getLoweredType();
           *this << ", indices_hash ";
-          component.getComputedPropertyIndexHash()->printName(PrintState.OS);
+          component.getSubscriptIndexHash()->printName(PrintState.OS);
           *this << " : "
-                << component.getComputedPropertyIndexHash()->getLoweredType();
+                << component.getSubscriptIndexHash()->getLoweredType();
         }
         break;
       }
@@ -2103,6 +2110,19 @@ public:
         }
         *this << component.getComponentType();
         break;
+      }
+      case KeyPathPatternComponent::Kind::External: {
+        *this << "external #";
+        printValueDecl(component.getExternalDecl(), PrintState.OS);
+        if (!component.getExternalSubstitutions().empty()) {
+          printSubstitutions(component.getExternalSubstitutions());
+        }
+        
+        if (!component.getSubscriptIndices().empty()) {
+          printComponentIndices(component.getSubscriptIndices());
+        }
+        
+        *this << " : $" << component.getComponentType();
       }
       }
     }

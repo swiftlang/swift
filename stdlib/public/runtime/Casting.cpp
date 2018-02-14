@@ -2985,7 +2985,10 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                           const Metadata *srcType) {
-  return bridgeAnythingNonVerbatimToObjectiveC(src, srcType, /*consume*/ true);
+  bool shouldConsume = true;
+  SWIFT_CC_PLUSZERO_GUARD(shouldConsume = false);
+  return bridgeAnythingNonVerbatimToObjectiveC(src, srcType,
+                                               /*consume*/shouldConsume);
 }
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
@@ -3177,7 +3180,7 @@ _bridgeNonVerbatimFromObjectiveCConditional(
 
   // Local function that releases the source and returns false.
   auto fail = [&] () -> bool {
-    swift_unknownRelease(sourceValue);
+    SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(sourceValue));
     return false;
   };
   
