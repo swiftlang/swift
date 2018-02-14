@@ -389,16 +389,8 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
     SILValue result = SILUndef::get(destType, SGF.SGM.M);
     return ManagedValue::forUnmanaged(result);
   }
-  
-  // Save the cleanup on the argument so we can forward it onto the cast
-  // result.
-  auto cleanup = args[0].getCleanup();
 
-  // Take the reference type argument and cast it.
-  SILValue result = SGF.B.createUncheckedRefCast(loc, args[0].getValue(),
-                                                 destType);
-  // Return the cast result with the original cleanup.
-  return ManagedValue(result, cleanup);
+  return SGF.B.createUncheckedRefCast(loc, args[0], destType);
 }
 
 /// Specialized emitter for Builtin.castFromNativeObject.
