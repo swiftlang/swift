@@ -747,9 +747,10 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
     SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
     Optional<unsigned> bufferID) {
   ModuleDecl *mainModule = getMainModule();
-  bool keepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
   SourceFile *inputFile = new (*Context)
-      SourceFile(*mainModule, fileKind, bufferID, importKind, keepSyntaxInfo);
+      SourceFile(*mainModule, fileKind, bufferID, importKind,
+                 Invocation.getLangOptions().CollectParsedToken,
+                 Invocation.getLangOptions().BuildSyntaxTree);
   MainModule->addFile(*inputFile);
 
   if (bufferID && isPrimaryInput(*bufferID)) {
