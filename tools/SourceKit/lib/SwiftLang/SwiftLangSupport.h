@@ -91,7 +91,8 @@ public:
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
-  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang);
+  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
+             bool BuildSyntaxTree);
   void readSyntaxInfo(EditorConsumer& consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
