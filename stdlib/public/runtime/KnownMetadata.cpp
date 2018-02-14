@@ -148,12 +148,12 @@ namespace {
   };
 } // end anonymous namespace
 
-/// The basic value-witness table for @noescape function types.
+/// The basic value-witness table for escaping function types.
 const ExtraInhabitantsValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
 
-/// The basic value-witness table for escaping function types.
+/// The basic value-witness table for @noescape function types.
 const ExtraInhabitantsValueWitnessTable
   swift::VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING) =
     ValueWitnessTableForBox<TrivialThickFunctionBox>::table;
