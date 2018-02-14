@@ -63,27 +63,6 @@ const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-SWIFT_READONLY __swift_int32_t
-_swift_stdlib_unicode_compare_utf16_utf16(const __swift_uint16_t *Left,
-                                          __swift_int32_t LeftLength,
-                                          const __swift_uint16_t *Right,
-                                          __swift_int32_t RightLength);
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-SWIFT_READONLY __swift_int32_t
-_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *Left,
-                                         __swift_int32_t LeftLength,
-                                         const __swift_uint16_t *Right,
-                                         __swift_int32_t RightLength);
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-SWIFT_READONLY __swift_int32_t
-_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *Left,
-                                        __swift_int32_t LeftLength,
-                                        const unsigned char *Right,
-                                        __swift_int32_t RightLength);
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
 void *_swift_stdlib_unicodeCollationIterator_create(
     const __swift_uint16_t *Str,
     __swift_uint32_t Length);
