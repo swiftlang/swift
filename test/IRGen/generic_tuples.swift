@@ -22,6 +22,8 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK: [[X_TMP:%.*]] = bitcast i8* [[X_ALLOCA]] to %swift.opaque*
+// Debug info shadow copy.
+// CHECK-NEXT: store i8* [[X_ALLOCA]]
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: [[INITIALIZE_WITH_COPY:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
