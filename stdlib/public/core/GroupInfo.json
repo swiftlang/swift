@@ -120,9 +120,8 @@
     "Dump.swift",
     "Mirror.swift",
     "Mirrors.swift",
-    "ObjCMirrors.swift",
-    "ObjectIdentifier.swift",
-    "ReflectionLegacy.swift"
+    "ReflectionMirror.swift",
+    "ObjectIdentifier.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
