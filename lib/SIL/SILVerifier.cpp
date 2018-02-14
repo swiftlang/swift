@@ -2898,8 +2898,10 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
-    auto adjustedOperandExtInfo = opFTy->getExtInfo().withRepresentation(
-                                           SILFunctionType::Representation::Thick);
+    auto adjustedOperandExtInfo =
+        opFTy->getExtInfo()
+            .withRepresentation(SILFunctionType::Representation::Thick)
+            .withNoEscape(resFTy->isNoEscape());
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }

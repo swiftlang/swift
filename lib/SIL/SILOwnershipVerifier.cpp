@@ -1009,6 +1009,9 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
     return {compatibleWithOwnership(ValueOwnershipKind::Owned),
             UseLifetimeConstraint::MustBeInvalidated};
   case ParameterConvention::Direct_Guaranteed:
+    if (SubstCalleeType->isNoEscape())
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+        UseLifetimeConstraint::MustBeLive};
     return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
             UseLifetimeConstraint::MustBeLive};
   }
@@ -1189,6 +1192,16 @@ OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
     MarkDependenceInst *MDI) {
+
+  // Forward ownership if the mark_dependence instruction marks a dependence
+  // on a @noescape function type for an escaping function type.
+  if (getValue() == MDI->getValue())
+    if (auto ResFnTy = MDI->getType().getAs<SILFunctionType>())
+      if (auto BaseFnTy = MDI->getBase()->getType().getAs<SILFunctionType>())
+        if (!ResFnTy->isNoEscape() && BaseFnTy->isNoEscape())
+          return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+                  UseLifetimeConstraint::MustBeInvalidated};
+
   // We always treat mark dependence as a use that keeps a value alive. We will
   // be introducing a begin_dependence/end_dependence version of this later.
   return {true, UseLifetimeConstraint::MustBeLive};

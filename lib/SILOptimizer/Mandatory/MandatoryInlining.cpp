@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
@@ -196,9 +197,12 @@ static void cleanupCalleeValue(
   // Handle partial_apply/thin_to_thick -> convert_function:
   // tryDeleteDeadClosure must run before deleting a ConvertFunction that
   // uses the PartialApplyInst or ThinToThickFunctionInst. tryDeleteDeadClosure
-  // will delete any uses of the closure, including this ConvertFunction.
+  // will delete any uses of the closure, including a convert_escape_to_noescape
+  // conversion.
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue))
     CalleeSource = CFI->getOperand();
+  else if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue))
+    CalleeSource = Cvt->getOperand();
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeSource)) {
     SILValue Callee = PAI->getCallee();
@@ -315,7 +319,7 @@ static SILFunction *getCalleeFunction(
   // would be a good optimization to handle and would be as simple as inserting
   // a cast.
   auto skipFuncConvert = [](SILValue CalleeValue) {
-    auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeValue);
+    auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
     if (!CFI)
       return CalleeValue;
 
@@ -338,6 +342,7 @@ static SILFunction *getCalleeFunction(
     return CFI->getOperand();
   };
 
+  // Look through a escape to @noescape conversion.
   CalleeValue = skipFuncConvert(CalleeValue);
 
   // We are allowed to see through exactly one "partial apply" instruction or

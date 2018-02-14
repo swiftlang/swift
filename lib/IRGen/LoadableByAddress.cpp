@@ -2402,7 +2402,19 @@ void LoadableByAddress::recreateConvInstrs() {
           instr->getLoc(), instr->getOperand(), newType);
       break;
     }
-    default:
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+      auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
+      newInstr = convBuilder.createConvertEscapeToNoEscape(
+          instr->getLoc(), instr->getOperand(), newType);
+      break;
+    }
+    case SILInstructionKind::MarkDependenceInst: {
+      auto instr = cast<MarkDependenceInst>(convInstr);
+      newInstr = convBuilder.createMarkDependence(
+          instr->getLoc(), instr->getValue(), instr->getBase());
+      break;
+    }
+     default:
       llvm_unreachable("Unexpected conversion instruction");
     }
     convInstr->replaceAllUsesWith(newInstr);
@@ -2484,6 +2496,8 @@ void LoadableByAddress::run() {
                 break;
               }
               case SILInstructionKind::ConvertFunctionInst:
+              case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+              case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
               case SILInstructionKind::ThinToThickFunctionInst: {
                 conversionInstrs.insert(
@@ -2504,6 +2518,22 @@ void LoadableByAddress::run() {
               }
             }
             funcRefs.insert(FRI);
+          }
+        } else if (auto *Cvt = dyn_cast<MarkDependenceInst>(&I)) {
+          SILValue val = Cvt->getValue();
+          SILType currType = val->getType();
+          if (auto fType = currType.getAs<SILFunctionType>()) {
+            if (modifiableFunction(fType)) {
+              conversionInstrs.insert(Cvt);
+            }
+          }
+        } else if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(&I)) {
+          SILValue val = Cvt->getConverted();
+          SILType currType = val->getType();
+          auto fType = currType.getAs<SILFunctionType>();
+          assert(fType && "Expected SILFunctionType");
+          if (modifiableFunction(fType)) {
+            conversionInstrs.insert(Cvt);
           }
         } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(&I)) {
           SILValue val = CFI->getConverted();
