@@ -118,7 +118,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                                   enableResilience,
                                                   DepTracker));
   }
-  
+
   auto SML = SerializedModuleLoader::create(*Context, DepTracker);
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
@@ -391,7 +391,8 @@ void CompilerInstance::createREPLFile(
     const ImplicitImports &implicitImports) const {
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
-      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
+      Invocation.getLangOptions().CollectParsedToken,
+      Invocation.getLangOptions().BuildSyntaxTree);
   MainModule->addFile(*SingleInputFile);
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
@@ -416,7 +417,8 @@ void CompilerInstance::addMainFileToModule(
 
   auto *MainFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), MainBufferID,
-      implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
+      implicitImports.kind, Invocation.getLangOptions().CollectParsedToken,
+      Invocation.getLangOptions().BuildSyntaxTree);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
@@ -494,7 +496,8 @@ void CompilerInstance::parseLibraryFile(
 
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
-      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
+      Invocation.getLangOptions().CollectParsedToken,
+      Invocation.getLangOptions().BuildSyntaxTree);
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
@@ -654,7 +657,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
-  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
 
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
@@ -671,7 +673,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *MainFile = new (*Context)
         SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
-                   implicitModuleImportKind, KeepSyntaxInfo);
+                   implicitModuleImportKind,
+                   Invocation.getLangOptions().CollectParsedToken,
+                   Invocation.getLangOptions().BuildSyntaxTree);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -687,7 +691,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *NextInput = new (*Context)
         SourceFile(*MainModule, SourceFileKind::Library, BufferID,
-                   implicitModuleImportKind, KeepSyntaxInfo);
+                   implicitModuleImportKind,
+                   Invocation.getLangOptions().CollectParsedToken,
+                   Invocation.getLangOptions().BuildSyntaxTree);
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);

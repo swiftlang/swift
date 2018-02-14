@@ -890,7 +890,8 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepSyntaxInfo);
+             ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
+             bool KeepSyntaxTree = false);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -1079,7 +1080,9 @@ public:
 
   ArrayRef<Token> getAllTokens() const;
 
-  bool shouldKeepSyntaxInfo() const;
+  bool shouldCollectToken() const;
+
+  bool shouldBuildSyntaxTree() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);

@@ -55,7 +55,7 @@ static RC<RawSyntax> createSyntaxAs(SyntaxKind Kind,
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF)
     : Parent(nullptr), CtxtHolder(CtxtHolder), Mode(AccumulationMode::Root),
-      SF(&SF), Enabled(SF.shouldKeepSyntaxInfo()) {
+      SF(&SF), Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
 }
 
