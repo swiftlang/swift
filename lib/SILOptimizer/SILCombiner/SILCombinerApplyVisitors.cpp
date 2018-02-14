@@ -377,7 +377,7 @@ SILInstruction *PartialApplyCombiner::combine() {
     auto *User = Use->getUser();
 
     // Recurse through conversions.
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
+    if (auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(User)) {
       // TODO: Handle argument conversion. All the code in this file needs to be
       // cleaned up and generalized. The argument conversion handling in
       // optimizeApplyOfConvertFunctionInst should apply to any combine
@@ -389,9 +389,9 @@ SILInstruction *PartialApplyCombiner::combine() {
       auto EscapingCalleeTy =
           ConvertCalleeTy->getWithExtInfo(
             ConvertCalleeTy->getExtInfo().withNoEscape(false));
-      if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
-        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
-
+      assert(Use->get()->getType().castTo<SILFunctionType>() ==
+             EscapingCalleeTy);
+      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }
     // If this use of a partial_apply is not

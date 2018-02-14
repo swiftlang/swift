@@ -377,14 +377,8 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
-// CHECK: bb0([[CLOSURE:%.*]] : @owned $@noescape @callee_guaranteed () -> Bool):
-// CHECK:   [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
-// CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
-// CHECK:   [[BORROW:%.*]] =  begin_borrow [[CLOSURE_COPY]]
-// CHECK:   apply [[BORROW]]() : $@noescape @callee_guaranteed () -> Bool
-// CHECK:   destroy_value [[CLOSURE_COPY]]
-// CHECK:   end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
-// CHECK:   destroy_value [[CLOSURE]]
+// CHECK: bb0([[CLOSURE:%.*]] : @trivial $@noescape @callee_guaranteed () -> Bool):
+// CHECK:   apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> Bool
 // CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
 func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.

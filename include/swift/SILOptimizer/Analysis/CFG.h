@@ -32,6 +32,7 @@ class SILBasicBlock;
 ///
 /// 1. Has a return terminator.
 /// 2. unreachable + noreturn terminator sequence.
+/// 3. has a throw terminator.
 ///
 /// If we just have an unreachable without a noreturn call before it, we must
 /// have a failure BB.

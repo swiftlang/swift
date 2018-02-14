@@ -102,7 +102,8 @@ bool isIncidentalUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
-/// If V is a convert_function, return its operand recursively.
+/// If V is a convert_function or convert_escape_to_noescape return its operand
+/// recursively.
 SILValue stripConvertFunctions(SILValue V);
 
 /// Given an address accessed by an instruction that reads or modifies
