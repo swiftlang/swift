@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 #include <iterator>
 #include <functional>
-#include <sys/mman.h>
 #include <vector>
 #include <pthread.h>
 
