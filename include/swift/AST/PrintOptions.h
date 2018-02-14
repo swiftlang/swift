@@ -16,6 +16,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include "llvm/ADT/Optional.h"
 #include <limits.h>
 #include <vector>
@@ -36,16 +37,19 @@ enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
+
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
   TypeBase *BaseType;
-  NominalTypeDecl *Nominal = nullptr;
+  TypeOrExtensionDecl Decl;
 
   explicit TypeTransformContext(Type T);
-  explicit TypeTransformContext(NominalTypeDecl* NTD);
+  explicit TypeTransformContext(TypeOrExtensionDecl D);
 
   Type getBaseType() const;
-  NominalTypeDecl *getNominal() const;
+  TypeOrExtensionDecl getDecl() const;
+
+  DeclContext *getDeclContext() const;
 
   bool isPrintingSynthesizedExtension() const;
 };
@@ -417,7 +421,7 @@ struct PrintOptions {
 
   void setBaseType(Type T);
 
-  void initForSynthesizedExtension(NominalTypeDecl *D);
+  void initForSynthesizedExtension(TypeOrExtensionDecl D);
 
   void clearSynthesizedExtension();
 
