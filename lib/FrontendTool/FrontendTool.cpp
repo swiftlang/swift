@@ -1065,9 +1065,8 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
-static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
-                         const PrimarySpecificPaths &PSPs, ASTContext &Context,
-                         ModuleOrSourceFile MSF) {
+static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
+                         ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath =
       PSPs.SupplementaryOutputs.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
@@ -1209,8 +1208,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    serializeSIB(Invocation.getFrontendOptions(), SM.get(), PSPs,
-                 Instance.getASTContext(), MSF);
+    serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1271,8 +1269,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                             opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(Invocation.getFrontendOptions(), SM.get(), PSPs,
-                        Instance.getASTContext(), MSF);
+    return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
 
   const bool haveModulePath =
       !PSPs.SupplementaryOutputs.ModuleOutputPath.empty() ||

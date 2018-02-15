@@ -865,12 +865,11 @@ static void ThreadEntryPoint(IRGenerator *irgen,
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
 /// All this is done in multiple threads.
-static void performParallelIRGeneration(IRGenOptions &Opts,
-                                        swift::ModuleDecl *M,
-                                        std::unique_ptr<SILModule> SILMod,
-                                        const PrimarySpecificPaths &PSPs,
-                                        StringRef ModuleName, int numThreads,
-                                        ArrayRef<std::string> outputFilenames) {
+static void performParallelIRGeneration(
+    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    const SupplementaryOutputPaths &supplementaryOutputPathsForFirstInput,
+    StringRef ModuleName, int numThreads,
+    ArrayRef<std::string> outputFilenames) {
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -903,7 +902,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == outputFilenames.end()) {
-      // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
@@ -916,12 +914,12 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
-                                       nextSF, *Context,
-                                       ModuleName,
-                                       PrimarySpecificPaths(*OutputIter++,
-                                                          nextSF->getFilename(),
-                                       PSPs.SupplementaryOutputs));
+    const bool isFirst = OutputIter == outputFilenames.begin();
+    IRGenModule *IGM = new IRGenModule(
+        irgen, std::move(targetMachine), nextSF, *Context, ModuleName,
+        PrimarySpecificPaths(*OutputIter++, nextSF->getFilename(),
+                             isFirst ? supplementaryOutputPathsForFirstInput
+                                     : SupplementaryOutputPaths()));
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -1081,17 +1079,17 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
 }
 
-std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
-                    std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-                    llvm::LLVMContext &LLVMContext,
-                    ArrayRef<std::string> parallelOutputFilenames,
-                    llvm::GlobalVariable **outModuleHash) {
+std::unique_ptr<llvm::Module> swift::performIRGeneration(
+    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+    llvm::LLVMContext &LLVMContext,
+    ArrayRef<std::string> parallelOutputFilenames,
+    llvm::GlobalVariable **outModuleHash) {
   if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
     auto NumThreads = SILMod->getOptions().NumThreads;
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), PSPs, ModuleName,
+    ::performParallelIRGeneration(Opts, M, std::move(SILMod),
+                                  PSPs.SupplementaryOutputs, ModuleName,
                                   NumThreads, parallelOutputFilenames);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.

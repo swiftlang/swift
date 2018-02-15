@@ -226,11 +226,11 @@ public:
   /// to tell it which primary input you wanted the outputs for.
   ///
   /// Must not be constructed on-the-fly because some parts of the compiler
-  /// truck in StringRef's to its components, so it must live as long as the
+  /// receive StringRefs to its components, so it must live as long as the
   /// compiler.
   PrimarySpecificPaths &getPrimarySpecificPathsForAtMostOnePrimary();
 
-  PrimarySpecificPaths &getPrimarySpecificPathsForPrimary(StringRef);
+  PrimarySpecificPaths &getPrimarySpecificPathsForPrimary(StringRef filename);
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
