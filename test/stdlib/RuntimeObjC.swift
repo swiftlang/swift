@@ -386,12 +386,16 @@ Runtime.test("Generic class ObjC runtime names") {
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }
 
+@objc protocol P {}
+struct AnyObjStruct<T: AnyObject> {}
+
 Runtime.test("typeByName") {
   // Make sure we don't crash if we have foreign classes in the
   // table -- those don't have NominalTypeDescriptors
   print(CFArray.self)
   expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
   expectTrue(_typeByName("DoesNotExist") == nil)
+  expectTrue(_typeByName("1a12AnyObjStructVyAA1P_pG") == AnyObjStruct<P>.self)
 }
 
 Runtime.test("casting AnyObject to class metatypes") {
