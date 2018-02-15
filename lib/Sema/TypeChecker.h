@@ -910,6 +910,8 @@ private:
 public:
   TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
   TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
+  TypeChecker(const TypeChecker&) = delete;
+  TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
