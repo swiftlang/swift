@@ -52,7 +52,7 @@ public func run_RangeIterationSigned(_ N: Int) {
 
 @inline(never)
 public func run_RangeIterationSigned64(_ N: Int) {
-  let range: CountableRange<Int64> = 0..<100000
+  let range: Range<Int64> = 0..<100000
   check = 0
   for _ in 1...N {
     for e in range {
@@ -65,7 +65,7 @@ public func run_RangeIterationSigned64(_ N: Int) {
 
 @inline(never)
 public func run_RangeIterationUnsigned(_ N: Int) {
-  let range: CountableRange<UInt> = 0..<100000
+  let range: Range<UInt> = 0..<100000
   check = 0
   for _ in 1...N {
     for e in range {
