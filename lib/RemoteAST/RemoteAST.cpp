@@ -68,9 +68,8 @@ private:
     : SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
       IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>",
-          PrimarySpecificPaths("<fake output filename>",
-                                 "<fake main input filename>")) {}
+          LLVMContext, "<fake module name>", "<fake output filename>",
+          "<fake main input filename>") {}
 
 public:
   static std::unique_ptr<IRGenContext>

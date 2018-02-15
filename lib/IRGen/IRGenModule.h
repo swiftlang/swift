@@ -25,7 +25,6 @@
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
-#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -442,7 +441,8 @@ public:
   ModuleDecl *ClangImporterModule = nullptr;
   SourceFile *CurSourceFile = nullptr;
 
-  PrimarySpecificPaths PSPs;
+  llvm::SmallString<128> OutputFilename;
+  llvm::SmallString<128> MainInputFilenameForDebugInfo;
 
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -1043,7 +1043,8 @@ public:
               std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName,
-              const PrimarySpecificPaths &PSPs);
+              StringRef OutputFilename,
+              StringRef MainInputFilenameForDebugInfo);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
