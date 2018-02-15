@@ -96,6 +96,27 @@ func test_function_iuo(x : FnTest!) {
 }
 
 //===----------------------------------------------------------------------===//
+// Existential Cases
+//===----------------------------------------------------------------------===//
+
+
+@dynamicMemberLookup
+protocol ProtoExt { }
+extension ProtoExt {
+  subscript(dynamicMember member: String) -> String {
+    get {}
+  }
+}
+
+extension String: ProtoExt { }
+
+func testProtoExt() -> String {
+  let str = "test"
+  return str.sdfsdfsdf
+}
+
+
+//===----------------------------------------------------------------------===//
 // Explicitly declared members take precedence
 //===----------------------------------------------------------------------===//
 

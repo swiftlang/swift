@@ -1579,7 +1579,7 @@ namespace {
       SmallVector<Substitution, 4> substitutions;
       solution.computeSubstitutions(
         subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-        locator.withPathElement(ConstraintLocator::SubscriptMember),
+        locator.withPathElement(locatorKind),
         substitutions);
       ConcreteDeclRef subscriptRef(tc.Context, subscript, substitutions);
 
