@@ -334,4 +334,46 @@ func testOverrideSubscript(a : BaseClass, b: DerivedClassWithSetter) {
   a.balboza = 12  // expected-error {{cannot assign to property}}
 }
 
+//===----------------------------------------------------------------------===//
+// Generics
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+struct SettableGeneric1<T> {
+  subscript(dynamicMember member: StaticString) -> T? {
+    get {}
+    nonmutating set {}
+  }
+}
+
+func testGenericType<T>(a : SettableGeneric1<T>, b : T) -> T? {
+  a.dfasdf = b
+  return a.dfsdffff
+}
+
+func testConcreteGenericType(a : SettableGeneric1<Int>) -> Int? {
+  a.dfasdf = 42
+  return a.dfsdffff
+}
+
+@dynamicMemberLookup
+struct SettableGeneric2<T> {
+  subscript<U: ExpressibleByStringLiteral>(dynamicMember member: U) -> T {
+    get {}
+    nonmutating set {}
+  }
+}
+
+func testGenericType2<T>(a : SettableGeneric2<T>, b : T) -> T? {
+  a[dynamicMember: "fasdf"] = b
+  a.dfasdf = b
+  return a.dfsdffff
+}
+
+func testConcreteGenericType2(a : SettableGeneric2<Int>) -> Int? {
+  a.dfasdf = 42
+  return a.dfsdffff
+}
+
+
 

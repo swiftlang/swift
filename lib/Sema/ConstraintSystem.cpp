@@ -1704,12 +1704,33 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
       increaseScore(SK_Unavailable);
     }
-    
-    // If this is a dynamic member lookup, then the decl we have is for the
-    // subscript(dynamicMember:) member, but the type we need to return is the
-    // result of the subscript.  Dig through it.
-    if (kind == OverloadChoiceKind::DynamicMemberLookup)
-      refType = refType->castTo<FunctionType>()->getResult();
+
+    if (kind == OverloadChoiceKind::DynamicMemberLookup) {
+      // DynamicMemberLookup results are always a (dynamicMember:T1)->T2
+      // subscript.
+      auto refFnType = refType->castTo<FunctionType>();
+
+      // If this is a dynamic member lookup, then the decl we have is for the
+      // subscript(dynamicMember:) member, but the type we need to return is the
+      // result of the subscript.  Dig through it.
+      refType = refFnType->getResult();
+
+      // Before we drop the argument type on the floor, we need to constrain it
+      // to having a literal conformance to ExpressibleByStringLiteral.  This
+      // makes the index default to String if otherwise unconstrained.
+      assert(refFnType->getParams().size() == 1 &&
+             "subscript always has one arg");
+      auto argType = refFnType->getParams()[0].getPlainType();
+      
+      auto protoKind = KnownProtocolKind::ExpressibleByStringLiteral;
+      auto protocol = getTypeChecker().getProtocol(choice.getDecl()->getLoc(),
+                                                   protoKind);
+      if (!protocol)
+        break;
+      addConstraint(ConstraintKind::LiteralConformsTo, argType,
+                    protocol->getDeclaredType(),
+                    locator);
+    }
     break;
   }
 

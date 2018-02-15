@@ -2779,7 +2779,6 @@ namespace {
       case OverloadChoiceKind::DynamicMemberLookup: {
         // Application of a DynamicMemberLookup result turns a member access of
         // x.foo into x[dynamicMember: "foo"].
-        auto subscriptDecl = cast<SubscriptDecl>(selected.choice.getDecl());
         auto &ctx = cs.getASTContext();
         auto loc = nameLoc.getStartLoc();
         
@@ -2790,14 +2789,22 @@ namespace {
                             loc, /*implicit*/true);
         auto nameLabel = ctx.getIdentifier("dynamicMember");
         
-        auto stringType = subscriptDecl->getIndices()->get(0)->getTypeLoc();
+        // Figure out the expected type of the string.  We know the
+        // openedFullType will be "xType -> indexType -> resultType".  Dig out
+        // its index type.
+        auto declTy = solution.simplifyType(selected.openedFullType);
+        auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
+        auto refFnType = subscriptTy->castTo<FunctionType>();
+        assert(refFnType->getParams().size() == 1 &&
+               "subscript always has one arg");
+        auto stringType = refFnType->getParams()[0].getPlainType();
         
         // Build a tuple so that argument has a label.
         Expr *tuple = TupleExpr::create(cs.getASTContext(), loc, nameExpr,
                                         nameLabel, loc, nameLoc.getStartLoc(),
                                         /*hasTrailingClosure*/false,
                                         /*implicit*/true);
-        auto tupleTy = TupleType::get(TupleTypeElt(stringType.getType(),
+        auto tupleTy = TupleType::get(TupleTypeElt(stringType,
                                                    nameLabel), ctx);
         (void)cs.TC.typeCheckExpression(tuple, dc,
                                         TypeLoc::withoutLoc(tupleTy),
