@@ -808,7 +808,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // We need to look for the first non-trivial value and use that as our cleanup
   // cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return mv.getType().isTrivial(getModule());
+    return !mv.getType().isTrivial(getModule());
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;
