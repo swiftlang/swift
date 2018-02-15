@@ -207,6 +207,20 @@ extension Int {
 func NotAllowedOnFunc() {
 }
 
+
+// @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
+// derived class.
+
+// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' member with a string index}}
+@dynamicMemberLookup
+class InvalidBase {}
+
+class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { get {}} }
+
+// expected-error @+1 {{value of type 'InvalidDerived' has no member 'dynamicallyLookedUp'}}
+_ = InvalidDerived().dynamicallyLookedUp
+
+
 //===----------------------------------------------------------------------===//
 // Test Existential
 //===----------------------------------------------------------------------===//
