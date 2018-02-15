@@ -88,7 +88,6 @@ set(SWIFTLIB_ESSENTIAL
   Misc.swift
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
-  NormalizedCodeUnitIterator.swift
   ObjCMirrors.swift
   ObjectIdentifier.swift
   Optional.swift
@@ -124,7 +123,6 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringComparable.swift
-  StringComparison.swift
   StringGuts.swift
   StringObject.swift
   StringIndex.swift
@@ -134,7 +132,6 @@ set(SWIFTLIB_ESSENTIAL
   StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
-  StringNormalization.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
