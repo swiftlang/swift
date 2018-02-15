@@ -29,14 +29,33 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 }
 
 TensorTests.testCPUAndGPU("Initializers") {
-  let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
-  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.scalars)
+  let scalar = Tensor(1.0)
+  let matrix = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  expectEqual(ShapedArray(shape: [], scalars: [1]), scalar.array)
+  expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
+              matrix.array)
 }
 
 TensorTests.testCPUAndGPU("FactoryInitializers") {
   let x = Tensor<Float>(ones: [1, 10])
-  expectEqual([1, 10], x.shape)
-  expectEqual(Array(repeating: 1, count: 10), x.scalars)
+  expectEqual(ShapedArray(shape: [1, 10], repeating: 1), x.array)
+}
+
+TensorTests.testCPUAndGPU("RandomInitializer") {
+  let random = Tensor<Float>(
+    randomNormal: [3, 4], mean: 100, stddev: 50, seed: 42
+  )
+  expectEqual([3, 4], random.shape)
+  expectPointwiseNearlyEqual([
+    137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
+    107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
+  ], random.scalars)
+}
+
+TensorTests.testCPUAndGPU("ScalarToTensorConversion") {
+  let tensor = 5.makeTensor(withRank: 4)
+  expectEqual([1, 1, 1, 1], tensor.shape)
+  expectEqual([5], tensor.scalars)
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
@@ -49,6 +68,16 @@ TensorTests.testCPUAndGPU("DataTypeCast") {
   expectEqual(ShapedArray(shape: [5, 5], repeating: 1), i8s.array)
 }
 
+TensorTests.testCPUAndGPU("BoolToNumericCast") {
+  let bools = Tensor<Bool>(shape: [2, 2], scalars: [true, false, true, false])
+  let ints = Tensor<Int64>(bools)
+  let floats = Tensor<Float>(bools)
+  let i8s = Tensor<Int8>(bools)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 0, 1, 0]), ints.array)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 0, 1, 0]), floats.array)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
+}
+
 TensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxes: [0], keepingDimensions: true)
@@ -59,7 +88,8 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
-  expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars, byError: 0.0001)
+  expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars,
+                             byError: 0.0001)
 }
 
 TensorTests.testCPUAndGPU("Convolution") {
@@ -185,9 +215,9 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
-    /// - NOTE: This initializer must be manually declared, because the initializer
-    /// logic for the variables declared above is large, and we need to mark
-    /// this as inline(__always).
+    /// - NOTE: This initializer must be manually declared, because the
+    /// initializer logic for the variables declared above is large, and we need
+    /// to mark this as inline(__always).
     /// - TODO: Remove when deabstraction is implemented.
     @inline(__always)
     init() {}
@@ -205,14 +235,23 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
 }
 
 TensorTests.testCPUAndGPU("Reshape") {
-  let x = Tensor([[1], [2], [3]]) // Shape 3 x 1
-  let y = x.reshaped([1, 3, 1, 1, 1])
+  // 3 x 1
+  let x = Tensor([[1], [2], [3]])
+  let y = x.reshaped(to: [1, 3, 1, 1, 1])
   expectEqual([1, 3, 1, 1, 1], y.shape)
 }
 
-TensorTests.testCPUAndGPU("ReshapeScalar") {
-  let z = Tensor([[10]]).reshaped([])
+TensorTests.testCPUAndGPU("ReshapeToScalar") {
+  let z = Tensor([[10]]).reshaped(to: [])
   expectEqual([], z.shape)
+}
+
+TensorTests.testCPUAndGPU("BroadcastTensor") {
+  // 3 x 1
+  let x = Tensor<Float>(shape: [3, 1], repeating: 0.0)
+  let y = Tensor<Float>(shape: [1, 3, 1, 1, 1], repeating: 0.0)
+  let result = x.broadcast(to: y)
+  expectEqual([1, 3, 1, 1, 1], result.shape)
 }
 
 TensorTests.testCPU("StraightLineXORTraining") {

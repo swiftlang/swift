@@ -86,7 +86,6 @@ RankedArrayTests.test("ElementMutation") {
   expectEqual(Array(0..<5) + Array(0..<10) + Array(15..<60), tensor.scalars)
 
   for scalarIndex in tensor[0][0].indices {
-    // TODO: ArraySlice shouldn't need initialization from Array
     tensor[0][0][scalarIndex] = scalarIndex - 5
   }
   expectEqual(Array(-5..<10) + Array(15..<60), tensor.scalars)

@@ -807,7 +807,6 @@ public extension Tensor where Scalar : FloatingPoint {
     strides: [Int32],
     padding: Padding
   ) -> Tensor {
-    // FIXME: handle attributes (ksize, strides, padding)
     return #tfop("AvgPool", handle, ksize: kernelSize, strides: strides,
                  padding: padding.cName)
   }

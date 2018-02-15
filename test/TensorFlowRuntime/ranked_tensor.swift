@@ -29,8 +29,16 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 }
 
 RankedTensorTests.testCPUAndGPU("Initializers") {
-  let x = Tensor1D([1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
-  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.scalars)
+  let vector = Tensor1D([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+  let matrix = Tensor2D([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  let tensor = Tensor3D(identicallyRanked: Tensor<Float>(ones: [2, 3, 4]))
+  // TODO(danielzheng): compare `.array` instead after it is implemented.
+  // expectEqual([6], vector.shape)
+  // expectEqual([2, 3], matrix.shape)
+  // expectEqual([2, 3, 4], tensor.shape)
+  expectEqual([1, 2, 3, 4, 5, 6], vector.scalars)
+  expectEqual([1, 2, 3, 4, 5, 6], matrix.scalars)
+  expectEqual(Array(repeating: 1, count: 24), tensor.scalars)
 }
 
 RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
@@ -39,18 +47,57 @@ RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
   expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
+RankedTensorTests.testCPUAndGPU("RandomInitializer") {
+  let random = Tensor2D<Float>(
+    randomNormal: [3, 4], mean: 100, stddev: 50, seed: 42
+  )
+  expectEqual([3, 4], random.shape)
+  expectPointwiseNearlyEqual([
+      137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
+      107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
+  ], random.scalars)
+}
+
+RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion1") {
+  let matrix = -1.makeTensor2D()
+  expectEqual([1, 1], matrix.shape)
+  expectEqual([-1], matrix.scalars)
+}
+
+// TODO: Merge into the previous example when we support code motion to avoid
+// sends.
+RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion2") {
+  let tensor = 42.makeTensor4D()
+  expectEqual([1, 1, 1, 1], tensor.shape)
+  expectEqual([42], tensor.scalars)
+}
+
 RankedTensorTests.testCPUAndGPU("DataTypeCast") {
   let x = Tensor2D<Int32>(ones: [5, 5])
   let ints = Tensor2D<Int64>(x)
   let floats = Tensor2D<Float>(x)
   let i8s = Tensor2D<Int8>(floats)
-  /// TODO(danielzheng): compare `.array` instead after it is implemented.
+  // TODO(danielzheng): compare `.array` instead after it is implemented.
   // expectEqual([5, 5], ints.shape)
   // expectEqual([5, 5], floats.shape)
   // expectEqual([5, 5], i8s.shape)
   expectEqual(Array(repeating: 1, count: 25), ints.scalars)
   expectEqual(Array(repeating: 1, count: 25), floats.scalars)
   expectEqual(Array(repeating: 1, count: 25), i8s.scalars)
+}
+
+RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
+  let bools = Tensor2D<Bool>([[true, false], [true, false]])
+  let ints = Tensor2D<Int64>(bools)
+  let floats = Tensor2D<Float>(bools)
+  let i8s = Tensor2D<Int8>(bools)
+  // TODO(danielzheng): compare `.array` instead after it is implemented.
+  // expectEqual([2, 2], ints.shape)
+  // expectEqual([2, 2], floats.shape)
+  // expectEqual([2, 2], i8s.shape)
+  expectEqual([1, 0, 1, 0], ints.scalars)
+  expectEqual([1, 0, 1, 0], floats.scalars)
+  expectEqual([1, 0, 1, 0], i8s.scalars)
 }
 
 RankedTensorTests.testCPUAndGPU("Reduction") {
