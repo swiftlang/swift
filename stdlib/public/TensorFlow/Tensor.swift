@@ -135,7 +135,7 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 extension Tensor where Scalar : Numeric {
-  /// Perform an element conversion from Tensor<U> to Tensor<T>.
+  /// Perform an element-wise conversion from Tensor<U>.
   @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
     self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
@@ -214,7 +214,7 @@ public extension Tensor {
   var rank: Int {
     @inline(__always)
     get {
-      return Int(rankTensor.scalar!)
+      return Int(_TFGetScalarOrDie(rankTensor.handle))
     }
   }
 
@@ -222,7 +222,7 @@ public extension Tensor {
   var scalarCount: Int {
     @inline(__always)
     get {
-      return Int(scalarCountTensor.scalar!)
+      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
     }
   }
 }
@@ -269,9 +269,11 @@ public extension Tensor where Scalar : Numeric {
   ///
   @_inlineable @inline(__always)
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
-    self.init(handle:
-      #tfop("Range", start.handle, end.handle, stride.handle,
-            Tidx: Scalar.self))
+    self.init(
+      handle: #tfop(
+        "Range", start.handle, end.handle, stride.handle, Tidx: Scalar.self
+      )
+    )
   }
 
   /// Initialize a 1-D tensor representing a sequence from a starting value to,
@@ -296,13 +298,29 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : FloatingPoint {
-  // def tf.random_normal(shape, mean=0.0, stddev=1.0, dtype=dtypes.float32,
-  //                      seed=None, name=None):
-  @inline(never) // make @_inlineable when implemented.
-  static func randomNormal(
-    shape: [Int32], mean: Double = 0, stddev: Double = 1
-  ) -> Tensor {
-    fatalError("FIXME: implement randomNormal")
+  /// Initialize a tensor with the specified shape, randomly sampling scalar
+  /// values from a normal distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - mean: The mean of the distribution.
+  ///   - stddev: The standard deviation of the distribution.
+  ///   - seed: A random seed for the operation.
+  ///
+  @_inlineable @inline(__always)
+  init(
+    randomNormal shape: TensorShape, mean: Double = 0, stddev: Double = 1,
+    seed: Int32 = 0
+  ) {
+    let shapeTensor = Tensor<Int32>(shape.dimensions).handle
+    // NOTE: First seed value (87654321) is the DEFAULT_GRAPH_SEED value defined
+    // in tensorflow/python/framework/random_seed.py.
+    let standardNormal: Tensor<Double> = #tfop(
+      "RandomStandardNormal", shapeTensor, seed: 87654321, seed2: seed,
+      dtype: Double.self, T: Int32.self
+    )
+    let result = (standardNormal * stddev) + mean
+    self = Tensor(result)
   }
 }
 
@@ -311,11 +329,13 @@ public extension Tensor where Scalar : FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 public extension AccelerableByTensorFlow {
-  /// Broadcast the specified scalar value to be a tensor with the same rank as
-  /// the specified other tensor, but with dimension=1 for each rank.
-  @inline(never) // make @_inlineable when implemented.
-  func broadcast(toRank rank: Int32) -> Tensor<Self> {
-    fatalError("FIXME: implement scalar broadcast")
+  /// Convert to a tensor with the specified rank, with all dimensions equal to
+  /// 1.
+  @_inlineable @inline(__always)
+  func makeTensor(withRank rank: Int32) -> Tensor<Self> {
+    let valueTensor = Tensor(self)
+    let shapeTensor = Tensor<Int32>(ones: [rank])
+    return #tfop("Fill", shapeTensor, valueTensor)
   }
 }
 
@@ -330,44 +350,37 @@ public extension Tensor {
   /// index.
   @_inlineable @inline(__always)
   func shapePadded(atIndex index: Int32) -> Tensor {
-    return Tensor(handle:
-      #tfop("ExpandDims", handle, Tensor<Int32>(index).handle, Tdim: Int32.self))
-  }
-
-  /// Broadcast the specified Tensor to a rank greater than or equal to its
-  /// one, filling in the new dimensions with size 1.
-  // FIXME: this function is ambiguous about how dimensions are filled in. Is
-  // it the leading or the trailing dimensions that are filled with 1? Consider
-  // removing.
-  @inline(never)
-  func broadcast(toRank rank: Int32) -> Tensor {
-    fatalError("FIXME: implement broadcast")
+    return #tfop(
+      "ExpandDims", handle, Tensor<Int32>(index), Tdim: Int32.self
+    )
   }
 
   /// Broadcast to the same shape as the specified Tensor.
-  @inline(never) // make @_inlineable when implemented.
+  /// - Precondition: The number of scalars matches the shape of the specified
+  ///   Tensor.
+  @_inlineable @inline(__always)
   func broadcast(to other: Tensor) -> Tensor {
-    fatalError("FIXME: implement broadcast")
+    return reshaped(toShape: other.shapeTensor)
   }
 
   /// Reshape to the specified shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  func reshaped(_ newShape: [Int32]) -> Tensor {
-    return reshaped(Tensor<Int32>(newShape))
+  func reshaped(to newShape: TensorShape) -> Tensor {
+    return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
   }
 
   /// Reshape to the specified Tensor representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  func reshaped(_ newShape: Tensor<Int32>) -> Tensor {
-    return Tensor(handle: #tfop("Reshape", handle, newShape.handle))
+  func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
+    return #tfop("Reshape", handle, newShape.handle)
   }
 
   /// Remove dimensions of size 1 from the shape of a tensor.
   @_inlineable @inline(__always)
   func squeezed() -> Tensor {
-    return Tensor(handle: #tfop("Squeeze", handle))
+    return #tfop("Squeeze", handle)
   }
 
   /// Concatenates tensors along a dimension.
@@ -403,9 +416,11 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
-  @inline(never)
+  @_inlineable @inline(__always)
   init(_ other: Tensor<Bool>) {
-    fatalError("FIXME: implement boolean conversion")
+    self.init(
+      handle: #tfop("Cast", other.handle, DstT: Scalar.self)
+    )
   }
 }
 
