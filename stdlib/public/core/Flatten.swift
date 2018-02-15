@@ -235,6 +235,12 @@ extension FlattenCollection.Index : Hashable
   public var hashValue: Int {
     return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
   }
+
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    let h = hasher.appending(_outer)
+    guard let inner = _inner else { return h }
+    return h.appending(inner)
+  }
 }
 
 extension FlattenCollection : Sequence {
