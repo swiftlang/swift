@@ -739,10 +739,9 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   return Alloca.getAddress();
 }
 
-std::pair<llvm::Value *, llvm::Value *>
-irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
-                                    llvm::Value *size, llvm::Value *alignMask,
-                                    TailArraysRef TailArrays) {
+llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                                     llvm::Value *size,
+                                                     TailArraysRef TailArrays) {
   for (const auto &TailArray : TailArrays) {
     SILType ElemTy = TailArray.first;
     llvm::Value *Count = TailArray.second;
@@ -751,17 +750,16 @@ irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
 
     // Align up to the tail-allocated array.
     llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
-    llvm::Value *ElemAlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
-    size = IGF.Builder.CreateAdd(size, ElemAlignMask);
-    llvm::Value *InvertedMask = IGF.Builder.CreateNot(ElemAlignMask);
+    llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+    size = IGF.Builder.CreateAdd(size, AlignMask);
+    llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
     size = IGF.Builder.CreateAnd(size, InvertedMask);
 
     // Add the size of the tail allocated array.
     llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
     size = IGF.Builder.CreateAdd(size, AllocSize);
-    alignMask = IGF.Builder.CreateOr(alignMask, ElemAlignMask);
   }
-  return {size, alignMask};
+  return size;
 }
 
 
@@ -802,8 +800,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
   } else {
     // Allocate the object on the heap.
-    std::tie(size, alignMask)
-      = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
+    size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
@@ -826,8 +823,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  std::tie(size, alignMask)
-    = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
+  size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
