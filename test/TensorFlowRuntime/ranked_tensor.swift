@@ -32,13 +32,9 @@ RankedTensorTests.testCPUAndGPU("Initializers") {
   let vector = Tensor1D([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
   let matrix = Tensor2D([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
   let tensor = Tensor3D(identicallyRanked: Tensor<Float>(ones: [2, 3, 4]))
-  // TODO(danielzheng): compare `.array` instead after it is implemented.
-  // expectEqual([6], vector.shape)
-  // expectEqual([2, 3], matrix.shape)
-  // expectEqual([2, 3, 4], tensor.shape)
-  expectEqual([1, 2, 3, 4, 5, 6], vector.scalars)
-  expectEqual([1, 2, 3, 4, 5, 6], matrix.scalars)
-  expectEqual(Array(repeating: 1, count: 24), tensor.scalars)
+  expectEqual([1, 2, 3, 4, 5, 6], vector.array)
+  expectEqual(Array2D(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]), matrix.array)
+  expectEqual(Array3D(shape: [2, 3, 4], repeating: 1), tensor.array)
 }
 
 RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
@@ -72,18 +68,20 @@ RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion2") {
   expectEqual([42], tensor.scalars)
 }
 
+RankedTensorTests.testCPUAndGPU("ArrayXDConversion") {
+  let array3D = Array3D(shape: [2, 3, 4], repeating: 1.0)
+  let tensor3D = Tensor3D(array3D)
+  expectEqual(array3D, tensor3D.array)
+}
+
 RankedTensorTests.testCPUAndGPU("DataTypeCast") {
   let x = Tensor2D<Int32>(ones: [5, 5])
   let ints = Tensor2D<Int64>(x)
   let floats = Tensor2D<Float>(x)
   let i8s = Tensor2D<Int8>(floats)
-  // TODO(danielzheng): compare `.array` instead after it is implemented.
-  // expectEqual([5, 5], ints.shape)
-  // expectEqual([5, 5], floats.shape)
-  // expectEqual([5, 5], i8s.shape)
-  expectEqual(Array(repeating: 1, count: 25), ints.scalars)
-  expectEqual(Array(repeating: 1, count: 25), floats.scalars)
-  expectEqual(Array(repeating: 1, count: 25), i8s.scalars)
+  expectEqual(Array2D(shape: [5, 5], repeating: 1), ints.array)
+  expectEqual(Array2D(shape: [5, 5], repeating: 1), floats.array)
+  expectEqual(Array2D(shape: [5, 5], repeating: 1), i8s.array)
 }
 
 RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
@@ -91,42 +89,43 @@ RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
   let ints = Tensor2D<Int64>(bools)
   let floats = Tensor2D<Float>(bools)
   let i8s = Tensor2D<Int8>(bools)
-  // TODO(danielzheng): compare `.array` instead after it is implemented.
-  // expectEqual([2, 2], ints.shape)
-  // expectEqual([2, 2], floats.shape)
-  // expectEqual([2, 2], i8s.shape)
-  expectEqual([1, 0, 1, 0], ints.scalars)
-  expectEqual([1, 0, 1, 0], floats.scalars)
-  expectEqual([1, 0, 1, 0], i8s.scalars)
+  expectEqual(Array2D(shape: [2, 2], scalars: [1, 0, 1, 0]), ints.array)
+  expectEqual(Array2D(shape: [2, 2], scalars: [1, 0, 1, 0]), floats.array)
+  expectEqual(Array2D(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
 }
 
 RankedTensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxis: 0)
-  expectEqual([5], sum.shape)
-  expectEqual([2, 4, 6, 8, 10], sum.scalars)
+  expectEqual([2, 4, 6, 8, 10], sum.array)
 }
 
 RankedTensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor1D<Float>([1.2, 1.2])
   let y = tanh(x)
-  expectEqual([2], y.shape)
-  expectPointwiseNearlyEqual([0.833655, 0.833655], y.scalars, byError: 0.0001)
+  expectPointwiseNearlyEqual([0.833655, 0.833655], y.array, byError: 0.0001)
 }
 
-#if false
 RankedTensorTests.testCPUAndGPU("Convolution") {
-  let x = Tensor4D<Float>(shape: [1, 3, 3, 1], repeating: 0.5)
-  let filter = Tensor4D<Float>(shape: [1, 3, 3, 1],
-                               scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-  let y = x.convolved2D(withFilter: filter,
-                        strides: [1, 1, 1, 1], padding: .same)
-  expectEqual([0.5, 1.5, 0.5,
-               0.5, 1.5, 0.5,
-               0.5, 1.5, 0.5],
-              y.scalars)
+  // TODO: the code for initializing Tensor4D instances here is quite verbose.
+  // Consider adding `init(shape:repeating)` and/or `init(shape:scalars)`
+  // initializers to TensorXD?
+  let x = Tensor4D(
+    identicallyRanked: Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
+  )
+  let filter = Tensor4D(
+    identicallyRanked: Tensor<Float>(
+      shape: [1, 1, 3, 3], scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0]
+    )
+  )
+  let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
+                        padding: .same)
+  expectEqual(Array4D(shape: [1, 1, 3, 3],
+                      scalars: [0.5, 1.5, 0.5,
+                                0.5, 1.5, 0.5,
+                                0.5, 1.5, 0.5]),
+              y.array)
 }
-#endif
 
 RankedTensorTests.testCPUAndGPU("3Adds") {
   let a = Tensor1D([1])
@@ -134,23 +133,19 @@ RankedTensorTests.testCPUAndGPU("3Adds") {
   let c = Tensor1D([3])
   let o = a + b + c
 
-  expectEqual([1], o.shape)
-  expectEqual([6], o.scalars)
+  expectEqual([6], o.array)
 }
 
 RankedTensorTests.testCPUAndGPU("testMultiOpMath") {
   let x = Tensor1D<Float>([1.2, 1.2])
   let y = Tensor1D<Float>([2.4, 2.4])
-  let sum = x + y
-  let squared = sum * sum
-  let squareRooted = sqrt(squared)
+  let t1 = x + y
+  let t2 = t1 * t1
+  let t3 = sqrt(t2)
 
-  // expectEqual([2], sum.shape)
-  // expectEqual([2], squared.shape)
-  // expectEqual([2], squareRooted.shape)
-  expectPointwiseNearlyEqual([3.6, 3.6], sum.scalars)
-  expectPointwiseNearlyEqual([12.96, 12.96], squared.scalars)
-  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.scalars)
+  expectPointwiseNearlyEqual([3.6, 3.6], t1.array)
+  expectPointwiseNearlyEqual([12.96, 12.96], t2.array)
+  expectPointwiseNearlyEqual([3.6, 3.6], t3.array)
 }
 
 RankedTensorTests.testCPUAndGPU("testXWPlusB") {

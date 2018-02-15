@@ -41,13 +41,16 @@ infix operator ⊗ : MultiplicationPrecedence
 %   elementRank = rank - 1
 %   liftedRank = rank + 1
 %   TensorXD = 'Tensor{}D'.format(rank)
+%   ArrayXD = 'Array{}D'.format(rank)
 %   ElementTensor = 'Tensor{}D'.format(elementRank)
 %   LiftedTensor = 'Tensor{}D'.format(liftedRank)
 %   elementArrayLiteral = _elementArrayLiteral(rank)
 
 /// A ${rankName(rank)}-dimensional tensor.
 public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
-  public var base: Tensor<Scalar>
+  /// The underlying Tensor of the ${TensorXD}.
+  @_versioned
+  internal var base: Tensor<Scalar>
 
   @_inlineable
   public static var rank: Int {
@@ -61,7 +64,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   public var rank: Int {
     @inline(__always)
     get {
-      return ${TensorXD}.rank
+      return ${rank}
     }
   }
 
@@ -99,6 +102,9 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
     }
   }
 
+  /// Creates a ${TensorXD} from a Tensor.
+  /// - Note: This is an internal initializer and should not be exposed to
+  ///   users.
   @_versioned
   @_inlineable @inline(__always)
   internal init(base: Tensor<Scalar>) {
@@ -110,15 +116,15 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
     self.init(base: Tensor(handle: handle))
   }
 
-  /// Initialize a ${TensorXD} from the given Tensor. Returns nil if the Tensor
-  /// does not have rank ${rank}.
+  /// Creates a ${TensorXD} from a Tensor. Returns nil if the Tensor does not
+  /// have rank ${rank}.
   @_inlineable @inline(__always)
   public init?(_ other: Tensor<Scalar>) {
-    guard other.rank == ${TensorXD}.rank else { return nil }
+    guard other.rank == ${rank} else { return nil }
     self.init(base: other)
   }
 
-  /// Initialize a ${TensorXD} from the given Tensor.
+  /// Creates a ${TensorXD} from a Tensor.
   /// - Precondition: The tensor must have rank ${rank}.
   @_inlineable @inline(__always)
   public init(identicallyRanked other: Tensor<Scalar>) {
@@ -127,14 +133,14 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
     // implemented.
     // TODO(clattner): need a better way of exposing rank information in our
     // model.
-    // precondition(other.rank == ${TensorXD}.rank, "Rank is not ${rank}")
+    // precondition(other.rank == ${rank}, "Rank is not ${rank}.")
     self.init(base: other)
   }
 }
 
 /// Array literal support.
 extension ${TensorXD} : ExpressibleByArrayLiteral {
-  /// Initialize a ${TensorXD} initialized with the given elements.
+  /// Creates a ${TensorXD} from with the specified elements.
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: ${elementArrayLiteral}...) {
     self.init(elements)
@@ -142,13 +148,13 @@ extension ${TensorXD} : ExpressibleByArrayLiteral {
 }
 
 public extension ${TensorXD} where Scalar : Numeric {
-  /// Perform an element-wise type conversion from `${TensorXD}<T>`.
+  /// Perform an element-wise type conversion from ${TensorXD}<T>.
   @_inlineable @inline(__always)
   init<FromType : Numeric>(_ other: ${TensorXD}<FromType>) {
     self.init(base: Tensor<Scalar>(other.base))
   }
 
-  /// Perform an element-wise type conversion from `${TensorXD}<Bool>`.
+  /// Perform an element-wise type conversion from ${TensorXD}<Bool>.
   @_inlineable @inline(__always)
   init(_ other: ${TensorXD}<Bool>) {
     self.init(base: Tensor<Scalar>(other.base))
@@ -157,27 +163,35 @@ public extension ${TensorXD} where Scalar : Numeric {
 
 /// Initializers
 public extension ${TensorXD} {
-  /// Convert from a ShapedArray. Returns nil if the ShapedArray does not have
-  /// rank ${rank}.
+  /// Creates a ${TensorXD} from a ShapedArray. Returns nil if the ShapedArray
+  /// does not have rank ${rank}.
   @_inlineable @inline(__always)
   init?(_ other: ShapedArray<Scalar>) {
     self.init(Tensor(other))
   }
 
-  /// Convert from a ShapedArray.
+  /// Creates a ${TensorXD} from a ShapedArray.
   /// - Precondition: The ShapedArray must have rank ${rank}.
   @_inlineable @inline(__always)
   init(identicallyRanked other: ShapedArray<Scalar>) {
     self.init(identicallyRanked: Tensor(other))
   }
 
-  /// Initialize a ${TensorXD} with the given element literals.
+% if rank != 1:
+  /// Creates a ${TensorXD} from an ${ArrayXD}.
+  @_inlineable @inline(__always)
+  init(_ other: ${ArrayXD}<Scalar>) {
+    self.init(base: Tensor(other.base))
+  }
+% end
+
+  /// Creates a ${TensorXD} containing the given element literals.
   @_inlineable @inline(__always)
   init(_ scalars: [${elementArrayLiteral}]) {
     self.init(base: Tensor<Scalar>(scalars))
   }
 
-  /// Initialize a ${TensorXD} with the given element literals.
+  /// Creates a ${TensorXD} containing the given element literals.
   @_inlineable @inline(__always)
   init(_ scalars: ${elementArrayLiteral}...) {
     self.init(scalars)
@@ -185,7 +199,7 @@ public extension ${TensorXD} {
 }
 
 public extension AccelerableByTensorFlow {
-  /// Convert to a ${TensorXD} with all dimensions equal to 1.
+  /// Converts to a ${TensorXD} with all dimensions equal to 1.
   @_inlineable @inline(__always)
   func make${TensorXD}() -> ${TensorXD}<Self> {
     return ${TensorXD}(base: self.makeTensor(withRank: ${rank}))
@@ -210,31 +224,31 @@ public extension ${TensorXD} {
 
 /// Factories
 public extension ${TensorXD} where Scalar : Numeric {
-  /// Initialize a ${TensorXD} with all elements set to zero.
+  /// Creates a ${TensorXD} with all elements set to zero.
   ///
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
   init(zeros shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
-    // precondition(shape.count == ${TensorXD}.rank,
+    // precondition(shape.count == ${rank},
     //              "Rank is not ${rank}")
     self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
-  /// Initialize a ${TensorXD} with all elements set to one.
+  /// Creates a ${TensorXD} with all elements set to one.
   ///
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
   init(ones shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
-    // precondition(shape.count == ${TensorXD}.rank,
+    // precondition(shape.count == ${rank},
     //              "Rank is not ${rank}")
     self.init(base: Tensor<Scalar>(ones: shape))
   }
 }
 
 public extension ${TensorXD} where Scalar : FloatingPoint {
-  /// Initialize a ${TensorXD} with the specified shape, randomly sampling
+  /// Creates a ${TensorXD} with the specified shape, randomly sampling
   /// scalar values from a normal distribution.
   ///
   /// - Parameters:
@@ -350,6 +364,27 @@ public extension ${TensorXD} where Scalar : Numeric {
 % end
 }
 
+public extension ${TensorXD} {
+% if rank < ranks[-1]:
+  /// Returns a rank-lifted {LiftedTensor} with a leading dimension of 1.
+  @_inlineable @inline(__always)
+  func rankLifted() -> ${LiftedTensor}<Scalar> {
+    return ${LiftedTensor}<Scalar>(base: base.rankLifted())
+  }
+
+  /// Returns a shape-padded {LiftedTensor}, inserting a dimension of 1 at the
+  /// specified index.
+  @_inlineable @inline(__always)
+  func shapePadded(atIndex index: Int32) -> ${LiftedTensor}<Scalar> {
+    return ${LiftedTensor}<Scalar>(base: base.shapePadded(atIndex: index))
+  }
+% end
+}
+
+//===----------------------------------------------------------------------===//
+// Description and visualization
+//===----------------------------------------------------------------------===//
+
 /// Make "print(some${TensorXD})" print a pretty form of the tensor.
 extension ${TensorXD} : CustomStringConvertible {
   @_inlineable
@@ -366,23 +401,30 @@ extension ${TensorXD} : CustomPlaygroundQuickLookable {
   }
 }
 
-public extension ${TensorXD} {
-% if rank < ranks[-1]:
-  /// Returns a rank-lifted {LiftedTensor} with a leading dimension of 1.
-  @_inlineable @inline(__always)
-  func rankLifted() -> ${LiftedTensor}<Scalar> {
-    return ${LiftedTensor}<Scalar>(base: base.rankLifted())
-  }
+//===----------------------------------------------------------------------===//
+// Array conversion
+//===----------------------------------------------------------------------===//
 
-  /// Returns a shape-padded {LiftedTensor}, inserting a dimension of 1 at a
-  /// given index.
-  @_inlineable @inline(__always)
-  func shapePadded(atIndex index: Int32) -> ${LiftedTensor}<Scalar> {
-    return ${LiftedTensor}<Scalar>(base: base.shapePadded(atIndex: index))
-  }
+public extension ${TensorXD} {
+  @_inlineable
+  var array: ${ArrayXD}<Scalar> {
+    @inline(__always)
+    get {
+      // This is considered to be a well known way to produce a copy to the
+      // host, so an "implicit copy to host" warning should not be produced.
+% if rank == 1:
+      return base.scalars
+% else:
+      return ${ArrayXD}(base: base.array)
 % end
+    }
+  }
 }
 % end
+
+//===----------------------------------------------------------------------===//
+// Tensor conversion
+//===----------------------------------------------------------------------===//
 
 /// Value-preserving conversion initializer
 public extension Tensor {

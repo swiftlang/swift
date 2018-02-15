@@ -811,3 +811,22 @@ public extension Tensor where Scalar : FloatingPoint {
                  padding: padding.cName)
   }
 }
+
+public extension Tensor4D where Scalar : FloatingPoint {
+  @_inlineable @inline(__always)
+  // @differentiable(
+  //   withRespectTo: (self, .0),
+  //   gradient: _adjointConvolve2D(input:filter:primal:seed:)
+  // )
+  func convolved2D(
+    withFilter filter: Tensor4D,
+    strides: [Int32],
+    padding: Padding
+  ) -> Tensor4D {
+    return #tfop("Conv2D", handle, filter, strides: strides,
+                 padding: padding.cName)
+  }
+
+  // NOTE: Conv3D requires the existence of Tensor5D, since the input/filter
+  // tensors for a Conv3D operation must have rank 5.
+}
