@@ -286,6 +286,18 @@ void TypeChecker::resolveInheritanceClause(
   }
 }
 
+/// Determine whether this type refers to the deprecated NSObjectProtocol
+/// type alias.
+static bool isDeprecatedNSObjectProtocol(Type type) {
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer())) {
+    if (typeAlias->getDecl()->getAttrs().getDeprecated(type->getASTContext()) &&
+        typeAlias->getDecl()->getName().str() == "NSObjectProtocol")
+      return true;
+  }
+
+  return false;
+}
+
 /// check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
@@ -518,8 +530,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       }
 
       // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
-      if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
-          inheritedTy->isAnyObject()) {
+      if (isa<ClassDecl>(decl) && inheritedTy->isAnyObject() &&
+          (Context.LangOpts.isSwiftVersion3() ||
+           isDeprecatedNSObjectProtocol(inheritedTy))) {
         auto classDecl = cast<ClassDecl>(decl);
         auto removeRange = getRemovalRange(i);
         diagnose(inherited.getSourceRange().Start,
