@@ -966,33 +966,56 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       if (var->isLet())
         guaranteedValid = true;
 
+      // Protect the lvalue read with access markers. The !is<LValueType> assert
+      // above ensures that the "LValue" is actually immutable, so we use an
+      // unenforced access marker.
+      SILValue destAddr = result.getLValueAddress();
+      SILValue accessAddr = UnenforcedFormalAccess::enter(*this, loc, destAddr,
+                                                          SILAccessKind::Read);
+      auto propagateRValuePastAccess = [&](RValue &&rvalue) {
+        // Check if a new begin_access was emitted and returned as the
+        // RValue. This means that the load did not actually load. If so, then
+        // fix the rvalue to begin_access operand. The end_access cleanup
+        // doesn't change. FIXME: this can't happen with sil-opaque-values.
+        if (accessAddr != destAddr && rvalue.isComplete()
+            && rvalue.isPlusZero(*this) && !isa<TupleType>(rvalue.getType())) {
+          auto mv = std::move(rvalue).getScalarValue();
+          if (mv.getValue() == accessAddr)
+            mv = std::move(mv).transform(
+                cast<BeginAccessInst>(accessAddr)->getOperand());
+          return RValue(*this, loc, refType, mv);
+        }
+        return std::move(rvalue);
+      };
       // If we have self, see if we are in an 'init' delegation sequence. If so,
       // call out to the special delegation init routine. Otherwise, use the
       // normal RValue emission logic.
       if (var->getName() == getASTContext().Id_self &&
           SelfInitDelegationState != NormalSelf) {
-        return emitRValueForSelfInDelegationInit(loc, refType,
-                                                 result.getLValueAddress(), C);
+        auto rvalue =
+            emitRValueForSelfInDelegationInit(loc, refType, accessAddr, C);
+        return propagateRValuePastAccess(std::move(rvalue));
       }
 
       // Avoid computing an abstraction pattern for local variables.
       // This is a slight compile-time optimization, but more importantly
       // it avoids problems where locals don't always have interface types.
       if (var->getDeclContext()->isLocalContext()) {
-        return RValue(*this, loc, refType,
-                      emitLoad(loc, result.getLValueAddress(),
-                               getTypeLowering(refType), C, shouldTake,
-                               guaranteedValid));
+        auto rvalue = RValue(*this, loc, refType,
+                             emitLoad(loc, accessAddr, getTypeLowering(refType),
+                                      C, shouldTake, guaranteedValid));
+
+        return propagateRValuePastAccess(std::move(rvalue));
       }
 
       // Otherwise, do the full thing where we potentially bridge and
       // reabstract the declaration.
       auto origFormalType = SGM.Types.getAbstractionPattern(var);
-      return RValue(*this, loc, refType,
-                    emitLoad(loc, result.getLValueAddress(),
-                             origFormalType, refType,
-                             getTypeLowering(refType), C, shouldTake,
-                             guaranteedValid));
+      auto rvalue = RValue(*this, loc, refType,
+                           emitLoad(loc, accessAddr, origFormalType, refType,
+                                    getTypeLowering(refType), C, shouldTake,
+                                    guaranteedValid));
+      return propagateRValuePastAccess(std::move(rvalue));
     }
 
     // For local decls, use the address we allocated or the value if we have it.
@@ -1276,14 +1299,21 @@ RValue SILGenFunction::emitRValueForStorageLoad(
       result = result.copyUnmanaged(*this, loc);
     }
   } else {
+    // Create a tiny unenforced access scope around a load from local memory. No
+    // cleanup is necessary since we directly emit the load here. This will
+    // probably go away with opaque values.
+    UnenforcedAccess access;
+    SILValue accessAddress =
+      access.beginAccess(*this, loc, base.getValue(), SILAccessKind::Read);
+
     // For address-only sequences, the base is in memory.  Emit a
     // struct_element_addr to get to the field, and then load the element as an
     // rvalue.
-    SILValue ElementPtr =
-      B.createStructElementAddr(loc, base.getValue(), field);
+    SILValue ElementPtr = B.createStructElementAddr(loc, accessAddress, field);
 
     result = emitLoad(loc, ElementPtr, abstractedTL,
                       hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    access.endAccess(*this);
   }
 
   // If we're accessing this member with an abstraction change, perform that

@@ -457,4 +457,10 @@ def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversio
 def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
     HelpText<"Bypass checks for batch-mode errors.">;
 
+def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
+  HelpText<"Enable verification of access markers used to enforce exclusivity.">;
+
+def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
+  HelpText<"Diable verification of access markers used to enforce exclusivity.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
