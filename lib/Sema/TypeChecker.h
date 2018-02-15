@@ -2552,7 +2552,7 @@ public:
 };
 
 /// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the DynamicMemberLookupProtocol
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
 /// requirement.
 bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                               DeclContext *DC,

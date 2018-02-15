@@ -922,7 +922,7 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
 }
 
 /// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the DynamicMemberLookupProtocol
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
 /// requirement.
 bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                      DeclContext *DC,
@@ -932,12 +932,12 @@ bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
   auto indices = decl->getIndices();
   
   auto EBSL =
-  TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   
   return indices->size() == 1 &&
-  !indices->get(0)->isVariadic() &&
-  TC.conformsToProtocol(indices->get(0)->getType(),
-                        EBSL, DC, ConformanceCheckOptions());
+    !indices->get(0)->isVariadic() &&
+    TC.conformsToProtocol(indices->get(0)->getType(),
+                          EBSL, DC, ConformanceCheckOptions());
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -966,7 +966,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Lookup the implementations of our subscript.
   auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
   
-  // If we have none, then there is no conformance.
+  // If we have none, then there is no attribute.
   if (candidates.empty()) {
     TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
     attr->setInvalid();
@@ -987,11 +987,6 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     attr->setInvalid();
   }
 }
-#if 0
-ERROR(invalid_retroactive_conformance_dmlp,none,
-      "retroactive conformance of %0 to 'DynamicMemberLookupProtocol' is not "
-      "allowed, only primary type declarations may conform", (Type))
-#endif
 
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().

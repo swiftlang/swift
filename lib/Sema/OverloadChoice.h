@@ -46,7 +46,7 @@ enum class OverloadChoiceKind : int {
   BaseType,
   /// \brief The overload choice selects a key path subscripting operation.
   KeyPathApplication,
-  /// \brief The member is looked up through DynamicMemberLookupProtocol.
+  /// \brief The member is looked up using @dynamicMemberLookup.
   DynamicMemberLookup,
   /// \brief The overload choice selects a particular declaration that
   /// was found by bridging the base value type to its Objective-C
