@@ -82,3 +82,7 @@ extension NSObject : Equatable, Hashable {
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
+
+@available(*, deprecated, renamed: "AnyObject",
+           message: "all classes implicitly conform to the 'NSObject' protocol")
+public typealias NSObjectProtocol = AnyObject

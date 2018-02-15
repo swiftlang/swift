@@ -6714,6 +6714,8 @@ void SwiftDeclConverter::importObjCProtocols(
 
   for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
        cp != cpEnd; ++cp) {
+    if (isNSObjectProtocol(*cp)) continue;
+    
     if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
@@ -6797,6 +6799,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         inherited.push_back(TypeLoc::withoutLoc(superclassType));
       }
       for (clang::ObjCProtocolDecl *clangProto : clangBound->quals()) {
+        if (isNSObjectProtocol(clangProto)) continue;
+
         ProtocolDecl *proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(clangProto, getActiveSwiftVersion()));
         if (!proto) {
@@ -8555,6 +8559,14 @@ void ClangImporter::Implementation::collectMembersToAdd(
                                             members);
     }
 
+    // For NSObject, add the otherwise-hidden NSObject protocol. This is only
+    // used to import mirrored members.
+    // FIXME: Check for any class that conforms to the NSObject protocol?
+    if (clangClass->getName() == "NSObject") {
+      if (auto nsObjectProto = getNSObjectProtocolType()) {
+        protos.push_back(nsObjectProto->castTo<ProtocolType>()->getDecl());
+      }
+    }
   } else if (auto clangProto
                = dyn_cast<clang::ObjCProtocolDecl>(objcContainer)) {
     objcContainer = clangProto->getDefinition();

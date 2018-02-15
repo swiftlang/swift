@@ -926,17 +926,6 @@ namespace {
             SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
               type->qual_begin(), type->qual_end()
             };
-            auto *nsObjectProto =
-                Impl.getNSObjectProtocolType()->getAnyNominal();
-            if (!nsObjectProto) {
-              // Input is malformed
-              return {};
-            }
-            auto *clangProto =
-                cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
-            protocols.push_back(
-                const_cast<clang::ObjCProtocolDecl *>(clangProto));
-
             clang::ASTContext &clangCtx = Impl.getClangASTContext();
             clang::QualType protosOnlyType =
                 clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
@@ -1037,8 +1026,15 @@ namespace {
         if (!importedType->isAnyObject())
           members.push_back(importedType);
 
+        bool hasNSObjectProtocol = false;
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
+          // Never import the NSObject protocol in a type.
+          if (isNSObjectProtocol(*cp)) {
+            hasNSObjectProtocol = true;
+            continue;
+          }
+
           auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, Impl.CurrentVersion));
           if (!proto)
@@ -1049,7 +1045,7 @@ namespace {
 
         importedType = ProtocolCompositionType::get(Impl.SwiftContext,
                                                     members,
-                                                    /*HasExplicitAnyObject=*/false);
+                                                    /*HasExplicitAnyObject=*/hasNSObjectProtocol);
       }
 
       // Class or Class<P> maps to an existential metatype.
@@ -2473,3 +2469,10 @@ Type ClangImporter::Implementation::getNSCopyingType() {
 Type ClangImporter::Implementation::getNSObjectProtocolType() {
   return getNamedProtocolType(*this, "NSObject");
 }
+
+bool swift::importer::isNSObjectProtocol(const clang::Decl *decl) {
+  if (auto objcProto = dyn_cast_or_null<clang::ObjCProtocolDecl>(decl))
+    return objcProto->getName() == "NSObject";
+  return false;
+}
+

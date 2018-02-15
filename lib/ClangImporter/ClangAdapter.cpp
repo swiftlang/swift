@@ -221,6 +221,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 
     // For id<Proto> or NSObject<Proto>, retrieve the name of "Proto".
     if (objcObjectPtr->getNumProtocols() == 1 &&
+        !isNSObjectProtocol(*objcObjectPtr->qual_begin()) &&
         (!objcClass || objcClass->getName() == "NSObject"))
       return (*objcObjectPtr->qual_begin())->getName();
 

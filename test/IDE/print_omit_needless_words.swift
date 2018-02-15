@@ -140,7 +140,7 @@
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
+// CHECK-FOUNDATION: func doSomethingElse(with: NSCopying)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (Any, Any) -> Int)

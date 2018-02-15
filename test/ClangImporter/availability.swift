@@ -13,10 +13,6 @@ func test_unavailable_instance_method(_ x : NSObject) -> Bool {
   return x.allowsWeakReference() // expected-error {{'allowsWeakReference()' is unavailable}}
 }
 
-func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
-  // expected-warning @+1 {{expression of type 'NSObjectProtocol' is unused}}
-  x.retain() // expected-error {{'retain()' is unavailable}}
-}
 func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
   x.retain() // expected-error {{'retain()' is unavailable}} expected-warning {{result of call to 'retain()' is unused}}
 }

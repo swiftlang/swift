@@ -612,6 +612,9 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   if (version == ImportNameVersion::raw())
     return nullptr;
 
+  // HACK: Don't rename the NSObject protocol.
+  if (isNSObjectProtocol(decl)) return nullptr;
+
   // Handle versioned API notes for Swift 3 and later. This is the common case.
   if (version > ImportNameVersion::swift2()) {
     const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
@@ -1020,6 +1023,10 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
       break;
     }
   }
+
+  // The NSObject protocol is SwiftPrivate.
+  // FIXME: Move this into the API notes for the ObjectiveC module.
+  if (isNSObjectProtocol(decl)) return true;
 
   return false;
 }

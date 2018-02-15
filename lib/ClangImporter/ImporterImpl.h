@@ -1409,6 +1409,8 @@ static T *castIgnoringCompatibilityAlias(Decl *D) {
   return cast_or_null<T>(D);
 }
 
+bool isNSObjectProtocol(const clang::Decl *decl);
+
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;

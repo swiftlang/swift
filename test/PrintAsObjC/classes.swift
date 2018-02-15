@@ -89,13 +89,13 @@ class ClassWithCustomName2 {}
 class ClassWithCustomNameSub : ClassWithCustomName {}
 
 
-// CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
+// CHECK-LABEL: @interface ClassWithNSObjectProtocol
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * _Nonnull description;
 // CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * _Nonnull)_ SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (BOOL)isKindOfClass:(Class _Nonnull)aClass SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
-@objc class ClassWithNSObjectProtocol : NSObjectProtocol {
+@objc class ClassWithNSObjectProtocol {
   @objc var description: String { return "me" }
   @objc(conformsToProtocol:)
   func conforms(to _: Protocol) -> Bool { return false }
@@ -355,9 +355,9 @@ typealias AliasForNSRect = NSRect
 // NEGATIVE-NOT: @interface NSObject
 class MyObject : NSObject {}
 
-// CHECK-LABEL: @protocol MyProtocol <NSObject>
+// CHECK-LABEL: @protocol MyProtocol
 // CHECK-NEXT: @end
-@objc protocol MyProtocol : NSObjectProtocol {}
+@objc protocol MyProtocol {}
 
 // CHECK-LABEL: @protocol MyProtocolMetaOnly;
 // CHECK-LABEL: @interface MyProtocolMetaCheck
@@ -521,7 +521,6 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * _Null_unspecified outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  _Nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * _Nullable outletCollectionAnyObject;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * _Nullable outletCollectionProto;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger staticInt;)
 // CHECK-NEXT: + (NSInteger)staticInt SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, copy) NSString * _Nonnull staticString;)
@@ -614,7 +613,6 @@ public class NonObjCClass { }
   @IBOutlet var outletCollection: [Properties]!
   @IBOutlet var outletCollectionOptional: [ClassWithCustomName]? = []
   @IBOutlet var outletCollectionAnyObject: [AnyObject]?
-  @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
 
   @objc static let staticInt = 2
   @objc static var staticString = "Hello"

@@ -196,7 +196,10 @@ public var NO: ObjCBool {
 
 // NSObject implements Equatable's == as -[NSObject isEqual:]
 // NSObject implements Hashable's hashValue() as -[NSObject hash]
-// FIXME: what about NSObjectProtocol?
+
+@available(*, deprecated, renamed: "AnyObject",
+           message: "all classes implicitly conform to the 'NSObject' protocol")
+public typealias NSObjectProtocol = AnyObject
 
 extension NSObject : Equatable, Hashable {
   /// The hash value.

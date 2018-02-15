@@ -14,10 +14,11 @@
 // CHECK-NOT: lookup table
 // CHECK:   NSObject:
 // CHECK-NEXT:     TU: NSObject
-// CHECK-NEXT:   NSObjectProtocol:
+// CHECK:   __NSObjectProtocol:
 // CHECK-NEXT:     TU: NSObject
 // CHECK:   responds:
 // CHECK-NEXT:     -[NSObject respondsToSelector:]
+
 
 // CHECK-LABEL: <<Bridging header lookup table>>
 // CHECK-NEXT:      Base name -> entry mappings:

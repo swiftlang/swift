@@ -3,7 +3,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: protocol ImportedProtocolBase : NSObjectProtocol {
+// CHECK: protocol ImportedProtocolBase {
 // CHECK: }
 // CHECK: typealias ImportedProtocolBase_t = ImportedProtocolBase
 // CHECK: protocol IPSub : ImportedProtocolBase {

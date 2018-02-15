@@ -695,8 +695,8 @@ Reflection.test("MetatypeMirror") {
     dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)
     
-    let objcDefinedProtoType = NSObjectProtocol.self
-    expectEqual(String(describing: objcDefinedProtoType), "NSObject")
+    let objcDefinedProtoType = NSCoding.self
+    expectEqual(String(describing: objcDefinedProtoType), "NSCoding")
   }
 }
 

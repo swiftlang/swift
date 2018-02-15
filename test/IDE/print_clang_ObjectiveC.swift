@@ -13,13 +13,13 @@
 // NEGATIVE-WITHOUT-FORWARD-DECLS-NOT: var description
 // NEGATIVE-NOT: NSCoder
 
-// CHECK-LABEL: protocol NSObjectProtocol {
+// CHECK-LABEL: protocol __NSObjectProtocol {
 // CHECK-DAG: var superclass: AnyClass? { get }
 // CHECK-DAG: func zone() -> NSZone
 // CHECK-WITH-FORWARD-DECLS-DAG: var description: String { get }
 // CHECK: {{^[}]$}}
 
-// CHECK-LABEL: class NSObject : NSObjectProtocol {
+// CHECK-LABEL: class NSObject {
 // CHECK-DAG: func copy() -> Any
 // CHECK-DAG: class func hash() -> Int
 // CHECK-WITH-FORWARD-DECLS-DAG: class func description() -> String

@@ -57,7 +57,7 @@ func instanceMethods(_ b: B) {
 
   // Instance methods with keyword components
   var obj = NSObject()
-  var prot = NSObjectProtocol.self
+  var prot = NSCoding.self
   b.`protocol`(prot, hasThing:obj)
   b.doThing(obj, protocol: prot)
 }
@@ -311,10 +311,10 @@ func ivars(_ hive: Hive) {
   hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
-class NSObjectable : NSObjectProtocol {
-  @objc var description : String { return "" }
-  @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
-  @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
+class NSObjectable : NSObject {
+  @objc override var description : String { return "" }
+  @objc(conformsToProtocol:) override func conforms(to _: Protocol) -> Bool { return false }
+  @objc(isKindOfClass:) override func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
 
@@ -553,17 +553,15 @@ func testStrangeSelectors(obj: StrangeSelectors) {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
-  _ = obj as NSObjectProtocol
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
-  _ = cell as NSObjectProtocol
   _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
 

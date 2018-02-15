@@ -12,7 +12,7 @@
 @objc class ForwardClass : NSObject {
 }
 
-@objc protocol ForwardProto : NSObjectProtocol {
+@objc protocol ForwardProto : AnyObject {
 }
 @objc class ForwardProtoAdopter : NSObject, ForwardProto {
 }
