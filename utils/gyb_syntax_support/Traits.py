@@ -1,14 +1,14 @@
 from Child import Child
 
 
-class TRAIT(object):
+class Trait(object):
     def __init__(self, trait_name, children):
         self.trait_name = trait_name
         self.children = children
 
 
 TRAITS = [
-    TRAIT('DeclGroup',
+    Trait('DeclGroup',
           children=[
               Child('Attributes', kind='AttributeList', is_optional=True),
               Child('AccessLevelModifier', kind='DeclModifier',
@@ -16,7 +16,7 @@ TRAITS = [
               Child('Members', kind='MemberDeclBlock'),
           ]),
 
-    TRAIT('BracedSyntax',
+    Trait('BracedSyntax',
           children=[
               Child('LeftBrace', kind='LeftBraceToken'),
               Child('RightBrace', kind='RightBraceToken'),
