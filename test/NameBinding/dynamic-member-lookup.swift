@@ -245,6 +245,20 @@ func testMutableExistential(a : PyVal, b : MyType) -> PyVal {
   return a.foo.bar.baz
 }
 
+
+// Verify the protocol compositions and protocol refinements work.
+protocol SubPyVal : PyVal { }
+
+typealias ProtocolComp = AnyObject & PyVal
+
+func testMutableExistential2(a : AnyObject & PyVal, b : SubPyVal,
+                             c : ProtocolComp & AnyObject)  {
+  a.x.y = b
+  b.x.y = b
+  c.x.y = b
+}
+
+
 //===----------------------------------------------------------------------===//
 // JSON example
 //===----------------------------------------------------------------------===//
@@ -302,6 +316,22 @@ class DerivedClass : BaseClass {
 
 func testDerivedClass(x : BaseClass, y : DerivedClass) -> Int {
   return x.life - y.the + x.universe - y.and + x.everything
+}
+
+
+// Test that derived classes can add a setter.
+class DerivedClassWithSetter : BaseClass {
+  override subscript(dynamicMember member: String) -> Int {
+    get { return super[dynamicMember: member] }
+    set { }
+  }
+}
+
+func testOverrideSubscript(a : BaseClass, b: DerivedClassWithSetter) {
+  let x = a.frotz + b.garbalaz
+  b.baranozo = x
+  
+  a.balboza = 12  // expected-error {{cannot assign to property}}
 }
 
 

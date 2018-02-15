@@ -2870,6 +2870,16 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
 static bool hasDynamicMemberLookupAttribute(Type ty) {
+  // If this is a protocol composition, check to see if any of the protocols
+  // have the attribute on them.
+  if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
+    for (auto p : protocolComp->getMembers())
+      if (hasDynamicMemberLookupAttribute(p))
+        return true;
+    return false;
+  }
+  
+  // Otherwise this has to be a nominal type.
   auto nominal = ty->getAnyNominal();
   if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
 
