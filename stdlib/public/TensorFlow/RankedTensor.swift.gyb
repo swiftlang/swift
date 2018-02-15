@@ -13,7 +13,7 @@
 // Dynamically shaped but statically ranked tensors.
 //
 // Ranked tensors (Tensor1D, Tensor2D, etc) use an array of integers to
-// represent a shape with known rank. The length of the shape is guaranteed to
+// represent a shape with known rank. The number of dimensions is guaranteed to
 // equal the rank of the tensor.
 //
 //===----------------------------------------------------------------------===//
@@ -25,13 +25,13 @@ infix operator ⊗ : MultiplicationPrecedence
 
   def rankName(rank):
     if rank == 1:
-         return 'one'
+      return 'one'
     elif rank == 2:
-         return 'two'
+      return 'two'
     elif rank == 3:
-         return 'three'
+      return 'three'
     elif rank == 4:
-         return 'four'
+      return 'four'
 
   def _elementArrayLiteral(rank):
     return 'Scalar' if rank == 1 else 'Tensor{}D<Scalar>'.format(rank-1)
@@ -198,7 +198,7 @@ public extension ${Self} {
 public extension ${Self} where Scalar : Numeric {
   /// Initialize a ${rank}D tensor with all elements set to zero.
   ///
-  /// - Parameter shape: the sizes of the tensor along each dimension.
+  /// - Parameter shape: The sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
   init(zeros shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
@@ -209,7 +209,7 @@ public extension ${Self} where Scalar : Numeric {
 
   /// Initialize a ${rank}D tensor with all elements set to one.
   ///
-  /// - Parameter shape: the sizes of the tensor along each dimension.
+  /// - Parameter shape: The sizes of the tensor along each dimension.
   @_inlineable @inline(__always)
   init(ones shape: TensorShape) {
     // TODO: Uncomment precondition when `.count` is reliably constant folded.
@@ -259,7 +259,7 @@ public extension ${Self} {
 % if rank == 1:
   @_inlineable
   /// Access the scalar specified by a given index.
-  /// - Parameter index: index of the scalar
+  /// - Parameter index: Index of the scalar.
   subscript(index: Int) -> Scalar {
     @inline(never) get {
       fatalError("Unimplemented")
@@ -270,8 +270,9 @@ public extension ${Self} {
   }
 % else:
   @_inlineable
-  /// Access the element ${ElementTensor} specified by an index in the leading dimension.
-  /// - Parameter index: index of the element tensor
+  /// Access the element ${ElementTensor} specified by an index in the leading
+  /// dimension.
+  /// - Parameter index: Index of the element tensor.
   subscript(index: Int) -> ${ElementTensor} {
     @inline(__always)
     get {
@@ -285,7 +286,7 @@ public extension ${Self} {
 % end
 
   /// Returns the subtensor defined by the specified bounds.
-  /// - Parameter bounds: contiguous range of indices
+  /// - Parameter bounds: Contiguous range of indices.
   //  - TODO: begin/end are vectors in general.
   // tfop_slice(tensor, begin, end) -> tensor
   subscript(bounds: Range<Int>) -> ${Self} {

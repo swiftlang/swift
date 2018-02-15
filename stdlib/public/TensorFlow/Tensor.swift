@@ -90,14 +90,15 @@ func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int32])
     -> TensorHandle<Scalar> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
   precondition(scalars.count == contiguousSize,
-               "The number of scalars doesn't match the shape.")
+               "The number of scalars does not match the shape.")
   return TensorHandle(
-      shape: shape,
-      scalarsInitializer: { addr in
-        scalars.withUnsafeBufferPointer { ptr in
-          addr.assign(from: ptr.baseAddress!, count: contiguousSize)
-        }
-    })
+    shape: shape,
+    scalarsInitializer: { addr in
+      scalars.withUnsafeBufferPointer { ptr in
+        addr.assign(from: ptr.baseAddress!, count: contiguousSize)
+      }
+    }
+  )
 }
 
 @_versioned @_inlineable @inline(__always)
@@ -162,15 +163,18 @@ public extension Tensor {
     self.init(handle: _TFTensorFromScalars1D(vector))
   }
 
-  /// Initialize a tensor with arbitrary shape.
-  /// - Precondition: The number of scalars should be the same as the
-  ///   product of all of shape's dimensions.
+  /// Initialize a tensor with a specified shape.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   shape's dimensions.
   @_inlineable @inline(__always)
   init(shape: TensorShape, scalars: [Scalar]) {
     self.init(handle: _TFTensorFromScalars(scalars, shape: shape.dimensions))
   }
 
-  /// Initialize a tensor of a specified shape, filled with a single value.
+  /// Initialize a tensor with a specified shape to a repeated value.
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - repeatedValue: The scalar value to repeat.
   @_inlineable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     let valueTensor = Tensor(repeatedValue).handle
@@ -230,7 +234,7 @@ public extension Tensor {
 public extension Tensor where Scalar : Numeric {
   /// Initialize a tensor with all elements set to zero.
   ///
-  /// - Parameter shape: the dimensions of the tensor.
+  /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)
   init(zeros shape: TensorShape) {
     self.init(shape: shape, repeating: 0)
@@ -238,7 +242,7 @@ public extension Tensor where Scalar : Numeric {
 
   /// Initialize a tensor with all elements set to one.
   ///
-  /// - Parameter shape: the dimensions of the tensor.
+  /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)
   init(ones shape: TensorShape) {
     self.init(shape: shape, repeating: 1)
