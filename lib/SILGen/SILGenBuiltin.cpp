@@ -677,11 +677,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
     SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
-  
-  // Save the cleanup on the argument so we can forward it onto the cast
-  // result.
-  auto refCleanup = args[0].getCleanup();
-  SILValue ref = args[0].getValue();
+
+  ManagedValue ref = args[0];
   SILValue bits = args[1].getUnmanagedValue();
   
   // If the argument is existential, open it.
@@ -691,9 +688,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
-  
-  SILValue result = SGF.B.createRefToBridgeObject(loc, ref, bits);
-  return ManagedValue(result, refCleanup);
+
+  return SGF.B.createRefToBridgeObject(loc, ref, bits);
 }
 
 /// Specialized emitter for Builtin.castReferenceFromBridgeObject.
