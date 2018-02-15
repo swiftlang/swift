@@ -110,6 +110,7 @@ import RangeIteration
 import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
+import RemoveWhere
 import ReversedCollections
 import RomanNumbers
 import SetTests
@@ -255,6 +256,7 @@ registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
+registerBenchmark(RemoveWhere)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
 registerBenchmark(SetTests)
