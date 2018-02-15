@@ -498,14 +498,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_StaticInitializeObjCMetadata:
-    Printer.printAttrName("@_staticInitializeObjCMetadata");
-    break;
-
-  case DAK_DowngradeExhaustivityCheck:
-    Printer.printAttrName("@_downgrade_exhaustivity_check");
-    break;
-
   case DAK_ClangImporterSynthesizedType: {
     Printer.printAttrName("@_clangImporterSynthesizedType");
     auto *attr = cast<ClangImporterSynthesizedTypeAttr>(this);
@@ -517,8 +509,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
+#define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
+#include "swift/AST/Attr.def"
+    llvm_unreachable("handled above");
+
   default:
-    llvm_unreachable("handled before this switch");
+    assert(DeclAttribute::isDeclModifier(getKind()) &&
+           "handled above");
   }
 
   return true;
