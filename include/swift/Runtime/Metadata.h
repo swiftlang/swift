@@ -949,6 +949,8 @@ public:
     return asWords + description->getGenericArgumentOffset(this);
   }
 
+  bool satisfiesClassConstraint() const;
+
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
   /// the type is not a class (or not a class with a class object).
