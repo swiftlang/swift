@@ -66,7 +66,7 @@ internal final class TensorBuffer<Scalar> {
 
 /// TF Tensor-specific initializer
 extension TensorBuffer where Scalar : AccelerableByTensorFlow {
-  /// Initialize a local tensor buffer from a C `TF_Tensor*` value and takes
+  /// Creates a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
   convenience init(owning cTensor: CTensor, count: Int) {
     debugLog("Initializing TensorBuffer with a cTensor of \(count) elements.")
@@ -153,16 +153,16 @@ public protocol _ShapedArrayProtocol
   /// The total number of scalars in this array.
   var scalarCount: Int { get }
 
-  /// Initialize an array with a specific shape and contiguous scalars in
+  /// Creates an array with the specificied shape and contiguous scalars in
   /// row-major order.
-  /// - Precondition: The number of `scalars` must be equal to the product of
-  ///   all dimensions of the shape.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init(shape: [Int], scalars: [Scalar])
 
-  /// Initialize an array with a specific shape and a sequence of scalars in
+  /// Creates an array with the specified shape and sequence of scalars in
   /// row-major order.
-  /// - Precondition: The number of `scalars` must be equal to the product of
-  ///   all dimensions of the shape.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init<S : Sequence>(shape: [Int], scalars: S) where S.Element == Scalar
 
   /// Calls a closure with a pointer to the array’s contiguous storage.
@@ -234,7 +234,7 @@ public extension _ShapedArrayProtocol {
 }
 
 internal extension _ShapedArrayProtocol {
-  /// Returns the scalar count for an element in a ShapedArray.
+  /// Returns the scalar count for an element of a ShapedArray.
   var scalarCountPerElement: Int {
     return shape.isEmpty ? 0 : shape.dropFirst().reduce(1, *)
   }
@@ -287,10 +287,10 @@ public struct ShapedArray<Scalar> : _ShapedArrayProtocol {
   /// Contiguous memory storing scalars.
   internal var buffer: TensorBuffer<Scalar>
 
-  /// The shape of this array.
+  /// The dimensions of the array.
   public private(set) var shape: [Int]
 
-  /// Initialize a shaped array from an existing buffer and a shape.
+  /// Creates a ShapedArray from a TensorShape and a shape.
   internal init(buffer: TensorBuffer<Scalar>, shape: [Int]) {
     precondition(buffer.count == shape.reduce(1, *),
       "The scalar count of the buffer does not match the shape.")
@@ -379,7 +379,7 @@ public extension ShapedArray {
     self.init(buffer: buffer, shape: shape)
   }
 
-  /// Initialize a scalar tensor.
+  /// Creates a ShapedArray from a scalar value.
   init(_ scalar: Scalar) {
     let buffer = TensorBuffer<Scalar>.create(count: 1) { buffPtr in
       let ptr = buffPtr.baseAddress!
@@ -388,7 +388,8 @@ public extension ShapedArray {
     self.init(buffer: buffer, shape: [])
   }
 
-  /// Allocate and initialize a ShapedArray to a repeated value.
+  /// Creates a ShapedArray with the specified shape and a single, repeated
+  /// value.
   /// - Parameters:
   ///   - shape: The dimensions of the array.
   ///   - repeatedValue: The scalar value to repeat.
@@ -504,6 +505,7 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
     return MemoryLayout<Scalar>.stride * scalarCount
   }
 
+  @_versioned
   func makeTensorHandle() -> TensorHandle<Scalar> {
     // This initializer is designed to optimize conversion from TF-allocated
     // `ShapedArray` instances.
@@ -601,15 +603,15 @@ extension ShapedArray : CustomStringConvertible {
 ///     // `matrix` now represents [[0, 0], [0, 0], [4, 5]].
 
 public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
-  /// The underlying `ShapedArray` of a slice.
+  /// The underlying ShapedArray of the slice.
   internal var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
   internal var baseIndices: [Int]
   /// The subarray bounds of a slice.
   internal var bounds: CountableRange<Int>?
 
-  /// Initialize a shaped array slice from a shaped array as base, with
-  /// specified subdimensional inwards indices and subarray bounds.
+  /// Creates a ShapedArraySlice from a base ShapedArray, with the specified
+  /// subdimensional indices and subarray bounds.
   internal init(
     base: ShapedArray<Scalar>,
     baseIndices indices: [Int] = [],
@@ -658,12 +660,13 @@ public extension ShapedArraySlice {
     self.init(base: ShapedArray(shape: shape, scalars: scalars))
   }
 
-  /// Initialize a scalar ShapedArraySlice.
+  /// Creates a ShapedArraySlice from a scalar value.
   init(_ scalar: Scalar) {
     self.init(base: ShapedArray(scalar))
   }
 
-  /// Allocate and initialize a ShapedArraySlice to a repeated value.
+  /// Creates a ShapedArraySlice with the specified shape and a single, repeated
+  /// value.
   /// - Parameters:
   ///   - shape: The dimensions of the array.
   ///   - repeatedValue: The scalar value to repeat.
