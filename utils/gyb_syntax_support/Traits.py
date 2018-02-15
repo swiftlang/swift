@@ -8,7 +8,7 @@ class Trait(object):
 
 
 TRAITS = [
-    Trait('DeclGroup',
+    Trait('DeclGroupSyntax',
           children=[
               Child('Attributes', kind='AttributeList', is_optional=True),
               Child('AccessLevelModifier', kind='DeclModifier',

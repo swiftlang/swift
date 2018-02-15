@@ -157,7 +157,7 @@ DECL_NODES = [
     #                      generic-where-clause?
     #                     '{' class-members '}'
     # class-name -> identifier
-    Node('ClassDecl', kind='Decl', traits=['DeclGroup'],
+    Node('ClassDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -181,7 +181,7 @@ DECL_NODES = [
     #                         generic-where-clause?
     #                         '{' struct-members '}'
     # struct-name -> identifier
-    Node('StructDecl', kind='Decl', traits=['DeclGroup'],
+    Node('StructDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -198,7 +198,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('ProtocolDecl', kind='Decl', traits=['DeclGroup'],
+    Node('ProtocolDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -219,7 +219,7 @@ DECL_NODES = [
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
-    Node('ExtensionDecl', kind='Decl', traits=['DeclGroup'],
+    Node('ExtensionDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
