@@ -53,9 +53,15 @@ TensorTests.testCPUAndGPU("RandomInitializer") {
 }
 
 TensorTests.testCPUAndGPU("ScalarToTensorConversion") {
-  let tensor = 5.makeTensor(withRank: 4)
+  let tensor = 42.makeTensor(withRank: 4)
   expectEqual([1, 1, 1, 1], tensor.shape)
-  expectEqual([5], tensor.scalars)
+  expectEqual([42], tensor.scalars)
+}
+
+TensorTests.testCPUAndGPU("ArrayConversion") {
+  let array3D = ShapedArray(shape: [2, 3, 4], repeating: 1.0)
+  let tensor3D = Tensor(array3D)
+  expectEqual(array3D, tensor3D.array)
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
@@ -88,6 +94,7 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
+  expectEqual([2], array.shape)
   expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars,
                              byError: 0.0001)
 }
@@ -96,8 +103,8 @@ TensorTests.testCPUAndGPU("Convolution") {
   let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
                              scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-  let y = x.convolved2D(withFilter: filter,
-                        strides: [1, 1, 1, 1], padding: .same)
+  let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
+                        padding: .same)
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5,
@@ -117,16 +124,19 @@ TensorTests.testCPUAndGPU("3Adds") {
 TensorTests.testCPUAndGPU("MultiOpMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = Tensor<Float>([2.4, 2.4])
-  let sum = x + y
-  let squared = sum * sum
-  let squareRooted = sqrt(squared)
+  let t1 = x + y
+  let t2 = t1 * t1
+  let t3 = sqrt(t2)
 
-  // expectEqual([2], sum.shape)
-  // expectEqual([2], squared.shape)
-  // expectEqual([2], squareRooted.shape)
-  expectPointwiseNearlyEqual([3.6, 3.6], sum.scalars)
-  expectPointwiseNearlyEqual([12.96, 12.96], squared.scalars)
-  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.scalars)
+  let array1 = t1.array
+  let array2 = t2.array
+  let array3 = t3.array
+  expectEqual([2], array1.shape)
+  expectEqual([2], array2.shape)
+  expectEqual([2], array3.shape)
+  expectPointwiseNearlyEqual([3.6, 3.6], array1.scalars)
+  expectPointwiseNearlyEqual([12.96, 12.96], array2.scalars)
+  expectPointwiseNearlyEqual([3.6, 3.6], array3.scalars)
 }
 
 TensorTests.testCPUAndGPU("XWPlusB") {

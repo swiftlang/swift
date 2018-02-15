@@ -143,13 +143,13 @@ extension Tensor where Scalar : Numeric {
 }
 
 public extension Tensor {
-  /// Initialize a tensor with a scalar representing a scalar value.
+  /// Creates a tensor from a scalar value.
   @_inlineable @inline(__always)
   init(_ value: Scalar) {
     self.init(handle: _TFMakeScalarTensor(value))
   }
 
-  /// Initialize a tensor with an array of tensors (which may themselves be
+  /// Creates a tensor from an array of tensors (which may themselves be
   /// scalars).
   @_inlineable @inline(__always)
   init<TensorType : TensorProtocol>(_ elements: [TensorType])
@@ -157,21 +157,22 @@ public extension Tensor {
     self.init(handle: #tfop("Pack", elements))
   }
 
-  /// Initialize a tensor with an array representing a vector.
+  /// Creates a tensor from an array representing a vector.
   @_inlineable @inline(__always)
   init(_ vector: [Scalar]) {
     self.init(handle: _TFTensorFromScalars1D(vector))
   }
 
-  /// Initialize a tensor with a specified shape.
+  /// Creates a tensor with the specified shape and contiguous scalars in
+  /// row-major order.
   /// - Precondition: The number of scalars must equal the product of the
-  ///   shape's dimensions.
+  ///   dimensions of the shape.
   @_inlineable @inline(__always)
   init(shape: TensorShape, scalars: [Scalar]) {
     self.init(handle: _TFTensorFromScalars(scalars, shape: shape.dimensions))
   }
 
-  /// Initialize a tensor with a specified shape to a repeated value.
+  /// Creates a tensor with the specified shape and a single, repeated value.
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
@@ -190,7 +191,7 @@ public extension Tensor {
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   public typealias ArrayLiteralElement = Tensor<Scalar>
-  /// Creates an instance initialized with the given elements.
+  /// Creates a tensor initialized with the given elements.
   @inline(__always)
   public init(arrayLiteral elements: Tensor<Scalar>...) {
     self.init(elements);
@@ -232,7 +233,7 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
-  /// Initialize a tensor with all elements set to zero.
+  /// Creates a tensor with all elements set to zero.
   ///
   /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)
@@ -240,7 +241,7 @@ public extension Tensor where Scalar : Numeric {
     self.init(shape: shape, repeating: 0)
   }
 
-  /// Initialize a tensor with all elements set to one.
+  /// Creates a tensor with all elements set to one.
   ///
   /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)
@@ -255,8 +256,8 @@ public extension Tensor where Scalar : Numeric {
     fatalError("FIXME: implement eye")
   }
 
-  /// Initialize a 1-D tensor representing a sequence from a starting value to,
-  /// but not including, an end value, stepping by the specified amount.
+  /// Creates a 1-D tensor representing a sequence from a starting value to, but
+  /// not including, an end value, stepping by the specified amount.
   ///
   /// - Parameters:
   ///   - start: The starting value to use for the sequence. If the sequence
@@ -276,8 +277,8 @@ public extension Tensor where Scalar : Numeric {
     )
   }
 
-  /// Initialize a 1-D tensor representing a sequence from a starting value to,
-  /// but not including, an end value, stepping by the specified amount.
+  /// Creates a 1-D tensor representing a sequence from a starting value to, but
+  /// not including, an end value, stepping by the specified amount.
   ///
   /// - Parameters:
   ///   - start: The starting value to use for the sequence. If the sequence
@@ -298,8 +299,8 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : FloatingPoint {
-  /// Initialize a tensor with the specified shape, randomly sampling scalar
-  /// values from a normal distribution.
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a normal distribution.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
@@ -346,7 +347,7 @@ public extension Tensor {
     return shapePadded(atIndex: 0)
   }
 
-  /// Returns a shape-padded Tensor, inserting a dimension of 1 at a given
+  /// Returns a shape-padded Tensor, inserting a dimension of 1 at the specified
   /// index.
   @_inlineable @inline(__always)
   func shapePadded(atIndex index: Int32) -> Tensor {
@@ -486,8 +487,8 @@ public extension Tensor {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
-      // This is considered to be a well known way to produce a copy to the host,
-      // so we never want to produce an "implicit copy to host" warning.
+      // This is considered to be a well known way to produce a copy to the
+      // host, so an "implicit copy to host" warning should not be produced.
       return toHost().handle.makeHostCopy()
     }
   }
