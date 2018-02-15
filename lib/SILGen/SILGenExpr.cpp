@@ -3702,6 +3702,96 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto baseTy = rootTy;
   SmallVector<SILValue, 4> operands;
   
+  auto lowerSubscriptIndices =
+    [this, &operands, &needsGenericContext, baseTy, E]
+    (const KeyPathExpr::Component &component) ->
+                                SmallVector<KeyPathPatternComponent::Index, 4> {
+      // Capturing an index value dependent on the generic context means we
+      // need the generic context captured in the key path.
+      needsGenericContext |=
+          component.getIndexExpr()->getType()->hasArchetype()
+        | baseTy->hasTypeParameter();
+      
+      // Evaluate the index arguments.
+      SmallVector<RValue, 2> indexValues;
+      auto indexResult = visit(component.getIndexExpr(), SGFContext());
+      if (isa<TupleType>(indexResult.getType())) {
+        std::move(indexResult).extractElements(indexValues);
+      } else {
+        indexValues.push_back(std::move(indexResult));
+      }
+
+      SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
+      for (unsigned i : indices(indexValues)) {
+        auto hashable = component.getSubscriptIndexHashableConformances()[i];
+        assert(hashable.isAbstract() ||
+          hashable.getConcrete()->getType()->isEqual(indexValues[i].getType()));
+        auto &value = indexValues[i];
+        
+        auto indexTy = value.getType()->mapTypeOutOfContext()->getCanonicalType();
+        auto indexLoweredTy = SGF.getLoweredType(value.getType());
+        indexLoweredTy = SILType::getPrimitiveType(
+          indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
+             ->getCanonicalType(),
+          indexLoweredTy.getCategory());
+        indexPatterns.push_back({(unsigned)operands.size(),
+                 indexTy, indexLoweredTy,
+                 hashable});
+        operands.push_back(
+          std::move(indexValues[i]).forwardAsSingleValue(SGF, E));
+      }
+      return indexPatterns;
+    };
+  
+  /// Returns true if a key path component for the given property or
+  /// subscript should be externally referenced.
+  auto shouldUseExternalKeyPathComponent =
+    [&](AbstractStorageDecl *storage) -> bool {
+      return SGF.getASTContext().LangOpts.EnableKeyPathResilience
+        && storage->getModuleContext() != SGF.SGM.SwiftModule;
+    };
+  
+  /// Build an external key path component referencing a property or subscript
+  /// from another module.
+  auto makeExternalKeyPathComponent =
+    [&](const KeyPathExpr::Component &component,
+        CanType ty) -> KeyPathPatternComponent {
+      SmallVector<KeyPathPatternComponent::Index, 4> indices;
+      SubstitutionList subs = component.getDeclRef().getSubstitutions();
+      
+      // Map the substitutions out of context.
+      if (!subs.empty()) {
+        // If any of the substitutions involve local archetypes, then the
+        // key path pattern needs to capture the generic context, and we need
+        // to map the pattern substitutions out of this context.
+        if (std::any_of(subs.begin(), subs.end(),
+                        [](const Substitution &s) -> bool {
+                          return s.getReplacement()->hasArchetype();
+                        })) {
+          needsGenericContext = true;
+          auto sig = component.getDeclRef().getDecl()
+            ->getInnermostDeclContext()
+            ->getGenericSignatureOfContext();
+          auto subMap = sig
+            ->getSubstitutionMap(component.getDeclRef().getSubstitutions());
+          subMap = subMap.mapReplacementTypesOutOfContext();
+          SmallVector<Substitution, 4> subsBuf;
+          
+          sig->getSubstitutions(subMap, subsBuf);
+          
+          subs = SGF.getASTContext().AllocateCopy(subsBuf);
+        }
+      }
+      
+      if (component.getKind() ==  KeyPathExpr::Component::Kind::Subscript)
+        indices = lowerSubscriptIndices(component);
+      return KeyPathPatternComponent::forExternal(
+        cast<AbstractStorageDecl>(component.getDeclRef().getDecl()),
+        subs,
+        SGF.getASTContext().AllocateCopy(indices),
+        ty);
+    };
+  
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
@@ -3710,6 +3800,12 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
         ->getReferenceStorageReferent()
         ->getCanonicalType();
+      
+      if (shouldUseExternalKeyPathComponent(decl)) {
+        loweredComponents.push_back(makeExternalKeyPathComponent(component,
+                                                                 baseTy));
+        continue;
+      }
       
       switch (auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
                                                       AccessKind::ReadWrite)) {
@@ -3805,44 +3901,16 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           ->substGenericArgs(component.getDeclRef().getSubstitutions());
       auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
         baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
-      
       baseTy = baseSubscriptInterfaceTy.getResult();
-
-      // Capturing an index value dependent on the generic context means we
-      // need the generic context captured in the key path.
-      needsGenericContext |=
-          component.getIndexExpr()->getType()->hasArchetype()
-        | baseTy->hasTypeParameter();
+    
+      if (shouldUseExternalKeyPathComponent(decl)) {
+        loweredComponents.push_back(makeExternalKeyPathComponent(component,
+                                                                 baseTy));
+        continue;
+      }
       
-      // Evaluate the index arguments.
-      SmallVector<RValue, 2> indexValues;
-      auto indexResult = visit(component.getIndexExpr(), SGFContext());
-      if (isa<TupleType>(indexResult.getType())) {
-        std::move(indexResult).extractElements(indexValues);
-      } else {
-        indexValues.push_back(std::move(indexResult));
-      }
-
-      SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
+      auto indexPatterns = lowerSubscriptIndices(component);
       SILFunction *indexEquals = nullptr, *indexHash = nullptr;
-      for (unsigned i : indices(indexValues)) {
-        auto hashable = component.getSubscriptIndexHashableConformances()[i];
-        assert(hashable.isAbstract() ||
-          hashable.getConcrete()->getType()->isEqual(indexValues[i].getType()));
-        auto &value = indexValues[i];
-        
-        auto indexTy = value.getType()->mapTypeOutOfContext()->getCanonicalType();
-        auto indexLoweredTy = SGF.getLoweredType(value.getType());
-        indexLoweredTy = SILType::getPrimitiveType(
-          indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
-             ->getCanonicalType(),
-          indexLoweredTy.getCategory());
-        indexPatterns.push_back({(unsigned)operands.size(),
-                 indexTy, indexLoweredTy,
-                 hashable});
-        operands.push_back(
-          std::move(indexValues[i]).forwardAsSingleValue(SGF, E));
-      }
       getOrCreateKeyPathEqualsAndHash(SGF, SILLocation(E),
                needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
                indexPatterns,
