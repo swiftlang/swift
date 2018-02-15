@@ -337,6 +337,7 @@ extension StrideTo.Iterator: IteratorProtocol {
 
 extension StrideTo: Sequence {
   public typealias SubSequence = StrideTo
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -485,9 +486,8 @@ extension StrideTo: Sequence {
     var subEnd = _end
 
     @discardableResult
-    func appendSubsequence(_ knownEmpty: Bool? = nil) -> Bool {
-      let isEmpty = knownEmpty ??
-        (subStart.distance(to: subEnd).magnitude < _stride.magnitude)
+    func appendSubsequence() -> Bool {
+      let isEmpty = subStart == subEnd
       if isEmpty && omittingEmptySubsequences {
         return false
       }
@@ -521,9 +521,9 @@ extension StrideTo: Sequence {
     if elementIsSeparator {
       subStart = iterator.next() ?? _end
     }
-    // processing the rest of the sequence as a single sub-sequence
+    // Processing the rest of the sequence as a single sub-sequence
     subEnd = _end
-    appendSubsequence(subEnd == subStart)
+    appendSubsequence()
     return result
   }
 }
@@ -770,6 +770,8 @@ extension StrideThrough.Iterator: IteratorProtocol {
 }
 
 extension StrideThrough: Sequence {
+  public typealias SubSequence = StrideThrough
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -801,10 +803,178 @@ extension StrideThrough: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end < element {
+    let distance = _start.distance(to: _end)
+    if distance == 0 || (distance > 0) != (_stride > 0) {
+      return false
+    }
+    if distance > 0 && !(_start <= element && element <= _end)
+    || distance < 0 && !(_end <= element && element <= _start) {
       return false
     }
     return nil
+  }
+
+  @_inlineable
+  public func dropFirst(_ n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    let distance = _start.distance(to: _end)
+    var start = _start
+    for _ in 0..<n {
+      start = start.advanced(by: _stride)
+      let isPastEnd = distance > 0 ? start > _end : start < _end
+      if isPastEnd {
+        break
+      }
+    }
+    return StrideThrough(_start: start, end: _end, stride: _stride)
+  }
+
+  @_inlineable
+  public func dropLast(_ n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    let distance = _start.distance(to: _end)
+    var end = _end
+    for _ in 0..<n {
+      end = end.advanced(by: -_stride)
+      let isBeforeStart = distance > 0 ? end < _start : end > _start
+      if isBeforeStart {
+        break
+      }
+    }
+    return StrideThrough(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var it = makeIterator()
+    if let first = it.next() {
+      if try !predicate(first) { // predicate is false even on the first element
+        return self
+      }
+    }
+    else { // sequence is empty
+      return self
+    }
+    while let element = it.next() {
+      if try !predicate(element) {
+        return StrideThrough(_start: element, end: _end, stride: _stride)
+      }
+    }
+    // predicate returned true for all elements.
+    // Unlike StrideTo case, stride(from: x, through: x, by: whatever) won't be
+    // empty, therefore we need to advance _end once more.
+    let pastEnd = _end.advanced(by: _stride)
+    return StrideThrough(_start: pastEnd, end: _end, stride: _stride)
+  }
+
+  @_inlineable
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0,
+      "Can't take a prefix of negative length from a sequence")
+    let distance = _start.distance(to: _end)
+    // In case maxLength == 0, the result should be an empty sequence, which
+    // for StrideThrough means "end before start"
+    var end = _start.advanced(by: -_stride)
+    for _ in 0..<maxLength {
+      end = end.advanced(by: _stride)
+      let isEndOrPastEnd = distance > 0 ? end >= _end : end <= _end
+      if isEndOrPastEnd {
+        end = _end
+        break
+      }
+    }
+    return StrideThrough(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var end = _start.advanced(by: -_stride)
+    for element in self {
+      if try !predicate(element) {
+        break
+      }
+      end = element
+    }
+    return StrideThrough(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0,
+      "Can't take a suffix of negative length from a sequence")
+    let count = underestimatedCount
+    if maxLength >= count {
+      return self
+    }
+    return dropFirst(count - maxLength)
+  }
+
+  @_inlineable
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    _precondition(maxSplits >= 0, "Must take zero or more splits")
+    var result = [StrideThrough]()
+    var subStart = _start
+    var subEnd = _end
+
+    @discardableResult
+    func appendSubsequence() -> Bool {
+      let subDistance = subStart.distance(to: subEnd)
+      let sameDirection = (subDistance < 0) == (_stride < 0)
+      // StrideThrought with a zero distance is considered non-empty regardless
+      // of stride, otherwise the distance and the stride have to have the same
+      // sign for the stride to be non-empty
+      let isEmpty = !(sameDirection || subDistance == 0)
+
+      if isEmpty && omittingEmptySubsequences {
+        return false
+      }
+      result.append(
+        StrideThrough(_start: subStart, end: subEnd, stride: _stride))
+      return true
+    }
+
+    if maxSplits == 0 {
+      appendSubsequence()
+      return result
+    }
+
+    var elementIsSeparator = false
+    var iterator = self.makeIterator()
+    while let element = iterator.next() {
+      if elementIsSeparator { // refers to the previous element
+        subStart = element
+      }
+      subEnd = element
+      elementIsSeparator = try isSeparator(element) // now refers to the current
+      if elementIsSeparator {
+        // since it's a "through" stride, we need to exclude the separator from
+        // the subsequence
+        subEnd = subEnd.advanced(by: -_stride)
+        if !appendSubsequence() {
+          continue
+        }
+        if result.count == maxSplits {
+          break
+        }
+      }
+    }
+
+    if elementIsSeparator {
+      subStart = iterator.next() ?? _end
+    }
+    // Processing the rest of the sequence as a single sub-sequence
+    // If subStart is at _end, the subsequence should be empty, hence the call
+    // to advanced(by:)
+    subEnd = (subStart == _end) ? _end.advanced(by: -_stride) : _end
+    appendSubsequence()
+    return result
   }
 }
 
