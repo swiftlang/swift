@@ -126,7 +126,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
 }
 
-extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
+extension ClosedRange {
   @_frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
@@ -134,7 +134,7 @@ extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
   }
 }
 
-extension ClosedRange.Index : Comparable {
+extension ClosedRange.Index: Equatable where Bound: Equatable {
   @inlinable
   public static func == (
     lhs: ClosedRange<Bound>.Index,
@@ -149,7 +149,9 @@ extension ClosedRange.Index : Comparable {
       return false
     }
   }
+}
 
+extension ClosedRange.Index: Comparable where Bound: Comparable {
   @inlinable
   public static func < (
     lhs: ClosedRange<Bound>.Index,
@@ -166,8 +168,7 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable
-where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+extension ClosedRange.Index: Hashable where Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)
@@ -188,8 +189,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
 // FIXME: this should only be conformance to RandomAccessCollection but
 // the compiler balks without all 3
 extension ClosedRange: Collection, BidirectionalCollection, RandomAccessCollection
-where Bound : Strideable, Bound.Stride : SignedInteger
-{
+where Bound : Strideable, Bound.Stride : SignedInteger {
   // while a ClosedRange can't be empty, a _slice_ of a ClosedRange can,
   // so ClosedRange can't be its own self-slice unlike Range
   public typealias SubSequence = Slice<ClosedRange<Bound>>
