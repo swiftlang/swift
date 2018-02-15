@@ -1,0 +1,470 @@
+//===-- RankedArray.swift.gyb ---------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Dynamically shaped but statically ranked n-dimensional arrays.
+//
+// Ranked arrays (Array1D, Array2D, etc) use an array of integers to represent a
+// shape with known rank. The number of dimensions is guaranteed to equal the
+// rank of the array.
+//
+//===----------------------------------------------------------------------===//
+
+// TODO:
+// - Link ArrayXD with TensorXD.
+//   - Add `.array` property to TensorXD, returning a corresponding host
+//     ArrayXD.
+//   - Add initializers converting TensorXD to ArrayXD.
+// - Further gyb similar methods of ArrayXD and ArraySliceXD.
+// - Add documentation and standardize with ShapedArray.
+
+import CTensorFlow
+
+public typealias Array1D = Array
+public typealias ArraySlice1D = ArraySlice
+
+extension Array1D {
+  /// Initialize an Array1D from an existing ShapedArray.
+  /// - Precondition: The ShapedArray must have rank 1.
+  fileprivate init(base: ShapedArray<Element>) {
+    precondition(base.rank == 1, "The ShapedArray does not have rank 1.")
+    switch base.buffer.allocation {
+    case let .native(box):
+      self = box.array
+    case .tensorFlow:
+      self = base.scalars
+    }
+  }
+}
+
+internal extension Array1D where Element : AccelerableByTensorFlow {
+  @_versioned
+  init(owning cTensor: CTensor) {
+    let shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
+    precondition(shape.count == 1, "The shape does not have 1 dimension.")
+    let startAddress = TF_TensorData(cTensor)
+      .assumingMemoryBound(to: Element.self)
+    let bufferPointer = UnsafeMutableBufferPointer(
+      start: startAddress, count: shape.reduce(1, *)
+    )
+    self = Array(bufferPointer)
+  }
+}
+
+extension ArraySlice1D {
+  /// Initialize an ArraySlice1D from an existing ShapedArraySlice.
+  /// - Precondition: The ShapedArraySlice must have rank 1.
+  fileprivate init(base: ShapedArraySlice<Element>) {
+    precondition(base.rank == 1, "The ShapedArraySlice does not have rank 1.")
+    self = base.withUnsafeBufferPointer(ArraySlice.init)
+  }
+}
+
+internal extension ArraySlice1D where Element : AccelerableByTensorFlow {
+  @_versioned
+  init(owning cTensor: CTensor) {
+    let shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
+    precondition(shape.count == 1, "Rank is not 1")
+    let startAddress = TF_TensorData(cTensor)
+      .assumingMemoryBound(to: Element.self)
+    let bufferPointer = UnsafeMutableBufferPointer(
+      start: startAddress, count: shape.reduce(1, *)
+    )
+    self = ArraySlice(bufferPointer)
+  }
+}
+
+%{
+  ranks = [2, 3, 4]
+
+  def rankName(rank):
+    if rank == 2:
+      return 'two'
+    elif rank == 3:
+      return 'three'
+    elif rank == 4:
+      return 'four'
+
+  def _elementArrayLiteral(rank):
+    return 'Scalar' if rank == 1 else '[' + _elementArrayLiteral(rank - 1) + ']'
+
+  def _element(rank):
+    return 'Scalar' if rank == 1 else 'ArraySlice{}D'.format(rank - 1)
+}%
+
+% for rank in ranks:
+%   elementRank = rank - 1
+%   liftedRank = rank + 1
+%   Array = 'Array{}D'.format(rank)
+%   Element = _element(rank)
+%   Slice = 'ArraySlice{}D'.format(rank)
+%   elementArrayLiteral = _elementArrayLiteral(rank)
+%   arrayLiteral = '[' + elementArrayLiteral + ']'
+
+/// A ${rankName(rank)}-dimensional array.
+public struct ${Array}<Scalar> {
+  /// The underlying ShapedArray of an ${Array}.
+  fileprivate var base: ShapedArray<Scalar>
+
+  /// The shape of this array.
+  public var shape: [Int] {
+    return base.shape
+  }
+
+  public static var rank: Int {
+    return ${rank}
+  }
+
+  public var rank: Int {
+    return ${Array}.rank
+  }
+
+  public var scalarCount: Int {
+    return base.scalarCount
+  }
+
+  public var scalars: [Scalar] {
+    get {
+      return base.scalars
+    }
+    set {
+      precondition(newValue.count == scalarCount, "Scalar count mismatch.")
+      base.scalars = newValue
+    }
+  }
+
+  /// Initialize an ${Array} from an existing buffer and a shape.
+  fileprivate init(buffer: TensorBuffer<Scalar>, shape: [Int]) {
+    self.init(base: ShapedArray(buffer: buffer, shape: shape))
+  }
+
+  /// Initialize an ${Array} from an existing ShapedArray.
+  fileprivate init(base: ShapedArray<Scalar>) {
+    precondition(base.rank == ${rank},
+                 "The ShapedArray does not have rank ${rank}.")
+    self.base = base
+  }
+}
+
+public extension ${Array} {
+  /// Returns the number of element arrays in an ${Array} (equivalent to the
+  /// first dimension).
+  /// - Note: `count` is distinct from `scalarCount`, which represents the total
+  ///   number of scalars.
+  var count: Int {
+    return base.count
+  }
+
+  /// Initialize an ${Array} with a specific shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The number of `scalars` must be equal to the product of
+  ///   all dimensions of the shape.
+  init(shape: [Int], scalars: [Scalar]) {
+    precondition(shape.count == ${rank},
+                 "The shape does not have ${rank} dimensions.")
+    precondition(shape.reduce(1, *) == scalars.count, "Scalar count mismatch.")
+    // self = ArraySlice(scalars)
+    self.init(base: ShapedArray(shape: shape, scalars: scalars))
+  }
+
+  /// Allocate and initialize an ${Array} to a repeated value.
+  /// - Parameters:
+  ///   - shape: The dimensions of the array.
+  ///   - repeatedValue: The scalar value to repeat.
+  init(shape: [Int], repeating repeatedValue: Scalar) {
+    self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
+  }
+}
+
+internal extension ${Array} where Scalar : AccelerableByTensorFlow {
+  @_versioned
+  init(owning cTensor: CTensor) {
+    let shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
+    let buffer = TensorBuffer<Scalar>(owning: cTensor, count: shape.count)
+    self.init(buffer: buffer, shape: shape)
+  }
+}
+
+public extension ${Array} {
+  func withUnsafeBufferPointer<Result>(
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
+  ) rethrows -> Result {
+    return try base.withUnsafeBufferPointer(body)
+  }
+
+  mutating func withUnsafeMutableBufferPointer<Result>(
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
+  ) rethrows -> Result {
+    return try base.withUnsafeMutableBufferPointer(body)
+  }
+}
+
+extension ${Array} : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias Element = ${Element}<Scalar>
+  public typealias SubSequence = ${Slice}<Scalar>
+
+  public var indices: CountableRange<Int> {
+    return base.indices
+  }
+
+  public var startIndex: Int {
+    return base.startIndex
+  }
+
+  public var endIndex: Int {
+    return base.endIndex
+  }
+
+  /// Access the element array specified by an index in the leading dimension.
+  /// - Parameter index: Index of the element array.
+  public subscript(index: Int) -> Element {
+    get {
+      precondition(index < endIndex, "${Array} index is out of range")
+      precondition(index >= startIndex,
+                   "${Array} index is out of range (before startIndex)")
+      let slice = ShapedArraySlice<Scalar>(
+        base: base,
+        baseIndices: [index]
+      )
+% if rank == 2:
+      return slice.withUnsafeBufferPointer(ArraySlice.init)
+% else:
+      return ${Element}(base: slice)
+% end
+    }
+    set {
+      precondition(index < endIndex, "${Array} index is out of range")
+      precondition(index >= startIndex,
+                   "${Array} index is out of range (before startIndex)")
+% if rank == 2:
+      precondition(shape.dropFirst().elementsEqual([newValue.count]),
+                   "Element shape mismatch")
+      base[index].scalars = Array(newValue)
+% else:
+      precondition(shape.dropFirst().elementsEqual(newValue.shape),
+                   "Element shape mismatch")
+      base[index] = newValue.base
+% end
+    }
+  }
+
+  /// Access the subarray specified by a contiguous range of indices.
+  /// - Parameter bounds: Contiguous range of indices.
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "${Array} indices are out of range")
+      return ${Slice}(
+        base: ShapedArraySlice(
+          base: base,
+          bounds: CountableRange(bounds)
+        )
+      )
+    }
+    set {
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "${Array} indices are out of range")
+      let subArrayShape = [bounds.count] + shape.dropFirst()
+      precondition(subArrayShape == newValue.shape,
+                   "Subarray shape mismatch.")
+      base[bounds] = newValue.base
+    }
+  }
+}
+
+/// Equatable conformance
+extension ${Array} : Equatable where Scalar : Equatable {
+  static public func == (lhs: ${Array}, rhs: ${Array}) -> Bool {
+    return lhs.base == rhs.base
+  }
+}
+
+/// String conversion
+extension ${Array} : CustomStringConvertible {
+  /// A textual representation of this ${Array}.
+  public var description: String {
+    return base.description
+  }
+}
+
+public struct ${Slice}<Scalar>  {
+  /// The underlying ShapedArraySlice of an ${Slice}.
+  fileprivate var base: ShapedArraySlice<Scalar>
+
+  /// Initialize an ${Slice} from a ShapedArraySlice.
+  fileprivate init(base: ShapedArraySlice<Scalar>) {
+    precondition(base.rank == ${rank},
+                 "The ShapedArraySlice does not have rank ${rank}")
+    self.base = base
+  }
+}
+
+public extension ${Slice} {
+  var rank: Int {
+    return ${rank}
+  }
+
+  var shape: [Int] {
+    return base.shape
+  }
+
+  var scalarCount: Int {
+    return base.scalarCount
+  }
+
+  var scalars: [Scalar] {
+    get {
+      return base.scalars
+    }
+    set {
+      precondition(newValue.count == scalarCount, "Scalar count mismatch.")
+      base.scalars = newValue
+    }
+  }
+}
+
+/// Slice initializers
+public extension ${Slice} {
+  /// Returns the number of element arrays in an ${Slice} (equivalent to the
+  /// first dimension).
+  /// - Note: `count` is distinct from `scalarCount`, which represents the total
+  ///   number of scalars.
+  var count: Int {
+    return base.count
+  }
+
+  /// Initialize an ${Slice} with a specific shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The number of `scalars` must be equal to the product of
+  ///   all dimensions of the shape.
+  init(shape: [Int], scalars: [Scalar]) {
+    self.init(base: ShapedArraySlice(shape: shape, scalars: scalars))
+  }
+
+  /// Allocate and initialize an ${Slice} to a repeated value.
+  /// - Parameters:
+  ///   - shape: The dimensions of the array.
+  ///   - repeatedValue: The scalar value to repeat.
+  init(shape: [Int], repeating repeatedValue: Scalar) {
+    self.init(base: ShapedArraySlice(shape: shape, repeating: repeatedValue))
+  }
+}
+
+public extension ${Slice} {
+  func withUnsafeBufferPointer<Result>(
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
+  ) rethrows -> Result {
+    return try base.withUnsafeBufferPointer(body)
+  }
+
+  mutating func withUnsafeMutableBufferPointer<Result>(
+    _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
+  ) rethrows -> Result {
+    return try base.withUnsafeMutableBufferPointer(body)
+  }
+}
+
+extension ${Slice} : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias Element = ${Element}<Scalar>
+  public typealias SubSequence = ${Slice}
+
+  public var indices: CountableRange<Int> {
+    return base.indices
+  }
+
+  public var startIndex: Int {
+    return base.startIndex
+  }
+
+  public var endIndex: Int {
+    return base.endIndex
+  }
+
+  /// Access the element ${Element} specified by an index in the leading
+  /// dimension.
+  /// - Parameter index: Index of the element ${Element}.
+  public subscript(index: Int) -> Element {
+    get {
+      precondition(index < endIndex, "${Slice} index is out of range")
+      precondition(index >= startIndex,
+                   "${Slice} index is out of range (before startIndex)")
+      let slice = ShapedArraySlice<Scalar>(
+        base: base.base,
+        baseIndices: base.baseIndices + [index],
+        bounds: base.bounds
+      )
+% if rank == 2:
+      return slice.withUnsafeBufferPointer(ArraySlice.init)
+% else:
+      return ${Element}(base: slice)
+% end
+    }
+    set {
+      precondition(index < endIndex, "${Slice} index is out of range")
+      precondition(index >= startIndex,
+                   "${Slice} index is out of range (before startIndex)")
+% if rank == 2:
+      precondition(shape.dropFirst().elementsEqual([newValue.count]),
+                   "Element shape mismatch")
+      base[index] = ShapedArraySlice(shape: [newValue.count], scalars: newValue)
+% else:
+      precondition(shape.dropFirst().elementsEqual(newValue.shape),
+                   "Element shape mismatch")
+      base[index] = newValue.base
+% end
+    }
+  }
+
+  /// Access the subarray specified by a contiguous range of indices.
+  /// - Parameter bounds: Contiguous range of indices.
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "${Slice} indices are out of range")
+      return ${Slice}(
+        base: ShapedArraySlice(
+          base: base.base,
+          baseIndices: base.baseIndices,
+          bounds: CountableRange(bounds)
+        )
+      )
+    }
+    set {
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "${Slice} indices are out of range")
+      let subArrayShape = [bounds.count] + shape.dropFirst()
+      precondition(subArrayShape == newValue.shape, "Subarray shape mismatch")
+      base[bounds] = newValue.base
+    }
+  }
+}
+
+/// Equatable conformance
+extension ${Slice} : Equatable where Scalar : Equatable {
+  public static func == (lhs: ${Slice}, rhs: ${Slice}) -> Bool {
+    return lhs.base == rhs.base
+  }
+}
+
+/// String conversion
+extension ${Slice} : CustomStringConvertible {
+  /// A textual representation of this ${Slice}.
+  public var description: String {
+    return base.description
+  }
+}
+% end
