@@ -470,6 +470,34 @@ var nsStringCanaryCount = 0
   }
 }
 
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollation/NoLeak"
+) {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    _stdlib_compareNSStringDeterministicUnicodeCollation(a, b)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollationPtr/NoLeak"
+) {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
+    _stdlib_compareNSStringDeterministicUnicodeCollationPointer(ptrA, ptrB)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
