@@ -236,6 +236,8 @@ public:
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)) {}
 
+  virtual ~Job();
+
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
   }

@@ -181,6 +181,7 @@ CommandOutput::dump() const {
   llvm::errs() << '\n';
 }
 
+Job::~Job() = default;
 
 void Job::printArguments(raw_ostream &os,
                          const llvm::opt::ArgStringList &Args) {
