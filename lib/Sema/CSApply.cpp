@@ -1420,10 +1420,16 @@ namespace {
         }
       }
 
-      if (selected->choice.isDecl())
+      if (selected->choice.isDecl()) {
+        auto locatorKind = ConstraintLocator::SubscriptMember;
+        if (selected->choice.getKind() ==
+            OverloadChoiceKind::DynamicMemberLookup)
+          locatorKind = ConstraintLocator::Member;
+        
         newSubscript = forceUnwrapIfExpected(
             newSubscript, selected->choice.getDecl(),
-            locator.withPathElement(ConstraintLocator::SubscriptMember));
+            locator.withPathElement(locatorKind));
+      }
 
       return newSubscript;
     }

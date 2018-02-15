@@ -133,6 +133,26 @@ func testDog(person: Dog) -> String {
   return person.name + person.otherName
 }
 
+//===----------------------------------------------------------------------===//
+// Returning an IUO
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+struct IUOResultTest {
+  subscript(dynamicMember member: StaticString) -> Int! {
+    get { return 42 }
+    nonmutating set {}
+  }
+}
+
+func test_iuo_result(x : IUOResultTest) {
+  x.foo?.negate()   // Test mutating writeback.
+  
+  let _ : Int = x.bar  // Test implicitly forced optional
+  let b = x.bar        // Should promote to 'Int?'
+  let _ : Int = b // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'}}
+}
+
 
 //===----------------------------------------------------------------------===//
 // Error cases
