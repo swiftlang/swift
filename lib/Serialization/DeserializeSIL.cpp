@@ -2247,7 +2247,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         }
         
         indices = MF->getContext().AllocateCopy(indicesBuf);
-        if (!indices.empty()) {
+        if (!indices.empty() &&
+            kind != KeyPathComponentKindEncoding::External) {
           auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
           auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
           indicesEquals = getFuncForReference(indicesEqualsName.str());
@@ -2296,6 +2297,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         components.push_back(KeyPathPatternComponent::forOptional(
             KeyPathPatternComponent::Kind::OptionalWrap, type));
         break;
+      case KeyPathComponentKindEncoding::External: {
+        auto declID = ListOfValues[nextValue++];
+        auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
+        auto numComponentSubstitutions = ListOfValues[nextValue++];
+        SmallVector<Substitution, 4> subs;
+        while (numComponentSubstitutions-- > 0) {
+          auto sub = MF->maybeReadSubstitution(SILCursor);
+          subs.push_back(*sub);
+        }
+        handleComputedIndices();
+        components.push_back(
+          KeyPathPatternComponent::forExternal(decl,
+            MF->getContext().AllocateCopy(subs), indices, type));
+        break;
+      }
       }
     }
     

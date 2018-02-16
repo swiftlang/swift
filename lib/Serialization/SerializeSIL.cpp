@@ -1915,7 +1915,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(0);
     }
     
-    SmallVector<ProtocolConformanceRef, 4> hashableConformances;
+    // Some components need to serialize additional Substitutions or
+    // ProtocolConformances after the main record is emitted.
+    struct ConformanceOrSubstitution {
+      enum { ProtocolConformance, SubstitutionList } Kind;
+      union {
+        swift::ProtocolConformanceRef Conformance;
+        swift::SubstitutionList Substitutions;
+      };
+      
+      ConformanceOrSubstitution(ProtocolConformanceRef c)
+        : Kind(ProtocolConformance), Conformance(c)
+      {}
+      
+      ConformanceOrSubstitution(swift::SubstitutionList s)
+        : Kind(SubstitutionList), Substitutions(s)
+      {}
+    };
+    SmallVector<ConformanceOrSubstitution, 4> serializeAfter;
+    SmallVector<SubstitutionList, 4> externalSubstitutions;
     
     for (auto &component : pattern->getComponents()) {
       auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
@@ -1951,9 +1969,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
             ListOfValues.push_back(
               S.addTypeRef(index.LoweredType.getSwiftRValueType()));
             ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
-            hashableConformances.push_back(index.Hashable);
+            serializeAfter.push_back(index.Hashable);
           }
-          if (!indices.empty()) {
+          if (!indices.empty() &&
+              component.getKind() != KeyPathPatternComponent::Kind::External) {
             ListOfValues.push_back(
               addSILFunctionRef(component.getSubscriptIndexEquals()));
             ListOfValues.push_back(
@@ -1992,7 +2011,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
         break;
       case KeyPathPatternComponent::Kind::External:
-        llvm_unreachable("todo");
+        handleComponentCommon(KeyPathComponentKindEncoding::External);
+        ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
+        ListOfValues.push_back(component.getExternalSubstitutions().size());
+        serializeAfter.push_back(component.getExternalSubstitutions());
+        handleComputedIndices(component);
+        break;
       }
     }
     
@@ -2008,8 +2032,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
          S.addTypeRef(KPI->getType().getSwiftRValueType()),
          (unsigned)KPI->getType().getCategory(),
          ListOfValues);
-    for (auto conformance : hashableConformances) {
-      S.writeConformance(conformance, SILAbbrCodes);
+    for (auto &confOrSub : serializeAfter) {
+      switch (confOrSub.Kind) {
+      case ConformanceOrSubstitution::ProtocolConformance:
+        S.writeConformance(confOrSub.Conformance, SILAbbrCodes);
+        break;
+      case ConformanceOrSubstitution::SubstitutionList:
+        S.writeSubstitutions(confOrSub.Substitutions, SILAbbrCodes);
+        break;
+      }
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
     S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
