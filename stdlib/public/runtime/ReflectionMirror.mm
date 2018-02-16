@@ -33,6 +33,7 @@
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
+#include "SwiftObject.h"
 #include <Foundation/Foundation.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
@@ -43,13 +44,8 @@ using namespace swift;
 #if SWIFT_OBJC_INTEROP
 // Declare the debugQuickLookObject selector.
 @interface DeclareSelectors
-
 - (id)debugQuickLookObject;
 @end
-
-// mangled Swift._SwiftObject
-#define SwiftObject _TtCs12_SwiftObject
-@class SwiftObject;
 #endif
 
 namespace {
