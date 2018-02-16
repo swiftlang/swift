@@ -2869,47 +2869,55 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool hasDynamicMemberLookupAttribute(Type ty) {
-  // If this is a protocol composition, check to see if any of the protocols
-  // have the attribute on them.
-  if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
-    for (auto p : protocolComp->getMembers())
-      if (hasDynamicMemberLookupAttribute(p))
-        return true;
-    return false;
-  }
+static bool hasDynamicMemberLookupAttribute(Type ty,
+                       llvm::DenseMap<Type, bool> &IsDynamicMemberLookupCache) {
+  auto it = IsDynamicMemberLookupCache.find(ty);
+  if (it != IsDynamicMemberLookupCache.end()) return it->second;
   
-  // Otherwise this has to be a nominal type.
-  auto nominal = ty->getAnyNominal();
-  if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
-
-  llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
-
-  // Walk superclasses, if present.
-  while (1) {
-    // If we found a circular parent class chain, reject this.
-    if (!visitedDecls.insert(nominal).second)
+  auto calculate = [&]()-> bool {
+    // If this is a protocol composition, check to see if any of the protocols
+    // have the attribute on them.
+    if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
+      for (auto p : protocolComp->getMembers())
+        if (hasDynamicMemberLookupAttribute(p, IsDynamicMemberLookupCache))
+          return true;
       return false;
+    }
     
-    // If this type has the attribute on it, then yes!
-    if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
-      return true;
+    // Otherwise this has to be a nominal type.
+    auto nominal = ty->getAnyNominal();
+    if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
     
-    // If any of the protocols this type conforms to has the attribute, then yes.
+    // If any of the protocols this type conforms to has the attribute, then
+    // yes.
     for (auto p : nominal->getAllProtocols())
       if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
         return true;
-
-    // If this is a class with a super class, check super classes as well.
-    if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-      if (auto superClass = cd->getSuperclassDecl()) {
-        nominal = superClass;
-        continue;
+    
+    // Walk superclasses, if present.
+    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
+    while (1) {
+      // If we found a circular parent class chain, reject this.
+      if (!visitedDecls.insert(nominal).second)
+        return false;
+      
+      // If this type has the attribute on it, then yes!
+      if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+        return true;
+      
+      // If this is a class with a super class, check super classes as well.
+      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+        if (auto superClass = cd->getSuperclassDecl()) {
+          nominal = superClass;
+          continue;
+        }
       }
+      
+      return false;
     }
+  };
   
-    return false;
-  }
+  return IsDynamicMemberLookupCache[ty] = calculate();
 }
 
 
@@ -3299,7 +3307,8 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (hasDynamicMemberLookupAttribute(instanceTy)) {
+    if (hasDynamicMemberLookupAttribute(instanceTy,
+                                        IsDynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
       // Recursively look up the subscript(dynamicMember:)'s in this type.
       auto subscriptName =
