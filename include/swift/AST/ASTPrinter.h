@@ -84,7 +84,7 @@ enum class PrintStructureKind {
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
   unsigned PendingNewlines = 0;
-  const NominalTypeDecl *SynthesizeTarget = nullptr;
+  TypeOrExtensionDecl SynthesizeTarget;
 
   void printTextImpl(StringRef Text);
 
@@ -136,13 +136,14 @@ public:
 
   /// Called before printing a synthesized extension.
   virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                            const NominalTypeDecl *NTD,
+                                            TypeOrExtensionDecl NTD,
                                             Optional<BracketOptions> Bracket) {}
 
   /// Called after printing a synthesized extension.
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                             const NominalTypeDecl *NTD,
-                                             Optional<BracketOptions> Bracket) {}
+                                             TypeOrExtensionDecl TargetDecl,
+                                             Optional<BracketOptions> Bracket) {
+  }
 
   /// Called before printing a structured entity.
   ///
@@ -213,7 +214,7 @@ public:
     CurrentIndentation = NumSpaces;
   }
 
-  void setSynthesizedTarget(NominalTypeDecl *Target) {
+  void setSynthesizedTarget(TypeOrExtensionDecl Target) {
     assert((!SynthesizeTarget || !Target || Target == SynthesizeTarget) &&
            "unexpected change of setSynthesizedTarget");
     // FIXME: this can overwrite the original target with nullptr.

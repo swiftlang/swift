@@ -433,19 +433,20 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
-void SwiftLangSupport::
-printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
-                                          swift::NominalTypeDecl *Target,
-                                          llvm::raw_ostream &OS) {
+void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
+    const swift::ValueDecl *VD, TypeOrExtensionDecl Target,
+    llvm::raw_ostream &OS) {
   // FIXME: Mutable global variable - gross!
   static llvm::SmallDenseMap<swift::ValueDecl*,
     std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (TargetToAnalyzerMap.count(Target) == 0) {
+  NominalTypeDecl *TargetNTD = Target.getBaseNominal();
+
+  if (TargetToAnalyzerMap.count(TargetNTD) == 0) {
     std::unique_ptr<SynthesizedExtensionAnalyzer> Analyzer(
-      new SynthesizedExtensionAnalyzer(Target, PO));
-    TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
+        new SynthesizedExtensionAnalyzer(TargetNTD, PO));
+    TargetToAnalyzerMap.insert({TargetNTD, std::move(Analyzer)});
   }
   PO.initForSynthesizedExtension(Target);
   PO.PrintAsMember = true;
