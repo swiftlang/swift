@@ -152,6 +152,9 @@
     "CompilerProtocols.swift",
     "ShadowProtocols.swift"
   ],
+  "Playground": [
+    "PlaygroundDisplay.swift"
+  ],
   "Misc": [
     "AnyHashable.swift",
     "Interval.swift",
