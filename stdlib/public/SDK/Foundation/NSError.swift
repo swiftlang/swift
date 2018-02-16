@@ -366,93 +366,59 @@ public func _bridgeNSErrorToError<
   }
 }
 
-/// Helper protocol for _BridgedNSError, which used to provide
-/// default implementations.
-public protocol __BridgedNSError : Error {
-  static var _nsErrorDomain: String { get }
-}
-
-// Allow two bridged NSError types to be compared.
-extension __BridgedNSError
-    where Self: RawRepresentable, Self.RawValue: SignedInteger {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue == rhs.rawValue
-  }
-}
-
-public extension __BridgedNSError 
-    where Self: RawRepresentable, Self.RawValue: SignedInteger {
-  public var _domain: String { return Self._nsErrorDomain }
-  public var _code: Int { return Int(rawValue) }
-
-  public init?(rawValue: RawValue) {
-    self = unsafeBitCast(rawValue, to: Self.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._nsErrorDomain {
-      return nil
-    }
-
-    self.init(rawValue: RawValue(IntMax(_bridgedNSError.code)))
-  }
-
-  public var hashValue: Int { return _code }
-}
-
-// Allow two bridged NSError types to be compared.
-extension __BridgedNSError
-    where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue == rhs.rawValue
-  }
-}
-
-public extension __BridgedNSError
-    where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
-  public var _domain: String { return Self._nsErrorDomain }
-  public var _code: Int {
-    return Int(bitPattern: UInt(rawValue))
-  }
-
-  public init?(rawValue: RawValue) {
-    self = unsafeBitCast(rawValue, to: Self.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._nsErrorDomain {
-      return nil
-    }
-
-    self.init(rawValue: RawValue(UIntMax(UInt(_bridgedNSError.code))))
-  }
-
-  public var hashValue: Int { return _code }
-}
-
 /// Describes a raw representable type that is bridged to a particular
 /// NSError domain.
 ///
 /// This protocol is used primarily to generate the conformance to
-/// _ObjectiveCBridgeableError for such an enum.
-public protocol _BridgedNSError : __BridgedNSError,
-                                  RawRepresentable,
-                                  _ObjectiveCBridgeableError,
-                                  Hashable {
+/// _ObjectiveCBridgeableError for such an enum defined in Swift.
+public protocol _BridgedNSError :
+    _ObjectiveCBridgeableError, RawRepresentable, Hashable
+    where Self.RawValue: FixedWidthInteger {
   /// The NSError domain to which this type is bridged.
   static var _nsErrorDomain: String { get }
+}
+
+extension _BridgedNSError {
+  public var _domain: String { return Self._nsErrorDomain }
+}
+
+extension _BridgedNSError where Self.RawValue: SignedInteger {
+  public var _code: Int { return Int(rawValue) }
+
+  public init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != Self._nsErrorDomain {
+      return nil
+    }
+
+    self.init(rawValue: RawValue(_bridgedNSError.code))
+  }
+
+  public var hashValue: Int { return _code }
+}
+
+extension _BridgedNSError where Self.RawValue: UnsignedInteger {
+  public var _code: Int {
+    return Int(bitPattern: UInt(rawValue))
+  }
+
+  public init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != Self._nsErrorDomain {
+      return nil
+    }
+
+    self.init(rawValue: RawValue(UInt(bitPattern: _bridgedNSError.code)))
+  }
+
+  public var hashValue: Int { return _code }
 }
 
 /// Describes a bridged error that stores the underlying NSError, so
 /// it can be queried.
 public protocol _BridgedStoredNSError :
-     __BridgedNSError, _ObjectiveCBridgeableError, CustomNSError,
-     Hashable {
+     _ObjectiveCBridgeableError, CustomNSError, Hashable {
   /// The type of an error code.
-  associatedtype Code: _ErrorCodeProtocol
-
-  /// The error code for the given error.
-  var code: Code { get }
+  associatedtype Code: _ErrorCodeProtocol, RawRepresentable
+  where Code.RawValue: FixedWidthInteger
 
   //// Retrieves the embedded NSError.
   var _nsError: NSError { get }
@@ -476,9 +442,7 @@ internal func _stringDictToAnyHashableDict(_ input: [String : Any])
 }
 
 /// Various helper implementations for _BridgedStoredNSError
-public extension _BridgedStoredNSError
-    where Code: RawRepresentable, Code.RawValue: SignedInteger {
-  // FIXME: Generalize to Integer.
+extension _BridgedStoredNSError {
   public var code: Code {
     return Code(rawValue: numericCast(_nsError.code))!
   }
@@ -486,39 +450,22 @@ public extension _BridgedStoredNSError
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
-    self.init(_nsError: NSError(domain: Self._nsErrorDomain,
+    self.init(_nsError: NSError(domain: Self.errorDomain,
                                 code: numericCast(code.rawValue),
                                 userInfo: _stringDictToAnyHashableDict(userInfo)))
   }
 
   /// The user-info dictionary for an error that was bridged from
   /// NSError.
-  var userInfo: [String : Any] { return errorUserInfo }
+  public var userInfo: [String : Any] { return errorUserInfo }
 }
 
-/// Various helper implementations for _BridgedStoredNSError
-public extension _BridgedStoredNSError
-    where Code: RawRepresentable, Code.RawValue: UnsignedInteger {
-  // FIXME: Generalize to Integer.
-  public var code: Code {
-    return Code(rawValue: numericCast(_nsError.code))!
-  }
-
-  /// Initialize an error within this domain with the given ``code``
-  /// and ``userInfo``.
-  public init(_ code: Code, userInfo: [String : Any] = [:]) {
-    self.init(_nsError: NSError(domain: Self._nsErrorDomain,
-                                code: numericCast(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
-  }
-}
-
-/// Implementation of __BridgedNSError for all _BridgedStoredNSErrors.
+/// Implementation of _ObjectiveCBridgeableError for all _BridgedStoredNSErrors.
 public extension _BridgedStoredNSError {
-  /// Default implementation of ``init(_bridgedNSError)`` to provide
+  /// Default implementation of ``init(_bridgedNSError:)`` to provide
   /// bridging from NSError.
   public init?(_bridgedNSError error: NSError) {
-    if error.domain != Self._nsErrorDomain {
+    if error.domain != Self.errorDomain {
       return nil
     }
 
@@ -531,7 +478,8 @@ public extension _BridgedStoredNSError {
   // FIXME: Would prefer to have a clear "extract an NSError
   // directly" operation.
 
-  static var errorDomain: String { return _nsErrorDomain }
+  // Synthesized by the compiler.
+  // static var errorDomain: String
 
   var errorCode: Int { return _nsError.code }
 
@@ -555,20 +503,15 @@ public extension _BridgedStoredNSError {
 /// Describes the code of an error.
 public protocol _ErrorCodeProtocol : Equatable {
   /// The corresponding error code.
-  associatedtype _ErrorType
-
-  // FIXME: We want _ErrorType to be _BridgedStoredNSError and have its
-  // Code match Self, but we cannot express those requirements yet.
+  associatedtype _ErrorType: _BridgedStoredNSError where _ErrorType.Code == Self
 }
 
-extension _ErrorCodeProtocol where Self._ErrorType: _BridgedStoredNSError {
+extension _ErrorCodeProtocol {
   /// Allow one to match an error code against an arbitrary error.
   public static func ~=(match: Self, error: Error) -> Bool {
     guard let specificError = error as? Self._ErrorType else { return false }
 
-    // FIXME: Work around IRGen crash when we set Code == Code._ErrorType.Code.
-    let specificCode = specificError.code as! Self
-    return match == specificCode
+    return match == specificError.code
   }
 }
 
@@ -595,7 +538,7 @@ public struct CocoaError : _BridgedStoredNSError {
     self._nsError = error
   }
 
-  public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
+  public static var errorDomain: String { return NSCocoaErrorDomain }
 
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
@@ -1826,7 +1769,7 @@ public struct URLError : _BridgedStoredNSError {
     self._nsError = error
   }
 
-  public static var _nsErrorDomain: String { return NSURLErrorDomain }
+  public static var errorDomain: String { return NSURLErrorDomain }
 
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
@@ -2486,7 +2429,7 @@ public struct POSIXError : _BridgedStoredNSError {
     self._nsError = error
   }
 
-  public static var _nsErrorDomain: String { return NSPOSIXErrorDomain }
+  public static var errorDomain: String { return NSPOSIXErrorDomain }
 
   public typealias Code = POSIXErrorCode
 }
@@ -2972,7 +2915,7 @@ public struct MachError : _BridgedStoredNSError {
     self._nsError = error
   }
 
-  public static var _nsErrorDomain: String { return NSMachErrorDomain }
+  public static var errorDomain: String { return NSMachErrorDomain }
 
   public typealias Code = MachErrorCode
 }
