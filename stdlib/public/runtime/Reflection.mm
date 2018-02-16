@@ -446,19 +446,6 @@ void swift_TupleMirror_subscript(String *outString,
   new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
 }
 
-// Get a field name from a doubly-null-terminated list.
-static const char *getFieldName(const char *fieldNames, size_t i) {
-  const char *fieldName = fieldNames;
-  for (size_t j = 0; j < i; ++j) {
-    size_t len = strlen(fieldName);
-    assert(len != 0);
-    fieldName += len + 1;
-  }
-
-  return fieldName;
-}
-
-
 static bool loadSpecialReferenceStorage(HeapObject *owner,
                                         OpaqueValue *fieldData,
                                         const FieldType fieldType,
@@ -581,17 +568,14 @@ static bool isEnumReflectable(const Metadata *type) {
   const auto &Description = *Enum->getDescription();
 
   // No metadata for C and @objc enums yet
-  if (Description.CaseNames == nullptr)
-    return false;
-
-  return true;
+  return Description.IsReflectable;
 }
 
-static void getEnumMirrorInfo(const OpaqueValue *value,
-                              const Metadata *type,
-                              unsigned *tagPtr,
-                              const Metadata **payloadTypePtr,
-                              bool *indirectPtr) {
+static const char *getEnumMirrorInfo(const OpaqueValue *value,
+                                     const Metadata *type,
+                                     unsigned *tagPtr = nullptr,
+                                     const Metadata **payloadTypePtr = nullptr,
+                                     bool *indirectPtr = nullptr) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = *Enum->getDescription();
 
@@ -606,12 +590,12 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
   const Metadata *payloadType = nullptr;
   bool indirect = false;
 
-  if (static_cast<unsigned>(tag) < payloadCases) {
-    swift_getFieldAt(type, tag, [&](llvm::StringRef caseName, FieldType info) {
-      payloadType = info.getType();
-      indirect = info.isIndirect();
-    });
-  }
+  const char *caseName = nullptr;
+  swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+    caseName = name.data();
+    payloadType = info.getType();
+    indirect = info.isIndirect();
+  });
 
   if (tagPtr)
     *tagPtr = tag;
@@ -619,6 +603,8 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
     *payloadTypePtr = payloadType;
   if (indirectPtr)
     *indirectPtr = indirect;
+
+  return caseName;
 }
 
 // internal func _swift_EnumMirror_caseName(
@@ -634,15 +620,11 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
     return nullptr;
   }
 
-  const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = *Enum->getDescription();
-
-  unsigned tag;
-  getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
+  auto caseName = getEnumMirrorInfo(value, type);
 
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
 
-  return getFieldName(Description.CaseNames, tag);
+  return caseName;
 }
 
 // internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
@@ -687,7 +669,7 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
   }
 
   const Metadata *payloadType;
-  getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
+  (void)getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   return (payloadType != nullptr) ? 1 : 0;
 }
@@ -709,7 +691,7 @@ void swift_EnumMirror_subscript(String *outString,
   const Metadata *payloadType;
   bool indirect;
 
-  getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
+  auto caseName = getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
 
   // Copy the enum payload into a box
   const Metadata *boxType = (indirect ? &METADATA_SYM(Bo).base : payloadType);
@@ -733,7 +715,7 @@ void swift_EnumMirror_subscript(String *outString,
     swift_release(pair.object);
   }
 
-  new (outString) String(getFieldName(Description.CaseNames, tag));
+  new (outString) String(caseName);
   new (outMirror) Mirror(reflect(owner, value, payloadType));
 }
 

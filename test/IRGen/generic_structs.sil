@@ -20,7 +20,6 @@ import Builtin
 
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [14 x i8] c"SingleDynamic\00"
-// CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
 // CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant 
 // --       flags: struct, unique, generic
 // CHECK-SAME:   <i32 0x0000_00D1>
@@ -30,8 +29,6 @@ import Builtin
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
-// --       field names
-// CHECK-SAME:   [3 x i8]* [[SINGLEDYNAMIC_FIELDS]]
 // --       generic parameter vector offset
 // CHECK-SAME:   i32 2,
 // --       generic params, requirements, key args, extra args
@@ -53,7 +50,6 @@ import Builtin
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [24 x i8] c"DynamicWithRequirements\00"
-// CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMn" = hidden constant <{ {{.*}} i32 }> <{
 // --       flags: struct, unique, generic
 // CHECK-SAME:   <i32 0x0000_00D1>
@@ -63,8 +59,6 @@ import Builtin
 // CHECK-SAME: i32 2,
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
-// --       field names
-// CHECK-SAME: [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
 // --       generic parameter vector offset
 // CHECK-SAME: i32 2,
 // --       generic params, requirements, key args, extra args

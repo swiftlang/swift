@@ -3154,9 +3154,11 @@ private:
   }
 
 public:
-  /// The field names. A doubly-null-terminated list of strings, whose
-  /// length and order is consistent with that of the field offset vector.
-  RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
+  /// Indicates if the type represented by this descriptor
+  /// supports reflection (C and Obj-C enums currently don't).
+  /// FIXME: This is temporarily left as 32-bit integer to avoid
+  ///        changing layout of context descriptor.
+  uint32_t IsReflectable;
 
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
@@ -3258,9 +3260,11 @@ public:
   /// vector.
   uint32_t FieldOffsetVectorOffset;
   
-  /// The field names. A doubly-null-terminated list of strings, whose
-  /// length and order is consistent with that of the field offset vector.
-  RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
+  /// Indicates if the type represented by this descriptor
+  /// supports reflection (C and Obj-C enums currently don't).
+  /// FIXME: This is temporarily left as 32-bit integer to avoid
+  ///        changing layout of context descriptor.
+  uint32_t IsReflectable;
 
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
@@ -3304,10 +3308,11 @@ public:
   /// The number of empty cases in the enum.
   uint32_t NumEmptyCases;
 
-  /// The names of the cases. A doubly-null-terminated list of strings,
-  /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
-  /// tag order, non-empty cases first, followed by empty cases.
-  RelativeDirectPointer<const char, /*nullable*/ true> CaseNames;
+  /// Indicates if the type represented by this descriptor
+  /// supports reflection (C and Obj-C enums currently don't).
+  /// FIXME: This is temporarily left as 32-bit integer to avoid
+  ///        changing layout of context descriptor.
+  uint32_t IsReflectable;
 
   uint32_t getNumPayloadCases() const {
     return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;

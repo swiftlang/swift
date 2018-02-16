@@ -1054,8 +1054,12 @@ void swift::swift_getFieldAt(
   auto getFieldAt = [&](const FieldDescriptor &descriptor) {
     auto &field = descriptor.getFields()[index];
     auto name = field.getFieldName(0);
-    auto type = field.getMangledTypeName(0);
 
+    // Enum cases don't always have types.
+    if (!field.hasMangledTypeName()) {
+      callback(name, FieldType().withIndirect(field.isIndirectCase()));
+      return;
+    }
 
     std::vector<const ContextDescriptor *> descriptorPath;
     {
@@ -1070,7 +1074,8 @@ void swift::swift_getFieldAt(
     }
 
     auto typeInfo = _getTypeByMangledName(
-        type, [&](unsigned depth, unsigned index) -> const Metadata * {
+        field.getMangledTypeName(0),
+        [&](unsigned depth, unsigned index) -> const Metadata * {
           if (depth >= descriptorPath.size())
             return nullptr;
 

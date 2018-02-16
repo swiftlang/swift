@@ -2779,17 +2779,12 @@ namespace {
     }
     
     void addLayoutInfo() {
-      // Build the field name list.
-      llvm::SmallString<64> fieldNames;
-      unsigned numFields = getFieldNameString(getType()->getStoredProperties(),
-                                              fieldNames);
-      
-      B.addInt32(numFields);
+      auto properties = getType()->getStoredProperties();
+      B.addInt32(std::distance(properties.begin(), properties.end()));
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
+      B.addInt32(1); // struct always reflectable
 
-      addFieldTypes(IGM, getType(), getType()->getStoredProperties());
+      addFieldTypes(IGM, getType(), properties);
     }
     
     uint16_t getKindSpecificFlags() {
@@ -2844,8 +2839,7 @@ namespace {
       B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
       // # empty cases
       B.addInt32(strategy.getElementsWithNoPayload().size());
-
-      B.addRelativeAddressOrNull(strategy.emitCaseNames());
+      B.addInt32(strategy.isReflectable());
 
       addFieldTypes(IGM, strategy.getElementsWithPayload());
     }
@@ -2981,17 +2975,12 @@ namespace {
     }
     
     void addLayoutInfo() {
-      // Build the field name list.
-      llvm::SmallString<64> fieldNames;
-      unsigned numFields = getFieldNameString(getType()->getStoredProperties(),
-                                              fieldNames);
-      
-      B.addInt32(numFields);
+      auto properties = getType()->getStoredProperties();
+      B.addInt32(std::distance(properties.begin(), properties.end()));
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
+      B.addInt32(1); // class is always reflectable
 
-      addFieldTypes(IGM, getType(), getType()->getStoredProperties());
+      addFieldTypes(IGM, getType(), properties);
     }
   };
 } // end anonymous namespace

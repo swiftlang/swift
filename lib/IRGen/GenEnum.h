@@ -224,7 +224,7 @@ public:
   }
 
   /// Emit field names for enum reflection.
-  virtual llvm::Constant *emitCaseNames() const;
+  virtual bool isReflectable() const;
 
   /// \brief Return the bits used for discriminators for payload cases.
   ///

@@ -104,7 +104,6 @@ import Swift
 //    The witness table pattern includes extra inhabitant witness
 //    implementations which are used if the instance has extra inhabitants.
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private constant [7 x i8] c"value\00\00"
 // CHECK: @"$S4enum16DynamicSingletonOWV" =
 // CHECK-SAME:   i8* null
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum16DynamicSingletonOwxs" to i8*)
@@ -117,8 +116,6 @@ import Swift
 // CHECK-SAME:   i32 1,
 // --       No empty cases
 // CHECK-SAME:   i32 0,
-// --       Case names
-// CHECK-SAME:   [[DYNAMICSINGLETON_FIELD_NAMES]]
 // --       Case type accessor
 // CHECK-SAME:   i32 2,
 // --       generic parameters, requirements, key, extra
