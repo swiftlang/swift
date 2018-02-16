@@ -147,6 +147,15 @@ public:
   /// with the provided \p Input pair of Base and Primary inputs.
   void addPrimaryOutput(CommandInputPair Input, StringRef PrimaryOutputFile);
 
+  /// Return true iff the set of additional output types in \c this is
+  /// identical to the set of additional output types in \p other.
+  bool hasSameAdditionalOutputTypes(CommandOutput const &other) const;
+
+  /// Copy all the input pairs from \p other to \c this. Assumes (and asserts)
+  /// that \p other shares output file map and PrimaryOutputType with \c this
+  /// already, as well as AdditionalOutputTypes if \c this has any.
+  void addOutputs(CommandOutput const &other);
+
   /// Assuming (and asserting) that there is only one input pair, return the
   /// primary output file associated with it. Note that the returned StringRef
   /// may be invalidated by subsequent mutations to the \c CommandOutput.
@@ -235,6 +244,8 @@ public:
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)) {}
+
+  virtual ~Job();
 
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
