@@ -420,9 +420,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       // but that gets tricky with synthesized function bodies.
       if (AFD->isBodyTypeChecked()) continue;
 
-      UnifiedStatsReporter::FrontendStatsTracer Tracer;
-      if (TC.Context.Stats)
-        Tracer = TC.Context.Stats->getStatsTracer("typecheck-fn", AFD);
+      FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-fn", AFD);
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
 

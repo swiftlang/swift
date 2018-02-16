@@ -7878,11 +7878,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
-  UnifiedStatsReporter::FrontendStatsTracer Tracer;
-  if (SwiftContext.Stats)
-    Tracer = SwiftContext.Stats->getStatsTracer("import-clang-decl",
-                                                ClangDecl);
-
+  FrontendStatsTracer StatsTracer(SwiftContext.Stats,
+                                  "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
@@ -8636,13 +8633,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static ClangDeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const clang::Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
+  return &TF;
 }

@@ -58,6 +58,7 @@ namespace swift {
 class Decl;
 class Expr;
 class SILFunction;
+class FrontendStatsTracer;
 
 class UnifiedStatsReporter {
 
@@ -96,25 +97,6 @@ public:
                           clang::SourceManager *ClangSourceMgr,
                           raw_ostream &OS) const = 0;
     virtual ~TraceFormatter();
-  };
-
-  struct FrontendStatsTracer
-  {
-    UnifiedStatsReporter *Reporter;
-    llvm::TimeRecord SavedTime;
-    StringRef EventName;
-    const void *Entity;
-    const TraceFormatter *Formatter;
-    FrontendStatsTracer(StringRef EventName,
-                        const void *Entity,
-                        const TraceFormatter *Formatter,
-                        UnifiedStatsReporter *Reporter);
-    FrontendStatsTracer();
-    FrontendStatsTracer(FrontendStatsTracer&& other);
-    FrontendStatsTracer& operator=(FrontendStatsTracer&&);
-    ~FrontendStatsTracer();
-    FrontendStatsTracer(const FrontendStatsTracer&) = delete;
-    FrontendStatsTracer& operator=(const FrontendStatsTracer&) = delete;
   };
 
   struct FrontendStatsEvent
@@ -172,16 +154,69 @@ public:
   AlwaysOnFrontendCounters &getFrontendCounters();
   AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   void noteCurrentProcessExitStatus(int);
-  // We declare 4 explicit overloads here, but the _definitions_ live in the
-  // upper-level files (in libswiftAST or libswiftSIL) that provide the types
-  // being traced. If you want to trace those types, it's assumed you're linking
-  // with the object files that define the tracer.
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Decl *D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const clang::Decl*D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Expr *E);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const SILFunction *F);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
 };
+
+// This is a non-nested type just to make it less work to write at call sites.
+class FrontendStatsTracer
+{
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,
+                      StringRef EventName,
+                      const void *Entity,
+                      const UnifiedStatsReporter::TraceFormatter *Formatter);
+
+  // In the general case we do not know how to format an entity for tracing.
+  template<typename T> static
+  const UnifiedStatsReporter::TraceFormatter *getTraceFormatter() {
+    return nullptr;
+  }
+
+public:
+  UnifiedStatsReporter *Reporter;
+  llvm::TimeRecord SavedTime;
+  StringRef EventName;
+  const void *Entity;
+  const UnifiedStatsReporter::TraceFormatter *Formatter;
+  FrontendStatsTracer();
+  FrontendStatsTracer(FrontendStatsTracer&& other);
+  FrontendStatsTracer& operator=(FrontendStatsTracer&&);
+  ~FrontendStatsTracer();
+  FrontendStatsTracer(const FrontendStatsTracer&) = delete;
+  FrontendStatsTracer& operator=(const FrontendStatsTracer&) = delete;
+
+  /// These are the convenience constructors you want to be calling throughout
+  /// the compiler: they select an appropriate trace formatter for the provided
+  /// entity type, and produce a tracer that's either active or inert depending
+  /// on whether the provided \p Reporter is null (nullptr means "tracing is
+  /// disabled").
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const Decl *D);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const clang::Decl *D);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const Expr *E);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const SILFunction *F);
+};
+
+// In particular cases, we do know how to format traced entities: we declare
+// explicit specializations of getTraceFormatter() here, matching the overloaded
+// constructors of FrontendStatsTracer above, where the _definitions_ live in
+// the upper-level files (in libswiftAST or libswiftSIL), and provide tracing
+// for those entity types. If you want to trace those types, it's assumed you're
+// linking with the object files that define the tracer.
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Decl *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Expr *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SILFunction *>();
 
 }
 #endif // SWIFT_BASIC_STATISTIC_H
