@@ -124,6 +124,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ReduceInto
     single-source/ReversedCollections
     single-source/RomanNumbers
+    single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
