@@ -10,7 +10,7 @@ way that it can be transformed in-place into a key path object with a one-time
 initialization in the common case where the entire path is fully specialized
 and crosses no resilience boundaries.
 
-## ABI Concerns For Key Paths 
+## ABI Concerns For Key Paths
 
 For completeness, this document describes the layout of both key path objects
 and patterns; note however that the instantiated runtime layout of key path
@@ -18,7 +18,7 @@ objects is an implementation detail of the Swift runtime, and *only key path
 patterns* are strictly ABI, since they are emitted by the compiler. The
 runtime has the freedom to change the runtime layout of key path objects, but
 will have to maintain the ability to instantiate from key path patterns emitted
-by previous ABI-stable versions of the Swift complier.
+by previous ABI-stable versions of the Swift compiler.
 
 ## Key Path Objects
 
@@ -202,10 +202,10 @@ Value in bit 30&29 | Description
     `2*sizeof(Int)`  | **Is Equal**
     `3*sizeof(Int)`  | **Hash**
 
-    The *destroy* function, if not null, has signature 
+    The *destroy* function, if not null, has signature
     `@convention(thin) (UnsafeMutableRawPointer) -> ()` and is invoked to
     destroy the captures when the key path object is deallocated.
-    
+
     The *copy* function has signature
     `@convention(thin) (_ src: UnsafeRawPointer,
                         _ dest: UnsafeMutableRawPointer) -> ()`
