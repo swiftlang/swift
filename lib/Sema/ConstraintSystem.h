@@ -3101,6 +3101,9 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(Expr *) LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
   void print(raw_ostream &out);
 };
 

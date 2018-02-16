@@ -3118,6 +3118,15 @@ void ConstraintSystem::dump() {
   print(llvm::errs());
 }
 
+void ConstraintSystem::dump(Expr *E) {
+  auto getTypeOfExpr = [&](const Expr *E) -> Type { return getType(E); };
+  auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+    return getType(TL);
+  };
+
+  E->dump(getTypeOfExpr, getTypeOfTypeLoc);
+}
+
 void ConstraintSystem::print(raw_ostream &out) {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
