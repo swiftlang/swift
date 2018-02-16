@@ -63,8 +63,14 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 // Type aliases
 //===----------------------------------------------------------------------===//
 
+/// TF_Session* type
+typealias CTFSession = OpaquePointer
+
 /// TF_Status* type
 typealias CTFStatus = OpaquePointer
+
+/// TF_Graph* type
+typealias CTFGraph = OpaquePointer
 
 /// TF_Function* type
 typealias CTFFunction = OpaquePointer

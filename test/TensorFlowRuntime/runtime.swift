@@ -58,6 +58,8 @@ func runProgram(_ progName: String,
   print("The input graph of program \(progName) has \(graphProto.count) bytes.")
   // TODO: Remove reset() when the proto is no longer using "the_function".
   _ExecutionContext.global.reset()
+  // "the_function" as function name is only supported in eager mode.
+  _RuntimeConfig.usesTFEagerAPI = true
   let computation = _TFCStartTensorComputation(graphProto,
                                                graphProto.count,
                                                entryFunctionName,
@@ -93,6 +95,9 @@ func runConst() {
    */
   // TODO: Regenerate a proto that's not using "the_function".
   let graphProto = decodeHex("12680A660A0E0A0C7468655F66756E6374696F6E1A540A236F702E5F54303174313774657374546573746F724578616D706C657979462E332E31331205436F6E73742A190A0576616C75651210420E08011204120208012A04000000402A0B0A0564747970651202300122020818")
+
+  // "the_function" as function name is only supported in eager mode.
+  _RuntimeConfig.usesTFEagerAPI = true
 
   // TODO: Remove reset() when the proto is no longer using "the_function".
   _ExecutionContext.global.reset() 

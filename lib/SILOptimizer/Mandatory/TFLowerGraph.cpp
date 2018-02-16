@@ -182,13 +182,24 @@ public:
     errorOccurred = true;
   }
 
-
   /// Given a GraphFunctionBody, which encapsulates all the information
   /// necessary to represent a tensorflow TF_Function, perform the final steps
   /// to generate the TF_Function itself and put it into the resultGraph.
   ///
+  /// When `isTopLevelFunction` is true, also adds a graph node corresponding to
+  /// this function, and a set of PlaceHolder nodes as the input parameters to
+  /// that function. Caller can call this function through the function node via
+  /// TF_SessionRun(). The graph node for the function is named
+  /// `tfc_func_<name>`, and the placeholder nodes are named
+  /// "tfc_input_<i>_<name>", where i denotes the i-th input parameter. This
+  /// naming convention is used by Swift run-time to locate these graph nodes.
+  ///
+  /// Note: `name` starts with _, where the name of a graph node cannot start
+  /// with _.
+  ///
   /// This emits an error and returns true on error.
-  bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name);
+  bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
+                          bool isTopLevelFunction = false);
 
 private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
@@ -1292,8 +1303,9 @@ lowerToFunction(const std::function<void()> &body) {
 /// to generate the TF_Function itself and put it into the resultGraph.
 ///
 /// This emits an error and returns true on error.
-bool TFGraphLowering::
-buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name) {
+bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
+                                         StringRef name,
+                                         bool isTopLevelFunction) {
   if (errorOccurred)
     return true;
 
@@ -1306,7 +1318,7 @@ buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name) {
     outs.push_back(elt.second);
 
   auto resultFn =
-    TF_GraphToFunction(graphBody.getGraph(), name.data(),
+    TF_GraphToFunction(graphBody.getGraph(), name.str().c_str(),
                        /*append_hash_to_fn_name*/false,
                        /*num_opers*/graphBody.operations.size(),
                        /*opers*/graphBody.operations.data(),
@@ -1329,6 +1341,29 @@ buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name) {
   TF_GraphCopyFunction(resultGraph, resultFn, /*gradient*/nullptr, status);
   if (checkStatus(SILFn->getLocation()))
     return true;
+
+  if (isTopLevelFunction) {
+    const std::string funcName = name.str();
+    const std::string funcNodeName = "tfc_func_" + funcName;
+    TF_OperationDescription *funcDesc =
+        TF_NewOperation(resultGraph, /*op_type*/ funcName.c_str(),
+                        /*op_name*/ funcNodeName.c_str());
+
+    for (unsigned i = 0, e = ins.size(); i != e; ++i) {
+      const std::string inputNodeName =
+        "tfc_input_" + std::to_string(i) + "_" + funcName;
+      TF_OperationDescription *inputDesc =
+          TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
+      TF_SetAttrType(inputDesc, "dtype", TF_OperationOutputType(ins[i]));
+      TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
+      if (checkStatus(SILFn->getLocation()))
+        return true;
+      TF_AddInput(funcDesc, {placeholder, 0});
+    }
+    TF_FinishOperation(funcDesc, status);
+    if (checkStatus(SILFn->getLocation()))
+      return true;
+  }
 
   // Everything is good!
   return false;
@@ -1395,7 +1430,7 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
 
   // Create the graph function for the top level code.
   auto fnName = graphGen.SILFn->getName();
-  if (graphGen.buildGraphFunction(graphFnBody, fnName))
+  if (graphGen.buildGraphFunction(graphFnBody, fnName, /*isTopLevelFunction*/true))
     return {};
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.

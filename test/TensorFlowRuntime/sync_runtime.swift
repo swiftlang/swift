@@ -67,6 +67,9 @@ RuntimeTests.test("BasicTanhSync") {
     """
   let bytes = decodeHex(graphProto)
 
+  // "the_function" as function name is only supported in eager mode.
+  _RuntimeConfig.usesTFEagerAPI = true
+
   let computation = _TFCStartTensorComputation(
     /*programByteAddress:*/ bytes,
     /*programByteCount:*/ bytes.count,
