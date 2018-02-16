@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
@@ -3025,6 +3026,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
+                                  Conformance);
 
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
