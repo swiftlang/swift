@@ -42,20 +42,6 @@ struct LargeKey: Hashable {
     self.p = value & 8 == 0
     self.q = value & 16 == 0
   }
-#if true // FIXME remove once synthesized hashing generates _hash(into:)
-  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher
-      .appending(i)
-      .appending(j)
-      .appending(k)
-      .appending(l)
-      .appending(m)
-      .appending(n)
-      .appending(o)
-      .appending(p)
-      .appending(q)
-  }
-#endif
 }
 
 @inline(never)
