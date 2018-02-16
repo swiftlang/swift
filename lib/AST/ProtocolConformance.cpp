@@ -24,6 +24,7 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -1366,4 +1367,47 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
   if (isAbstract())
     return *this;
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// ProtocolConformances, is defined here to avoid too much layering violation /
+// circular linkage dependency.
+
+struct ProtocolConformanceTraceFormatter
+    : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    OS << "<conformance ";
+    if (auto const *DC = C->getDeclContext()) {
+      if (auto const *N = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        N->getFullName().print(OS, false);
+      }
+    }
+    OS << " : ";
+    if (auto *P = C->getProtocol())
+      P->getFullName().print(OS, false);
+    OS << ">";
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    if (auto const *DC = C->getDeclContext()) {
+      if (auto const *D = DC->getAsDeclOrDeclExtensionContext())
+        D->getSourceRange().print(OS, *SM, false);
+    }
+  }
+};
+
+static ProtocolConformanceTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>() {
+  return &TF;
 }

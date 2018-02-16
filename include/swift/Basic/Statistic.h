@@ -56,6 +56,7 @@ namespace clang {
 namespace swift {
 
 class Decl;
+class ProtocolConformance;
 class Expr;
 class SILFunction;
 class FrontendStatsTracer;
@@ -192,6 +193,8 @@ public:
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
                       const Decl *D);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const ProtocolConformance *P);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
                       const clang::Decl *D);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
                       const Expr *E);
@@ -208,6 +211,9 @@ public:
 
 template<> const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Decl *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>();
 
 template<> const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const clang::Decl *>();

@@ -277,6 +277,11 @@ FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
 {}
 
 FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const ProtocolConformance *P)
+    : FrontendStatsTracer(R, S, P,
+                          getTraceFormatter<const ProtocolConformance *>()) {}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
                                          const Expr *E)
     : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>())
 {}
