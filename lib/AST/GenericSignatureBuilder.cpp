@@ -3293,17 +3293,19 @@ RewriteTreeNode::bestMatch(GenericParamKey base, RelativeRewritePath path,
                         [&](unsigned length, RewritePath path) {
     // Determine how much of the original path will be replaced by the rewrite.
     unsigned adjustedLength = length;
+    bool changesBase = false;
     if (auto newBase = path.getBase()) {
       adjustedLength += prefixLength;
 
       // If the base is unchanged, make sure we're reducing the length.
-      if (*newBase == base && adjustedLength <= path.getPath().size())
+      changesBase = *newBase != base;
+      if (!changesBase && adjustedLength <= path.getPath().size())
         return;
     }
 
-    if (adjustedLength == 0) return;
+    if (adjustedLength == 0 && !changesBase) return;
 
-    if (adjustedLength > bestAdjustedLength ||
+    if (adjustedLength > bestAdjustedLength || !best ||
         (adjustedLength == bestAdjustedLength &&
          path.compare(best->second) < 0)) {
       best = { length, path };
@@ -3836,6 +3838,7 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   GenericParamKey Key(GenericParam);
   auto params = getGenericParams();
+  (void)params;
   assert(params.empty() ||
          ((Key.Depth == params.back()->getDepth() &&
            Key.Index == params.back()->getIndex() + 1) ||
