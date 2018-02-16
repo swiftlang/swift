@@ -14,8 +14,9 @@
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
-#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -56,6 +57,12 @@ public:
   SupplementaryOutputPaths &supplementaryOutputs() {
     return SupplementaryOutputs;
   }
+
+  /// When performing a compilation for zero or one primary input file,
+  /// this will hold the PrimarySpecificPaths.
+  /// In a future PR, each InputFile will hold its own PrimarySpecificPaths and
+  /// this will go away.
+  PrimarySpecificPaths PrimarySpecificPathsForAtMostOnePrimary;
 
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
@@ -181,6 +188,10 @@ private:
 public:
   unsigned countOfInputsProducingMainOutputs() const;
 
+  bool hasInputsProducingMainOutputs() const {
+    return countOfInputsProducingMainOutputs() != 0;
+  }
+
   const InputFile &firstInputProducingOutput() const;
   const InputFile &lastInputProducingOutput() const;
 
@@ -209,6 +220,17 @@ public:
 
   void forEachInputProducingSupplementaryOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
+
+  /// Assumes there is not more than one primary input file, if any.
+  /// Otherwise, you would need to call getPrimarySpecificPathsForPrimary
+  /// to tell it which primary input you wanted the outputs for.
+  ///
+  /// Must not be constructed on-the-fly because some parts of the compiler
+  /// receive StringRefs to its components, so it must live as long as the
+  /// compiler.
+  PrimarySpecificPaths &getPrimarySpecificPathsForAtMostOnePrimary();
+
+  PrimarySpecificPaths &getPrimarySpecificPathsForPrimary(StringRef filename);
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;

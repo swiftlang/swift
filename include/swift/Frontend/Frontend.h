@@ -301,6 +301,9 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
+
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
+  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -578,6 +581,11 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+public:
+  PrimarySpecificPaths getPrimarySpecificPathsForWholeModuleOptimizationMode();
+  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
 };
 
 } // namespace swift

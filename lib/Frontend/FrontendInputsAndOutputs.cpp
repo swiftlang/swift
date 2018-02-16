@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -36,6 +37,8 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   SupplementaryOutputs = other.SupplementaryOutputs;
+  PrimarySpecificPathsForAtMostOnePrimary =
+      other.PrimarySpecificPathsForAtMostOnePrimary;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -45,6 +48,8 @@ operator=(const FrontendInputsAndOutputs &other) {
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   SupplementaryOutputs = other.SupplementaryOutputs;
+  PrimarySpecificPathsForAtMostOnePrimary =
+      other.PrimarySpecificPathsForAtMostOnePrimary;
   return *this;
 }
 
@@ -303,6 +308,18 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
       AllInputs[i].setOutputFilename(outputFiles[i]);
   }
   SupplementaryOutputs = supplementaryOutputs;
+
+  if (hasUniquePrimaryInput() || (hasInputs() && isWholeModule())) {
+    // When batch mode is fully implemented, each InputFile will own
+    // a PrimarySpecificPaths.
+    PrimarySpecificPathsForAtMostOnePrimary.OutputFilename =
+        getSingleOutputFilename();
+    PrimarySpecificPathsForAtMostOnePrimary.MainInputFilenameForDebugInfo =
+        hasInputsProducingMainOutputs() ? firstInputProducingOutput().file()
+                                        : StringRef();
+    PrimarySpecificPathsForAtMostOnePrimary.SupplementaryOutputs =
+        supplementaryOutputs;
+  }
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
@@ -378,4 +395,15 @@ bool FrontendInputsAndOutputs::hasTBDPath() const {
 bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
   return hasDependenciesPath() || hasReferenceDependenciesPath() ||
          hasLoadedModuleTracePath();
+}
+
+PrimarySpecificPaths &
+FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() {
+  return PrimarySpecificPathsForAtMostOnePrimary;
+}
+
+PrimarySpecificPaths &
+FrontendInputsAndOutputs::getPrimarySpecificPathsForPrimary(
+    StringRef filename) {
+  return getPrimarySpecificPathsForAtMostOnePrimary(); // just a stub for now
 }

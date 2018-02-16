@@ -298,12 +298,12 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool writeSIL(SILModule &SM, CompilerInstance &Instance,
+static bool writeSIL(SILModule &SM, const PrimarySpecificPaths PSPs,
+                     CompilerInstance &Instance,
                      CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
   return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                  opts.InputsAndOutputs.getSingleOutputFilename(),
-                  opts.EmitSortedSIL);
+                  PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
 static bool printAsObjCIfNeeded(const std::string &outputPath, ModuleDecl *M,
@@ -542,6 +542,7 @@ struct PostSILGenInputs {
   std::unique_ptr<SILModule> TheSILModule;
   bool ASTGuaranteedToCorrespondToSIL;
   ModuleOrSourceFile ModuleOrPrimarySourceFile;
+  PrimarySpecificPaths PSPs;
 };
 
 static bool precompileBridgingHeader(CompilerInvocation &Invocation,
@@ -606,7 +607,10 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
   IRGenOpts.OutputKind =
       getOutputKind(Invocation.getFrontendOptions().RequestedAction);
 
-  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
+  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(),
+                     Invocation.getFrontendOptions()
+                         .InputsAndOutputs.getSingleOutputFilename(),
+                     Stats);
 }
 
 static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
@@ -769,7 +773,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   auto mod = Instance.getMainModule();
   if (auto SM = Instance.takeSILModule()) {
     std::deque<PostSILGenInputs> PSGIs;
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForAtMostOnePrimary();
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod, PSPs});
     return PSGIs;
   }
 
@@ -785,8 +791,10 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
     // SILModule for the entire module.
     auto SM = performSILGeneration(mod, SILOpts, true);
     std::deque<PostSILGenInputs> PSGIs;
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     PSGIs.push_back(PostSILGenInputs{
-        std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
+        std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod, PSPs});
     return PSGIs;
   }
   // If there are primary source files, build a separate SILModule for
@@ -795,7 +803,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (auto *PrimaryFile = Instance.getPrimarySourceFile()) {
     auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
     std::deque<PostSILGenInputs> PSGIs;
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile});
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForPrimary(PrimaryFile->getFilename());
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
     return PSGIs;
   }
   // If there are primary inputs but no primary _source files_, there might be
@@ -807,8 +817,10 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
         auto SM = performSILGeneration(*SASTF, SILOpts, None);
+        const PrimarySpecificPaths PSPs =
+            Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
-            PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
+            PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod, PSPs});
       }
   }
   return PSGIs;
@@ -819,6 +831,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
                                           ModuleOrSourceFile MSF,
+                                          PrimarySpecificPaths PSPs,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
@@ -946,6 +959,7 @@ static bool performCompile(CompilerInstance &Instance,
                                       std::move(PSGI.TheSILModule),
                                       PSGI.ASTGuaranteedToCorrespondToSIL,
                                       PSGI.ModuleOrPrimarySourceFile,
+                                      PSGI.PSPs,
                                       moduleIsPublic,
                                       ReturnValue, observer, Stats))
       return true;
@@ -990,14 +1004,13 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 
 static SerializationOptions
 computeSerializationOptions(const CompilerInvocation &Invocation,
+                            const SupplementaryOutputPaths &outs,
                             bool moduleIsPublic) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath =
-      opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath =
-      opts.InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath.c_str();
+  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader)
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -1052,10 +1065,10 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
-static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
+static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
                          ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath =
-      opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath;
+      PSPs.SupplementaryOutputs.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
 
   SerializationOptions serializationOpts;
@@ -1068,19 +1081,22 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
 }
 
 static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
+                       const PrimarySpecificPaths &PSPs,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
-                       llvm::GlobalVariable *&HashGlobal) {
+                       llvm::GlobalVariable *&HashGlobal,
+                       ArrayRef<std::string> parallelOutputFilenames) {
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
-                                       std::move(SM), OutputFilename,
+                                       std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, 0, &HashGlobal)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
-                                       std::move(SM), OutputFilename,
-                                       LLVMContext, &HashGlobal);
+                                       std::move(SM), OutputFilename, PSPs,
+                                       LLVMContext, parallelOutputFilenames,
+                                       &HashGlobal);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
@@ -1166,6 +1182,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
                                           ModuleOrSourceFile MSF,
+                                          const PrimarySpecificPaths PSPs,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
@@ -1186,13 +1203,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    return writeSIL(*SM, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                 Instance.getASTContext(), MSF);
+    serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1218,11 +1234,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty())
+    const SupplementaryOutputPaths &outs = PSPs.SupplementaryOutputs;
+    if (outs.ModuleOutputPath.empty())
       return;
 
     SerializationOptions serializationOpts =
-        computeSerializationOptions(Invocation, moduleIsPublic);
+        computeSerializationOptions(Invocation, outs, moduleIsPublic);
     serialize(MSF, serializationOpts, SM.get());
   };
 
@@ -1247,24 +1264,26 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
-  (void)printAsObjCIfNeeded(
-      opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
-      Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
+                            Instance.getMainModule(),
+                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                        Instance.getASTContext(), MSF);
+    return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
 
   const bool haveModulePath =
-      !opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty() ||
-      !opts.InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath.empty();
+      !PSPs.SupplementaryOutputs.ModuleOutputPath.empty() ||
+      !PSPs.SupplementaryOutputs.ModuleDocOutputPath.empty();
   if (haveModulePath && !SM->isSerialized())
     SM->serialize();
 
   if (haveModulePath) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
+      // What if MSF is a module?
+      // emitIndexDataIfNeeded already handles that case;
+      // it'll index everything.
+      return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
                                    Instance) ||
              Context.hadError();
     }
@@ -1275,7 +1294,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL)
-    return writeSIL(*SM, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation);
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
          "All actions not requiring IRGen must have been handled!");
@@ -1294,12 +1313,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
+  StringRef OutputFilename = PSPs.OutputFilename;
+  std::vector<std::string> ParallelOutputFilenames = Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  generateIR(IRGenOpts, std::move(SM),
-             Invocation.getFrontendOptions()
-                 .InputsAndOutputs.getSingleOutputFilename(),
-             MSF, IRModule, HashGlobal);
+  generateIR(
+      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, IRModule, HashGlobal,
+      ParallelOutputFilenames);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
@@ -1319,10 +1339,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                           *IRModule))
     return true;
 
-  return generateCode(Invocation, Instance,
-                      Invocation.getFrontendOptions()
-                          .InputsAndOutputs.getSingleOutputFilename(),
-                      IRModule.get(), HashGlobal, Stats) ||
+  return generateCode(Invocation, Instance, OutputFilename, IRModule.get(),
+                      HashGlobal, Stats) ||
          HadError;
 }
 
