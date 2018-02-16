@@ -375,5 +375,18 @@ func testConcreteGenericType2(a : SettableGeneric2<Int>) -> Int? {
   return a.dfsdffff
 }
 
+//===----------------------------------------------------------------------===//
+// Keypaths
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+class C {
+  subscript(dynamicMember member: String) -> Int { return 7 }
+}
+_ = \C.[dynamicMember: "hi"]
+_ = \C.testLookup
+
+
+
 
 
