@@ -1514,11 +1514,22 @@ ModuleDecl *ClangImporter::loadModule(
 
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
-  for (auto component : path.slice(1)) {
+  for (auto &component : path.slice(1)) {
     submodule = submodule->findSubmodule(component.first.str());
-    // FIXME: Specialize the error for a missing submodule?
-    if (!submodule)
+
+    // Special case: a submodule named "Foo.Private" can be moved to a top-level
+    // module named "Foo_Private". Clang has special support for this.
+    // We're limiting this to just submodules named "Private" because this will
+    // put the Clang AST in a fatal error state if it /doesn't/ exist.
+    if (!submodule && component.first.str() == "Private" &&
+        (&component) == (&path[1])) {
+      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
+    }
+
+    if (!submodule) {
+      // FIXME: Specialize the error for a missing submodule?
       return nullptr;
+    }
   }
 
   // Finally, load the submodule and make it visible.
