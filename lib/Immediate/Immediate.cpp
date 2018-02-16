@@ -262,10 +262,10 @@ bool swift::immediate::IRGenImportedModules(
 
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto SubModule = performIRGeneration(IRGenOpts, import,
-                                         std::move(SILMod),
-                                         import->getName().str(),
-                                         getGlobalLLVMContext());
+    auto SubModule = performIRGeneration(
+        IRGenOpts, import, std::move(SILMod), import->getName().str(),
+        CI.getPrimarySpecificPathsForAtMostOnePrimary(), getGlobalLLVMContext(),
+        ArrayRef<std::string>());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -301,10 +301,10 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   auto *swiftModule = CI.getMainModule();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto ModuleOwner = performIRGeneration(IRGenOpts, swiftModule,
-                                         CI.takeSILModule(),
-                                         swiftModule->getName().str(),
-                                         getGlobalLLVMContext());
+  auto ModuleOwner = performIRGeneration(
+      IRGenOpts, swiftModule, CI.takeSILModule(), swiftModule->getName().str(),
+      CI.getPrimarySpecificPathsForAtMostOnePrimary(), getGlobalLLVMContext(),
+      ArrayRef<std::string>());
   auto *Module = ModuleOwner.get();
 
   if (Context.hadError())

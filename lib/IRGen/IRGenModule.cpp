@@ -125,7 +125,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName, StringRef OutputFilename)
+                         StringRef ModuleName, StringRef OutputFilename,
+                         StringRef MainInputFilenameForDebugInfo)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
@@ -133,6 +134,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(target->createDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
+      MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
@@ -414,7 +416,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module, SF);
+                                                     Module,
+                                                 MainInputFilenameForDebugInfo);
 
   initClangTypeConverter();
 

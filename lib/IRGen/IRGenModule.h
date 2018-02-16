@@ -442,7 +442,8 @@ public:
   SourceFile *CurSourceFile = nullptr;
 
   llvm::SmallString<128> OutputFilename;
-  
+  llvm::SmallString<128> MainInputFilenameForDebugInfo;
+
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -1042,7 +1043,8 @@ public:
               std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName,
-              StringRef OutputFilename);
+              StringRef OutputFilename,
+              StringRef MainInputFilenameForDebugInfo);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
