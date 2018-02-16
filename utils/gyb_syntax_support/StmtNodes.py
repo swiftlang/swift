@@ -91,6 +91,7 @@ STMT_NODES = [
     # switch-stmt -> identifier? ':'? 'switch' expr '{'
     #   switch-case-list '}' ';'?
     Node('SwitchStmt', kind='Stmt',
+         traits=['BracedSyntax'],
          children=[
              Child('LabelName', kind='IdentifierToken',
                    is_optional=True),
@@ -98,9 +99,9 @@ STMT_NODES = [
                    is_optional=True),
              Child('SwitchKeyword', kind='SwitchToken'),
              Child('Expression', kind='Expr'),
-             Child('OpenBrace', kind='LeftBraceToken'),
+             Child('LeftBrace', kind='LeftBraceToken'),
              Child('Cases', kind='SwitchCaseList'),
-             Child('CloseBrace', kind='RightBraceToken'),
+             Child('RightBrace', kind='RightBraceToken'),
          ]),
 
     # catch-clause-list -> catch-clause catch-clause-list?
