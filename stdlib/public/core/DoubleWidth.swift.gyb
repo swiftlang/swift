@@ -151,7 +151,7 @@ extension DoubleWidth : Comparable {
 extension DoubleWidth : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _defaultHashValue(for: self)
+    return _hashValue(for: self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

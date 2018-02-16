@@ -49,7 +49,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   
   @_inlineable // FIXME(sil-serialize-all)
   final public var hashValue: Int {
-    return _defaultHashValue(for: self)
+    return _hashValue(for: self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -458,7 +458,7 @@ internal struct ComputedPropertyID: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var hashValue: Int {
-    return _defaultHashValue(for: self)
+    return _hashValue(for: self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

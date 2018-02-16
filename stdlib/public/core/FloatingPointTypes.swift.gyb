@@ -1440,7 +1440,7 @@ extension ${Self} : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _defaultHashValue(for: self)
+    return _hashValue(for: self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

@@ -115,7 +115,7 @@ public protocol Hashable : Equatable {
 @_versioned
 @_inlineable
 @inline(__always)
-internal func _defaultHashValue<T : Hashable>(for value: T) -> Int {
+internal func _hashValue<H: Hashable>(for value: H) -> Int {
   var hasher = _Hasher(_inlineable: ())
   return withUnsafeMutablePointer(to: &hasher) { p in
     return _UnsafeHasher(p).appending(value).finalized()
