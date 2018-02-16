@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -F %S/Inputs/frameworks -DOLD -verify %s
-// RUN: %target-swift-frontend -typecheck -F %S/Inputs/frameworks -DNEW -verify %s
+// RUN: %target-swift-frontend -typecheck -F %S/Inputs/frameworks -DOLD -verify %s -Xcc -Wno-private-module
+// RUN: %target-swift-frontend -typecheck -F %S/Inputs/frameworks -DNEW -verify %s -Xcc -Wno-private-module
 
 import PrivateAsSubmodule.Private
 
