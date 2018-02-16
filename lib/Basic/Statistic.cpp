@@ -258,31 +258,41 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   OS.flush();
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
-    StringRef EventName,
-    const void *Entity,
-    const TraceFormatter *Formatter,
-    UnifiedStatsReporter *Reporter)
-  : Reporter(Reporter),
-    SavedTime(llvm::TimeRecord::getCurrentTime()),
-    EventName(EventName),
-    Entity(Entity),
-    Formatter(Formatter)
-{
-  if (Reporter)
+FrontendStatsTracer::FrontendStatsTracer(
+    UnifiedStatsReporter *Reporter, StringRef EventName, const void *Entity,
+    const UnifiedStatsReporter::TraceFormatter *Formatter)
+    : Reporter(Reporter), SavedTime(), EventName(EventName), Entity(Entity),
+      Formatter(Formatter) {
+  if (Reporter) {
+    SavedTime = llvm::TimeRecord::getCurrentTime();
     Reporter->saveAnyFrontendStatsEvents(*this, true);
+  }
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer()
-  : Reporter(nullptr),
-    Entity(nullptr),
-    Formatter(nullptr)
-{
-}
+FrontendStatsTracer::FrontendStatsTracer() = default;
 
-UnifiedStatsReporter::FrontendStatsTracer&
-UnifiedStatsReporter::FrontendStatsTracer::operator=(
-    FrontendStatsTracer&& other)
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const Expr *E)
+    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const clang::Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const SILFunction *F)
+    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>())
+{}
+
+FrontendStatsTracer&
+FrontendStatsTracer::operator=(FrontendStatsTracer&& other)
 {
   Reporter = other.Reporter;
   SavedTime = other.SavedTime;
@@ -293,8 +303,7 @@ UnifiedStatsReporter::FrontendStatsTracer::operator=(
   return *this;
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
-    FrontendStatsTracer&& other)
+FrontendStatsTracer::FrontendStatsTracer(FrontendStatsTracer&& other)
   : Reporter(other.Reporter),
     SavedTime(other.SavedTime),
     EventName(other.EventName),
@@ -304,7 +313,7 @@ UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
   other.Reporter = nullptr;
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::~FrontendStatsTracer()
+FrontendStatsTracer::~FrontendStatsTracer()
 {
   if (Reporter)
     Reporter->saveAnyFrontendStatsEvents(*this, false);
