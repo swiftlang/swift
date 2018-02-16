@@ -365,6 +365,7 @@ extension Substring : CustomReflectable {
 
 extension Substring : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
