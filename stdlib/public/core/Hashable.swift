@@ -112,21 +112,38 @@ public protocol Hashable : Equatable {
   func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
 }
 
-@_versioned
-@_inlineable
-@inline(__always)
-internal func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = _Hasher(_inlineable: ())
-  return withUnsafeMutablePointer(to: &hasher) { p in
-    return _UnsafeHasher(p).appending(value).finalized()
-  }
-}
-
 extension Hashable {
   @_inlineable
   @inline(__always)
   public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return hasher.appending(self.hashValue)
+  }
+}
+
+@_versioned
+@inline(__always)
+internal func _hashValue<H: Hashable>(for value: H) -> Int {
+  var value = value
+  return withUnsafePointer(to: &value) { _hashValue(for: $0) }
+}
+
+@_versioned
+@inline(never)
+internal func _hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
+  var hasher = _Hasher()
+  return withUnsafeMutablePointer(to: &hasher) { p in
+    return pointer.pointee._hash(into: _UnsafeHasher(p))._finalized()
+  }
+}
+
+@_versioned
+@inline(never)
+internal func _hashValue(
+  with hash: (_UnsafeHasher) -> _UnsafeHasher
+) -> Int {
+  var hasher = _Hasher()
+  return withUnsafeMutablePointer(to: &hasher) { p in
+    return hash(_UnsafeHasher(p))._finalized()
   }
 }
 
@@ -155,12 +172,17 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
 @_fixed_layout
 public struct _UnsafeHasher {
   @_versioned
-  internal let _state: UnsafeMutablePointer<_Hasher>
+  internal let _rawState: UnsafeMutableRawPointer
 
-  @_inlineable
+  internal var _state: UnsafeMutablePointer<_Hasher> {
+    @inline(__always)
+    get { return _rawState.assumingMemoryBound(to: _Hasher.self) }
+  }
+
+  @inline(__always)
   @_versioned
   internal init(_ state: UnsafeMutablePointer<_Hasher>) {
-    self._state = state
+    self._rawState = UnsafeMutableRawPointer(state)
   }
 
   @effects(readonly)
@@ -175,50 +197,39 @@ public struct _UnsafeHasher {
     // to assume it may mutate the hashable we're visiting. We know that won't
     // be the case (the stdlib owns the hash function), but the only way to tell
     // this to the compiler is to pretend the state update is pure.
-    _state.pointee._append_alwaysInline(value)
+    _state.pointee._append(value)
     return self
   }
 
   @_inlineable
-  @_transparent
+  @inline(__always)
   public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
     return value._hash(into: self)
   }
 
-  @effects(readonly) // See comment on appending(_:) above
-  @inline(never)
-  @_versioned
-  internal func finalized() -> Int {
-    return _state.pointee._finalize_alwaysInline()
+  @inline(__always)
+  internal func _appending(_ value: Int) -> _UnsafeHasher {
+    _state.pointee._append(value)
+    return self
+  }
+
+  @inline(__always)
+  internal func _finalized() -> Int {
+    return _state.pointee._finalize()
   }
 }
 
 // FIXME: This is purely for benchmarking; to be removed.
-@_fixed_layout
-public struct _QuickHasher {
-  @_versioned
+internal struct _QuickHasher {
   internal var _hash: Int
 
-  @inline(never)
-  public init() {
-    _hash = 0
-  }
-
-  @_inlineable
-  @_versioned
-  internal init(_inlineable: Void) {
-    _hash = 0
-  }
-
-  @inline(never)
-  public mutating func append(_ value: Int) {
-    _append_alwaysInline(value)
-  }
-
-  @_inlineable
-  @_versioned
   @inline(__always)
-  internal mutating func _append_alwaysInline(_ value: Int) {
+  internal init() {
+    _hash = 0
+  }
+
+  @inline(__always)
+  internal mutating func _append(_ value: Int) {
     if _hash == 0 {
       _hash = value
       return
@@ -226,17 +237,10 @@ public struct _QuickHasher {
     _hash = _combineHashValues(_hash, value)
   }
 
-  @inline(never)
-  public mutating func finalize() -> Int {
-    return _finalize_alwaysInline()
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
   @inline(__always)
-  internal mutating func _finalize_alwaysInline() -> Int {
+  internal mutating func _finalize() -> Int {
     return _mixInt(_hash)
   }
 }
 
-public typealias _Hasher = _QuickHasher
+internal typealias _Hasher = _QuickHasher
