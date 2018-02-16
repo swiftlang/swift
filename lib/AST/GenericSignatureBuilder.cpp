@@ -107,8 +107,6 @@ STATISTIC(NumDelayedRequirementUnresolved,
           "Delayed requirements left unresolved");
 STATISTIC(NumConditionalRequirementsAdded,
           "# of conditional requirements added");
-STATISTIC(NumComponentsCollapsedViaRewriting,
-          "# of same-type components collapsed via term rewriting");
 
 namespace  {
 
