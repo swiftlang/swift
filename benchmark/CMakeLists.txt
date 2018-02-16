@@ -122,6 +122,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
+    single-source/RemoveWhere
     single-source/ReversedCollections
     single-source/RomanNumbers
     single-source/SequenceAlgos
