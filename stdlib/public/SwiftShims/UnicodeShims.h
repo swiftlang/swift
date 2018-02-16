@@ -294,7 +294,15 @@ typedef enum __swift_stdlib_UBreakIteratorType {
 } __swift_stdlib_UBreakIteratorType;
 
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
+#if defined(__APPLE__)
 typedef __swift_uint16_t __swift_stdlib_UChar;
+#else
+#if defined(__cplusplus)
+typedef char16_t __swift_stdlib_UChar;
+#else
+typedef __swift_uint16_t __swift_stdlib_UChar;
+#endif
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_ubrk_close(__swift_stdlib_UBreakIterator *bi);
