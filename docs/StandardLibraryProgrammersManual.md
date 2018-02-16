@@ -12,7 +12,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 1. Library Organization
     1. What files are where
         1. Brief about CMakeLists
-    1. Brief about GroupInfo.json
+        1. Brief about GroupInfo.json
     1. What tests are where
         1. Furthermore, should there be a split between whitebox tests and blackbox tests?
     1. What benchmarks are where
