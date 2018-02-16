@@ -57,20 +57,25 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     RValue tuple(type);
     for (auto fieldType : tupleTy.getElementTypes())
       tuple.addElement(emitImplicitValueConstructorArg(SGF, loc, fieldType, DC));
-
     return tuple;
-  } else {
-    auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"),
-                                 SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"), Type(),
-                                 DC);
-    VD->setInterfaceType(interfaceType);
-    SILValue arg =
-        SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(type), VD);
-    return RValue(SGF, loc, type, SGF.emitManagedRValueWithCleanup(arg));
   }
+
+  auto &AC = SGF.getASTContext();
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+                               AC.getIdentifier("$implicit_value"),
+                               SourceLoc(),
+                               AC.getIdentifier("$implicit_value"), Type(),
+                               DC);
+  VD->setInterfaceType(interfaceType);
+  SILFunctionArgument *arg =
+      SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(type), VD);
+  ManagedValue mvArg;
+  if (arg->getArgumentConvention().isOwnedConvention()) {
+    mvArg = SGF.emitManagedRValueWithCleanup(arg);
+  } else {
+    mvArg = ManagedValue::forUnmanaged(arg);
+  }
+  return RValue(SGF, loc, type, mvArg);
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
