@@ -47,6 +47,14 @@ struct SupplementaryOutputPaths {
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
+
+  bool empty() const {
+    return ObjCHeaderOutputPath.empty() && ModuleOutputPath.empty() &&
+           ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
+           ReferenceDependenciesFilePath.empty() &&
+           SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
+           TBDPath.empty();
+  }
 };
 } // namespace swift
 

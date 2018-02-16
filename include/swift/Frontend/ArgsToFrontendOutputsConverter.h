@@ -16,8 +16,8 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "swift/Option/Options.h"
 #include "llvm/Option/ArgList.h"
 
