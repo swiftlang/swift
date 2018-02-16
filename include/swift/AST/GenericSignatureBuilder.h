@@ -445,10 +445,10 @@ private:
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
 
-  /// Add a rewrite rule for a same-type constraint between the given
-  /// types.
-  void addSameTypeRewriteRule(PotentialArchetype *type1,
-                              PotentialArchetype *type2);
+  /// Add a rewrite rule that makes \c otherPA a part of the given equivalence
+  /// class.
+  void addSameTypeRewriteRule(EquivalenceClass *equivClass,
+                              PotentialArchetype *otherPA);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
