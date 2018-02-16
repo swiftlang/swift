@@ -81,9 +81,9 @@ public final class _ExecutionContext {
 
   /// The set of all loaded programs indexed by their unique address.
   /// Used when _RuntimeConfig.usesTFEagerAPI is true.
-  private var loadedProgramsTFE: Set<UnsafeRawPointer> = []
+  private var loadedTFEPrograms: Set<UnsafeRawPointer> = []
   /// Used when _RuntimeConfig.usesTFEagerAPI is false.
-  private var loadedProgramsTF = [UnsafeRawPointer : CTFGraph]()
+  private var loadedTFPrograms: [UnsafeRawPointer : CTFGraph] = [:]
 
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
@@ -148,7 +148,7 @@ public final class _ExecutionContext {
   deinit {
     debugLog("De-initializing global context.")
 
-    for (_, graph) in loadedProgramsTF {
+    for (_, graph) in loadedTFPrograms {
       TF_DeleteGraph(graph)
     }
     TFE_DeleteContext(cContext, status)
@@ -220,7 +220,7 @@ fileprivate extension _ExecutionContext {
       debugLog("Loading a program.")
 
       // If the program is already loaded, do nothing.
-      if loadedProgramsTFE.contains(address) {
+      if loadedTFEPrograms.contains(address) {
         return
       }
 
@@ -257,7 +257,7 @@ fileprivate extension _ExecutionContext {
       }
 
       // Memorize the loaded program by address.
-      loadedProgramsTFE.insert(address)
+      loadedTFEPrograms.insert(address)
       debugLog("Done loading a new program.")
     }
   }
@@ -268,7 +268,7 @@ fileprivate extension _ExecutionContext {
   /// - Parameters:
   ///   - address: The address of the serialized program in memory.
   ///   - count: The size of the program in bytes.
-  func getGraph(_ address: UnsafeRawPointer, count: Int) -> CTFGraph {
+  func loadGraphInBytes(_ address: UnsafeRawPointer, count: Int) -> CTFGraph {
     // Intentionally duplicate some code with the above version, as the above
     // one is expected to go away soon (due to challenges in XLA support).
     debugLog("Loading a program.")
@@ -276,7 +276,7 @@ fileprivate extension _ExecutionContext {
     // If the program is already loaded, do nothing.
     var graph: CTFGraph?
     sync { [unowned self] in
-      graph = self.loadedProgramsTF[address]
+      graph = self.loadedTFPrograms[address]
     }
     if graph != nil {
       debugLog("Already loaded before.")
@@ -297,7 +297,7 @@ fileprivate extension _ExecutionContext {
 
     // Memorize the loaded program by address.
     sync {
-      loadedProgramsTF[address] = graph
+      loadedTFPrograms[address] = graph
     }
     debugLog("Done loading a new program.")
     return graph!
@@ -373,12 +373,12 @@ public final class _TensorComputation {
     /// The graph that contains the function to execute. Not owned.
     let graph: CTFGraph
     /// The input tensors.
-    var inputTensors = [CTensor?]()
+    var inputTensors: [CTensor?] = []
 
     init(_ programByteAddress: UnsafeRawPointer,
       programByteCount: Int) {
       // Make sure the program is loaded to the context.
-      graph = _ExecutionContext.global.getGraph(programByteAddress,
+      graph = _ExecutionContext.global.loadGraphInBytes(programByteAddress,
         count: programByteCount)
       let opts = TF_NewSessionOptions()
       cSession = TF_NewSession(graph, opts, status)
@@ -408,7 +408,7 @@ public final class _TensorComputation {
         TF_OperationNumOutputs(funcNode) == returnValues.count)
 
       // Prepare input related parameters for TF_SessionRun().
-      var inputNodeSpecs = [TF_Output]()
+      var inputNodeSpecs: [TF_Output] = []
       for i in 0..<inputTensors.count {
         let inputNodeName = String("tfc_input_\(i)_\(entryFuncName)")
         let inputNode = TF_GraphOperationByName(graph, inputNodeName)
@@ -418,7 +418,7 @@ public final class _TensorComputation {
       }
 
       // Prepare output related parameters for TF_SessionRun().
-      var outputNodeSpecs = [TF_Output]()
+      var outputNodeSpecs: [TF_Output] = []
       for i in 0..<returnValues.count {
         outputNodeSpecs.append(TF_Output(oper: funcNode, index: Int32(i)))
       }
