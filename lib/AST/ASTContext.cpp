@@ -201,6 +201,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
   
+  /// func _hashValue<H: Hashable>(for: H) -> Int
+  FuncDecl *HashValueForDecl = nullptr;
+
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -1070,6 +1073,34 @@ FuncDecl *ASTContext::getMixIntDecl() const {
   auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
   Impl.MixIntDecl = decl;
   return decl;
+}
+
+FuncDecl *ASTContext::getHashValueForDecl() const {
+  if (Impl.HashValueForDecl)
+    return Impl.HashValueForDecl;
+
+  auto resolver = getLazyResolver();
+  auto hasherType = getUnsafeHasherDecl()->getDeclaredType();
+
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("_hashValue", results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    auto paramLists = fd->getParameterLists();
+    if (paramLists.size() != 1 || paramLists[0]->size() != 1)
+      continue;
+    auto paramDecl = paramLists[0]->get(0);
+    if (paramDecl->getArgumentName() != Id_for)
+      continue;
+    auto genericParams = fd->getGenericParams();
+    if (!genericParams || genericParams->size() != 1)
+      continue;
+    Impl.HashValueForDecl = fd;
+    return fd;
+  }
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {
