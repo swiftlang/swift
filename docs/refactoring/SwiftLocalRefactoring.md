@@ -162,7 +162,7 @@ Though a little more complex than its counterpart in the aforementioned String
 Localization refactoring, this implementation is self-explaining too. Lines 3
 to 4 check the kind of the given range, which has to be a single expression
 to proceed with the extraction. Lines 5 to 7 ensure the extracted expression has
-a well-formed type. Further conditions that need to be checked are ommitted in
+a well-formed type. Further conditions that need to be checked are omitted in
 the example for now. Interested readers can refer to [Refactoring.cpp] for
 more details. For the code change part, we can use the same [RangeInfo] instance
 to emit textual edits:
