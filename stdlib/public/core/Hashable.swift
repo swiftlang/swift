@@ -135,17 +135,6 @@ internal func _hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
   }
 }
 
-@_versioned
-@inline(never)
-internal func _hashValue(
-  with hash: (_UnsafeHasher) -> _UnsafeHasher
-) -> Int {
-  var hasher = _Hasher()
-  return withUnsafeMutablePointer(to: &hasher) { p in
-    return hash(_UnsafeHasher(p))._finalized()
-  }
-}
-
 // Called by the SwiftValue implementation.
 @_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
 internal func Hashable_isEqual_indirect<T : Hashable>(
