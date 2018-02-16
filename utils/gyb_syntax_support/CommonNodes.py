@@ -32,9 +32,10 @@ COMMON_NODES = [
 
     # code-block -> '{' stmt-list '}'
     Node('CodeBlock', kind='Syntax',
+         traits=['BracedSyntax'],
          children=[
-             Child('OpenBrace', kind='LeftBraceToken'),
+             Child('LeftBrace', kind='LeftBraceToken'),
              Child('Statements', kind='CodeBlockItemList'),
-             Child('CloseBrace', kind='RightBraceToken'),
+             Child('RightBrace', kind='RightBraceToken'),
          ]),
 ]
