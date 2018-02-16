@@ -1622,10 +1622,16 @@ namespace {
 class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
+  llvm::function_ref<Type(const Expr *)> GetTypeOfExpr;
+  llvm::function_ref<Type(const TypeLoc &)> GetTypeOfTypeLoc;
   unsigned Indent;
 
-  PrintExpr(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
-  }
+  PrintExpr(raw_ostream &os,
+            llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            unsigned indent)
+      : OS(os), GetTypeOfExpr(getTypeOfExpr),
+        GetTypeOfTypeLoc(getTypeOfTypeLoc), Indent(indent) {}
 
   void printRec(Expr *E) {
     Indent += 2;
@@ -1669,7 +1675,7 @@ public:
 
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
-    PrintWithColorRAII(OS, TypeColor) << " type='" << E->getType() << '\'';
+    PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
 
     if (E->hasLValueAccessKind()) {
       PrintWithColorRAII(OS, ExprModifierColor)
@@ -1677,7 +1683,7 @@ public:
     }
 
     // If we have a source range and an ASTContext, print the source range.
-    if (auto Ty = E->getType()) {
+    if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();
       auto L = E->getLoc();
       if (L.isValid()) {
@@ -1719,7 +1725,7 @@ public:
     if (E->isNegative())
       PrintWithColorRAII(OS, LiteralValueColor) << " negative";
     PrintWithColorRAII(OS, LiteralValueColor) << " value=";
-    Type T = E->getType();
+    Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
       PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
     else
@@ -2345,7 +2351,7 @@ public:
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
     OS << "writtenType='";
-    E->getCastTypeLoc().getType().print(OS);
+    GetTypeOfTypeLoc(E->getCastTypeLoc()).print(OS);
     OS << "'\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -2546,12 +2552,23 @@ public:
 
 } // end anonymous namespace
 
+void Expr::dump(
+    raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+    llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc) const {
+  if (auto ty = getTypeOfExpr(this)) {
+    llvm::SaveAndRestore<bool> X(
+        ty->getASTContext().LangOpts.DebugConstraintSolver, true);
+    print(OS, getTypeOfExpr, getTypeOfTypeLoc);
+  } else {
+    print(OS, getTypeOfExpr, getTypeOfTypeLoc);
+  }
+  OS << '\n';
+}
 
 void Expr::dump(raw_ostream &OS) const {
   if (auto ty = getType()) {
     llvm::SaveAndRestore<bool> X(ty->getASTContext().LangOpts.
                                  DebugConstraintSolver, true);
-  
     print(OS);
   } else {
     print(OS);
@@ -2563,8 +2580,26 @@ void Expr::dump() const {
   dump(llvm::errs());
 }
 
+void Expr::dump(
+    llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+    llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc) const {
+  dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
+}
+
+void Expr::print(raw_ostream &OS,
+                 llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+                 llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+                 unsigned Indent) const {
+  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent)
+      .visit(const_cast<Expr *>(this));
+}
+
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
-  PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
+  auto getTypeOfExpr = [](const Expr *E) -> Type { return E->getType(); };
+  auto getTypeOfTypeLoc = [](const TypeLoc &TL) -> Type {
+    return TL.getType();
+  };
+  print(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
