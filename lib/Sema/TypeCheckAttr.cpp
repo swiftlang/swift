@@ -958,7 +958,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Lookup our subscript.
   auto subscriptName =
     DeclName(TC.Context, DeclBaseName::createSubscript(),
-             TC.Context.getIdentifier("dynamicMember"));
+             TC.Context.Id_dynamicMember);
   
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;

@@ -3158,7 +3158,7 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     // access. Emit a more specific diagnostic.
     if (sub->getIndex()->isImplicit() &&
         sub->getArgumentLabels().size() == 1 &&
-        sub->getArgumentLabels().front().str() == "dynamicMember")
+        sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
       diagID = diag::assignment_dynamic_property_has_immutable_base;
   } else {
     diagID = diag::assignment_lhs_is_immutable_variable;

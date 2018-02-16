@@ -2787,7 +2787,6 @@ namespace {
         Expr *nameExpr = new (ctx)
           StringLiteralExpr(selected.choice.getName().getBaseIdentifier().str(),
                             loc, /*implicit*/true);
-        auto nameLabel = ctx.getIdentifier("dynamicMember");
         
         // Figure out the expected type of the string.  We know the
         // openedFullType will be "xType -> indexType -> resultType".  Dig out
@@ -2801,18 +2800,19 @@ namespace {
         
         // Build a tuple so that argument has a label.
         Expr *tuple = TupleExpr::create(cs.getASTContext(), loc, nameExpr,
-                                        nameLabel, loc, nameLoc.getStartLoc(),
+                                        ctx.Id_dynamicMember, loc,
+                                        nameLoc.getStartLoc(),
                                         /*hasTrailingClosure*/false,
                                         /*implicit*/true);
         auto tupleTy = TupleType::get(TupleTypeElt(stringType,
-                                                   nameLabel), ctx);
+                                                   ctx.Id_dynamicMember), ctx);
         (void)cs.TC.typeCheckExpression(tuple, dc,
                                         TypeLoc::withoutLoc(tupleTy),
                                         CTP_CallArgument);
         cs.cacheExprTypes(tuple);
 
         // Build and return a subscript that uses this string as the index.
-        return buildSubscript(base, tuple, nameLabel,
+        return buildSubscript(base, tuple, ctx.Id_dynamicMember,
                               /*trailingClosure*/false,
                               cs.getConstraintLocator(expr),
                               /*isImplicit*/false,

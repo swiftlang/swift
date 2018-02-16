@@ -3303,8 +3303,7 @@ retry_after_fail:
       auto &ctx = getASTContext();
       // Recursively look up the subscript(dynamicMember:)'s in this type.
       auto subscriptName =
-        DeclName(ctx, DeclBaseName::createSubscript(),
-                 ctx.getIdentifier("dynamicMember"));
+        DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
 
       auto subscripts = performMemberLookup(constraintKind,
                                             subscriptName,
