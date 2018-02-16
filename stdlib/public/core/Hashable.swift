@@ -120,9 +120,8 @@ extension Hashable {
   }
 }
 
-@_versioned
 @inline(__always)
-internal func _hashValue<H: Hashable>(for value: H) -> Int {
+public func _hashValue<H: Hashable>(for value: H) -> Int {
   var value = value
   return withUnsafePointer(to: &value) { _hashValue(for: $0) }
 }
