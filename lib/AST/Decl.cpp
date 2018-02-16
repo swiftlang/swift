@@ -5677,6 +5677,10 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const Decl *D = static_cast<const Decl *>(Entity);
     if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
       VD->getFullName().print(OS, false);
+    } else {
+      OS << "<"
+         << Decl::getDescriptiveKindName(D->getDescriptiveKind())
+         << ">";
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
