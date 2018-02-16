@@ -112,6 +112,7 @@ import RecursiveOwnedParameter
 import ReduceInto
 import ReversedCollections
 import RomanNumbers
+import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -257,6 +258,7 @@ registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
+registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
