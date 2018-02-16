@@ -302,7 +302,7 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
                             version::Version const& effectiveLanguageVersion) {
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
-  llvm::WriteBitcodeToFile(Module, HashStream);
+  llvm::WriteBitcodeToFile(*Module, HashStream);
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
@@ -601,7 +601,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   std::string Data;
   llvm::raw_string_ostream OS(Data);
   if (Opts.EmbedMode == IRGenEmbedMode::EmbedBitcode)
-    llvm::WriteBitcodeToFile(M, OS);
+    llvm::WriteBitcodeToFile(*M, OS);
 
   ArrayRef<uint8_t> ModuleData(
       reinterpret_cast<const uint8_t *>(OS.str().data()), OS.str().size());
