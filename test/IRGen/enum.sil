@@ -120,8 +120,6 @@ import Swift
 // --       Case names
 // CHECK-SAME:   [[DYNAMICSINGLETON_FIELD_NAMES]]
 // --       Case type accessor
-// CHECK-SAME:   @get_field_types_DynamicSingleton
-// --       generic argument offset
 // CHECK-SAME:   i32 2,
 // --       generic parameters, requirements, key, extra
 // CHECK-SAME:   i32 1, i32 0, i32 1, i32 0

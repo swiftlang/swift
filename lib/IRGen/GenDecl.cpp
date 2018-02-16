@@ -1151,7 +1151,7 @@ void IRGenerator::emitLazyDefinitions() {
   while (!LazyMetadata.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
-         !LazyFieldTypeAccessors.empty() ||
+         !LazyFieldTypes.empty() ||
          !LazyWitnessTables.empty()) {
 
     // Emit any lazy type metadata we require.
@@ -1171,10 +1171,20 @@ void IRGenerator::emitLazyDefinitions() {
         emitLazyTypeContextDescriptor(*IGM.get(), Nominal);
       }
     }
-    while (!LazyFieldTypeAccessors.empty()) {
-      auto accessor = LazyFieldTypeAccessors.pop_back_val();
-      emitFieldTypeAccessor(*accessor.IGM, accessor.type, accessor.fn,
-                            accessor.fieldTypes);
+    while (!LazyFieldTypes.empty()) {
+      auto info = LazyFieldTypes.pop_back_val();
+      auto &IGM = *info.IGM;
+
+      for (auto fieldType : info.fieldTypes) {
+        if (fieldType->isAnyExistentialType())
+          continue;
+
+        // Ensure that all of the foreign metadata is forced, otherwise
+        // there might be a problem when fields are accessed through
+        // reflection.
+        if (IGM.requiresForeignTypeMetadata(fieldType))
+          (void)IGM.getAddrOfForeignTypeMetadataCandidate(fieldType);
+      }
     }
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();

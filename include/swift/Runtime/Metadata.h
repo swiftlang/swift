@@ -1289,16 +1289,6 @@ public:
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const StoredPointer *>(asWords + offset);
   }
-  
-  /// Get a pointer to the field type vector, if present, or null.
-  const FieldType *getFieldTypes() const {
-    assert(isTypeMetadata());
-    auto *getter = getDescription()->GetFieldTypes.get();
-    if (!getter)
-      return nullptr;
-    
-    return getter(this);
-  }
 
   uint32_t getSizeInWords() const {
     assert(isTypeMetadata());
@@ -1570,15 +1560,6 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const StoredPointer *>(asWords + offset);
-  }
-  
-  /// Get a pointer to the field type vector, if present, or null.
-  const FieldType *getFieldTypes() const {
-    auto *getter = getDescription()->GetFieldTypes.get();
-    if (!getter)
-      return nullptr;
-    
-    return getter(this);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -3177,12 +3158,6 @@ public:
   /// length and order is consistent with that of the field offset vector.
   RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
 
-  /// The field type vector accessor. Returns a pointer to an array of
-  /// type metadata references whose order is consistent with that of the
-  /// field offset vector.
-  RelativeDirectPointer<const FieldType *
-    (const TargetMetadata<Runtime> *)> GetFieldTypes;
-
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
@@ -3286,12 +3261,6 @@ public:
   /// The field names. A doubly-null-terminated list of strings, whose
   /// length and order is consistent with that of the field offset vector.
   RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
-  
-  /// The field type vector accessor. Returns a pointer to an array of
-  /// type metadata references whose order is consistent with that of the
-  /// field offset vector.
-  RelativeDirectPointer<const FieldType *
-    (const TargetMetadata<Runtime> *)> GetFieldTypes;
 
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
@@ -3339,13 +3308,6 @@ public:
   /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
   /// tag order, non-empty cases first, followed by empty cases.
   RelativeDirectPointer<const char, /*nullable*/ true> CaseNames;
-
-  /// The field type vector accessor. Returns a pointer to an array of
-  /// type metadata references whose order is consistent with that of the
-  /// CaseNames. Only types for payload cases are provided.
-  RelativeDirectPointer<
-    const FieldType * (const TargetMetadata<Runtime> *)>
-    GetCaseTypes;
 
   uint32_t getNumPayloadCases() const {
     return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;
