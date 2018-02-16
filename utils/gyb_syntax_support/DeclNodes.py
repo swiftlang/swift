@@ -157,7 +157,7 @@ DECL_NODES = [
     #                      generic-where-clause?
     #                     '{' class-members '}'
     # class-name -> identifier
-    Node('ClassDecl', kind='Decl',
+    Node('ClassDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -181,7 +181,7 @@ DECL_NODES = [
     #                         generic-where-clause?
     #                         '{' struct-members '}'
     # struct-name -> identifier
-    Node('StructDecl', kind='Decl',
+    Node('StructDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -198,7 +198,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('ProtocolDecl', kind='Decl',
+    Node('ProtocolDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -219,7 +219,7 @@ DECL_NODES = [
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
-    Node('ExtensionDecl', kind='Decl',
+    Node('ExtensionDecl', kind='Decl', traits=['DeclGroupSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -234,7 +234,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('MemberDeclBlock', kind='Syntax',
+    Node('MemberDeclBlock', kind='Syntax', traits=['BracedSyntax'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='DeclList'),
@@ -464,7 +464,7 @@ DECL_NODES = [
 
     Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
 
-    Node('AccessorBlock', kind="Syntax",
+    Node('AccessorBlock', kind="Syntax", traits=['BracedSyntax'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('AccessorListOrStmtList', kind='Syntax',
