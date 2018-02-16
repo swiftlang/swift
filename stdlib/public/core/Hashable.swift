@@ -128,6 +128,7 @@ public func _hashValue<H: Hashable>(for value: H) -> Int {
 
 @_versioned
 @inline(never)
+@effects(readonly) // FIXME: Unjustified
 internal func _hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
   var hasher = _Hasher()
   return withUnsafeMutablePointer(to: &hasher) { p in
