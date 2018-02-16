@@ -198,7 +198,13 @@ void NameBinder::addImport(
     // If we imported a submodule, import the top-level module as well.
     Identifier topLevelName = ID->getModulePath().front().first;
     topLevelModule = Context.getLoadedModule(topLevelName);
-    assert(topLevelModule && "top-level module missing");
+    if (!topLevelModule) {
+      // Clang can sometimes import top-level modules as if they were
+      // submodules.
+      assert(!M->getFiles().empty() &&
+             isa<ClangModuleUnit>(M->getFiles().front()));
+      topLevelModule = M;
+    }
   }
 
   auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
