@@ -364,6 +364,11 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       if (fnName.endswith(".tf_partition"))
         fnName = fnName.drop_back(strlen(".tf_partition"));
 
+      // $ isn't a valid character in a tensorflow op name, and gets added to
+      // the start of some symbols.  If we see it, drop it.
+      if (fnName.startswith("$"))
+        fnName = fnName.drop_front();
+
       name += "."+fnName.str()+"."+llvm::utostr(lineCol.first);
       name += "."+llvm::utostr(lineCol.second);
     }
