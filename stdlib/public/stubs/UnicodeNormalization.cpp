@@ -248,9 +248,8 @@ void swift::__swift_stdlib_ubrk_close(
   ubrk_close(ptr_cast<UBreakIterator>(bi));
 }
 
-swift::__swift_stdlib_UBreakIterator *
-swift::__swift_stdlib_ubrk_open(swift::__swift_stdlib_UBreakIteratorType type,
-                                const char *locale, const uint16_t *text,
+swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
+    swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
     const __swift_stdlib_UChar *text, int32_t textLength,
     __swift_stdlib_UErrorCode *status) {
   return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
