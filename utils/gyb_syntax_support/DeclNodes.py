@@ -15,7 +15,7 @@ DECL_NODES = [
     #                            typealias-name generic-parameter-clause?
     #                            type-assignment
     # typealias-name -> identifier
-    Node('TypealiasDecl', kind='Decl',
+    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -36,7 +36,7 @@ DECL_NODES = [
     #                                 inheritance-clause? type-assignment?
     #                                 generic-where-clause?
     # associatedtype-name -> identifier
-    Node('AssociatedtypeDecl', kind='Decl',
+    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -157,7 +157,8 @@ DECL_NODES = [
     #                      generic-where-clause?
     #                     '{' class-members '}'
     # class-name -> identifier
-    Node('ClassDecl', kind='Decl', traits=['DeclGroupSyntax'],
+    Node('ClassDecl', kind='Decl',
+         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -181,7 +182,8 @@ DECL_NODES = [
     #                         generic-where-clause?
     #                         '{' struct-members '}'
     # struct-name -> identifier
-    Node('StructDecl', kind='Decl', traits=['DeclGroupSyntax'],
+    Node('StructDecl', kind='Decl',
+         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -198,7 +200,8 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('ProtocolDecl', kind='Decl', traits=['DeclGroupSyntax'],
+    Node('ProtocolDecl', kind='Decl',
+         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -312,7 +315,7 @@ DECL_NODES = [
          element='Syntax',
          element_name='Modifier'),
 
-    Node('FunctionDecl', kind='Decl',
+    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
