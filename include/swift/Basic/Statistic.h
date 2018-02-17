@@ -185,6 +185,7 @@ public:
   /// entity type, and produce a tracer that's either active or inert depending
   /// on whether the provided \p Reporter is null (nullptr means "tracing is
   /// disabled").
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
                       const Decl *D);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,

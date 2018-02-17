@@ -296,6 +296,10 @@ FrontendStatsTracer::FrontendStatsTracer(
 
 FrontendStatsTracer::FrontendStatsTracer() = default;
 
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S)
+    : FrontendStatsTracer(R, S, nullptr, nullptr)
+{}
+
 FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
                                          const Decl *D)
     : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>())
