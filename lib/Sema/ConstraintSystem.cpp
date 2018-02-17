@@ -1579,7 +1579,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup: {
     // Retrieve the type of a reference to the specific declaration choice.
     if (auto baseTy = choice.getBaseType()) {
       assert(!baseTy->hasTypeParameter());
@@ -1704,6 +1705,32 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       increaseScore(SK_Unavailable);
     }
 
+    if (kind == OverloadChoiceKind::DynamicMemberLookup) {
+      // DynamicMemberLookup results are always a (dynamicMember:T1)->T2
+      // subscript.
+      auto refFnType = refType->castTo<FunctionType>();
+
+      // If this is a dynamic member lookup, then the decl we have is for the
+      // subscript(dynamicMember:) member, but the type we need to return is the
+      // result of the subscript.  Dig through it.
+      refType = refFnType->getResult();
+
+      // Before we drop the argument type on the floor, we need to constrain it
+      // to having a literal conformance to ExpressibleByStringLiteral.  This
+      // makes the index default to String if otherwise unconstrained.
+      assert(refFnType->getParams().size() == 1 &&
+             "subscript always has one arg");
+      auto argType = refFnType->getParams()[0].getPlainType();
+      
+      auto protoKind = KnownProtocolKind::ExpressibleByStringLiteral;
+      auto protocol = getTypeChecker().getProtocol(choice.getDecl()->getLoc(),
+                                                   protoKind);
+      if (!protocol)
+        break;
+      addConstraint(ConstraintKind::LiteralConformsTo, argType,
+                    protocol->getDeclaredType(),
+                    locator);
+    }
     break;
   }
 
@@ -1755,6 +1782,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
     // Increase the score so that actual subscripts get preference.
     increaseScore(SK_KeyPathSubscript);
+    break;
   }
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
@@ -1897,13 +1925,16 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return getDecl()->getFullName();
       
-    case OverloadChoiceKind::KeyPathApplication: {
+    case OverloadChoiceKind::KeyPathApplication:
       // TODO: This should probably produce subscript(keyPath:), but we
       // don't currently pre-filter subscript overload sets by argument
       // keywords, so "subscript" is still the name that keypath subscripts
       // are looked up by.
       return DeclBaseName::createSubscript();
-    }
+    
+    case OverloadChoiceKind::DynamicMemberLookup:
+      return DeclName(DynamicNameAndFRK.getPointer());
+      
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
