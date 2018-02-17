@@ -54,13 +54,18 @@ std::string CompilerInvocation::getPCHHash() const {
 }
 
 PrimarySpecificPaths
-CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() {
+CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths
-CompilerInvocation::getPrimarySpecificPathsForPrimary(StringRef filename) {
+PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForPrimary(
+    StringRef filename) const {
   return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
+}
+
+PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForSourceFile(
+    const SourceFile &SF) const {
+  return getPrimarySpecificPathsForPrimary(SF.getFilename());
 }
 
 void CompilerInstance::createSILModule() {
@@ -837,14 +842,19 @@ void CompilerInstance::freeASTContext() {
 void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
 
 PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode() {
+CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode()
+    const {
   return getPrimarySpecificPathsForAtMostOnePrimary();
 }
 PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() {
+CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return Invocation.getPrimarySpecificPathsForAtMostOnePrimary();
 }
 PrimarySpecificPaths
-CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) {
+CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return Invocation.getPrimarySpecificPathsForPrimary(filename);
+}
+PrimarySpecificPaths CompilerInstance::getPrimarySpecificPathsForSourceFile(
+    const SourceFile &SF) const {
+  return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }

@@ -302,8 +302,11 @@ public:
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -583,9 +586,13 @@ private:
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
 public:
-  PrimarySpecificPaths getPrimarySpecificPathsForWholeModuleOptimizationMode();
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef filename);
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary();
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 } // namespace swift

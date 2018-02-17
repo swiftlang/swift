@@ -298,7 +298,7 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool writeSIL(SILModule &SM, const PrimarySpecificPaths PSPs,
+static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      CompilerInstance &Instance,
                      CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
@@ -804,7 +804,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
     auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
     std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForPrimary(PrimaryFile->getFilename());
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
     return PSGIs;
   }
@@ -831,7 +831,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
                                           ModuleOrSourceFile MSF,
-                                          PrimarySpecificPaths PSPs,
+                                          const PrimarySpecificPaths &PSPs,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
@@ -1182,7 +1182,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
                                           ModuleOrSourceFile MSF,
-                                          const PrimarySpecificPaths PSPs,
+                                          const PrimarySpecificPaths &PSPs,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
