@@ -1951,9 +1951,9 @@ struct ComparisonTestCase {
     }
   }
   
-  func testOpaquePath() {
+  func testOpaqueStrings() {
 #if _runtime(_ObjC)
-    let opaqueStrings = strings.map { NSSlowString(string: $0) as String } 
+    let opaqueStrings = strings.map { NSSlowString(string: $0) as String }
     for pair in zip(opaqueStrings, opaqueStrings[1...]) {
       switch comparison {
       case .less:
@@ -1966,18 +1966,35 @@ struct ComparisonTestCase {
     }
 #endif
   }
+  
+  func testOpaqueSubstrings() {
+#if _runtime(_ObjC)
+    for pair in zip(strings, strings[1...]) {
+      let string1 = pair.0.dropLast()
+      let string2 = pair.1
+      let opaqueString = (NSSlowString(string: pair.0) as String).dropLast()
+      
+      guard string1.count > 0 else { return }
+      
+      let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
+      let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
+      
+      expectEqual(opaqueResult, expectedResult)
+    }
+#endif
+  }
 }
 
-let comparisonTestCases = [
+let simpleComparisonTestCases = [
   ComparisonTestCase(["a", "a"], .equal),
-
-  ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
-
   ComparisonTestCase(["abcdefg", "abcdefg"], .equal),
+  ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
 
   ComparisonTestCase(["ábcdefg", "ábcdefgh", "ábcdefghi"], .less),
   ComparisonTestCase(["abcdefg", "abcdefgh", "abcdefghi"], .less),
+]
 
+let complexComparisonTestCases = [
   ComparisonTestCase(["á", "\u{0061}\u{0301}"], .equal),
   ComparisonTestCase(["à", "\u{0061}\u{0301}", "â", "\u{e3}", "a\u{0308}"], .less),
   
@@ -2049,14 +2066,25 @@ let comparisonTestCases = [
   ComparisonTestCase(["ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .equal)
 ]
 
+let comparisonTestCases = simpleComparisonTestCases + complexComparisonTestCases
+
 for test in comparisonTestCases {
   StringTests.test("Comparison.\(test.strings)") {
     test.test()
   }
+
   StringTests.test("Comparison.OpaqueString.\(test.strings)")
     .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
     .code {
-    test.testOpaquePath()
+    test.testOpaqueStrings()
+  }
+}
+
+for test in simpleComparisonTestCases {
+  StringTests.test("Comparison.OpaqueSubstring.\(test.strings)")
+    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+    .code {
+    test.testOpaqueSubstrings()
   }
 }
 
