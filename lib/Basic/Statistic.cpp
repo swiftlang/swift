@@ -221,14 +221,6 @@ UnifiedStatsReporter::getFrontendCounters()
   return *FrontendCounters;
 }
 
-UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers &
-UnifiedStatsReporter::getFrontendRecursiveSharedTimers() {
-  if (!FrontendRecursiveSharedTimers)
-    FrontendRecursiveSharedTimers =
-        make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
-  return *FrontendRecursiveSharedTimers;
-}
-
 void
 UnifiedStatsReporter::noteCurrentProcessExitStatus(int status) {
   assert(!currentProcessExitStatusSet);
@@ -393,15 +385,6 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
-}
-
-UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
-    AlwaysOnFrontendRecursiveSharedTimers()
-    :
-#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) ID(#ID),
-#include "swift/Basic/Statistics.def"
-#undef FRONTEND_RECURSIVE_SHARED_TIMER
-      dummyInstanceVariableToGetConstructorToParse(0) {
 }
 
 UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}

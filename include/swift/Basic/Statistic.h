@@ -78,15 +78,6 @@ public:
 #undef FRONTEND_STATISTIC
   };
 
-  struct AlwaysOnFrontendRecursiveSharedTimers {
-    AlwaysOnFrontendRecursiveSharedTimers();
-#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) RecursiveSharedTimer ID;
-#include "Statistics.def"
-#undef FRONTEND_RECURSIVE_SHARED_TIMER
-
-    int dummyInstanceVariableToGetConstructorToParse;
-  };
-
   // To trace an entity, you have to provide a TraceFormatter for it. This is a
   // separate type since we do not have retroactive conformances in C++, and it
   // is a type that takes void* arguments since we do not have existentials
@@ -133,8 +124,6 @@ private:
   std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
   std::vector<FrontendStatsEvent> FrontendStatsEvents;
   std::unique_ptr<RecursionSafeTimers> RecursiveTimers;
-  std::unique_ptr<AlwaysOnFrontendRecursiveSharedTimers>
-      FrontendRecursiveSharedTimers;
 
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
@@ -160,7 +149,6 @@ public:
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
-  AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   void noteCurrentProcessExitStatus(int);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
 };
