@@ -1472,6 +1472,11 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
   TRC = Root;
 }
 
+void SourceFile::createReferencedNameTracker() {
+  assert(!ReferencedNames && "This file already has a name tracker.");
+  ReferencedNames.emplace(ReferencedNameTracker());
+}
+
 //===----------------------------------------------------------------------===//
 // Miscellaneous
 //===----------------------------------------------------------------------===//
