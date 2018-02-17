@@ -107,8 +107,6 @@ STATISTIC(NumDelayedRequirementUnresolved,
           "Delayed requirements left unresolved");
 STATISTIC(NumConditionalRequirementsAdded,
           "# of conditional requirements added");
-STATISTIC(NumComponentsCollapsedViaRewriting,
-          "# of same-type components collapsed via term rewriting");
 
 namespace  {
 
@@ -412,10 +410,6 @@ namespace {
     BaseIterator base;
     BaseIterator baseEnd;
 
-    void advance() {
-      ++base;
-    }
-
   public:
     using difference_type = ptrdiff_t;
     using value_type = EquivalenceClassVizNode;
@@ -426,7 +420,6 @@ namespace {
     EquivalenceClassVizIterator(EquivalenceClassVizNode node,
                                 BaseIterator base, BaseIterator baseEnd)
         : node(node), base(base), baseEnd(baseEnd) {
-      advance();
     }
 
     BaseIterator &getBase() { return base; }
@@ -438,7 +431,6 @@ namespace {
 
     EquivalenceClassVizIterator& operator++() {
       ++getBase();
-      advance();
       return *this;
     }
 
@@ -2157,19 +2149,42 @@ Type EquivalenceClass::getAnchor(
   }
 
   // Form the anchor.
+  bool updatedAnchor = false;
   for (auto member : members) {
     auto anchorType =
       builder.getCanonicalTypeParameter(member->getDependentType(genericParams));
     if (!anchorType) continue;
 
+#ifndef NDEBUG
+    // Check that we get consistent results from all of the anchors.
+    if (updatedAnchor) {
+      assert(anchorType->isEqual(archetypeAnchorCache.anchor) &&
+             "Inconsistent anchor computation");
+      continue;
+    }
+#endif
+
     // Record the cache miss and update the cache.
     ++NumArchetypeAnchorCacheMisses;
     archetypeAnchorCache.anchor = anchorType;
     archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
-    return substAnchor();
+    updatedAnchor = true;
+
+#if NDEBUG
+    break;
+#endif
   }
 
-  llvm_unreachable("Unable to compute anchor");
+  // FIXME: Once we are no longer constructing potential archetypes with
+  // concrete nested types, we can turn this into assert(updatedAnchor);
+  if (!updatedAnchor) {
+    ++NumArchetypeAnchorCacheMisses;
+    archetypeAnchorCache.anchor =
+      builder.getCanonicalTypeParameter(members.front()->getDependentType({ }));
+    archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
+  }
+
+  return substAnchor();
 }
 
 Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
@@ -3299,17 +3314,19 @@ RewriteTreeNode::bestMatch(GenericParamKey base, RelativeRewritePath path,
                         [&](unsigned length, RewritePath path) {
     // Determine how much of the original path will be replaced by the rewrite.
     unsigned adjustedLength = length;
+    bool changesBase = false;
     if (auto newBase = path.getBase()) {
       adjustedLength += prefixLength;
 
       // If the base is unchanged, make sure we're reducing the length.
-      if (*newBase == base && adjustedLength <= path.getPath().size())
+      changesBase = *newBase != base;
+      if (!changesBase && adjustedLength <= path.getPath().size())
         return;
     }
 
-    if (adjustedLength == 0) return;
+    if (adjustedLength == 0 && !changesBase) return;
 
-    if (adjustedLength > bestAdjustedLength ||
+    if (adjustedLength > bestAdjustedLength || !best ||
         (adjustedLength == bestAdjustedLength &&
          path.compare(best->second) < 0)) {
       best = { length, path };
@@ -3407,39 +3424,29 @@ GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
   return root;
 }
 
-void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *pa1,
-                                                     PotentialArchetype *pa2){
-  auto pathOpt1 = RewritePath::createPath(pa1);
-  if (!pathOpt1) return;
+void GenericSignatureBuilder::addSameTypeRewriteRule(
+                                                EquivalenceClass *equivClass,
+                                                PotentialArchetype *otherPA){
+  // Simplify both sides in the hope of uncovering a common path.
+  Type simplifiedType1 = equivClass->getAnchor(*this, { });
+  if (!simplifiedType1) return;
 
-  auto pathOpt2 = RewritePath::createPath(pa2);
-  if (!pathOpt2) return;
-
-  auto path1 = std::move(pathOpt1).getValue();
-  auto path2 = std::move(pathOpt2).getValue();
-
-  // Look for a common path.
-  auto prefix = path1.commonPath(path2);
-
-  // If we didn't find a common path, try harder.
-  Type simplifiedType1;
   Type simplifiedType2;
-  if (!prefix) {
-    // Simplify both sides in the hope of uncovering a common path.
-    simplifiedType1 = getCanonicalTypeParameter(pa1->getDependentType({ }));
-    simplifiedType2 = getCanonicalTypeParameter(pa2->getDependentType({ }));
-    if (simplifiedType1->isEqual(simplifiedType2)) return;
+  if (auto otherEquivClass = otherPA->getEquivalenceClassIfPresent())
+    simplifiedType2 = otherEquivClass->getAnchor(*this, { });
+  else
+    simplifiedType2 = getCanonicalTypeParameter(otherPA->getDependentType({ }));
+  if (!simplifiedType2) return;
 
-    // Create new paths from the simplified types.
-    path1 = *RewritePath::createPath(simplifiedType1);
-    path2 = *RewritePath::createPath(simplifiedType2);
+  // We already effectively have this rewrite rule.
+  if (simplifiedType1->isEqual(simplifiedType2)) return;
 
-    // Find a common path.
-    prefix = path1.commonPath(path2);
-  }
+  auto path1 = *RewritePath::createPath(simplifiedType1);
+  auto path2 = *RewritePath::createPath(simplifiedType2);
 
-  // When we have a common prefix, form a rewrite rule using relative paths.
-  if (prefix) {
+  // Look for a common prefix. When we have one, form a rewrite rule using
+  // relative paths.
+  if (auto prefix = path1.commonPath(path2)) {
     // Find the better relative rewrite path.
     RelativeRewritePath relPath1
       = path1.getPath().slice(prefix->getPath().size());
@@ -3475,11 +3482,11 @@ void GenericSignatureBuilder::addSameTypeRewriteRule(PotentialArchetype *pa1,
   Type firstBase =
     GenericTypeParamType::get(path1.getBase()->Depth, path1.getBase()->Index,
                               getASTContext());
-  auto equivClass =
+  auto baseEquivClass =
     resolveEquivalenceClass(firstBase, ArchetypeResolutionKind::WellFormed);
-  assert(equivClass && "Base cannot be resolved?");
+  assert(baseEquivClass && "Base cannot be resolved?");
 
-  auto root = Impl->getOrCreateRewriteTreeRoot(equivClass);
+  auto root = Impl->getOrCreateRewriteTreeRoot(baseEquivClass);
   root->addRewriteRule(path1.getPath(), path2);
 }
 
@@ -3842,6 +3849,7 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   GenericParamKey Key(GenericParam);
   auto params = getGenericParams();
+  (void)params;
   assert(params.empty() ||
          ((Key.Depth == params.back()->getDepth() &&
            Key.Index == params.back()->getIndex() + 1) ||
@@ -4544,9 +4552,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT2,
        const RequirementSource *Source) 
 {
-  // Add a rewrite rule based on the given same-type constraint.
-  addSameTypeRewriteRule(OrigT1, OrigT2);
-
   // Record the same-type constraint, and bail out if it was already known.
   if (!OrigT1->getOrCreateEquivalenceClass(*this)
         ->recordSameTypeConstraint(OrigT1, OrigT2, Source))
@@ -4566,10 +4571,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     std::swap(OrigT1, OrigT2);
   }
 
-  // Merge the equivalence classes.
+  // Add a rewrite rule to map T2 down to the anchor.
   auto equivClass = T1->getOrCreateEquivalenceClass(*this);
-  equivClass->modified(*this);
+  addSameTypeRewriteRule(equivClass, T2);
 
+  // Merge the equivalence classes.
+  equivClass->modified(*this);
   auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
   for (auto equiv : equivClass2Members)

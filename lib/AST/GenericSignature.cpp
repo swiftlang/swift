@@ -1120,6 +1120,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
     if (source->kind == RequirementSource::Superclass ||
         source->kind == RequirementSource::Concrete) {
       auto conformance = source->getProtocolConformance();
+      (void)conformance;
       assert(conformance.getRequirement() == conformingProto);
       path.path.push_back({source->getAffectedType(), conformingProto});
       return;
