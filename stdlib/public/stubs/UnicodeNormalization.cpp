@@ -288,8 +288,8 @@ swift::__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *err) {
 }
 
 int32_t swift::__swift_stdlib_unorm2_normalize(
-    const __swift_stdlib_UNormalizer2 *norm, const __swift_stdlib_UChar *src,
-    __swift_int32_t len, __swift_stdlib_UChar *dst, __swift_int32_t capacity,
+    const __swift_stdlib_UNormalizer2 *norm, const __swift_uint16_t *src,
+    __swift_int32_t len, __swift_uint16_t *dst, __swift_int32_t capacity,
     __swift_stdlib_UErrorCode *err) {
   return unorm2_normalize(ptr_cast<UNormalizer2>(norm), src, len, dst, capacity,
                           ptr_cast<UErrorCode>(err));
