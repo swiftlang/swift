@@ -16,7 +16,7 @@
 #include "SILGen.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
-#include "SwitchCaseFullExpr.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
