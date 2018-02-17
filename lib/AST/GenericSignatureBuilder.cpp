@@ -137,11 +137,20 @@ public:
   /// When present, it indicates that the entire path will be rebased on
   /// the given base generic parameter. This is required for describing
   /// rewrites on type parameters themselves, e.g., T == U.
+  ///
+  /// When absent, the path is relative to the root of the tree from which
+  /// the search began.
   Optional<GenericParamKey> getBase() const { return base; }
 
   /// Retrieve the sequence of associated type references that describes
   /// the path.
   ArrayRef<AssociatedTypeDecl *> getPath() const { return path; }
+
+  /// Whether this path is completely empty.
+  bool isEmpty() const { return getBase() == None && getPath().empty(); }
+
+  /// whether this describes a valid path.
+  explicit operator bool() const { return !isEmpty(); }
 
   /// Decompose a type into a path.
   ///
@@ -149,14 +158,8 @@ public:
   /// types.
   Optional<RewritePath> static createPath(Type type);
 
-  /// Decompose a potential archetype into a patch.
-  ///
-  /// \returns the path, or None if it contained potential archetypes
-  /// with concrete declarations.
-  Optional<RewritePath> static createPath(PotentialArchetype *pa);
-
-  /// Compute the common path between this path and \c other, if one exists.
-  Optional<RewritePath> commonPath(const RewritePath &other) const;
+  /// Compute the longer common prefix between this path and \c other.
+  RewritePath commonPath(const RewritePath &other) const;
 
   /// Form a canonical, dependent type.
   ///
@@ -262,9 +265,18 @@ public:
   /// \c matchPath that matched and \c rewrite is the path to which it can
   /// be rewritten.
   void enumerateRewritePaths(
-                       RelativeRewritePath matchPath,
-                       llvm::function_ref<void(unsigned, RewritePath)> callback,
-                       unsigned depth = 0) const;
+               RelativeRewritePath matchPath,
+               llvm::function_ref<void(unsigned, RewritePath)> callback) const {
+    return enumerateRewritePathsImpl(matchPath, callback, /*depth=*/0);
+  }
+
+private:
+  void enumerateRewritePathsImpl(
+               RelativeRewritePath matchPath,
+               llvm::function_ref<void(unsigned, RewritePath)> callback,
+               unsigned depth) const;
+
+public:
 
   /// Find the best rewrite rule to match the given path.
   ///
@@ -314,7 +326,8 @@ struct GenericSignatureBuilder::Implementation {
   std::vector<void *> FreeEquivalenceClasses;
 
   /// The roots of the rewrite tree.
-  DenseMap<const EquivalenceClass *, RewriteTreeNode *> RewriteTreeRoots;
+  DenseMap<const EquivalenceClass *, std::unique_ptr<RewriteTreeNode>>
+    RewriteTreeRoots;
 
   /// The generation number, which is incremented whenever we successfully
   /// introduce a new constraint.
@@ -362,9 +375,6 @@ struct GenericSignatureBuilder::Implementation {
 GenericSignatureBuilder::Implementation::~Implementation() {
   for (auto pa : PotentialArchetypes)
     pa->~PotentialArchetype();
-
-  for (const auto &root : RewriteTreeRoots)
-    delete root.second;
 }
 
 EquivalenceClass *
@@ -3093,19 +3103,6 @@ RewritePath::RewritePath(Optional<GenericParamKey> base,
   }
 }
 
-Optional<RewritePath> RewritePath::createPath(PotentialArchetype *pa) {
-  SmallVector<AssociatedTypeDecl *, 4> path;
-  while (auto parent = pa->getParent()) {
-    auto assocType = pa->getResolvedAssociatedType();
-    if (!assocType) return None;
-
-    path.push_back(assocType);
-    pa = parent;
-  }
-
-  return RewritePath(pa->getGenericParamKey(), path, Reverse);
-}
-
 Optional<RewritePath> RewritePath::createPath(Type type) {
   SmallVector<AssociatedTypeDecl *, 4> path;
   while (auto depMemTy = type->getAs<DependentMemberType>()) {
@@ -3122,10 +3119,10 @@ Optional<RewritePath> RewritePath::createPath(Type type) {
   return RewritePath(GenericParamKey(genericParam), path, Reverse);
 }
 
-Optional<RewritePath> RewritePath::commonPath(const RewritePath &other) const {
+RewritePath RewritePath::commonPath(const RewritePath &other) const {
   assert(getBase().hasValue() && other.getBase().hasValue());
 
-  if (*getBase() != *other.getBase()) return None;
+  if (*getBase() != *other.getBase()) return RewritePath();
 
   // Find the longest common prefix.
   RelativeRewritePath path1 = getPath();
@@ -3276,7 +3273,7 @@ void RewriteTreeNode::addRewriteRule(RelativeRewritePath matchPath,
   (*childPos)->addRewriteRule(matchPath.slice(1), replacementPath);
 }
 
-void RewriteTreeNode::enumerateRewritePaths(
+void RewriteTreeNode::enumerateRewritePathsImpl(
                        RelativeRewritePath matchPath,
                        llvm::function_ref<void(unsigned, RewritePath)> callback,
                        unsigned depth) const {
@@ -3289,7 +3286,7 @@ void RewriteTreeNode::enumerateRewritePaths(
   if (childPos != children.end() &&
       (*childPos)->getMatch() == matchPath[depth]) {
     // Try to match the rest of the path.
-    (*childPos)->enumerateRewritePaths(matchPath, callback, depth + 1);
+    (*childPos)->enumerateRewritePathsImpl(matchPath, callback, depth + 1);
   }
 
   // If we have a rewrite rule at this position, invoke it.
@@ -3301,7 +3298,7 @@ void RewriteTreeNode::enumerateRewritePaths(
   // Walk any children with NULL associated types; they might have more matches.
   for (auto otherRewrite : children) {
     if (otherRewrite->getMatch()) break;
-    otherRewrite->enumerateRewritePaths(matchPath, callback, depth);
+    otherRewrite->enumerateRewritePathsImpl(matchPath, callback, depth);
   }
 }
 
@@ -3408,7 +3405,7 @@ RewriteTreeNode *
 GenericSignatureBuilder::Implementation::getRewriteTreeRootIfPresent(
                                           const EquivalenceClass *equivClass) {
   auto known = RewriteTreeRoots.find(equivClass);
-  if (known != RewriteTreeRoots.end()) return known->second;
+  if (known != RewriteTreeRoots.end()) return known->second.get();
 
   return nullptr;
 }
@@ -3417,11 +3414,11 @@ RewriteTreeNode *
 GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
                                           const EquivalenceClass *equivClass) {
   auto known = RewriteTreeRoots.find(equivClass);
-  if (known != RewriteTreeRoots.end()) return known->second;
+  if (known != RewriteTreeRoots.end()) return known->second.get();
 
-  auto root = new RewriteTreeNode(nullptr);
-  RewriteTreeRoots[equivClass] = root;
-  return root;
+  auto &root = RewriteTreeRoots[equivClass];
+  root = std::unique_ptr<RewriteTreeNode>(new RewriteTreeNode(nullptr));
+  return root.get();
 }
 
 void GenericSignatureBuilder::addSameTypeRewriteRule(
@@ -3449,15 +3446,15 @@ void GenericSignatureBuilder::addSameTypeRewriteRule(
   if (auto prefix = path1.commonPath(path2)) {
     // Find the better relative rewrite path.
     RelativeRewritePath relPath1
-      = path1.getPath().slice(prefix->getPath().size());
+      = path1.getPath().slice(prefix.getPath().size());
     RelativeRewritePath relPath2
-      = path2.getPath().slice(prefix->getPath().size());
+      = path2.getPath().slice(prefix.getPath().size());
     // Order the paths so that we go to the more-canonical path.
     if (compareDependentPaths(relPath1, relPath2) < 0)
       std::swap(relPath1, relPath2);
 
     // Find the equivalence class for the prefix.
-    CanType commonType = prefix->formDependentType(getASTContext());
+    CanType commonType = prefix.formDependentType(getASTContext());
     auto equivClass =
       resolveEquivalenceClass(commonType, ArchetypeResolutionKind::WellFormed);
     assert(equivClass && "Prefix cannot be resolved?");
@@ -4606,11 +4603,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
         // Merge the second rewrite tree into the first.
         rewriteRoot2->mergeInto(rewriteRoot1);
         Impl->RewriteTreeRoots.erase(equivClass2);
-        delete rewriteRoot2;
       } else {
         // Take the second rewrite tree and make it the first.
-        Impl->RewriteTreeRoots.erase(equivClass2);
-        (void)Impl->RewriteTreeRoots.insert({equivClass, rewriteRoot2});
+        auto root2Entry = Impl->RewriteTreeRoots.find(equivClass2);
+        auto root2Ptr = std::move(root2Entry->second);
+        Impl->RewriteTreeRoots.erase(root2Entry);
+        (void)Impl->RewriteTreeRoots.insert({equivClass, std::move(root2Ptr)});
       }
     }
   }
