@@ -66,14 +66,14 @@ class UnifiedStatsReporter {
 public:
   struct AlwaysOnDriverCounters
   {
-#define DRIVER_STATISTIC(ID) size_t ID;
+#define DRIVER_STATISTIC(ID) int64_t ID;
 #include "Statistics.def"
 #undef DRIVER_STATISTIC
   };
 
   struct AlwaysOnFrontendCounters
   {
-#define FRONTEND_STATISTIC(NAME, ID) size_t ID;
+#define FRONTEND_STATISTIC(NAME, ID) int64_t ID;
 #include "Statistics.def"
 #undef FRONTEND_STATISTIC
   };
@@ -98,8 +98,8 @@ public:
     bool IsEntry;
     StringRef EventName;
     StringRef CounterName;
-    size_t CounterDelta;
-    size_t CounterValue;
+    int64_t CounterDelta;
+    int64_t CounterValue;
     const void *Entity;
     const TraceFormatter *Formatter;
   };

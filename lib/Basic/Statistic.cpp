@@ -25,6 +25,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
+#include <limits>
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -37,12 +38,15 @@ namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
 
-static size_t
+static int64_t
 getChildrenMaxResidentSetSize() {
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
-  return RU.ru_maxrss;
+  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
+  if (M < 0)
+    M = std::numeric_limits<int64_t>::max();
+  return M;
 #else
   return 0;
 #endif
@@ -377,8 +381,8 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                          \
   do {                                                        \
-    auto total = C.NAME;                                      \
-    auto delta = C.NAME - LastTracedFrontendCounters->NAME;   \
+    int64_t total = C.NAME;                                    \
+    int64_t delta = C.NAME - LastTracedFrontendCounters->NAME; \
     static char const *name = #TY "." #NAME;                  \
     if (delta != 0) {                                         \
       LastTracedFrontendCounters->NAME = C.NAME;              \
@@ -428,8 +432,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     auto &C = getFrontendCounters();
     // Convenience calculation for crude top-level "absolute speed".
     if (C.NumSourceLines != 0 && ElapsedTime.getProcessTime() != 0.0)
-      C.NumSourceLinesPerSecond = (size_t) (((double)C.NumSourceLines) /
-                                            ElapsedTime.getProcessTime());
+      C.NumSourceLinesPerSecond = (int64_t) (((double)C.NumSourceLines) /
+                                             ElapsedTime.getProcessTime());
   }
 
   std::error_code EC;
