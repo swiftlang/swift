@@ -1565,7 +1565,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type openedFullType;
 
   bool isDynamicResult = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-  bool createdDynamicResultDisjunction = false;
+  bool bindConstraintCreated = false;
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -1622,6 +1622,19 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       //
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
+
+      // Deal with values declared as implicitly unwrapped, or
+      // functions with return types that are implicitly unwrapped.
+      if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+        // Build the disjunction to attempt binding both T? and T (or
+        // function returning T? and function returning T).
+        Type ty = createTypeVariable(locator, TVO_CanBindToInOut);
+        buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType,
+                                                       locator);
+        addConstraint(ConstraintKind::Bind, boundType,
+                      OptionalType::get(ty->getRValueType()), locator);
+        bindConstraintCreated = true;
+      }
       refType = OptionalType::get(refType->getRValueType());
     }
     // For a non-subscript declaration found via dynamic lookup, strip
@@ -1696,7 +1709,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         refType = OptionalType::get(refType->getRValueType());
       }
 
-      createdDynamicResultDisjunction = true;
+      bindConstraintCreated = true;
     }
 
     // If the declaration is unavailable, note that in the score.
@@ -1785,8 +1798,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
-  // We created appropriate disjunctions for dynamic result above.
-  if (!createdDynamicResultDisjunction) {
+  // In some cases we already created the appropriate bind constraints.
+  if (!bindConstraintCreated) {
     if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).

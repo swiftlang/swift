@@ -1065,7 +1065,8 @@ namespace {
         // We also need to handle the implicitly unwrap of the result
         // of the called function if that's the type checking solution
         // we ended up with.
-        return forceUnwrapIfExpected(ref, member, memberLocator);
+        return forceUnwrapIfExpected(ref, member, memberLocator,
+                                     member->getAttrs().hasAttribute<OptionalAttr>());
       }
 
       // For types and properties, build member references.
@@ -2396,8 +2397,21 @@ namespace {
       return expr;
     }
 
-    Expr *forceUnwrapResult(Expr *expr) {
+    // Add a forced unwrap of an expression which either has type Optional<T>
+    // or is a function that returns an Optional<T>. The latter turns into a
+    // conversion expression that we will hoist above the ApplyExpr
+    // that needs to be forced during the process of rewriting the expression.
+    //
+    // forForcedOptional is used to indicate that we will further need
+    // to hoist this result above an explicit force of an optional that is
+    // in place for something like an @optional protocol member from
+    // Objective C that we might otherwise mistake for the thing we mean to
+    // force here.
+    Expr *forceUnwrapResult(Expr *expr, bool forForcedOptional =false) {
       auto ty = simplifyType(cs.getType(expr));
+
+      if (forForcedOptional)
+        ty = ty->getOptionalObjectType();
 
       if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
         auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
@@ -2422,12 +2436,13 @@ namespace {
     }
 
     Expr *forceUnwrapIfExpected(Expr *expr, Decl *decl,
-                                ConstraintLocatorBuilder locator) {
+                                ConstraintLocatorBuilder locator,
+                                bool forForcedOptional =false) {
       if (!shouldForceUnwrapResult(decl, locator))
         return expr;
 
       // Force the expression if required for the solution.
-      return forceUnwrapResult(expr);
+      return forceUnwrapResult(expr, forForcedOptional);
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -3774,9 +3789,29 @@ namespace {
     }
 
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
+      // Check to see if we are forcing an
+      // ImplicitlyUnwrappedFunctionConversionExpr.  This can happen
+      // in cases where we had a ForceValueExpr of an optional for a
+      // declaration for a function whose result type we need to
+      // implicitly force after applying. We need to hoist the function
+      // conversion above the ForceValueExpr, so that we may ultimately
+      // hoist it above the ApplyExpr where we will eventually rewrite the
+      // function conversion into a force of the result.
+      Expr *replacement = expr;
+      if (auto fnConv =
+          dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(expr->getSubExpr())) {
+        auto fnConvSubExpr = fnConv->getSubExpr();
+        auto fnConvSubObjTy =
+          cs.getType(fnConvSubExpr)->getOptionalObjectType();
+        cs.setType(expr, fnConvSubObjTy);
+        expr->setSubExpr(fnConvSubExpr);
+        fnConv->setSubExpr(expr);
+        replacement = fnConv;
+      }
+
       Type valueType = simplifyType(cs.getType(expr));
       cs.setType(expr, valueType);
-      
+
       // Coerce the object type, if necessary.
       auto subExpr = expr->getSubExpr();
       if (auto objectTy = cs.getType(subExpr)->getOptionalObjectType()) {
@@ -3789,7 +3824,7 @@ namespace {
         }
       }
       
-      return expr;
+      return replacement;
     }
 
     Expr *visitOpenExistentialExpr(OpenExistentialExpr *expr) {
