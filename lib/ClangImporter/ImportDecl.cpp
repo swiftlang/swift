@@ -8343,12 +8343,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  RecursiveSharedTimer::Guard guard;
-  if (auto s = D->getASTContext().Stats) {
-    guard = s->getFrontendRecursiveSharedTimers()
-                .ClangImporter__Implementation__loadAllMembers.getGuard();
-  }
 
+  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
