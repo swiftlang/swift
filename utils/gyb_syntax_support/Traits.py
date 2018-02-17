@@ -21,4 +21,9 @@ TRAITS = [
               Child('LeftBrace', kind='LeftBraceToken'),
               Child('RightBrace', kind='RightBraceToken'),
           ]),
+
+    Trait('IdentifiedDeclSyntax',
+          children=[
+              Child('Identifier', kind='IdentifierToken'),
+          ]),
 ]
