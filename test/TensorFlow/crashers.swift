@@ -144,3 +144,24 @@ public func testEagerLoop() -> Int32 { // expected-note 4 {{value used here}}
   }
   return count.scalar!  // expected-note {{value used here}}
 }
+
+// This crashed sinking a "tensor to scalar" operation in mean out the bottom
+// of the loop.
+@_silgen_name("opaque_generic_function")
+func opaqueGenericFunction<T>(_ a : T)
+
+@inline(never)
+public func sinkTensorToScalarCrash() {
+  var loss = Float.infinity
+  let w1 = Tensor<Float>(shape: [4, 1], repeating: 0.1)
+  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+
+  for _ in 0...10000 {
+    w2 -= w1
+    loss = w2.mean()
+  }
+
+  opaqueGenericFunction(loss)
+}
+
+
