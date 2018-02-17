@@ -31,8 +31,8 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     source = _UnmanagedStringSource(unmanagedString, start: startIndex)
   }
   
-  init(_ guts: _StringGuts, startIndex: Int = 0) {
-    source = _StringGutsSource(guts, start: startIndex)
+  init(_ guts: _StringGuts, _ range: Range<Int>, startIndex: Int = 0) {
+    source = _StringGutsSource(guts, range, start: startIndex)
   }
   
   mutating func compare(with other: _NormalizedCodeUnitIterator) -> _Ordering {
@@ -137,21 +137,23 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
   
   struct _StringGutsSource: _SegmentSource {
     var remaining: Int {
-      return guts.count - index
+      return range.count - index
     }
     var guts: _StringGuts
     var index: Int
+    var range: Range<Int>
     
-    init(_ guts: _StringGuts, start: Int = 0) {
+    init(_ guts: _StringGuts, _ range: Range<Int>, start: Int = 0) {
       self.guts = guts
-      index = start
+      self.range = range
+      index = range.lowerBound + start
     }
     
     mutating func tryFill(buffer: UnsafeMutableBufferPointer<UInt16>) -> Int? {
       var bufferIndex = 0
       let originalIndex = index
       repeat {
-        guard index < guts.count else {
+        guard index < range.count else {
           break
         }
         

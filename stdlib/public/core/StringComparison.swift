@@ -209,11 +209,11 @@ extension _UnmanagedString where CodeUnit : FixedWidthInteger & UnsignedInteger 
 }
 
 extension _UnmanagedOpaqueString {
-  internal func _findDiffIdx(_ other: _StringGuts
+  internal func _findDiffIdx(_ other: _StringGuts, _ otherRange: Range<Int>
   ) -> Int {
-    let count = Swift.min(self.count, other.count)
+    let count = Swift.min(self.count, otherRange.count)
     for idx in 0..<count {
-      guard self[idx] == other[idx] else {
+      guard self[idx] == other[idx + otherRange.lowerBound] else {
         return idx
       }
     }
@@ -552,13 +552,13 @@ extension _UnmanagedOpaqueString {
     let selfCount = selfRange.count
     let otherCount = otherRange.count
     let count = Swift.min(selfCount, otherCount)
-    let idx = self._findDiffIdx(other)
+    let idx = self[selfRange]._findDiffIdx(other, otherRange)
     if idx == count {
       return _lexicographicalCompare(selfCount, otherCount)
     }
 
     let selfCU = self[idx]
-    let otherCU = other[idx]
+    let otherCU = other[idx + otherRange.lowerBound]
 
     //
     // Fast path: if one is ASCII, we can often compare the code units directly.
@@ -587,7 +587,7 @@ extension _UnmanagedOpaqueString {
         }
         
         return self._compareOpaquePathological(
-          other, startingFrom: Swift.max(0, idx-1))
+          other, otherRange, startingFrom: Swift.max(0, idx-1))
       }
       
       if selfIsASCII && selfIsSingleSegmentScalar
@@ -600,19 +600,20 @@ extension _UnmanagedOpaqueString {
     }
 
     return self._compareOpaquePathological(
-      other, startingFrom: Swift.max(0, idx-1)
+      other, otherRange, startingFrom: Swift.max(0, idx-1)
     )
   }
 
   @inline(never)
   func _compareOpaquePathological(
-    _ other: _StringGuts, startingFrom: Int
+    _ other: _StringGuts, _ otherRange: Range<Int>,
+    startingFrom: Int
   ) -> _Ordering {
     // Compare by pulling in a segment at a time, normalizing then comparing
     // individual code units
     var selfIterator = _NormalizedCodeUnitIterator(self, startIndex: startingFrom)
     return selfIterator.compare(with:
-      _NormalizedCodeUnitIterator(other, startIndex: startingFrom)
+      _NormalizedCodeUnitIterator(other, otherRange, startIndex: startingFrom)
     )
   }
 }
