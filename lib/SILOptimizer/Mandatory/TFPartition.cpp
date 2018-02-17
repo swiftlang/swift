@@ -1108,16 +1108,25 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
 /// true if it successfully sinks the computation or if the value is already
 /// below the end point.
 static bool sinkValueAfterEndPoint(SILInstruction *inst,
-                                   SILInstruction *tensorEndPoint,
+                                   SILInstruction *&tensorEndPoint,
                                    DominanceInfo &DI) {
-  // If this instruction already dominated by the end point, then we're good to
-  // go.  Don't move anything.
+  // If this instruction is already dominated by the end point, then we're good
+  // to go.  Don't move anything.
   if (DI.dominates(tensorEndPoint, inst))
     return true;
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate results can all be sunk after the endpoint.
   if (canMoveInstruction(inst)) {
+    // Make sure the end point is dominated by any operands.
+    //
+    // TODO: We could make this more aggressive through various techniques, e.g.
+    // hoisting instructions to dominate the start point (which is known to also
+    // dominate the end points).
+    for (auto &op : inst->getAllOperands())
+      if (!DI.properlyDominates(op.get(), tensorEndPoint))
+        return false;
+
     for (auto result : inst->getResults())
       for (auto use : result->getUses())
         if (!sinkValueAfterEndPoint(use->getUser(), tensorEndPoint, DI))
@@ -1126,12 +1135,11 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
     // If all of the uses are sunk after the end point, then this
     // instruction can be too.
 
-    // We can't insert after a terminator, but they shouldn't be end points
-    // anyway.
-    if (isa<TermInst>(tensorEndPoint)) return false;
-
-    // There is no "moveAfter" helper, so we do it the hard way.
-    inst->moveBefore(&*++SILBasicBlock::iterator(tensorEndPoint));
+    // The tensorEndPoint is the first non-tensor instruction in the program.
+    // Insert our sunk instruction immediately before it, and this instruction
+    // becomes the new end point.
+    inst->moveBefore(tensorEndPoint);
+    tensorEndPoint = inst;
     return true;
   }
 
@@ -3007,6 +3015,7 @@ public:
       auto len = B.createIntegerLiteral(fn->getLocation(),
                               tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
+
       // Strip off the $ from the start of a function name if present.
       // FIXME: Factor this out somewhere common.
       auto fnName = tensorProgram.fn->getName();
