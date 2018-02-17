@@ -17,7 +17,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "SwitchCaseFullExpr.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
