@@ -1236,11 +1236,8 @@ void AssociatedTypeInference::findSolutionsRec(
 
     // If we've seen this solution already, bail out; there's no point in
     // checking further.
-    if (std::find_if(solutions.begin(), solutions.end(), matchesSolution)
-          != solutions.end() ||
-        std::find_if(nonViableSolutions.begin(), nonViableSolutions.end(),
-                     matchesSolution)
-          != nonViableSolutions.end()) {
+    if (llvm::any_of(solutions, matchesSolution) ||
+        llvm::any_of(nonViableSolutions, matchesSolution)) {
       ++NumDuplicateSolutionStates;
       return;
     }
