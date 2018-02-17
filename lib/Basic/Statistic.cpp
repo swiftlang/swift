@@ -14,6 +14,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Timer.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
@@ -126,6 +127,37 @@ auxName(StringRef ModuleName,
           + "-" + cleanName(OptType));
 }
 
+class UnifiedStatsReporter::RecursionSafeTimers {
+
+  struct RecursionSafeTimer {
+    llvm::Optional<SharedTimer> Timer;
+    size_t RecursionDepth;
+  };
+
+  StringMap<RecursionSafeTimer> Timers;
+
+public:
+
+  void BeginTimer(StringRef Name) {
+    RecursionSafeTimer &T = Timers[Name];
+    if (T.RecursionDepth == 0) {
+      T.Timer.emplace(Name);
+    }
+    T.RecursionDepth++;
+  }
+
+  void EndTimer(StringRef Name) {
+    auto I = Timers.find(Name);
+    assert(I != Timers.end());
+    RecursionSafeTimer &T = I->getValue();
+    assert(T.RecursionDepth != 0);
+    T.RecursionDepth--;
+    if (T.RecursionDepth == 0) {
+      T.Timer.reset();
+    }
+  }
+};
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef ModuleName,
                                            StringRef InputName,
@@ -162,7 +194,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
     SourceMgr(SM),
-    ClangSourceMgr(CSM)
+    ClangSourceMgr(CSM),
+    RecursiveTimers(llvm::make_unique<RecursionSafeTimers>())
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -329,6 +362,16 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     FrontendStatsTracer const& T,
     bool IsEntry)
 {
+  // First make a note in the recursion-safe timers; these
+  // are active anytime UnifiedStatsReporter is active.
+  if (IsEntry) {
+    RecursiveTimers->BeginTimer(T.EventName);
+  } else {
+    RecursiveTimers->EndTimer(T.EventName);
+  }
+
+  // If we don't have a saved entry to form deltas against in
+  // the trace buffer, we're not tracing: return early.
   if (!LastTracedFrontendCounters)
     return;
   auto Now = llvm::TimeRecord::getCurrentTime();
