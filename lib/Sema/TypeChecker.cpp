@@ -694,8 +694,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
-  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
   Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
