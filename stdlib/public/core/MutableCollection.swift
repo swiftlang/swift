@@ -193,7 +193,9 @@ extension MutableCollection {
   ) rethrows -> R? {
     return nil
   }
+}
 
+extension MutableCollection where SubSequence == Slice<Self> {
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -228,7 +230,13 @@ extension MutableCollection {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
+}
 
+//===----------------------------------------------------------------------===//
+// swapAt(_:_:), swap(_:_:)
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
   /// Exchanges the values at the specified indices of the collection.
   ///
   /// Both parameters must be valid indices of the collection that are not
