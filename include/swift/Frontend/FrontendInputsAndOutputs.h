@@ -224,13 +224,11 @@ public:
   /// Assumes there is not more than one primary input file, if any.
   /// Otherwise, you would need to call getPrimarySpecificPathsForPrimary
   /// to tell it which primary input you wanted the outputs for.
-  ///
-  /// Must not be constructed on-the-fly because some parts of the compiler
-  /// receive StringRefs to its components, so it must live as long as the
-  /// compiler.
-  PrimarySpecificPaths &getPrimarySpecificPathsForAtMostOnePrimary();
 
-  PrimarySpecificPaths &getPrimarySpecificPathsForPrimary(StringRef filename);
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
