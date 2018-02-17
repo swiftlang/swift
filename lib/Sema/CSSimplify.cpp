@@ -2869,8 +2869,8 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool hasDynamicMemberLookupAttribute(Type ty,
-                       llvm::DenseMap<Type, bool> &IsDynamicMemberLookupCache) {
+static bool hasDynamicMemberLookupAttribute(CanType ty,
+                    llvm::DenseMap<CanType, bool> &IsDynamicMemberLookupCache) {
   auto it = IsDynamicMemberLookupCache.find(ty);
   if (it != IsDynamicMemberLookupCache.end()) return it->second;
   
@@ -2879,7 +2879,8 @@ static bool hasDynamicMemberLookupAttribute(Type ty,
     // have the attribute on them.
     if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
       for (auto p : protocolComp->getMembers())
-        if (hasDynamicMemberLookupAttribute(p, IsDynamicMemberLookupCache))
+        if (hasDynamicMemberLookupAttribute(p->getCanonicalType(),
+                                            IsDynamicMemberLookupCache))
           return true;
       return false;
     }
@@ -2917,7 +2918,13 @@ static bool hasDynamicMemberLookupAttribute(Type ty,
     }
   };
   
-  return IsDynamicMemberLookupCache[ty] = calculate();
+  auto result = calculate();
+  
+  // Cache this if we can.
+  if (!ty->hasTypeVariable())
+    IsDynamicMemberLookupCache[ty] = result;
+  
+  return result;
 }
 
 
@@ -3307,7 +3314,7 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (hasDynamicMemberLookupAttribute(instanceTy,
+    if (hasDynamicMemberLookupAttribute(instanceTy->getCanonicalType(),
                                         IsDynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
       // Recursively look up the subscript(dynamicMember:)'s in this type.
