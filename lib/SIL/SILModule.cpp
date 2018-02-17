@@ -455,11 +455,10 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AllocWithTailElems;
   else {
     // Switch through the rest of builtins.
-    Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(ID, Name, Attrs) \
-      .Case(Name, BuiltinValueKind::ID)
+#define BUILTIN(Id, Name, Attrs) \
+    if (OperationName == Name) { Info.ID = BuiltinValueKind::Id; } else
 #include "swift/AST/Builtins.def"
-      .Default(BuiltinValueKind::None);
+    /* final "else" */ { Info.ID = BuiltinValueKind::None; }
   }
 
   return Info;
