@@ -113,6 +113,12 @@ public:
     const TraceFormatter *Formatter;
   };
 
+  // We only write fine-grained trace entries when the user passed
+  // -trace-stats-events, but we recycle the same FrontendStatsTracers to give
+  // us some free recursion-save phase timings whenever -trace-stats-dir is
+  // active at all. Reduces redundant machinery.
+  class RecursionSafeTimers;
+
 private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
@@ -126,6 +132,7 @@ private:
   std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
   std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
   std::vector<FrontendStatsEvent> FrontendStatsEvents;
+  std::unique_ptr<RecursionSafeTimers> RecursiveTimers;
   std::unique_ptr<AlwaysOnFrontendRecursiveSharedTimers>
       FrontendRecursiveSharedTimers;
 
