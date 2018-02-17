@@ -15,14 +15,22 @@ COMMON_NODES = [
 
     # code-block-item = (decl | stmt | expr) ';'?
     Node('CodeBlockItem', kind='Syntax',
+         description="""
+         A CodeBlockItem is any Syntax node that appears on its own line inside
+         a CodeBlock.
+         """,
          children=[
              Child('Item', kind='Syntax',
+                   description="The underlying node inside the code block.",
                    node_choices=[
                        Child('Decl', kind='Decl'),
                        Child('Stmt', kind='Stmt'),
                        Child('Expr', kind='Expr'),
                    ]),
              Child('Semicolon', kind='SemicolonToken',
+                   description="""
+                   If present, the trailing semicolon at the end of the item.
+                   """,
                    is_optional=True),
          ]),
 
