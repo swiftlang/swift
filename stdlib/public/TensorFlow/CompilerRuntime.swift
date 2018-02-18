@@ -39,6 +39,10 @@ public enum _RuntimeConfig {
   /// When true, uses the TF eager C API. Otherwise uses the TF C API.
   static public var usesTFEagerAPI = false
 
+  /// When true, enables XLA jit compilation for TF graphs. Only defined when
+  /// usesTFEagerAPI == false.
+  static public var usesXLA = false
+
   /// When true, prints various debug messages on the runtime state.
   static public var printsDebugLog = false
 
@@ -98,7 +102,7 @@ public final class _ExecutionContext {
     debugLog("Initializing global context.")
 
     // Initialize the TF runtime exactly once.
-    InitTensorFlowRuntime()
+    InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0)
 
     let opts = TFE_NewContextOptions()
     if _RuntimeConfig.usesTFEagerAPI {
@@ -381,6 +385,9 @@ public final class _TensorComputation {
       graph = _ExecutionContext.global.loadGraphInBytes(programByteAddress,
         count: programByteCount)
       let opts = TF_NewSessionOptions()
+      if _RuntimeConfig.usesXLA {
+        TF_EnableXLACompilation(opts, 1)
+      }
       cSession = TF_NewSession(graph, opts, status)
       checkOk(status)
       TF_DeleteSessionOptions(opts)
