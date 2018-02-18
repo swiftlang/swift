@@ -78,20 +78,6 @@ extension RangeExpression {
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
   }
-
-  @_inlineable
-  public func _relativeAsOffset<C: Collection>(to c: C) -> Range<C.Index> 
-  where Bound == Int {
-    let offsetRange = 0..<c.count
-    let relativeOffsetRange = relative(to: offsetRange)
-    let distance = offsetRange.distance(
-      from: relativeOffsetRange.lowerBound,
-      to: relativeOffsetRange.upperBound
-    )
-    let start = c.index(c.startIndex, offsetBy: relativeOffsetRange.lowerBound)
-    let end = c.index(start, offsetBy: distance)
-    return start..<end
-  } 
 }
 
 /// A half-open interval over a comparable type, from a lower bound up to, but
@@ -714,12 +700,6 @@ extension Collection {
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
   }
-
-  @_inlineable
-  public subscript<R: RangeExpression>(offset offset: R) -> SubSequence
-  where R.Bound == Int {
-    return self[offset._relativeAsOffset(to: self)]
-  }
 }
 extension MutableCollection {
   @_inlineable
@@ -740,17 +720,6 @@ extension MutableCollection {
     }
     set {
       self[startIndex...] = newValue
-    }
-  }
-
-  @_inlineable
-  public subscript<R: RangeExpression>(offset offset: R) -> SubSequence
-  where R.Bound == Int {
-    get {
-      return self[offset._relativeAsOffset(to: self)]
-    }
-    set {
-      self[offset._relativeAsOffset(to: self)] = newValue
     }
   }
 }

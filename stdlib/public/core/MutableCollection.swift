@@ -121,19 +121,6 @@ where SubSequence: MutableCollection
   ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence { get set }
 
-  /// Accesses a contiguous subrange of the collection's elements with an
-  /// offsetting range.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  ///
-  /// - Parameter offset: A range of values that will offset the collections 
-  ///   starting index to form a new range of indices relative to the 
-  ///   collection.
-  subscript(offset offset: Range<Int>) -> SubSequence { get set }
-
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't
   /// match.
