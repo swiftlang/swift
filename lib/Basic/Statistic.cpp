@@ -19,6 +19,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/Driver/DependencyGraph.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -81,6 +82,12 @@ static std::string
 makeTraceFileName(StringRef ProgramName,
                   StringRef AuxName) {
   return makeFileName("trace", ProgramName, AuxName, "csv");
+}
+
+static std::string
+makeProfileDirName(StringRef ProgramName,
+                   StringRef AuxName) {
+  return makeFileName("profile", ProgramName, AuxName, "dir");
 }
 
 // LLVM's statistics-reporting machinery is sensitive to filenames containing
@@ -162,6 +169,134 @@ public:
   }
 };
 
+class StatsProfiler {
+  struct Node {
+    int64_t SelfCount;
+    typedef std::tuple<StringRef,
+                       const void*,
+                       const UnifiedStatsReporter::TraceFormatter*> Key;
+    Node *Parent;
+    DenseMap<Key, std::unique_ptr<Node>> Children;
+
+    Node(Node *P=nullptr) : SelfCount(0), Parent(P)
+    {}
+
+    void print(std::vector<Key> &Context, raw_ostream &OS) const {
+      StringRef delim;
+      if (!(SelfCount == 0 || Context.empty())) {
+        for (auto const &K : Context) {
+          StringRef Name;
+          const void* Entity;
+          const UnifiedStatsReporter::TraceFormatter *Formatter;
+          std::tie(Name, Entity, Formatter) = K;
+          OS << delim << Name;
+          if (Formatter && Entity) {
+            OS << ' ';
+            Formatter->traceName(Entity, OS);
+          }
+          delim = ";";
+        }
+        OS << ' ' << SelfCount << '\n';
+      }
+      for (auto const &I : Children) {
+        Context.push_back(I.getFirst());
+        I.getSecond()->print(Context, OS);
+        Context.pop_back();
+      }
+    }
+
+    Node *getChild(StringRef Name,
+                   const void *Entity,
+                   const UnifiedStatsReporter::TraceFormatter *TF) {
+      Key K(Name, Entity, TF);
+      auto I = Children.find(K);
+      if (I != Children.end()) {
+        return I->getSecond().get();
+      } else {
+        auto N = llvm::make_unique<Node>(this);
+        auto P = N.get();
+        Children.insert(std::make_pair(K, std::move(N)));
+        return P;
+      }
+    }
+  };
+  Node Root;
+  Node *Curr;
+public:
+
+  StatsProfiler()
+    : Curr(&Root)
+  {}
+  StatsProfiler(StatsProfiler const &Other) = delete;
+  StatsProfiler& operator=(const StatsProfiler&) = delete;
+
+  void print(raw_ostream &OS) const {
+    std::vector<Node::Key> Context;
+    Root.print(Context, OS);
+  }
+
+  void printToFile(StringRef Dirname, StringRef Filename) const {
+    SmallString<256> Path(Dirname);
+    llvm::sys::path::append(Path, Filename);
+    std::error_code EC;
+    raw_fd_ostream Stream(Path, EC, fs::F_Append | fs::F_Text);
+    if (EC) {
+      llvm::errs() << "Error opening profile file '"
+                   << Path << "' for writing\n";
+      return;
+    }
+    print(Stream);
+  }
+
+  void profileEvent(StringRef Name,
+                    double DeltaSeconds,
+                    bool IsEntry,
+                    const void *Entity=nullptr,
+                    const UnifiedStatsReporter::TraceFormatter *TF=nullptr) {
+    int64_t DeltaUSec = int64_t(1000000.0 * DeltaSeconds);
+    profileEvent(Name, DeltaUSec, IsEntry, Entity, TF);
+  }
+
+  void profileEvent(StringRef Name,
+                    int64_t Delta,
+                    bool IsEntry,
+                    const void *Entity=nullptr,
+                    const UnifiedStatsReporter::TraceFormatter *TF=nullptr) {
+    assert(Curr);
+    Curr->SelfCount += Delta;
+    if (IsEntry) {
+      Node *Child = Curr->getChild(Name, Entity, TF);
+      assert(Child);
+      assert(Child->Parent == Curr);
+      Curr = Child;
+    } else {
+      Curr = Curr->Parent;
+      assert(Curr);
+    }
+  }
+};
+
+struct UnifiedStatsReporter::StatsProfilers
+{
+  // Timerecord of last update.
+  llvm::TimeRecord LastUpdated;
+
+  // One profiler for each time category.
+  StatsProfiler UserTime;
+  StatsProfiler SystemTime;
+  StatsProfiler ProcessTime;
+  StatsProfiler WallTime;
+
+  // Then one profiler for each frontend statistic.
+#define FRONTEND_STATISTIC(TY, NAME) StatsProfiler NAME;
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+
+  StatsProfilers()
+    : LastUpdated(llvm::TimeRecord::getCurrentTime())
+  {}
+};
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef ModuleName,
                                            StringRef InputName,
@@ -171,7 +306,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
-                                           bool TraceEvents)
+                                           bool TraceEvents,
+                                           bool ProfileEvents,
+                                           bool ProfileEntities)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
@@ -179,7 +316,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                  OutputType,
                                  OptType),
                          Directory,
-                         SM, CSM, TraceEvents)
+                         SM, CSM,
+                         TraceEvents, ProfileEvents, ProfileEntities)
 {
 }
 
@@ -188,11 +326,14 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
-                                           bool TraceEvents)
+                                           bool TraceEvents,
+                                           bool ProfileEvents,
+                                           bool ProfileEntities)
   : currentProcessExitStatusSet(false),
     currentProcessExitStatus(EXIT_FAILURE),
     StatsFilename(Directory),
     TraceFilename(Directory),
+    ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
@@ -203,17 +344,24 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
+  path::append(ProfileDirname, makeProfileDirName(ProgramName, AuxName));
   EnableStatistics(/*PrintOnExit=*/false);
   SharedTimer::enableCompilationTimers();
+  if (TraceEvents || ProfileEvents || ProfileEntities)
+    LastTracedFrontendCounters.emplace();
   if (TraceEvents)
-    LastTracedFrontendCounters = make_unique<AlwaysOnFrontendCounters>();
+    FrontendStatsEvents.emplace();
+  if (ProfileEvents)
+    EventProfilers = make_unique<StatsProfilers>();
+  if (ProfileEntities)
+    EntityProfilers = make_unique<StatsProfilers>();
 }
 
 UnifiedStatsReporter::AlwaysOnDriverCounters &
 UnifiedStatsReporter::getDriverCounters()
 {
   if (!DriverCounters)
-    DriverCounters = make_unique<AlwaysOnDriverCounters>();
+    DriverCounters.emplace();
   return *DriverCounters;
 }
 
@@ -221,7 +369,7 @@ UnifiedStatsReporter::AlwaysOnFrontendCounters &
 UnifiedStatsReporter::getFrontendCounters()
 {
   if (!FrontendCounters)
-    FrontendCounters = make_unique<AlwaysOnFrontendCounters>();
+    FrontendCounters.emplace();
   return *FrontendCounters;
 }
 
@@ -357,6 +505,21 @@ FrontendStatsTracer::~FrontendStatsTracer()
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
 
+static inline void
+saveEvent(StringRef StatName,
+          int64_t Curr, int64_t Last,
+          uint64_t NowUS, uint64_t LiveUS,
+          std::vector<UnifiedStatsReporter::FrontendStatsEvent> &Events,
+          FrontendStatsTracer const& T,
+          bool IsEntry) {
+  int64_t Delta = Curr - Last;
+  if (Delta != 0) {
+    Events.emplace_back(UnifiedStatsReporter::FrontendStatsEvent{
+        NowUS, LiveUS, IsEntry, T.EventName, StatName, Delta, Curr,
+        T.Entity, T.Formatter});
+  }
+}
+
 void
 UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     FrontendStatsTracer const& T,
@@ -370,29 +533,71 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     RecursiveTimers->endTimer(T.EventName);
   }
 
-  // If we don't have a saved entry to form deltas against in
-  // the trace buffer, we're not tracing: return early.
+  // If we don't have a saved entry to form deltas against in the trace buffer
+  // or profilers, we're not tracing or profiling: return early.
   if (!LastTracedFrontendCounters)
     return;
   auto Now = llvm::TimeRecord::getCurrentTime();
-  auto StartUS = uint64_t(1000000.0 * T.SavedTime.getProcessTime());
-  auto NowUS = uint64_t(1000000.0 * Now.getProcessTime());
-  auto LiveUS = IsEntry ? 0 : NowUS - StartUS;
-  auto &C = getFrontendCounters();
-#define FRONTEND_STATISTIC(TY, NAME)                          \
-  do {                                                        \
-    int64_t total = C.NAME;                                    \
-    int64_t delta = C.NAME - LastTracedFrontendCounters->NAME; \
-    static char const *name = #TY "." #NAME;                  \
-    if (delta != 0) {                                         \
-      LastTracedFrontendCounters->NAME = C.NAME;              \
-      FrontendStatsEvents.emplace_back(FrontendStatsEvent {   \
-          NowUS, LiveUS, IsEntry, T.EventName, name,          \
-            delta, total, T.Entity, T.Formatter});            \
-    }                                                         \
-  } while (0);
+  auto &Curr = getFrontendCounters();
+  auto &Last = *LastTracedFrontendCounters;
+  if (EventProfilers) {
+    auto TimeDelta = Now;
+    TimeDelta -= EventProfilers->LastUpdated;
+    EventProfilers->UserTime.profileEvent(T.EventName,
+                                          TimeDelta.getUserTime(),
+                                          IsEntry);
+    EventProfilers->SystemTime.profileEvent(T.EventName,
+                                            TimeDelta.getSystemTime(),
+                                            IsEntry);
+    EventProfilers->ProcessTime.profileEvent(T.EventName,
+                                             TimeDelta.getProcessTime(),
+                                             IsEntry);
+    EventProfilers->WallTime.profileEvent(T.EventName,
+                                          TimeDelta.getWallTime(),
+                                          IsEntry);
+#define FRONTEND_STATISTIC(TY, N)                                       \
+    EventProfilers->N.profileEvent(T.EventName, Curr.N - Last.N, IsEntry);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
+    EventProfilers->LastUpdated = Now;
+  }
+
+  if (EntityProfilers) {
+    auto TimeDelta = Now;
+    TimeDelta -= EntityProfilers->LastUpdated;
+    EntityProfilers->UserTime.profileEvent(T.EventName,
+                                           TimeDelta.getUserTime(),
+                                           IsEntry, T.Entity, T.Formatter);
+    EntityProfilers->SystemTime.profileEvent(T.EventName,
+                                             TimeDelta.getSystemTime(),
+                                             IsEntry, T.Entity, T.Formatter);
+    EntityProfilers->ProcessTime.profileEvent(T.EventName,
+                                              TimeDelta.getProcessTime(),
+                                              IsEntry, T.Entity, T.Formatter);
+    EntityProfilers->WallTime.profileEvent(T.EventName,
+                                           TimeDelta.getWallTime(),
+                                           IsEntry, T.Entity, T.Formatter);
+#define FRONTEND_STATISTIC(TY, N)                                          \
+    EntityProfilers->N.profileEvent(T.EventName, Curr.N - Last.N, IsEntry, \
+                                    T.Entity, T.Formatter);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+    EntityProfilers->LastUpdated = Now;
+  }
+
+  if (FrontendStatsEvents) {
+    auto StartUS = uint64_t(1000000.0 * T.SavedTime.getProcessTime());
+    auto NowUS = uint64_t(1000000.0 * Now.getProcessTime());
+    auto LiveUS = IsEntry ? 0 : NowUS - StartUS;
+    auto &Events = *FrontendStatsEvents;
+#define FRONTEND_STATISTIC(TY, N)                                       \
+    saveEvent(#TY "." #N, Curr.N, Last.N, NowUS, LiveUS, Events, T, IsEntry);
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+  }
+
+  // Save all counters (changed or otherwise).
+  Last = Curr;
 }
 
 UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}
@@ -464,7 +669,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   printAlwaysOnStatsAndTimers(ostream);
 #endif
 
-  if (LastTracedFrontendCounters && SourceMgr) {
+  if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
     if (EC) {
@@ -474,7 +679,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
     tstream << "Time,Live,IsEntry,EventName,CounterName,"
             << "CounterDelta,CounterValue,EntityName,EntityRange\n";
-    for (auto const &E : FrontendStatsEvents) {
+    for (auto const &E : *FrontendStatsEvents) {
       tstream << E.TimeUSec << ','
               << E.LiveUSec << ','
               << (E.IsEntry ? "\"entry\"," : "\"exit\",")
@@ -490,6 +695,39 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
       if (E.Formatter)
         E.Formatter->traceLoc(E.Entity, SourceMgr, ClangSourceMgr, tstream);
       tstream << '"' << '\n';
+    }
+  }
+
+  if (EventProfilers || EntityProfilers) {
+    std::error_code EC = llvm::sys::fs::create_directories(ProfileDirname);
+    if (EC) {
+      llvm::errs() << "Failed to create directory '" << ProfileDirname << "': "
+                   << EC.message() << "\n";
+      return;
+    }
+    if (EventProfilers) {
+      auto D = ProfileDirname;
+      EventProfilers->UserTime.printToFile(D, "Time.User.events");
+      EventProfilers->SystemTime.printToFile(D, "Time.System.events");
+      EventProfilers->ProcessTime.printToFile(D, "Time.Process.events");
+      EventProfilers->WallTime.printToFile(D, "Time.Wall.events");
+#define FRONTEND_STATISTIC(TY, NAME)                                    \
+      EventProfilers->NAME.printToFile(ProfileDirname,                  \
+                                       #TY "." #NAME ".events");
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+    }
+    if (EntityProfilers) {
+      auto D = ProfileDirname;
+      EntityProfilers->UserTime.printToFile(D, "Time.User.entities");
+      EntityProfilers->SystemTime.printToFile(D, "Time.System.entities");
+      EntityProfilers->ProcessTime.printToFile(D, "Time.Process.entities");
+      EntityProfilers->WallTime.printToFile(D, "Time.Wall.entities");
+#define FRONTEND_STATISTIC(TY, NAME)                                    \
+      EntityProfilers->NAME.printToFile(ProfileDirname,                 \
+                                       #TY "." #NAME ".entities");
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
     }
   }
 }

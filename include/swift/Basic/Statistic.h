@@ -15,8 +15,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
-#include "swift/AST/Identifier.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Timer.h"
 
 #define SWIFT_FUNC_STAT                                                 \
@@ -60,6 +59,7 @@ class ProtocolConformance;
 class Expr;
 class SILFunction;
 class FrontendStatsTracer;
+class SourceManager;
 
 class UnifiedStatsReporter {
 
@@ -110,30 +110,48 @@ public:
   // active at all. Reduces redundant machinery.
   class RecursionSafeTimers;
 
+  // We also keep a few banks of optional hierarchical profilers for times and
+  // statistics, activated with -profile-stats-events and
+  // -profile-stats-entities, which are part way between the detail level of the
+  // aggregate statistic JSON files and the fine-grained CSV traces. Naturally
+  // these are written in yet a different file format: the input format for
+  // flamegraphs.
+  struct StatsProfilers;
+
 private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
   SmallString<128> StatsFilename;
   SmallString<128> TraceFilename;
+  SmallString<128> ProfileDirname;
   llvm::TimeRecord StartedTime;
+
+  // This is unique_ptr because NamedRegionTimer is non-copy-constructable.
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
+
   SourceManager *SourceMgr;
   clang::SourceManager *ClangSourceMgr;
-  std::unique_ptr<AlwaysOnDriverCounters> DriverCounters;
-  std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
-  std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
-  std::vector<FrontendStatsEvent> FrontendStatsEvents;
+  Optional<AlwaysOnDriverCounters> DriverCounters;
+  Optional<AlwaysOnFrontendCounters> FrontendCounters;
+  Optional<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
+  Optional<std::vector<FrontendStatsEvent>> FrontendStatsEvents;
+
+  // These are unique_ptr so we can use incomplete types here.
   std::unique_ptr<RecursionSafeTimers> RecursiveTimers;
+  std::unique_ptr<StatsProfilers> EventProfilers;
+  std::unique_ptr<StatsProfilers> EntityProfilers;
 
   void publishAlwaysOnStatsToLLVM();
-  void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
+  void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef AuxName,
                        StringRef Directory,
                        SourceManager *SM,
                        clang::SourceManager *CSM,
-                       bool TraceEvents);
+                       bool TraceEvents,
+                       bool ProfileEvents,
+                       bool ProfileEntities);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -144,7 +162,9 @@ public:
                        StringRef Directory,
                        SourceManager *SM=nullptr,
                        clang::SourceManager *CSM=nullptr,
-                       bool TraceEvents=false);
+                       bool TraceEvents=false,
+                       bool ProfileEvents=false,
+                       bool ProfileEntities=false);
   ~UnifiedStatsReporter();
 
   AlwaysOnDriverCounters &getDriverCounters();

@@ -202,6 +202,12 @@ def stats_output_dir: Separate<["-"], "stats-output-dir">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def profile_stats_events: Flag<["-"], "profile-stats-events">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Profile changes to stats in -stats-output-dir">;
+def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
