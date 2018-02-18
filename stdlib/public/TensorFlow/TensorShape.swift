@@ -20,6 +20,7 @@
 // NOTE: it may be possible to edit TensorShape to support "labeled tensors".
 // Dimensions may be either an Int or an enum representing a label.
 
+@_fixed_layout
 public struct TensorShape : ExpressibleByArrayLiteral {
   /// The dimensions of the shape.
   @_versioned
@@ -30,7 +31,6 @@ public struct TensorShape : ExpressibleByArrayLiteral {
   /// - Parameter dimensions: the shape dimensions.
   @_inlineable @inline(__always)
   public init(_ dimensions: [Int32]) {
-    self.init()
     self.dimensions = dimensions
   }
 
