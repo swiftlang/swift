@@ -170,20 +170,6 @@ public:
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
-                                     ValueOwnershipKind K2) {
-  return K1.merge(K2).hasValue();
-}
-
-/// Returns true if \p Kind is trivial or if \p Kind is compatible with \p
-/// ComparisonKind.
-static bool
-trivialOrCompatibleOwnershipKinds(ValueOwnershipKind Kind,
-                                  ValueOwnershipKind ComparisonKind) {
-  return compatibleOwnershipKinds(Kind, ValueOwnershipKind::Trivial) ||
-         compatibleOwnershipKinds(Kind, ComparisonKind);
-}
-
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
   return V->getType().isAddress() ||
          V.getOwnershipKind() == ValueOwnershipKind::Trivial ||
@@ -333,7 +319,7 @@ public:
   SILType getType() const { return Op.get()->getType(); }
 
   bool compatibleWithOwnership(ValueOwnershipKind Kind) const {
-    return compatibleOwnershipKinds(getOwnershipKind(), Kind);
+    return getOwnershipKind().isCompatibleWith(Kind);
   }
 
   bool hasExactOwnership(ValueOwnershipKind Kind) const {
@@ -1049,8 +1035,7 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitEnumArgument(
   } else {
     lifetimeConstraint = UseLifetimeConstraint::MustBeLive;
   }
-  return {compatibleOwnershipKinds(ownership, RequiredKind),
-          lifetimeConstraint};
+  return {ownership.isCompatibleWith(RequiredKind), lifetimeConstraint};
 }
 
 // We allow for trivial cases of enums with non-trivial cases to be passed in
@@ -1805,14 +1790,14 @@ void SILValueOwnershipChecker::gatherUsers(
         // TODO: Add a flag that associates the terminator instruction with
         // needing to be verified. If it isn't verified appropriately, assert
         // when the verifier is destroyed.
-        if (!trivialOrCompatibleOwnershipKinds(BBArg->getOwnershipKind(),
-                                               OwnershipKind)) {
+        auto BBArgOwnershipKind = BBArg->getOwnershipKind();
+        if (!BBArgOwnershipKind.isTrivialOrCompatibleWith(OwnershipKind)) {
           // This is where the error would go.
           continue;
         }
 
         // If we have a trivial value, just continue.
-        if (BBArg->getOwnershipKind() == ValueOwnershipKind::Trivial)
+        if (BBArgOwnershipKind == ValueOwnershipKind::Trivial)
           continue;
 
         // Otherwise, 
