@@ -851,7 +851,7 @@ swift::_getTypeByMangledName(StringRef typeName,
       return llvm::StringRef::npos;
     if (typeName.find('.', dotPos + 1) != llvm::StringRef::npos)
       return llvm::StringRef::npos;
-    if (typeName.find('$') != llvm::StringRef::npos)
+    if (typeName.find('\1') != llvm::StringRef::npos)
       return llvm::StringRef::npos;
     return dotPos;
   };
