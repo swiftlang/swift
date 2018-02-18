@@ -1147,7 +1147,7 @@ StringTests.test("growth") {
     s2 = s
   }
   expectEqual(s2, s)
-  expectLE(s.nativeCapacity, 34)
+  expectLE(s.nativeCapacity, 40)
 }
 
 StringTests.test("Construction") {
