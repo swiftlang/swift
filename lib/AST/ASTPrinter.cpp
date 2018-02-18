@@ -1772,6 +1772,12 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
       Printer << ".";
     }
   }
+  if (auto et = ExtendedType->getAs<EnumType>()) {
+    if (auto ParentType = et->getParent()) {
+      ParentType.print(Printer, Options);
+      Printer << ".";
+    }
+  }
 
   // Respect alias type.
   if (isa<NameAliasType>(ExtendedType.getPointer())) {
