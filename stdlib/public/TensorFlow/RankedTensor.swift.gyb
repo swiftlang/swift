@@ -47,6 +47,7 @@ infix operator ⊗ : MultiplicationPrecedence
 %   elementArrayLiteral = _elementArrayLiteral(rank)
 
 /// A ${rankName(rank)}-dimensional tensor.
+@_fixed_layout
 public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   /// The underlying Tensor of the ${TensorXD}.
   @_versioned
@@ -108,7 +109,6 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   @_versioned
   @_inlineable @inline(__always)
   internal init(base: Tensor<Scalar>) {
-    self.init()
     self.base = base
   }
 
