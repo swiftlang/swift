@@ -140,9 +140,6 @@ TensorTests.testCPUAndGPU("MultiOpMath") {
 }
 
 TensorTests.testCPUAndGPU("XWPlusB") {
-  // Exercise debug logging.
-  _RuntimeConfig.printsDebugLog = true
-
   // Shape: 1 x 4
   let x = Tensor([[1.0, 2.0, 2.0, 1.0]])
   // Shape: 4 x 2
