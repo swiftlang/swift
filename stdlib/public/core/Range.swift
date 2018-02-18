@@ -77,7 +77,7 @@ extension RangeExpression {
   @_inlineable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
-  }  
+  }
 }
 
 /// A half-open interval over a comparable type, from a lower bound up to, but

@@ -57,6 +57,7 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "RelativeOffsetRange.swift",
     "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",

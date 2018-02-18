@@ -172,6 +172,7 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   CommandLine.swift
   SliceBuffer.swift
+  RelativeOffsetRange.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift
