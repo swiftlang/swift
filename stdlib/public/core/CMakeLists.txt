@@ -171,6 +171,7 @@ set(SWIFTLIB_SOURCES
   ExistentialCollection.swift.gyb
   Mirror.swift
   CommandLine.swift
+  RelativeOffsetRange.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
