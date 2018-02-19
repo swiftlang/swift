@@ -676,6 +676,45 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
     TopLevelSGF->B.createMarkFunctionEscape(loc, Captures);
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Given a @differentiable attribute and the function declaration that holds
+/// this attribute, this function returns the lowered (SIL) argument indices
+/// to differentiate with respect to.
+static SmallVector<unsigned, 8>
+getLoweredDifferentiationIndices(const AbstractFunctionDecl *AFD,
+                                 const DifferentiableAttr *DA) {
+  SmallVector<unsigned, 8> indices;
+
+  // If no arguments are specified, it's differentiating wrt all arguments.
+  if (DA->getArguments().empty()) {
+    unsigned numArgs = AFD->getImplicitSelfDecl()
+      ? AFD->getParameterList(1)->size() + 1
+      : AFD->getParameterList(0)->size();
+    for (unsigned i = 0; i < numArgs; i++)
+      indices.push_back(i);
+    return indices;
+  }
+
+  // Otherwise, convert differentiation arguments.
+  bool hasSelf = false;
+  for (auto arg : DA->getArguments()) {
+    switch (arg.getKind()) {
+    // Normal index maps directly to a SIL argument index.
+    case AutoDiffArgument::Kind::Index:
+      indices.push_back(arg.getIndex());
+    // 'self' is always the last SIL argument.
+    case AutoDiffArgument::Kind::Self:
+      // Sema guarantees this case to occur at most once.
+      hasSelf = true;
+    }
+  }
+  if (hasSelf) {
+    auto numDeclaredArgs = AFD->getParameterList(1)->size();
+    indices.push_back(numDeclaredArgs);
+  }
+  return indices;
+}
+
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   if (!isa<DestructorDecl>(AFD)) {
@@ -699,6 +738,21 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     auto thunk = SILDeclRef(AFD).asForeign();
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // If the declaration has a @differentiable attribute, turn it into a SIL
+  // [differentiable] attribute with lowered adjoint function name and lowered
+  // differentiation argument indices.
+  if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
+        AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
+    auto silPrimalFn = getFunction(SILDeclRef(AFD), ForDefinition);
+    auto *adjointFn = diffAttr->getAdjointFunction();
+    assert(adjointFn && "Adjoint should've been type-checked and resolved.");
+    auto silAdjFn = getFunction(SILDeclRef(adjointFn), ForDefinition);
+    auto indices = getLoweredDifferentiationIndices(AFD, diffAttr);
+    silPrimalFn->setDifferentiableAttr(
+      SILDifferentiableAttr::create(M, silAdjFn->getName(), indices));
   }
 }
 

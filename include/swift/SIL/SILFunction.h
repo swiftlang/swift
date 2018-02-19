@@ -100,17 +100,17 @@ class SILDifferentiableAttr final {
 
 private:
   /// Name of the function to differentiate.
-  Identifier AdjointName;
+  StringRef AdjointName;
   /// Arguments of the primal to differentiate with respect to.
   unsigned NumArgIndices;
   /// Constructor, copying argument indices to the trailing buffer.
-  SILDifferentiableAttr(Identifier adjointName, ArrayRef<unsigned> argIndices);
+  SILDifferentiableAttr(StringRef adjointName, ArrayRef<unsigned> argIndices);
 
 public:
-  static SILDifferentiableAttr *create(SILModule &M, Identifier adjointName,
+  static SILDifferentiableAttr *create(SILModule &M, StringRef adjointName,
                                        ArrayRef<unsigned> argIndices);
 
-  Identifier getAdjointName() const {
+  StringRef getAdjointName() const {
     return AdjointName;
   }
 

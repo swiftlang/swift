@@ -927,7 +927,7 @@ static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
   /// Create an AdjointAttr and we are done.
-  DA = SILDifferentiableAttr::create(SP.SILMod, AdjName, ArgIndices);
+  DA = SILDifferentiableAttr::create(SP.SILMod, AdjName.get(), ArgIndices);
   return false;
 }
 

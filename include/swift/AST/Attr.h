@@ -1274,7 +1274,7 @@ public:
 class DifferentiableAttr : public DeclAttribute {
 private:
   /// The number of arguments specified in 'withRespectTo:'.
-  size_t NumArguments;
+  unsigned NumArguments;
   /// The name of the function which the declared function differentiates.
   DeclName GradFuncName;
   DeclNameLoc GradFuncNameLoc;

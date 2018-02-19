@@ -56,14 +56,14 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-SILDifferentiableAttr::SILDifferentiableAttr(Identifier adjointName,
+SILDifferentiableAttr::SILDifferentiableAttr(StringRef adjointName,
                                              ArrayRef<unsigned> argIndices)
   : AdjointName(adjointName), NumArgIndices(argIndices.size()) {
   std::copy(argIndices.begin(), argIndices.end(), getArgIndicesData());
 }
 
 SILDifferentiableAttr *
-SILDifferentiableAttr::create(SILModule &M, Identifier adjointName,
+SILDifferentiableAttr::create(SILModule &M, StringRef adjointName,
                               ArrayRef<unsigned> argIndices) {
   size_t size =
     sizeof(SILDifferentiableAttr) + argIndices.size() * sizeof(unsigned);
