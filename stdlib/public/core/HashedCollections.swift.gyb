@@ -513,7 +513,6 @@ extension Set {
 }
 
 extension Set : ExpressibleByArrayLiteral {
-
   //
   // `ExpressibleByArrayLiteral` conformance
   //

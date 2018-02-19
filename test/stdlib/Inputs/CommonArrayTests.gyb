@@ -415,7 +415,7 @@ ${Suite}.test("${ArrayType}<Void>/map") {
 
 ${Suite}.test("${ArrayType}/AssociatedTypes") {
   typealias Collection = ${ArrayType}<OpaqueValue<Int>>
-  typealias CollectionSlice = ArraySlice<OpaqueValue<Int>>
+  typealias CollectionSlice = Slice<${ArrayType}<OpaqueValue<Int>>>
   expectCollectionAssociatedTypes(
     collectionType: Collection.self,
     iteratorType: IndexingIterator<Collection>.self,
