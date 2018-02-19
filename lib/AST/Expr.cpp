@@ -1265,7 +1265,7 @@ GradientExpr::GradientExpr(SourceLoc loc, SourceLoc lParenLoc,
                            Expr *primalExpr,
                            ArrayRef<AutoDiffArgument> arguments,
                            SourceLoc rParenLoc)
-  : Expr(ExprKind::OpaqueValue, /*Implicit=*/true),
+  : Expr(ExprKind::Gradient, /*Implicit=*/false),
       Loc(loc), LParenLoc(lParenLoc), PrimalExpr(primalExpr),
       NumArguments(arguments.size()),
       RParenLoc(rParenLoc) {

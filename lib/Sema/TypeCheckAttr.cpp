@@ -2160,10 +2160,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         auto param = primalParams[index];
         // Argument type cannot be a reference type or an existential type.
         if (param->getType()->isAnyClassReferenceType() ||
-            param->getType()->isExistentialType())
+            param->getType()->isExistentialType()) {
           TC.diagnose(argLoc,
               diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
-              param->getType());
+                      param->getType());
+          return;
+        }
         lastIndex = index;
         retElts.push_back(param->getType());
         break;
@@ -2182,6 +2184,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           return;
         }
         auto selfTy = primal->getParent()->getSelfTypeInContext();
+        // 'self' cannot be a reference type or an existential type.
+        if (selfTy->isAnyClassReferenceType() || selfTy->isExistentialType()) {
+          TC.diagnose(argLoc,
+              diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
+                      selfTy);
+          return;
+        }
         retElts.push_back(selfTy);
         break;
       }

@@ -1014,6 +1014,7 @@ private:
   bool visitCaptureListExpr(CaptureListExpr *CLE);
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
+  bool visitGradientExpr(GradientExpr *GE);
 };
 } // end anonymous namespace
 
@@ -7031,6 +7032,21 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
   // if there is something wrong with the path itself, maybe one of the
   // components is incorrectly typed or doesn't exist...
   return diagnoseKeyPathComponents(CS, KPE, rootType);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
+  return false;
+}
+
+static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,
+                                          SourceLoc loc) {
+  auto DLC =
+      CS.TC.getProtocol(loc, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+  if (!DLC) return false;
+  return CS.TC
+      .conformsToProtocol(ty, DLC, CS.DC, ConformanceCheckFlags::InExpression)
+      .hasValue();
 }
 
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {

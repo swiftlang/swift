@@ -681,9 +681,23 @@ NOTE(object_literal_resolve_import,none,
 // TensorFlow op literal
 ERROR(invalid_tfop,none, "%0", (StringRef))
 
-// 'gradient(...)' expression for automatic differentiation
-ERROR(gradient_literal_function_not_differentiable,none,
+// '#gradient(...)' expression for automatic differentiation
+ERROR(gradient_expr_function_not_differentiable,none,
       "function '%0' is not differentiable", (Identifier))
+ERROR(gradient_expr_not_a_function,none,
+      "only functions can be differentiated, but this expression has type %0", (Type))
+ERROR(gradient_expr_not_a_decl_ref,none,
+      "the argument must refer to a function declaration", ())
+ERROR(gradient_expr_argument_self_not_first,none,
+      "the 'self' argument must be the first in the argument list", ())
+ERROR(gradient_expr_argument_self_not_in_instance_context,none,
+      "a 'self' argument can only be used in an instance declaration context where the function being differentiated is also located", ())
+ERROR(gradient_expr_argument_indices_not_ascending,none,
+      "argument indices must be ascending", ())
+ERROR(gradient_expr_argument_index_out_of_bounds,none,
+      "the argument index is out of bounds for type %0, which has %1 arguments", (Type, unsigned))
+ERROR(gradient_expr_argument_not_value_type,none,
+      "the argument referred to has non-value type %0, and thus cannot be differentiated with respect to.", (Type))
 
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))

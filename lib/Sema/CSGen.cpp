@@ -1232,11 +1232,117 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Type visitGradientExpr(GradientExpr *expr) {
-      // #gradient already has an assigned type.
-      assert(expr->getType() &&
-             "#gradient expression should already have a type.");
-      return expr->getType();
+    Type visitGradientExpr(GradientExpr *GE) {
+      auto &TC = CS.getTypeChecker();
+      auto *primalExpr = GE->getPrimalExpr();
+      auto *primalTy = CS.getType(primalExpr)->getAs<AnyFunctionType>();
+      if (!primalTy) {
+        TC.diagnose(primalExpr->getLoc(),
+                    diag::gradient_expr_not_a_function, CS.getType(primalExpr));
+        return nullptr;
+      }
+      // The primal expression must be a declaration reference.
+      if (!(isa<UnresolvedDeclRefExpr>(primalExpr) ||
+            isa<DeclRefExpr>(primalExpr) ||
+            isa<UnresolvedMemberExpr>(primalExpr) ||
+            isa<UnresolvedDotExpr>(primalExpr) ||
+            isa<MemberRefExpr>(primalExpr))) {
+        TC.diagnose(primalExpr->getLoc(), diag::gradient_expr_not_a_decl_ref);
+        return nullptr;
+      }
+      auto primalParams = primalTy->getParams();
+      // Compute the gradient type.
+      auto *genSig = primalTy->getOptGenericSignature();
+      // We are going to collect differention arguments' types into this array.
+      SmallVector<TupleTypeElt, 8> gradResultTypes;
+      // If no arguments are given, then it is differentiating with respect to
+      // all arguments (except self). The gradient's result type is all of the
+      // primal's parameters' types.
+      if (GE->getArguments().empty()) {
+        for (auto &primalParam : primalParams)
+          gradResultTypes.push_back(primalParam.getType());
+      }
+      // If arguments are specified, collect and type-check those arguments.
+      else {
+        int lastIndex = -1;
+        for (auto &arg : GE->getArguments()) {
+          switch (arg.getKind()) {
+          case AutoDiffArgument::Kind::Index: {
+            auto index = arg.getIndex();
+            // Indices must be ascending.
+            if (lastIndex >= (int)index) {
+              TC.diagnose(arg.getLoc(),
+                          diag::gradient_expr_argument_indices_not_ascending);
+              return nullptr;
+            }
+            // Indices cannot exdeed the number of arguments in the primal
+            // function.
+            if (index >= primalParams.size()) {
+              TC.diagnose(arg.getLoc(),
+                          diag::gradient_expr_argument_index_out_of_bounds,
+                          primalTy, primalParams.size());
+              return nullptr;
+            }
+            // The argument cannot be a reference object or a protocol
+            // existential.
+            auto paramTy = primalParams[index].getType();
+            if (paramTy->isAnyClassReferenceType() ||
+                paramTy->isExistentialType()) {
+              TC.diagnose(arg.getLoc(),
+                          diag::gradient_expr_argument_not_value_type,
+                          paramTy);
+              return nullptr;
+            }
+            lastIndex = index;
+            gradResultTypes.push_back(paramTy);
+            break;
+          }
+          case AutoDiffArgument::Kind::Self: {
+            // Self must come first in the argument list.
+            if (lastIndex != -1) {
+              TC.diagnose(arg.getLoc(),
+                          diag::gradient_expr_argument_self_not_first);
+              return nullptr;
+            }
+            // To use 'self', #gradient must be located in an instance type
+            // context.
+            auto *method = CurDC->getInnermostMethodContext();
+            // Must be within an instance method to use 'self'.
+            if (!method || !method->isInstanceMember()) {
+              TC.diagnose(arg.getLoc(),
+                     diag::gradient_expr_argument_self_not_in_instance_context);
+              return nullptr;
+            }
+            // 'self' cannot be a reference or existential type.
+            auto *selfDecl = method->getImplicitSelfDecl();
+            auto selfTy = selfDecl->getType();
+            if (selfTy->isAnyClassReferenceType() ||
+                selfTy->isExistentialType()) {
+              TC.diagnose(arg.getLoc(),
+                        diag::gradient_expr_argument_not_value_type, selfTy);
+              return nullptr;
+            }
+            // Collect the type.
+            gradResultTypes.push_back(selfTy);
+            break;
+          }
+          }
+        }
+      }
+      // Create a type for the gradient. The gradient has the same generic
+      // signature as the primal function. The gradient's result types are
+      // what we collected in `gradResultTypes`.
+      Type gradResult = gradResultTypes.size() == 1
+        ? gradResultTypes.front().getType()
+        : gradResult = TupleType::get(gradResultTypes, TC.Context);
+      Type gradTy;
+      if (genSig)
+        gradTy = GenericFunctionType::get(genSig, primalParams,
+                                          gradResult, primalTy->getExtInfo());
+      else
+        gradTy = FunctionType::get(primalParams, gradResult,
+                                   primalTy->getExtInfo());
+      return gradTy;
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
