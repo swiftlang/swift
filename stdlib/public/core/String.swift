@@ -1366,6 +1366,10 @@ extension String {
 }
 
 extension String : CustomStringConvertible {
+  /// The value of this string.
+  ///
+  /// Using this property directly is discouraged. Instead, use simple
+  /// assignment to create a new constant or variable equal to this string.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
     return self
