@@ -22,16 +22,18 @@ StrideTestSuite.test("StrideToCollection/Int") {
   checkRandomAccessCollection(expected, odds)
 
   let reversedOdds = stride(from: 9, to: 0, by: -2)
-  checkRandomAccessCollection(Array(expected.reversed()), reversedOdds)
+  checkRandomAccessCollection(expected.reversed(), reversedOdds)
 }
 
-#if false
 StrideTestSuite.test("StrideThroughCollection/Int") {
   let odds = stride(from: 1, through: 10, by: 2)
-  let expected = (1...10).filter { $0 % 2 != 0 }
-  checkRandomAccessCollection(expected, odds)
+  let expected = (1..<10).filter { $0 % 2 != 0 }
+  /*checkRandomAccessCollection(expected, odds)*/
+  checkForwardCollection(expected, odds)
+
+  let reversedOdds = stride(from: 9, through: 0, by: -2)
+  /*checkRandomAccessCollection(expected.reversed(), reversedOdds)*/
 }
-#endif
 
 
 runAllTests()

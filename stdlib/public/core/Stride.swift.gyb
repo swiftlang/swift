@@ -577,11 +577,6 @@ extension StrideTo.Index: Comparable {
   }
 }
 
-extension StrideTo.Index: Hashable where Element: Hashable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int { return _value.hashValue }
-}
-
 extension StrideTo: Collection
 where Element.Stride: BinaryInteger {
   @_inlineable
@@ -625,7 +620,6 @@ where Element.Stride: BinaryInteger {
   internal func _index(_ value: Element) -> Index {
     return Index(value, _stride)
   }
-
 }
 
 extension StrideTo: BidirectionalCollection
@@ -734,7 +728,6 @@ extension StrideThrough {
 
     @_versioned
     internal var _didReturnEnd: Bool = false
-
     @_inlineable
     @_versioned
     internal init(_start: Element, end: Element, stride: Element.Stride) {
@@ -993,23 +986,62 @@ extension StrideThrough: CustomStringConvertible {
   }
 }
 
-// FIXME(conditional-conformances): This does not yet compile (SR-6474).
-#if false
-extension StrideThrough : RandomAccessCollection
-where Element.Stride : BinaryInteger {
-  public typealias Index = ClosedRangeIndex<Int>
-  public typealias SubSequence = Slice<StrideThrough<Element>>
+extension StrideThrough {
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Index {
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _position: ClosedRange<Element>.Index
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _stride: Element.Stride
 
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(
+      _ position: ClosedRange<Element>.Index,
+      _ stride: Element.Stride
+    ) {
+      self._position = position
+      self._stride = stride
+    }
+  }
+}
+
+extension StrideThrough.Index: Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (
+    lhs: StrideThrough.Index, rhs: StrideThrough.Index
+  ) -> Bool {
+    _precondition(lhs._stride == rhs._stride, "Incompatible indices")
+    return lhs._position == rhs._position
+  }
+}
+
+extension StrideThrough.Index: Comparable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (
+    lhs: StrideThrough.Index, rhs: StrideThrough.Index
+  ) -> Bool {
+    _precondition(lhs._stride == rhs._stride, "Incompatible indices")
+    return lhs._stride < (0 as Element.Stride)
+      ? rhs._position < lhs._position
+      : lhs._position < rhs._position
+  }
+}
+
+extension StrideThrough: Collection
+where Element.Stride: BinaryInteger {
   @_inlineable
   public var startIndex: Index {
-    let distance = _start.distance(to: _end)
-    return distance == 0 || (distance < 0) == (_stride < 0)
-      ? ClosedRangeIndex(0)
-      : ClosedRangeIndex()
+    if (_start.distance(to: _end) < 0) != (_stride < 0) {
+      return _index(.pastEnd)
+    }
+    return _index(.inRange(_start))
   }
 
   @_inlineable
-  public var endIndex: Index { return ClosedRangeIndex() }
+  public var endIndex: Index {
+    return _index(.pastEnd)
+  }
 
   @_inlineable
   public var count: Int {
@@ -1020,39 +1052,91 @@ where Element.Stride : BinaryInteger {
   }
 
   public subscript(position: Index) -> Element {
-    let offset = Element.Stride(position._dereferenced) * _stride
-    return _start.advanced(by: offset)
-  }
-
-  public subscript(bounds: Range<Index>) -> Slice<StrideThrough<Element>> {
-    return Slice(base: self, bounds: bounds)
-  }
-
-  @_inlineable
-  public func index(before i: Index) -> Index {
-    switch i._value {
-    case .inRange(let n):
-      _precondition(n > 0, "Incrementing past start index")
-      return ClosedRangeIndex(n - 1)
+    switch position._position {
+    case .inRange(let element):
+      return element
     case .pastEnd:
-      _precondition(_end >= _start, "Incrementing past start index")
-      return ClosedRangeIndex(count - 1)
+      _preconditionFailure("Index out of range")
+    }
+  }
+
+  public subscript(bounds: Range<Index>) -> StrideThrough {
+    _precondition(bounds.lowerBound._stride == bounds.upperBound._stride,
+      "Incompatible indices")
+    switch (bounds.lowerBound._position, bounds.upperBound._position) {
+    // FIXME: should we support the (.pastEnd, .pastEnd) case?
+    // It is correct, just not clear what to return. Any empty StrideThrough
+    // value with the same _stride would do
+    case (.pastEnd, _):
+      _preconditionFailure("Index out of range")
+    case (.inRange(let start), .pastEnd):
+      return StrideThrough(_start: start, end: _end, stride: _stride)
+    case (.inRange(let start), .inRange(let end)):
+      _precondition(bounds.lowerBound >= startIndex, "Index out of range")
+      return StrideThrough(
+        _start: start, end: end.advanced(by: -_stride), stride: _stride)
     }
   }
 
   @_inlineable
   public func index(after i: Index) -> Index {
-    switch i._value {
-    case .inRange(let n):
-      return n == (count - 1)
-        ? ClosedRangeIndex()
-        : ClosedRangeIndex(n + 1)
+    switch i._position {
+    case .inRange(let element):
+      let nextIsPastEnd = _isOutOfRange(
+        element, advancedBy: _stride, comparedTo: _end, using: >)
+      return nextIsPastEnd
+        ? _index(.pastEnd)
+        : _index(.inRange(element.advanced(by: _stride)))
     case .pastEnd:
       _preconditionFailure("Incrementing past end index")
     }
   }
+
+  @_inlineable
+  @_versioned
+  internal func _index(_ position: ClosedRange<Element>.Index) -> Index {
+    return Index(position, _stride)
+  }
+
+  // We need to check whether element.advanced(by: someStride) > _end or
+  // element.advanced(by: someStride) < _start but since _end or _start might
+  // be already Int.max, then simply advancing past it would trap, hence the
+  // cutoff dance.
+  @_inlineable
+  @_versioned
+  internal func _isOutOfRange(
+    _ element: Element,
+    advancedBy offset: Element.Stride,
+    comparedTo bound: Element,
+    using op: (Element, Element) -> Bool
+  ) -> Bool {
+    let cutoffValue = bound.advanced(by: -offset)
+    let isBeyondCutoff = (_stride > 0)
+      ? op(element, cutoffValue)
+      : op(cutoffValue, element)
+    return isBeyondCutoff
+  }
 }
-#endif
+
+extension StrideThrough: BidirectionalCollection
+where Element.Stride: BinaryInteger {
+  @_inlineable
+  public func index(before i: Index) -> Index {
+    switch i._position {
+    case .inRange(let element):
+      let nextIsPastStart = _isOutOfRange(
+        element, advancedBy: -_stride, comparedTo: _start, using: <)
+      _precondition(!nextIsPastStart, "Incrementing past start index")
+      return _index(.inRange(element.advanced(by: -_stride)))
+    case .pastEnd:
+      let lastElement = _start.advanced(by: _stride * numericCast(count-1))
+      return _index(.inRange(lastElement))
+    }
+  }
+}
+
+extension StrideThrough: RandomAccessCollection
+where Element.Stride: BinaryInteger { }
 
 /// Returns a sequence from a starting value toward, and possibly including, an end
 /// value, stepping by the specified amount.
