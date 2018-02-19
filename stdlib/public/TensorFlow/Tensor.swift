@@ -179,9 +179,18 @@ public extension Tensor {
   ///   - repeatedValue: The scalar value to repeat.
   @_inlineable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    let valueTensor = Tensor(repeatedValue).handle
-    let shapeTensor = Tensor<Int32>(shape.dimensions).handle
-    self.init(handle: #tfop("Fill", shapeTensor, valueTensor))
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    self.init(shape: shapeTensor, repeating: repeatedValue)
+  }
+
+  /// Creates a tensor with the specified shape tensor and a single, repeated
+  /// value.
+  /// - Parameters:
+  ///   - shapeTensor: A Tensor representing the shape.
+  ///   - repeatedValue: The scalar value to repeat.
+  @_inlineable @inline(__always)
+  init(shape shapeTensor: Tensor<Int32>, repeating repeatedValue: Scalar) {
+    self.init(handle: #tfop("Fill", shapeTensor, Tensor(repeatedValue)))
   }
 }
 
@@ -254,6 +263,8 @@ public extension Tensor where Scalar : Numeric {
   static func eye(
     rowCount: Int, columnCount: Int? = nil, batchShape: [Int]? = nil
   ) -> Tensor {
+    // NOTE: TF doesn't have an "Eye" op. Instead, the `tf.eye` function
+    // composes many tensor/linear algebra ops.
     fatalError("FIXME: implement eye")
   }
 
@@ -292,6 +303,24 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
     self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
+  }
+}
+
+internal extension Tensor where Scalar : Numeric {
+  /// Creates a tensor with all elements set to zero.
+  ///
+  /// - Parameter shapeTensor: A tensor representing the shape.
+  @_versioned @inline(__always)
+  init(zerosWithShape shapeTensor: Tensor<Int32>) {
+    self.init(shape: shapeTensor, repeating: 0)
+  }
+
+  /// Creates a tensor with all elements set to one.
+  ///
+  /// - Parameter shapeTensor: A tensor representing the shape.
+  @_versioned @inline(__always)
+  init(onesWithShape shapeTensor: Tensor<Int32>) {
+    self.init(shape: shapeTensor, repeating: 1)
   }
 }
 
@@ -339,22 +368,30 @@ public extension AccelerableByTensorFlow {
     let shapeTensor = Tensor<Int32>(ones: [rank])
     return #tfop("Fill", shapeTensor, valueTensor)
   }
+
+  /// Convert to a tensor with the specified rank, with all dimensions equal to
+  /// 1.
+  @_inlineable @inline(__always)
+  func makeTensor(withRank rankTensor: Tensor<Int32>) -> Tensor<Self> {
+    let valueTensor = Tensor(self)
+    let shapeTensor = Tensor<Int32>(onesWithShape: rankTensor)
+    return #tfop("Fill", shapeTensor, valueTensor)
+  }
 }
 
 public extension Tensor {
   /// Returns a rank-lifted Tensor with a leading dimension of 1.
   @_inlineable @inline(__always)
   func rankLifted() -> Tensor {
-    return shapePadded(atIndex: 0)
+    return expandingShape(at: 0)
   }
 
-  /// Returns a shape-padded Tensor, inserting a dimension of 1 at the specified
-  /// index.
+  /// Returns a shape-expanded Tensor, with a dimension of 1 inserted at the
+  /// specified shape index.
   @_inlineable @inline(__always)
-  func shapePadded(atIndex index: Int32) -> Tensor {
-    return #tfop(
-      "ExpandDims", handle, Tensor<Int32>(index), Tdim: Int32.self
-    )
+  func expandingShape(at shapeIndex: Int32) -> Tensor {
+    return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
+                 Tdim: Int32.self)
   }
 
   /// Broadcast to the same shape as the specified Tensor.
@@ -379,17 +416,26 @@ public extension Tensor {
     return #tfop("Reshape", handle, newShape.handle)
   }
 
+  /// Return a copy of the tensor collapsed into a 1-D Tensor, in row-major
+  /// order.
+  @_inlineable @inline(__always)
+  func flattened() -> Tensor {
+    return reshaped(to: [-1])
+  }
+
   /// Remove dimensions of size 1 from the shape of a tensor.
   @_inlineable @inline(__always)
   func squeezed() -> Tensor {
     return #tfop("Squeeze", handle)
   }
 
-  /// Concatenates tensors along a dimension.
-  // TODO: improve description when implemented.
-  @inline(never) // make @_inlineable when implemented.
+  /// Concatenates tensors along the first dimension.
+  /// - Precondition: The tensors must have the same shape.
+  @_inlineable @inline(__always)
   func concatenated(with other: Tensor) -> Tensor {
-    fatalError("FIXME: implement concatenated(with:)")
+    // TODO: Implement `concatenated(with:alongAxis)` and `++` operator.
+    // NOTE: Consider reimplementating using Pack (`tf.stack`)?
+    return #tfop("ConcatV2", [self, other], Tensor<Int32>(0), Tidx: Int32.self)
   }
 
   /// Reshape to scalar.

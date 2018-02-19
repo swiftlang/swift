@@ -40,7 +40,8 @@
 
 // Python PEP 465 makes a compelling argument that matrix multiplication should
 // not be spelled with the standard * operator, so we need a new one.  We'll use
-// this operator, though it is defensible to use a variety of other ones as well.
+// this operator, though it is defensible to use a variety of other ones as
+// well.
 infix operator ⊗ : MultiplicationPrecedence
 
 // TODO:
@@ -611,16 +612,6 @@ public extension TensorProtocol {
     return _TFGetScalarOrDie(#tfop("Sum", handle,
                                    Tensor<Int32>([] as [Int32]).handle))
   }
-
-  @inline(never) // make @_inlineable when implemented.
-  func argmax() -> Int {
-    fatalError("FIXME: implement argmax")
-  }
-
-  @inline(never) // make @_inlineable when implemented.
-  func argmin() -> Int {
-    fatalError("FIXME: implement argmin")
-  }
 }
 
 public extension Tensor {
@@ -659,6 +650,28 @@ public extension Tensor {
   ) -> Tensor {
     return #tfop("Sum", handle, Tensor<Int32>(axes),
                  keep_dims: keepingDimensions, Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func argmax(alongAxis axis: Int32) -> Tensor<Int32> {
+    return #tfop("ArgMax", handle, Tensor<Int32>(axis), output_type: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func argmin(alongAxis axis: Int32) -> Tensor<Int32> {
+    return #tfop("ArgMin", handle, Tensor<Int32>(axis), output_type: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func argmax() -> Int32 {
+    return _TFGetScalarOrDie(#tfop("ArgMax", flattened(), Tensor<Int32>(0),
+                                   output_type: Int32.self))
+  }
+
+  @_inlineable @inline(__always)
+  func argmin() -> Int32 {
+    return _TFGetScalarOrDie(#tfop("ArgMin", flattened(), Tensor<Int32>(0),
+                                   output_type: Int32.self))
   }
 }
 
@@ -699,41 +712,68 @@ public extension TensorProtocol {
 
 public extension Tensor {
   /// Access the element tensor specified by an index in the leading dimension.
-  /// - Parameter index: index of the element tensor
-  subscript(index: Int) -> Tensor {
+  /// - Parameter index: Index of the element tensor.
+  @_inlineable
+  subscript(index: Int32) -> Tensor {
+    @inline(__always)
     get {
-      fatalError("FIXME: implement subscript to tensor")
-    }
-    set {
-      fatalError("FIXME: implement subscript to tensor")
+      // TODO: Rewrite using Slice, which is non-allocating.
+      return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
+                   Tindices: Int32.self)
     }
   }
 
-  /// Returns the subdimensional tensor at the specified list of indices.
-  /// - Parameter indices: list of indices
-  /// - TODO: If possible, this should be defined as an op, to be run on the
-  /// accelerator.
-  subscript(indices: Int...) -> Tensor {
+  /// Access the subdimensional tensor at the specified list of indices.
+  /// - Parameter indices: List of indices.
+  /// - Note: this function is more efficient than using `subscript(index:)`
+  ///   multiple times because this produces a single GatherNd op (compared with
+  ///   multiple Gather ops).
+  @_inlineable
+  subscript(indices: Int32...) -> Tensor {
+    @inline(__always)
     get {
-      fatalError("FIXME: implement subscript to tensor")
-    }
-    set {
-      fatalError("FIXME: implement subscript to tensor")
+      // TODO: Rewrite using Slice, which is non-allocating.
+      return #tfop("GatherNd", self, Tensor<Int32>(indices),
+                   Tindices: Int32.self)
     }
   }
 
-  /// Returns the subtensor defined by the specified bounds.
-  /// - Parameter bounds: contiguous range of indices
-  // TODO: begin/end are vectors in general.
-  // tfop_slice(tensor, begin, end) -> tensor
-  subscript(bounds: Range<Int>) -> Tensor {
+  /// Access the subtensor specified by a contiguous range of indices.
+  /// - Parameter bounds: Contiguous range of indices.
+  @_inlineable
+  subscript(bounds: Range<Int32>) -> Tensor {
+    @inline(__always)
     get {
-      fatalError("FIXME: implement subscript to tensor")
-    }
-    set {
-      fatalError("FIXME: implement subscript to tensor")
+      // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
+      // because they require slice bounds for every dimension, they should be
+      // used because the are non-allocating. Other slice implementations (like
+      // combining Gather and Range) perform allocation and should not be used
+      // even though they are easier to write.
+
+      // Let (lo, hi) represent lower and upper bounds respectively.
+      // startIndices = [lo, 0, 0, ..., 0]
+      // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
+      // TODO: The horrendous mess of type-casting is necessary due to GPU ops
+      // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
+      // if possible.
+      let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
+      let remainingZeros = Tensor<Int32>(
+        zerosWithShape: (rankTensor - 1).rankLifted())
+      let startIndices = lowerBound.concatenated(with: remainingZeros)
+
+      let boundSize = Tensor<Int32>([bounds.upperBound])
+        - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
+      let offset: Tensor<Int32> = Tensor<Int32>(Tensor<Float>(
+        handle: #tfop("ScatterNd", Tensor<Int32>([0]).rankLifted(),
+                      Tensor<Float>(boundSize), rankTensor.rankLifted()))
+      )
+      let boundSizes: Tensor<Int32> = shapeTensor + offset
+      return #tfop("Slice", self, startIndices, boundSizes, Index: Int32.self)
     }
   }
+  // TODO: Add strided slices? (increment by something different than 1)
+  // Ideas for strided slice API: it could be another subscript method, or it
+  // be a top level `stride` function like Swift's `stride(from:to:by:)`.
 }
 
 //===----------------------------------------------------------------------===//

@@ -565,7 +565,7 @@ extension ShapedArray : CustomStringConvertible {
 ///
 /// Element arrays are subdimensional elements of a `ShapedArray`: their rank
 /// is one less than that of their base. Element array slices are obtained by
-/// indexing a `ShapedArray` instance with a singular `Int` index.
+/// indexing a `ShapedArray` instance with a singular `Int32` index.
 ///
 /// For example:
 ///
@@ -582,10 +582,10 @@ extension ShapedArray : CustomStringConvertible {
 ///
 /// Subarrays are a contiguous range of the elements in a `ShapedArray`.
 /// The rank of a subarray is the same as that of its base, but its leading
-/// dimension may be smaller. Subarray slices are obtained by indexing a
-/// `ShapedArray` with a `Range<Int>` that represents a range of elements (in
-/// the leading dimension). Methods like `prefix(:)` and `suffix(:)` that
-/// internally index with a range also produce subarray.
+/// dimension is the count of the slice range. Subarray slices are obtained by
+/// indexing a `ShapedArray` with a `Range<Int32>` that represents a range of
+/// elements (in the leading dimension). Methods like `prefix(:)` and
+/// `suffix(:)` that internally index with a range also produce subarray.
 ///
 /// For example:
 ///
