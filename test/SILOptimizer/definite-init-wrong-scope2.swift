@@ -1,6 +1,4 @@
-// FIXME: This test is currently commented due to breakage from Swift merge.
-// Remove "true ||" from the RUN line below when things are fixed.
-// RUN: true || %target-swift-frontend -emit-sil %s -Onone -Xllvm -sil-print-debuginfo \
+// RUN: %target-swift-frontend -emit-sil %s -Onone -Xllvm -sil-print-debuginfo \
 // RUN:   -o /dev/null -Xllvm -sil-print-after=definite-init \
 // RUN:   -Xllvm -sil-print-only-functions=$S8patatino4BearC6before7before26during5afterACSb_S3btKcfc \
 // RUN:   2>&1 | %FileCheck %s
