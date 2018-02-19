@@ -24,13 +24,13 @@ func _compareUnicode(
   let left = _StringGuts(rawBits: lhs)
   let right = _StringGuts(rawBits: rhs)
 
-   if _slowPath(!left._isContiguous || !right._isContiguous) {
-     if !left._isContiguous {
-       return left._asOpaque()._compareOpaque(right).rawValue
-     } else {
-       return right._asOpaque()._compareOpaque(left).flipped.rawValue
-     }
-   }
+  if _slowPath(!left._isContiguous || !right._isContiguous) {
+    if !left._isContiguous {
+      return left._asOpaque()._compareOpaque(right).rawValue
+    } else {
+      return right._asOpaque()._compareOpaque(left).flipped.rawValue
+    }
+  }
 
   return left._compareContiguous(right)
 }
