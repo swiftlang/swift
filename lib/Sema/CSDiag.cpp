@@ -4617,10 +4617,12 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE, bool inAssignm
           UncurriedCandidate cand = calleeInfo.candidates[0];
           auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                     cand.getDecl(), nullptr);
-          auto paramsType = candType->getAs<FunctionType>()->getInput();
-          if (!typeCheckChildIndependently(indexExpr, paramsType,
-                                           CTP_CallArgument, TCC_ForceRecheck))
-            return true;
+          if (auto *candFunc = candType->getAs<FunctionType>()) {
+            auto paramsType = candFunc->getInput();
+            if (!typeCheckChildIndependently(
+                    indexExpr, paramsType, CTP_CallArgument, TCC_ForceRecheck))
+              return true;
+          }
         }
       }
 
