@@ -2731,22 +2731,20 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
-                if [[ ! "${LLDB_TEST_SWIFT_ONLY}" ]]; then
-                    # Run the gtests.
-                    if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                        set_lldb_xcodebuild_options
-                        # Run the LLDB unittests (gtests).
-                        with_pushd ${LLDB_SOURCE_DIR} \
-                                   call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                        rc=$?
-                        if [[ "$rc" -ne 0 ]] ; then
-                            >&2 echo "error: LLDB gtests failed"
-                            exit 1
-                        fi
-                    else
-                        with_pushd ${lldb_build_dir} \
-                            ${NINJA_BIN} check-lldb-unit
+                # Run the gtests.
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                    set_lldb_xcodebuild_options
+                    # Run the LLDB unittests (gtests).
+                    with_pushd ${LLDB_SOURCE_DIR} \
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                    rc=$?
+                    if [[ "$rc" -ne 0 ]] ; then
+                        >&2 echo "error: LLDB gtests failed"
+                        exit 1
                     fi
+                else
+                    with_pushd ${lldb_build_dir} \
+                        ${NINJA_BIN} check-lldb-unit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
