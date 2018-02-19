@@ -591,26 +591,26 @@ public extension TensorProtocol where Scalar == Bool {
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func mean() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Mean", handle,
-                                   Tensor<Int32>([] as [Int32]).handle))
+    return _TFGetScalarOrDie(#tfop("Mean", self,
+                                   Tensor<Int32>([] as [Int32])))
   }
 
   @_inlineable @inline(__always)
   func min() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Min", handle,
-                                   Tensor<Int32>([] as [Int32]).handle))
+    return _TFGetScalarOrDie(#tfop("Min", self,
+                                   Tensor<Int32>([] as [Int32])))
   }
 
   @_inlineable @inline(__always)
   func max() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Max", handle,
-                                   Tensor<Int32>([] as [Int32]).handle))
+    return _TFGetScalarOrDie(#tfop("Max", self,
+                                   Tensor<Int32>([] as [Int32])))
   }
 
   @_inlineable @inline(__always)
   func sum() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Sum", handle,
-                                   Tensor<Int32>([] as [Int32]).handle))
+    return _TFGetScalarOrDie(#tfop("Sum", self,
+                                   Tensor<Int32>([] as [Int32])))
   }
 }
 
@@ -639,7 +639,7 @@ public extension Tensor {
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Scalar>(handle:
-      #tfop("Max", handle, Tensor<Int32>(axes).handle,
+      #tfop("Max", handle, Tensor<Int32>(axes),
             keep_dims: keepingDimensions, Tidx: Int32.self))
   }
 
@@ -757,15 +757,18 @@ public extension Tensor {
       // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
       // if possible.
       let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
-      let remainingZeros = Tensor<Int32>(
-        zerosWithShape: (rankTensor - 1).rankLifted())
+      let remainingZeros: Tensor<Int32> = #tfop(
+        "Fill", (rankTensor - 1).rankLifted(), Tensor<Int32>(0)
+      )
       let startIndices = lowerBound.concatenated(with: remainingZeros)
 
       let boundSize = Tensor<Int32>([bounds.upperBound])
         - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
-      let offset: Tensor<Int32> = Tensor<Int32>(Tensor<Float>(
-        handle: #tfop("ScatterNd", Tensor<Int32>([0]).rankLifted(),
-                      Tensor<Float>(boundSize), rankTensor.rankLifted()))
+      let offset: Tensor<Int32> = Tensor<Int32>(
+        Tensor<Float>(
+          handle: #tfop("ScatterNd", Tensor<Int32>([0]).rankLifted(),
+                        Tensor<Float>(boundSize), rankTensor.rankLifted())
+        )
       )
       let boundSizes: Tensor<Int32> = shapeTensor + offset
       return #tfop("Slice", self, startIndices, boundSizes, Index: Int32.self)
