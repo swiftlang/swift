@@ -506,6 +506,35 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Differentiable: {
+    Printer.printAttrName("@differentiable");
+    auto *attr = cast<DifferentiableAttr>(this);
+    auto args = attr->getArguments();
+    // Print differentiation arguments if any.
+    if (!args.empty()) {
+      Printer << '(';
+      interleave(args, [&](const AutoDiffArgument &arg) {
+        switch (arg.getKind()) {
+        case AutoDiffArgument::Kind::Index:
+          Printer << '.' << arg.getIndex();
+          break;
+        case AutoDiffArgument::Kind::Self:
+          Printer << "self";
+          break;
+        }
+      }, [&] {
+        Printer << ", ";
+      });
+      Printer << "), ";
+    }
+    // Print gradient function name.
+    Printer << "gradient: " << attr->getGradFuncName();
+    // FIXME: Print 'where' clause, if any.
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
