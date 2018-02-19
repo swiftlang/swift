@@ -1448,7 +1448,7 @@ ERROR(attr_differentiable_missing_rsquare,PointsToFirstBadToken,
       "missing ']' for argument index list", ())
 
 ERROR(attr_differentiable_expected_argument_list,PointsToFirstBadToken,
-      "expected a list of arguments to differentiate with respect to, e.g. [.0, w, b]", ())
+      "expected a list of arguments to differentiate with respect to, e.g. (.0, w, b)", ())
 
 ERROR(attr_differentiable_expected_argument,PointsToFirstBadToken,
       "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
@@ -1641,8 +1641,6 @@ ERROR(gradient_expr_expected_label,none,
       "expected label '%0' in '#gradient' expression", (StringRef))
 ERROR(gradient_expr_expected_expression,none,
       "expected an expression representing the function to be differentiated", ())
-ERROR(gradient_expr_expected_argument_list,none,
-      "expected a list of arguments to differentiate with respect to, e.g. '(self, .0, .1)'", ())
 ERROR(gradient_expr_expected_argument,none,
       "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
 
