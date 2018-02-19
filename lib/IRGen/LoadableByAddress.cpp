@@ -395,7 +395,11 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     nonOptionalType = optType;
   }
   if (nonOptionalType.getAs<TupleType>()) {
-    return getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
+    SILType newSILType =
+        getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
+    return isLargeLoadableType(GenericEnv, newSILType, Mod)
+               ? newSILType.getAddressType()
+               : newSILType;
   }
   SILType newSILType = getNewOptionalFunctionType(GenericEnv, storageType, Mod);
   if (newSILType != storageType) {
