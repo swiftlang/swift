@@ -179,18 +179,8 @@ public extension Tensor {
   ///   - repeatedValue: The scalar value to repeat.
   @_inlineable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    let shapeTensor = Tensor<Int32>(shape.dimensions)
-    self.init(shape: shapeTensor, repeating: repeatedValue)
-  }
-
-  /// Creates a tensor with the specified shape tensor and a single, repeated
-  /// value.
-  /// - Parameters:
-  ///   - shapeTensor: A Tensor representing the shape.
-  ///   - repeatedValue: The scalar value to repeat.
-  @_inlineable @inline(__always)
-  init(shape shapeTensor: Tensor<Int32>, repeating repeatedValue: Scalar) {
-    self.init(handle: #tfop("Fill", shapeTensor, Tensor(repeatedValue)))
+    self.init(handle: #tfop("Fill", Tensor<Int32>(shape.dimensions),
+                            Tensor(repeatedValue)))
   }
 }
 
@@ -284,7 +274,7 @@ public extension Tensor where Scalar : Numeric {
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
     self.init(
       handle: #tfop(
-        "Range", start.handle, end.handle, stride.handle, Tidx: Scalar.self
+        "Range", start, end, stride, Tidx: Scalar.self
       )
     )
   }
@@ -303,24 +293,6 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
     self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
-  }
-}
-
-internal extension Tensor where Scalar : Numeric {
-  /// Creates a tensor with all elements set to zero.
-  ///
-  /// - Parameter shapeTensor: A tensor representing the shape.
-  @_versioned @inline(__always)
-  init(zerosWithShape shapeTensor: Tensor<Int32>) {
-    self.init(shape: shapeTensor, repeating: 0)
-  }
-
-  /// Creates a tensor with all elements set to one.
-  ///
-  /// - Parameter shapeTensor: A tensor representing the shape.
-  @_versioned @inline(__always)
-  init(onesWithShape shapeTensor: Tensor<Int32>) {
-    self.init(shape: shapeTensor, repeating: 1)
   }
 }
 
@@ -343,11 +315,12 @@ public extension Tensor where Scalar : FloatingPoint {
     randomNormal shape: TensorShape, mean: Double = 0, stddev: Double = 1,
     seed: Int32 = 0
   ) {
-    let shapeTensor = Tensor<Int32>(shape.dimensions).handle
     // NOTE: First seed value (87654321) is the DEFAULT_GRAPH_SEED value defined
     // in tensorflow/python/framework/random_seed.py.
     let standardNormal: Tensor<Double> = #tfop(
-      "RandomStandardNormal", shapeTensor, seed: 87654321, seed2: seed,
+      "RandomStandardNormal",
+      Tensor<Int32>(shape.dimensions),
+      seed: 87654321, seed2: seed,
       dtype: Double.self, T: Int32.self
     )
     let result = (standardNormal * stddev) + mean
@@ -364,18 +337,7 @@ public extension AccelerableByTensorFlow {
   /// 1.
   @_inlineable @inline(__always)
   func makeTensor(withRank rank: Int32) -> Tensor<Self> {
-    let valueTensor = Tensor(self)
-    let shapeTensor = Tensor<Int32>(ones: [rank])
-    return #tfop("Fill", shapeTensor, valueTensor)
-  }
-
-  /// Convert to a tensor with the specified rank, with all dimensions equal to
-  /// 1.
-  @_inlineable @inline(__always)
-  func makeTensor(withRank rankTensor: Tensor<Int32>) -> Tensor<Self> {
-    let valueTensor = Tensor(self)
-    let shapeTensor = Tensor<Int32>(onesWithShape: rankTensor)
-    return #tfop("Fill", shapeTensor, valueTensor)
+    return #tfop("Fill", Tensor<Int32>(ones: TensorShape(rank)), Tensor(self))
   }
 }
 
@@ -413,7 +375,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
-    return #tfop("Reshape", handle, newShape.handle)
+    return #tfop("Reshape", handle, newShape)
   }
 
   /// Return a copy of the tensor collapsed into a 1-D Tensor, in row-major
@@ -467,7 +429,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   init(_ other: Tensor<Bool>) {
     self.init(
-      handle: #tfop("Cast", other.handle, DstT: Scalar.self)
+      handle: #tfop("Cast", other, DstT: Scalar.self)
     )
   }
 }
