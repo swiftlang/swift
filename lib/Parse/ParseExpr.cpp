@@ -3625,7 +3625,7 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient:
 ///     'gradient' '('
 ///       'of' ':' expr
-///       (',' 'withRespectTo' ':' '(' expr-gradient-arg-list ')')?
+///       (',' 'withRespectTo' ':' expr-gradient-arg-list)?
 ///     ')'
 ///   expr-gradient-arg-list:
 ///     expr-gradient-arg-index (',' expr-gradient-arg-index)*
@@ -3661,12 +3661,11 @@ ParserResult<Expr> Parser::parseExprGradient() {
   // If found comma, parse 'withRespectTo:'.
   SmallVector<AutoDiffArgument, 8> args;
   if (consumeIf(tok::comma)) {
-    // Parse 'withRespectTo' ':' '('.
+    // Parse 'withRespectTo' ':'.
     if (parseSpecificIdentifier("withRespectTo",
                                 diag::gradient_expr_expected_label,
                                 "withRespectTo:") ||
-        parseToken(tok::colon, diag::expected_parameter_colon) ||
-        parseToken(tok::l_paren, diag::gradient_expr_expected_argument_list))
+        parseToken(tok::colon, diag::expected_parameter_colon))
       return errorAndSkipToEnd();
     // Function that parses one argument.
     auto parseArg = [&]() -> bool {
@@ -3693,12 +3692,11 @@ ParserResult<Expr> Parser::parseExprGradient() {
     };
     // Parse first argument.
     if (parseArg())
-      return errorAndSkipToEnd(2);
+      return errorAndSkipToEnd();
     // Parse the rest of arguments, ending with ')'.
-    while (!consumeIf(tok::r_paren))
-      if (parseToken(tok::comma, diag::gradient_expr_expected_rparen) ||
-          parseArg())
-        return errorAndSkipToEnd(2);
+    while (consumeIf(tok::comma))
+      if (parseArg())
+        return errorAndSkipToEnd();
   }
   // Parse the closing ')'.
   if (parseToken(tok::r_paren, rParenLoc, diag::gradient_expr_expected_rparen))
