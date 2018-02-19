@@ -305,14 +305,7 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 }
 #endif
 
-/// Check whether a type conforms to a protocol.
-///
-/// \param value - can be null, in which case the question should
-///   be answered abstractly if possible
-/// \param conformance - if non-null, and the protocol requires a
-///   witness table, and the type implements the protocol, the witness
-///   table will be placed here
-static bool _conformsToProtocol(const OpaqueValue *value,
+bool swift::_conformsToProtocol(const OpaqueValue *value,
                                 const Metadata *type,
                                 const ProtocolDescriptor *protocol,
                                 const WitnessTable **conformance) {

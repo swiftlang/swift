@@ -465,6 +465,7 @@ struct PrintOptions {
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
+    result.PrintIfConfig = false;
     return result;
   }
 

@@ -6237,11 +6237,13 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
     case RequirementKind::Conformance: {
       // ABI TODO: We also need a *key* argument that uniquely identifies
       // the conformance for conformance requirements as well.
-      auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
-                                           /*TODO key argument*/ false,
-                                           /*extra argument*/ true);
       auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
         ->getDecl();
+      bool needsWitnessTable =
+        Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
+      auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
+                                           /*TODO key argument*/ false,
+                                           needsWitnessTable);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,

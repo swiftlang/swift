@@ -962,6 +962,9 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+ERROR(type_invalid_dml,none,
+      "@dynamicMemberLookup attribute requires %0 to have a "
+      "'subscript(dynamicMember:)' member with a string index", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -2857,6 +2860,8 @@ ERROR(assignment_lhs_is_immutable_property,none,
       "cannot assign to property: %0", (StringRef))
 ERROR(assignment_subscript_has_immutable_base,none,
       "cannot assign through subscript: %0", (StringRef))
+ERROR(assignment_dynamic_property_has_immutable_base,none,
+      "cannot assign through dynamic lookup property: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
 

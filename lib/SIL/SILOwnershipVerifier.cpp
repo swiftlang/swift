@@ -1921,11 +1921,16 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
   if (!isValueAddressOrTrivial(Value, Mod)) {
     return !handleError([&] {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                   << "Non trivial values, non address values, and non "
-                      "guaranteed function args must have at least one "
-                      "lifetime ending use?!\n"
-                   << "Value: " << *Value << '\n';
+      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n";
+      if (Value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+        llvm::errs() << "Error! Found a leaked owned value that was never "
+                        "consumed.\n";
+      } else {
+        llvm::errs() << "Non trivial values, non address values, and non "
+                        "guaranteed function args must have at least one "
+                        "lifetime ending use?!\n";
+      }
+      llvm::errs() << "Value: " << *Value << '\n';
     });
   }
 

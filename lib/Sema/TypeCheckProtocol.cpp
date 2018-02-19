@@ -4173,8 +4173,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
 
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl) &&
-      classDecl->getDeclContext()->isModuleScopeContext()) {
+  if (!hasGenericAncestry(classDecl)) {
     return;
   }
 
