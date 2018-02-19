@@ -188,13 +188,33 @@ public extension Tensor {
 // Initialization Syntax
 //===----------------------------------------------------------------------===//
 
+extension Tensor : ExpressibleByIntegerLiteral
+  where Scalar : ExpressibleByIntegerLiteral &
+        _ExpressibleByBuiltinIntegerLiteral {
+  public typealias IntegerLiteralType = Scalar
+  @inline(__always)
+  public init(integerLiteral: Scalar) {
+    self.init(integerLiteral)
+  }
+}
+
+extension Tensor : ExpressibleByFloatLiteral
+  where Scalar : BinaryFloatingPoint &
+        _ExpressibleByBuiltinFloatLiteral {
+  public typealias FloatLiteralType = Scalar
+  @inline(__always)
+  public init(floatLiteral: Scalar) {
+    self.init(floatLiteral)
+  }
+}
+
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   public typealias ArrayLiteralElement = Tensor<Scalar>
   /// Creates a tensor initialized with the given elements.
   @inline(__always)
   public init(arrayLiteral elements: Tensor<Scalar>...) {
-    self.init(elements);
+    self.init(elements)
   }
 }
 
@@ -323,8 +343,7 @@ public extension Tensor where Scalar : FloatingPoint {
       seed: 87654321, seed2: seed,
       dtype: Double.self, T: Int32.self
     )
-    let result = (standardNormal * stddev) + mean
-    self = Tensor(result)
+    self.init(standardNormal * stddev + mean)
   }
 }
 
