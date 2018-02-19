@@ -3459,8 +3459,12 @@ public:
         if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
           SILType bbArgTy = dest->getArguments()[0]->getType();
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          if (F.getModule().getStage() != SILStage::Lowered) {
+            // During the lowered stage, a function type might have different
+            // signature
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
           require(!dest->getArguments()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
