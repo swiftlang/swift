@@ -80,16 +80,14 @@ internal extension TensorHandle {
   @_versioned
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
-    return TensorHandle.makeHostCopy(cTensorHandle)
+    return ShapedArray(cTensorHandle: cTensorHandle)
   }
+}
 
-  /// Same as above, except the input tensor's content is taken from
-  /// `cTensorHandle`.
+internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
   @_versioned
   @inline(never)
-  static func makeHostCopy(
-    _ cTensorHandle: CTensorHandle
-  ) -> ShapedArray<Scalar> {
+  init(cTensorHandle: CTensorHandle) {
     let status = TF_NewStatus()
     // If the tensor is on the accelerator, we need to copy it to the host.
     // NOTE: This will not perform a copy if the handle is already on the host.
@@ -97,7 +95,8 @@ internal extension TensorHandle {
     let hostHandle: CTensorHandle = context.withMutableCContext { ctx in
       debugLog("Calling TFE_TensorHandleCopyToDevice().")
       let ret = TFE_TensorHandleCopyToDevice(
-        cTensorHandle, ctx, context.cpuDeviceName, status)
+        cTensorHandle, ctx, context.cpuDeviceName, status
+      )
       checkOk(status)
       return ret!
     }
@@ -109,7 +108,7 @@ internal extension TensorHandle {
     TF_DeleteStatus(status)
     debugLog("# of dims is \(TF_NumDims(cTensor!))")
     debugLog("Returning a shaped array.")
-    return ShapedArray(owning: cTensor!)
+    self.init(owning: cTensor!)
   }
 }
 
