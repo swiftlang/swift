@@ -43,20 +43,6 @@ fileprivate extension Array1D {
   }
 }
 
-internal extension Array1D where Element : AccelerableByTensorFlow {
-  @_versioned
-  init(owning cTensor: CTensor) {
-    let shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
-    precondition(shape.count == 1, "The shape does not have 1 dimension.")
-    let startAddress = TF_TensorData(cTensor)
-      .assumingMemoryBound(to: Element.self)
-    let bufferPointer = UnsafeMutableBufferPointer(
-      start: startAddress, count: shape.reduce(1, *)
-    )
-    self = Array(bufferPointer)
-  }
-}
-
 fileprivate extension ArraySlice1D {
   /// Creates an ArraySlice1D from a ShapedArraySlice.
   /// - Precondition: The ShapedArraySlice must have rank 1.
@@ -65,20 +51,6 @@ fileprivate extension ArraySlice1D {
   init(base: ShapedArraySlice<Element>) {
     assert(base.rank == 1, "The ShapedArraySlice does not have rank 1.")
     self = base.withUnsafeBufferPointer(ArraySlice.init)
-  }
-}
-
-internal extension ArraySlice1D where Element : AccelerableByTensorFlow {
-  @_versioned
-  init(owning cTensor: CTensor) {
-    let shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
-    precondition(shape.count == 1, "Rank is not 1")
-    let startAddress = TF_TensorData(cTensor)
-      .assumingMemoryBound(to: Element.self)
-    let bufferPointer = UnsafeMutableBufferPointer(
-      start: startAddress, count: shape.reduce(1, *)
-    )
-    self = ArraySlice(bufferPointer)
   }
 }
 
