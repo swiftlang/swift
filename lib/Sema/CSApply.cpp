@@ -2424,8 +2424,8 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *visitGradientExpr(GradientExpr *expr) {
-      // FIXME: Implement this.
-      llvm_unreachable("Unhandled GradientExpr");
+      assert(cs.getType(expr) && "should've been assigned a type");
+      return expr;
     }
 
     // SWIFT_ENABLE_TENSORFLOW
