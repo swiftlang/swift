@@ -392,8 +392,36 @@ static bool tryToRemoveArrayValue(SILValue value) {
     inst->dropAllReferences();
 
   // Then delete them.
-  for (auto inst : instsToCheck)
+  for (auto inst : instsToCheck) {
     inst->eraseFromParent();
+  }
+
+  // Okay, we successfully nuked the array guts.  Check to see if any of the
+  // element value can also be removed.  We'll often get a StructInst or other
+  // glue instructions hanging around, and we don't want to consider them uses.
+  SmallPtrSet<SILValue, 8> visitedInsts;
+  while (!elements.empty()) {
+    auto val = elements.pop_back_val();
+    // If we've already visited this instruction we may have removed it, don't
+    // reprocess it.
+    if (!visitedInsts.insert(val).second)
+      continue;
+
+    auto inst = dyn_cast<SILInstruction>((SILNode*)val);
+    if (!inst || inst->hasUsesOfAnyResult()) continue;
+
+    // Don't delete out of global initializers.
+    if (!inst->getFunction()) continue;
+
+    if (isa<StructInst>(inst) || isa<LiteralInst>(inst) ||
+        isa<MetatypeInst>(inst)) {
+      for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+        visitedInsts.erase(inst->getOperand(i));
+        elements.push_back(inst->getOperand(i));
+      }
+      inst->eraseFromParent();
+    }
+  }
 
   return true;
 }
@@ -757,18 +785,10 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   operands.push_back(operands[0]);
   name += ",dtype";
 
+  auto scalarV = inst->getOperand(1);
+  auto shapeV = inst->getOperand(2);
+
   SILBuilder B(inst);
-
-  // We are dropping a reference to the element and shape array initializers, so
-  // we need to remove the arrays themselves or at least release them.
-  auto tmp = inst->getOperand(1);
-  inst->getAllOperands()[1].drop();
-  removeOrDestroyArrayValue(tmp, inst->getLoc(), B);
-  // Shape too.
-  tmp = inst->getOperand(2);
-  inst->getAllOperands()[2].drop();
-  removeOrDestroyArrayValue(tmp, inst->getLoc(), B);
-
   // Finally build a new builtin instruction with the simplified operands.
   auto newInst =
     B.createBuiltin(inst->getLoc(),
@@ -778,6 +798,11 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
+
+  // We are dropping a reference to the element and shape array initializers, so
+  // we need to remove the arrays themselves or at least release them.
+  removeOrDestroyArrayValue(scalarV, inst->getLoc(), B);
+  removeOrDestroyArrayValue(shapeV, inst->getLoc(), B);
   return newInst;
 }
 
@@ -837,11 +862,7 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   operands.push_back(operands[0]);
   name += ",dtype";
 
-  // We are dropping a reference to the element initializer, so we need to
-  // remove the array itself or at least release it.
   auto arrayValue = inst->getOperand(1);
-  inst->getAllOperands()[1].drop();
-  removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
 
   // Finally build a new builtin instruction with the simplified operands.
   auto newInst =
@@ -852,6 +873,13 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
+
+  // We dropped a reference to the element initializer, so we need to
+  // remove the array itself or at least release it.  This happens after
+  // creating the replacement builtin, so that element initializers aren't
+  // dropped.
+  B.setInsertionPoint(newInst);
+  removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
 
   return newInst;
 }
@@ -1130,6 +1158,8 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   std::string name = "__tfop_" + opName.str();
   SILBuilder B(inst);
 
+  SmallVector<SILValue, 4> arrayOperands;
+
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto opInfo = operandClasses[i];
@@ -1193,13 +1223,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
         name += ",$inelt";
       }
 
-      // Drop a reference to the array, making it easy to know if it is
-      // now-unused.
-      inst->getAllOperands()[i].drop();
-
-      // Try to remove the array entirely if it is dead, otherwise emit a
-      // release of it, since we've dropped a consuming use of it.
-      removeOrDestroyArrayValue(operand, inst->getLoc(), B);
+      arrayOperands.push_back(operand);
       continue;
     }
 
@@ -1221,13 +1245,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
                                         opInfo.second, name, operands, inst);
     assert(isArray && "array should be validated in earlier pass");
 
-    // Drop a reference to the array, making it easy to know if it is
-    // now-unused.
-    inst->getAllOperands()[i].drop();
-
-    // Try to remove the array entirely if it is dead, otherwise emit a
-    // release of it, since we've dropped a consuming use of it.
-    removeOrDestroyArrayValue(attrOperand, inst->getLoc(), B);
+    arrayOperands.push_back(attrOperand);
   }
 
   // Determine whether canonicalization changed anything.
@@ -1251,6 +1269,14 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
 
+  B.setInsertionPoint(newInst);
+  for (auto array : arrayOperands) {
+    // Try to remove the arrays entirely if it is dead, otherwise emit a
+    // release of them, since we've dropped a consuming use of it.
+    removeOrDestroyArrayValue(array, inst->getLoc(), B);
+  }
+
+
   // Now that we have a new instruction, reparse it to make sure that our
   // internal state is all up to date, and that we built it correctly.
   auto newResult = decode(newInst);
@@ -1260,6 +1286,9 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
 }
 
 
+//===----------------------------------------------------------------------===//
+// Source Location Manipulation Helpers
+//===----------------------------------------------------------------------===//
 
 /// The SIL location for operations we process are usually deep in the bowels
 /// of the tensor library code, which are all implementation details to the
@@ -1317,4 +1346,161 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   }
 
   return getUserSourceLocation(inst->getDebugLocation());
+}
+
+
+//===----------------------------------------------------------------------===//
+// TensorFunctionClassifier Implementation
+//===----------------------------------------------------------------------===//
+
+/// Return true if the specified function is the top-level context that
+/// tensor partitioning should be applied to.  This returns false (for
+/// example) for inlined functions that take and return tensors, since we
+/// know that they are either unreachable or will be inlined into any
+/// clients that use them.
+bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
+  // Ignore transparent functions.
+  if (fn->isTransparent())
+    return false;
+
+  auto hasInlinableAttrs = [&](Decl *decl) -> bool {
+    if (decl->getAttrs().hasAttribute<InlineableAttr>())
+      return true;
+    if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Always)
+        return true;
+    return false;
+  };
+
+  // Don't transform functions that are marked @_inlineable or inline(always)
+  if (auto dc = fn->getDeclContext()) {
+    if (auto fnDecl = dc->getInnermostDeclarationDeclContext()) {
+      if (hasInlinableAttrs(fnDecl))
+        return false;
+
+      // If this is an accessor for a computed property, check the property for
+      // @_inlineable as well.
+      if (auto *fd = dyn_cast<AccessorDecl>(fnDecl))
+        if (hasInlinableAttrs(fd->getStorage()))
+          return false;
+    }
+  }
+
+  // If the function is marked public, but it isn't marked inlinable, then it is
+  // a public entrypoint that cannot be deabstracted through, so we must
+  // transform it.
+  //
+  // TODO: It will probably be a common error to forget to add the inlinable
+  // attributes, we should either infer the attribute or produce better QoI that
+  // suggests adding it when an error occurs.
+  if (fn->getLinkage() == SILLinkage::Public)
+    return true;
+
+  // Something is creating public thunks around 'shared' implementations, which
+  // prevents the above check from working.  Check for public functions.
+  // FIXME: This should go away when we get deabstraction.
+  if (fn->getLinkage() == SILLinkage::Shared)
+    if (auto *dc = fn->getDeclContext())
+      if (auto *fd = dyn_cast<FuncDecl>(dc))
+        if (fd->getFormalAccess() >= AccessLevel::Public)
+          return true;
+#if 0
+  // Can we us this to simplify the above code?
+  if (fn->isThunk())
+#endif
+
+
+
+  // Otherwise, the function is either public and inlininable or it is internal
+  // to the current module.  In both cases, we check to see if the function
+  // takes TensorHandle values as arguments or results.  If so, then we know
+  // that it will be inlined away by deabstraction, and we don't need to touch
+  // it.
+  if (containsTensorHandle(fn->getLoweredFunctionType()))
+    return false;
+
+  // If this function has no source location information, then it came from
+  // a deserialized module.  Don't transform it.
+  // TODO: Why is this necessary?
+  if (fn->getLocation().isNull())
+    return false;
+
+  // If it contains no tensor inputs or results, then we are willing to
+  // transform it!
+  return true;
+}
+
+/// Return true if the specified function type has TensorHandle's in its
+/// argument or result list, even if they are abstracted by structs or
+/// tuples.
+bool TensorFunctionClassifier::containsTensorHandle(CanSILFunctionType fnType) {
+  for (auto &result : fnType->getResults())
+    if (containsTensorHandle(result.getType()))
+      return true;
+
+  for (auto &param : fnType->getParameters())
+    if (containsTensorHandle(param.getType()))
+      return true;
+
+  return false;
+}
+
+
+/// Return true if the specified type contains a TensorHandle that will be
+/// exposed after deabstraction.
+bool TensorFunctionClassifier::containsTensorHandle(Type ty) {
+  // If this type literally is TensorHandle, then yep, we contain it.  This is
+  // the base case.
+  if (isTensorHandle(ty))
+    return true;
+
+  // Deabstraction flattens tuples, so if a tuple contains any tensor handles,
+  // then the tuple itself does.
+  if (auto *tuple = ty->getAs<TupleType>()) {
+    for (auto &elt : tuple->getElements())
+      if (containsTensorHandle(elt.getType()))
+        return true;
+    return false;
+  }
+
+  // Deabstraction scalarizes structs.
+  if (auto *st = ty->getAs<StructType>())
+    return structContainsTensorHandle(st->getDecl());
+
+  // Deabstractions binds specialized generic structs.  Check if either the
+  // struct itself or one of the generic arguments contains a TensorHandle.
+  if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
+    // Check the generic arguments.
+    for (auto arg : bgst->getGenericArgs())
+      if (containsTensorHandle(arg))
+        return true;
+
+    return structContainsTensorHandle(bgst->getDecl());
+  }
+
+  // Handle still-generic types that may contain a TensorHandle.
+  if (auto *ugst = ty->getAs<UnboundGenericType>())
+    if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
+      return structContainsTensorHandle(decl);
+
+  // Otherwise we have a class or some other type that is opaque to
+  // deabstraction.
+  return false;
+}
+
+/// Determine whether the given struct contains a TensorHandle, caching the
+/// result.
+bool TensorFunctionClassifier::structContainsTensorHandle(StructDecl *decl) {
+  auto it = declContainsTensorHandle.find(decl);
+  if (it != declContainsTensorHandle.end())
+    return it->second;
+
+  bool hasTensorHandle = false;
+  for (auto p : decl->getStoredProperties())
+    if (containsTensorHandle(p->getType())) {
+      hasTensorHandle = true;
+      break;
+    }
+
+  return declContainsTensorHandle[decl] = hasTensorHandle;
 }

@@ -36,6 +36,15 @@ namespace tf {
   /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
   unsigned convertSwiftTypeToTF(Type ty);
 
+  /// Return true if the specified type is a valid tensor element type.  For
+  /// example, int128 and pointers are not.
+  ///
+  /// TODO: This should eventually consider information about the target
+  /// deployment.
+  inline bool isValidTensorFlowElementType(Type ty) {
+    return convertSwiftTypeToTF(ty) != 0;
+  }
+
   /// Represent information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
   struct SILTensorOpInfo {
@@ -135,6 +144,10 @@ namespace tf {
   };
 
 
+  //===--------------------------------------------------------------------===//
+  // Source location helpers
+  //===--------------------------------------------------------------------===//
+
   /// The SIL location for operations we process are usually deep in the bowels
   /// of the tensor library code, which are all implementation details to the
   /// user.  As such, walk the inlining location of the specified node to return
@@ -153,22 +166,46 @@ namespace tf {
   SILLocation getUserSourceLocation(SILValue value);
   SILLocation getUserSourceLocation(SILInstruction *inst);
 
+  //===--------------------------------------------------------------------===//
+  // Other stuff
+  //===--------------------------------------------------------------------===//
 
+  /// This struct provides a an efficient implementation of a predicate that
+  /// determines whether a type is or contains a TensorHandle that will be
+  /// exposed after deabstraction.  This is a class instead of a simple function
+  /// because we memoize state to avoid rechecking types over and over again.
+  class TensorFunctionClassifier {
+    /// This map memoizes whether the specified type declaration is known to
+    /// contain a TensorHandle or not, used to accelerate queries against types
+    /// that are frequently referenced like Tensor.
+    llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+  public:
+    TensorFunctionClassifier() {}
+
+    /// Return true if the specified function is the top-level context that
+    /// tensor partitioning should be applied to.  This returns false (for
+    /// example) for inlined functions that take and return tensors, since we
+    /// know that they are either unreachable or will be inlined into any
+    /// clients that use them.
+    bool shouldBePartitioned(SILFunction *fn);
+
+    /// Return true if the specified function type has TensorHandle's in its
+    /// argument or result list, even if they are abstracted by structs or
+    /// tuples.
+    bool containsTensorHandle(CanSILFunctionType fnType);
+
+    /// Return true if the specified type contains a TensorHandle that will be
+    /// exposed after deabstraction.
+    bool containsTensorHandle(Type ty);
+
+  private:
+    bool structContainsTensorHandle(StructDecl *decl);
+  };
 
   /// Lower the specified SIL function (which was formed by the partitioner)
   /// into a TensorFlow graph, and encode into a vector of bytes.
   ///
   std::vector<char> lowerTFGraph(SILFunction *fn);
-
-  /// Return true if the specified type is a valid tensor element type.  For
-  /// example, int128 and pointers are not.
-  ///
-  /// TODO: This should eventually consider information about the target
-  /// deployment.
-  inline bool isValidTensorFlowElementType(Type ty) {
-    return convertSwiftTypeToTF(ty) != 0;
-  }
-
 } // end namespace tf
 } // end namespace swift
 #endif

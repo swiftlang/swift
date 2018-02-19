@@ -253,7 +253,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 
 // CHECK: bb3([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>, [[A:%.*]] : $TensorHandle<Float>):
 // CHECK-NEXT:  [[NEXTA:%.*]] = builtin "__tfop_Sub,$in,$in"([[A:%.*]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  [[NEXTCOUNT:%.*]] = builtin "__tfop_Add,$in,$in"([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>,
+// CHECK-NEXT:  [[NEXTCOUNT:%.*]] = builtin "__tfop_Add,$in,$in"([[COUNT]] : $TensorHandle<Builtin.Int64>,
 // CHECK-NEXT: [[CONDT:%.*]] = builtin "__tfop_Less,$in,$in"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>,
 // CHECK-NEXT:   [[COND:%.*]] = builtin "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
 // CHECK-NEXT:   cond_br [[COND]], bb5, bb4
@@ -348,4 +348,34 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
  CHECK:  return %6 : $TensorHandle<Float>
  CHECK: }
 */
+
+
+// This should produce exactly one live out value in the call to
+// _swift_tfc_FinishTensorComputation.
+public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
+                        c : Tensor2D<Float>) -> Tensor2D<Float> {
+  return a+b+c  // expected-note 3 {{value used here}}
+} // expected-warning 3 {{value implicitly copied to the accelerator}}     TODO: Poor loc info.
+
+/*
+ CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}liveOutTest
+ CHECK: sil private @{{.*}}liveOutTest{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+ CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
+ CHECK:  return {{.*}} : $TensorHandle<Float>
+ CHECK-LABEL: }
+ */
+
+
+/*
+ CHECK-LABEL: --- TFPartition Host Result: {{.*}}liveOutTest{{.*}}
+ CHECK: sil  [thunk] [always_inline] @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@owned Tensor2D<Float>, @owned Tensor2D<Float>, @owned Tensor2D<Float>) -> @owned Tensor2D<Float> {
+
+ // [[RESULTBUF:%.*]] = alloc_stack $OpaquePointer
+ // [[RESULTACCESS:%.*]] = begin_access [modify] [static] [[RESULTBUF]] : $*OpaquePointer
+ // [[RESULTPTR:%.*]] = address_to_pointer [[RESULTACCESS]] : $*OpaquePointer to $Builtin.RawPointer
+ // [[RESULTMP:%.*]] = struct $UnsafeMutablePointer<OpaquePointer> ([[RESULTPTR]] : $Builtin.RawPointer)
+ // [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
+ // %53 = apply [[FINISHFN]]({{.*}}, [[RESULTMP]], {{.*}}) : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
+*/
+
 
