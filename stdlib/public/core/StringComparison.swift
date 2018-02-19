@@ -16,25 +16,49 @@ import SwiftShims
 //memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
 @effects(readonly)
-@_versioned internal
+@_versioned // @opaque
+internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ rhs: _StringGuts._RawBitPattern
 ) -> Int {
   let left = _StringGuts(rawBits: lhs)
   let right = _StringGuts(rawBits: rhs)
-  return left._compare(right)
+
+  if _slowPath(!left._isContiguous || !right._isContiguous) {
+    if !left._isContiguous {
+      return left._asOpaque()._compareOpaque(right).rawValue
+    } else {
+      return right._asOpaque()._compareOpaque(left).flipped.rawValue
+    }
+  }
+
+  return left._compareContiguous(right)
 }
 
 @inline(never) // @outlined
 @effects(readonly)
-@_versioned internal
+@_versioned // @opaque
+internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ leftRange: Range<Int>,
   _ rhs: _StringGuts._RawBitPattern, _ rightRange: Range<Int>
 ) -> Int {
   let left = _StringGuts(rawBits: lhs)
   let right = _StringGuts(rawBits: rhs)
-  return left._compare(leftRange, right, rightRange)
+
+   if _slowPath(!left._isContiguous || !right._isContiguous) {
+     if !left._isContiguous {
+       return left._asOpaque()[leftRange]._compareOpaque(
+         right, rightRange
+       ).rawValue
+     } else {
+       return right._asOpaque()[rightRange]._compareOpaque(
+         left, leftRange
+       ).flipped.rawValue
+     }
+   }
+
+  return left._compareContiguous(leftRange, right, rightRange)
 }
 
 //
@@ -484,61 +508,68 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 public extension _StringGuts {  
   @inline(__always)
   public
-  func _compare(_ other: _StringGuts) -> Int {
-    let selfRange = Range<Int>(uncheckedBounds: (0, self.count))
-    let otherRange = Range<Int>(uncheckedBounds: (0, other.count))
-    return _compare(selfRange, other, otherRange)
+  func _compareContiguous(_ other: _StringGuts) -> Int {
+    _sanityCheck(self._isContiguous && other._isContiguous)
+    switch (self.isASCII, other.isASCII) {
+    case (true, true):
+      fatalError("Should have hit the ascii comp in StringComparable.compare()")
+    case (true, false):
+      return self._unmanagedASCIIView._compareStringsPreLoop(
+        other: other._unmanagedUTF16View
+      ).rawValue
+    case (false, true):
+      // Same compare, just invert result
+      return other._unmanagedASCIIView._compareStringsPreLoop(
+        other: self._unmanagedUTF16View
+      ).flipped.rawValue
+    case (false, false):
+      return self._unmanagedUTF16View._compareStringsPreLoop(
+        other: other._unmanagedUTF16View
+      ).rawValue
+    }
   }
 
   @inline(__always)
   public
-  func _compare(
+  func _compareContiguous(
     _ selfRange: Range<Int>, 
     _ other: _StringGuts, 
     _ otherRange: Range<Int>
   ) -> Int {
-     if _slowPath(
-       !self._isContiguous || !other._isContiguous
-     ) {
-       if !self._isContiguous {
-         return self._asOpaque()._compareOpaque(
-           selfRange, other, otherRange
-         ).rawValue
-       } else {
-         return other._asOpaque()._compareOpaque(
-           otherRange, self, selfRange
-         ).flipped.rawValue
-       }
-     }
- 
-     switch (self.isASCII, other.isASCII) {
-     case (true, true):
-       fatalError("Should have hit the ascii comp in StringComparable.compare()")
-     case (true, false):
-       return self._unmanagedASCIIView[selfRange]._compareStringsPreLoop(
-         other: other._unmanagedUTF16View[otherRange]
-       ).rawValue
-     case (false, true):
-       // Same compare, just invert result
-       return other._unmanagedASCIIView[otherRange]._compareStringsPreLoop(
-         other: self._unmanagedUTF16View[selfRange]
-       ).flipped.rawValue
-     case (false, false):
-       return self._unmanagedUTF16View[selfRange]._compareStringsPreLoop(
-         other: other._unmanagedUTF16View[otherRange]
-       ).rawValue
-     }
+    _sanityCheck(self._isContiguous && other._isContiguous)
+    switch (self.isASCII, other.isASCII) {
+    case (true, true):
+      fatalError("Should have hit the ascii comp in StringComparable.compare()")
+    case (true, false):
+      return self._unmanagedASCIIView[selfRange]._compareStringsPreLoop(
+        other: other._unmanagedUTF16View[otherRange]
+      ).rawValue
+    case (false, true):
+      // Same compare, just invert result
+      return other._unmanagedASCIIView[otherRange]._compareStringsPreLoop(
+        other: self._unmanagedUTF16View[selfRange]
+      ).flipped.rawValue
+    case (false, false):
+      return self._unmanagedUTF16View[selfRange]._compareStringsPreLoop(
+        other: other._unmanagedUTF16View[otherRange]
+      ).rawValue
+    }
   }
 }
 
 extension _UnmanagedOpaqueString {
-  @inline(never)
+  @inline(never) // @outlined
+  @_versioned
+  internal
+  func _compareOpaque(_ other: _StringGuts) -> _Ordering {
+    return self._compareOpaque(other, 0..<other.count)
+  }
+
+  @inline(never) // @outlined
   @_versioned
   internal
   func _compareOpaque(
-    _ selfRange: Range<Int>, 
-    _ other: _StringGuts, 
-    _ otherRange: Range<Int>
+    _ other: _StringGuts, _ otherRange: Range<Int>
   ) -> _Ordering {
     //
     // Do a fast Latiny comparison loop; bail if that proves insufficient.
@@ -548,11 +579,10 @@ extension _UnmanagedOpaqueString {
     // termination of an all-ASCII file loaded by String.init(contentsOfFile:).
     //
     
-    
-    let selfCount = selfRange.count
+    let selfCount = self.count
     let otherCount = otherRange.count
     let count = Swift.min(selfCount, otherCount)
-    let idx = self[selfRange]._findDiffIdx(other, otherRange)
+    let idx = self._findDiffIdx(other, otherRange)
     if idx == count {
       return _lexicographicalCompare(selfCount, otherCount)
     }
