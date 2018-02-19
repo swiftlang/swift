@@ -26,50 +26,6 @@ extern "C" {
 
 typedef uintptr_t swift_typeref_t;
 
-/// \brief Represents one of the Swift reflection sections of an image.
-typedef struct swift_reflection_section {
-  void *Begin;
-  void *End;
-} swift_reflection_section_t;
-
-/// \brief Represents the set of Swift reflection sections of an image.
-/// Not all sections may be present.
-typedef struct swift_reflection_info {
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } field;
-
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } associated_types;
-
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } builtin_types;
-
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } capture;
-
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } type_references;
-
-  struct {
-    swift_reflection_section_t section;
-    uintptr_t offset;
-  } reflection_strings;
-
-  // Start address in local and remote address spaces.
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
-} swift_reflection_info_t;
-
 /// The layout kind of a Swift type.
 typedef enum swift_layout_kind {
   // Nothing is known about the size or contents of this value.
