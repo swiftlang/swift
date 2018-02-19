@@ -250,6 +250,11 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element < upperBound
   }
 
+  @_inlineable
+  public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return lowerBound <= element && element < upperBound ? element : nil
+  }
+
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
