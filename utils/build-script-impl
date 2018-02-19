@@ -2808,6 +2808,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_TEST_DEBUG_SERVER=""
                 fi
 
+		# rdar://37173570: dotest's multiprocess runner is not reliable, use --no-multiprocess for now.
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2818,6 +2819,7 @@ for host in "${ALL_HOSTS[@]}"; do
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_TEST_CATEGORIES} \
                            ${LLDB_DOTEST_CC_OPTS} \
+                           --no-multiprocess \
                            ${LLDB_FORMATTER_OPTS}
                 continue
                 ;;
