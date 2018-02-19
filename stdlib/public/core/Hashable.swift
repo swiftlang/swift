@@ -109,17 +109,14 @@ public protocol Hashable : Equatable {
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
 
+  /// Feed bits to be hashed into the hash function represented by `hasher`.
+  ///
+  /// If this requirement is not explicitly implemented, the compiler
+  /// automatically synthesizes an implementation for it.
   func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
 }
 
-extension Hashable {
-  @_inlineable
-  @inline(__always)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher.appending(self.hashValue)
-  }
-}
-
+// Used in synthesized `hashValue` implementations.
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
   var value = value
@@ -176,7 +173,7 @@ public struct _UnsafeHasher {
 
   @effects(readonly)
   @inline(never)
-  public func appending(_ value: Int) -> _UnsafeHasher {
+  public func appending(bitPattern value: Int) -> _UnsafeHasher {
     // The effects attribute is a lie; however, it enables the compiler to
     // eliminate unnecessary retain/releases protecting Hashable state around
     // calls to `_Hasher.append(_:)`.

@@ -210,6 +210,10 @@ extension NSObject : Equatable, Hashable {
   open var hashValue: Int {
     return hash
   }
+
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    return hasher.appending(self.hashValue)
+  }
 }
 
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {

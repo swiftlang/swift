@@ -177,7 +177,7 @@ extension LazyPrefixWhileIndex : Hashable where Base.Index : Hashable {
     case .index(let value):
       return hasher.appending(value)
     case .pastEnd:
-      return hasher.appending(.max)
+      return hasher.appending(bitPattern: .max)
     }
   }
 }

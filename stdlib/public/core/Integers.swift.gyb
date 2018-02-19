@@ -3610,10 +3610,12 @@ extension ${Self} : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     % if bits <= word_bits:
-    return hasher.appending(Int(bitPattern: _lowWord))
+    return hasher.appending(bitPattern: Int(bitPattern: _lowWord))
     % else:
     var hasher = hasher
-    words.forEach { hasher = hasher.appending(Int(bitPattern: $0)) }
+    for word in words {
+      hasher = hasher.appending(bitPattern: Int(bitPattern: word))
+    }
     return hasher
     % end
   }

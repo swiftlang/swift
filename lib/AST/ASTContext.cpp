@@ -1079,9 +1079,6 @@ FuncDecl *ASTContext::getHashValueForDecl() const {
   if (Impl.HashValueForDecl)
     return Impl.HashValueForDecl;
 
-  auto resolver = getLazyResolver();
-  auto hasherType = getUnsafeHasherDecl()->getDeclaredType();
-
   SmallVector<ValueDecl *, 1> results;
   lookupInSwiftModule("_hashValue", results);
   for (auto result : results) {

@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -750,12 +751,10 @@ static Expr* integerLiteralExpr(ASTContext &C, int64_t value) {
 ///
 /// \param C The AST context to create the expression in.
 ///
-/// \param DC The \c DeclContext to create any decls in.
-///
 /// \param hasher The base expression to make the call on.
 ///
 /// \param hashable The parameter to the call.
-static CallExpr* createHasherAppendingCall(ASTContext &C, DeclContext *DC,
+static CallExpr* createHasherAppendingCall(ASTContext &C,
                                            Expr* hasher,
                                            Expr* hashable) {
   // hasher.appending(_:)
@@ -772,14 +771,15 @@ static CallExpr* createHasherAppendingCall(ASTContext &C, DeclContext *DC,
                                   C.AllocateCopy(argLabels));
 }
 
-static ValueDecl *
+static FuncDecl *
 deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                         NominalTypeDecl *typeDecl,
                         void (*bodySynthesizer)(AbstractFunctionDecl *)) {
   // @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
 
   ASTContext &C = tc.Context;
-  
+  auto parentDC = cast<DeclContext>(parentDecl);
+
   // Expected type: (Self) -> (into: _UnsafeHasher) -> _UnsafeHasher
   // Constructed as:
   //   func type(input: Self,
@@ -789,12 +789,11 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
 
   Type hasherType = C.getUnsafeHasherDecl()->getDeclaredType();
 
-
   // Params: self (implicit), hasher
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), typeDecl);
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   auto *hasherParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                         SourceLoc(), C.Id_into, SourceLoc(),
-                                        C.Id_hasher, hasherType, typeDecl);
+                                        C.Id_hasher, hasherType, parentDC);
   hasherParam->setInterfaceType(hasherType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -808,39 +807,29 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                                     /*Throws=*/false, SourceLoc(),
                                     nullptr, params,
                                     TypeLoc::withoutLoc(hasherType),
-                                    typeDecl);
+                                    parentDC);
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
   // Evaluate type of Self in (Self) -> (into: _UnsafeHasher) -> _UnsafeHasher
-  Type selfType = typeDecl->getDeclaredInterfaceType();
+  auto selfParam = computeSelfParam(hashDecl);
   auto inputTypeElt = TupleTypeElt(hasherType, C.Id_into);
-  auto inputType = TupleType::get(ArrayRef<TupleTypeElt>(inputTypeElt), C);
+  auto inputType = TupleType::get({inputTypeElt}, C);
   auto innerType = FunctionType::get(inputType, hasherType,
                                      FunctionType::ExtInfo());
 
   Type interfaceType;
-  if (auto sig = typeDecl->getGenericSignatureOfContext()) {
-    hashDecl->setGenericEnvironment(typeDecl->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfType, innerType,
+  if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    hashDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
+    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
                                              FunctionType::ExtInfo());
   } else {
     // (Self) -> innerType == (_UnsafeHasher) -> _UnsafeHasher
-    interfaceType = FunctionType::get(selfType, innerType,
+    interfaceType = FunctionType::get({selfParam}, innerType,
                                       FunctionType::ExtInfo());
   }
   hashDecl->setInterfaceType(interfaceType);
-
-//  hashDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
-  auto access = typeDecl->getFormalAccess();
-  hashDecl->setAccess(
-    access != AccessLevel::Private ? access : AccessLevel::FilePrivate);
-
-  // Inherit the @_versioned attribute.
-  if (typeDecl->getAttrs().hasAttribute<VersionedAttr>()) {
-    auto *clonedAttr = new (C) VersionedAttr(/*implicit=*/true);
-    hashDecl->getAttrs().add(clonedAttr);
-  }
+  hashDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
@@ -848,13 +837,63 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
   if (typeDecl->hasClangNode())
     tc.Context.addExternalDecl(hashDecl);
 
-  typeDecl->addMember(hashDecl);
+  cast<IterableDeclContext>(parentDecl)->addMember(hashDecl);
   return hashDecl;
+}
+
+static bool
+parentHasDerivedHashValueImplementation(AbstractFunctionDecl *hashIntoDecl) {
+  ASTContext &C = hashIntoDecl->getASTContext();
+  auto parentDC = hashIntoDecl->getDeclContext();
+  auto decl = parentDC->getAsDeclOrDeclExtensionContext();
+  for (auto member: cast<IterableDeclContext>(decl)->getMembers()) {
+    if (auto varDecl = dyn_cast<VarDecl>(member)) {
+      if (varDecl->getBaseName() == C.Id_hashValue) {
+        return varDecl->isImplicit();
+      }
+    }
+  }
+  return false;
+}
+
+/// Determine if hashValue has an explicit implementation, and if so, derive
+/// the body for the _hash(into:) method to use it, and return true.
+/// Returns false if hashValue has a derived implementation.
+static bool
+deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+  // func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  //   return hasher.appending(self.hashValue)
+  // }
+  auto parentDC = hashIntoDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/ true);
+  auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
+                                                 C.Id_hashValue, DeclNameLoc(),
+                                                 /*implicit*/ true);
+  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherRef = new (C) DeclRefExpr(ConcreteDeclRef(hasherParam),
+                                       DeclNameLoc(), /*implicit*/ true);
+  auto hasherExpr = createHasherAppendingCall(C, hasherRef, hashValueExpr);
+
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), hasherExpr);
+  SmallVector<ASTNode, 1> statements { ASTNode(returnStmt) };
+  auto body = BraceStmt::create(C, SourceLoc(), statements,
+                                SourceLoc(), /*implicit*/ true);
+  hashIntoDecl->setBody(body);
+  return true;
 }
 
 /// Derive the body for the '_hash(into:)' method for an enum.
 static void
 deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+  if (!parentHasDerivedHashValueImplementation(hashIntoDecl)) {
+    deriveBodyHashable_compat_hashInto(hashIntoDecl);
+    return;
+  }
+
   // enum SomeEnum {
   //   case A, B, C
   //   @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
@@ -926,8 +965,7 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
     // <hasher> := <hasher>.appending(<ordinal>)
     {
       auto ordinalExpr = integerLiteralExpr(C, index++);
-      hasherExpr = createHasherAppendingCall(C, parentDC,
-                                             hasherExpr, ordinalExpr);
+      hasherExpr = createHasherAppendingCall(C, hasherExpr, ordinalExpr);
     }
 
     if (!hasNoAssociatedValues) {
@@ -937,8 +975,7 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
         auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
         // <hasher> := <hasher>.appending(<payloadVar>)
-        hasherExpr = createHasherAppendingCall(C, parentDC,
-                                               hasherExpr, payloadVarRef);
+        hasherExpr = createHasherAppendingCall(C, hasherExpr, payloadVarRef);
       }
     }
 
@@ -964,6 +1001,11 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
 /// Derive the body for the '_hash(into:)' method for a struct.
 static void
 deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+  if (!parentHasDerivedHashValueImplementation(hashIntoDecl)) {
+    deriveBodyHashable_compat_hashInto(hashIntoDecl);
+    return;
+  }
+
   // struct SomeStruct {
   //   var x: Int
   //   var y: String
@@ -980,8 +1022,8 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   // hasher
   auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
 
-  Expr* hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasherParam),
-                                         DeclNameLoc(), /*implicit*/ true);
+  Expr* hasherExpr = new (C) DeclRefExpr(hasherParam, DeclNameLoc(),
+                                         /*implicit*/ true);
 
   auto storedProperties =
     structDecl->getStoredProperties(/*skipInaccessible=*/true);
@@ -996,14 +1038,22 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
     // <hasher> := <hasher>.appending(self.<property>)
-    hasherExpr = createHasherAppendingCall(C, parentDC,
-                                           hasherExpr, selfPropertyExpr);
+    hasherExpr = createHasherAppendingCall(C, hasherExpr, selfPropertyExpr);
   }
 
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), hasherExpr);
   SmallVector<ASTNode, 1> statements { ASTNode(returnStmt) };
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  auto body = BraceStmt::create(C, SourceLoc(), statements,
+                                SourceLoc(), /*implicit*/ true);
   hashIntoDecl->setBody(body);
+}
+
+/// Derive the body for the '_hash(into:)' method for a class.
+static void
+deriveBodyHashable_class_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+  if (deriveBodyHashable_compat_hashInto(hashIntoDecl))
+    return;
+  llvm_unreachable("Synthesized hashValue for class");
 }
 
 /// Derive the body for the 'hashValue' getter.
@@ -1018,7 +1068,8 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  auto callExpr = CallExpr::createImplicit(C, hashExpr, { selfRef }, { C.Id_for });
+  auto callExpr = CallExpr::createImplicit(C, hashExpr,
+                                           { selfRef }, { C.Id_for });
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   SmallVector<ASTNode, 1> statements { returnStmt };
@@ -1130,37 +1181,64 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
 bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
                                            NominalTypeDecl *type,
                                            ValueDecl *requirement) {
-  auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
-  return canDeriveConformance(tc, type, hashableProto);
+  if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type)) {
+    return false;
+  }
+  // FIXME: This is not actually correct. We cannot promise to always
+  // provide a witness here in all cases. Unfortunately, figuring out
+  // whether this is actually possible requires a parent decl context.
+  // When the answer is no, DerivedConformance::deriveHashable will output
+  // its own diagnostics.
+  return true;
 }
 
 ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
                                               Decl *parentDecl,
                                               NominalTypeDecl *type,
                                               ValueDecl *requirement) {
-  // Conformance can't be synthesized in an extension; we allow it as a special
-  // case for enums with no associated values to preserve source compatibility.
+  ASTContext &C = parentDecl->getASTContext();
+
   auto theEnum = dyn_cast<EnumDecl>(type);
-  if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
-      type != parentDecl) {
-    auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
-    auto hashableType = hashableProto->getDeclaredType();
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                hashableType);
-    return nullptr;
+  
+  // Hashable.hashValue
+  if (requirement->getBaseName() == C.Id_hashValue) {
+    auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
+    // Refuse to synthesize hashValue if type isn't a struct or enum, or if it
+    // has non-Hashable stored properties/associated values.
+    if (!canDeriveConformance(tc, type, hashableProto)) {
+      tc.diagnose(parentDecl->getLoc(), diag::type_does_not_conform,
+                  type->getDeclaredType(), hashableProto->getDeclaredType());
+      return nullptr;
+    }
+    // hashValue can't be synthesized in an extension; we allow it as a special
+    // case for enums with no associated values to preserve source
+    // compatibility.
+    if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
+        type != parentDecl) {
+      tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+                  hashableProto->getDeclaredType());
+      return nullptr;
+    }
+
+    return deriveHashable_hashValue(tc, parentDecl, type);
   }
 
-  // Build the necessary decl.
-  if (requirement->getBaseName() == "hashValue") {
-    // Also derive _hash(into:) -- it has a default implementation, so we
-    // wouldn't otherwise consider it as a candidate for synthesizing.
+  // Hashable._hash(into:)
+  if (requirement->getBaseName() == C.Id_hash) {
+    // We always allow _hash(into:) to be synthesized.  Its body changes
+    // depending on whether hashValue was implemented explicitly, and whether
+    // the type is a struct or an enum.
     if (theEnum)
-      deriveHashable_hashInto(tc, parentDecl, theEnum,
-                              &deriveBodyHashable_enum_hashInto);
+      return deriveHashable_hashInto(tc, parentDecl, theEnum,
+                                     &deriveBodyHashable_enum_hashInto);
     else if (auto theStruct = dyn_cast<StructDecl>(type))
-      deriveHashable_hashInto(tc, parentDecl, theStruct,
-                              &deriveBodyHashable_struct_hashInto);
-    return deriveHashable_hashValue(tc, parentDecl, type);
+      return deriveHashable_hashInto(tc, parentDecl, theStruct,
+                                     &deriveBodyHashable_struct_hashInto);
+    else if (auto theClass = dyn_cast<ClassDecl>(type))
+      return deriveHashable_hashInto(tc, parentDecl, theClass,
+                                     &deriveBodyHashable_class_hashInto);
+    else
+      llvm_unreachable("todo");
   }
   tc.diagnose(requirement->getLoc(),
               diag::broken_hashable_requirement);
