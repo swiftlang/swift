@@ -236,8 +236,8 @@ foreach(SDK ${SWIFT_SDKS})
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.
-              "${SWIFT_ANDROID_ICU_UC}"
-              "${SWIFT_ANDROID_ICU_I18N}")
+              "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
+              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}")
     endif()
     add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
         ${command_upload_stdlib}
