@@ -1985,16 +1985,14 @@ struct ComparisonTestCase {
   }
 }
 
-let simpleComparisonTestCases = [
+let comparisonTestCases = [
   ComparisonTestCase(["a", "a"], .equal),
   ComparisonTestCase(["abcdefg", "abcdefg"], .equal),
   ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
 
   ComparisonTestCase(["ábcdefg", "ábcdefgh", "ábcdefghi"], .less),
   ComparisonTestCase(["abcdefg", "abcdefgh", "abcdefghi"], .less),
-]
 
-let complexComparisonTestCases = [
   ComparisonTestCase(["á", "\u{0061}\u{0301}"], .equal),
   ComparisonTestCase(["à", "\u{0061}\u{0301}", "â", "\u{e3}", "a\u{0308}"], .less),
   
@@ -2066,8 +2064,6 @@ let complexComparisonTestCases = [
   ComparisonTestCase(["ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .equal)
 ]
 
-let comparisonTestCases = simpleComparisonTestCases + complexComparisonTestCases
-
 for test in comparisonTestCases {
   StringTests.test("Comparison.\(test.strings)") {
     test.test()
@@ -2078,9 +2074,7 @@ for test in comparisonTestCases {
     .code {
     test.testOpaqueStrings()
   }
-}
 
-for test in simpleComparisonTestCases {
   StringTests.test("Comparison.OpaqueSubstring.\(test.strings)")
     .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
     .code {
