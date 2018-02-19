@@ -94,10 +94,76 @@ RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
   expectEqual(Array2D(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
 }
 
+RankedTensorTests.test("ElementIndexing") {
+  // NOTE: This tests the `subscript(index:)` method, which is distinct from
+  // the `subscript(indices:)` method.
+  // NOTE: cannot test multiple `Tensor.shape` or `Tensor.scalars` directly
+  // until send and receive are implemented (without writing a bunch of mini
+  // tests). Instead, `Tensor.array` is called to make a ShapedArray host copy
+  // and the ShapedArray is tested.
+  let tensor3D = Tensor3D<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1))
+  )
+  let element2D = tensor3D[2]
+  let element1D = tensor3D[1][3]
+  let element0D = tensor3D[2][0][3]
+
+  let array2D = element2D.array
+  let array1D = element1D.array
+
+  /// Test shapes
+  expectEqual([4, 5], array2D.shape)
+  expectEqual(5, array1D.count)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 40.0, to: 60.0, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 35.0, to: 40.0, by: 1)), array1D)
+  expectEqual(43, element0D)
+}
+
+RankedTensorTests.test("SliceIndexing") {
+  // NOTE: cannot test `TensorXD.shape` or `TensorXD.scalars` directly until
+  // send and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `TensorXD.array` is called to make an ArrayXD host copy and the
+  // ArrayXD is tested instead.
+  let tensor3D = Tensor3D<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1))
+  )
+  let slice3D = tensor3D[1..<2]
+  let slice2D = tensor3D[1][0..<2]
+  let slice1D = tensor3D[0][0][3..<5]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual(2, array1D.count)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 20.0, to: 40, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D)
+}
+
 RankedTensorTests.testCPUAndGPU("Reduction") {
+  // 2 x 5
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxis: 0)
   expectEqual([2, 4, 6, 8, 10], sum.array)
+}
+
+RankedTensorTests.testCPUAndGPU("ArgMax") {
+  // 2 x 3
+  let x = Tensor2D<Float>([[0, 1, 2], [3, 4, 5]])
+  let argmax0 = x.argmax(alongAxis: 0)
+  let argmax1 = x.argmax(alongAxis: 1)
+  let scalarsArgmax = x.argmax()
+  expectEqual([1, 1, 1], argmax0.array)
+  expectEqual([2, 2], argmax1.array)
+  expectEqual(5, scalarsArgmax)
 }
 
 RankedTensorTests.testCPUAndGPU("SimpleMath") {
@@ -110,14 +176,9 @@ RankedTensorTests.testCPUAndGPU("Convolution") {
   // TODO: the code for initializing Tensor4D instances here is quite verbose.
   // Consider adding `init(shape:repeating)` and/or `init(shape:scalars)`
   // initializers to TensorXD?
-  let x = Tensor4D(
-    identicallyRanked: Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
-  )
-  let filter = Tensor4D(
-    identicallyRanked: Tensor<Float>(
-      shape: [1, 1, 3, 3], scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0]
-    )
-  )
+  let x = Tensor4D<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
+  let filter = Tensor4D<Float>(shape: [1, 1, 3, 3],
+                               scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
   let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
                         padding: .same)
   expectEqual(Array4D(shape: [1, 1, 3, 3],
@@ -167,6 +228,14 @@ RankedTensorTests.testCPUAndGPU("Transpose") {
   expectEqual(2, xT.rank)
   expectEqual([2, 3], xT.shape)
   expectEqual([1, 3, 5, 2, 4, 6], xT.scalars)
+}
+
+RankedTensorTests.testCPUAndGPU("Flatten") {
+  // 2 x 3
+  let matrix = Tensor2D<Int32>([[0, 1, 2], [3, 4, 5]])
+  let flattened = matrix.flattened()
+  expectEqual([6], flattened.shape)
+  expectEqual(Array(0..<6), flattened.scalars)
 }
 
 // FIXME: Partitioner bug (b/72997202)

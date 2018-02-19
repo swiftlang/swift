@@ -37,7 +37,7 @@ ShapedArrayTests.test("Initializers") {
 }
 
 ShapedArrayTests.test("Indexing") {
-  var tensor = ShapedArray(shape: [3, 4, 5], scalars: Array(0..<60))
+  let tensor = ShapedArray(shape: [3, 4, 5], scalars: Array(0..<60))
 
   /// Test shapes
   expectEqual([4, 5], tensor[0].shape)
@@ -46,7 +46,7 @@ ShapedArrayTests.test("Indexing") {
   expectEqual([2, 4, 5], tensor[0..<2].shape)
   expectEqual([3, 5], tensor[0][0..<3].shape)
 
-  /// Test element tensor indexing
+  /// Test element tensor scalars
   expectEqual(Array(0..<20), tensor[0].scalars)
   expectEqual(Array(40..<60), tensor[2].scalars)
   expectEqual(Array(0..<5), tensor[0][0].scalars)
@@ -54,11 +54,13 @@ ShapedArrayTests.test("Indexing") {
   expectEqual([43], tensor[2][0][3].scalars)
   expectEqual([37], tensor[1][3][2].scalars)
 
-  /// Test subtensor indexing
-  expectEqual(Array(40..<60), tensor[2..<3].scalars)
+  /// Test subtensor scalars
+  expectEqual(Array(20..<40), tensor[1..<2].scalars)
   expectEqual(Array(20..<30), tensor[1][0..<2].scalars)
   expectEqual(Array(45..<50), tensor[2][1..<2].scalars)
   expectEqual(Array(3..<5), tensor[0][0][3..<5].scalars)
+
+  // TODO: add more indexing tests, such as slice of slice
 }
 
 ShapedArrayTests.test("ElementMutation") {

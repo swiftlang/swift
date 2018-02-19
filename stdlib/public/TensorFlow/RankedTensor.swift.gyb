@@ -129,13 +129,40 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   /// - Precondition: The tensor must have rank ${rank}.
   @_inlineable @inline(__always)
   public init(identicallyRanked other: Tensor<Scalar>) {
-    // NOTE: Assertion disabled because `other.rank` causes a copy of `other`
+    // NOTE: Precondition disabled because `other.rank` causes a copy of `other`
     // back to the host. Uncomment precondition when send/receive is
     // implemented.
     // TODO(clattner): need a better way of exposing rank information in our
     // model.
     // precondition(other.rank == ${rank}, "Rank is not ${rank}.")
     self.init(base: other)
+  }
+
+  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The shape must have ${rank} dimensions.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  @_inlineable @inline(__always)
+  public init(shape: TensorShape, scalars: [Scalar]) {
+    // TODO: Uncomment precondition when send/receive is implemented.
+    // precondition(shape.count == ${rank},
+    //              "Shape does not have ${rank} dimensions")
+    self.init(base: Tensor(shape: shape, scalars: scalars))
+  }
+
+  /// Creates a ${TensorXD} with the specified shape and a single, repeated
+  /// value.
+  /// - Precondition: The shape must have ${rank} dimensions.
+  /// - Parameters:
+  ///   - shape: The dimensions of the ${TensorXD}.
+  ///   - repeatedValue: The scalar value to repeat.
+  @_inlineable @inline(__always)
+  public init(shape: TensorShape, repeating repeatedValue: Scalar) {
+    // TODO: Uncomment precondition when send/receive is implemented.
+    // precondition(shape.count == ${rank},
+    //              "Shape does not have ${rank} dimensions")
+    self.init(base: Tensor(shape: shape, repeating: repeatedValue))
   }
 }
 
@@ -287,6 +314,13 @@ public extension ${TensorXD} {
     )
     return transposed(withPermutations: defaultPermutations)
   }
+
+  /// Return a copy of the ${TensorXD} collapsed into a Tensor1D in row-major
+  /// order.
+  @_inlineable @inline(__always)
+  func flattened() -> Tensor1D<Scalar> {
+    return Tensor1D(base: base.flattened())
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -298,12 +332,10 @@ public extension ${TensorXD} {
   @_inlineable
   /// Access the scalar specified by a given index.
   /// - Parameter index: Index of the scalar.
-  subscript(index: Int) -> Scalar {
-    @inline(never) get {
-      fatalError("Unimplemented")
-    }
-    @inline(never )set {
-      fatalError("Unimplemented")
+  subscript(index: Int32) -> Scalar {
+    @inline(__always)
+    get {
+      return _TFGetScalarOrDie(base[index].handle)
     }
   }
 % else:
@@ -311,28 +343,21 @@ public extension ${TensorXD} {
   /// Access the element ${ElementTensor} specified by an index in the leading
   /// dimension.
   /// - Parameter index: Index of the element ${ElementTensor}.
-  subscript(index: Int) -> ${ElementTensor}<Scalar> {
+  subscript(index: Int32) -> ${ElementTensor}<Scalar> {
     @inline(__always)
     get {
       return ${ElementTensor}<Scalar>(base: base[index])
-    }
-    @inline(__always)
-    set {
-      base[index] = newValue.base
     }
   }
 % end
 
   /// Access the subtensor specified by a contiguous range of indices.
   /// - Parameter bounds: Contiguous range of indices.
-  //  - TODO: begin/end are vectors in general.
-  // tfop_slice(tensor, begin, end) -> tensor
-  subscript(bounds: Range<Int>) -> ${TensorXD} {
+  @_inlineable
+  subscript(bounds: Range<Int32>) -> ${TensorXD} {
+    @inline(__always)
     get {
-      fatalError("FIXME: implement subscript to tensor")
-    }
-    set {
-      fatalError("FIXME: implement subscript to tensor")
+      return ${TensorXD}<Scalar>(base: base[bounds])
     }
   }
 }
@@ -362,7 +387,28 @@ public extension ${TensorXD} where Scalar : Numeric {
   func mean(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.mean(alongAxes: [axis]))
   }
+
+  @_inlineable @inline(__always)
+  func argmax(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
+    return ${ElementTensor}<Int32>(base: base.argmax(alongAxis: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func argmin(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
+    return ${ElementTensor}<Int32>(base: base.argmin(alongAxis: axis))
+  }
 % end
+  @_inlineable @inline(__always)
+  func argmax() -> Int32 {
+    return _TFGetScalarOrDie(#tfop("ArgMax", flattened(), Tensor<Int32>(0),
+                                   output_type: Int32.self))
+  }
+
+  @_inlineable @inline(__always)
+  func argmin() -> Int32 {
+    return _TFGetScalarOrDie(#tfop("ArgMin", flattened(), Tensor<Int32>(0),
+                                   output_type: Int32.self))
+  }
 }
 
 public extension ${TensorXD} {
@@ -373,11 +419,11 @@ public extension ${TensorXD} {
     return ${LiftedTensor}<Scalar>(base: base.rankLifted())
   }
 
-  /// Returns a shape-padded {LiftedTensor}, inserting a dimension of 1 at the
-  /// specified index.
+  /// Returns a shape-expanded {LiftedTensor}, inserting a dimension of 1 at the
+  /// specified shape index.
   @_inlineable @inline(__always)
-  func shapePadded(atIndex index: Int32) -> ${LiftedTensor}<Scalar> {
-    return ${LiftedTensor}<Scalar>(base: base.shapePadded(atIndex: index))
+  func expandingShape(at shapeIndex: Int32) -> ${LiftedTensor}<Scalar> {
+    return ${LiftedTensor}<Scalar>(base: base.expandingShape(at: shapeIndex))
   }
 % end
 }

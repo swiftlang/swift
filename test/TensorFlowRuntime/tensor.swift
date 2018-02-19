@@ -84,10 +84,99 @@ TensorTests.testCPUAndGPU("BoolToNumericCast") {
   expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
 }
 
+TensorTests.test("ElementIndexing") {
+  // NOTE: This tests the `subscript(index:)` method, which is distinct from
+  // the `subscript(indices:)` method.
+  // NOTE: cannot test multiple `Tensor.shape` or `Tensor.scalars` directly
+  // until send and receive are implemented (without writing a bunch of mini
+  // tests). Instead, `Tensor.array` is called to make a ShapedArray host copy
+  // and the ShapedArray is tested.
+  let tensor3D = Tensor<Float>(shape: [3, 4, 5],
+                               scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let element2D = tensor3D[2]
+  let element1D = tensor3D[1][3]
+  let element0D = tensor3D[2][0][3]
+
+  let array2D = element2D.array
+  let array1D = element1D.array
+  let array0D = element0D.array
+
+  /// Test shapes
+  expectEqual([4, 5], array2D.shape)
+  expectEqual([5], array1D.shape)
+  expectEqual([], array0D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 35.0, to: 40, by: 1)), array1D.scalars)
+  expectEqual([43], array0D.scalars)
+}
+
+TensorTests.test("NestedElementIndexing") {
+  // NOTE: This tests the `subscript(indices:)` method, which is distinct from
+  // the `subscript(index:)` method.
+  // NOTE: This test could use a clearer name, along with other "indexing"
+  // tests. Note to update corresponding test names in other files
+  // (ranked_tensor.test, shaped_array.test) as well.
+  let tensor3D = Tensor<Float>(shape: [3, 4, 5],
+                               scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let element1D = tensor3D[1, 3]
+  let element0D = tensor3D[2, 0, 3]
+
+  let array1D = element1D.array
+  let array0D = element0D.array
+
+  /// Test shapes
+  expectEqual([5], array1D.shape)
+  expectEqual([], array0D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 35.0, to: 40, by: 1)), array1D.scalars)
+  expectEqual([43], array0D.scalars)
+}
+
+TensorTests.test("SliceIndexing") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  let tensor3D = Tensor<Float>(shape: [3, 4, 5],
+                               scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let slice3D = tensor3D[1..<2]
+  let slice2D = tensor3D[1][0..<2]
+  let slice1D = tensor3D[0][0][3..<5]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual([2], array1D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 20.0, to: 40, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
+}
+
 TensorTests.testCPUAndGPU("Reduction") {
+  // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxes: [0], keepingDimensions: true)
   expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]), sum.array)
+}
+
+TensorTests.testCPUAndGPU("ArgMax") {
+  // 2 x 3
+  let x = Tensor<Float>([[0, 1, 2], [3, 4, 5]])
+  let argmax0 = x.argmax(alongAxis: 0)
+  let argmax1 = x.argmax(alongAxis: 1)
+  let scalarsArgmax = x.argmax()
+  expectEqual(ShapedArray(shape: [3], scalars: [1, 1, 1]), argmax0.array)
+  expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), argmax1.array)
+  expectEqual(5, scalarsArgmax)
 }
 
 TensorTests.testCPUAndGPU("SimpleMath") {
@@ -146,14 +235,14 @@ TensorTests.testCPUAndGPU("XWPlusB") {
   let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
   // Shape: 2
   let b = Tensor([0.5, 0.5])
-  // Do xW+b!
+  // Shape: 1 x 2 (broadcasted)
   let result = x ⊗ w + b
   expectEqual([1, 2], result.shape)
   expectEqual([12.5, 6.5], result.scalars)
 }
 
 TensorTests.testCPUAndGPU("Transpose") {
-  // Shape: 3 x 2
+  // 3 x 2 -> 2 x 3
   let xT = Tensor([[1, 2], [3, 4], [5, 6]]).transposed()
   let xTArray = xT.array
   expectEqual(2, xTArray.rank)
@@ -242,23 +331,42 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
 }
 
 TensorTests.testCPUAndGPU("Reshape") {
-  // 3 x 1
-  let x = Tensor([[1], [2], [3]])
-  let y = x.reshaped(to: [1, 3, 1, 1, 1])
-  expectEqual([1, 3, 1, 1, 1], y.shape)
+  // 2 x 3 -> 1 x 3 x 1 x 2 x 1
+  let matrix = Tensor<Int32>([[0, 1, 2], [3, 4, 5]])
+  let reshaped = matrix.reshaped(to: [1, 3, 1, 2, 1])
+
+  expectEqual([1, 3, 1, 2, 1], reshaped.shape)
+  expectEqual(Array(0..<6), reshaped.scalars)
+}
+
+TensorTests.testCPUAndGPU("Flatten") {
+  // 2 x 3 -> 6
+  let matrix = Tensor<Int32>([[0, 1, 2], [3, 4, 5]])
+  let flattened = matrix.flattened()
+
+  expectEqual([6], flattened.shape)
+  expectEqual(Array(0..<6), flattened.scalars)
+}
+
+TensorTests.testCPUAndGPU("Flatten0D") {
+  let scalar = Tensor<Float>(5)
+  let flattened = scalar.flattened()
+  expectEqual([1], flattened.shape)
+  expectEqual([5], flattened.scalars)
 }
 
 TensorTests.testCPUAndGPU("ReshapeToScalar") {
+  // 1 x 1 -> scalar
   let z = Tensor([[10]]).reshaped(to: [])
   expectEqual([], z.shape)
 }
 
 TensorTests.testCPUAndGPU("BroadcastTensor") {
-  // 3 x 1
-  let x = Tensor<Float>(shape: [3, 1], repeating: 0.0)
-  let y = Tensor<Float>(shape: [1, 3, 1, 1, 1], repeating: 0.0)
+  // 2 x 3 -> 1 x 3 x 1 x 2 x 1
+  let x = Tensor<Float>(shape: [2, 3], repeating: 0.0)
+  let y = Tensor<Float>(shape: [1, 3, 1, 2, 1], repeating: 0.0)
   let result = x.broadcast(to: y)
-  expectEqual([1, 3, 1, 1, 1], result.shape)
+  expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
 TensorTests.testCPU("StraightLineXORTraining") {
@@ -398,34 +506,63 @@ TensorTests.testCPU("XORClassifierTraining") {
   // expectEqual(classifier.prediction(for: true, true), false)
 }
 
+// TODO: Merge all rank/shape getter tests into one when we support code motion
+// to avoid sends.
+
 @inline(never)
 func testRankGetter() {
-  let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-  expectEqual(2, x.rank)
+  let tensor = Tensor<Int32>(shape: [3, 4, 5], scalars: Array(0..<60))
+  expectEqual(3, tensor.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 
-// TODO: Merge into the previous example when we support code motion to avoid
-// sends.
 @inline(never)
 func testRankGetter2() {
-  let y = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
-  expectEqual(7, y.rank)
+  let vector = Tensor<Int32>([1])
+  expectEqual(1, vector.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter2", testRankGetter2)
 
 @inline(never)
+func testRankGetter3() {
+  let matrix = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  expectEqual(2, matrix.rank)
+}
+TensorTests.testCPUAndGPU("RankGetter3", testRankGetter3)
+
+@inline(never)
+func testRankGetter4() {
+  let ones = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
+  expectEqual(7, ones.rank)
+}
+TensorTests.testCPUAndGPU("RankGetter4", testRankGetter4)
+
+@inline(never)
 func testShapeGetter() {
-  let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-  expectEqual([2, 3], x.shape)
+  let tensor = Tensor<Int32>(shape: [3, 4, 5], scalars: Array(0..<60))
+  expectEqual([3, 4, 5], tensor.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
-  let y = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
-  expectEqual([1, 2, 2, 2, 2, 2, 1], y.shape)
+  let vector = Tensor<Int32>([1])
+  expectEqual([1], vector.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter2", testShapeGetter2)
+
+@inline(never)
+func testShapeGetter3() {
+  let matrix = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  expectEqual([2, 3], matrix.shape)
+}
+TensorTests.testCPUAndGPU("ShapeGetter3", testShapeGetter3)
+
+@inline(never)
+func testShapeGetter4() {
+  let ones = Tensor<Int32>(ones: [1, 2, 2, 2, 2, 2, 1])
+  expectEqual([1, 2, 2, 2, 2, 2, 1], ones.shape)
+}
+TensorTests.testCPUAndGPU("ShapeGetter4", testShapeGetter4)
 
 runAllTests()
