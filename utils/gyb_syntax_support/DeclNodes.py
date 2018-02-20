@@ -56,6 +56,7 @@ DECL_NODES = [
          element='FunctionParameter'),
 
     Node('ParameterClause', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ParameterList', kind='FunctionParameterList'),
@@ -106,19 +107,21 @@ DECL_NODES = [
          ]),
 
     Node('PoundErrorDecl', kind='Decl',
+         traits=['Parenthesized'],
          children=[
              Child('PoundError', kind='PoundErrorToken'),
-             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Message', kind='StringLiteralExpr'),
-             Child('RightParenToken', kind='RightParenToken')
+             Child('RightParen', kind='RightParenToken')
          ]),
 
     Node('PoundWarningDecl', kind='Decl',
+         traits=['Parenthesized'],
          children=[
              Child('PoundWarning', kind='PoundWarningToken'),
-             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Message', kind='StringLiteralExpr'),
-             Child('RightParenToken', kind='RightParenToken')
+             Child('RightParen', kind='RightParenToken')
          ]),
 
     Node('DeclModifier', kind='Syntax',
@@ -416,11 +419,11 @@ DECL_NODES = [
     Node('AccessLevelModifier', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
-             Child('OpenParen', kind='LeftParenToken',
+             Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
              Child('Modifier', kind='IdentifierToken',
                    is_optional=True),
-             Child('CloseParen', kind='RightParenToken',
+             Child('RightParen', kind='RightParenToken',
                    is_optional=True),
          ]),
 
@@ -447,6 +450,7 @@ DECL_NODES = [
 
     # (value)
     Node('AccessorParameter', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Name', kind='IdentifierToken'),

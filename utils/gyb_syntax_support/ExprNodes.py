@@ -59,6 +59,7 @@ EXPR_NODES = [
     Node('DeclNameArgumentList', kind='SyntaxCollection',
          element='DeclNameArgument'),
     Node('DeclNameArguments', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='DeclNameArgumentList'),
@@ -181,6 +182,7 @@ EXPR_NODES = [
          ]),
 
     Node('TupleExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ElementList', kind='TupleElementList'),
@@ -459,6 +461,7 @@ EXPR_NODES = [
 
     # expression segment in a string interpolation expression.
     Node('ExpressionSegment', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
              Child('LeftParen', kind='LeftParenToken'),
@@ -501,6 +504,7 @@ EXPR_NODES = [
 
     # e.g. "#keyPath(a.b.c)"
     Node('ObjcKeyPathExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('KeyPath', kind='PoundKeyPathToken'),
              Child('LeftParen', kind='LeftParenToken'),
@@ -515,6 +519,7 @@ EXPR_NODES = [
          ]),
     # #fileLiteral(a, b, c)
     Node('ObjectLiteralExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('Identifier', kind='Token',
                    token_choices=[
