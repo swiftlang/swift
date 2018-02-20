@@ -398,57 +398,64 @@ TensorTests.testCPUAndGPU("BroadcastTensor") {
 }
 
 TensorTests.testCPU("StraightLineXORTraining") {
+  // FIXME: This test fails on Eager API.
+  guard !_RuntimeConfig.usesTFEagerAPI else { return }
+  // FIXME: This test fails on both CPU and GPU when --config=cuda is on.
+#if CUDA
+  return
+#endif
+
+  // Enable runtime support for loops.
+  guard doLoopTest() else { return }
+
   // Hyper-parameters
-  let iterationCount = 1000
+  let iterationCount = 2000
   let learningRate: Float = 0.2
   var loss = Float.infinity
 
   // Parameters
-  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
-  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
-  var b1 = Tensor<Float>(shape: [1, 4], repeating: 0.0)
-  var b2 = Tensor<Float>(shape: [1, 1], repeating: 0.0)
+  var w1 = Tensor<Float>(randomUniform: [2, 4])
+  var w2 = Tensor<Float>(randomUniform: [4, 1])
+  var b1 = Tensor<Float>(zeros: [1, 4])
+  var b2 = Tensor<Float>(zeros: [1, 1])
 
   // Training data
-  let x = Tensor<Float>(
-    shape: [4, 2],
-    scalars: [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
-  )
-  let y = Tensor<Float>(
-    shape: [4, 1],
-    scalars: [0.0, 1.0, 1.0, 0.0]
-  )
+  let x: Tensor<Float> = [[0, 0], [0, 1], [1, 0], [1, 1]]
+  let y: Tensor<Float> = [[0], [1], [1], [0]]
 
   // Training loop
-  // FIXME: Loop crasher b/73088003
-  // for _ in 0..<iterationCount {
+  // FIXME: Use a for-loop when it can be properly deabstracted.
+  var i = 0
+  repeat {
+    // Forward pass
     let z1 = x.dot(w1) + b1
     let h1 = sigmoid(z1)
     let z2 = h1.dot(w2) + b2
     let pred = sigmoid(z2)
 
+    // Backward pass
     let dz2 = pred - y
-    let dw2 = h1.transposed().dot(dz2)
+    let dw2 = h1.transposed(withPermutations: [1, 0]).dot(dz2)
     let db2 = dz2.sum(alongAxes: [0])
-    let dz1 = dz2.dot(w2.transposed()) * h1 * (1 - h1)
-    let dw1 = x.transposed().dot(dz1)
+    let dz1 = dz2.dot(w2.transposed(withPermutations: [1, 0])) * h1 * (1 - h1)
+    let dw1 = x.transposed(withPermutations: [1, 0]).dot(dz1)
     let db1 = dz1.sum(alongAxes: [0])
 
-    // Descent
-    w1 -= (dw1 * learningRate)
-    b1 -= (db1 * learningRate)
-    w2 -= (dw2 * learningRate)
-    b2 -= (db2 * learningRate)
+    // Gradient descent
+    w1 -= dw1 * learningRate
+    b1 -= db1 * learningRate
+    w2 -= dw2 * learningRate
+    b2 -= db2 * learningRate
 
     // Update current loss
-    // FIXME: Partitioner bug (b/73260623) turns this into malformed SIL.
-    // Uncommend when fixed.
-    //
-    // loss = dz2.squared().mean()
-  // }
+    loss = dz2.squared().mean(alongAxes: [1, 0]).scalarized()
+
+    // Update iteration count
+    i += 1
+  } while i < iterationCount
 
   // Check results
-  // expectLT(loss, 0.00001)
+  expectLT(loss, 0.0001)
 }
 
 TensorTests.testCPU("XORClassifierTraining") {
