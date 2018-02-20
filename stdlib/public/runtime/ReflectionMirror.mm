@@ -514,8 +514,8 @@ struct OpaqueImpl: ReflectionMirrorImpl {
 
 
 template<typename F>
-auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedType, const F &f)
-    -> decltype(f(nullptr))
+auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedType,
+          const F &f) -> decltype(f(nullptr))
 {
   const Metadata *type;
   OpaqueValue *value;
@@ -548,7 +548,9 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
   #if SWIFT_OBJC_INTEROP
     // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
-    if (!static_cast<const ClassMetadata*>(passedType)->isTypeMetadata()) {
+    // ForeignClass (e.g. CF classes) manifests as a NULL class object.
+    auto classObject = passedType->getClassObject();
+    if (classObject == nullptr || !classObject->isTypeMetadata()) {
       ObjCClassImpl impl;
       return call(&impl);
     }
