@@ -668,7 +668,7 @@ public extension Tensor {
         - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
       let offset: Tensor<Int32> = Tensor<Int32>(
         Tensor<Float>(
-          handle: #tfop("ScatterNd", Tensor<Int32>([0]).rankLifted(),
+          handle: #tfop("ScatterNd", Tensor<Int32>([[0]]),
                         Tensor<Float>(boundSize), rankTensor.rankLifted())
         )
       )
