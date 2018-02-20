@@ -422,10 +422,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
-                                                    llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic, {});
-    IGF.Builder.CreateUnreachable();
+    IGF.emitTrap(/*EmitUnreachable=*/true);
     break;
   }
   }
