@@ -1322,18 +1322,16 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
   for (auto &elt : graphBody.outputs)
     outs.push_back(elt.second);
 
-  auto resultFn =
-    TF_GraphToFunction(graphBody.getGraph(), name.str().c_str(),
-                       /*append_hash_to_fn_name*/false,
-                       /*num_opers*/graphBody.operations.size(),
-                       /*opers*/graphBody.operations.data(),
-                       /*numinputs*/ins.size(),
-                       /*inputs*/ins.data(),
-                       /*noutputs*/outs.size(),
-                       /*outputs*/outs.data(),
-                       /*outputnames*/nullptr,
-                       /*functionoptions*/nullptr,
-                       "", status);
+  auto resultFn = TF_GraphToFunction(graphBody.getGraph(), name.str().c_str(),
+                                     /*append_hash_to_fn_name*/ false,
+                                     /*num_opers*/ -1,
+                                     /*opers*/ nullptr,
+                                     /*numinputs*/ ins.size(),
+                                     /*inputs*/ ins.data(),
+                                     /*noutputs*/ outs.size(),
+                                     /*outputs*/ outs.data(),
+                                     /*outputnames*/ nullptr,
+                                     /*functionoptions*/ nullptr, "", status);
   // Diagnose any error that occurred if it happened building the graph.
   if (checkStatus(SILFn->getLocation()))
     return true;

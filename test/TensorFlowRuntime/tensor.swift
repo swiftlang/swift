@@ -250,23 +250,18 @@ TensorTests.testCPUAndGPU("Transpose") {
   expectEqual([1, 3, 5, 2, 4, 6], xTArray.scalars)
 }
 
-// FIXME: Partitioner bug (b/72997202)
-#if false // Remove #if when fixed.
-// This is derived from a TF Eager testcase.
-TensorTests.testGPU("loopsAndConditions") {
-  var a = Tensor<Int32>(6)
-  var count = Tensor<Int32>(0)
-  while (a != 1).scalar! {
-    if (a % 2 == 0).scalar! {
-      a = a / 2
-    } else {
-      a = 3 * a + 1
-    }
-    count += 1
+TensorTests.testCPUAndGPU("SimpleCond") {
+  func selectValue(_ pred: Bool) -> Tensor<Int32> {
+  let a = Tensor<Int32>(0)
+  let b = Tensor<Int32>(1)
+  if pred  {
+    return a
   }
-  expectEqual(8, count.scalar)
+    return b
+  }
+
+  expectEqual(0, selectValue(true).scalar)
 }
-#endif
 
 @inline(never)
 func testXORInference() {
