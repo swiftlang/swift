@@ -41,15 +41,24 @@ TensorTests.testCPUAndGPU("FactoryInitializers") {
   expectEqual(ShapedArray(shape: [1, 10], repeating: 1), x.array)
 }
 
-TensorTests.testCPUAndGPU("RandomInitializer") {
-  let random = Tensor<Float>(
+TensorTests.testCPUAndGPU("RandomNormalInitializer") {
+  let normal = Tensor<Float>(
     randomNormal: [3, 4], mean: 100, stddev: 50, seed: 42
   )
-  expectEqual([3, 4], random.shape)
-  expectPointwiseNearlyEqual([
-    137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
-    107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
-  ], random.scalars)
+  expectEqual([3, 4], normal.shape)
+  expectEqual([85.9612427, 93.1123962, 66.1835175, 101.229019,
+               55.3207741, 58.5763359, 160.344727, 169.050781,
+               27.2101135, 87.6893082, 31.9579697, 154.39801],
+              normal.scalars)
+}
+
+TensorTests.testCPUAndGPU("RandomUniformInitializer") {
+  let uniform = Tensor<Float>(randomUniform: [3, 4], seed: 42)
+  expectEqual([3, 4], uniform.shape)
+  expectEqual([0.952271461, 0.677407742, 0.795318246, 0.75578177,
+               0.475955606, 0.631014824, 0.186020374, 0.114307761,
+               0.336221814, 0.723335028, 0.219199657, 0.857337594],
+              uniform.scalars)
 }
 
 TensorTests.testCPUAndGPU("ScalarToTensorConversion") {
@@ -203,6 +212,13 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   expectEqual([2], array.shape)
   expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars,
                              byError: 0.0001)
+}
+
+TensorTests.testCPUAndGPU("ReductionToScalar") {
+  let x: Tensor<Float> = [1, 2, 3, 4, 5]
+  expectEqual(x.mean(), 3)
+  // TODO: Test other reduction ops here. Currently code motion isn't
+  // smart enough to avoid send/receive.
 }
 
 TensorTests.testCPUAndGPU("Convolution") {

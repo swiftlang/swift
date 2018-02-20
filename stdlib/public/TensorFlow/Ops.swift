@@ -239,10 +239,8 @@ public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @_inlineable @inline(__always)
   func transposed() -> Self {
-    let defaultPermutations = (rankTensor - 1) - Tensor<Int32>(
-      rangeFrom: Tensor<Int32>(handle: _TFMakeScalarTensor(0)),
-      to: rankTensor,
-      stride: Tensor<Int32>(handle: _TFMakeScalarTensor(1))
+    let defaultPermutations = rankTensor - 1 - Tensor<Int32>(
+      rangeFrom: 0, to: rank, stride: 1
     )
     return transposed(withPermutations: defaultPermutations)
   }
@@ -461,26 +459,26 @@ public extension TensorProtocol where Scalar == Bool {
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func mean() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Mean", self,
-                                   Tensor<Int32>([] as [Int32])))
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Mean", self, axes))
   }
 
   @_inlineable @inline(__always)
   func min() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Min", self,
-                                   Tensor<Int32>([] as [Int32])))
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Min", self, axes))
   }
 
   @_inlineable @inline(__always)
   func max() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Max", self,
-                                   Tensor<Int32>([] as [Int32])))
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Max", self, axes))
   }
 
   @_inlineable @inline(__always)
   func sum() -> Scalar {
-    return _TFGetScalarOrDie(#tfop("Sum", self,
-                                   Tensor<Int32>([] as [Int32])))
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Sum", self, axes))
   }
 }
 

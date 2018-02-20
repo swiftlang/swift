@@ -54,7 +54,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   internal var base: Tensor<Scalar>
 
   @_inlineable
-  public static var rank: Int {
+  public static var rank: Int32 {
     @inline(__always)
     get {
       return ${rank}
@@ -62,7 +62,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   }
 
   @_inlineable
-  public var rank: Int {
+  public var rank: Int32 {
     @inline(__always)
     get {
       return ${rank}
@@ -80,7 +80,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   }
 
   @_inlineable
-  public var scalarCount: Int {
+  public var scalarCount: Int32 {
     @inline(__always)
     get {
       return base.scalarCount
@@ -281,13 +281,27 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
   ///
   @_inlineable @inline(__always)
   init(
-    randomNormal shape: TensorShape, mean: Double = 0, stddev: Double = 1,
+    randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
     seed: Int32 = 0
   ) {
     self.init(
-      base: Tensor<Scalar>(
-        randomNormal: shape, mean: mean, stddev: stddev, seed: seed
-      )
+      base: Tensor(randomNormal: shape, mean: mean, stddev: stddev, seed: seed)
+    )
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - min: The lower bound of the distribution.
+  ///   - max: The upper bound of the distribution.
+  ///   - seed: A random seed for the operation.
+  ///
+  @_inlineable @inline(__always)
+  init(randomUniform shape: TensorShape, seed: Int32 = 0) {
+    self.init(
+      base: Tensor(randomUniform: shape, seed: seed)
     )
   }
 }
@@ -301,10 +315,8 @@ public extension ${TensorXD} {
   /// order.
   @_inlineable @inline(__always)
   func transposed() -> ${TensorXD} {
-    let defaultPermutations = (rankTensor - 1) - Tensor<Int32>(
-    rangeFrom: Tensor<Int32>(handle: _TFMakeScalarTensor(0)),
-      to: rankTensor,
-      stride: Tensor<Int32>(handle: _TFMakeScalarTensor(1))
+    let defaultPermutations = rankTensor - 1 - Tensor<Int32>(
+      rangeFrom: 0, to: rank, stride: 1
     )
     return transposed(withPermutations: defaultPermutations)
   }
