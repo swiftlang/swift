@@ -9,14 +9,22 @@ import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
 
-// TODO(b/73088003): Fix test crashes on GPU.
-LoopsTests.testCPU("simpleCounterLoop") {
-  // When using TF C API and GPU is available, the computation will be placed
-  // on GPU automatically, and GPU support for loops is not yet ready.
-  if !_RuntimeConfig.usesTFEagerAPI &&
-    _ExecutionContext.global.gpuDeviceName != nil {
-    return
+func doLoopTest() -> Bool {
+  // Loop testing on GPU is only supported via XLA, which in turn only
+  // supports TF C API.
+  //
+  // So for TF eager C API + GPU execution, the test is skipped.
+  if _RuntimeConfig.usesTFEagerAPI &&
+     _ExecutionContext.global.gpuDeviceName != nil {
+    print("Loop tests are skipped in Eager + GPU mode.")
+    return false
   }
+  _RuntimeConfig.usesXLA = true
+  return true
+}
+
+LoopsTests.testCPUAndGPU("simpleCounterLoop") {
+  if !doLoopTest() { return }
 
   let maxCount = 100
   var a = Tensor<Int32>(0)
@@ -33,13 +41,8 @@ LoopsTests.testCPU("simpleCounterLoop") {
 }
 
 // Explicitly use Int64 everywhere.
-LoopsTests.testCPU("simpleCounterLoop_Int64") {
-  // When using TF C API and GPU is available, the computation will be placed
-  // on GPU automatically, and GPU support for loops is not yet ready.
-  if !_RuntimeConfig.usesTFEagerAPI &&
-    _ExecutionContext.global.gpuDeviceName != nil {
-    return
-  }
+LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
+  if !doLoopTest() { return }
 
   let maxCount = 100
   var a = Tensor<Int64>(0)
@@ -56,13 +59,8 @@ LoopsTests.testCPU("simpleCounterLoop_Int64") {
 }
 
 // Explicitly use Int32 everywhere.
-LoopsTests.testCPU("simpleCounterLoop_Int32") {
-  // When using TF C API and GPU is available, the computation will be placed
-  // on GPU automatically, and GPU support for loops is not yet ready.
-  if !_RuntimeConfig.usesTFEagerAPI &&
-    _ExecutionContext.global.gpuDeviceName != nil {
-    return
-  }
+LoopsTests.testCPUAndGPU("simpleCounterLoop_Int32") {
+  if !doLoopTest() { return }
 
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
@@ -77,5 +75,25 @@ LoopsTests.testCPU("simpleCounterLoop_Int32") {
   a -= b
   expectEqual(98, a.scalar)
 }
+
+// FIXME: Compiler bug (b/73607740)
+// error: internal error generating TensorFlow graph:
+// GraphGen cannot lower a 'send' to the host yet
+#if false // Remove #if when fixed.
+// This is derived from a TF Eager testcase.
+TensorTests.testGPU("loopsAndConditions") {
+  var a = Tensor<Int32>(6)
+  var count = Tensor<Int32>(0)
+  while (a != 1).scalar! {
+    if (a % 2 == 0).scalar! {
+      a = a / 2
+    } else {
+      a = 3 * a + 1
+    }
+    count += 1
+  }
+  expectEqual(8, count.scalar)
+}
+#endif
 
 runAllTests()

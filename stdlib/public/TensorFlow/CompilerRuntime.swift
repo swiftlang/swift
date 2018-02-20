@@ -582,6 +582,7 @@ public final class _TensorComputation {
         case TF_INT64: dumpTensorContent(inputTensorHandle, Int64.self)
         case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
         case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
+        case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
         default: fatalError("Unsupported dtype \(dType)")
         }
       }
