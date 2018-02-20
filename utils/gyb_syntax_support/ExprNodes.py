@@ -220,6 +220,7 @@ EXPR_NODES = [
 
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
                    is_optional=True),
@@ -232,6 +233,7 @@ EXPR_NODES = [
 
     # An element inside a tuple element list
     Node('TupleElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
                    is_optional=True),
@@ -244,6 +246,7 @@ EXPR_NODES = [
 
     # element inside an array expression: expression ','?
     Node('ArrayElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Expression', kind='Expr'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
@@ -251,6 +254,7 @@ EXPR_NODES = [
 
     # element inside an array expression: expression ','?
     Node('DictionaryElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('KeyExpression', kind='Expr'),
              Child('Colon', kind='ColonToken'),
@@ -340,6 +344,7 @@ EXPR_NODES = [
          ]),
 
     Node('ClosureCaptureItem', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child("Specifier", kind='TokenList', is_optional=True),
              Child("Name", kind='IdentifierToken', is_optional=True),
@@ -359,6 +364,7 @@ EXPR_NODES = [
          ]),
 
     Node('ClosureParam', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Name', kind='Token',
                    token_choices=[

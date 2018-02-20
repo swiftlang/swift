@@ -138,6 +138,7 @@ DECL_NODES = [
          ]),
 
     Node('InheritedType', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
             Child('TypeName', kind='Type'),
             Child('TrailingComma', kind='CommaToken', is_optional=True),
@@ -269,6 +270,7 @@ DECL_NODES = [
     # external-parameter-name? local-parameter-name ':'
     #   type '...'? '='? expression? ','?
     Node('FunctionParameter', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -483,6 +485,7 @@ DECL_NODES = [
 
     # Pattern: Type = Value { get {} },
     Node('PatternBinding', kind="Syntax",
+         traits=['WithTrailingComma'],
          children=[
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
