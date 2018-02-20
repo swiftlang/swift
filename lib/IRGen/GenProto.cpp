@@ -1968,10 +1968,7 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
 
   // The counts didn't match; abort.
   IGF.Builder.emitBlock(failBB);
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
-  IGF.Builder.CreateCall(trapIntrinsic, {});
-  IGF.Builder.CreateUnreachable();
+  IGF.emitTrap(/*EmitUnreachable=*/true);
 
   return fn;
 }

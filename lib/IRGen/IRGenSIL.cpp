@@ -388,7 +388,6 @@ public:
   /// Holds the DominancePoint of values that are storage for a source variable.
   SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
-  unsigned NumCondFails = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
@@ -3851,9 +3850,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc, bool checkPinned) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic, {});
+    IGF.emitTrap(/*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
   }
 
@@ -4480,10 +4477,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
   IGF.FailBBs.push_back(failBB);
   
   IGF.Builder.emitBlock(failBB);
-  llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
-    &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
-  IGF.Builder.CreateCall(trapIntrinsic, {});
-  IGF.Builder.CreateUnreachable();
+  IGF.emitTrap(/*EmitUnreachable=*/true);
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   IGF.Builder.emitBlock(contBB);
@@ -5377,28 +5371,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
-
-  if (IGM.IRGen.Opts.shouldOptimize()) {
-    // Emit unique side-effecting inline asm calls in order to eliminate
-    // the possibility that an LLVM optimization or code generation pass
-    // will merge these blocks back together again. We emit an empty asm
-    // string with the side-effect flag set, and with a unique integer
-    // argument for each cond_fail we see in the function.
-    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-    llvm::Type *argTys = { asmArgTy };
-    llvm::FunctionType *asmFnTy =
-      llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-    llvm::InlineAsm *inlineAsm =
-      llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    Builder.CreateAsmCall(inlineAsm,
-                          llvm::ConstantInt::get(asmArgTy, NumCondFails++));
-  }
-
-  // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
-  Builder.CreateCall(trapIntrinsic, {});
-  Builder.CreateUnreachable();
+  emitTrap(/*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
 }
