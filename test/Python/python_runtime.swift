@@ -27,6 +27,9 @@ PythonRuntimeTestSuite.test("pylist") {
   expectEqual(true, polymorphicList[2])
   expectEqual(1.5, polymorphicList[3])
   expectEqual(1.5, polymorphicList[-1])
+
+  polymorphicList[2] = 2
+  expectEqual(2, polymorphicList[2])
 }
 
 PythonRuntimeTestSuite.test("pydict") {
@@ -34,6 +37,11 @@ PythonRuntimeTestSuite.test("pydict") {
   expectEqual(2, Python.len.call(args: dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
+
+  dict["b"] = "c"
+  expectEqual("c", dict["b"])
+  dict["b"] = "d"
+  expectEqual("d", dict["b"])
 }
 
 PythonRuntimeTestSuite.test("binary-ops") {
@@ -53,6 +61,17 @@ PythonRuntimeTestSuite.test("binary-ops") {
   expectEqual(7, x)
   x /= 2
   expectEqual(3.5, x)
+}
+
+PythonRuntimeTestSuite.test("comparable") {
+  let pyValArray: [PyVal] = [-1, 10, 1, 0, 0]
+  expectEqual([-1, 0, 0, 1, 10], pyValArray.sorted())
+}
+
+PythonRuntimeTestSuite.test("range-iter") {
+  for (index, val) in Python.range.call(args: PyVal(5)).enumerated() {
+    expectEqual(PyVal(index), val)
+  }
 }
 
 runAllTests()
