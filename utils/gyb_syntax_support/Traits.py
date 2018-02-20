@@ -37,4 +37,9 @@ TRAITS = [
               Child('LeftParen', kind='LeftParenToken'),
               Child('RightParen', kind='RightParenToken'),
           ]),
+
+    Trait('WithTrailingComma',
+          children=[
+              Child('TrailingComma', kind='CommaToken', is_optional=True),
+          ])
 ]

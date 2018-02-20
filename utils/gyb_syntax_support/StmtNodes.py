@@ -158,6 +158,7 @@ STMT_NODES = [
     #            | case-condition
     #            | optional-binding-condition
     Node('ConditionElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Condition', kind='Syntax',
                    node_choices=[
@@ -268,11 +269,12 @@ STMT_NODES = [
 
     # case-item -> pattern where-clause? ','?
     Node('CaseItem', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Pattern', kind='Pattern'),
              Child('WhereClause', kind='WhereClause',
                    is_optional=True),
-             Child('Comma', kind='CommaToken',
+             Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
 
