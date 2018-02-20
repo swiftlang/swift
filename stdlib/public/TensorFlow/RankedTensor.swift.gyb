@@ -176,15 +176,9 @@ extension ${TensorXD} : ExpressibleByArrayLiteral {
 }
 
 public extension ${TensorXD} where Scalar : Numeric {
-  /// Perform an element-wise type conversion from ${TensorXD}<T>.
+  /// Perform an element-wise type conversion from a ${TensorXD}<T>.
   @_inlineable @inline(__always)
   init<FromType : Numeric>(_ other: ${TensorXD}<FromType>) {
-    self.init(base: Tensor<Scalar>(other.base))
-  }
-
-  /// Perform an element-wise type conversion from ${TensorXD}<Bool>.
-  @_inlineable @inline(__always)
-  init(_ other: ${TensorXD}<Bool>) {
     self.init(base: Tensor<Scalar>(other.base))
   }
 }

@@ -49,3 +49,11 @@ public protocol TensorProtocol {
   /// - Note: Do NOT remove this. This is a compiler requirement.
   init(handle: TensorHandle<Scalar>)
 }
+
+public extension TensorProtocol where Scalar : Numeric {
+  /// Perform an element-wise type conversion from a Bool tensor.
+  @_inlineable @inline(__always)
+  init(_ other: BoolTensor) {
+    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
+  }
+}
