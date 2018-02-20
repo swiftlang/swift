@@ -9,22 +9,8 @@ import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
 
-func doLoopTest() -> Bool {
-  // Loop testing on GPU is only supported via XLA, which in turn only
-  // supports TF C API.
-  //
-  // So for TF eager C API + GPU execution, the test is skipped.
-  if _RuntimeConfig.usesTFEagerAPI &&
-     _ExecutionContext.global.gpuDeviceName != nil {
-    print("Loop tests are skipped in Eager + GPU mode.")
-    return false
-  }
-  _RuntimeConfig.usesXLA = true
-  return true
-}
-
 LoopsTests.testCPUAndGPU("simpleCounterLoop") {
-  if !doLoopTest() { return }
+  guard doLoopTest() else { return }
 
   let maxCount = 100
   var a = Tensor<Int32>(0)
@@ -42,7 +28,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop") {
 
 // Explicitly use Int64 everywhere.
 LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
-  if !doLoopTest() { return }
+  guard doLoopTest() else { return }
 
   let maxCount = 100
   var a = Tensor<Int64>(0)
@@ -60,7 +46,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
 
 // Explicitly use Int32 everywhere.
 LoopsTests.testCPUAndGPU("simpleCounterLoop_Int32") {
-  if !doLoopTest() { return }
+  guard doLoopTest() else { return }
 
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
