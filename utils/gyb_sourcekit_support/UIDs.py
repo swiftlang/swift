@@ -337,6 +337,8 @@ UID_KINDS = [
     KIND('BuildConfigKeyword',
          'source.lang.swift.syntaxtype.buildconfig.keyword'),
     KIND('BuildConfigId', 'source.lang.swift.syntaxtype.buildconfig.id'),
+    KIND('PoundDirectiveKeyword',
+         'source.lang.swift.syntaxtype.pounddirective.keyword'),
     KIND('AttributeId', 'source.lang.swift.syntaxtype.attribute.id'),
     KIND('AttributeBuiltin', 'source.lang.swift.syntaxtype.attribute.builtin'),
     KIND('Number', 'source.lang.swift.syntaxtype.number'),
