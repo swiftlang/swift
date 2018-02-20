@@ -406,7 +406,7 @@ TensorTests.testCPU("StraightLineXORTraining") {
 #endif
 
   // Enable runtime support for loops.
-  guard doLoopTest() else { return }
+  guard shouldDoLoopTest() else { return }
 
   // Hyper-parameters
   let iterationCount = 2000
@@ -467,7 +467,7 @@ TensorTests.testCPU("XORClassifierTraining") {
 #endif
 
   // Enable runtime support for loops.
-  guard doLoopTest() else { return }
+  guard shouldDoLoopTest() else { return }
 
   // The classifier struct.
   struct MLPClassifier {
