@@ -138,7 +138,7 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 extension Tensor where Scalar : Numeric {
-  /// Perform an element-wise conversion from Tensor<U>.
+  /// Perform an element-wise conversion from a Tensor<U>.
   @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
     self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
@@ -430,19 +430,6 @@ public extension Tensor {
     }
 #endif
     return scalar
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Safe data type conversion
-//===----------------------------------------------------------------------===//
-
-public extension Tensor where Scalar : Numeric {
-  @_inlineable @inline(__always)
-  init(_ other: Tensor<Bool>) {
-    self.init(
-      handle: #tfop("Cast", other, DstT: Scalar.self)
-    )
   }
 }
 
