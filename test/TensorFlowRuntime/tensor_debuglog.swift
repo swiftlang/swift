@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// Tensor API tests.
+// Tensor API tests, with debug logging enabled.
 
 import TensorFlow
 import TestUtils

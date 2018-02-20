@@ -45,7 +45,7 @@ extension TestSuite {
 /// Loop testing on GPU is only supported via XLA, which in turn only
 /// supports TF C API. So for TF eager C API + GPU execution, the test is
 /// skipped.
-public func doLoopTest() -> Bool {
+public func shouldDoLoopTest() -> Bool {
   if _RuntimeConfig.usesTFEagerAPI &&
      _ExecutionContext.global.gpuDeviceName != nil {
     print("Loop tests are skipped in Eager + GPU mode.")
