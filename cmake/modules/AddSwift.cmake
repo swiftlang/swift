@@ -1475,11 +1475,6 @@ function(add_swift_library name)
         continue()
       endif()
 
-      # TODO: Currently SwiftPrivate runs into linker problems on Windows. See SR-6489.
-      if ("${sdk}" STREQUAL "WINDOWS" AND "${name}" MATCHES "SwiftPrivate")
-        continue()
-      endif()
-
       set(THIN_INPUT_TARGETS)
 
       # For each architecture supported by this SDK
