@@ -459,10 +459,21 @@ TensorTests.testCPU("StraightLineXORTraining") {
 }
 
 TensorTests.testCPU("XORClassifierTraining") {
+  // FIXME: This test fails on Eager API.
+  guard !_RuntimeConfig.usesTFEagerAPI else { return }
+  // FIXME: This test fails on both CPU and GPU when --config=cuda is on.
+#if CUDA
+  return
+#endif
+
+  // Enable runtime support for loops.
+  guard doLoopTest() else { return }
+
+  // The classifier struct.
   struct MLPClassifier {
-    // TODO: randomize weights once we have Tensor(random:) is implemented.
-    var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
-    var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+    // Parameters
+    var w1 = Tensor<Float>(randomUniform: [2, 4])
+    var w2 = Tensor<Float>(randomUniform: [4, 1])
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -470,75 +481,66 @@ TensorTests.testCPU("XORClassifierTraining") {
     @inline(__always)
     init() {}
 
-    @_versioned
-    @inline(__always)
+    @_versioned @_inlineable @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = sigmoid(x ⊗ w1 + b1)
       return sigmoid(o1 ⊗ w2 + b2)
     }
 
-    @_versioned
-    @inline(__always)
-    func prediction(for a: Bool, _ b: Bool) -> Bool {
-      let x: Float = a ? 1 : 0
-      let y: Float = b ? 1 : 0
-      let input = Tensor([[x, y]])
+    @_versioned @_inlineable @inline(__always)
+    func prediction(for x: Bool, _ y: Bool) -> Bool {
+      let input = Tensor<Float>(Tensor([[x, y]]))
       let floatPred = prediction(for: input).scalarized()
-      return abs(floatPred - 1) < 0.001
+      return abs(floatPred - 1) < 0.1
     }
 
-    @_versioned
-    @inline(__always)
+    @_versioned @_inlineable @inline(__always)
     func loss(of prediction: Tensor<Float>,
               from exampleOutput: Tensor<Float>) -> Float {
-      return (prediction - exampleOutput).squared().mean()
+      return (prediction - exampleOutput).squared()
+        .mean(alongAxes: [0, 1]).scalarized()
     }
 
-    @_versioned
-    @inline(__always)
+    @_versioned @_inlineable @inline(__always)
     mutating func train(inputBatch x: Tensor<Float>,
                         outputBatch y: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
       // FIXME: Loop crasher b/73088003
-      // for _ in 0..<iterationCount {
+      var i = 0
+      repeat {
         let z1 = x.dot(w1) + b1
         let h1 = sigmoid(z1)
         let z2 = h1.dot(w2) + b2
         let pred = sigmoid(z2)
 
         let dz2 = pred - y
-        let dw2 = h1.transposed().dot(dz2)
+        let dw2 = h1.transposed(withPermutations: [1, 0]).dot(dz2)
         let db2 = dz2.sum(alongAxes: [0])
-        let dz1 = dz2.dot(w2.transposed()) * h1 * (1 - h1)
-        let dw1 = x.transposed().dot(dz1)
+        let dz1 = dz2.dot(w2.transposed(withPermutations: [1, 0])) * h1 * (1 - h1)
+        let dw1 = x.transposed(withPermutations: [1, 0]).dot(dz1)
         let db1 = dz1.sum(alongAxes: [0])
 
-        // Descent
-        w1 -= (dw1 * learningRate)
-        b1 -= (db1 * learningRate)
-        w2 -= (dw2 * learningRate)
-        b2 -= (db2 * learningRate)
-      // }
+        // Gradient descent
+        w1 -= dw1 * learningRate
+        b1 -= db1 * learningRate
+        w2 -= dw2 * learningRate
+        b2 -= db2 * learningRate
+
+        // Update iteration count
+        i += 1
+      } while i < iterationCount
     }
   }
 
   var classifier = MLPClassifier()
   classifier.train(
-    inputBatch: Tensor<Float>(shape: [4, 2],
-                              scalars: [0.0, 0.0,
-                                        0.0, 1.0,
-                                        1.0, 0.0,
-                                        1.0, 1.0]),
-    outputBatch: Tensor<Float>(shape: [4, 1],
-                               scalars: [0.0, 1.0, 1.0, 0.0]),
-    iterationCount: 1000,
+    inputBatch: [[0, 0], [0, 1], [1, 0], [1, 1]],
+    outputBatch: [[0], [1], [1], [0]],
+    iterationCount: 2000,
     learningRate: 0.2
   )
-  // TODO: Uncomment once send/receive is fixed.
-  // expectEqual(classifier.prediction(for: false, false), false)
-  // expectEqual(classifier.prediction(for: false, true), true)
-  // expectEqual(classifier.prediction(for: true, false), true)
-  // expectEqual(classifier.prediction(for: true, true), false)
+  // TODO: Add other expectations once code motion helps avoid send/receive.
+  expectEqual(classifier.prediction(for: true, false), true)
 }
 
 // TODO: Merge all rank/shape getter tests into one when we support code motion
