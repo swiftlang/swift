@@ -24,6 +24,8 @@
 
 import CTensorFlow
 
+infix operator ++ : AdditionPrecedence
+
 //===----------------------------------------------------------------------===//
 // Tensor type
 //===----------------------------------------------------------------------===//
@@ -408,15 +410,6 @@ public extension Tensor {
   @_inlineable @inline(__always)
   func squeezed() -> Tensor {
     return #tfop("Squeeze", handle)
-  }
-
-  /// Concatenates tensors along the first dimension.
-  /// - Precondition: The tensors must have the same shape.
-  @_inlineable @inline(__always)
-  func concatenated(with other: Tensor) -> Tensor {
-    // TODO: Implement `concatenated(with:alongAxis)` and `++` operator.
-    // NOTE: Consider reimplementating using Pack (`tf.stack`)?
-    return #tfop("ConcatV2", [self, other], Tensor<Int32>(0), Tidx: Int32.self)
   }
 
   /// Reshape to scalar.

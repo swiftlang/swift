@@ -168,6 +168,23 @@ TensorTests.testCPUAndGPU("Reduction") {
   expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]), sum.array)
 }
 
+TensorTests.testCPUAndGPU("Concatenation") {
+  // 2 x 3
+  let t1 = Tensor<Int32>([[0, 1, 2], [3, 4, 5]])
+  // 2 x 3
+  let t2 = Tensor<Int32>([[6, 7, 8], [9, 10, 11]])
+  let concatenated = t1 ++ t2
+  let concatenated0 = t1.concatenated(with: t2)
+  let concatenated1 = t1.concatenated(with: t2, alongAxis: 1)
+  expectEqual(ShapedArray(shape: [4, 3], scalars: Array(0..<12)),
+              concatenated.array)
+  expectEqual(ShapedArray(shape: [4, 3], scalars: Array(0..<12)),
+              concatenated0.array)
+  expectEqual(ShapedArray(shape: [2, 6],
+                          scalars: [0, 1, 2, 6, 7, 8, 3, 4, 5, 9, 10, 11]),
+              concatenated1.array)
+}
+
 TensorTests.testCPUAndGPU("ArgMax") {
   // 2 x 3
   let x = Tensor<Float>([[0, 1, 2], [3, 4, 5]])

@@ -49,8 +49,8 @@ RankedTensorTests.testCPUAndGPU("RandomInitializer") {
   )
   expectEqual([3, 4], random.shape)
   expectPointwiseNearlyEqual([
-      137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
-      107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
+    137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
+    107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
   ], random.scalars)
 }
 
@@ -153,6 +153,23 @@ RankedTensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxis: 0)
   expectEqual([2, 4, 6, 8, 10], sum.array)
+}
+
+RankedTensorTests.testCPUAndGPU("Concatenation") {
+  // 2 x 3
+  let t1 = Tensor2D<Int32>([[0, 1, 2], [3, 4, 5]])
+  // 2 x 3
+  let t2 = Tensor2D<Int32>([[6, 7, 8], [9, 10, 11]])
+  let concatenated = t1 ++ t2
+  let concatenated0 = t1.concatenated(with: t2)
+  let concatenated1 = t1.concatenated(with: t2, alongAxis: 1)
+  expectEqual(Array2D(shape: [4, 3], scalars: Array(0..<12)),
+              concatenated.array)
+  expectEqual(Array2D(shape: [4, 3], scalars: Array(0..<12)),
+              concatenated0.array)
+  expectEqual(Array2D(shape: [2, 6],
+                      scalars: [0, 1, 2, 6, 7, 8, 3, 4, 5, 9, 10, 11]),
+              concatenated1.array)
 }
 
 RankedTensorTests.testCPUAndGPU("ArgMax") {
