@@ -168,6 +168,94 @@ llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
   return mangledName.drop_front(getManglingPrefixLength(mangledName));
 }
 
+static bool isAliasNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isAliasNode(Node->getChild(0));
+  case Demangle::Node::Kind::TypeAlias:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isAlias(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isAliasNode(Dem.demangleType(mangledName));
+}
+
+static bool isClassNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isClassNode(Node->getChild(0));
+  case Demangle::Node::Kind::Class:
+  case Demangle::Node::Kind::BoundGenericClass:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isClass(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isClassNode(Dem.demangleType(mangledName));
+}
+
+static bool isEnumNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isEnumNode(Node->getChild(0));
+  case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::BoundGenericEnum:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isEnum(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isEnumNode(Dem.demangleType(mangledName));
+}
+
+static bool isProtocolNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isProtocolNode(Node->getChild(0));
+  case Demangle::Node::Kind::Protocol:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isProtocolNode(Dem.demangleType(dropSwiftManglingPrefix(mangledName)));
+}
+
+static bool isStructNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isStructNode(Node->getChild(0));
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::BoundGenericStructure:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isStructNode(Dem.demangleType(mangledName));
+}
+
 namespace swift {
 namespace Demangle {
 
