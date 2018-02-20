@@ -589,6 +589,7 @@ public struct PythonInterface {
   public var len : PyVal { return builtins["len"] }
   public var open : PyVal { return builtins["open"] }
   public var print : PyVal { return builtins["print"] }
+  public var range : PyVal { return builtins["range"] }
   public var repr : PyVal { return builtins["repr"] }
   public var str : PyVal { return builtins["str"] }
   public var type : PyVal { return builtins["type"] }
@@ -940,18 +941,33 @@ extension PyVal : SignedNumeric {
 extension PyVal : Hashable, Comparable, Equatable {
   public static func <(lhs: PyVal, rhs: PyVal) -> Bool {
     if let cmp = lhs.checking.get(member: "__cmp__") {
-      return Int(cmp.call(args: rhs))! == -1
+      guard let cmpResult = Int(cmp.call(args: rhs)) else {
+        fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
+      }
+      return cmpResult == -1
     }
-    return Bool(lhs.call(member: "__lt__", args: rhs))!
+    guard let ltResult = Bool(lhs.call(member: "__lt__", args: rhs)) else {
+      fatalError("cannot use __lt__ on \(lhs) and \(rhs)")
+    }
+    return ltResult
   }
   public static func==(lhs: PyVal, rhs: PyVal) -> Bool {
     if let cmp = lhs.checking.get(member: "__cmp__") {
-      return Int(cmp.call(args: rhs))! == 0
+      guard let cmpResult = Int(cmp.call(args: rhs)) else {
+        fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
+      }
+      return cmpResult == 0
     }
-    return Bool(lhs.call(member: "__eq__", args: rhs))!
+    guard let eqResult = Bool(lhs.call(member: "__eq__", args: rhs)) else {
+      fatalError("cannot use __eq__ on \(lhs) and \(rhs)")
+    }
+    return eqResult
   }
   public var hashValue: Int {
-    return Int(self.call(member: "__hash__"))!
+    guard let hash = Int(self.call(member: "__hash__")) else {
+      fatalError("cannot use __hash__ on \(self)")
+    }
+    return hash
   }
 }
 
