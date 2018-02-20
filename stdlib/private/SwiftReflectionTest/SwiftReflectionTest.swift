@@ -45,96 +45,25 @@ public enum InstanceKind : UInt8 {
   case Closure
 }
 
-/// Represents a section in a loaded image in this process.
-internal struct Section {
-  /// The absolute start address of the section's data in this address space.
-  let startAddress: UnsafeRawPointer
-
-  /// The size of the section in bytes.
-  let size: UInt
-}
-
-/// Holds the addresses and sizes of sections related to reflection
-internal struct ReflectionInfo : Sequence {
-  /// The name of the loaded image
-  internal let imageName: String
-
-  /// Reflection metadata sections
-  internal let fieldmd: Section?
-  internal let assocty: Section?
-  internal let builtin: Section?
-  internal let capture: Section?
-  internal let typeref: Section?
-  internal let reflstr: Section?
-
-  internal func makeIterator() -> AnyIterator<Section?> {
-    return AnyIterator([
-      fieldmd,
-      assocty,
-      builtin,
-      capture,
-      typeref,
-      reflstr
-    ].makeIterator())
-  }
-}
-
 #if arch(x86_64) || arch(arm64)
 typealias MachHeader = mach_header_64
 #else
 typealias MachHeader = mach_header
 #endif
 
-/// Get the location and size of a section in a binary.
-///
-/// - Parameter name: The name of the section
-/// - Parameter imageHeader: A pointer to the Mach header describing the
-///   image.
-/// - Returns: A `Section` containing the address and size, or `nil` if there
-///   is no section by the given name.
-internal func getSectionInfo(_ name: String,
-  _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
-  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  var size: UInt = 0
-  let address = getsectiondata(imageHeader, "__TEXT", name, &size)
-  guard let nonNullAddress = address else { return nil }
-  guard size != 0 else { return nil }
-  return Section(startAddress: nonNullAddress, size: size)
-}
-
-/// Get the Swift Reflection section locations for a loaded image.
-///
-/// An image of interest must have the following sections in the __DATA
-/// segment:
-/// - __swift5_fieldmd
-/// - __swift5_assocty
-/// - __swift5_builtin
-/// - __swift5_capture
-/// - __swift5_typeref
-/// - __swift5_reflstr (optional, may have been stripped out)
+/// Get the TEXT segment location and size for a loaded image.
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
-/// - Returns: A `ReflectionInfo` containing the locations of all of the
-///   needed sections, or `nil` if the image doesn't contain all of them.
-internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
+/// - Returns: The image name, address, and size.
+internal func getAddressInfoForImage(atIndex i: UInt32) ->
+  (name: String, address: UnsafeMutablePointer<UInt8>?, size: UInt) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let header = unsafeBitCast(_dyld_get_image_header(i),
     to: UnsafePointer<MachHeader>.self)
-
-  let imageName = _dyld_get_image_name(i)!
-  let fieldmd = getSectionInfo("__swift5_fieldmd", header)
-  let assocty = getSectionInfo("__swift5_assocty", header)
-  let builtin = getSectionInfo("__swift5_builtin", header)
-  let capture = getSectionInfo("__swift5_capture", header)
-  let typeref = getSectionInfo("__swift5_typeref", header)
-  let reflstr = getSectionInfo("__swift5_reflstr", header)
-  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-                        fieldmd: fieldmd,
-                        assocty: assocty,
-                        builtin: builtin,
-                        capture: capture,
-                        typeref: typeref,
-                        reflstr: reflstr)
+  let name = String(validatingUTF8: _dyld_get_image_name(i)!)!
+  var size: UInt = 0
+  let address = getsegmentdata(header, "__TEXT", &size)
+  return (name, address, size)
 }
 
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
@@ -179,18 +108,15 @@ internal func readUInt() -> UInt {
 /// process.
 internal func sendReflectionInfos() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let infos = (0..<_dyld_image_count()).compactMap(getReflectionInfoForImage)
+  let infos = (0..<_dyld_image_count()).map(getAddressInfoForImage)
 
-  var numInfos = infos.count
-  debugLog("\(numInfos) reflection info bundles.")
-  precondition(numInfos >= 1)
-  sendBytes(from: &numInfos, count: MemoryLayout<UInt>.size)
-  for info in infos {
-    debugLog("Sending info for \(info.imageName)")
-    for section in info {
-      sendValue(section?.startAddress)
-      sendValue(section?.size ?? 0)
-    }
+  debugLog("\(infos.count) reflection info bundles.")
+  precondition(infos.count >= 1)
+  sendValue(infos.count)
+  for (name, address, size) in infos {
+    debugLog("Sending info for \(name)")
+    sendValue(address)
+    sendValue(size)
   }
 }
 
@@ -256,8 +182,7 @@ internal func sendPointerSize() {
 /// This is the main "run loop" of the test harness.
 ///
 /// The parent will necessarily need to:
-/// - Get the addresses of all of the reflection sections for any swift dylibs
-///   that are loaded, where applicable.
+/// - Get the addresses of any swift dylibs that are loaded, where applicable.
 /// - Get the address of the `instance`
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.

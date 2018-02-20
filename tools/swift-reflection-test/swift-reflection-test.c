@@ -29,27 +29,10 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef struct RemoteSection {
-  uintptr_t StartAddress;
-  uintptr_t Size;
-  uintptr_t EndAddress;
-} RemoteSection;
-
 typedef struct PipeMemoryReader {
   int to_child[2];
   int from_child[2];
 } PipeMemoryReader;
-
-typedef struct RemoteReflectionInfo {
-  RemoteSection fieldmd;
-  RemoteSection assocty;
-  RemoteSection builtin;
-  RemoteSection capture;
-  RemoteSection typeref;
-  RemoteSection reflstr;
-  uintptr_t StartAddress;
-  size_t TotalSize;
-} RemoteReflectionInfo;
 
 static void errorAndExit(const char *message) {
   fprintf(stderr, "%s\n", message);
@@ -59,77 +42,6 @@ static void errorAndExit(const char *message) {
 static void errnoAndExit(const char *message) {
   fprintf(stderr, "%s: %s\n", message, strerror(errno));
   abort();
-}
-
-static swift_reflection_section_t
-makeLocalSection(void *Buffer, RemoteSection Section,
-                 RemoteReflectionInfo Info) {
-  if (Section.Size == 0) {
-    swift_reflection_section_t LS = {NULL, NULL};
-    return LS;
-  }
-
-  uintptr_t Base
-    = (uintptr_t)Buffer + Section.StartAddress - Info.StartAddress;
-  swift_reflection_section_t LS = {
-    (void *)Base,
-    (void *)(Base + Section.Size)
-  };
-  return LS;
-}
-
-static
-uintptr_t getStartAddress(const RemoteSection Sections[], size_t Count) {
-  uintptr_t Start = 0;
-  for (size_t i = 0; i < Count; ++i) {
-    if (Sections[i].StartAddress != 0) {
-      if (Start != 0)
-        Start = MIN(Start, Sections[i].StartAddress);
-      else
-        Start = Sections[i].StartAddress;
-    }
-  }
-  return Start;
-}
-
-static
-uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
-  uintptr_t End = 0;
-  for (size_t i = 0; i < Count; ++i) {
-    if (Sections[i].StartAddress != 0)
-      End = MAX(End, Sections[i].EndAddress);
-  }
-  return End;
-}
-
-static
-RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
-                                              RemoteSection assocty,
-                                              RemoteSection builtin,
-                                              RemoteSection capture,
-                                              RemoteSection typeref,
-                                              RemoteSection reflstr) {
-  RemoteReflectionInfo Info = {
-    fieldmd,
-    assocty,
-    builtin,
-    capture,
-    typeref,
-    reflstr,
-    0,
-    0
-  };
-
-  const RemoteSection Sections[6] = {
-    fieldmd, assocty, builtin, capture, typeref, reflstr
-  };
-
-  Info.StartAddress = getStartAddress(Sections, 6);
-
-  uintptr_t EndAddress = getEndAddress(Sections, 6);
-  Info.TotalSize = EndAddress - Info.StartAddress;
-
-  return Info;
 }
 
 static const size_t ReadEnd = 0;
@@ -247,18 +159,6 @@ PipeMemoryReader createPipeMemoryReader() {
   return Reader;
 }
 
-static
-RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
-  uintptr_t Start;
-  size_t Size;
-
-  PipeMemoryReader_collectBytesFromPipe(Reader, &Start, sizeof(Start));
-  PipeMemoryReader_collectBytesFromPipe(Reader, &Size, sizeof(Size));
-
-  RemoteSection RS = {Start, Size, Start + Size};
-  return RS;
-}
-
 static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
                                        const PipeMemoryReader *Reader) {
@@ -270,50 +170,17 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
 
   if (NumReflectionInfos == 0)
     return;
-
-  RemoteReflectionInfo *RemoteInfos = calloc(NumReflectionInfos,
-                                             sizeof(RemoteReflectionInfo));
-  if (RemoteInfos == NULL)
-    errnoAndExit("malloc failed");
-
+  
+  struct { uintptr_t Start, Size; } *Images;
+  Images = calloc(NumReflectionInfos, sizeof(*Images));
+  PipeMemoryReader_collectBytesFromPipe(Reader, Images,
+                                        NumReflectionInfos * sizeof(*Images));
+  
   for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    RemoteInfos[i] = makeRemoteReflectionInfo(
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader));
+    swift_reflection_addImage(RC, Images[i].Start, Images[i].Size);
   }
-
-  // Now pull in the remote sections into our address space.
-
-  for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
-
-    void *Buffer = malloc(RemoteInfo.TotalSize);
-
-    int Success = PipeMemoryReader_readBytes((void *)Reader,
-                                             RemoteInfo.StartAddress,
-                                             Buffer,
-                                             RemoteInfo.TotalSize);
-    if (!Success)
-      errorAndExit("Couldn't read reflection information");
-
-    swift_reflection_info_t Info = {
-      {makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo), 0},
-      /*LocalStartAddress*/ (uintptr_t) Buffer,
-      /*RemoteStartAddress*/ RemoteInfo.StartAddress,
-    };
-    swift_reflection_addReflectionInfo(RC, Info);
-  }
-
-  free(RemoteInfos);
+  
+  free(Images);
 }
 
 uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {

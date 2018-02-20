@@ -54,10 +54,18 @@ swift_reflection_createReflectionContext(
 void
 swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
-/// Add reflection information from a loaded Swift image.
+/// Add reflection sections for a loaded Swift image.
 void
-swift_reflection_addImage(SwiftReflectionContextRef ContextRef, swift_addr_t imageStart);
+swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
+                                   swift_reflection_info_t Info);
 
+#ifdef __APPLE__
+/// Add reflection information from a loaded Swift image.
+/// Returns true on success, false if the image's memory couldn't be read.
+int
+swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
+                          swift_addr_t imageStart, uint64_t imageLength);
+#endif
 
 /// Returns a boolean indicating if the isa mask was successfully
 /// read, in which case it is stored in the isaMask out parameter.
