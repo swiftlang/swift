@@ -19,6 +19,14 @@
 // - Detach compiler runtime from the TensorFlow standard library to a separate
 //   TensorFlowRuntime module.
 //
+// NOTE:
+// - Much code is intentionally un-Swifty because TF/TFE support is likely to
+//   change. Variable pairs with versions for TF/TFE would be better represented
+//   as an enum, but since the TFE runtime is soon to be removed it doesn't make
+//   sense temporarily change the code.
+// - Code should be made Swifty after support is stabilized and churn rate is
+//   lower (e.g. variable pairs should be rewritten as an enums).
+//
 //===----------------------------------------------------------------------===//
 
 #if os(Linux) || os(FreeBSD)
@@ -82,6 +90,8 @@ public final class _ExecutionContext {
   /// The TFE_Context object.
   private var cContext: CTFEContext
 
+  // NOTE: the following properties are intentionally not implemented as an enum
+  // due to high churn, *please do not refactor for Swiftiness*.
   /// The set of all loaded programs indexed by their unique address.
   /// Used when _RuntimeConfig.usesTFEagerAPI is true.
   private var loadedTFEPrograms: Set<UnsafeRawPointer> = []
@@ -248,7 +258,7 @@ fileprivate extension _ExecutionContext {
       // to standalone TF_Function's.
       let funcCount = TF_GraphNumFunctions(graph)
       // Allocate an array to accept functions.
-      var funcs = [CTFFunction?](repeating: nil, count: Int(funcCount))
+      var funcs: [CTFFunction?] = Array(repeating: nil, count: Int(funcCount))
       TF_GraphGetFunctions(graph, &funcs, funcCount, self.status)
       checkOk(self.status)
       // Delete the graph as it's no longer needed.
@@ -275,8 +285,9 @@ fileprivate extension _ExecutionContext {
   ///   - address: The address of the serialized program in memory.
   ///   - count: The size of the program in bytes.
   func loadGraphInBytes(_ address: UnsafeRawPointer, count: Int) -> CTFGraph {
-    // Intentionally duplicate some code with the above version, as the above
-    // one is expected to go away soon (due to challenges in XLA support).
+    // NOTE: Code is intentionally duplicated with the above version of
+    // `loadGraphInBytes`, as the above one is expected to go away soon (due to
+    // challenges in XLA support). *Please do not refactor for Swiftiness*.
     debugLog("Loading a program.")
 
     // If the program is already loaded, do nothing.
@@ -284,9 +295,9 @@ fileprivate extension _ExecutionContext {
     sync { [unowned self] in
       graph = self.loadedTFPrograms[address]
     }
-    if graph != nil {
+    if let graph = graph {
       debugLog("Already loaded before.")
-      return graph!
+      return graph
     }
 
     // Load the program as a TF_Graph
@@ -418,7 +429,8 @@ extension TFState {
     let outputNodeSpecs = (0..<Int32(returnValues.count)).map { i in
       TF_Output(oper: funcNode, index: i)
     }
-    var outputTensors = [CTensor?](repeating: nil, count: returnValues.count)
+    var outputTensors: [CTensor?] = Array(repeating: nil,
+                                          count: returnValues.count)
 
     if returnValues.count > 0 {
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
@@ -480,6 +492,8 @@ public final class _TensorComputation {
   /// TODO(hongm): Retire returnValues when eager based runtime is removed.
   var returnValues: [CTensorHandle?]
 
+  // NOTE: the following properties are intentionally not implemented as an enum
+  // due to high churn, *please do not refactor for Swiftiness*.
   private var stateTFE: TFEState?
   private var stateTF: TFState?
 
@@ -602,7 +616,7 @@ public final class _TensorComputation {
     }
 
     debugLog("Created returning info.")
-    self.returnValues = [CTensorHandle?](repeating: nil, count: resultCount)
+    self.returnValues = Array(repeating: nil, count: resultCount)
 
     debugLog("Starting TF graph execution.")
 
