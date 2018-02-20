@@ -161,6 +161,9 @@ private:
   /// redundant work.
   bool EnableBatchMode;
 
+  /// Provides a randomization seed to batch-mode partitioning, for debugging.
+  unsigned BatchSeed;
+
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
@@ -203,6 +206,7 @@ public:
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
+              unsigned BatchSeed = 0,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
