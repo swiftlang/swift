@@ -133,6 +133,7 @@ TYPE_NODES = [
 
     # tuple-type -> '(' tuple-type-element-list ')'
     Node('TupleType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Elements', kind='TupleTypeElementList'),
@@ -143,6 +144,7 @@ TYPE_NODES = [
     # function-type -> attribute-list '(' function-type-argument-list ')'
     #   throwing-specifier? '->'? type?
     Node('FunctionType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='TupleTypeElementList'),
