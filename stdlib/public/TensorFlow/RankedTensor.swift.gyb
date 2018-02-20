@@ -488,7 +488,6 @@ public extension Tensor {
 // Elementwise binary ops with scalar on one side
 //===----------------------------------------------------------------------===//
 
-% ranks = [1, 2, 3, 4]
 % tensors = ['Tensor'] + ['Tensor{}D'.format(rank) for rank in ranks]
 % for Tensor in tensors:
 

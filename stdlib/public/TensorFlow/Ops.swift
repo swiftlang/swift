@@ -103,6 +103,7 @@ public extension TensorProtocol where Scalar : Numeric {
   static prefix func -(rhs: Self) -> Self {
     return #tfop("Neg", rhs)
   }
+
   @_inlineable @inline(__always)
   static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
@@ -244,6 +245,34 @@ public extension TensorProtocol {
       stride: Tensor<Int32>(handle: _TFMakeScalarTensor(1))
     )
     return transposed(withPermutations: defaultPermutations)
+  }
+
+  /// Concatenates tensors along the first dimension.
+  /// - Precondition: The tensors must have the same shape, except for the
+  ///   leading dimension.
+  @_inlineable @inline(__always)
+  func concatenated(with other: Self) -> Self {
+    return #tfop("ConcatV2", [self, other], Tensor<Int32>(0), Tidx: Int32.self)
+  }
+
+  /// Concatenates tensors along the specified axis.
+  /// - Precondition: The tensors must have the same dimensions, except for the
+  ///   specified axis.
+  /// - Precondition: The axis must be in the range `-rank..<rank`.
+  @_inlineable @inline(__always)
+  func concatenated(with other: Self, alongAxis axis: Int32) -> Self {
+    return #tfop("ConcatV2", [self, other], Tensor<Int32>(axis),
+                 Tidx: Int32.self)
+  }
+
+  /// Concatenation operator.
+  /// - Note: `++` is a custom operator that does not exist in Swift, but does
+  ///   in Haskell/Scala. Its addition is not an insignificant language change
+  ///   and may be controversial. The existence/naming of `++` will be discussed
+  ///   during a later API design phase.
+  @_inlineable @inline(__always)
+  static func ++ (lhs: Self, rhs: Self) -> Self {
+    return lhs.concatenated(with: rhs)
   }
 }
 
@@ -558,9 +587,35 @@ public extension Tensor {
   subscript(index: Int32) -> Tensor {
     @inline(__always)
     get {
-      // TODO: Rewrite using Slice, which is non-allocating.
-      return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
-                   Tindices: Int32.self)
+      // NOTE: Thought Gather exactly performs element indexing, it is an
+      // allocating operation. Slice is used here instead even though the
+      // implementation is more convoluted because it is non-allocating.
+      // Actual performance/memory tests should be done for some empirical
+      // comparison.
+      // Gather implementation is below:
+      // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
+      //              Tindices: Int32.self)
+      let indexTensor = Tensor<Int32>(index).rankLifted()
+      let remainingZeros: Tensor<Int32> = #tfop(
+        "Fill", (rankTensor - 1).rankLifted(), Tensor<Int32>(0)
+      )
+      let startIndices = indexTensor.concatenated(with: remainingZeros)
+
+      let firstDimension: Tensor<Float> = #tfop(
+        "GatherV2", Tensor<Float>(shapeTensor), Tensor<Int32>(0),
+        Tensor<Int32>(0), Tindices: Int32.self
+      )
+      let boundSize = Tensor<Float>(1).rankLifted() - firstDimension
+      let offset: Tensor<Int32> = Tensor<Int32>(
+        Tensor<Float>(
+          handle: #tfop("ScatterNd", Tensor<Int32>([0]).rankLifted(),
+                        boundSize, rankTensor.rankLifted())
+        )
+      )
+      let boundSizes: Tensor<Int32> = shapeTensor + offset
+      let slice: Tensor = #tfop("Slice", self, startIndices, boundSizes,
+                        Index: Int32.self)
+      return #tfop("Squeeze", slice, squeeze_dims: [0])
     }
   }
 
@@ -573,7 +628,13 @@ public extension Tensor {
   subscript(indices: Int32...) -> Tensor {
     @inline(__always)
     get {
-      // TODO: Rewrite using Slice, which is non-allocating.
+      // NOTE: Rewriting this using Slice is difficult: the main challenge is in
+      // constructing the "sizes" argument, which essentially is
+      // `indices.shapeTensor` but with `indices.count` number of leading 1s.
+      // Since GatherNd is the exact op that performs subdimensional indexing,
+      // it is used here in spite of the fact it may perform allocation(?).
+      // TODO: Consider more clearly distinguishing `subscript(index:)` and
+      // `subscript(indices:)`, since their implementations are quite different.
       return #tfop("GatherNd", self, Tensor<Int32>(indices),
                    Tindices: Int32.self)
     }
@@ -597,7 +658,7 @@ public extension Tensor {
       // TODO: The horrendous mess of type-casting is necessary due to GPU ops
       // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
       // if possible.
-      let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
+      let lowerBound = Tensor<Int32>([bounds.lowerBound])
       let remainingZeros: Tensor<Int32> = #tfop(
         "Fill", (rankTensor - 1).rankLifted(), Tensor<Int32>(0)
       )
