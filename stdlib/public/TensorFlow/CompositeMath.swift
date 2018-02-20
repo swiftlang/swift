@@ -17,22 +17,32 @@
 //===----------------------------------------------------------------------===//
 
 @_inlineable @inline(__always)
-public func sigmoid<Scalar : BinaryFloatingPoint>(
-  _ x: Tensor<Scalar>
-) -> Tensor<Scalar> {
+public func sigmoid<Scalar : BinaryFloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Scalar == Scalar {
   let expx = exp(-x)
-  return 1.0 / (1.0 + expx)
+  let one = T(handle: _TFMakeScalarTensor(1.0))
+  return one / (one + expx)
+  // NOTE: Scalar-tensor op implementation below. It cannot be used currently
+  // because scalar-tensor binary ops are not defind on TensorProtocol.
+  // let expx = exp(-x)
+  // return 1.0 / (1.0 + expx)
 }
 
 @_inlineable @inline(__always)
-public func relu<Scalar : Numeric & Comparable>(
-  _ x: Tensor<Scalar>
-) -> Tensor<Scalar> {
+public func relu<Scalar : Numeric & Comparable, T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar == Scalar {
   return max(0, x)
 }
 
 @_inlineable @inline(__always)
-public func softmax<Scalar : FloatingPoint>(_ x: Tensor<Scalar>) -> Tensor<Scalar> {
+public func softmax<Scalar : FloatingPoint, T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar == Scalar {
   let expx = exp(x)
-  return expx / expx.sum()
+  let sum = T(handle: _TFMakeScalarTensor(expx.sum()))
+  return expx / sum
+  // NOTE: Scalar-tensor op implementation below. It cannot be used currently
+  // because scalar-tensor binary ops are not defind on TensorProtocol.
+  // let expx = exp(x)
+  // return expx / expx.sum()
 }
