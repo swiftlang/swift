@@ -51,10 +51,11 @@ PATTERN_NODES = [
 
     # tuple-pattern -> '(' tuple-pattern-element-list ')'
     Node('TuplePattern', kind='Pattern',
+         traits=['Parenthesized'],
          children=[
-             Child('OpenParen', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Elements', kind='TuplePatternElementList'),
-             Child('CloseParen', kind='RightParenToken'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 
     # wildcard-pattern -> '_' type-annotation?
