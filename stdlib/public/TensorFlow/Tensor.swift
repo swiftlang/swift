@@ -210,6 +210,14 @@ extension Tensor : ExpressibleByFloatLiteral
   }
 }
 
+extension Tensor : ExpressibleByBooleanLiteral where Scalar == Bool {
+  public typealias BooleanLiteralType = Bool
+  @inline(__always)
+  public init(booleanLiteral: Bool) {
+    self.init(booleanLiteral)
+  }
+}
+
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   public typealias ArrayLiteralElement = Tensor<Scalar>
