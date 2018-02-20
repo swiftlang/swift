@@ -31,4 +31,10 @@ TRAITS = [
           children=[
               Child('Body', kind='CodeBlock'),
           ]),
+
+    Trait('Parenthesized',
+          children=[
+              Child('LeftParen', kind='LeftParenToken'),
+              Child('RightParen', kind='RightParenToken'),
+          ]),
 ]
