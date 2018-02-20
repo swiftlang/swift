@@ -234,18 +234,18 @@ public extension Tensor {
   }
 
   @_inlineable
-  var rank: Int {
+  var rank: Int32 {
     @inline(__always)
     get {
-      return Int(_TFGetScalarOrDie(rankTensor.handle))
+      return _TFGetScalarOrDie(rankTensor.handle)
     }
   }
 
   @_inlineable
-  var scalarCount: Int {
+  var scalarCount: Int32 {
     @inline(__always)
     get {
-      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
+      return _TFGetScalarOrDie(scalarCountTensor.handle)
     }
   }
 }
@@ -290,31 +290,14 @@ public extension Tensor where Scalar : Numeric {
   ///     the resulting sequence.
   ///   - stride: The amount to step by with each iteration. `stride` must be
   ///     positive.
-  /// - Precondition: `start`, `end`, `stride` must be scalar tensors.
-  ///
-  @_inlineable @inline(__always)
-  init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
-    self.init(
-      handle: #tfop(
-        "Range", start, end, stride, Tidx: Scalar.self
-      )
-    )
-  }
-
-  /// Creates a 1-D tensor representing a sequence from a starting value to, but
-  /// not including, an end value, stepping by the specified amount.
-  ///
-  /// - Parameters:
-  ///   - start: The starting value to use for the sequence. If the sequence
-  ///     contains any values, the first one is `start`.
-  ///   - end: An end value to limit the sequence. `end` is never an element of
-  ///     the resulting sequence.
-  ///   - stride: The amount to step by with each iteration. `stride` must be
-  ///     positive.
   ///
   @_inlineable @inline(__always)
   init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
-    self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
+    self.init(
+      handle: #tfop(
+        "Range", Tensor(start), Tensor(end), Tensor(stride), Tidx: Scalar.self
+      )
+    )
   }
 }
 
@@ -334,18 +317,34 @@ public extension Tensor where Scalar : FloatingPoint {
   ///
   @_inlineable @inline(__always)
   init(
-    randomNormal shape: TensorShape, mean: Double = 0, stddev: Double = 1,
+    randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
     seed: Int32 = 0
   ) {
     // NOTE: First seed value (87654321) is the DEFAULT_GRAPH_SEED value defined
     // in tensorflow/python/framework/random_seed.py.
-    let standardNormal: Tensor<Double> = #tfop(
+    let standardNormal: Tensor<Scalar> = #tfop(
       "RandomStandardNormal",
       Tensor<Int32>(shape.dimensions),
       seed: 87654321, seed2: seed,
-      dtype: Double.self, T: Int32.self
+      dtype: Scalar.self, T: Int32.self
     )
-    self.init(standardNormal * stddev + mean)
+    self = standardNormal * stddev + mean
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - seed: A random seed for the operation.
+  ///
+  @_inlineable @inline(__always)
+  init(randomUniform shape: TensorShape, seed: Int32 = 0) {
+    self.init(
+      handle: #tfop("RandomUniform", Tensor<Int32>(shape.dimensions),
+                    seed: 87654321, seed2: seed, dtype: Scalar.self,
+                    T: Int32.self)
+    )
   }
 }
 

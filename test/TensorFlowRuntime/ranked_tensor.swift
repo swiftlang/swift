@@ -43,17 +43,6 @@ RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
   expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
-RankedTensorTests.testCPUAndGPU("RandomInitializer") {
-  let random = Tensor2D<Float>(
-    randomNormal: [3, 4], mean: 100, stddev: 50, seed: 42
-  )
-  expectEqual([3, 4], random.shape)
-  expectPointwiseNearlyEqual([
-    137.281219, 68.1401749, 102.428467, 67.4076538, 56.9186516, 100.973923,
-    107.604424, 150.683273, 195.382324, 22.3883247, 55.4706612, 118.716873
-  ], random.scalars)
-}
-
 RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion1") {
   let matrix = -1.makeTensor2D()
   expectEqual([1, 1], matrix.shape)
