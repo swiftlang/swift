@@ -2276,14 +2276,10 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   // If we entered an initializer context, contextualize any
   // auto-closures we might have created.
-  if (initContext) {
+  if (initContext && !hadError) {
     // Check safety of error-handling in the declaration, too.
-    if (!hadError) {
-      checkInitializerErrorHandling(initContext, init);
-    }
-
-    if (!hadError)
-      (void)contextualizeInitializer(initContext, init);
+    checkInitializerErrorHandling(initContext, init);
+    (void)contextualizeInitializer(initContext, init);
   }
 
   if (hadError) {
