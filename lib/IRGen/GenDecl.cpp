@@ -1154,6 +1154,27 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyFieldTypes.empty() ||
          !LazyWitnessTables.empty()) {
 
+    while (!LazyFieldTypes.empty()) {
+      auto info = LazyFieldTypes.pop_back_val();
+      auto &IGM = *info.IGM;
+
+      for (auto fieldType : info.fieldTypes) {
+        if (fieldType->hasArchetype())
+          continue;
+
+        // All of the required attributes are going to be preserved
+        // by field reflection metadata in the mangled name, so
+        // there is no need to worry about ownership semantics here.
+        if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldType))
+          fieldType = refStorTy.getReferentType();
+
+        // Make sure that all of the field type metadata is forced,
+        // otherwise there might be a problem when fields are accessed
+        // through reflection.
+        (void)irgen::getOrCreateTypeMetadataAccessFunction(IGM, fieldType);
+      }
+    }
+
     // Emit any lazy type metadata we require.
     while (!LazyMetadata.empty()) {
       NominalTypeDecl *Nominal = LazyMetadata.pop_back_val();
@@ -1169,21 +1190,6 @@ void IRGenerator::emitLazyDefinitions() {
       if (eligibleLazyMetadata.count(Nominal) != 0) {
         CurrentIGMPtr IGM = getGenModule(Nominal->getDeclContext());
         emitLazyTypeContextDescriptor(*IGM.get(), Nominal);
-      }
-    }
-    while (!LazyFieldTypes.empty()) {
-      auto info = LazyFieldTypes.pop_back_val();
-      auto &IGM = *info.IGM;
-
-      for (auto fieldType : info.fieldTypes) {
-        if (fieldType->isAnyExistentialType())
-          continue;
-
-        // Ensure that all of the foreign metadata is forced, otherwise
-        // there might be a problem when fields are accessed through
-        // reflection.
-        if (IGM.requiresForeignTypeMetadata(fieldType))
-          (void)IGM.getAddrOfForeignTypeMetadataCandidate(fieldType);
       }
     }
     while (!LazyWitnessTables.empty()) {
