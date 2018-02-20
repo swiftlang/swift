@@ -540,23 +540,44 @@ public:
   llvm::Optional<uint32_t>
   readGenericArgsOffset(MetadataRef metadata,
                         ContextDescriptorRef descriptor) {
-    auto type = cast<TargetTypeContextDescriptor<Runtime>>(descriptor);
-    if (auto *classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)){
-      if (classMetadata->SuperClass) {
-        auto superMetadata = readMetadata(classMetadata->SuperClass);
-        if (!superMetadata)
-          return llvm::None;
+    switch (descriptor->getKind()) {
+    case ContextDescriptorKind::Class: {
+      auto type = cast<TargetClassDescriptor<Runtime>>(descriptor);
 
-        auto result =
-          type->getGenericArgumentOffset(
-            classMetadata,
-            cast<TargetClassMetadata<Runtime>>(superMetadata));
+      auto *classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
+      if (!classMetadata)
+        return llvm::None;
 
-        return result;
-      }
+      if (!classMetadata->SuperClass)
+        return type->getGenericArgumentOffset(nullptr, nullptr);
+
+      auto superMetadata = readMetadata(classMetadata->SuperClass);
+      if (!superMetadata)
+        return llvm::None;
+
+      auto superClassMetadata =
+        dyn_cast<TargetClassMetadata<Runtime>>(superMetadata);
+      if (!superClassMetadata)
+        return llvm::None;
+
+      auto result =
+        type->getGenericArgumentOffset(classMetadata, superClassMetadata);
+      return result;
     }
 
-    return type->getGenericArgumentOffset();
+    case ContextDescriptorKind::Enum: {
+      auto type = cast<TargetEnumDescriptor<Runtime>>(descriptor);
+      return type->getGenericArgumentOffset();
+    }
+
+    case ContextDescriptorKind::Struct: {
+      auto type = cast<TargetStructDescriptor<Runtime>>(descriptor);
+      return type->getGenericArgumentOffset();
+    }
+
+    default:
+      return llvm::None;
+    }
   }
 
   /// Read a single generic type argument from a bound generic type
@@ -959,15 +980,21 @@ private:
     case ContextDescriptorKind::Anonymous:
       baseSize = sizeof(TargetAnonymousContextDescriptor<Runtime>);
       break;
+    case ContextDescriptorKind::Class:
+      baseSize = sizeof(TargetClassDescriptor<Runtime>);
+      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      hasVTable = flags.getKindSpecificFlags()
+                   & (uint16_t)TypeContextDescriptorFlags::HasVTable;
+      break;
+    case ContextDescriptorKind::Enum:
+      baseSize = sizeof(TargetEnumDescriptor<Runtime>);
+      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      break;
+    case ContextDescriptorKind::Struct:
+      baseSize = sizeof(TargetStructDescriptor<Runtime>);
+      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      break;
     default:
-      if (kind >= ContextDescriptorKind::Type_First
-          && kind <= ContextDescriptorKind::Type_Last) {
-        baseSize = sizeof(TargetTypeContextDescriptor<Runtime>);
-        genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-        hasVTable = flags.getKindSpecificFlags()
-                     & (uint16_t)TypeContextDescriptorFlags::HasVTable;
-        break;
-      }
       // We don't know about this kind of context.
       return nullptr;
     }
