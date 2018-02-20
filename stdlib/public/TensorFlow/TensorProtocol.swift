@@ -29,14 +29,14 @@ public protocol TensorProtocol {
   associatedtype BoolTensor : TensorProtocol where BoolTensor.Scalar == Bool
 
   /// The number of dimensions of the tensor.
-  var rank: Int { get }
+  var rank: Int32 { get }
 
   /// The sizes of the tensor along each dimension.
   var shape: TensorShape { get }
 
   /// The number of scalars in the tensor.
   /// Always equal to the product of the elements of `shape`.
-  var scalarCount: Int { get }
+  var scalarCount: Int32 { get }
 
   /// Scalars of the tensor, in row-major order.
   var scalars: [Scalar] { get }
