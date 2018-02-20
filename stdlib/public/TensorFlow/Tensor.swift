@@ -416,20 +416,7 @@ public extension Tensor {
   /// - Precondition: The tensor has exactly one scalar.
   @_inlineable @inline(__always)
   func scalarized() -> Scalar {
-#if false // FIXME: The partitioner needs to promote array literals.
-    guard let scalar = reshaped([]).scalar else {
-      preconditionFailure(
-        "Only tensors with exactly one scalar can be scalarized.")
-    }
-#else
-    // FIXME: This is the inefficient implementation. When the partitioner
-    // can promote array literals, replace this with the implementation above.
-    guard let scalar = array.scalar else {
-      preconditionFailure(
-        "Only tensors with exactly one scalar can be scalarized.")
-    }
-#endif
-    return scalar
+    return _TFGetScalarOrDie(reshaped(to: []).handle)
   }
 }
 
