@@ -8,7 +8,7 @@ class Trait(object):
 
 
 TRAITS = [
-    Trait('DeclGroupSyntax',
+    Trait('DeclGroup',
           children=[
               Child('Attributes', kind='AttributeList', is_optional=True),
               Child('AccessLevelModifier', kind='DeclModifier',
@@ -16,14 +16,19 @@ TRAITS = [
               Child('Members', kind='MemberDeclBlock'),
           ]),
 
-    Trait('BracedSyntax',
+    Trait('Braced',
           children=[
               Child('LeftBrace', kind='LeftBraceToken'),
               Child('RightBrace', kind='RightBraceToken'),
           ]),
 
-    Trait('IdentifiedDeclSyntax',
+    Trait('IdentifiedDecl',
           children=[
               Child('Identifier', kind='IdentifierToken'),
+          ]),
+
+    Trait('WithCodeBlock',
+          children=[
+              Child('Body', kind='CodeBlock'),
           ]),
 ]
