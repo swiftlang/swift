@@ -15,7 +15,7 @@ DECL_NODES = [
     #                            typealias-name generic-parameter-clause?
     #                            type-assignment
     # typealias-name -> identifier
-    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -36,7 +36,7 @@ DECL_NODES = [
     #                                 inheritance-clause? type-assignment?
     #                                 generic-where-clause?
     # associatedtype-name -> identifier
-    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -158,7 +158,7 @@ DECL_NODES = [
     #                     '{' class-members '}'
     # class-name -> identifier
     Node('ClassDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -183,7 +183,7 @@ DECL_NODES = [
     #                         '{' struct-members '}'
     # struct-name -> identifier
     Node('StructDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -201,7 +201,7 @@ DECL_NODES = [
          ]),
 
     Node('ProtocolDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -222,7 +222,7 @@ DECL_NODES = [
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
-    Node('ExtensionDecl', kind='Decl', traits=['DeclGroupSyntax'],
+    Node('ExtensionDecl', kind='Decl', traits=['DeclGroup'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -237,7 +237,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('MemberDeclBlock', kind='Syntax', traits=['BracedSyntax'],
+    Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='DeclList'),
@@ -315,7 +315,7 @@ DECL_NODES = [
          element='Syntax',
          element_name='Modifier'),
 
-    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -467,7 +467,7 @@ DECL_NODES = [
 
     Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
 
-    Node('AccessorBlock', kind="Syntax", traits=['BracedSyntax'],
+    Node('AccessorBlock', kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('AccessorListOrStmtList', kind='Syntax',

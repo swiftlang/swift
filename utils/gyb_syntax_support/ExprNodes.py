@@ -384,7 +384,7 @@ EXPR_NODES = [
          ]),
 
     Node('ClosureExpr', kind='Expr',
-         traits=['BracedSyntax'],
+         traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
