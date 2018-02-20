@@ -440,8 +440,8 @@ __swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t
 __swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *,
-                                const __swift_uint16_t *, __swift_int32_t,
-                                __swift_uint16_t *, __swift_int32_t,
+                                const __swift_stdlib_UChar *, __swift_int32_t,
+                                __swift_stdlib_UChar *, __swift_int32_t,
                                 __swift_stdlib_UErrorCode *);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
