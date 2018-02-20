@@ -1959,7 +1959,7 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
     return (NODE)->getEndLoc();                   \
   }                                               \
   SourceLoc CLASS::getLoc() const {               \
-    return (NODE)->getStartLoc();                 \
+    return (NODE)->getLoc();                      \
   }
 
 FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
