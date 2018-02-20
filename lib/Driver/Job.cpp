@@ -244,36 +244,44 @@ void Job::printSummary(raw_ostream &os) const {
   // from a JobAction that itself has InputActions sources, then we collect
   // those up. Otherwise it's more correct to talk about our inputs as the
   // outputs of our input-jobs.
-  SmallVector<std::string, 4> Inputs;
+  SmallVector<StringRef, 4> Inputs;
+  SmallVector<StringRef, 4> Outputs = getOutput().getPrimaryOutputFilenames();
 
   for (const Action *A : getSource().getInputs())
     if (const auto *IA = dyn_cast<InputAction>(A))
       Inputs.push_back(IA->getInputArg().getValue());
 
   for (const Job *J : getInputs())
-    for (const std::string &f : J->getOutput().getPrimaryOutputFilenames())
+    for (StringRef f : J->getOutput().getPrimaryOutputFilenames())
       Inputs.push_back(f);
 
   size_t limit = 3;
-  size_t actual = Inputs.size();
-  if (actual > limit) {
+  size_t actual_in = Inputs.size();
+  size_t actual_out = Outputs.size();
+  if (actual_in > limit) {
     Inputs.erase(Inputs.begin() + limit, Inputs.end());
+  }
+  if (actual_out > limit) {
+    Outputs.erase(Outputs.begin() + limit, Outputs.end());
   }
 
   os << "{" << getSource().getClassName() << ": ";
-  interleave(getOutput().getPrimaryOutputFilenames(),
+  interleave(Outputs,
              [&](const std::string &Arg) {
                os << llvm::sys::path::filename(Arg);
              },
              [&] { os << ' '; });
+  if (actual_out > limit) {
+    os << " ... " << (actual_out-limit) << " more";
+  }
   os << " <= ";
   interleave(Inputs,
              [&](const std::string &Arg) {
                os << llvm::sys::path::filename(Arg);
              },
              [&] { os << ' '; });
-  if (actual > limit) {
-    os << " ... " << (actual-limit) << " more";
+  if (actual_in > limit) {
+    os << " ... " << (actual_in-limit) << " more";
   }
   os << "}";
 }
