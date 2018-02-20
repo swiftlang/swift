@@ -1759,23 +1759,30 @@ static void generateEnumCaseBlocks(
 
   assert(caseBBs.size() == caseInfos.size());
 
-  // We always need a default block if the enum is resilient.
-  // If the enum is @_fixed_layout, we only need one if the
-  // switch is not exhaustive.
-  bool exhaustive = false;
-
-  if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
-                             SGF.F.getResilienceExpansion())) {
-    exhaustive = true;
+  // Check to see if the enum may have values beyond the cases we can see
+  // at compile-time. This includes future cases (for resilient enums) and
+  // random values crammed into C enums.
+  //
+  // Note: This relies on the fact that there are no "non-resilient" enums that
+  // are still non-exhaustive, except for @objc enums.
+  bool canAssumeExhaustive = !enumDecl->isObjC();
+  if (canAssumeExhaustive) {
+    canAssumeExhaustive =
+        !enumDecl->isResilient(SGF.SGM.SwiftModule,
+                               SGF.F.getResilienceExpansion());
+  }
+  if (canAssumeExhaustive) {
+    // Check that Sema didn't let any cases slip through. (This can happen
+    // with @_downgrade_exhaustivity_check.)
     for (auto elt : enumDecl->getAllElements()) {
       if (!caseToIndex.count(elt)) {
-        exhaustive = false;
+        canAssumeExhaustive = false;
         break;
       }
     }
   }
 
-  if (!exhaustive)
+  if (!canAssumeExhaustive)
     defaultBB = SGF.createBasicBlock(curBB);
 }
 
@@ -2542,17 +2549,21 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
         llvm::dbgs() << '\n');
-  auto failure = [&](SILLocation location) {
-    // If we fail to match anything, we can just emit unreachable.
-    // This will be a dataflow error if we can reach here.
-    B.createUnreachable(S);
+  auto failure = [this](SILLocation location) {
+    // If we fail to match anything, we trap. This can happen with a switch
+    // over an @objc enum, which may contain any value of its underlying type.
+    // FIXME: Even if we can't say what the invalid value was, we should at
+    // least mention that this was because of a non-exhaustive enum.
+    B.createBuiltinTrap(location);
+    B.createUnreachable(location);
   };
   
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
   if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
     emitIgnoredExpr(S->getSubjectExpr());
-    return failure(SILLocation(S));
+    B.createUnreachable(S);
+    return;
   }
 
   auto completionHandler = [&](PatternMatchEmission &emission,
