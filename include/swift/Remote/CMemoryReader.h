@@ -62,17 +62,27 @@ public:
     if (!length)
       return false;
 
-    auto buffer = std::unique_ptr<uint8_t>(new uint8_t[length + 1]);
-    if (!readBytes(address, buffer.get(), length + 1))
+    const void *ptr;
+    std::function<void()> freeFunc;
+    std::tie(ptr, freeFunc) = readBytes(address, length);
+    if (ptr != nullptr) {
+      dest = std::string(reinterpret_cast<const char *>(ptr), length);
+      freeFunc();
+      return true;
+    } else {
       return false;
-
-    dest = std::string(reinterpret_cast<const char *>(buffer.get()));
-    return true;
+    }
   }
 
-  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
-    return Impl.readBytes(Impl.reader_context,
-                          address.getAddressData(), dest, size) != 0;
+  std::tuple<const void *, std::function<void()>>
+    readBytes(RemoteAddress address, uint64_t size) override {
+      FreeBytesFunction freeFunc;
+      void *freeContext;
+      auto ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
+                                &freeFunc, &freeContext);
+      auto freeLambda = [=]{ freeFunc(ptr, freeContext); };
+      
+      return std::make_tuple(ptr, freeLambda);
   }
 };
 

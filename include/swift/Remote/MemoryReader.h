@@ -20,7 +20,9 @@
 
 #include "swift/Remote/RemoteAddress.h"
 
+#include <functional>
 #include <string>
+#include <tuple>
 
 namespace swift {
 namespace remote {
@@ -40,12 +42,12 @@ public:
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;
 
-  /// Attempts to read 'size' bytes from the given address in the
-  /// remote process.
+  /// Attempts to read 'size' bytes from the given address in the remote process.
   ///
-  /// Returns false if the operation failed.
-  virtual bool readBytes(RemoteAddress address, uint8_t *dest,
-                         uint64_t size) = 0;
+  /// Returns a pointer to the requested data and a function that must be called to
+  /// free that data when done. The pointer will be NULL if the operation failed.
+  virtual std::tuple<const void *, std::function<void()>>
+    readBytes(RemoteAddress address, uint64_t size) = 0;
 
   /// Attempts to read a C string from the given address in the remote
   /// process.
@@ -63,6 +65,23 @@ public:
                      sizeof(IntegerType));
   }
 
+  /// Attempts to read 'size' bytes from the given address in the
+  /// remote process.
+  ///
+  /// Returns false if the operation failed.
+  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) {
+    const void *ptr;
+    std::function<void()> freeFunc;
+    std::tie(ptr, freeFunc) = readBytes(address, size);
+    if (ptr != nullptr) {
+      memcpy(dest, ptr, size);
+      freeFunc();
+      return true;
+    } else {
+      return false;
+    }
+  }
+          
   virtual ~MemoryReader() = default;
 };
 

@@ -95,9 +95,15 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
   }
 }
 
+static void PipeMemoryReader_freeBytes(const void *bytes, void *context) {
+  free((void *)bytes);
+}
+
 static
-int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
-                               uint64_t Size) {
+const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
+                                       uint64_t Size,
+                                       FreeBytesFunction *outFreeFunction,
+                                       void **outFreeContext) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
   size_t TargetSize = (size_t)Size;
@@ -105,8 +111,14 @@ int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
   write(WriteFD, REQUEST_READ_BYTES, 2);
   write(WriteFD, &TargetAddress, sizeof(TargetAddress));
   write(WriteFD, &TargetSize, sizeof(size_t));
-  PipeMemoryReader_collectBytesFromPipe(Reader, Dest, Size);
-  return 1;
+  
+  void *Buf = malloc(Size);
+  PipeMemoryReader_collectBytesFromPipe(Reader, Buf, Size);
+  
+  *outFreeFunction = PipeMemoryReader_freeBytes;
+  *outFreeContext = NULL;
+  
+  return Buf;
 }
 
 static

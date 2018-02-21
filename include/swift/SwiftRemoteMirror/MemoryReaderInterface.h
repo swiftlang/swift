@@ -32,13 +32,14 @@ extern "C" {
 // in the system library, so we use 'swift_addr_t'.
 typedef uint64_t swift_addr_t;
 
-typedef void (*FreeBytesFunction)(void *bytes, void *context);
+typedef void (*FreeBytesFunction)(const void *bytes, void *context);
 
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
 typedef uint8_t (*SizeSizeFunction)(void *reader_context);
-typedef void *(*ReadBytesFunction)(void *reader_context, swift_addr_t address,
-                                 uint64_t size, FreeBytesFunction *outFreeFunction,
-                                 void **outFreeContext);
+typedef const void *(*ReadBytesFunction)(void *reader_context, swift_addr_t address,
+                                         uint64_t size,
+                                         FreeBytesFunction *outFreeFunction,
+                                         void **outFreeContext);
 typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
                                             swift_addr_t address);
 typedef swift_addr_t (*GetSymbolAddressFunction)(void *reader_context,
