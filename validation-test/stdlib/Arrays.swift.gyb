@@ -2366,9 +2366,9 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     : "invalid Collection: count differed in successive traversals"
 
   let constructionMessage =
-    /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
-      ? "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity"
-      :*/ message
+    _isDebugAssertConfiguration() && evilBoundsCheck && step <= 0
+      ? "invalid Collection: count differed in successive traversals"
+      : message
 
   // The invalid Collection error is a _debugPreconditon that will only fire
   // in a Debug assert configuration.
