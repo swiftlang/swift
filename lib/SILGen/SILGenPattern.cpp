@@ -1710,7 +1710,7 @@ static void generateEnumCaseBlocks(
 
   auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
 
-  llvm::DenseMap<EnumElementDecl*, unsigned> caseToIndex;
+  llvm::SmallDenseMap<EnumElementDecl *, unsigned, 16> caseToIndex;
   for (auto &row : rows) {
     EnumElementDecl *formalElt;
     Pattern *subPattern = nullptr;
@@ -1774,12 +1774,10 @@ static void generateEnumCaseBlocks(
   if (canAssumeExhaustive) {
     // Check that Sema didn't let any cases slip through. (This can happen
     // with @_downgrade_exhaustivity_check.)
-    for (auto elt : enumDecl->getAllElements()) {
-      if (!caseToIndex.count(elt)) {
-        canAssumeExhaustive = false;
-        break;
-      }
-    }
+    canAssumeExhaustive = llvm::all_of(enumDecl->getAllElements(),
+                                       [&](const EnumElementDecl *elt) {
+      return caseToIndex.count(elt);
+    });
   }
 
   if (!canAssumeExhaustive)
