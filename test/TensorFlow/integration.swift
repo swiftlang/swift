@@ -354,8 +354,8 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 // _swift_tfc_FinishTensorComputation.
 public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
                         c : Tensor2D<Float>) -> Tensor2D<Float> {
-  return a+b+c  // expected-note 3 {{value used here}}
-} // expected-warning 3 {{value implicitly copied to the accelerator}}     TODO: Poor loc info.
+  return a+b+c  // expected-warning 3 {{value implicitly copied to the accelerator}}
+}
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}liveOutTest

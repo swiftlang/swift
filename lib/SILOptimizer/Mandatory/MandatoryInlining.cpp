@@ -259,7 +259,9 @@ static void collectPartiallyAppliedArguments(
 static SILFunction *getCalleeFunction(
     SILFunction *F, FullApplySite AI, bool &IsThick,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
-    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply) {
+    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply,
+    // SWIFT_ENABLE_TENSORFLOW
+    const ShouldMandatoryInlineFnPred &shouldInlinePredicate) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -405,7 +407,8 @@ static SILFunction *getCalleeFunction(
 
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
-  if (CalleeFunction->isTransparent() == IsNotTransparent)
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!shouldInlinePredicate(AI, *CalleeFunction))
     return nullptr;
 
   // If CalleeFunction is a declaration, see if we can load it.
@@ -466,7 +469,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
-                         ClassHierarchyAnalysis *CHA) {
+                         ClassHierarchyAnalysis *CHA,
+                         // SWIFT_ENABLE_TENSORFLOW
+                     const ShouldMandatoryInlineFnPred &shouldInlinePredicate) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -510,7 +515,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI);
+          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI,
+          shouldInlinePredicate);  // SWIFT_ENABLE_TENSORFLOW
 
       if (!CalleeFunction)
         continue;
@@ -518,7 +524,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
-                                    CurrentInliningSet, CHA)) {
+                                    CurrentInliningSet, CHA,
+                                    // SWIFT_ENABLE_TENSORFLOW
+                                    shouldInlinePredicate)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -614,6 +622,29 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
   return true;
 }
 
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Scan the given function body, mandatory inlining calls to callees that
+/// satisfy the specified predicate, including calls sites exposed by inlining
+/// other functions.
+///
+/// The deabstraction phase of TensorFlow support needs to mandatory inline
+/// certain functions using the standard mandatory inlining algorithm.  This
+/// function implements support for it, inlining direct calls to callees that
+/// satisfy the given predicate.
+void swift::inlineForTFDeabstraction(SILFunction &fn,
+                                 const ShouldMandatoryInlineFnPred &predicate) {
+  DenseFunctionSet FullyInlinedSet;
+  ImmutableFunctionSet::Factory SetFactory;
+
+  runOnFunctionRecursively(&fn,
+                           FullApplySite(static_cast<ApplyInst*>(nullptr)),
+                           FullyInlinedSet,
+                           SetFactory, SetFactory.getEmptySet(),
+                           /*CHA*/nullptr,
+                           predicate);
+}
+
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -639,8 +670,14 @@ class MandatoryInlining : public SILModuleTransform {
         continue;
 
       runOnFunctionRecursively(&F,
-                               FullApplySite(), FullyInlinedSet, SetFactory,
-                               SetFactory.getEmptySet(), CHA);
+                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
+                               FullyInlinedSet,
+                               SetFactory, SetFactory.getEmptySet(), CHA,
+         // SWIFT_ENABLE_TENSORFLOW
+         [&](FullApplySite site, const SILFunction &callee) -> bool {
+           return callee.isTransparent() == IsTransparent;
+         }
+       );
     }
 
     if (!ShouldCleanup)

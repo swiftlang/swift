@@ -19,6 +19,7 @@ set(MANDATORY_SOURCES
   # SWIFT_ENABLE_TENSORFLOW
   Mandatory/TensorFlow.cpp
   Mandatory/TFCanonicalizeCFG.cpp
+  Mandatory/TFDeabstraction.cpp
   Mandatory/TFLowerGraph.cpp
   Mandatory/TFPartition.cpp
   PARENT_SCOPE)
