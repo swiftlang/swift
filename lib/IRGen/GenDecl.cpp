@@ -809,7 +809,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
         return getAddrOfLLVMVariableOrGOTEquivalent(
                                 LinkEntity::forNominalTypeDescriptor(nominal),
                                 Alignment(4),
-                                NominalTypeDescriptorTy,
+                                TypeContextDescriptorTy,
                                 shouldBeIndirect);
       }
     }
@@ -2495,8 +2495,8 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     // are represented by referencing the nominal type descriptor.
     typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
-    defaultTy = IGM.NominalTypeDescriptorTy;
-    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
+    defaultTy = IGM.TypeContextDescriptorTy;
+    defaultPtrTy = IGM.TypeContextDescriptorPtrTy;
   }
 
   return {typeKind, *entity, defaultTy, defaultPtrTy};
@@ -3305,7 +3305,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
-                               NominalTypeDescriptorTy,
+                               TypeContextDescriptorTy,
                                DebugTypeInfo());
 }
 
