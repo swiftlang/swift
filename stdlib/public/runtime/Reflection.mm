@@ -446,19 +446,6 @@ void swift_TupleMirror_subscript(String *outString,
   new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
 }
 
-// Get a field name from a doubly-null-terminated list.
-static const char *getFieldName(const char *fieldNames, size_t i) {
-  const char *fieldName = fieldNames;
-  for (size_t j = 0; j < i; ++j) {
-    size_t len = strlen(fieldName);
-    assert(len != 0);
-    fieldName += len + 1;
-  }
-
-  return fieldName;
-}
-
-
 static bool loadSpecialReferenceStorage(HeapObject *owner,
                                         OpaqueValue *fieldData,
                                         const FieldType fieldType,
@@ -552,25 +539,26 @@ void swift_StructMirror_subscript(String *outString,
   if (i < 0 || (size_t)i > Struct->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
-  // Load the type and offset from their respective vectors.
-  auto fieldType = Struct->getFieldTypes()[i];
+  // Load the offset from its vector.
   auto fieldOffset = Struct->getFieldOffsets()[i];
 
-  auto bytes = reinterpret_cast<char*>(value);
-  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+  swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    new (outString) String(name.data(), name.size());
 
-  new (outString) String(getFieldName(Struct->getDescription()->FieldNames, i));
+    // 'owner' is consumed by this call.
+    SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
 
-  // 'owner' is consumed by this call.
-  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
+    assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
 
-  assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
+    auto bytes = reinterpret_cast<char *>(value);
+    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
-  // This only consumed owner if we succeed.
-  if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
-    return;
+    // This only consumed owner if we succeed.
+    if (loadSpecialReferenceStorage(owner, fieldData, fieldInfo, outMirror))
+      return;
 
-  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
+    new (outMirror) Mirror(reflect(owner, fieldData, fieldInfo.getType()));
+  });
 }
 
 // -- Enum destructuring.
@@ -580,17 +568,14 @@ static bool isEnumReflectable(const Metadata *type) {
   const auto &Description = *Enum->getDescription();
 
   // No metadata for C and @objc enums yet
-  if (Description.CaseNames == nullptr)
-    return false;
-
-  return true;
+  return Description.IsReflectable;
 }
 
-static void getEnumMirrorInfo(const OpaqueValue *value,
-                              const Metadata *type,
-                              unsigned *tagPtr,
-                              const Metadata **payloadTypePtr,
-                              bool *indirectPtr) {
+static const char *getEnumMirrorInfo(const OpaqueValue *value,
+                                     const Metadata *type,
+                                     unsigned *tagPtr = nullptr,
+                                     const Metadata **payloadTypePtr = nullptr,
+                                     bool *indirectPtr = nullptr) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = *Enum->getDescription();
 
@@ -605,11 +590,12 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
   const Metadata *payloadType = nullptr;
   bool indirect = false;
 
-  if (static_cast<unsigned>(tag) < payloadCases) {
-    auto payload = Description.GetCaseTypes(type)[tag];
-    payloadType = payload.getType();
-    indirect = payload.isIndirect();
-  }
+  const char *caseName = nullptr;
+  swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+    caseName = name.data();
+    payloadType = info.getType();
+    indirect = info.isIndirect();
+  });
 
   if (tagPtr)
     *tagPtr = tag;
@@ -617,6 +603,8 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
     *payloadTypePtr = payloadType;
   if (indirectPtr)
     *indirectPtr = indirect;
+
+  return caseName;
 }
 
 // internal func _swift_EnumMirror_caseName(
@@ -632,15 +620,11 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
     return nullptr;
   }
 
-  const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = *Enum->getDescription();
-
-  unsigned tag;
-  getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
+  auto caseName = getEnumMirrorInfo(value, type);
 
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
 
-  return getFieldName(Description.CaseNames, tag);
+  return caseName;
 }
 
 // internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
@@ -685,7 +669,7 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
   }
 
   const Metadata *payloadType;
-  getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
+  (void)getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   return (payloadType != nullptr) ? 1 : 0;
 }
@@ -707,7 +691,7 @@ void swift_EnumMirror_subscript(String *outString,
   const Metadata *payloadType;
   bool indirect;
 
-  getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
+  auto caseName = getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
 
   // Copy the enum payload into a box
   const Metadata *boxType = (indirect ? &METADATA_SYM(Bo).base : payloadType);
@@ -731,7 +715,7 @@ void swift_EnumMirror_subscript(String *outString,
     swift_release(pair.object);
   }
 
-  new (outString) String(getFieldName(Description.CaseNames, tag));
+  new (outString) String(caseName);
   new (outMirror) Mirror(reflect(owner, value, payloadType));
 }
 
@@ -791,11 +775,6 @@ void swift_ClassMirror_subscript(String *outString,
   if (i < 0 || (size_t)i > Clas->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
-  // Load the type and offset from their respective vectors.
-  auto fieldType = Clas->getFieldTypes()[i];
-  assert(!fieldType.isIndirect()
-         && "class indirect properties not implemented");
-
   // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
   // metadata, because we don't update the field offsets in the face of
   // resilient base classes.
@@ -812,16 +791,21 @@ void swift_ClassMirror_subscript(String *outString,
 #endif
   }
 
-  auto bytes = *reinterpret_cast<char * const *>(value);
-  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+  swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    assert(!fieldInfo.isIndirect() &&
+           "class indirect properties not implemented");
 
-  new (outString) String(getFieldName(Clas->getDescription()->FieldNames, i));
+    auto bytes = *reinterpret_cast<char *const *>(value);
+    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
- if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
-   return;
+    new (outString) String(name.data(), name.size());
 
-  // 'owner' is consumed by this call.
-  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
+    if (loadSpecialReferenceStorage(owner, fieldData, fieldInfo, outMirror))
+      return;
+
+    // 'owner' is consumed by this call.
+    new (outMirror) Mirror(reflect(owner, fieldData, fieldInfo.getType()));
+  });
 }
 
 // -- Mirror witnesses for ObjC classes.

@@ -162,8 +162,6 @@ enum GenericFixedLayout<T> {
 // CHECK:   i64 2,
 // CHECK:   {{.*}}* @"$S20enum_value_semantics18GenericFixedLayoutOMn"
 // CHECK:   i{{32|64}} 0
-// CHECK:   %swift.type* null,
-// CHECK:   %swift.type** null
 // CHECK: }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
