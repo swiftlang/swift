@@ -14,6 +14,7 @@ import Foundation
 @_exported import AppKit
 
 extension NSCursor : _DefaultCustomPlaygroundQuickLookable {
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     return .image(image)
   }
@@ -24,6 +25,7 @@ internal struct _NSViewQuickLookState {
 }
 
 extension NSView : _DefaultCustomPlaygroundQuickLookable {
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
     // could need to draw itself in order to get a QLObject for itself, which in turn if your code was

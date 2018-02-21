@@ -113,6 +113,7 @@ extension NSString {
 }
 
 extension NSString : CustomPlaygroundQuickLookable {
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(self as String)
   }

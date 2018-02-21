@@ -660,6 +660,7 @@ internal extension Mirror {
 
 /// The sum of types that can be used as a Quick Look representation.
 @_fixed_layout // FIXME(sil-serialize-all)
+@available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
 public enum PlaygroundQuickLook {
   /// Plain text.
   case text(String)
@@ -746,6 +747,7 @@ extension PlaygroundQuickLook {
   /// - Parameter subject: The instance to represent with the resulting Quick
   ///   Look.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public init(reflecting subject: Any) {
     if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
@@ -771,6 +773,7 @@ extension PlaygroundQuickLook {
 /// with the representation supplied for your type by default, you can make it
 /// conform to the `CustomPlaygroundQuickLookable` protocol and provide a
 /// custom `PlaygroundQuickLook` instance.
+@available(swift, deprecated: 3, obsoleted: 5, message: "CustomPlaygroundQuickLookable is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please use PlaygroundSupport's CustomPlaygroundRepresentable instead")
 public protocol CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for this instance.
   ///
@@ -782,6 +785,7 @@ public protocol CustomPlaygroundQuickLookable {
 
 // A workaround for <rdar://problem/26182650>
 // FIXME(ABI)#50 (Dynamic Dispatch for Class Extensions) though not if it moves out of stdlib.
+@available(swift, deprecated: 3, obsoleted: 5, message: "_DefaultCustomPlaygroundQuickLookable is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please use PlaygroundSupport's CustomPlaygroundRepresentable instead")
 public protocol _DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
