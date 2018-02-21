@@ -529,7 +529,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     impl->type = type;
     impl->value = value;
     auto result = f(impl);
-    T->vw_destroy(passedValue);
+    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(passedValue));
     return result;
   };
   
