@@ -35,6 +35,16 @@ enum class InlineCost : unsigned {
 /// disappear at the LLVM IR level are assigned a cost of 'Free'.
 InlineCost instructionInlineCost(SILInstruction &I);
 
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Scan the given function body, mandatory inlining calls to callees that
+/// satisfy the specified predicate, including call sites exposed by inlining
+/// other functions.
+typedef std::function<bool (FullApplySite site, const SILFunction &callee)>
+    ShouldMandatoryInlineFnPred;
+void inlineForTFDeabstraction(SILFunction &fn,
+                              const ShouldMandatoryInlineFnPred &predicate);
+
 class SILInliner : public TypeSubstCloner<SILInliner> {
   friend class SILInstructionVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;

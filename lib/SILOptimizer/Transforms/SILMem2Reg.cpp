@@ -176,6 +176,10 @@ public:
 
   /// \brief Promote memory to registers. Return True on change.
   bool run();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Promote specific allocations.
+  void promoteAllocs(ArrayRef<AllocStackInst*> allocs);
 };
 
 } // end anonymous namespace
@@ -914,6 +918,37 @@ bool MemoryToRegisters::run() {
   }
   return Changed;
 }
+
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// Promote specific allocations.
+void MemoryToRegisters::promoteAllocs(ArrayRef<AllocStackInst*> allocs) {
+  splitAllCriticalEdges(F, true, DT, nullptr);
+
+  // Compute dominator tree node levels for the function.
+  DomTreeLevelMap DomTreeLevels;
+  computeDomTreeLevels(DT, DomTreeLevels);
+
+  for (auto alloc : allocs) {
+    if (!promoteSingleAllocation(alloc, DomTreeLevels))
+      continue;
+
+    if (alloc->use_empty())
+      alloc->eraseFromParent();
+  }
+}
+
+/// Attempt to promote the specified array of stack allocations to SSA
+/// registers.  Promotion can fail if the allocation escapes.
+void swift::promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
+                               DominanceInfo *domInfo) {
+  if (allocs.empty()) return;
+
+  auto *fn = allocs.front()->getFunction();
+  assert(fn && "Shouldn't have alloc stacks in global var initializers");
+  MemoryToRegisters(*fn, domInfo).promoteAllocs(allocs);
+}
+
 
 namespace {
 class SILMem2Reg : public SILFunctionTransform {
