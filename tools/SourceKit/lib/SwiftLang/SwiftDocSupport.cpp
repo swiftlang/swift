@@ -704,6 +704,7 @@ public:
     case SyntaxNodeKind::TypeId:
     case SyntaxNodeKind::BuildConfigKeyword:
     case SyntaxNodeKind::BuildConfigId:
+    case SyntaxNodeKind::PoundDirectiveKeyword:
     case SyntaxNodeKind::AttributeId:
     case SyntaxNodeKind::AttributeBuiltin:
     case SyntaxNodeKind::ObjectLiteral:
