@@ -886,7 +886,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createDebugValue(
                           Inst->getLoc(), getOpValue(Inst->getOperand()),
-                          Inst->getVarInfo()));
+                          *Inst->getVarInfo()));
 }
 template<typename ImplClass>
 void
@@ -900,8 +900,8 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // Do not remap the location for a debug Instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createDebugValueAddr(
-                          Inst->getLoc(), OpValue, Inst->getVarInfo()));
+  doPostProcess(Inst, getBuilder().createDebugValueAddr(Inst->getLoc(), OpValue,
+                                                        *Inst->getVarInfo()));
 }
 
 

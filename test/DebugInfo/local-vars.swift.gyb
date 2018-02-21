@@ -47,6 +47,7 @@ public protocol Proto {
   func f()
 }
 
+func nop() {}
 func use<T>(_ x: T) {}
 func variable_use<T>(_ x: inout T) {}
 
@@ -72,14 +73,13 @@ type_initializer_map = [
   #// Existentials.
    ("T", "self.t"),
    ("U", "self.u"),
+  #// Functions.
+   ("(() -> ())", "nop")
   ]
 
+import re
 def derive_name((type, val)):
-  return (type.replace('<', '_').replace(' ', '_')
-              .replace(',', '_').replace('.', '_')
-              .replace('?', '_').replace('>', '_')
-              .replace('(', '_').replace(')', '_')
-              .replace('[', '_').replace(']', '_'), type, val)
+  return (re.sub(r'[<> ,\.\?\(\)\[\]-]', '_', type), type, val)
 
 for name, type, val in map(derive_name, type_initializer_map):
   generic = (type in ['T', 'U'])
@@ -374,27 +374,27 @@ public func arg_tuple_${name}(_ v: (${type}, ${type})) {
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_name {{.*}}"v"
 %  if generic:
-  // FIXME-DWARF: DW_TAG_formal_parameter
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_name ("self")
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_artificial
+  // DWARF: DW_TAG_formal_parameter
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name ("self")
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_artificial
   // FIMXE-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_TAG_variable
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_name ("$swift.type.{{T|U}}")
-  // FIXME-DWARF: DW_AT_artificial
-  // FIXME-DWARF: DW_TAG_variable
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_name ("$swift.type.{{T|U}}")
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_artificial
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name ("$swift.type.{{T|U}}")
+  // DWARF: DW_AT_artificial
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name ("$swift.type.{{T|U}}")
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_artificial
 %  end
-  // FIXME-DWARF: DW_TAG_variable
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_location
-  // FIXME-DWARF-NOT: DW_TAG
-  // FIXME-DWARF: DW_AT_name {{.*}}"y"
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"y"
   use(y)
 }
   
