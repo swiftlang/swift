@@ -37,6 +37,9 @@
 
 using namespace swift;
 
+CompilerInstance::CompilerInstance() = default;
+CompilerInstance::~CompilerInstance() = default;
+
 std::string CompilerInvocation::getPCHHash() const {
   using llvm::hash_code;
   using llvm::hash_value;
@@ -74,6 +77,10 @@ void CompilerInstance::createSILModule() {
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
+}
+
+void CompilerInstance::setSILModule(std::unique_ptr<SILModule> M) {
+  TheSILModule = std::move(M);
 }
 
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {

@@ -310,6 +310,9 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   if (Attrs.hasAttribute<SILGenNameAttr>() ||
       Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  if (Attrs.hasAttribute<WeakLinkedAttr>())
+    F->setWeakLinked();
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
