@@ -71,7 +71,7 @@ unwrapExistential(const Metadata *T, OpaqueValue *Value) {
   // really matter yet since we don't have any special mirror behavior for
   // concrete metatypes yet.
   while (T->getKind() == MetadataKind::Existential) {
-    auto existential
+    auto *existential
       = static_cast<const ExistentialTypeMetadata *>(T);
 
     // Unwrap the existential container.
@@ -94,8 +94,8 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
   auto type = fieldType.getType();
   assert(type->getKind() == MetadataKind::Optional);
 
-  auto weakField = reinterpret_cast<WeakReference *>(fieldData);
-  auto strongValue = swift_unknownWeakLoadStrong(weakField);
+  auto *weakField = reinterpret_cast<WeakReference *>(fieldData);
+  auto *strongValue = swift_unknownWeakLoadStrong(weakField);
 
   // Now that we have a strong reference, we need to create a temporary buffer
   // from which to copy the whole value, which might be a native class-bound
@@ -108,7 +108,7 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
   // - the witness table for Protocol1
   // - the witness table for Protocol2
 
-  auto weakContainer =
+  auto *weakContainer =
     reinterpret_cast<WeakClassExistentialContainer *>(fieldData);
 
   // Create a temporary existential where we can put the strong reference.
@@ -116,7 +116,7 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
   // allocated storage.
   ValueBuffer temporaryBuffer;
 
-  auto temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
+  auto *temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
       type->allocateBufferIn(&temporaryBuffer));
 
   // Now copy the entire value out of the parent, which will include the
@@ -170,19 +170,19 @@ struct ReflectionMirrorImpl {
 
 
 // Implementation for tuples.
-struct TupleImpl: ReflectionMirrorImpl {
+struct TupleImpl : ReflectionMirrorImpl {
   char displayStyle() {
     return 't';
   }
   
   intptr_t count() {
-    auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+    auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
     return Tuple->NumElements;
   }
   
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+    auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
 
     if (i < 0 || (size_t)i > Tuple->NumElements)
       swift::crash("Swift mirror subscript bounds check failure");
@@ -214,8 +214,8 @@ struct TupleImpl: ReflectionMirrorImpl {
 
     // Get the nth element.
     auto &elt = Tuple->getElement(i);
-    auto bytes = reinterpret_cast<const char*>(value);
-    auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
+    auto *bytes = reinterpret_cast<const char *>(value);
+    auto *eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 
     Any result;
 
@@ -230,19 +230,19 @@ struct TupleImpl: ReflectionMirrorImpl {
 
 
 // Implementation for structs.
-struct StructImpl: ReflectionMirrorImpl {
+struct StructImpl : ReflectionMirrorImpl {
   char displayStyle() {
     return 's';
   }
   
   intptr_t count() {
-    auto Struct = static_cast<const StructMetadata *>(type);
+    auto *Struct = static_cast<const StructMetadata *>(type);
     return Struct->Description->Struct.NumFields;
   }
   
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    auto Struct = static_cast<const StructMetadata *>(type);
+    auto *Struct = static_cast<const StructMetadata *>(type);
 
     if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
@@ -251,8 +251,8 @@ struct StructImpl: ReflectionMirrorImpl {
     auto fieldType = Struct->getFieldTypes()[i];
     auto fieldOffset = Struct->getFieldOffsets()[i];
 
-    auto bytes = reinterpret_cast<char*>(value);
-    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+    auto *bytes = reinterpret_cast<char*>(value);
+    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
     *outName = getFieldName(Struct->Description->Struct.FieldNames, i);
     *outFreeFunc = nullptr;
@@ -273,9 +273,9 @@ struct StructImpl: ReflectionMirrorImpl {
 
 
 // Implementation for enums.
-struct EnumImpl: ReflectionMirrorImpl {
+struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
-    const auto Enum = static_cast<const EnumMetadata *>(type);
+    const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->Description->Enum;
 
     // No metadata for C and @objc enums yet
@@ -286,7 +286,7 @@ struct EnumImpl: ReflectionMirrorImpl {
   }
   
   void getInfo(unsigned *tagPtr, const Metadata **payloadTypePtr, bool *indirectPtr) {
-    const auto Enum = static_cast<const EnumMetadata *>(type);
+    const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->Description->Enum;
 
     unsigned payloadCases = Description.getNumPayloadCases();
@@ -330,7 +330,7 @@ struct EnumImpl: ReflectionMirrorImpl {
 
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    const auto Enum = static_cast<const EnumMetadata *>(type);
+    const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->Description->Enum;
 
     unsigned tag;
@@ -375,7 +375,7 @@ struct EnumImpl: ReflectionMirrorImpl {
       return nullptr;
     }
 
-    const auto Enum = static_cast<const EnumMetadata *>(type);
+    const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->Description->Enum;
 
     unsigned tag;
@@ -388,13 +388,13 @@ struct EnumImpl: ReflectionMirrorImpl {
 
 
 // Implementation for classes.
-struct ClassImpl: ReflectionMirrorImpl {
+struct ClassImpl : ReflectionMirrorImpl {
   char displayStyle() {
     return 'c';
   }
   
   intptr_t count() {
-    auto Clas = static_cast<const ClassMetadata*>(type);
+    auto *Clas = static_cast<const ClassMetadata*>(type);
     auto count = Clas->getDescription()->Class.NumFields;
 
     return count;
@@ -402,7 +402,7 @@ struct ClassImpl: ReflectionMirrorImpl {
   
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    auto Clas = static_cast<const ClassMetadata*>(type);
+    auto *Clas = static_cast<const ClassMetadata*>(type);
 
     if (i < 0 || (size_t)i > Clas->getDescription()->Class.NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
@@ -428,8 +428,8 @@ struct ClassImpl: ReflectionMirrorImpl {
   #endif
     }
 
-    auto bytes = *reinterpret_cast<char * const *>(value);
-    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+    auto *bytes = *reinterpret_cast<char * const *>(value);
+    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
     *outName = getFieldName(Clas->getDescription()->Class.FieldNames, i);
     *outFreeFunc = nullptr;
@@ -464,7 +464,7 @@ struct ClassImpl: ReflectionMirrorImpl {
 
 #if SWIFT_OBJC_INTEROP
 // Implementation for ObjC classes.
-struct ObjCClassImpl: ClassImpl {
+struct ObjCClassImpl : ClassImpl {
   intptr_t count() {
     // ObjC makes no guarantees about the state of ivars, so we can't safely
     // introspect them in the general case.
@@ -480,7 +480,7 @@ struct ObjCClassImpl: ClassImpl {
 
 
 // Implementation for metatypes.
-struct MetatypeImpl: ReflectionMirrorImpl {
+struct MetatypeImpl : ReflectionMirrorImpl {
   char displayStyle() {
     return '\0';
   }
@@ -497,7 +497,7 @@ struct MetatypeImpl: ReflectionMirrorImpl {
 
 
 // Implementation for opaque types.
-struct OpaqueImpl: ReflectionMirrorImpl {
+struct OpaqueImpl : ReflectionMirrorImpl {
   char displayStyle() {
     return '\0';
   }
@@ -549,7 +549,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
   #if SWIFT_OBJC_INTEROP
     // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
     // ForeignClass (e.g. CF classes) manifests as a NULL class object.
-    auto classObject = passedType->getClassObject();
+    auto *classObject = passedType->getClassObject();
     if (classObject == nullptr || !classObject->isTypeMetadata()) {
       ObjCClassImpl impl;
       return call(&impl);
@@ -644,8 +644,9 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_reflectionMirror_count(OpaqueValue *value,
                                       const Metadata *type,
                                       const Metadata *T) {
-  auto c = call(value, T, type, [](ReflectionMirrorImpl *impl) { return impl->count(); });
-  return c;
+  return call(value, T, type, [](ReflectionMirrorImpl *impl) {
+    return impl->count();
+  });
 }
 
 // We intentionally use a non-POD return type with this entry point to give

@@ -86,22 +86,32 @@ internal func _getClassPlaygroundQuickLook(
     default:
       return .int(number.longLongValue)
     }
-  } else if _is(object, kindOf: "NSAttributedString") {
+  }
+  
+  if _is(object, kindOf: "NSAttributedString") {
     return .attributedString(object)
-  } else if _is(object, kindOf: "NSImage") ||
-            _is(object, kindOf: "UIImage") ||
-            _is(object, kindOf: "NSImageView") ||
-            _is(object, kindOf: "UIImageView") ||
-            _is(object, kindOf: "CIImage") ||
-            _is(object, kindOf: "NSBitmapImageRep") {
+  }
+  
+  if _is(object, kindOf: "NSImage") ||
+     _is(object, kindOf: "UIImage") ||
+     _is(object, kindOf: "NSImageView") ||
+     _is(object, kindOf: "UIImageView") ||
+     _is(object, kindOf: "CIImage") ||
+     _is(object, kindOf: "NSBitmapImageRep") {
     return .image(object)
-  } else if _is(object, kindOf: "NSColor") ||
-            _is(object, kindOf: "UIColor") {
+  }
+  
+  if _is(object, kindOf: "NSColor") ||
+     _is(object, kindOf: "UIColor") {
     return .color(object)
-  } else if _is(object, kindOf: "NSBezierPath") ||
-            _is(object, kindOf: "UIBezierPath") {
+  }
+  
+  if _is(object, kindOf: "NSBezierPath") ||
+     _is(object, kindOf: "UIBezierPath") {
     return .bezierPath(object)
-  } else if _is(object, kindOf: "NSString") {
+  }
+  
+  if _is(object, kindOf: "NSString") {
     return .text(_forceBridgeFromObjectiveC(object, String.self))
   }
 
@@ -125,24 +135,24 @@ extension Mirror {
     self.children = Children(children)
     
     self._makeSuperclassMirror = {
-      if let subjectClass = subjectType as? AnyClass,
-         let superclass = _getSuperclass(subjectClass) {
-        // Handle custom ancestors. If we've hit the custom ancestor's subject type,
-        // or descendants are suppressed, return it. Otherwise continue reflecting.
-        if let customAncestor = customAncestor {
-          if superclass == customAncestor.subjectType {
-            return customAncestor
-          }
-          if customAncestor._defaultDescendantRepresentation == .suppressed {
-            return customAncestor
-          }
-        }
-        return Mirror(internalReflecting: subject,
-                      subjectType: superclass,
-                      customAncestor: customAncestor)
-      } else {
+      guard let subjectClass = subjectType as? AnyClass,
+            let superclass = _getSuperclass(subjectClass) else {
         return nil
       }
+      
+      // Handle custom ancestors. If we've hit the custom ancestor's subject type,
+      // or descendants are suppressed, return it. Otherwise continue reflecting.
+      if let customAncestor = customAncestor {
+        if superclass == customAncestor.subjectType {
+          return customAncestor
+        }
+        if customAncestor._defaultDescendantRepresentation == .suppressed {
+          return customAncestor
+        }
+      }
+      return Mirror(internalReflecting: subject,
+                    subjectType: superclass,
+                    customAncestor: customAncestor)
     }
     
     let rawDisplayStyle = _getDisplayStyle(subject)
