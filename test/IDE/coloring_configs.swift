@@ -316,3 +316,10 @@ class NestedPoundIf {
     func foo3() {}
 // CHECK: <kw>func</kw> foo3() {}
 }
+
+// CHECK: <#kw>#error</#kw>(<str>"Error"</str>)
+#error("Error")
+// CHECK: <#kw>#warning</#kw>(<str>"Warning"</str>)
+#warning("Warning")
+// CHECK: <#kw>#sourceLocation</#kw>(file: <str>"x"</str>, line: <int>1</int>)
+#sourceLocation(file: "x", line: 1)
