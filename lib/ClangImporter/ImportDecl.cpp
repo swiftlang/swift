@@ -4511,15 +4511,15 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto createRootClass = [=](Identifier name,
-                                 DeclContext *dc = nullptr) -> ClassDecl * {
+      auto createFakeRootClass = [=](Identifier name,
+                                     DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
                                           /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        AccessLevel::Open,
+                                                        AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
@@ -4547,7 +4547,7 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
+        auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
@@ -4579,7 +4579,7 @@ namespace {
 
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
-          auto result = createRootClass(name);
+          auto result = createFakeRootClass(name);
           result->setImplicit();
           auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
@@ -4602,13 +4602,16 @@ namespace {
       if (declaredNative && nativeDecl)
         return nativeDecl;
 
+      auto access = AccessLevel::Open;
+      if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
+          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+        access = AccessLevel::Public;
+      }
+
       // Create the class declaration and record it.
-      auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                AccessLevel::Open,
-                                Impl.importSourceLoc(decl->getLocStart()),
-                                name,
-                                Impl.importSourceLoc(decl->getLocation()),
-                                None, nullptr, dc);
+      auto result = Impl.createDeclWithClangNode<ClassDecl>(
+          decl, access, Impl.importSourceLoc(decl->getLocStart()), name,
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
