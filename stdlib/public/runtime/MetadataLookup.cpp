@@ -18,6 +18,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Reflection/Records.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -33,15 +34,56 @@
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
+#include <list>
 
 using namespace swift;
 using namespace Demangle;
+using namespace reflection;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
 #endif
+
+/// Produce a Demangler value suitable for resolving runtime type metadata
+/// strings.
+static Demangler getDemanglerForRuntimeTypeResolution() {
+  Demangler dem;
+  // Resolve symbolic references to type contexts into the absolute address of
+  // the type context descriptor, so that if we see a symbolic reference in the
+  // mangled name we can immediately find the associated metadata.
+  dem.setSymbolicReferenceResolver([&](int32_t offset,
+                                       const void *base) -> NodePointer {
+    auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
+    auto reference = dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
+    auto type = dem.createNode(Node::Kind::Type);
+    type->addChild(reference, dem);
+    return type;
+  });
+  return dem;
+}
+
+template <typename T> struct DescriptorCacheEntry {
+private:
+  std::string Name;
+  const T *Description;
+
+public:
+  DescriptorCacheEntry(const llvm::StringRef name, const T *description)
+      : Name(name.str()), Description(description) {}
+
+  const T *getDescription() { return Description; }
+
+  int compareWithKey(llvm::StringRef aName) const {
+    return aName.compare(Name);
+  }
+
+  template <class... Args>
+  static size_t getExtraAllocationSize(Args &&... ignored) {
+    return 0;
+  }
+};
 
 #pragma mark Nominal type descriptor cache
 // Type Metadata Cache.
@@ -136,8 +178,16 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
-  
+
   while (context) {
+    // We can directly match symbolic references to the current context.
+    if (node && node->getKind() == Demangle::Node::Kind::SymbolicReference) {
+      if (equalContexts(context, reinterpret_cast<const ContextDescriptor *>(
+                                     node->getIndex()))) {
+        return true;
+      }
+    }
+
     switch (context->getKind()) {
     case ContextDescriptorKind::Module: {
       auto module = cast<ModuleContextDescriptor>(context);
@@ -181,10 +231,16 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
           if (!(flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef))
             return false;
           break;
+
         default:
           return false;
         }
-        if (!node->getChild(1)->getText().equals(type->Name.get()))
+
+        auto nameNode = node->getChild(1);
+        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
+          return false;
+
+        if (nameNode->getText() != type->Name.get())
           return false;
         
         node = node->getChild(0);
@@ -233,9 +289,12 @@ _findNominalTypeDescriptor(Demangle::NodePointer node) {
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
-  if (node->getKind() == Node::Kind::SymbolicReference)
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
     return cast<TypeContextDescriptor>(
-      (const ContextDescriptor *)node->getIndex());
+      (const ContextDescriptor *)symbolicNode->getIndex());
 
   auto mangledName = Demangle::mangleNode(node);
 
@@ -274,32 +333,8 @@ namespace {
     }
   };
 
-  struct ProtocolDescriptorCacheEntry {
-  private:
-    std::string Name;
-    const ProtocolDescriptor *Description;
-
-  public:
-    ProtocolDescriptorCacheEntry(const llvm::StringRef name,
-                                 const ProtocolDescriptor *description)
-      : Name(name.str()), Description(description) {}
-
-    const ProtocolDescriptor *getDescription() {
-      return Description;
-    }
-
-    int compareWithKey(llvm::StringRef aName) const {
-      return aName.compare(Name);
-    }
-
-    template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
-      return 0;
-    }
-  };
-
   struct ProtocolMetadataState {
-    ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
+    ConcurrentMap<DescriptorCacheEntry<ProtocolDescriptor>> ProtocolCache;
     std::vector<ProtocolSection> SectionsToScan;
     Mutex SectionsToScanLock;
 
@@ -386,6 +421,94 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
   }
 
   return foundProtocol;
+}
+
+#pragma mark Type field descriptor cache
+namespace {
+template <typename T> struct FieldDescriptorCacheEntry {
+private:
+  const Metadata *Base;
+  const T *Description;
+
+public:
+  FieldDescriptorCacheEntry(const Metadata *Base, const T *description)
+  : Base(Base), Description(description) {}
+
+  const T *getDescription() { return Description; }
+
+  int compareWithKey(const Metadata *other) const {
+    return Base == other;
+  }
+
+  template <class... Args>
+  static size_t getExtraAllocationSize(Args &&... ignored) {
+    return 0;
+  }
+};
+
+class StaticFieldSection {
+  const void *Begin;
+  const void *End;
+
+public:
+  StaticFieldSection(const void *begin, const void *end)
+      : Begin(begin), End(end) {}
+
+  FieldDescriptorIterator begin() const {
+    return FieldDescriptorIterator(Begin, End);
+  }
+
+  FieldDescriptorIterator end() const {
+    return FieldDescriptorIterator(End, End);
+  }
+};
+
+class DynamicFieldSection {
+  const FieldDescriptor **Begin;
+  const FieldDescriptor **End;
+
+public:
+  DynamicFieldSection(const FieldDescriptor **fields, size_t size)
+      : Begin(fields), End(fields + size) {}
+
+  const FieldDescriptor **begin() { return Begin; }
+
+  const FieldDescriptor **end() const { return End; }
+};
+
+struct FieldCacheState {
+  ConcurrentMap<FieldDescriptorCacheEntry<FieldDescriptor>> FieldCache;
+
+  Mutex SectionsLock;
+  std::vector<StaticFieldSection> StaticSections;
+  std::vector<DynamicFieldSection> DynamicSections;
+
+  FieldCacheState() {
+    StaticSections.reserve(16);
+    DynamicSections.reserve(8);
+    initializeTypeFieldLookup();
+  }
+};
+
+static Lazy<FieldCacheState> FieldCache;
+} // namespace
+
+void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
+                                           size_t size) {
+  auto &cache = FieldCache.get();
+  ScopedLock guard(cache.SectionsLock);
+  cache.DynamicSections.push_back({records, size});
+}
+
+void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
+                                                     uintptr_t size) {
+  auto sectionBytes = reinterpret_cast<const char *>(recordsBegin);
+  auto recordsEnd = reinterpret_cast<const void *>(sectionBytes + size);
+
+  // Field cache should always be sufficiently initialized by this point.
+  auto &cache = FieldCache.unsafeGetAlreadyInitialized();
+  ScopedLock guard(cache.SectionsLock);
+  cache.StaticSections.push_back({recordsBegin, recordsEnd});
 }
 
 #pragma mark Metadata lookup via mangled name
@@ -841,7 +964,7 @@ public:
 TypeInfo
 swift::_getTypeByMangledName(StringRef typeName,
                              SubstGenericParameterFn substGenericParam) {
-  Demangler demangler;
+  auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
@@ -856,16 +979,6 @@ swift::_getTypeByMangledName(StringRef typeName,
     return dotPos;
   };
 
-  // Resolve symbolic references to type contexts into the absolute address of
-  // the type context descriptor, so that if we see a symbolic reference in the
-  // mangled name we can immediately find the associated metadata.
-  demangler.setSymbolicReferenceResolver(
-    [&](int32_t offset, const void *base) -> NodePointer {
-      auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
-      return demangler.createNode(Node::Kind::SymbolicReference,
-                                  absolute_addr);
-    });
-
   auto dotPos = getDotPosForConvenienceSyntax();
   if (dotPos != llvm::StringRef::npos) {
     // Form a demangle tree for this class.
@@ -873,7 +986,7 @@ swift::_getTypeByMangledName(StringRef typeName,
     NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
                                                   typeName.substr(0, dotPos));
     NodePointer nameNode = demangler.createNode(Node::Kind::Identifier,
-                                            typeName.substr(dotPos + 1));
+                                                typeName.substr(dotPos + 1));
     classNode->addChild(moduleNode, demangler);
     classNode->addChild(nameNode, demangler);
 
@@ -928,4 +1041,107 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
 
       return flatSubstitutions[flatIndex];
     });
+}
+
+void swift::swift_getFieldAt(
+    const Metadata *base, unsigned index,
+    std::function<void(llvm::StringRef name, FieldType fieldInfo)>
+        callback) {
+  auto *baseDesc = base->getTypeContextDescriptor();
+  if (!baseDesc)
+    return;
+
+  auto getFieldAt = [&](const FieldDescriptor &descriptor) {
+    auto &field = descriptor.getFields()[index];
+    auto name = field.getFieldName(0);
+
+    // Enum cases don't always have types.
+    if (!field.hasMangledTypeName()) {
+      callback(name, FieldType().withIndirect(field.isIndirectCase()));
+      return;
+    }
+
+    std::vector<const ContextDescriptor *> descriptorPath;
+    {
+      const auto *parent = reinterpret_cast<
+                              const ContextDescriptor *>(baseDesc);
+      while (parent) {
+        if (parent->isGeneric())
+          descriptorPath.push_back(parent);
+
+        parent = parent->Parent.get();
+      }
+    }
+
+    auto typeInfo = _getTypeByMangledName(
+        field.getMangledTypeName(0),
+        [&](unsigned depth, unsigned index) -> const Metadata * {
+          if (depth >= descriptorPath.size())
+            return nullptr;
+
+          unsigned currentDepth = 0;
+          unsigned flatIndex = index;
+          const ContextDescriptor *currentContext = descriptorPath.back();
+
+          for (const auto *context : llvm::reverse(descriptorPath)) {
+            if (currentDepth >= depth)
+              break;
+
+            flatIndex += context->getNumGenericParams();
+            currentContext = context;
+            ++currentDepth;
+          }
+
+          if (index >= currentContext->getNumGenericParams())
+            return nullptr;
+
+          return base->getGenericArgs()[flatIndex];
+        });
+
+    callback(name, FieldType()
+                       .withType(typeInfo)
+                       .withIndirect(field.isIndirectCase())
+                       .withWeak(typeInfo.isWeak()));
+
+  };
+
+  auto dem = getDemanglerForRuntimeTypeResolution();
+  auto &cache = FieldCache.get();
+  auto isRequestedDescriptor = [&](const FieldDescriptor &descriptor) {
+    assert(descriptor.hasMangledTypeName());
+    auto mangledName = descriptor.getMangledTypeName(0);
+
+    if (!_contextDescriptorMatchesMangling(baseDesc,
+                                           dem.demangleType(mangledName)))
+      return false;
+
+    cache.FieldCache.getOrInsert(base, &descriptor);
+    getFieldAt(descriptor);
+    return true;
+  };
+
+
+  // Fast path: If we already have field descriptor cached.
+  /*
+  if (auto Value = cache.FieldCache.find(base)) {
+    getFieldAt(*Value->getDescription());
+    return;
+  }
+  */
+
+  ScopedLock guard(cache.SectionsLock);
+  // Otherwise let's try to find it in one of the sections.
+  for (auto &section : cache.DynamicSections) {
+    for (const auto *descriptor : section) {
+      if (isRequestedDescriptor(*descriptor))
+        return;
+    }
+  }
+
+  for (const auto &section : cache.StaticSections) {
+    for (auto &descriptor : section) {
+      if (isRequestedDescriptor(descriptor))
+        return;
+    }
+  }
 }
