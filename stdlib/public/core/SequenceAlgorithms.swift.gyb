@@ -127,7 +127,7 @@ ${orderingExplanation}
   ) rethrows -> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
-    for e in IteratorSequence(it) {
+    while let e = it.next() {
       if try areInIncreasingOrder(e, result) { result = e }
     }
     return result
@@ -157,7 +157,7 @@ ${orderingExplanation}
   ) rethrows -> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
-    for e in IteratorSequence(it) {
+    while let e = it.next() {
       if try areInIncreasingOrder(result, e) { result = e }
     }
     return result
@@ -196,7 +196,7 @@ extension Sequence where Element: Comparable {
   @_inlineable
   @warn_unqualified_access
   public func max() -> Element? {
-    return self.min(by: >)
+    return self.max(by: <)
   }
 }
 
