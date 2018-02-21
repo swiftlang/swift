@@ -1013,16 +1013,16 @@ public:
     }
   }
 
-  void printDebugVar(SILDebugVariable Var) {
-    if (Var.Name.empty())
+  void printDebugVar(Optional<SILDebugVariable> Var) {
+    if (!Var || Var->Name.empty())
       return;
-    if (Var.Constant)
+    if (Var->Constant)
       *this << ", let";
     else
       *this << ", var";
-    *this << ", name \"" << Var.Name << '"';
-    if (Var.ArgNo)
-      *this << ", argno " << Var.ArgNo;
+    *this << ", name \"" << Var->Name << '"';
+    if (Var->ArgNo)
+      *this << ", argno " << Var->ArgNo;
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
