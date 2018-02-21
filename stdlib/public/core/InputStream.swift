@@ -65,7 +65,7 @@ public func readLine(strippingNewline: Bool = true) -> String? {
       }
     }
   }
-  let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
+  let result = String._fromUTF8CodeUnitSequenceWithRepair(
     input: UnsafeMutableBufferPointer(
       start: linePtr,
       count: readBytes)).0

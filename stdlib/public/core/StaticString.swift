@@ -270,9 +270,12 @@ public struct StaticString
   /// A string representation of the static string.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return withUTF8Buffer {
-      (buffer) in
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+    return withUTF8Buffer { (buffer) in
+      if isASCII {
+        return String._fromASCII(buffer)
+      } else {
+        return String._fromWellFormedUTF8CodeUnitSequence(input: buffer)
+      }
     }
   }
 
