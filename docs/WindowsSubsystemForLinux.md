@@ -20,8 +20,8 @@ are identical to the Ubuntu dependencies, with the addition of `make`.
 sudo apt-get install git make cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev
 ```
 
-### 3. Upgrade clang
-Install a version of clang with C++ 14 support - the default version of clang
+### 3. Upgrade `clang`
+Install a version of `clang` with C++ 14 support; the default version of `clang`
 on WSL results in linker errors during compilation.
 ```bash
 sudo apt-get install clang-3.6
@@ -30,7 +30,7 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6
 ```
 
 ### 4. Upgrade CMake
-Install the latest version of CMake - Swift uses new CMake features such as
+Install the latest version of CMake; Swift uses new CMake features such as
 `IN_LIST` and won't build without these features.
 ```bash
 wget http://www.cmake.org/files/v3.6/cmake-3.6.2.tar.gz

@@ -22,29 +22,29 @@ Windows.
   manually to build Swift on Windows.
 - Windows support for Swift is a work in progress and may not work on your
   system, but it has been tested.
-- Using the latest Visual Studio version is recommended. Swift may fail to
-  build with older C++ compilers.
+- Using the latest Visual Studio version is recommended (tested with Visual
+  Studio 2017 - Version 15.5.5). Swift may fail to build with older C++ 
+  compilers.
 
 ### 1. Install dependencies
-- Make sure to add Python, CMake and Ninja to your `Path` environment variable
 1. Latest version (2.7.12 tested) of [Python
    2](https://www.python.org/downloads/)
-2. Latest version (3.7.0-rc3 tested) of [CMake](https://cmake.org/download/)
-3. Latest version (1.7.1 tested) of
+1. Latest version (3.7.0-rc3 tested) of [CMake](https://cmake.org/download/)
+1. Latest version (1.7.1 tested) of
    [Ninja](https://github.com/ninja-build/ninja/releases/latest)
-4. Latest version (2015 Update 3 tested) of [Visual
+1. Latest version (2015 Update 3 tested) of [Visual
    Studio](https://www.visualstudio.com/downloads/)
-
-- Make sure to include `Programming Languages|Visual C++` and `Windows and Web
-  Development|Universal Windows App Development|Windows SDK` in your
+- Make sure to include "Programming Languages|Visual C++" and "Windows and Web
+  Development|Universal Windows App Development|Windows SDK" in your
   installation.
+- Make sure to add Python, CMake and Ninja to your `Path` environment variable
 
 ### 2. Clone the repositories
 1. Create a folder to contain all the Swift repositories
-2. `apple/swift-cmark` into a folder named `cmark`
-3. `apple/swift-clang` into a folder named `clang`
-5. `apple/swift-llvm` into a folder named `llvm`
-5. `apple/swift` into a folder named `swift`
+1. Clone `apple/swift-cmark` into a folder named `cmark`
+1. Clone `apple/swift-clang` into a folder named `clang`
+1. Clone `apple/swift-llvm` into a folder named `llvm`
+1. Clone `apple/swift` into a folder named `swift`
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
 
@@ -52,12 +52,12 @@ Windows.
 1. Download and extract the [ICU source
 code](http://site.icu-project.org/download) to a folder named `icu` in the same
 directory as the other Swift project repositories.
-2. Open `src/win32/allinone.sln` in Visual Studio.
-3. Make sure to select the correct architecture from the drop-down in Visual
+1. Open `src/win32/allinone.sln` in Visual Studio.
+1. Make sure to select the correct architecture from the drop-down in Visual
 Studio.
-4. Right click on the solution in the Solution Explorer window and select
-`Build Solution`.
-5. When this is done, add the `<icu-source>/bin` folder to your `Path`
+1. Right click on the solution in the Solution Explorer window and select
+"Build Solution".
+1. When this is done, add the `<icu-source>/bin` folder to your `Path`
 environment variable.
 
 ### 4. Get ready
@@ -68,7 +68,7 @@ environment variable.
 ```cmd
 VsDevCmd -arch=amd64
 ```
-If instead, you're compiling for a 32-bit Windows target, adapt the `arch`
+If instead you're compiling for a 32-bit Windows target, adapt the `arch`
 argument to `x86` and run
 ```cmd
 VsDevCmd -arch=x86
@@ -92,8 +92,9 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 
 ### 6. Build LLVM/Clang/Compiler-RT
 - This must be done from within a developer command prompt. LLVM and Clang are
-  large projects so building might take a few hours. Make sure that the build
-  type (e.g. Debug/Release) for LLVM/Clang matches the build type for Swift.
+  large projects, so building might take a few hours. Make sure that the build
+  type (e.g. Debug, Release, RelWithDebInfoAssert) for LLVM/Clang matches the
+  build type for Swift.
 - Optionally, you can omit building compiler-rt by removing all lines referring
   to `compiler-rt` below, which should give faster build times.
 ```cmd
@@ -120,7 +121,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
   two hours depending on your system.
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
-- While the commands here use MSVC to build, using clang-cl is recommended (see
+- While the commands here use MSVC to build, using `clang-cl` is recommended (see
   the **Clang-cl** section below).
 ```cmd
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
@@ -163,7 +164,7 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
 ## Clang-cl
 
 Follow the instructions for MSVC, but add the following lines to each CMake
-configuration command. `Clang-cl` 4.0.1 has been tested. You can remove the
+configuration command. `clang-cl` 4.0.1 has been tested. You can remove the
 `SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE` definition, as overlays are supported
 with `clang-cl`, as it supports modules. The `Z7` flag is required to produce
 PDB files that MSVC's `link.exe` can read and enables proper stack traces.
