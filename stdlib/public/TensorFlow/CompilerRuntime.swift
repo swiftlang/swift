@@ -52,7 +52,22 @@ public enum _RuntimeConfig {
   static public var usesXLA = false
 
   /// When true, prints various debug messages on the runtime state.
+  ///
+  /// If the value is true when running tensor computation for the first time in
+  /// the process, INFO log from TensorFlow will also get printed.
   static public var printsDebugLog = false
+
+  /// Specifies the verbose log level in TensorFlow; a higher level prints out
+  /// more log. Only meaningful when `printsDebugLog` is true, and must be
+  /// within [0, 4] in that case.
+  static public var tensorflowVerboseLogLevel: Int32 = 0 {
+    willSet {
+      debugLog("About to set tensorflowVerboseLogLevel to \(newValue)")
+      guard newValue >= 0 && newValue <= 4 else {
+        fatalError("Invalid tensorflowVerboseLogLevel value \(newValue)")
+      }
+    }
+  }
 
   /// When true, forces the model code to be run on a GPU. If there is no usable
   /// GPU, your program will crash. This option requires that the Swift compiler
@@ -108,10 +123,27 @@ public final class _ExecutionContext {
 
   /// Initializes a new execution context by initializing available devices.
   private init() {
+    // A simple way to turn on debug logging via commandline arguments.
+    for arg in CommandLine.arguments {
+      if arg == "--enable-debuglog" {
+        _RuntimeConfig.printsDebugLog = true
+      } else if arg.prefix(4) == "--v=" {
+        guard var verboseLevel = Int32(arg.dropFirst(4)) else {
+          fatalError("Commandline argument \(arg) is not of form --v=<int>")
+        }
+        if verboseLevel > 4 {
+          verboseLevel = 4
+        }
+        _RuntimeConfig.tensorflowVerboseLogLevel = verboseLevel
+        debugLog("Setting TF logging verbose level to \(verboseLevel)")
+      }
+    }
+
     debugLog("Initializing global context.")
 
     // Initialize the TF runtime exactly once.
-    InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0)
+    InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
+                          _RuntimeConfig.tensorflowVerboseLogLevel)
 
     let opts = TFE_NewContextOptions()
     if _RuntimeConfig.usesTFEagerAPI {
@@ -382,6 +414,7 @@ private class TFState {
                                                       count: programByteCount)
     let opts = TF_NewSessionOptions()
     if _RuntimeConfig.usesXLA {
+      debugLog("Enable XLA execution.")
       TF_EnableXLACompilation(opts, 1)
     }
     cSession = TF_NewSession(graph, opts, status)
