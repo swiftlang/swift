@@ -6,11 +6,8 @@ host. For more context on the status of Swift on Windows in general, see
 
 ## 1. Setup Visual Studio Environment Variables
 Building for Windows requires that the Visual Studio environment variables are
-setup similar to the values on Windows. The following assumes that
-`WINKIT_ROOT` points to the path where the Windows 10 SDK is available and that
-`VC_ROOT` points to the path where the Visual Studio VC headers and libraries
-are available. Currently, the runtime has been tested to build against the
-Windows 10 SDK at revision 10.10.586.
+setup similar to the values on Windows. Currently, the runtime has been tested
+to build against the Windows 10 SDK at revision 10.10.586.
 
 ```bash
 # Visual Studio 2015 does not have VCToolsInstallDir, use VCINSTALLDIR's value
