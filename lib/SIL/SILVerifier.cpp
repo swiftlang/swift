@@ -474,30 +474,31 @@ public:
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
     if (!DS->InlinedCallSite) {
-      SILDebugVariable VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I)) {
+      Optional<SILDebugVariable> VarInfo;
+      if (auto *DI = dyn_cast<AllocStackInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<AllocBoxInst>(I)) {
+      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueAddrInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
         VarInfo = DI->getVarInfo();
-      }
 
-      if (unsigned ArgNo = VarInfo.ArgNo) {
-        // It is a function argument.
-        if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
-          require(DebugVars[ArgNo] == VarInfo.Name,
-                  "Scope contains conflicting debug variables for one function "
-                  "argument");
-        } else {
-          // Reserve enough space.
-          while (DebugVars.size() <= ArgNo) {
-            DebugVars.push_back(StringRef());
+      if (VarInfo)
+        if (unsigned ArgNo = VarInfo->ArgNo) {
+          // It is a function argument.
+          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+            require(
+                DebugVars[ArgNo] == VarInfo->Name,
+                "Scope contains conflicting debug variables for one function "
+                "argument");
+          } else {
+            // Reserve enough space.
+            while (DebugVars.size() <= ArgNo) {
+              DebugVars.push_back(StringRef());
+            }
           }
-        }
-        DebugVars[ArgNo] = VarInfo.Name;
+          DebugVars[ArgNo] = VarInfo->Name;
       }
     }
 

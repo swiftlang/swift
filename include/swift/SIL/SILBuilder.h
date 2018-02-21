@@ -286,7 +286,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
-                                   SILDebugVariable Var = SILDebugVariable()) {
+                                   Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocStackInst::create(getSILDebugLocation(Loc),
                                          elementType, getFunction(),
@@ -327,7 +327,7 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                               SILDebugVariable Var = SILDebugVariable()) {
+                               Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        OpenedArchetypes, Var));
@@ -733,13 +733,13 @@ public:
   }
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   SILDebugVariable Var = SILDebugVariable()) {
+                                   SILDebugVariable Var) {
     return insert(DebugValueInst::create(getSILDebugLocation(Loc), src,
                                          getModule(), Var));
   }
   DebugValueAddrInst *
   createDebugValueAddr(SILLocation Loc, SILValue src,
-                       SILDebugVariable Var = SILDebugVariable()) {
+                       SILDebugVariable Var) {
     return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
                                              getModule(), Var));
   }

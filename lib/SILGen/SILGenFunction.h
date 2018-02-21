@@ -661,7 +661,7 @@ public:
                   ArrayRef<ParameterList *> paramPatterns, Type resultType,
                   bool throws);
   /// returns the number of variables in paramPatterns.
-  unsigned emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
+  uint16_t emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
                       DeclContext *DeclCtx, bool throws);
 
   /// Create SILArguments in the entry block that bind all the values
