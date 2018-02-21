@@ -1,4 +1,4 @@
-//===--- SequenceAlgorithms.swift.gyb -------------------------*- swift -*-===//
+//===--- SequenceAlgorithms.swift -----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,36 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-
-orderingExplanation = """\
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
-  ///   `true`. (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
-  ///"""
-
-equivalenceExplanation = """\
-  /// The predicate must be a *equivalence relation* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
-  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
-  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
-  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
-  ///"""
-
-}%
 
 //===----------------------------------------------------------------------===//
 // enumerated()
@@ -105,7 +75,19 @@ extension Sequence {
   /// Returns the minimum element in the sequence, using the given predicate as
   /// the comparison between elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// This example shows how to use the `min(by:)` method on a
   /// dictionary to find the key-value pair with the lowest value.
   ///
@@ -136,7 +118,19 @@ ${orderingExplanation}
   /// Returns the maximum element in the sequence, using the given predicate
   /// as the comparison between elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// This example shows how to use the `max(by:)` method on a
   /// dictionary to find the key-value pair with the highest value.
   ///
@@ -209,7 +203,15 @@ extension Sequence  {
   /// sequence are equivalent to the elements in another sequence, using
   /// the given predicate as the equivalence test.
   ///
-${equivalenceExplanation}
+  /// The predicate must be a *equivalence relation* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
+  ///
   /// - Parameters:
   ///   - possiblePrefix: A sequence to compare to this sequence.
   ///   - areEquivalent: A predicate that returns `true` if its two arguments
@@ -279,7 +281,15 @@ extension Sequence {
   ///
   /// At least one of the sequences must be finite.
   ///
-${equivalenceExplanation}
+  /// The predicate must be a *equivalence relation* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
+  ///
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
   ///   - areEquivalent: A predicate that returns `true` if its two arguments
@@ -343,7 +353,19 @@ extension Sequence {
   /// sequence in a lexicographical (dictionary) ordering, using the given
   /// predicate to compare elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
   ///   - areInIncreasingOrder:  A predicate that returns `true` if its first
