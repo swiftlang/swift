@@ -522,6 +522,12 @@ Driver::buildCompilation(const ToolChain &TC,
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
+  if (const Arg *A = ArgList->getLastArg(options::OPT_driver_batch_seed)) {
+    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(*ArgList), A->getValue());
+    }
+  }
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -684,6 +690,7 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  BatchMode,
+                                                 DriverBatchSeed,
                                                  DriverSkipExecution,
                                                  SaveTemps,
                                                  ShowDriverTimeCompilation,

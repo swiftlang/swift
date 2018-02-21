@@ -42,6 +42,10 @@
 
 #include "CompilationRecord.h"
 
+// Batch-mode has a sub-mode for testing that randomizes batch partitions,
+// by user-provided seed. That is the only thing randomized here.
+#include <random>
+
 using namespace swift;
 using namespace swift::sys;
 using namespace swift::driver;
@@ -97,6 +101,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
+                         unsigned BatchSeed,
                          bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
@@ -112,6 +117,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     EnableBatchMode(EnableBatchMode),
+    BatchSeed(BatchSeed),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)) {
@@ -120,7 +126,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
 static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
-
+using CommandSetVector = llvm::SetVector<const Job*>;
+using BatchPartition = std::vector<std::vector<const Job*>>;
 
 using InputInfoMap = llvm::SmallMapVector<const llvm::opt::Arg *,
                                           CompileJobAction::InputInfo, 16>;
@@ -140,7 +147,7 @@ namespace driver {
     /// A temporary buffer to hold commands that were scheduled but haven't been
     /// added to the Task Queue yet, because we might try batching them together
     /// first.
-    CommandSet PendingExecution;
+    CommandSetVector PendingExecution;
 
     /// Set of synthetic BatchJobs that serve to cluster subsets of jobs waiting
     /// in PendingExecution. Also used to identify (then unpack) BatchJobs back
@@ -680,7 +687,8 @@ namespace driver {
 
     /// Insert all jobs in \p Cmds (of descriptive name \p Kind) to the \c
     /// TaskQueue, and clear \p Cmds.
-    void transferJobsToTaskQueue(CommandSet &Cmds, StringRef Kind) {
+    template <typename Container>
+    void transferJobsToTaskQueue(Container &Cmds, StringRef Kind) {
       for (const Job *Cmd : Cmds) {
         if (Comp.ShowJobLifecycle)
           llvm::outs() << "Adding " << Kind
@@ -694,8 +702,8 @@ namespace driver {
     /// Partition the jobs in \c PendingExecution into those that are \p
     /// Batchable and those that are \p NonBatchable, clearing \p
     /// PendingExecution.
-    void getPendingBatchableJobs(CommandSet &Batchable,
-                                 CommandSet &NonBatchable) {
+    void getPendingBatchableJobs(CommandSetVector &Batchable,
+                                 CommandSetVector &NonBatchable) {
       for (const Job *Cmd : PendingExecution) {
         if (Comp.getToolChain().jobIsBatchable(Comp, Cmd)) {
           if (Comp.ShowJobLifecycle)
@@ -710,49 +718,83 @@ namespace driver {
       PendingExecution.clear();
     }
 
-    /// If \p CurrentBatch is nonempty, construct a new \c BatchJob from its
+    /// If \p Batch is nonempty, construct a new \c BatchJob from its
     /// contents by calling \p ToolChain::constructBatchJob, then insert the
-    /// new \c BatchJob into \p Batches and clear \p CurrentBatch.
+    /// new \c BatchJob into \p Batches.
     void
-    formBatchJobFromCurrentBatch(CommandSet &Batches,
-                                 llvm::SetVector<const Job *> &CurrentBatch) {
-      if (CurrentBatch.empty())
+    formBatchJobFromPartitionBatch(std::vector<const Job *> &Batches,
+                                   std::vector<const Job *> const &Batch) {
+      if (Batch.empty())
         return;
       if (Comp.ShowJobLifecycle)
         llvm::outs() << "Forming batch job from "
-                     << CurrentBatch.size() << " constituents\n";
+                     << Batch.size() << " constituents\n";
       auto const &TC = Comp.getToolChain();
-      auto J = TC.constructBatchJob(CurrentBatch.getArrayRef(), Comp);
+      auto J = TC.constructBatchJob(Batch, Comp);
       if (J)
-        Batches.insert(Comp.addJob(std::move(J)));
-      CurrentBatch.clear();
+        Batches.push_back(Comp.addJob(std::move(J)));
     }
 
-    /// Return true iff \p Cmd can be expanded by \p CurrentBatch, meaning
-    /// that \p CurrentBatch is smaller than \p TargetBatchSize and \p Cmd
-    /// is batch-combinable with the equivalence class of \p CurrentBatch
-    /// (as represented by element 0 of \p CurrentBatch).
-    bool canExpandBatch(const Job *Cmd,
-                        llvm::SetVector<const Job *> &CurrentBatch,
-                        size_t TargetBatchSize) {
-      auto const &TC = Comp.getToolChain();
-      return (CurrentBatch.empty() ||
-              (TC.jobsAreBatchCombinable(Comp, Cmd, CurrentBatch[0]) &&
-               CurrentBatch.size() < TargetBatchSize));
+    /// Inspect current batch \p i of the \p Partition currently being built
+    /// and, if that batch is "full" (in the sense of holding an evenly-divided
+    /// portion of NumJobs) then advance \p i to the next batch index in the
+    /// partition.
+    void maybeAdvanceToNextPartition(size_t &i,
+                                     BatchPartition const &Partition,
+                                     size_t NumJobs) {
+      assert(i < Partition.size());
+      size_t Remainder = NumJobs % Partition.size();
+      size_t TargetSize = NumJobs / Partition.size();
+      // Spread remainder evenly across partitions by adding 1 to the target
+      // size of the first Remainder of them.
+      if (i < Remainder)
+        TargetSize++;
+      if (Partition[i].size() >= TargetSize)
+        ++i;
+      assert(i < Partition.size());
     }
 
-    /// If \p CurrentBatch can't be expanded with \p Cmd, form a new \c BatchJob
-    /// from \p CurrentBatch, add it to \p Batches, and reset\p CurrentBatch;
-    /// then in either case, insert \p Cmd into \p CurrentBatch.
-    void expandBatch(const Job *Cmd,
-                     CommandSet &Batches,
-                     llvm::SetVector<const Job *> &CurrentBatch,
-                     size_t TargetBatchSize) {
-      if (!canExpandBatch(Cmd, CurrentBatch, TargetBatchSize)) {
-        formBatchJobFromCurrentBatch(Batches, CurrentBatch);
+    /// Shuffle \p Batchable if -driver-batch-seed is nonzero.
+    void maybeShuffleBatchable(std::vector<const Job *> &Batchable) {
+      if (Comp.BatchSeed != 0) {
+        std::minstd_rand gen(Comp.BatchSeed);
+        std::shuffle(Batchable.begin(), Batchable.end(), gen);
       }
-      llvm::outs() << "Adding to batch: " << LogJob(Cmd) << "\n";
-      CurrentBatch.insert(Cmd);
+    }
+
+    /// Create \c NumberOfParallelCommands batches and assign each job to a
+    /// batch either filling each partition in order or, if seeded with a
+    /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
+    void partitionIntoBatches(std::vector<const Job *> Batchable,
+                              BatchPartition &Partition) {
+      if (Comp.ShowJobLifecycle) {
+        llvm::outs() << "Found " << Batchable.size() << " batchable jobs\n";
+        llvm::outs() << "Forming into " << Partition.size() << " batches\n";
+      }
+
+      assert(Partition.size() > 0);
+      maybeShuffleBatchable(Batchable);
+
+      size_t i = 0;
+      auto const &TC = Comp.getToolChain();
+      for (const Job *Cmd : Batchable) {
+        maybeAdvanceToNextPartition(i, Partition, Batchable.size());
+        std::vector<const Job*> &P = Partition[i];
+        if (P.empty() || TC.jobsAreBatchCombinable(Comp, P[0], Cmd)) {
+          if (Comp.ShowJobLifecycle)
+            llvm::outs() << "Adding " << LogJob(Cmd)
+                         << " to batch " << i << '\n';
+          P.push_back(Cmd);
+        } else {
+          // Strange but theoretically possible that we have a batchable job
+          // that's not combinable with others; tack a new batch on for it.
+          if (Comp.ShowJobLifecycle)
+            llvm::outs() << "Adding " << LogJob(Cmd)
+                         << " to new batch " << Partition.size() << '\n';
+          Partition.push_back(std::vector<const Job*>());
+          Partition.back().push_back(Cmd);
+        }
+      }
     }
 
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
@@ -768,25 +810,18 @@ namespace driver {
         return;
       }
 
-      // Partition the pending jobs.
-      CommandSet Batchable, NonBatchable, Batches;
+      // Split the batchable from non-batchable pending jobs.
+      CommandSetVector Batchable, NonBatchable;
       getPendingBatchableJobs(Batchable, NonBatchable);
-      size_t TargetBatchSize = Batchable.size() / Comp.NumberOfParallelCommands;
 
-      if (Comp.ShowJobLifecycle) {
-        llvm::outs() << "Found " << Batchable.size() << " batchable jobs\n";
-        llvm::outs() << "Aiming for batch size " << TargetBatchSize << '\n';
-      }
+      // Partition the batchable jobs into sets.
+      BatchPartition Partition(Comp.NumberOfParallelCommands);
+      partitionIntoBatches(Batchable.takeVector(), Partition);
 
-      // Batch the batchable jobs.
-      llvm::SetVector<const Job *> CurrentBatch;
-      for (const Job *Cmd : Batchable) {
-        expandBatch(Cmd, Batches, CurrentBatch, TargetBatchSize);
-      }
-
-      // Form a residual incomplete batch if any jobs remain.
-      if (!CurrentBatch.empty()) {
-        formBatchJobFromCurrentBatch(Batches, CurrentBatch);
+      // Construct a BatchJob from each batch in the partition.
+      std::vector<const Job *> Batches;
+      for (auto const &Batch : Partition) {
+        formBatchJobFromPartitionBatch(Batches, Batch);
       }
 
       // Save batches so we can locate and decompose them on task-exit.
