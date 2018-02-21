@@ -64,9 +64,9 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
 
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
-    _ = x+someGlobal // expected-note {{value used here}}
-    // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
-  } // expected-warning {{value implicitly copied to the accelerator}}
+    _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
+    // expected-error @-1 {{GraphGen cannot lower a 'receive' from the host yet}}
+  }
 }
 
 

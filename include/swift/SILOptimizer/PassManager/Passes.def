@@ -260,7 +260,9 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
 PASS(SwiftArrayOpts, "array-specialize",
      "Loop Specialization for Array Properties")
-// SWIFT_ENABLE_TENSORFLOW: One pass is used by the compiler, one by sil-opt.
+// SWIFT_ENABLE_TENSORFLOW
+PASS(TFDeabstraction, "tf-deabstraction",
+     "Deabstract tensor operations")
 PASS(TFPartition, "tf-partition-impl",
      "Partition accelerator operations out of mainline control flow")
 PASS(TFPartitionTest, "tf-partition",
