@@ -178,6 +178,38 @@ RankedTensorTests.testCPUAndGPU("SimpleMath") {
   expectPointwiseNearlyEqual([0.833655, 0.833655], y.array, byError: 0.0001)
 }
 
+// NOTE: scalar-tensor ops are tested for TensorXD but not Tensor because the
+// way such ops are resolved differs. s+t ops for Tensor call the underlying t+t
+// implementation, but s+t ops for TensorXD call the true s+t implementation
+// defined on TensorProtocol.
+// TODO: A more comprehensive way to eliminate redundant tests is to define
+// generic functions on TensorProtocol and call those.
+RankedTensorTests.testCPUAndGPU("ScalarTensorOps1") {
+  let scalar: Float = 2.0
+  let tensor = Tensor2D<Float>(ones: [2, 3])
+  let sum = tensor + scalar
+  let diff = scalar - tensor
+
+  let sumArray = sum.array
+  let diffArray = diff.array
+  expectEqual(Array2D(shape: [2, 3], scalars: [3, 3, 3, 3, 3, 3]),
+              sumArray)
+  expectEqual(Array2D(shape: [2, 3], scalars: [1, 1, 1, 1, 1, 1]),
+              diffArray)
+}
+
+RankedTensorTests.testCPUAndGPU("ScalarTensorOps2") {
+  let scalar: Float = 2.0
+  var tensor = Tensor2D<Float>(shape: [2, 3], repeating: 5)
+  tensor += scalar
+  tensor -= scalar
+  tensor *= scalar
+  tensor /= scalar
+
+  expectEqual(Array2D(shape: [2, 3], scalars: [5, 5, 5, 5, 5, 5]),
+              tensor.array)
+}
+
 RankedTensorTests.testCPUAndGPU("Convolution") {
   // TODO: the code for initializing Tensor4D instances here is quite verbose.
   // Consider adding `init(shape:repeating)` and/or `init(shape:scalars)`
