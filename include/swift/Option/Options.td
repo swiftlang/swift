@@ -98,6 +98,9 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   HelpText<"Show every step in the lifecycle of driver jobs">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
+def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
+  InternalDebugOpt,
+  HelpText<"Use the given seed value to randomize batch-mode partitions">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
