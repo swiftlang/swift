@@ -894,11 +894,8 @@ namespace {
         return eed->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>();
       }
 
-      static bool isSwift4NonExhaustiveEnum(TypeChecker &TC,
-                                            const DeclContext *DC,
-                                            Type tp) {
-        if (TC.getLangOpts().isSwiftVersionAtLeast(5))
-          return false;
+      static bool isNonExhaustiveEnum(TypeChecker &TC, const DeclContext *DC,
+                                      Type tp) {
         auto *enumDecl = tp->getEnumOrBoundGenericEnum();
         if (!enumDecl)
           return false;
@@ -940,12 +937,12 @@ namespace {
                 llvm::transform(TTy->getElements(),
                                 std::back_inserter(constElemSpaces),
                                 [&](TupleTypeElt elt) {
-                  bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC,
-                                                                elt.getType());
+                  bool canDowngrade = isNonExhaustiveEnum(TC, DC,
+                                                          elt.getType());
                   return Space(elt.getType(), elt.getName(), canDowngrade);
                 });
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
-                bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC, TTy);
+                bool canDowngrade = isNonExhaustiveEnum(TC, DC, TTy);
                 constElemSpaces.push_back(Space(TTy->getUnderlyingType(),
                                                 Identifier(), canDowngrade));
               }
@@ -959,8 +956,7 @@ namespace {
           llvm::transform(TTy->getElements(),
                           std::back_inserter(constElemSpaces),
                           [&](TupleTypeElt elt) {
-            bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC,
-                                                          elt.getType());
+            bool canDowngrade = isNonExhaustiveEnum(TC, DC, elt.getType());
             return Space(elt.getType(), elt.getName(), canDowngrade);
           });
           // Create an empty constructor head for the tuple space.
@@ -974,8 +970,13 @@ namespace {
       static bool canDecompose(Type tp, const DeclContext *DC) {
         if (tp->is<TupleType>() || tp->isBool())
           return true;
-        if (const EnumDecl *enumDecl = tp->getEnumOrBoundGenericEnum())
-          return enumDecl->isExhaustive(DC);
+        if (const EnumDecl *enumDecl = tp->getEnumOrBoundGenericEnum()) {
+          ASTContext &ctx = tp->getASTContext();
+          if (ctx.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics)
+            return enumDecl->isExhaustive(DC);
+          else
+            return true;
+        }
         return false;
       }
 
@@ -1121,7 +1122,7 @@ namespace {
       }
       
       Space totalSpace(subjectType, Identifier(),
-                       Space::isSwift4NonExhaustiveEnum(TC, DC, subjectType));
+                       Space::isNonExhaustiveEnum(TC, DC, subjectType));
       Space coveredSpace(spaces);
 
       size_t totalSpaceSize = totalSpace.getSize(TC, DC);
@@ -1204,7 +1205,8 @@ namespace {
           break;
         LLVM_FALLTHROUGH;
       case DowngradeToWarning::ForSwift4Exhaustive:
-        mainDiagType = diag::non_exhaustive_switch_warn_swift3;
+        if (!TC.getLangOpts().isSwiftVersionAtLeast(5))
+          mainDiagType = diag::non_exhaustive_switch_warn_swift3;
         break;
       }
 
