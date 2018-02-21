@@ -722,6 +722,10 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::manglePropertyDescriptor(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadata(Node *node) {
   Out << "M";
   mangleSingleChildNode(node); // type

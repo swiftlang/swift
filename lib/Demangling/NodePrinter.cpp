@@ -393,6 +393,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
@@ -1465,6 +1466,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ClassMetadataBaseOffset:
     Printer << "class metadata base offset for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::PropertyDescriptor:
+    Printer << "property descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:

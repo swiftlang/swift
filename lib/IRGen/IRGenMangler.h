@@ -111,6 +111,13 @@ public:
     appendOperator("Mc");
     return finalize();
   }
+  
+  std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
+    beginMangling();
+    appendEntity(storage);
+    appendOperator("MV");
+    return finalize();
+  }
 
   std::string mangleFieldOffset(const ValueDecl *Decl) {
     beginMangling();

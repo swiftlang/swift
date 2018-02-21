@@ -1893,7 +1893,8 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
          
          indexes.push_back({index, formalTy, loweredTy, conformance});
          
-         operandTypes.resize(index+1);
+         if (operandTypes.size() <= index)
+           operandTypes.resize(index+1);
          if (operandTypes[index] && operandTypes[index] != loweredTy) {
            P.diagnose(loweredTyLoc,
                       diag::sil_keypath_index_operand_type_conflict,

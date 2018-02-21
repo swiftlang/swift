@@ -1145,6 +1145,8 @@ public:
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
                                   const NormalProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfPropertyDescriptor(AbstractStorageDecl *D,
+                                      ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
