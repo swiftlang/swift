@@ -9,8 +9,10 @@ extern "C" {
 //
 // It sets up device context for any GPU based computation.  When
 // `enable_debug_logging` is true, it also dumps TF logging for debugging
-// purposes.
-extern void InitTensorFlowRuntime(unsigned char enable_debug_logging);
+// purposes. In that case, when `verbose_level` is positive (must be <= 4), it
+// also dumps verbose logs at that level.
+extern void InitTensorFlowRuntime(unsigned char enable_debug_logging,
+                                  int verbose_level);
 
 #ifdef __cplusplus
 } /* end extern "C" */
