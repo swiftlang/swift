@@ -39,9 +39,6 @@ Windows.
   Development|Universal Windows App Development|Windows SDK` in your
   installation.
 
-- Windows SDK 10.0.10240 was tested. Some later versions (e.g. 10.0.14393) are
-  known not to work, as they are not supported by `compiler-rt`.
-
 ### 2. Clone the repositories
 1. Create a folder to contain all the Swift repositories
 2. `apple/swift-cmark` into a folder named `cmark`
