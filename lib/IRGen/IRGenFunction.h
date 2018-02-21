@@ -276,7 +276,11 @@ public:
   /// Mark a load as dereferenceable to `size` bytes.
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
 
+  /// Emit a non-mergeable trap call, optionally followed by a terminator.
+  void emitTrap(bool EmitUnreachable);
+
 private:
+  unsigned NumTrapBarriers = 0;
   llvm::Instruction *AllocaIP;
   const SILDebugScope *DbgScope;
 

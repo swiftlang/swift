@@ -68,13 +68,14 @@ PATTERN_NODES = [
 
     # tuple-pattern-element -> identifier? ':' pattern ','?
     Node('TuplePatternElement', kind='Syntax',
+         traits=['WithTrailingComma', 'Labeled'],
          children=[
              Child('LabelName', kind='IdentifierToken',
                    is_optional=True),
-             Child('Colon', kind='ColonToken',
+             Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('Pattern', kind='Pattern'),
-             Child('Comma', kind='CommaToken',
+             Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
 

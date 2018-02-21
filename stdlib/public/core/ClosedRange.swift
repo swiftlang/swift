@@ -292,7 +292,13 @@ where Bound : Strideable, Bound.Stride : SignedInteger
 
   @_inlineable
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
-    return element >= self.lowerBound && element <= self.upperBound
+    return lowerBound <= element && element <= upperBound
+  }
+
+  @_inlineable
+  public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return lowerBound <= element && element <= upperBound
+              ? .inRange(element) : nil
   }
 }
 

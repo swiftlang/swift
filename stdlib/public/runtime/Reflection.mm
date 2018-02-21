@@ -534,7 +534,7 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
-  return Struct->Description->Struct.NumFields;
+  return Struct->getDescription()->NumFields;
 }
 
 // internal func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
@@ -549,7 +549,7 @@ void swift_StructMirror_subscript(String *outString,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
 
-  if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
+  if (i < 0 || (size_t)i > Struct->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
   // Load the type and offset from their respective vectors.
@@ -559,7 +559,7 @@ void swift_StructMirror_subscript(String *outString,
   auto bytes = reinterpret_cast<char*>(value);
   auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
-  new (outString) String(getFieldName(Struct->Description->Struct.FieldNames, i));
+  new (outString) String(getFieldName(Struct->getDescription()->FieldNames, i));
 
   // 'owner' is consumed by this call.
   SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
@@ -577,7 +577,7 @@ void swift_StructMirror_subscript(String *outString,
 
 static bool isEnumReflectable(const Metadata *type) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = Enum->Description->Enum;
+  const auto &Description = *Enum->getDescription();
 
   // No metadata for C and @objc enums yet
   if (Description.CaseNames == nullptr)
@@ -592,7 +592,7 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
                               const Metadata **payloadTypePtr,
                               bool *indirectPtr) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = Enum->Description->Enum;
+  const auto &Description = *Enum->getDescription();
 
   unsigned payloadCases = Description.getNumPayloadCases();
 
@@ -633,7 +633,7 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
   }
 
   const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = Enum->Description->Enum;
+  const auto &Description = *Enum->getDescription();
 
   unsigned tag;
   getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
@@ -701,7 +701,7 @@ void swift_EnumMirror_subscript(String *outString,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
-  const auto &Description = Enum->Description->Enum;
+  const auto &Description = *Enum->getDescription();
 
   unsigned tag;
   const Metadata *payloadType;
@@ -750,7 +750,7 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
                                  const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
   SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
-  auto count = Clas->getDescription()->Class.NumFields;
+  auto count = Clas->getDescription()->NumFields;
 
   // If the class has a superclass, the superclass instance is treated as the
   // first child.
@@ -788,7 +788,7 @@ void swift_ClassMirror_subscript(String *outString,
     --i;
   }
 
-  if (i < 0 || (size_t)i > Clas->getDescription()->Class.NumFields)
+  if (i < 0 || (size_t)i > Clas->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
   // Load the type and offset from their respective vectors.
@@ -815,8 +815,7 @@ void swift_ClassMirror_subscript(String *outString,
   auto bytes = *reinterpret_cast<char * const *>(value);
   auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
-  new (outString) String(getFieldName(Clas->getDescription()->Class.FieldNames,
-                                      i));
+  new (outString) String(getFieldName(Clas->getDescription()->FieldNames, i));
 
  if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
    return;

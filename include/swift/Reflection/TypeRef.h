@@ -668,8 +668,8 @@ public:
 
   static bool classof(const TypeRef *TR) {
     auto Kind = TR->getKind();
-    return (Kind == TypeRefKind::UnownedStorage &&
-            Kind == TypeRefKind::WeakStorage &&
+    return (Kind == TypeRefKind::UnownedStorage ||
+            Kind == TypeRefKind::WeakStorage ||
             Kind == TypeRefKind::UnmanagedStorage);
   }
 };
