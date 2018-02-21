@@ -101,6 +101,7 @@ TYPE_NODES = [
 
     # tuple-type-element -> identifier? ':'? type-annotation ','?
     Node('TupleTypeElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('InOut', kind='InOutToken',
                    is_optional=True),
@@ -180,6 +181,7 @@ TYPE_NODES = [
     # Dictionary<Int, String>
     #            ^~~~ ^~~~~~
     Node('GenericArgument', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('ArgumentType', kind='Type'),
              Child('TrailingComma', kind='CommaToken',
