@@ -19,6 +19,7 @@
 
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
+#include "llvm/ADT/ArrayRef.h"
 
 const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 3; // superclass field
 
@@ -202,6 +203,10 @@ public:
     auto Begin = getFieldRecordBuffer();
     auto End = Begin + NumFields;
     return const_iterator { End, End };
+  }
+
+  llvm::ArrayRef<FieldRecord> getFields() const {
+    return {getFieldRecordBuffer(), NumFields};
   }
 
   bool hasMangledTypeName() const {

@@ -65,7 +65,10 @@ static bool isAnyGeneric(Node::Kind kind) {
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::OtherNominalType:
     case Node::Kind::TypeAlias:
+    case Node::Kind::SymbolicReference:
+    case Node::Kind::UnresolvedSymbolicReference:
       return true;
     default:
       return false;
@@ -1237,11 +1240,35 @@ NodePointer Demangler::demangleBoundGenericType() {
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx) {
-  if (!Nominal || Nominal->getNumChildren() < 2)
+  // TODO: This would be a lot easier if we represented bound generic args
+  // flatly in the demangling tree, since that's how they're mangled and also
+  // how the runtime generally wants to consume them.
+  
+  if (!Nominal)
     return nullptr;
 
   if (TypeListIdx >= TypeLists.size())
     return nullptr;
+
+  // Associate a symbolic reference with all remaining generic arguments.
+  if (Nominal->getKind() == Node::Kind::SymbolicReference
+      || Nominal->getKind() == Node::Kind::UnresolvedSymbolicReference) {
+    auto remainingTypeList = createNode(Node::Kind::TypeList);
+    for (unsigned i = TypeLists.size() - 1;
+         i >= TypeListIdx && i < TypeLists.size();
+         --i) {
+      auto list = TypeLists[i];
+      for (auto child : *list) {
+        remainingTypeList->addChild(child, *this);
+      }
+    }
+    return createWithChildren(Node::Kind::BoundGenericOtherNominalType,
+                              createType(Nominal), remainingTypeList);
+  }
+
+  if (Nominal->getNumChildren() < 2)
+    return nullptr;
+
   NodePointer args = TypeLists[TypeListIdx++];
 
   // Generic arguments for the outermost type come first.
@@ -1285,6 +1312,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
       break;
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
+      break;
+    case Node::Kind::OtherNominalType:
+      kind = Node::Kind::BoundGenericOtherNominalType;
       break;
     default:
       return nullptr;

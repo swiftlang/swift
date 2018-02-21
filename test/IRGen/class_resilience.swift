@@ -27,7 +27,6 @@
 // CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|24}}
 
 // CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [15 x i8] c"ResilientChild\00"
-// CHECK: [[RESILIENTCHILD_FIELDS:@.*]] = private constant [7 x i8] c"field\00\00"
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has resilient superclass
@@ -38,8 +37,6 @@
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
-// --       field names,
-// CHECK-SAME:   [7 x i8]* [[RESILIENTCHILD_FIELDS]]
 // CHECK-SAME: }>
 
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[INT]] 0
