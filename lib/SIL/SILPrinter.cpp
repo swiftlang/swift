@@ -2280,7 +2280,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   if (isGlobalInit())
     OS << "[global_init] ";
-  
+  if (isWeakLinked())
+    OS << "[_weakLinked] ";
+
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;

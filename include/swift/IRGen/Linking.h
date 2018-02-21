@@ -733,9 +733,12 @@ public:
         getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
 
-    if (getKind() == Kind::SILFunction)
+    if (getKind() == Kind::SILFunction) {
       if (auto clangOwner = getSILFunction()->getClangNodeOwner())
         return clangOwner->isWeakImported(module);
+      if (getSILFunction()->isWeakLinked())
+        return getSILFunction()->isAvailableExternally();
+    }
 
     if (!isDeclKind(getKind()))
       return false;
