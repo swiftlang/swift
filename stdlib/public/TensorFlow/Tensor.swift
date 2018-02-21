@@ -24,8 +24,6 @@
 
 import CTensorFlow
 
-infix operator ++ : AdditionPrecedence
-
 //===----------------------------------------------------------------------===//
 // Tensor type
 //===----------------------------------------------------------------------===//
@@ -194,7 +192,7 @@ extension Tensor : ExpressibleByIntegerLiteral
   where Scalar : ExpressibleByIntegerLiteral &
         _ExpressibleByBuiltinIntegerLiteral {
   public typealias IntegerLiteralType = Scalar
-  @inline(__always)
+  @_inlineable @inline(__always)
   public init(integerLiteral: Scalar) {
     self.init(integerLiteral)
   }
@@ -204,7 +202,7 @@ extension Tensor : ExpressibleByFloatLiteral
   where Scalar : BinaryFloatingPoint &
         _ExpressibleByBuiltinFloatLiteral {
   public typealias FloatLiteralType = Scalar
-  @inline(__always)
+  @_inlineable @inline(__always)
   public init(floatLiteral: Scalar) {
     self.init(floatLiteral)
   }
@@ -212,7 +210,7 @@ extension Tensor : ExpressibleByFloatLiteral
 
 extension Tensor : ExpressibleByBooleanLiteral where Scalar == Bool {
   public typealias BooleanLiteralType = Bool
-  @inline(__always)
+  @_inlineable @inline(__always)
   public init(booleanLiteral: Bool) {
     self.init(booleanLiteral)
   }
@@ -222,7 +220,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   public typealias ArrayLiteralElement = Tensor<Scalar>
   /// Creates a tensor initialized with the given elements.
-  @inline(__always)
+  @_inlineable @inline(__always)
   public init(arrayLiteral elements: Tensor<Scalar>...) {
     self.init(elements)
   }
