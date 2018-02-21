@@ -112,6 +112,7 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
+  IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -833,6 +834,7 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
