@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# This test validates that all source files have _correct_ copyright notices.
+
+set -euo pipefail
+
+# Takes a filepath as the sole argument
+function dates() {
+	local G_LOG_OUTPUT=$(git log --format="%ad" --date="format:%Y" -- %@)
+
+	local CREATED_AT="tail -1 $G_LOG_OUTPUT"
+	local LAST_EDIT="head -1 $G_LOG_OUTPUT"
+
+	echo "created at 
+}
