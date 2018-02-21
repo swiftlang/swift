@@ -31,8 +31,8 @@
 // and chain them together for arbitrary differentiable programs.
 //
 // NOTE:
-// - Currently, we do not want to expose adjoint functions to users. Each
-//   adjoint function's name should start with an underscore.
+// - Currently, we do not want to expose adjoint functions to users. The name of
+//   each adjoint function should start with an underscore.
 // FIXME:
 // - Handle scalar broadcasting.
 //
@@ -80,93 +80,71 @@ extension TensorProtocol where Scalar : Numeric {
 // Elementwise binary ops with scalar on one side
 //===----------------------------------------------------------------------===//
 
-% ranks = [1, 2, 3, 4]
-% tensors = ['Tensor'] + ['Tensor{}D'.format(rank) for rank in ranks]
-% for Tensor in tensors:
-
-extension ${Tensor} where Scalar : Numeric {
+extension TensorProtocol where Scalar : Numeric {
   @inline(never)
   @_versioned
   static func _adjointAdd(
-    _: ${Tensor}, _: Scalar, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, Scalar) {
+    _: Self, _: Scalar, partial: Self, seed: Self
+  ) -> (Self, Scalar) {
     fatalError("Unimplemented")
   }
 
   @inline(never)
   @_versioned
   static func _adjointAdd(
-    _: Scalar, _: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (Scalar, ${Tensor}) {
+    _: Scalar, _: Self, partial: Self, seed: Self
+  ) -> (Scalar, Self) {
     fatalError("Unimplemented")
   }
 
   @inline(never)
   @_versioned
   static func _adjointSubtract(
-    _: ${Tensor}, _: Scalar, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, Scalar) {
+    _: Self, _: Scalar, partial: Self, seed: Self
+  ) -> (Self, Scalar) {
     fatalError("Unimplemented")
   }
 
   @inline(never)
   @_versioned
   static func _adjointSubtract(
-    _: Scalar, _: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (Scalar, ${Tensor}) {
-    fatalError("Unimplemented")
-  }
-
-  @_inlineable
-  @_versioned
-  static func _adjointMultiply(
-    _ x: ${Tensor}, _ y: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, ${Tensor}) {
-    return (y * seed, x * seed)
-  }
-
-  @inline(never)
-  @_versioned
-  static func _adjointMultiply(
-    _ x: ${Tensor}, _ y: Scalar, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, Scalar) {
+    _: Scalar, _: Self, partial: Self, seed: Self
+  ) -> (Scalar, Self) {
     fatalError("Unimplemented")
   }
 
   @inline(never)
   @_versioned
   static func _adjointMultiply(
-    _ x: Scalar, _ y: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (Scalar, ${Tensor}) {
+    _ x: Self, _ y: Scalar, partial: Self, seed: Self
+  ) -> (Self, Scalar) {
     fatalError("Unimplemented")
-  }
-
-  @_inlineable
-  @_versioned
-  static func _adjointDivide(
-    _ x: ${Tensor}, _ y: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, ${Tensor}) {
-    return (seed / y, -x / y.squared() * seed)
   }
 
   @inline(never)
   @_versioned
-  static func _adjointDivide(
-    _ x: ${Tensor}, _ y: Scalar, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (${Tensor}, Scalar) {
+  static func _adjointMultiply(
+    _ x: Scalar, _ y: Self, partial: Self, seed: Self
+  ) -> (Scalar, Self) {
     fatalError("Unimplemented")
   }
 
   @inline(never)
   @_versioned
   static func _adjointDivide(
-    _ x: Scalar, _ y: ${Tensor}, partial: ${Tensor}, seed: ${Tensor}
-  ) -> (Scalar, ${Tensor}) {
+    _ x: Self, _ y: Scalar, partial: Self, seed: Self
+  ) -> (Self, Scalar) {
+    fatalError("Unimplemented")
+  }
+
+  @inline(never)
+  @_versioned
+  static func _adjointDivide(
+    _ x: Scalar, _ y: Self, partial: Self, seed: Self
+  ) -> (Scalar, Self) {
     fatalError("Unimplemented")
   }
 }
-
-% end
 
 @_inlineable
 @_versioned
@@ -399,8 +377,6 @@ extension Tensor where Scalar : FloatingPoint {
     )
   }
 }
-
-// TODO: Add adjoint for Tensor4D.convolved2D.
 
 extension Tensor {
   @_inlineable
