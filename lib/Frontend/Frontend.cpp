@@ -384,7 +384,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
 }
 
 void CompilerInstance::performSema() {
-  SharedTimer timer("performSema");
+  FrontendStatsTracer tracer(Context->Stats, "perform-sema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
   if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
@@ -432,7 +432,7 @@ CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
 }
 
 bool CompilerInstance::loadStdlib() {
-  SharedTimer timer("performSema-loadStdlib");
+  FrontendStatsTracer tracer(Context->Stats, "load-stdlib");
   ModuleDecl *M = Context->getStdlibModule(true);
 
   if (!M) {
@@ -451,7 +451,7 @@ bool CompilerInstance::loadStdlib() {
 }
 
 ModuleDecl *CompilerInstance::importUnderlyingModule() {
-  SharedTimer timer("performSema-importUnderlyingModule");
+  FrontendStatsTracer tracer(Context->Stats, "import-underlying-module");
   ModuleDecl *objCModuleUnderlyingMixedFramework =
       static_cast<ClangImporter *>(Context->getClangModuleLoader())
           ->loadModule(SourceLoc(),
@@ -464,7 +464,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
 }
 
 ModuleDecl *CompilerInstance::importBridgingHeader() {
-  SharedTimer timer("performSema-importBridgingHeader");
+  FrontendStatsTracer tracer(Context->Stats, "import-bridging-header");
   const StringRef implicitHeaderPath =
       Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   auto clangImporter =
@@ -479,7 +479,7 @@ ModuleDecl *CompilerInstance::importBridgingHeader() {
 
 void CompilerInstance::getImplicitlyImportedModules(
     SmallVectorImpl<ModuleDecl *> &importModules) {
-  SharedTimer timer("performSema-getImplicitlyImportedModules");
+  FrontendStatsTracer tracer(Context->Stats, "get-implicitly-imported-modules");
   for (auto &ImplicitImportModuleName :
        Invocation.getFrontendOptions().ImplicitImportModuleNames) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
@@ -535,7 +535,7 @@ void CompilerInstance::addMainFileToModule(
 
 void CompilerInstance::parseAndCheckTypes(
     const ImplicitImports &implicitImports) {
-  SharedTimer timer("performSema-parseAndCheckTypes");
+  FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
   // Delayed parsing callback for the primary file, or all files
   // in non-WMO mode.
   std::unique_ptr<DelayedParsingCallbacks> PrimaryDelayedCB{
@@ -599,7 +599,7 @@ void CompilerInstance::parseLibraryFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *PrimaryDelayedCB,
     DelayedParsingCallbacks *SecondaryDelayedCB) {
-  SharedTimer timer("performSema-parseLibraryFile");
+  FrontendStatsTracer tracer(Context->Stats, "parse-library-file");
 
   auto *NextInput = createSourceFileForMainModule(
       SourceFileKind::Library, implicitImports.kind, BufferID);
@@ -653,7 +653,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *PrimaryDelayedCB,
     DelayedParsingCallbacks *SecondaryDelayedCB) {
-  SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
+  FrontendStatsTracer tracer(Context->Stats,
+                             "parse-partial-modules-and-library-files");
   bool hadLoadError = false;
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
@@ -677,8 +678,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  SharedTimer timer(
-      "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
+  FrontendStatsTracer tracer(Context->Stats,
+                             "parse-and-typecheck-main-file");
   bool mainIsPrimary =
       (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
 

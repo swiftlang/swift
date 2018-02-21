@@ -14,6 +14,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Timer.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
@@ -24,6 +25,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
+#include <limits>
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -36,12 +38,15 @@ namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
 
-static size_t
+static int64_t
 getChildrenMaxResidentSetSize() {
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
-  return RU.ru_maxrss;
+  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
+  if (M < 0)
+    M = std::numeric_limits<int64_t>::max();
+  return M;
 #else
   return 0;
 #endif
@@ -126,6 +131,37 @@ auxName(StringRef ModuleName,
           + "-" + cleanName(OptType));
 }
 
+class UnifiedStatsReporter::RecursionSafeTimers {
+
+  struct RecursionSafeTimer {
+    llvm::Optional<SharedTimer> Timer;
+    size_t RecursionDepth;
+  };
+
+  StringMap<RecursionSafeTimer> Timers;
+
+public:
+
+  void BeginTimer(StringRef Name) {
+    RecursionSafeTimer &T = Timers[Name];
+    if (T.RecursionDepth == 0) {
+      T.Timer.emplace(Name);
+    }
+    T.RecursionDepth++;
+  }
+
+  void EndTimer(StringRef Name) {
+    auto I = Timers.find(Name);
+    assert(I != Timers.end());
+    RecursionSafeTimer &T = I->getValue();
+    assert(T.RecursionDepth != 0);
+    T.RecursionDepth--;
+    if (T.RecursionDepth == 0) {
+      T.Timer.reset();
+    }
+  }
+};
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef ModuleName,
                                            StringRef InputName,
@@ -162,7 +198,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
     SourceMgr(SM),
-    ClangSourceMgr(CSM)
+    ClangSourceMgr(CSM),
+    RecursiveTimers(llvm::make_unique<RecursionSafeTimers>())
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -186,14 +223,6 @@ UnifiedStatsReporter::getFrontendCounters()
   if (!FrontendCounters)
     FrontendCounters = make_unique<AlwaysOnFrontendCounters>();
   return *FrontendCounters;
-}
-
-UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers &
-UnifiedStatsReporter::getFrontendRecursiveSharedTimers() {
-  if (!FrontendRecursiveSharedTimers)
-    FrontendRecursiveSharedTimers =
-        make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
-  return *FrontendRecursiveSharedTimers;
 }
 
 void
@@ -258,31 +287,50 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   OS.flush();
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
-    StringRef EventName,
-    const void *Entity,
-    const TraceFormatter *Formatter,
-    UnifiedStatsReporter *Reporter)
-  : Reporter(Reporter),
-    SavedTime(llvm::TimeRecord::getCurrentTime()),
-    EventName(EventName),
-    Entity(Entity),
-    Formatter(Formatter)
-{
-  if (Reporter)
+FrontendStatsTracer::FrontendStatsTracer(
+    UnifiedStatsReporter *Reporter, StringRef EventName, const void *Entity,
+    const UnifiedStatsReporter::TraceFormatter *Formatter)
+    : Reporter(Reporter), SavedTime(), EventName(EventName), Entity(Entity),
+      Formatter(Formatter) {
+  if (Reporter) {
+    SavedTime = llvm::TimeRecord::getCurrentTime();
     Reporter->saveAnyFrontendStatsEvents(*this, true);
+  }
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer()
-  : Reporter(nullptr),
-    Entity(nullptr),
-    Formatter(nullptr)
-{
-}
+FrontendStatsTracer::FrontendStatsTracer() = default;
 
-UnifiedStatsReporter::FrontendStatsTracer&
-UnifiedStatsReporter::FrontendStatsTracer::operator=(
-    FrontendStatsTracer&& other)
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S)
+    : FrontendStatsTracer(R, S, nullptr, nullptr)
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const ProtocolConformance *P)
+    : FrontendStatsTracer(R, S, P,
+                          getTraceFormatter<const ProtocolConformance *>()) {}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const Expr *E)
+    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const clang::Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>())
+{}
+
+FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
+                                         const SILFunction *F)
+    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>())
+{}
+
+FrontendStatsTracer&
+FrontendStatsTracer::operator=(FrontendStatsTracer&& other)
 {
   Reporter = other.Reporter;
   SavedTime = other.SavedTime;
@@ -293,8 +341,7 @@ UnifiedStatsReporter::FrontendStatsTracer::operator=(
   return *this;
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
-    FrontendStatsTracer&& other)
+FrontendStatsTracer::FrontendStatsTracer(FrontendStatsTracer&& other)
   : Reporter(other.Reporter),
     SavedTime(other.SavedTime),
     EventName(other.EventName),
@@ -304,7 +351,7 @@ UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
   other.Reporter = nullptr;
 }
 
-UnifiedStatsReporter::FrontendStatsTracer::~FrontendStatsTracer()
+FrontendStatsTracer::~FrontendStatsTracer()
 {
   if (Reporter)
     Reporter->saveAnyFrontendStatsEvents(*this, false);
@@ -315,6 +362,16 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     FrontendStatsTracer const& T,
     bool IsEntry)
 {
+  // First make a note in the recursion-safe timers; these
+  // are active anytime UnifiedStatsReporter is active.
+  if (IsEntry) {
+    RecursiveTimers->BeginTimer(T.EventName);
+  } else {
+    RecursiveTimers->EndTimer(T.EventName);
+  }
+
+  // If we don't have a saved entry to form deltas against in
+  // the trace buffer, we're not tracing: return early.
   if (!LastTracedFrontendCounters)
     return;
   auto Now = llvm::TimeRecord::getCurrentTime();
@@ -324,8 +381,8 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                          \
   do {                                                        \
-    auto total = C.NAME;                                      \
-    auto delta = C.NAME - LastTracedFrontendCounters->NAME;   \
+    int64_t total = C.NAME;                                    \
+    int64_t delta = C.NAME - LastTracedFrontendCounters->NAME; \
     static char const *name = #TY "." #NAME;                  \
     if (delta != 0) {                                         \
       LastTracedFrontendCounters->NAME = C.NAME;              \
@@ -336,15 +393,6 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
-}
-
-UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
-    AlwaysOnFrontendRecursiveSharedTimers()
-    :
-#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) ID(#ID),
-#include "swift/Basic/Statistics.def"
-#undef FRONTEND_RECURSIVE_SHARED_TIMER
-      dummyInstanceVariableToGetConstructorToParse(0) {
 }
 
 UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}
@@ -384,8 +432,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     auto &C = getFrontendCounters();
     // Convenience calculation for crude top-level "absolute speed".
     if (C.NumSourceLines != 0 && ElapsedTime.getProcessTime() != 0.0)
-      C.NumSourceLinesPerSecond = (size_t) (((double)C.NumSourceLines) /
-                                            ElapsedTime.getProcessTime());
+      C.NumSourceLinesPerSecond = (int64_t) (((double)C.NumSourceLines) /
+                                             ElapsedTime.getProcessTime());
   }
 
   std::error_code EC;
