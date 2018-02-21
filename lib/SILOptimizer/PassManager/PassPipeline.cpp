@@ -111,6 +111,9 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  P.addTFDeabstraction();
 }
 
 SILPassPipelinePlan

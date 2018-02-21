@@ -1297,10 +1297,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
 SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
   auto ds = loc.getScope();
 
-  if (!ds) return loc;
-
-  // If this location hasn't been inlined at all, just keep it unmodified.
-  if (!ds->InlinedCallSite && loc.getLocation().getSourceLoc().isValid())
+  if (!ds || loc.getLocation().getSourceLoc().isValid())
     return loc;
 
   // Zip through inlined call site information that came from the

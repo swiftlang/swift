@@ -648,6 +648,12 @@ protected:
   }
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Attempt to promote the specified array of stack allocations to SSA
+/// registers.  Promotion can fail if the allocation escapes.
+void promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
+                        DominanceInfo *domInfo);
+
 } // end namespace swift
 
 #endif
