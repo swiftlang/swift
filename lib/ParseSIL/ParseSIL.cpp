@@ -1450,8 +1450,10 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
         return true;
       }
-      if (P.Tok.getText().getAsInteger(0, Var.ArgNo))
+      uint16_t ArgNo;
+      if (P.Tok.getText().getAsInteger(0, ArgNo))
         return true;
+      Var.ArgNo = ArgNo;
     } else if (Key == "let") {
       Var.Constant = true;
     } else if (Key == "var") {
