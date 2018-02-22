@@ -121,9 +121,7 @@ public struct Mirror {
     if case let customized as CustomReflectable = subject {
       self = customized.customMirror
     } else {
-      self = Mirror(
-        legacy: _reflect(subject),
-        subjectType: type(of: subject))
+      self = Mirror(internalReflecting: subject)
     }
   }
 
@@ -164,29 +162,6 @@ public struct Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
 
-  /// Returns the legacy mirror representing the part of `subject`
-  /// corresponding to the superclass of `staticSubclass`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal static func _legacyMirror(
-    _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
-    
-    // get a legacy mirror and the most-derived type
-    var cls: AnyClass = type(of: subject)
-    var clsMirror = _reflect(subject)
-
-    // Walk up the chain of mirrors/classes until we find staticSubclass
-    while let superclass: AnyClass = _getSuperclass(cls) {
-      guard let superclassMirror = clsMirror._superMirror() else { break }
-      
-      if superclass == targetSuperclass { return superclassMirror }
-      
-      clsMirror = superclassMirror
-      cls = superclass
-    }
-    return nil
-  }
-
   @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
   @_inlineable // FIXME(sil-serialize-all)
@@ -201,14 +176,19 @@ public struct Mirror {
       switch ancestorRepresentation {
       case .generated:
         return {
-          self._legacyMirror(_unsafeDowncastToAnyObject(fromAny: subject), asClass: superclass).map {
-            Mirror(legacy: $0, subjectType: superclass)
-          }
+          Mirror(internalReflecting: subject, subjectType: superclass)
         }
       case .customized(let makeAncestor):
         return {
-          Mirror(_unsafeDowncastToAnyObject(fromAny: subject), subjectClass: superclass,
-                 ancestor: makeAncestor())
+          let ancestor = makeAncestor()
+          if superclass == ancestor.subjectType
+            || ancestor._defaultDescendantRepresentation == .suppressed {
+            return ancestor
+          } else {
+            return Mirror(internalReflecting: subject,
+                          subjectType: superclass,
+                          customAncestor: ancestor)
+          }
         }
       case .suppressed:
         break
@@ -503,161 +483,6 @@ extension Mirror {
   }
 }
 
-//===--- Legacy _Mirror Support -------------------------------------------===//
-extension Mirror.DisplayStyle {
-  /// Construct from a legacy `_MirrorDisposition`
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init?(legacy: _MirrorDisposition) {
-    switch legacy {
-    case .`struct`: self = .`struct`
-    case .`class`: self = .`class`
-    case .`enum`: self = .`enum`
-    case .tuple: self = .tuple
-    case .aggregate: return nil
-    case .indexContainer: self = .collection
-    case .keyContainer: self = .dictionary
-    case .membershipContainer: self = .`set`
-    case .container: preconditionFailure("unused!")
-    case .optional: self = .optional
-    case .objCObject: self = .`class`
-    }
-  }
-}
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func _isClassSuperMirror(_ t: Any.Type) -> Bool {
-#if  _runtime(_ObjC)
-  return t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self
-#else
-  return t == _ClassSuperMirror.self
-#endif
-}
-
-extension _Mirror {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _superMirror() -> _Mirror? {
-    if self.count > 0 {
-      let childMirror = self[0].1
-      if _isClassSuperMirror(type(of: childMirror)) {
-        return childMirror
-      }
-    }
-    return nil
-  }
-}
-
-/// When constructed using the legacy reflection infrastructure, the
-/// resulting `Mirror`'s `children` collection will always be
-/// upgradable to `AnyRandomAccessCollection` even if it doesn't
-/// exhibit appropriate performance. To avoid this pitfall, convert
-/// mirrors to use the new style, which only present forward
-/// traversal in general.
-internal extension Mirror {
-  /// An adapter that represents a legacy `_Mirror`'s children as
-  /// a `Collection` with integer `Index`.  Note that the performance
-  /// characteristics of the underlying `_Mirror` may not be
-  /// appropriate for random access!  To avoid this pitfall, convert
-  /// mirrors to use the new style, which only present forward
-  /// traversal in general.
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal struct LegacyChildren : RandomAccessCollection {
-    internal typealias Indices = Range<Int>
-    
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(_ oldMirror: _Mirror) {
-      self._oldMirror = oldMirror
-    }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal var startIndex: Int {
-      return _oldMirror._superMirror() == nil ? 0 : 1
-    }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal var endIndex: Int { return _oldMirror.count }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal subscript(position: Int) -> Child {
-      let (label, childMirror) = _oldMirror[position]
-      return (label: label, value: childMirror.value)
-    }
-
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _oldMirror: _Mirror
-  }
-
-  /// Initialize for a view of `subject` as `subjectClass`.
-  ///
-  /// - parameter ancestor: A Mirror for a (non-strict) ancestor of
-  ///   `subjectClass`, to be injected into the resulting hierarchy.
-  ///
-  /// - parameter legacy: Either `nil`, or a legacy mirror for `subject`
-  ///    as `subjectClass`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(
-    _ subject: AnyObject,
-    subjectClass: AnyClass,
-    ancestor: Mirror,
-    legacy legacyMirror: _Mirror? = nil
-  ) {
-    if ancestor.subjectType == subjectClass
-      || ancestor._defaultDescendantRepresentation == .suppressed {
-      self = ancestor
-    }
-    else {
-      let legacyMirror = legacyMirror ?? Mirror._legacyMirror(
-        subject, asClass: subjectClass)!
-      
-      self = Mirror(
-        legacy: legacyMirror,
-        subjectType: subjectClass,
-        makeSuperclassMirror: {
-          _getSuperclass(subjectClass).map {
-            Mirror(
-              subject,
-              subjectClass: $0,
-              ancestor: ancestor,
-              legacy: legacyMirror._superMirror())
-          }
-        })
-    }
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(
-    legacy legacyMirror: _Mirror,
-    subjectType: Any.Type,
-    makeSuperclassMirror: (() -> Mirror?)? = nil
-  ) {
-    if let makeSuperclassMirror = makeSuperclassMirror {
-      self._makeSuperclassMirror = makeSuperclassMirror
-    }
-    else if let subjectSuperclass = _getSuperclass(subjectType) {
-      self._makeSuperclassMirror = {
-        legacyMirror._superMirror().map {
-          Mirror(legacy: $0, subjectType: subjectSuperclass) }
-      }
-    }
-    else {
-      self._makeSuperclassMirror = Mirror._noSuperclassMirror
-    }
-    self.subjectType = subjectType
-    self.children = Children(LegacyChildren(legacyMirror))
-    self.displayStyle = DisplayStyle(legacy: legacyMirror.disposition)
-    self._defaultDescendantRepresentation = .generated
-  }
-}
-
 //===--- QuickLooks -------------------------------------------------------===//
 
 /// The sum of types that can be used as a Quick Look representation.
@@ -769,7 +594,7 @@ extension PlaygroundQuickLook {
       self = customized._defaultCustomPlaygroundQuickLook
     }
     else {
-      if let q = _reflect(subject).quickLookObject {
+      if let q = Mirror.quickLookObject(subject) {
         self = q
       }
       else {

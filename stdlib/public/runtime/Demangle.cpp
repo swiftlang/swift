@@ -12,6 +12,7 @@
 
 #include "swift/Basic/Range.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "Private.h"
 
@@ -633,4 +634,48 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   // Not a type.
   return nullptr;
+}
+
+// NB: This function is not used directly in the Swift codebase, but is
+// exported for Xcode support and is used by the sanitizers. Please coordinate
+// before changing.
+char *swift_demangle(const char *mangledName,
+                     size_t mangledNameLength,
+                     char *outputBuffer,
+                     size_t *outputBufferSize,
+                     uint32_t flags) {
+  if (flags != 0) {
+    swift::fatalError(0, "Only 'flags' value of '0' is currently supported.");
+  }
+  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
+    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
+  }
+
+  // Check if we are dealing with Swift mangled name, otherwise, don't try
+  // to demangle and send indication to the user.
+  if (!Demangle::isSwiftSymbol(mangledName))
+    return nullptr; // Not a mangled name
+
+  // Demangle the name.
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+  auto result =
+      Demangle::demangleSymbolAsString(mangledName,
+                                       mangledNameLength,
+                                       options);
+
+  // If the output buffer is not provided, malloc memory ourselves.
+  if (outputBuffer == nullptr || *outputBufferSize == 0) {
+    return strdup(result.c_str());
+  }
+
+  // Indicate a failure if the result does not fit and will be truncated
+  // and set the required outputBufferSize.
+  if (*outputBufferSize < result.length() + 1) {
+    *outputBufferSize = result.length() + 1;
+  }
+
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+  return outputBuffer;
 }
