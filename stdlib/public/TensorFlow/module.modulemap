@@ -1,6 +1,0 @@
-module CTensorFlow {
-  header "tensorflow/c/c_api.h"
-  header "tensorflow/c/c_api_experimental.h"
-  header "tensorflow/c/eager/c_api.h"
-  header "swift/stdlib/ctensorflow_init.h"
-}

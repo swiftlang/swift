@@ -744,6 +744,17 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
+        if args.swift_tensorflow_path_for_host:
+            impl_args += [
+                "--swift-tensorflow-path-for-host",
+                args.swift_tensorflow_path_for_host,
+            ]
+            if args.swift_tensorflow_path_for_target:
+                impl_args += [
+                    "--swift-tensorflow-path-for-target",
+                    args.swift_tensorflow_path_for_target,
+                ]
+
         impl_args += args.build_script_impl_args
 
         if args.dry_run:

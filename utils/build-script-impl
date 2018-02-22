@@ -252,6 +252,8 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    swift-tensorflow-path-for-host     ""        "If set, dir with TensorFlow libs linked into swiftc"
+    swift-tensorflow-path-for-target   ""        "If set, dir with TensorFlow libs linked into swift programs (default: path-to-tensorflow-for-host setting)"
 )
 
 # Centralized access point for traced command invocation.
@@ -1847,6 +1849,18 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${SWIFT_TENSORFLOW_PATH_FOR_HOST}" ]] ; then
+        if [[ ! "${SWIFT_TENSORFLOW_PATH_FOR_TARGET}" ]] ; then
+            SWIFT_TENSORFLOW_PATH_FOR_TARGET="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
+        fi
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+            -DSWIFT_TENSORFLOW_PATH_FOR_HOST:PATH="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
+            -DSWIFT_TENSORFLOW_PATH_FOR_TARGET:PATH="${SWIFT_TENSORFLOW_PATH_FOR_TARGET}"
+        )
+    fi
+
     if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
@@ -2190,6 +2204,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLDB_ENABLE:BOOL=TRUE
                         -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
+                    if [[ "${SWIFT_TENSORFLOW_PATH_FOR_HOST}" ]] ; then
+                        if [[ ! "${SWIFT_TENSORFLOW_PATH_FOR_TARGET}" ]] ; then
+                            SWIFT_TENSORFLOW_PATH_FOR_TARGET="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
+                        fi
+                        lldb_cmake_options=(
+                            "${lldb_cmake_options[@]}"
+                            -DLLDB_ENABLE_TENSORFLOW:BOOL=TRUE
+                            -DLLDB_TENSORFLOW_PATH_FOR_HOST:PATH="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
+                            -DLLDB_TENSORFLOW_PATH_FOR_TARGET:PATH="${SWIFT_TENSORFLOW_PATH_FOR_TARGET}"
+                        )
+                    fi
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")

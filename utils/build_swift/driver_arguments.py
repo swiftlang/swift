@@ -897,6 +897,17 @@ def create_argument_parser():
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------
+    in_group('Build settings specific to TensorFlow support')
+
+    option('--swift-tensorflow-path-for-host', store_path,
+           help='If set, directory with TensorFlow libraries to be '
+                'linked into swiftc')
+    option('--swift-tensorflow-path-for-target', store_path,
+           help='If set, directory with TensorFlow libraries to be '
+                'linked with the TensorFlow runtime library '
+                '(default: path-to-tensorflow-for-host setting)')
+
+    # -------------------------------------------------------------------------
     return builder.build()
 
 

@@ -52,6 +52,10 @@ option(SWIFT_BUILD_STATIC_SDK_OVERLAY
     "Build static variants of the Swift SDK overlay"
     FALSE)
 
+option(SWIFT_ENABLE_TENSORFLOW
+    "Enable TensorFlow in the compiler and build the Swift TensorFlow library"
+    FALSE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -273,6 +277,16 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
 option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
+
+#
+# User-configurable TensorFlow specific options.
+#
+
+set(SWIFT_TENSORFLOW_PATH_FOR_HOST "" CACHE PATH
+    "If set, dir with TensorFlow libs to be linked into swiftc")
+
+set(SWIFT_TENSORFLOW_PATH_FOR_TARGET "" CACHE PATH
+    "If set, dir with TensorFlow libs to be linked into swift programs (default: PATH_TO_TENSORFLOW_FOR_HOST setting)")
 
 #
 # User-configurable experimental options.  Do not use in production builds.
@@ -884,6 +898,11 @@ set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 include("${SWIFT_API_NOTES_PATH}/CMakeLists.txt")
 if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
+endif()
+
+# Enable TensorFlow in compiler code.
+if(SWIFT_ENABLE_TENSORFLOW)
+  add_definitions(-DSWIFT_ENABLE_TENSORFLOW)
 endif()
 
 # Add all of the subdirectories, where we actually do work.

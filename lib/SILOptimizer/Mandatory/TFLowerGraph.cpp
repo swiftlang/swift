@@ -18,11 +18,7 @@
 #include "TFUtilities.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "TFCanonicalizeCFG.h"
-#ifdef CMAKE_INTDIR
 #include "tensorflow/c/c_api.h"
-#else
-#include "tensorflow/c/c_api.h"
-#endif
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
