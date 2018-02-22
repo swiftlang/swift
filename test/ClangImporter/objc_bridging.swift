@@ -63,3 +63,24 @@ func objcStructs(_ s: StructOfNSStrings, sb: StructOfBlocks) {
   _ = sb.block as Bool // expected-error {{cannot convert value of type '@convention(block) () -> Void' to type 'Bool' in coercion}}
   sb.block() // okay
 }
+
+func deliberatelyUnbridgedTypedefs(_ s: String, _ ns: NSString) {
+  takesBridgedNSString(s)
+  takesBridgedNSString(ns) // expected-error {{'NSString' is not implicitly convertible to 'String'}}
+  takesUnbridgedNSString(s) // expected-error {{cannot convert value of type 'String' to expected argument type 'UnbridgedNSString' (aka 'NSString')}}
+  takesUnbridgedNSString(ns)
+
+  // This doesn't affect non-bridgeable positions, of course.
+  var mutS = s
+  var mutNS = ns
+  takesBridgedNSStringPointer(&mutS) // expected-error {{cannot convert value of type 'String' to expected argument type 'BridgedNSString' (aka 'NSString')}}
+  takesBridgedNSStringPointer(&mutNS)
+  takesUnbridgedNSStringPointer(&mutS) // expected-error {{cannot convert value of type 'String' to expected argument type 'UnbridgedNSString' (aka 'NSString')}}
+  takesUnbridgedNSStringPointer(&mutNS)
+
+  // Typedefs for classes never get bridged, with or without the attribute.
+  let _: BridgedNSString = s // expected-error {{cannot convert value of type 'String' to specified type 'BridgedNSString' (aka 'NSString')}}
+  let _: BridgedNSString = ns
+  let _: UnbridgedNSString = s // expected-error {{cannot convert value of type 'String' to specified type 'UnbridgedNSString' (aka 'NSString')}}
+  let _: UnbridgedNSString = ns
+}

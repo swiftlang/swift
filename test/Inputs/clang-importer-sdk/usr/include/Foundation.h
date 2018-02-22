@@ -1157,3 +1157,12 @@ void takeNullableId(__nullable id);
 @interface IUOProperty
 @property (readonly) id<OptionalMethods> iuo;
 @end
+
+typedef NSString *BridgedNSString;
+typedef NSString *UnbridgedNSString __attribute__((swift_nonbridged));
+
+void takesBridgedNSString(BridgedNSString _Nonnull);
+void takesUnbridgedNSString(UnbridgedNSString _Nonnull);
+
+void takesBridgedNSStringPointer(BridgedNSString _Nonnull const * _Nonnull);
+void takesUnbridgedNSStringPointer(UnbridgedNSString _Nonnull const * _Nonnull);
