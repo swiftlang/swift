@@ -48,4 +48,9 @@ TRAITS = [
               Child('LabelName', kind='IdentifierToken', is_optional=True),
               Child('LabelColon', kind='ColonToken', is_optional=True),
           ]),
+
+    Trait('WithStatements',
+          children=[
+              Child('Statements', kind='CodeBlockItemList'),
+          ]),
 ]
