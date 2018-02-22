@@ -1,4 +1,4 @@
-//===--- SequenceAlgorithms.swift.gyb -------------------------*- swift -*-===//
+//===--- SequenceAlgorithms.swift -----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,36 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-
-orderingExplanation = """\
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
-  ///   `true`. (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
-  ///"""
-
-equivalenceExplanation = """\
-  /// The predicate must be a *equivalence relation* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
-  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
-  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
-  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
-  ///"""
-
-}%
 
 //===----------------------------------------------------------------------===//
 // enumerated()
@@ -101,18 +71,23 @@ extension Sequence {
 // min(), max()
 //===----------------------------------------------------------------------===//
 
-% # Generate two versions: with explicit predicates and with
-% # a Comparable requirement.
-% for preds in [True, False]:
-%   rethrows_ = "rethrows " if preds else ""
-
-extension Sequence ${"" if preds else "where Element : Comparable"} {
-
-%   if preds:
+extension Sequence {
   /// Returns the minimum element in the sequence, using the given predicate as
   /// the comparison between elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// This example shows how to use the `min(by:)` method on a
   /// dictionary to find the key-value pair with the lowest value.
   ///
@@ -127,43 +102,35 @@ ${orderingExplanation}
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-%   else:
-  /// Returns the minimum element in the sequence.
-  ///
-  /// This example finds the smallest value in an array of height measurements.
-  ///
-  ///     let heights = [67.5, 65.7, 64.3, 61.1, 58.5, 60.3, 64.9]
-  ///     let lowestHeight = heights.min()
-  ///     print(lowestHeight)
-  ///     // Prints "Optional(58.5)"
-  ///
-  /// - Returns: The sequence's minimum element. If the sequence has no
-  ///   elements, returns `nil`.
-%   end
   @_inlineable
   @warn_unqualified_access
   public func min(
-%   if preds:
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-%   end
-  ) ${rethrows_}-> Element? {
+  ) rethrows -> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
-    for e in IteratorSequence(it) {
-%   if preds:
+    while let e = it.next() {
       if try areInIncreasingOrder(e, result) { result = e }
-%   else:
-      if e < result { result = e }
-%   end
     }
     return result
   }
 
-%   if preds:
   /// Returns the maximum element in the sequence, using the given predicate
   /// as the comparison between elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// This example shows how to use the `max(by:)` method on a
   /// dictionary to find the key-value pair with the highest value.
   ///
@@ -177,7 +144,38 @@ ${orderingExplanation}
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-%   else:
+  @_inlineable
+  @warn_unqualified_access
+  public func max(
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Element? {
+    var it = makeIterator()
+    guard var result = it.next() else { return nil }
+    while let e = it.next() {
+      if try areInIncreasingOrder(result, e) { result = e }
+    }
+    return result
+  }
+}
+
+extension Sequence where Element: Comparable {
+  /// Returns the minimum element in the sequence.
+  ///
+  /// This example finds the smallest value in an array of height measurements.
+  ///
+  ///     let heights = [67.5, 65.7, 64.3, 61.1, 58.5, 60.3, 64.9]
+  ///     let lowestHeight = heights.min()
+  ///     print(lowestHeight)
+  ///     // Prints "Optional(58.5)"
+  ///
+  /// - Returns: The sequence's minimum element. If the sequence has no
+  ///   elements, returns `nil`.
+  @_inlineable
+  @warn_unqualified_access
+  public func min() -> Element? {
+    return self.min(by: <)
+  }
+
   /// Returns the maximum element in the sequence.
   ///
   /// This example finds the largest value in an array of height measurements.
@@ -189,46 +187,31 @@ ${orderingExplanation}
   ///
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
-%   end
   @_inlineable
   @warn_unqualified_access
-  public func max(
-%   if preds:
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-%   end
-  ) ${rethrows_}-> Element? {
-    var it = makeIterator()
-    guard var result = it.next() else { return nil }
-    for e in IteratorSequence(it) {
-%   if preds:
-      if try areInIncreasingOrder(result, e) { result = e }
-%   else:
-      if e > result { result = e }
-%   end
-    }
-    return result
+  public func max() -> Element? {
+    return self.max(by: <)
   }
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 // starts(with:)
 //===----------------------------------------------------------------------===//
 
-% # Generate two versions: with explicit predicates and with
-% # an Equatable requirement.
-% for preds in [True, False]:
-%   rethrows_ = "rethrows " if preds else ""
-
-extension Sequence ${"" if preds else "where Element : Equatable"} {
-
-%   if preds:
+extension Sequence  {
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are equivalent to the elements in another sequence, using
   /// the given predicate as the equivalence test.
   ///
-${equivalenceExplanation}
+  /// The predicate must be a *equivalence relation* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
+  ///
   /// - Parameters:
   ///   - possiblePrefix: A sequence to compare to this sequence.
   ///   - areEquivalent: A predicate that returns `true` if its two arguments
@@ -236,7 +219,27 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-%   else:
+  @_inlineable
+  public func starts<PossiblePrefix: Sequence>(
+    with possiblePrefix: PossiblePrefix,
+    by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
+  ) rethrows -> Bool {
+    var possiblePrefixIterator = possiblePrefix.makeIterator()
+    for e0 in self {
+      if let e1 = possiblePrefixIterator.next() {
+        if try !areEquivalent(e0, e1) {
+          return false
+        }
+      }
+      else {
+        return true
+      }
+    }
+    return possiblePrefixIterator.next() == nil
+  }
+}
+
+extension Sequence where Element: Equatable {
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are the same as the elements in another sequence.
   ///
@@ -259,61 +262,61 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are the same as
   ///   the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-%   end
   @_inlineable
-  public func starts<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix${"," if preds else ""}
-%   if preds:
-    by areEquivalent: (Element, Element) throws -> Bool
-%   end
-  ) ${rethrows_}-> Bool
-    where
-    PossiblePrefix : Sequence,
-    PossiblePrefix.Element == Element {
-
-    var possiblePrefixIterator = possiblePrefix.makeIterator()
-    for e0 in self {
-      if let e1 = possiblePrefixIterator.next() {
-        if ${"try !areEquivalent(e0, e1)" if preds else "e0 != e1"} {
-          return false
-        }
-      }
-      else {
-        return true
-      }
-    }
-    return possiblePrefixIterator.next() == nil
+  public func starts<PossiblePrefix: Sequence>(
+    with possiblePrefix: PossiblePrefix
+  ) -> Bool where PossiblePrefix.Element == Element {
+    return self.starts(with: possiblePrefix, by: ==)
   }
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 // elementsEqual()
 //===----------------------------------------------------------------------===//
 
-% # Generate two versions: with explicit predicates and with
-% # an Equatable requirement.
-% for preds in [True, False]:
-%   rethrows_ = "rethrows " if preds else ""
-
-extension Sequence ${"" if preds else "where Element : Equatable"} {
-
-%   if preds:
+extension Sequence {
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain equivalent elements in the same order, using the given
   /// predicate as the equivalence test.
   ///
   /// At least one of the sequences must be finite.
   ///
-${equivalenceExplanation}
+  /// The predicate must be a *equivalence relation* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
+  ///
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
   ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
   ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-%   else:
+  @_inlineable
+  public func elementsEqual<OtherSequence: Sequence>(
+    _ other: OtherSequence,
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
+  ) rethrows -> Bool {
+    var iter1 = self.makeIterator()
+    var iter2 = other.makeIterator()
+    while true {
+      switch (iter1.next(), iter2.next()) {
+      case let (e1?, e2?):
+        if try !areEquivalent(e1, e2) {
+          return false
+        }
+      case (_?, nil), (nil, _?): return false
+      case (nil, nil):           return true
+      }
+    }
+  }
+}
+
+extension Sequence where Element : Equatable {
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
   ///
@@ -333,57 +336,36 @@ ${equivalenceExplanation}
   /// - Parameter other: A sequence to compare to this sequence.
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
-%   end
   @_inlineable
-  public func elementsEqual<OtherSequence>(
-    _ other: OtherSequence${"," if preds else ""}
-%   if preds:
-    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
-%   end
-  ) ${rethrows_}-> Bool
-    where
-    OtherSequence: Sequence${" {" if preds else ","}
-%   if not preds:
-    OtherSequence.Element == Element {
-%   end
-
-    var iter1 = self.makeIterator()
-    var iter2 = other.makeIterator()
-    while true {
-      switch (iter1.next(), iter2.next()) {
-      case let (e1?, e2?):
-        if ${'try !areEquivalent(e1, e2)' if preds else 'e1 != e2'} {
-          return false
-        }
-      case (_?, nil),
-           (nil, _?):
-        return false
-      case (nil, nil):
-        return true
-      }
-    }
+  public func elementsEqual<OtherSequence: Sequence>(
+    _ other: OtherSequence
+  ) -> Bool where OtherSequence.Element == Element {
+    return self.elementsEqual(other, by: ==)
   }
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 // lexicographicallyPrecedes()
 //===----------------------------------------------------------------------===//
 
-% # Generate two versions: with explicit predicates and with
-% # Comparable requirement.
-% for preds in [True, False]:
-%   rethrows_ = "rethrows " if preds else ""
-
-extension Sequence ${"" if preds else "where Element : Comparable"} {
-
-%   if preds:
+extension Sequence {
   /// Returns a Boolean value indicating whether the sequence precedes another
   /// sequence in a lexicographical (dictionary) ordering, using the given
   /// predicate to compare elements.
   ///
-${orderingExplanation}
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
   ///   - areInIncreasingOrder:  A predicate that returns `true` if its first
@@ -396,7 +378,34 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that perform
   ///   localized comparison instead.
-%   else:
+  @_inlineable
+  public func lexicographicallyPrecedes<OtherSequence: Sequence>(
+    _ other: OtherSequence,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Bool 
+  where OtherSequence.Element == Element {
+    var iter1 = self.makeIterator()
+    var iter2 = other.makeIterator()
+    while true {
+      if let e1 = iter1.next() {
+        if let e2 = iter2.next() {
+          if try areInIncreasingOrder(e1, e2) {
+            return true
+          }
+          if try areInIncreasingOrder(e2, e1) {
+            return false
+          }
+          continue // Equivalent
+        }
+        return false
+      }
+
+      return iter2.next() != nil
+    }
+  }
+}
+
+extension Sequence where Element : Comparable {
   /// Returns a Boolean value indicating whether the sequence precedes another
   /// sequence in a lexicographical (dictionary) ordering, using the
   /// less-than operator (`<`) to compare elements.
@@ -420,76 +429,17 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-%   end
   @_inlineable
-  public func lexicographicallyPrecedes<OtherSequence>(
-    _ other: OtherSequence${"," if preds else ""}
-%   if preds:
-    by areInIncreasingOrder:
-      (Element, Element) throws -> Bool
-%   end
-  ) ${rethrows_}-> Bool
-    where
-    OtherSequence : Sequence,
-    OtherSequence.Element == Element {
-
-    var iter1 = self.makeIterator()
-    var iter2 = other.makeIterator()
-    while true {
-      if let e1 = iter1.next() {
-        if let e2 = iter2.next() {
-          if ${"try areInIncreasingOrder(e1, e2)" if preds else "e1 < e2"} {
-            return true
-          }
-          if ${"try areInIncreasingOrder(e2, e1)" if preds else "e2 < e1"} {
-            return false
-          }
-          continue // Equivalent
-        }
-        return false
-      }
-
-      return iter2.next() != nil
-    }
+  public func lexicographicallyPrecedes<OtherSequence: Sequence>(
+    _ other: OtherSequence
+  ) -> Bool where OtherSequence.Element == Element {
+    return self.lexicographicallyPrecedes(other, by: <)
   }
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 // contains()
 //===----------------------------------------------------------------------===//
-
-extension Sequence where Element : Equatable {
-  /// Returns a Boolean value indicating whether the sequence contains the
-  /// given element.
-  ///
-  /// This example checks to see whether a favorite actor is in an array
-  /// storing a movie's cast.
-  ///
-  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     print(cast.contains("Marlon"))
-  ///     // Prints "true"
-  ///     print(cast.contains("James"))
-  ///     // Prints "false"
-  ///
-  /// - Parameter element: The element to find in the sequence.
-  /// - Returns: `true` if the element was found in the sequence; otherwise,
-  ///   `false`.
-  @_inlineable
-  public func contains(_ element: Element) -> Bool {
-    if let result = _customContainsEquatableElement(element) {
-      return result
-    }
-
-    for e in self {
-      if e == element {
-        return true
-      }
-    }
-    return false
-  }
-}
 
 extension Sequence {
   /// Returns a Boolean value indicating whether the sequence contains an
@@ -537,6 +487,32 @@ extension Sequence {
       }
     }
     return false
+  }
+}
+
+extension Sequence where Element : Equatable {
+  /// Returns a Boolean value indicating whether the sequence contains the
+  /// given element.
+  ///
+  /// This example checks to see whether a favorite actor is in an array
+  /// storing a movie's cast.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     print(cast.contains("Marlon"))
+  ///     // Prints "true"
+  ///     print(cast.contains("James"))
+  ///     // Prints "false"
+  ///
+  /// - Parameter element: The element to find in the sequence.
+  /// - Returns: `true` if the element was found in the sequence; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Element) -> Bool {
+    if let result = _customContainsEquatableElement(element) {
+      return result
+    } else {
+      return self.contains { $0 == element }
+    }
   }
 }
 
