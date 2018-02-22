@@ -323,7 +323,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,
     Int32Ty,
     Int32Ty,
-    Int32Ty,
     Int16Ty,
     Int16Ty,
     Int32Ty,
@@ -345,6 +344,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   FieldDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.field_descriptor");
   FieldDescriptorPtrTy = FieldDescriptorTy->getPointerTo(DefaultAS);
+  FieldDescriptorPtrPtrTy = FieldDescriptorPtrTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)

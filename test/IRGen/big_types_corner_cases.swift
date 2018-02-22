@@ -95,8 +95,6 @@ public class BigClass {
 }
 
 // CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
-// CHECK: getelementptr inbounds %T22big_types_corner_cases8BigClassC, %T22big_types_corner_cases8BigClassC*
-// CHECK: call void @"$SSqWy
 // CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
 // CHECK: call swiftcc void [[BITCAST]](%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself 
 // CHECK: ret void

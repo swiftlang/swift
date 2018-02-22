@@ -482,7 +482,14 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailableAttr::getVersionAvailability().
+  auto *containingModule = getModuleContext();
+  if (containingModule == fromModule)
+    return false;
+
+  if (getAttrs().hasAttribute<WeakLinkedAttr>())
+    return true;
+
+  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
@@ -5471,7 +5478,11 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // always delegating. This occurs if the struct type is not fixed layout,
   // and the constructor is either inlinable or defined in another module.
   if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
-    if (NTD->isFormallyResilient() &&
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for structs in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (NTD->isResilient() &&
         getResilienceExpansion() == ResilienceExpansion::Minimal) {
       Kind = BodyInitKind::Delegating;
 

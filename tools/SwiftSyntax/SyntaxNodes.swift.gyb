@@ -54,19 +54,6 @@ public struct UnknownSyntax: _SyntaxBase {
   }
 }
 
-% for trait in TRAITS:
-public protocol ${trait.trait_name} {
-% for child in trait.children:
-%   ret_type = child.type_name
-%   if child.is_optional:
-%       ret_type += '?'
-%    end
-  var ${child.swift_name}: ${ret_type} { get }
-  func with${child.name}(_ newChild: ${child.type_name}?) -> Self
-% end
-}
-% end
-
 % for node in SYNTAX_NODES:
 %   base_type = node.base_type
 %   if node.is_base():
@@ -75,12 +62,7 @@ public protocol ${node.name}: Syntax {}
 %   elif node.collection_element:
 %     pass
 %   else:
-%     traits_list = ""
-%     if node.traits:
-%       traits_list = ", ".join(node.traits)
-%       traits_list = traits_list + ", "
-%     end
-public struct ${node.name}: ${traits_list} ${base_type}, _SyntaxBase, Hashable {
+public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %     if node.children:
   enum Cursor: Int {
 %       for child in node.children:
@@ -189,6 +171,31 @@ public struct ${node.name}: ${traits_list} ${base_type}, _SyntaxBase, Hashable {
   }
 }
 
+%   end
+% end
+
+% for trait in TRAITS:
+public protocol ${trait.trait_name}Syntax {
+% for child in trait.children:
+%   ret_type = child.type_name
+%   if child.is_optional:
+%       ret_type += '?'
+%   end
+  var ${child.swift_name}: ${ret_type} { get }
+  func with${child.name}(_ newChild: ${child.type_name}?) -> Self
+% end
+}
+% end
+
+% for node in SYNTAX_NODES:
+%   base_type = node.base_type
+%   if node.is_base():
+%     pass
+%   elif node.collection_element:
+%     pass
+%   elif node.traits:
+%     traits_list = ", ".join(trait + 'Syntax' for trait in node.traits)
+extension ${node.name}: ${traits_list} {}
 %   end
 % end
 

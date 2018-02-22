@@ -671,15 +671,15 @@ public:
   }
 
   friend bool operator<=(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.compare(lhs) <= 0;
+    return lhs.compare(rhs) <= 0;
   }
 
   friend bool operator>(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.compare(lhs) > 0;
+    return lhs.compare(rhs) > 0;
   }
 
   friend bool operator>=(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.compare(lhs) >= 0;
+    return lhs.compare(rhs) >= 0;
   }
 };
 

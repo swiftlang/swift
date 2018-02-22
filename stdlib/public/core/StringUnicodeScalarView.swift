@@ -544,6 +544,7 @@ extension String.UnicodeScalarView : CustomReflectable {
 
 extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }

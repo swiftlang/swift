@@ -137,18 +137,6 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
   return true;
 }
 
-// Get a field name from a doubly-null-terminated list.
-static const char *getFieldName(const char *fieldNames, size_t i) {
-  const char *fieldName = fieldNames;
-  for (size_t j = 0; j < i; ++j) {
-    size_t len = strlen(fieldName);
-    assert(len != 0);
-    fieldName += len + 1;
-  }
-
-  return fieldName;
-}
-
 
 // Abstract base class for reflection implementations.
 struct ReflectionMirrorImpl {
@@ -237,36 +225,39 @@ struct StructImpl : ReflectionMirrorImpl {
   
   intptr_t count() {
     auto *Struct = static_cast<const StructMetadata *>(type);
-    return Struct->Description->Struct.NumFields;
+    return Struct->getDescription()->NumFields;
   }
   
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
     auto *Struct = static_cast<const StructMetadata *>(type);
 
-    if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
+    if (i < 0 || (size_t)i > Struct->getDescription()->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
 
-    // Load the type and offset from their respective vectors.
-    auto fieldType = Struct->getFieldTypes()[i];
+    // Load the offset from its respective vector.
     auto fieldOffset = Struct->getFieldOffsets()[i];
 
-    auto *bytes = reinterpret_cast<char*>(value);
-    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
-
-    *outName = getFieldName(Struct->Description->Struct.FieldNames, i);
-    *outFreeFunc = nullptr;
-
-    assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
-    
     Any result;
-    bool didLoad = loadSpecialReferenceStorage(fieldData, fieldType, &result);
-    if (!didLoad) {
-      result.Type = fieldType.getType();
-      auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
-      result.Type->vw_initializeWithCopy(opaqueValueAddr,
-                                         const_cast<OpaqueValue *>(fieldData));
-    }
+    
+    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+      assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
+      
+      *outName = name.data();
+      *outFreeFunc = nullptr;
+      
+      auto *bytes = reinterpret_cast<char*>(value);
+      auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+      
+      bool didLoad = loadSpecialReferenceStorage(fieldData, fieldInfo, &result);
+      if (!didLoad) {
+        result.Type = fieldInfo.getType();
+        auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
+        result.Type->vw_initializeWithCopy(opaqueValueAddr,
+                                           const_cast<OpaqueValue *>(fieldData));
+      }
+    });
+
     return AnyReturn(result);
   }
 };
@@ -276,20 +267,17 @@ struct StructImpl : ReflectionMirrorImpl {
 struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->Description->Enum;
-
-    // No metadata for C and @objc enums yet
-    if (Description.CaseNames == nullptr)
-      return false;
-
-    return true;
+    const auto &Description = Enum->getDescription();
+    return Description->IsReflectable;
   }
   
-  void getInfo(unsigned *tagPtr, const Metadata **payloadTypePtr, bool *indirectPtr) {
+  const char *getInfo(unsigned *tagPtr = nullptr,
+                      const Metadata **payloadTypePtr = nullptr,
+                      bool *indirectPtr = nullptr) {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->Description->Enum;
+    const auto &Description = Enum->getDescription();;
 
-    unsigned payloadCases = Description.getNumPayloadCases();
+    unsigned payloadCases = Description->getNumPayloadCases();
 
     // 'tag' is in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
     int tag = type->vw_getEnumTag(value);
@@ -299,12 +287,13 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     const Metadata *payloadType = nullptr;
     bool indirect = false;
-
-    if (static_cast<unsigned>(tag) < payloadCases) {
-      auto payload = Description.GetCaseTypes(type)[tag];
-      payloadType = payload.getType();
-      indirect = payload.isIndirect();
-    }
+    
+    const char *caseName = nullptr;
+    swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+      caseName = name.data();
+      payloadType = info.getType();
+      indirect = info.isIndirect();
+    });
 
     if (tagPtr)
       *tagPtr = tag;
@@ -312,6 +301,8 @@ struct EnumImpl : ReflectionMirrorImpl {
       *payloadTypePtr = payloadType;
     if (indirectPtr)
       *indirectPtr = indirect;
+    
+    return caseName;
   }
 
   char displayStyle() {
@@ -331,13 +322,13 @@ struct EnumImpl : ReflectionMirrorImpl {
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->Description->Enum;
+    const auto &Description = Enum->getDescription();
 
     unsigned tag;
     const Metadata *payloadType;
     bool indirect;
 
-    getInfo(&tag, &payloadType, &indirect);
+    auto *caseName = getInfo(&tag, &payloadType, &indirect);
 
     // Copy the enum payload into a box
     const Metadata *boxType = (indirect ? &METADATA_SYM(Bo).base : payloadType);
@@ -346,7 +337,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
     boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
     type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
-                                      (int) (tag - Description.getNumPayloadCases()));
+                                      (int) (tag - Description->getNumPayloadCases()));
 
     value = pair.buffer;
 
@@ -356,7 +347,7 @@ struct EnumImpl : ReflectionMirrorImpl {
       value = swift_projectBox(const_cast<HeapObject *>(owner));
     }
     
-    *outName = getFieldName(Description.CaseNames, tag);
+    *outName = caseName;
     *outFreeFunc = nullptr;
     
     Any result;
@@ -374,15 +365,8 @@ struct EnumImpl : ReflectionMirrorImpl {
     if (!isReflectable()) {
       return nullptr;
     }
-
-    const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->Description->Enum;
-
-    unsigned tag;
-    getInfo(&tag, nullptr, nullptr);
-
-    return getFieldName(Description.CaseNames, tag);
-
+    
+    return getInfo();
   }
 };
 
@@ -395,7 +379,7 @@ struct ClassImpl : ReflectionMirrorImpl {
   
   intptr_t count() {
     auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto count = Clas->getDescription()->Class.NumFields;
+    auto count = Clas->getDescription()->NumFields;
 
     return count;
   }
@@ -404,13 +388,8 @@ struct ClassImpl : ReflectionMirrorImpl {
                       void (**outFreeFunc)(const char *)) {
     auto *Clas = static_cast<const ClassMetadata*>(type);
 
-    if (i < 0 || (size_t)i > Clas->getDescription()->Class.NumFields)
+    if (i < 0 || (size_t)i > Clas->getDescription()->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
-
-    // Load the type and offset from their respective vectors.
-    auto fieldType = Clas->getFieldTypes()[i];
-    assert(!fieldType.isIndirect()
-           && "class indirect properties not implemented");
 
     // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
     // metadata, because we don't update the field offsets in the face of
@@ -428,21 +407,26 @@ struct ClassImpl : ReflectionMirrorImpl {
   #endif
     }
 
-    auto *bytes = *reinterpret_cast<char * const *>(value);
-    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
-
-    *outName = getFieldName(Clas->getDescription()->Class.FieldNames, i);
-    *outFreeFunc = nullptr;
-    
     Any result;
     
-    bool didLoad = loadSpecialReferenceStorage(fieldData, fieldType, &result);
-    if (!didLoad) {
-      result.Type = fieldType.getType();
-      auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
-      result.Type->vw_initializeWithCopy(opaqueValueAddr,
-                                         const_cast<OpaqueValue *>(fieldData));
-    }
+    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+      assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
+      
+      auto *bytes = *reinterpret_cast<char * const *>(value);
+      auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+
+      *outName = name.data();
+      *outFreeFunc = nullptr;
+    
+      bool didLoad = loadSpecialReferenceStorage(fieldData, fieldInfo, &result);
+      if (!didLoad) {
+        result.Type = fieldInfo.getType();
+        auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
+        result.Type->vw_initializeWithCopy(opaqueValueAddr,
+                                           const_cast<OpaqueValue *>(fieldData));
+      }
+    });
+    
     return AnyReturn(result);
   }
 

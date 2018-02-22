@@ -882,7 +882,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
-                                 bool *isLet,
+                                 bool *isLet, bool *isWeakLinked,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  ValueDecl **ClangDecl,
@@ -909,6 +909,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isThunk = IsReabstractionThunk;
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
       *isGlobalInit = true;
+    else if (isWeakLinked && SP.P.Tok.getText() == "_weakLinked")
+      *isWeakLinked = true;
     else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
     else if (optimizationMode && SP.P.Tok.getText() == "Onone")
@@ -1450,8 +1452,10 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
         return true;
       }
-      if (P.Tok.getText().getAsInteger(0, Var.ArgNo))
+      uint16_t ArgNo;
+      if (P.Tok.getText().getAsInteger(0, ArgNo))
         return true;
+      Var.ArgNo = ArgNo;
     } else if (Key == "let") {
       Var.Constant = true;
     } else if (Key == "var") {
@@ -5089,7 +5093,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   bool isTransparent = false;
   IsSerialized_t isSerialized = IsNotSerialized;
   IsThunk_t isThunk = IsNotThunk;
-  bool isGlobalInit = false;
+  bool isGlobalInit = false, isWeakLinked = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   SmallVector<std::string, 1> Semantics;
@@ -5099,7 +5103,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(&isTransparent, &isSerialized, &isThunk, &isGlobalInit,
                            &inlineStrategy, &optimizationMode, nullptr,
-                           &Semantics, &SpecAttrs,
+                           &isWeakLinked, &Semantics, &SpecAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5125,6 +5129,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setSerialized(IsSerialized_t(isSerialized));
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setGlobalInit(isGlobalInit);
+    FunctionState.F->setWeakLinked(isWeakLinked);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setEffectsKind(MRK);
@@ -5257,7 +5262,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
                            nullptr, nullptr, &isLet, nullptr, nullptr, nullptr,
-                           nullptr, State) ||
+                           nullptr, nullptr, State) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5300,7 +5305,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, VTableState))
+                           nullptr, nullptr, VTableState))
     return true;
 
   // Parse the class name.
@@ -5650,7 +5655,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, WitnessState))
+                           nullptr, nullptr, WitnessState))
     return true;
 
   Scope S(&P, ScopeKind::TopLevel);

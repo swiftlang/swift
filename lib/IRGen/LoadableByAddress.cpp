@@ -395,7 +395,11 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     nonOptionalType = optType;
   }
   if (nonOptionalType.getAs<TupleType>()) {
-    return getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
+    SILType newSILType =
+        getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
+    return isLargeLoadableType(GenericEnv, newSILType, Mod)
+               ? newSILType.getAddressType()
+               : newSILType;
   }
   SILType newSILType = getNewOptionalFunctionType(GenericEnv, storageType, Mod);
   if (newSILType != storageType) {
@@ -1510,7 +1514,8 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       SILBuilderWithScope dbgBuilder(dbgInst);
       // Rewrite the debug_value to point to the variable in the alloca.
-      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), allocInstr);
+      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), allocInstr,
+                                      *dbgInst->getVarInfo());
       dbgInst->eraseFromParent();
     }
   }
@@ -1879,7 +1884,8 @@ static void rewriteFunction(StructLoweringState &pass,
     SILBuilderWithScope allocBuilder(instr);
     SILType currSILType = instr->getType();
     SILType newSILType = getNewSILType(genEnv, currSILType, pass.Mod);
-    auto *newInstr = allocBuilder.createAllocStack(instr->getLoc(), newSILType);
+    auto *newInstr = allocBuilder.createAllocStack(instr->getLoc(), newSILType,
+                                                   instr->getVarInfo());
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }
@@ -1912,7 +1918,7 @@ static void rewriteFunction(StructLoweringState &pass,
                "Expected an address type");
         SILBuilderWithScope debugBuilder(instr);
         debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
-                                          instr->getVarInfo());
+                                          *instr->getVarInfo());
         instr->getParent()->erase(instr);
       }
     }

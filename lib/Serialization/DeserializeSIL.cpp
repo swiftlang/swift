@@ -413,12 +413,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, optimizationMode, effect, numSpecAttrs,
-      hasQualifiedOwnership;
+      hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
-                                optimizationMode, effect,
-                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                optimizationMode, effect, numSpecAttrs,
+                                hasQualifiedOwnership, isWeakLinked, funcTyID,
                                 genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -498,6 +498,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
     fn->setOptimizationMode((OptimizationMode)optimizationMode);
+    fn->setWeakLinked(isWeakLinked);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -2405,12 +2406,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
     inlineStrategy, optimizationMode, effect, numSpecAttrs,
-    hasQualifiedOwnership;
+    hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
-                                optimizationMode, effect,
-                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                optimizationMode, effect, numSpecAttrs,
+                                hasQualifiedOwnership, isWeakLinked, funcTyID,
                                 genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

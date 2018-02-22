@@ -15,7 +15,7 @@ DECL_NODES = [
     #                            typealias-name generic-parameter-clause?
     #                            type-assignment
     # typealias-name -> identifier
-    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -36,7 +36,7 @@ DECL_NODES = [
     #                                 inheritance-clause? type-assignment?
     #                                 generic-where-clause?
     # associatedtype-name -> identifier
-    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -56,6 +56,7 @@ DECL_NODES = [
          element='FunctionParameter'),
 
     Node('ParameterClause', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ParameterList', kind='FunctionParameterList'),
@@ -106,19 +107,21 @@ DECL_NODES = [
          ]),
 
     Node('PoundErrorDecl', kind='Decl',
+         traits=['Parenthesized'],
          children=[
              Child('PoundError', kind='PoundErrorToken'),
-             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Message', kind='StringLiteralExpr'),
-             Child('RightParenToken', kind='RightParenToken')
+             Child('RightParen', kind='RightParenToken')
          ]),
 
     Node('PoundWarningDecl', kind='Decl',
+         traits=['Parenthesized'],
          children=[
              Child('PoundWarning', kind='PoundWarningToken'),
-             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Message', kind='StringLiteralExpr'),
-             Child('RightParenToken', kind='RightParenToken')
+             Child('RightParen', kind='RightParenToken')
          ]),
 
     Node('DeclModifier', kind='Syntax',
@@ -135,6 +138,7 @@ DECL_NODES = [
          ]),
 
     Node('InheritedType', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
             Child('TypeName', kind='Type'),
             Child('TrailingComma', kind='CommaToken', is_optional=True),
@@ -158,7 +162,7 @@ DECL_NODES = [
     #                     '{' class-members '}'
     # class-name -> identifier
     Node('ClassDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -183,7 +187,7 @@ DECL_NODES = [
     #                         '{' struct-members '}'
     # struct-name -> identifier
     Node('StructDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -201,7 +205,7 @@ DECL_NODES = [
          ]),
 
     Node('ProtocolDecl', kind='Decl',
-         traits=['DeclGroupSyntax', 'IdentifiedDeclSyntax'],
+         traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -222,7 +226,7 @@ DECL_NODES = [
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
-    Node('ExtensionDecl', kind='Decl', traits=['DeclGroupSyntax'],
+    Node('ExtensionDecl', kind='Decl', traits=['DeclGroup'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -237,7 +241,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('MemberDeclBlock', kind='Syntax', traits=['BracedSyntax'],
+    Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='DeclList'),
@@ -266,6 +270,7 @@ DECL_NODES = [
     # external-parameter-name? local-parameter-name ':'
     #   type '...'? '='? expression? ','?
     Node('FunctionParameter', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -315,7 +320,7 @@ DECL_NODES = [
          element='Syntax',
          element_name='Modifier'),
 
-    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDeclSyntax'],
+    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -416,11 +421,11 @@ DECL_NODES = [
     Node('AccessLevelModifier', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
-             Child('OpenParen', kind='LeftParenToken',
+             Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
              Child('Modifier', kind='IdentifierToken',
                    is_optional=True),
-             Child('CloseParen', kind='RightParenToken',
+             Child('RightParen', kind='RightParenToken',
                    is_optional=True),
          ]),
 
@@ -447,6 +452,7 @@ DECL_NODES = [
 
     # (value)
     Node('AccessorParameter', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Name', kind='IdentifierToken'),
@@ -467,7 +473,7 @@ DECL_NODES = [
 
     Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
 
-    Node('AccessorBlock', kind="Syntax", traits=['BracedSyntax'],
+    Node('AccessorBlock', kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('AccessorListOrStmtList', kind='Syntax',
@@ -479,6 +485,7 @@ DECL_NODES = [
 
     # Pattern: Type = Value { get {} },
     Node('PatternBinding', kind="Syntax",
+         traits=['WithTrailingComma'],
          children=[
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),

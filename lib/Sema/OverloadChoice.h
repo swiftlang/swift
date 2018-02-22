@@ -190,6 +190,7 @@ public:
     result.BaseAndDeclKind.setPointer(base);
     result.DeclOrKind = value;
     result.DynamicNameAndFRK.setPointer(name);
+    result.DynamicNameAndFRK.setInt(FunctionRefKind::SingleApply);
     return result;
   }
 

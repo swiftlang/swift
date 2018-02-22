@@ -124,7 +124,8 @@ class TypeDecoder {
     }
     case NodeKind::BoundGenericClass:
     case NodeKind::BoundGenericEnum:
-    case NodeKind::BoundGenericStructure: {
+    case NodeKind::BoundGenericStructure:
+    case NodeKind::BoundGenericOtherNominalType: {
       if (Node->getNumChildren() != 2)
         return BuiltType();
 

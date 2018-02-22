@@ -470,6 +470,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
       Separator = '_';
       break;
 
+    case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass: {
@@ -1983,11 +1984,13 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType:
       return true;
 
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::OtherNominalType:
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
@@ -2002,7 +2005,8 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
   switch (node->getKind()) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
-    case Node::Kind::Class: {
+    case Node::Kind::Class:
+    case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
       if (isSpecialized(parentOrModule))
@@ -2015,7 +2019,8 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
 
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
-    case Node::Kind::BoundGenericClass: {
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);

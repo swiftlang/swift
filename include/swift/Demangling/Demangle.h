@@ -247,6 +247,31 @@ bool isSwiftSymbol(const char *mangledName);
 /// This does not include the old (<= swift 3.x) mangling prefix "_T".
 llvm::StringRef dropSwiftManglingPrefix(llvm::StringRef mangledName);
 
+/// Returns true if the mangled name is an alias type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isAlias(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a class type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isClass(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is an enum type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isEnum(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a protocol type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isProtocol(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a structure type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isStruct(llvm::StringRef mangledName);
+
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///
