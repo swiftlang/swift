@@ -1380,9 +1380,15 @@ ConstraintSystem::solve(Expr *&expr,
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
-    auto getTypeOfExpr = [&](const Expr *E) -> Type { return getType(E); };
+    auto getTypeOfExpr = [&](const Expr *E) -> Type {
+      if (hasType(E))
+        return getType(E);
+      return Type();
+    };
     auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
-      return getType(TL);
+      if (hasType(TL))
+        return getType(TL);
+      return Type();
     };
 
     auto &log = getASTContext().TypeCheckerDebug->getStream();
