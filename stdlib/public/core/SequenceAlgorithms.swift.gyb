@@ -741,7 +741,7 @@ extension Sequence {
   ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
   ///     // [1, 2, nil, nil, 5]
   ///
-  ///     let flatMapped: [Int] = possibleNumbers.compactMap { str in Int(str) }
+  ///     let compactMapped: [Int] = possibleNumbers.compactMap { str in Int(str) }
   ///     // [1, 2, 5]
   ///
   /// - Parameter transform: A closure that accepts an element of this
