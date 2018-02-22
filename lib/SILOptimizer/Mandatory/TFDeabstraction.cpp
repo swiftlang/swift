@@ -16,7 +16,7 @@
 // specialization, and scalarization of structs and tuples.
 //
 // This is intended to be part of the mandatory passes, so its behavior is
-// defined to be a simple and predictable as possible.  We don't want to use
+// defined to be as simple and predictable as possible.  We don't want to use
 // heuristic techniques to resolve virtual calls for example, we'd rather leave
 // them, so the user has a simple and predictable model for what this can
 // handle.

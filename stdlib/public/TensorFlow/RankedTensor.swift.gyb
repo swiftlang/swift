@@ -129,12 +129,11 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   /// - Precondition: The tensor must have rank ${rank}.
   @_inlineable @inline(__always)
   public init(identicallyRanked other: Tensor<Scalar>) {
-    // NOTE: Precondition disabled because `other.rank` causes a copy of `other`
-    // back to the host. Uncomment precondition when send/receive is
-    // implemented.
-    // TODO(clattner): need a better way of exposing rank information in our
-    // model.
-    // precondition(other.rank == ${rank}, "Rank is not ${rank}.")
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let condition: Tensor<Bool> = other.rankTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, other.rankTensor]) as Void
     self.init(base: other)
   }
 
@@ -145,9 +144,14 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   ///   dimensions of the shape.
   @_inlineable @inline(__always)
   public init(shape: TensorShape, scalars: [Scalar]) {
-    // TODO: Uncomment precondition when send/receive is implemented.
-    // precondition(shape.count == ${rank},
-    //              "Shape does not have ${rank} dimensions")
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    // TODO(danielzheng): Uncomment Assert op once receive bug is fixed here.
+    // For some reason uncommenting even `rankTensor` below generates a receive.
+    // let rankTensor = Tensor<Int32>(${rank})
+    // let shapeTensor = Tensor<Int32>(shape.dimensions)
+    // let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    // #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(base: Tensor(shape: shape, scalars: scalars))
   }
 
@@ -159,9 +163,12 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   ///   - repeatedValue: The scalar value to repeat.
   @_inlineable @inline(__always)
   public init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    // TODO: Uncomment precondition when send/receive is implemented.
-    // precondition(shape.count == ${rank},
-    //              "Shape does not have ${rank} dimensions")
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(base: Tensor(shape: shape, repeating: repeatedValue))
   }
 }
@@ -251,9 +258,12 @@ public extension ${TensorXD} where Scalar : Numeric {
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
   init(zeros shape: TensorShape) {
-    // TODO: Uncomment precondition when `.count` is reliably constant folded.
-    // precondition(shape.count == ${rank},
-    //              "Rank is not ${rank}")
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
@@ -262,9 +272,12 @@ public extension ${TensorXD} where Scalar : Numeric {
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
   init(ones shape: TensorShape) {
-    // TODO: Uncomment precondition when `.count` is reliably constant folded.
-    // precondition(shape.count == ${rank},
-    //              "Rank is not ${rank}")
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(base: Tensor<Scalar>(ones: shape))
   }
 }
@@ -284,6 +297,12 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
     randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
     seed: Int32 = 0
   ) {
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(
       base: Tensor(randomNormal: shape, mean: mean, stddev: stddev, seed: seed)
     )
@@ -300,9 +319,13 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape, seed: Int32 = 0) {
-    self.init(
-      base: Tensor(randomUniform: shape, seed: seed)
-    )
+    // NOTE: Precondition written using Assert op instead of Swift
+    // `precondition` to prevent send/receive.
+    let rankTensor = Tensor<Int32>(${rank})
+    let shapeTensor = Tensor<Int32>(shape.dimensions)
+    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
+    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
+    self.init(base: Tensor(randomUniform: shape, seed: seed))
   }
 }
 

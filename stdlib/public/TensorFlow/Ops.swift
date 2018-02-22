@@ -76,19 +76,19 @@ extension Tensor4D : TensorProtocol {
 
 extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
+  // @differentiable(gradient: _adjointAdd(_:_:partial:seed:))
   public static func +(lhs: Self, rhs: Self) -> Self {
     return #tfop("Add", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointSubtract(_:_:primal:seed:))
+  // @differentiable(gradient: _adjointSubtract(_:_:partial:seed:))
   public static func -(lhs: Self, rhs: Self) -> Self {
     return #tfop("Sub", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointMultiply(_:_:primal:seed:))
+  // @differentiable(gradient: _adjointMultiply(_:_:partial:seed:))
   public static func *(lhs: Self, rhs: Self) -> Self {
     return #tfop("Mul", lhs, rhs)
   }
@@ -96,13 +96,13 @@ extension TensorProtocol where Scalar : Numeric {
 
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
+  // @differentiable(gradient: _adjointAdd(_:_:partial:seed:))
   static func +(lhs: Scalar, rhs: Self) -> Self {
     return #tfop("Add", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
+  // @differentiable(gradient: _adjointAdd(_:_:partial:seed:))
   static func +(lhs: Self, rhs: Scalar) -> Self {
     return #tfop("Add", lhs, _TFMakeScalarTensor(rhs))
   }
@@ -118,7 +118,7 @@ public extension TensorProtocol where Scalar : Numeric {
   }
 
   @_inlineable @inline(__always)
-  // @differentiable(gradient: _adjointNegate(_:primal:seed:))
+  // @differentiable(gradient: _adjointNegate(_:partial:seed:))
   static prefix func -(rhs: Self) -> Self {
     return #tfop("Neg", rhs)
   }
@@ -549,7 +549,7 @@ public extension TensorProtocol {
   @_inlineable @inline(__always)
   // @differentiable(
   //   withRespectTo: (self),
-  //   gradient: _adjointTransposed(_:_:primal:seed:)
+  //   gradient: _adjointTransposed(_:_:partial:seed:)
   // )
   func transposed(withPermutations permutations: Tensor<Int32>) -> Self {
     return #tfop("Transpose", handle, permutations, Tperm: Int32.self)
@@ -619,7 +619,7 @@ public func abs<Scalar: Numeric, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointLog(_:primal:seed:))
+// @differentiable(gradient: _adjointLog(_:partial:seed:))
 public func log<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -627,7 +627,7 @@ public func log<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointSin(_:primal:seed:))
+// @differentiable(gradient: _adjointSin(_:partial:seed:))
 public func sin<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -635,7 +635,7 @@ public func sin<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointCos(_:primal:seed:))
+// @differentiable(gradient: _adjointCos(_:partial:seed:))
 public func cos<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -643,7 +643,7 @@ public func cos<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointTan(_:primal:seed:))
+// @differentiable(gradient: _adjointTan(_:partial:seed:))
 public func tan<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -651,7 +651,7 @@ public func tan<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointSinh(_:primal:seed:))
+// @differentiable(gradient: _adjointSinh(_:partial:seed:))
 public func sinh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -659,7 +659,7 @@ public func sinh<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointCosh(_:primal:seed:))
+// @differentiable(gradient: _adjointCosh(_:partial:seed:))
 public func cosh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -667,7 +667,7 @@ public func cosh<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointTanh(_:primal:seed:))
+// @differentiable(gradient: _adjointTanh(_:partial:seed:))
 public func tanh<Scalar: FloatingPoint, T : TensorProtocol>(
   _ x: T
 ) -> T where T.Scalar == Scalar {
@@ -689,7 +689,7 @@ public func exp<Scalar: FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointPow(_:_:primal:seed:))
+// @differentiable(gradient: _adjointPow(_:_:partial:seed:))
 public func pow<Scalar : Numeric, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
@@ -711,7 +711,7 @@ public func pow<Scalar : Numeric, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointMin(_:_:primal:seed:))
+// @differentiable(gradient: _adjointMin(_:_:partial:seed:))
 public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
@@ -733,7 +733,7 @@ public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-// @differentiable(gradient: _adjointMax(_:_:primal:seed:))
+// @differentiable(gradient: _adjointMax(_:_:partial:seed:))
 public func max<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
@@ -1035,7 +1035,7 @@ public extension Tensor where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   // @differentiable(
   //   withRespectTo: (self, .0),
-  //   gradient: _adjointConvolve2D(input:filter:primal:seed:)
+  //   gradient: _adjointConvolve2D(input:filter:partial:seed:)
   // )
   func convolved2D(
     withFilter filter: Tensor,
@@ -1050,7 +1050,7 @@ public extension Tensor where Scalar : FloatingPoint {
   // @differentiable(
   //   withRespectTo: (self),
   //   gradient:
-  //     _adjointMaxPooled2D(input:kernelSize:strides:padding:primal:seed:)
+  //     _adjointMaxPooled2D(input:kernelSize:strides:padding:partial:seed:)
   // )
   func maxPooled(
     kernelSize: Tensor<Int32>,
@@ -1076,7 +1076,7 @@ public extension Tensor where Scalar : FloatingPoint {
   // @differentiable(
   //   withRespectTo: (self),
   //   gradient:
-  //     _adjointAveragePooled2D(input:kernelSize:strides:padding:primal:seed:)
+  //     _adjointAveragePooled2D(input:kernelSize:strides:padding:partial:seed:)
   // )
   func averagePooled(
     kernelSize: [Int32],
@@ -1092,7 +1092,7 @@ public extension Tensor4D where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   // @differentiable(
   //   withRespectTo: (self, .0),
-  //   gradient: _adjointConvolve2D(input:filter:primal:seed:)
+  //   gradient: _adjointConvolve2D(input:filter:partial:seed:)
   // )
   func convolved2D(
     withFilter filter: Tensor4D,
