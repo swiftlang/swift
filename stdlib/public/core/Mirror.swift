@@ -659,7 +659,19 @@ internal extension Mirror {
 //===--- QuickLooks -------------------------------------------------------===//
 
 /// The sum of types that can be used as a Quick Look representation.
+///
+/// - note: `PlaygroundQuickLook` is deprecated, and will be removed from the
+/// standard library in a future Swift release. Customizing display for in a
+/// playground is now done using the `CustomPlaygroundDisplayConvertible`
+/// protocol, which does not use the `PlaygroundQuickLook` enum. Please remove
+/// your uses of `PlaygroundQuickLook`, or conditionalize your use such that it
+/// is only present when compiling with Swift 4.0 or Swift 3.2 or earlier:
+///
+///     #if !(swift(>=4.1) || swift(>=3.3) && !swift(>=4.0))
+///       /* OK to use PlaygroundQuickLook */
+///     #endif
 @_fixed_layout // FIXME(sil-serialize-all)
+@available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public enum PlaygroundQuickLook {
   /// Plain text.
   case text(String)
@@ -746,6 +758,7 @@ extension PlaygroundQuickLook {
   /// - Parameter subject: The instance to represent with the resulting Quick
   ///   Look.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version.")
   public init(reflecting subject: Any) {
     if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
@@ -771,6 +784,23 @@ extension PlaygroundQuickLook {
 /// with the representation supplied for your type by default, you can make it
 /// conform to the `CustomPlaygroundQuickLookable` protocol and provide a
 /// custom `PlaygroundQuickLook` instance.
+///
+/// - note: `CustomPlaygroundQuickLookable` is deprecated, and will be removed
+/// from the standard library in a future Swift release. Please migrate to the
+/// `CustomPlaygroundDisplayConvertible` protocol instead, or conditionalize
+/// your conformance such that it is only present when compiling with Swift 4.0
+/// or Swift 3.2 or earlier:
+///
+///     #if swift(>=4.1) || swift(>=3.3) && !swift(>=4.0)
+///       // With Swift 4.1 and later (including Swift 3.3 and later), implement
+///       // CustomPlaygroundDisplayConvertible.
+///       extension MyType: CustomPlaygroundDisplayConvertible { /*...*/ }
+///     #else
+///       // Otherwise, on Swift 4.0 and Swift 3.2 and earlier,
+///       // implement CustomPlaygroundQuickLookable.
+///       extension MyType: CustomPlaygroundQuickLookable { /*...*/ }
+///     #endif
+@available(*, deprecated, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public protocol CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for this instance.
   ///
@@ -782,6 +812,7 @@ public protocol CustomPlaygroundQuickLookable {
 
 // A workaround for <rdar://problem/26182650>
 // FIXME(ABI)#50 (Dynamic Dispatch for Class Extensions) though not if it moves out of stdlib.
+@available(*, deprecated, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public protocol _DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }

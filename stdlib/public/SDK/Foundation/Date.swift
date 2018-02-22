@@ -280,6 +280,7 @@ extension Date : CustomPlaygroundQuickLookable {
         return df.string(from: self)
     }
     
+    @available(*, deprecated, message: "Date.customPlaygroundQuickLook will be removed in a future Swift version")
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .text(summary)
     }
