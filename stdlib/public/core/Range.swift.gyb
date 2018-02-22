@@ -777,7 +777,7 @@ extension PartialRangeUpTo: RangeExpression {
   }
 }
 
-/// A partial half-open interval up to, and including, an upper bound.
+/// A partial interval up to, and including, an upper bound.
 ///
 /// You create `PartialRangeThrough` instances by using the prefix closed range
 /// operator (prefix `...`).
@@ -875,9 +875,12 @@ extension PartialRangeFrom: RangeExpression {
 /// You can use a countable partial range to quickly check if a value is
 /// contained in a particular range of values. For example:
 ///
-///     atLeastFive.contains(4)     // false
-///     atLeastFive.contains(5)     // true
-///     atLeastFive.contains(6)     // true
+///     atLeastFive.contains(4)
+///     // false
+///     atLeastFive.contains(5)
+///     // true
+///     atLeastFive.contains(6)
+///     // true
 ///
 /// You can use a countable partial range of a collection's indices to
 /// represent the range from the partial range's lower bound up to the end of
@@ -893,7 +896,7 @@ extension PartialRangeFrom: RangeExpression {
 /// a countable range.
 ///
 /// Using a Partial Range as a Sequence
-/// ===================================
+/// -----------------------------------
 ///
 /// You can iterate over a countable partial range using a `for`-`in` loop, or
 /// call any sequence method that doesn't require that the sequence is finite.
@@ -990,8 +993,8 @@ extension Comparable {
   /// Returns a half-open range that contains its lower bound but not its upper
   /// bound.
   ///
-  /// Use the half-open range operator (`..<`) to create a range of any type that
-  /// conforms to the `Comparable` protocol. This example creates a
+  /// Use the half-open range operator (`..<`) to create a range of any type
+  /// that conforms to the `Comparable` protocol. This example creates a
   /// `Range<Double>` from zero up to, but not including, 5.0.
   ///
   ///     let lessThanFive = 0.0..<5.0
@@ -1207,17 +1210,94 @@ extension Strideable where Stride: SignedInteger {
   }
 }
 
-// FIXME: replace this with a computed var named `...` when the language makes
-// that possible.
+/// A range expression that represents the entire range of a collection.
+///
+/// You can use the unbounded range operator (`...`) to create a slice of a
+/// collection that contains all of the collection's elements. Slicing with an
+/// unbounded range is essentially a conversion of a collection instance into
+/// its slice type.
+///
+/// For example, the following code declares `levenshteinDistance(_:_:)`, a
+/// function that calculates the number of changes required to convert one
+/// string into another. `levenshteinDistance(_:_:)` uses `Substring`, a
+/// string's slice type, for its parameters.
+///
+///     func levenshteinDistance(_ s1: Substring, _ s2: Substring) -> Int {
+///         if s1.isEmpty { return s2.count }
+///         if s2.isEmpty { return s1.count }
+///
+///         let cost = s1.first == s2.first ? 0 : 1
+///
+///         return min(
+///             levenshteinDistance(s1.dropFirst(), s2) + 1,
+///             levenshteinDistance(s1, s2.dropFirst()) + 1,
+///             levenshteinDistance(s1.dropFirst(), s2.dropFirst()) + cost)
+///     }
+///
+/// To call `levenshteinDistance(_:_:)` with two strings, use an unbounded
+/// range in each string's subscript to convert it to a `Substring`.
+///
+///     let word1 = "grizzly"
+///     let word2 = "grisly"
+///     let distance = levenshteinDistance(word1[...], word2[...])
+///     // distance == 2
 public enum UnboundedRange_ {
+  // FIXME: replace this with a computed var named `...` when the language makes
+  // that possible.
+
+  /// Creates an unbounded range expression.
+  ///
+  /// The unbounded range operator (`...`) is valid only within a collection's
+  /// subscript.
   @_inlineable // FIXME(sil-serialize-all)
   public static postfix func ... (_: UnboundedRange_) -> () {
     fatalError("uncallable")
   }
 }
+
+/// The type of an unbounded range operator.
 public typealias UnboundedRange = (UnboundedRange_)->()
 
 extension Collection {
+  /// Accesses the contiguous subrange of the collection's elements specified
+  /// by a range expression.
+  ///
+  /// The range expression is converted to a concrete subrange relative to this
+  /// collection. For example, using a `PartialRangeFrom` range expression
+  /// with an array accesses the subrange from the start of the range
+  /// expression until the end of the array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2...]
+  ///     print(streetsSlice)
+  ///     // ["Channing", "Douglas", "Evarts"]
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection uses. This example searches `streetsSlice` for one
+  /// of the strings in the slice, and then uses that index in the original
+  /// array.
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // "Evarts"
+  ///
+  /// Always use the slice's `startIndex` property instead of assuming that its
+  /// indices start at a particular value. Attempting to access an element by
+  /// using an index outside the bounds of the slice's indices may result in a
+  /// runtime error, even if that index is valid for the original collection.
+  ///
+  ///     print(streetsSlice.startIndex)
+  ///     // 2
+  ///     print(streetsSlice[2])
+  ///     // "Channing"
+  ///
+  ///     print(streetsSlice[0])
+  ///     // error: Index out of bounds
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   @_inlineable
   public subscript<R: RangeExpression>(r: R)
   -> SubSequence where R.Bound == Index {
