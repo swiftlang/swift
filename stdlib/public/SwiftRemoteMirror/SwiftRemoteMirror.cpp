@@ -30,6 +30,7 @@ using NativeReflectionContext
 
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
+  std::vector<std::function<void()>> freeFuncs;
   
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
@@ -38,6 +39,8 @@ struct SwiftReflectionContext {
   
   ~SwiftReflectionContext() {
     delete nativeContext;
+    for (auto f : freeFuncs)
+      f();
   }
 };
 
@@ -110,10 +113,15 @@ swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
     return 0;
   }
   
-  auto Buf = malloc(imageLength);
-  Context->getReader().readBytes(RemoteAddress(imageStart),
-                                 reinterpret_cast<uint8_t *>(Buf),
-                                 imageLength);
+  const void *Buf;
+  std::function<void()> FreeFunc;
+  std::tie(Buf, FreeFunc) = Context->getReader().readBytes(RemoteAddress(imageStart),
+                                                           imageLength);
+  if (Buf == nullptr) {
+    return 0;
+  }
+  
+  ContextRef->freeFuncs.push_back(FreeFunc);
   
   auto Header = reinterpret_cast<MachHeader *>(Buf);
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
