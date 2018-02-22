@@ -1,3 +1,11 @@
+set(swiftSILOptimizerPrivateLibraries "")
+if(SWIFT_ENABLE_TENSORFLOW)
+  include_directories(BEFORE
+    "${SWIFT_TENSORFLOW_PATH_FOR_HOST}/include"
+  )
+  set(swiftSILOptimizerPrivateLibraries
+    "${SWIFT_TENSORFLOW_PATH_FOR_HOST}/lib/libtensorflow.so")
+endif()
 add_subdirectory(ARC)
 add_subdirectory(Analysis)
 add_subdirectory(IPO)
@@ -19,4 +27,5 @@ add_swift_library(swiftSILOptimizer STATIC
   ${MANDATORY_SOURCES}
   ${TRANSFORMS_SOURCES}
   ${IPO_SOURCES}
-  LINK_LIBRARIES swiftSIL)
+  LINK_LIBRARIES swiftSIL
+  PRIVATE_LINK_LIBRARIES "${swiftSILOptimizerPrivateLibraries}")

@@ -17,9 +17,9 @@ set(MANDATORY_SOURCES
   Mandatory/SemanticARCOpts.cpp
   Mandatory/ClosureLifetimeFixup.cpp
   # SWIFT_ENABLE_TENSORFLOW
-  Mandatory/TensorFlow.cpp
   Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFDeabstraction.cpp
   Mandatory/TFLowerGraph.cpp
   Mandatory/TFPartition.cpp
+  Mandatory/TFUtilities.cpp
   PARENT_SCOPE)
