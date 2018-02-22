@@ -37,9 +37,7 @@ internal func _collectAllReferencesInsideObjectImpl(
 ) {
   // Use the structural reflection and ignore any
   // custom reflectable overrides.
-  let mirror = Mirror(
-    legacy: _reflect(value),
-    subjectType: type(of: value))
+  let mirror = Mirror(internalReflecting: value)
 
   let id: ObjectIdentifier?
   let ref: UnsafeRawPointer?
