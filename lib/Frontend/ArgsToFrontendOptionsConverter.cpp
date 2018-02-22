@@ -179,6 +179,12 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
     if (Args.getLastArg(OPT_trace_stats_events)) {
       Opts.TraceStats = true;
     }
+    if (Args.getLastArg(OPT_profile_stats_events)) {
+      Opts.ProfileEvents = true;
+    }
+    if (Args.getLastArg(OPT_profile_stats_entities)) {
+      Opts.ProfileEntities = true;
+    }
   }
 }
 

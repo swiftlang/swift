@@ -164,6 +164,13 @@ public:
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
 
+  /// Profile changes to stats to files in StatsOutputDir.
+  bool ProfileEvents = false;
+
+  /// Profile changes to stats to files in StatsOutputDir, grouped by source
+  /// entity.
+  bool ProfileEntities = false;
+
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO
   /// build).

@@ -1402,7 +1402,7 @@ void ASTContext::loadObjCMethods(
 
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG
-  SharedTimer("verifyAllLoadedModules");
+  FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
   for (auto &loader : Impl.ModuleLoaders)
     loader->verifyAllModules();
 
