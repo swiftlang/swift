@@ -89,7 +89,6 @@ set(SWIFTLIB_ESSENTIAL
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
   NormalizedCodeUnitIterator.swift
-  ObjCMirrors.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
@@ -101,7 +100,7 @@ set(SWIFTLIB_ESSENTIAL
   RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
-  ReflectionLegacy.swift
+  ReflectionMirror.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
