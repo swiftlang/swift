@@ -51,6 +51,7 @@ add_swift_library(swiftAST STATIC
   Stmt.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
+  TensorFlow.cpp
   Type.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp

@@ -20,11 +20,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
-#ifdef CMAKE_INTDIR
 #include "tensorflow/c/c_api.h"
-#else
-#include "tensorflow/c/c_api.h"
-#endif
 #endif
 
 using namespace swift;

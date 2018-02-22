@@ -1,4 +1,4 @@
-#include "swift/stdlib/ctensorflow_init.h"
+#include "ctensorflow_init.h"
 
 #include "tensorflow/core/platform/init_main.h"
 
@@ -27,8 +27,7 @@ void InitTensorFlowRuntime(unsigned char enable_debug_logging,
   }
   int my_argc = my_argv.size();
   char** tmpArgv = my_argv.data();
-  // This call is needed to initialize GPU device for Google3. It is a no-op in
-  // non-Google3 platforms.
+  // Initialize GPU devices.
   tensorflow::port::InitMain(/*usage=*/nullptr, &my_argc, &tmpArgv);
 }
 
