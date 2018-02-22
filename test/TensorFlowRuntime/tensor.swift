@@ -41,24 +41,9 @@ TensorTests.testCPUAndGPU("FactoryInitializers") {
   expectEqual(ShapedArray(shape: [1, 10], repeating: 1), x.array)
 }
 
-TensorTests.testCPUAndGPU("RandomNormalInitializer") {
-  let normal = Tensor<Float>(
-    randomNormal: [3, 4], mean: 100, stddev: 50, seed: 42
-  )
-  expectEqual([3, 4], normal.shape)
-  expectEqual([85.9612427, 93.1123962, 66.1835175, 101.229019,
-               55.3207741, 58.5763359, 160.344727, 169.050781,
-               27.2101135, 87.6893082, 31.9579697, 154.39801],
-              normal.scalars)
-}
-
-TensorTests.testCPUAndGPU("RandomUniformInitializer") {
-  let uniform = Tensor<Float>(randomUniform: [3, 4], seed: 42)
-  expectEqual([3, 4], uniform.shape)
-  expectEqual([0.952271461, 0.677407742, 0.795318246, 0.75578177,
-               0.475955606, 0.631014824, 0.186020374, 0.114307761,
-               0.336221814, 0.723335028, 0.219199657, 0.857337594],
-              uniform.scalars)
+TensorTests.testCPUAndGPU("RandomInitializer") {
+  let uniform = Tensor<Float>(randomUniform: [3, 4])
+  let normal = Tensor<Float>(randomNormal: [3, 4])
 }
 
 TensorTests.testCPUAndGPU("ScalarToTensorConversion") {
