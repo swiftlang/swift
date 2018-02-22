@@ -23,6 +23,12 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
   public // @testable
   final var count: Int
 
+  // TODO: Is there a better way to derive this?
+  @nonobjc
+  @_versioned
+  internal static
+  let _storageOffset: Int = MemoryLayout<Int>.stride * 4
+
   @nonobjc
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Use the create method")
@@ -73,6 +79,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     storage.capacity = endAddr - storage.start
     storage.count = count
     _sanityCheck(storage.capacity >= capacity)
+    storage._invariantCheck()
     return storage
   }
 
@@ -100,6 +107,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   public func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
     precondition(index >= 0 && index < count, "Index out of bounds")
+    _invariantCheck()
     return UInt16(start[index])
   }
 
@@ -108,6 +116,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange
   ) {
+    _invariantCheck()
     _precondition(aRange.location >= 0 && aRange.length >= 0,
       "Range out of bounds")
     _precondition(aRange.location + aRange.length <= Int(count),
@@ -123,6 +132,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   @objc(_fastCharacterContents)
   public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+    _invariantCheck()
     guard CodeUnit.self == UInt16.self else { return nil }
     return UnsafePointer(rawStart.assumingMemoryBound(to: UInt16.self))
   }
@@ -145,6 +155,7 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final var start: UnsafeMutablePointer<CodeUnit> {
+    _invariantCheck()
     return UnsafeMutablePointer(Builtin.projectTailElems(self, CodeUnit.self))
   }
 
@@ -286,4 +297,18 @@ extension _SwiftStringStorage {
       other._wholeString._guts,
       range: other._encodedOffsetRange)
   }
+}
+
+extension _SwiftStringStorage {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    defer { _fixLifetime(self) }
+    let selfBits: UInt = Builtin.reinterpretCast(self)
+    let startBits: UInt = Builtin.reinterpretCast(start)
+    _sanityCheck(startBits == selfBits + _SwiftRawStringStorage._storageOffset)
+#endif // INTERNAL_CHECKS_ENABLED
+  }
+
 }
