@@ -1,5 +1,5 @@
-#ifndef SWIFT_STDLIB_CTENSORFLOW_INIT_H_
-#define SWIFT_STDLIB_CTENSORFLOW_INIT_H_
+#ifndef SWIFT_SRC_SWIFT_STDLIB_CTENSORFLOW_INIT_H_
+#define SWIFT_SRC_SWIFT_STDLIB_CTENSORFLOW_INIT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,4 +18,4 @@ extern void InitTensorFlowRuntime(unsigned char enable_debug_logging,
 } /* end extern "C" */
 #endif
 
-#endif  // SWIFT_STDLIB_CTENSORFLOW_INIT_H_
+#endif  // SWIFT_SRC_SWIFT_STDLIB_CTENSORFLOW_INIT_H_
