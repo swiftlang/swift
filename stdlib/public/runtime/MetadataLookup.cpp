@@ -64,27 +64,6 @@ static Demangler getDemanglerForRuntimeTypeResolution() {
   return dem;
 }
 
-template <typename T> struct DescriptorCacheEntry {
-private:
-  std::string Name;
-  const T *Description;
-
-public:
-  DescriptorCacheEntry(const llvm::StringRef name, const T *description)
-      : Name(name.str()), Description(description) {}
-
-  const T *getDescription() { return Description; }
-
-  int compareWithKey(llvm::StringRef aName) const {
-    return aName.compare(Name);
-  }
-
-  template <class... Args>
-  static size_t getExtraAllocationSize(Args &&... ignored) {
-    return 0;
-  }
-};
-
 #pragma mark Nominal type descriptor cache
 // Type Metadata Cache.
 
@@ -333,8 +312,30 @@ namespace {
     }
   };
 
+  struct ProtocolDescriptorCacheEntry {
+  private:
+    std::string Name;
+    const ProtocolDescriptor *Description;
+
+  public:
+    ProtocolDescriptorCacheEntry(const llvm::StringRef name,
+                                 const ProtocolDescriptor *description)
+        : Name(name.str()), Description(description) {}
+
+    const ProtocolDescriptor *getDescription() { return Description; }
+
+    int compareWithKey(llvm::StringRef aName) const {
+      return aName.compare(Name);
+    }
+
+    template <class... T>
+    static size_t getExtraAllocationSize(T &&... ignored) {
+      return 0;
+    }
+  };
+
   struct ProtocolMetadataState {
-    ConcurrentMap<DescriptorCacheEntry<ProtocolDescriptor>> ProtocolCache;
+    ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
     std::vector<ProtocolSection> SectionsToScan;
     Mutex SectionsToScanLock;
 
@@ -425,19 +426,22 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
 
 #pragma mark Type field descriptor cache
 namespace {
-template <typename T> struct FieldDescriptorCacheEntry {
+struct FieldDescriptorCacheEntry {
 private:
-  const Metadata *Base;
-  const T *Description;
+  const Metadata *Type;
+  const FieldDescriptor *Description;
 
 public:
-  FieldDescriptorCacheEntry(const Metadata *Base, const T *description)
-  : Base(Base), Description(description) {}
+  FieldDescriptorCacheEntry(const Metadata *type,
+                            const FieldDescriptor *description)
+      : Type(type), Description(description) {}
 
-  const T *getDescription() { return Description; }
+  const FieldDescriptor *getDescription() { return Description; }
 
   int compareWithKey(const Metadata *other) const {
-    return Base == other;
+    auto a = (uintptr_t)Type;
+    auto b = (uintptr_t)other;
+    return a == b ? 0 : (a < b ? -1 : 1);
   }
 
   template <class... Args>
@@ -477,7 +481,7 @@ public:
 };
 
 struct FieldCacheState {
-  ConcurrentMap<FieldDescriptorCacheEntry<FieldDescriptor>> FieldCache;
+  ConcurrentMap<FieldDescriptorCacheEntry> FieldCache;
 
   Mutex SectionsLock;
   std::vector<StaticFieldSection> StaticSections;
@@ -1122,12 +1126,10 @@ void swift::swift_getFieldAt(
 
 
   // Fast path: If we already have field descriptor cached.
-  /*
   if (auto Value = cache.FieldCache.find(base)) {
     getFieldAt(*Value->getDescription());
     return;
   }
-  */
 
   ScopedLock guard(cache.SectionsLock);
   // Otherwise let's try to find it in one of the sections.

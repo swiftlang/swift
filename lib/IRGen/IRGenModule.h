@@ -530,9 +530,9 @@ public:
   llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceDescriptorTy;
   llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
-  llvm::StructType *NominalTypeDescriptorTy;
-  llvm::PointerType *NominalTypeDescriptorPtrTy;
-  llvm::StructType *ClassNominalTypeDescriptorTy;
+  llvm::StructType *TypeContextDescriptorTy;
+  llvm::PointerType *TypeContextDescriptorPtrTy;
+  llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;

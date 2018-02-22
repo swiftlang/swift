@@ -109,7 +109,7 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift.gyb
   SentinelCollection.swift
   Sequence.swift
-  SequenceAlgorithms.swift.gyb
+  SequenceAlgorithms.swift
   SequenceWrapper.swift
   SetAlgebra.swift
   ShadowProtocols.swift

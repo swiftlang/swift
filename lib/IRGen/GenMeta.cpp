@@ -3030,7 +3030,7 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
   
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
-                               NominalTypeDescriptorTy,
+                               TypeContextDescriptorTy,
                                DebugTypeInfo());
 }
 
