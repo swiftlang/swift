@@ -2731,7 +2731,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
-                # Run the gtests.
+                # Run the unittests.
+                # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
@@ -2744,7 +2745,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 else
                     with_pushd ${lldb_build_dir} \
-                        ${NINJA_BIN} check-lldb-unit
+                        ${NINJA_BIN} check-lldb-lit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
