@@ -42,13 +42,6 @@ public:
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;
 
-  /// Attempts to read 'size' bytes from the given address in the remote process.
-  ///
-  /// Returns a pointer to the requested data and a function that must be called to
-  /// free that data when done. The pointer will be NULL if the operation failed.
-  virtual std::tuple<const void *, std::function<void()>>
-    readBytes(RemoteAddress address, uint64_t size) = 0;
-
   /// Attempts to read a C string from the given address in the remote
   /// process.
   ///
@@ -65,11 +58,32 @@ public:
                      sizeof(IntegerType));
   }
 
+  /// Attempts to read 'size' bytes from the given address in the remote process.
+  ///
+  /// Returns a pointer to the requested data and a function that must be called to
+  /// free that data when done. The pointer will be NULL if the operation failed.
+  ///
+  /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
+  /// implementation calls through to the other one.
+  virtual std::tuple<const void *, std::function<void()>>
+    readBytes(RemoteAddress address, uint64_t size) {
+    void *buffer = malloc(size);
+    bool success = readBytes(address, reinterpret_cast<uint8_t *>(buffer), size);
+    if (!success) {
+      free(buffer);
+      return std::make_tuple(nullptr, []{});
+    }
+    return std::make_tuple(nullptr, [=]{ free(buffer); });
+  }
+
   /// Attempts to read 'size' bytes from the given address in the
   /// remote process.
   ///
   /// Returns false if the operation failed.
-  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) {
+  ///
+  /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
+  /// implementation calls through to the other one.
+  virtual bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) {
     const void *ptr;
     std::function<void()> freeFunc;
     std::tie(ptr, freeFunc) = readBytes(address, size);
