@@ -411,8 +411,12 @@ extension LazySequenceProtocol {
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyCompactMapSequence<Elements, ElementOfResult> {
-    return self.compactMap(transform)
+  ) -> LazyMapSequence<
+    LazyFilterSequence<
+      LazyMapSequence<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }
 
@@ -449,8 +453,12 @@ extension LazyCollectionProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyCompactMapCollection<Elements, ElementOfResult> {
-    return self.compactMap(transform)
+  ) -> LazyMapCollection<
+    LazyFilterCollection<
+      LazyMapCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }
 
