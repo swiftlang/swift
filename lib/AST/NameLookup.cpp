@@ -1352,12 +1352,10 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
-  RecursiveSharedTimer::Guard guard;
   ASTContext &ctx = getASTContext();
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-    guard = s->getFrontendRecursiveSharedTimers()
-                .NominalTypeDecl__lookupDirect.getGuard();
   }
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have

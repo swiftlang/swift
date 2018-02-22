@@ -15,8 +15,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
-#include "swift/AST/Identifier.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Timer.h"
 
 #define SWIFT_FUNC_STAT                                                 \
@@ -56,33 +55,27 @@ namespace clang {
 namespace swift {
 
 class Decl;
+class ProtocolConformance;
 class Expr;
 class SILFunction;
+class FrontendStatsTracer;
+class SourceManager;
 
 class UnifiedStatsReporter {
 
 public:
   struct AlwaysOnDriverCounters
   {
-#define DRIVER_STATISTIC(ID) size_t ID;
+#define DRIVER_STATISTIC(ID) int64_t ID;
 #include "Statistics.def"
 #undef DRIVER_STATISTIC
   };
 
   struct AlwaysOnFrontendCounters
   {
-#define FRONTEND_STATISTIC(NAME, ID) size_t ID;
+#define FRONTEND_STATISTIC(NAME, ID) int64_t ID;
 #include "Statistics.def"
 #undef FRONTEND_STATISTIC
-  };
-
-  struct AlwaysOnFrontendRecursiveSharedTimers {
-    AlwaysOnFrontendRecursiveSharedTimers();
-#define FRONTEND_RECURSIVE_SHARED_TIMER(ID) RecursiveSharedTimer ID;
-#include "Statistics.def"
-#undef FRONTEND_RECURSIVE_SHARED_TIMER
-
-    int dummyInstanceVariableToGetConstructorToParse;
   };
 
   // To trace an entity, you have to provide a TraceFormatter for it. This is a
@@ -98,25 +91,6 @@ public:
     virtual ~TraceFormatter();
   };
 
-  struct FrontendStatsTracer
-  {
-    UnifiedStatsReporter *Reporter;
-    llvm::TimeRecord SavedTime;
-    StringRef EventName;
-    const void *Entity;
-    const TraceFormatter *Formatter;
-    FrontendStatsTracer(StringRef EventName,
-                        const void *Entity,
-                        const TraceFormatter *Formatter,
-                        UnifiedStatsReporter *Reporter);
-    FrontendStatsTracer();
-    FrontendStatsTracer(FrontendStatsTracer&& other);
-    FrontendStatsTracer& operator=(FrontendStatsTracer&&);
-    ~FrontendStatsTracer();
-    FrontendStatsTracer(const FrontendStatsTracer&) = delete;
-    FrontendStatsTracer& operator=(const FrontendStatsTracer&) = delete;
-  };
-
   struct FrontendStatsEvent
   {
     uint64_t TimeUSec;
@@ -124,37 +98,60 @@ public:
     bool IsEntry;
     StringRef EventName;
     StringRef CounterName;
-    size_t CounterDelta;
-    size_t CounterValue;
+    int64_t CounterDelta;
+    int64_t CounterValue;
     const void *Entity;
     const TraceFormatter *Formatter;
   };
+
+  // We only write fine-grained trace entries when the user passed
+  // -trace-stats-events, but we recycle the same FrontendStatsTracers to give
+  // us some free recursion-save phase timings whenever -trace-stats-dir is
+  // active at all. Reduces redundant machinery.
+  class RecursionSafeTimers;
+
+  // We also keep a few banks of optional hierarchical profilers for times and
+  // statistics, activated with -profile-stats-events and
+  // -profile-stats-entities, which are part way between the detail level of the
+  // aggregate statistic JSON files and the fine-grained CSV traces. Naturally
+  // these are written in yet a different file format: the input format for
+  // flamegraphs.
+  struct StatsProfilers;
 
 private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
   SmallString<128> StatsFilename;
   SmallString<128> TraceFilename;
+  SmallString<128> ProfileDirname;
   llvm::TimeRecord StartedTime;
+
+  // This is unique_ptr because NamedRegionTimer is non-copy-constructable.
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
+
   SourceManager *SourceMgr;
   clang::SourceManager *ClangSourceMgr;
-  std::unique_ptr<AlwaysOnDriverCounters> DriverCounters;
-  std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
-  std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
-  std::vector<FrontendStatsEvent> FrontendStatsEvents;
-  std::unique_ptr<AlwaysOnFrontendRecursiveSharedTimers>
-      FrontendRecursiveSharedTimers;
+  Optional<AlwaysOnDriverCounters> DriverCounters;
+  Optional<AlwaysOnFrontendCounters> FrontendCounters;
+  Optional<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
+  Optional<std::vector<FrontendStatsEvent>> FrontendStatsEvents;
+
+  // These are unique_ptr so we can use incomplete types here.
+  std::unique_ptr<RecursionSafeTimers> RecursiveTimers;
+  std::unique_ptr<StatsProfilers> EventProfilers;
+  std::unique_ptr<StatsProfilers> EntityProfilers;
 
   void publishAlwaysOnStatsToLLVM();
-  void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
+  void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef AuxName,
                        StringRef Directory,
                        SourceManager *SM,
                        clang::SourceManager *CSM,
-                       bool TraceEvents);
+                       bool TraceEvents,
+                       bool ProfileEvents,
+                       bool ProfileEntities);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -165,23 +162,83 @@ public:
                        StringRef Directory,
                        SourceManager *SM=nullptr,
                        clang::SourceManager *CSM=nullptr,
-                       bool TraceEvents=false);
+                       bool TraceEvents=false,
+                       bool ProfileEvents=false,
+                       bool ProfileEntities=false);
   ~UnifiedStatsReporter();
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
-  AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   void noteCurrentProcessExitStatus(int);
-  // We declare 4 explicit overloads here, but the _definitions_ live in the
-  // upper-level files (in libswiftAST or libswiftSIL) that provide the types
-  // being traced. If you want to trace those types, it's assumed you're linking
-  // with the object files that define the tracer.
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Decl *D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const clang::Decl*D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Expr *E);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const SILFunction *F);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
 };
+
+// This is a non-nested type just to make it less work to write at call sites.
+class FrontendStatsTracer
+{
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,
+                      StringRef EventName,
+                      const void *Entity,
+                      const UnifiedStatsReporter::TraceFormatter *Formatter);
+
+  // In the general case we do not know how to format an entity for tracing.
+  template<typename T> static
+  const UnifiedStatsReporter::TraceFormatter *getTraceFormatter() {
+    return nullptr;
+  }
+
+public:
+  UnifiedStatsReporter *Reporter;
+  llvm::TimeRecord SavedTime;
+  StringRef EventName;
+  const void *Entity;
+  const UnifiedStatsReporter::TraceFormatter *Formatter;
+  FrontendStatsTracer();
+  FrontendStatsTracer(FrontendStatsTracer&& other);
+  FrontendStatsTracer& operator=(FrontendStatsTracer&&);
+  ~FrontendStatsTracer();
+  FrontendStatsTracer(const FrontendStatsTracer&) = delete;
+  FrontendStatsTracer& operator=(const FrontendStatsTracer&) = delete;
+
+  /// These are the convenience constructors you want to be calling throughout
+  /// the compiler: they select an appropriate trace formatter for the provided
+  /// entity type, and produce a tracer that's either active or inert depending
+  /// on whether the provided \p Reporter is null (nullptr means "tracing is
+  /// disabled").
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const Decl *D);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const ProtocolConformance *P);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const clang::Decl *D);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const Expr *E);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+                      const SILFunction *F);
+};
+
+// In particular cases, we do know how to format traced entities: we declare
+// explicit specializations of getTraceFormatter() here, matching the overloaded
+// constructors of FrontendStatsTracer above, where the _definitions_ live in
+// the upper-level files (in libswiftAST or libswiftSIL), and provide tracing
+// for those entity types. If you want to trace those types, it's assumed you're
+// linking with the object files that define the tracer.
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Decl *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Expr *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SILFunction *>();
 
 }
 #endif // SWIFT_BASIC_STATISTIC_H

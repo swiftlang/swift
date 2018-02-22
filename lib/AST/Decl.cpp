@@ -5677,6 +5677,10 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const Decl *D = static_cast<const Decl *>(Entity);
     if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
       VD->getFullName().print(OS, false);
+    } else {
+      OS << "<"
+         << Decl::getDescriptiveKindName(D->getDescriptiveKind())
+         << ">";
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -5690,14 +5694,10 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static DeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName, const Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Decl *>() {
+  return &TF;
 }
 
 TypeOrExtensionDecl::TypeOrExtensionDecl(NominalTypeDecl *D) : Decl(D) {}

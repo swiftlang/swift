@@ -7878,11 +7878,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
-  UnifiedStatsReporter::FrontendStatsTracer Tracer;
-  if (SwiftContext.Stats)
-    Tracer = SwiftContext.Stats->getStatsTracer("import-clang-decl",
-                                                ClangDecl);
-
+  FrontendStatsTracer StatsTracer(SwiftContext.Stats,
+                                  "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
@@ -8349,12 +8346,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  RecursiveSharedTimer::Guard guard;
-  if (auto s = D->getASTContext().Stats) {
-    guard = s->getFrontendRecursiveSharedTimers()
-                .ClangImporter__Implementation__loadAllMembers.getGuard();
-  }
 
+  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
@@ -8604,17 +8597,20 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
+    } else {
+      OS << "<unnamed-clang-decl>";
     }
   }
 
-  static inline void printClangShortLoc(raw_ostream &OS,
+  static inline bool printClangShortLoc(raw_ostream &OS,
                                         clang::SourceManager *CSM,
                                         clang::SourceLocation L) {
     if (!L.isValid() || !L.isFileID())
-      return;
+      return false;
     auto PLoc = CSM->getPresumedLoc(L);
     OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
        << ':' << PLoc.getColumn();
+    return true;
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -8624,8 +8620,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (CSM) {
       const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
       auto Range = CD->getSourceRange();
-      printClangShortLoc(OS, CSM, Range.getBegin());
-      OS << '-';
+      if (printClangShortLoc(OS, CSM, Range.getBegin()))
+        OS << '-';
       printClangShortLoc(OS, CSM, Range.getEnd());
     }
   }
@@ -8633,13 +8629,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static ClangDeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const clang::Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
+  return &TF;
 }

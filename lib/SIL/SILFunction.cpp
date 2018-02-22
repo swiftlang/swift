@@ -515,13 +515,8 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static SILFunctionTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const SILFunction *F) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, F, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SILFunction *>() {
+  return &TF;
 }
