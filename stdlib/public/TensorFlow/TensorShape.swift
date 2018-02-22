@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 // NOTE: it may be possible to edit TensorShape to support "labeled tensors".
-// Dimensions may be either an Int or an enum representing a label.
+// Dimensions may be either an Int32 or an enum representing a label.
 
 @_fixed_layout
 public struct TensorShape : ExpressibleByArrayLiteral {
@@ -52,80 +52,84 @@ public struct TensorShape : ExpressibleByArrayLiteral {
 
   /// The rank of the shape.
   @_inlineable
-  public var rank: Int {
+  public var rank: Int32 {
     @inline(__always)
     get {
-      return dimensions.count
+      return Int32(dimensions.count)
     }
   }
 
   /// The size of the shape as a contiguously stored array.
   @_inlineable
-  public var contiguousSize: Int {
+  public var contiguousSize: Int32 {
     @inline(__always)
     get {
-      return dimensions.lazy.map(Int.init).reduce(1, *)
+      return dimensions.reduce(1, *)
     }
   }
 }
 
 public extension TensorShape {
   @_inlineable
-  var count: Int {
+  var count: Int32 {
     @inline(__always)
     get {
-      return dimensions.count
+      return Int32(dimensions.count)
     }
   }
 
   @_inlineable
-  var indices: Range<Int> {
+  var indices: Range<Int32> {
     @inline(__always)
     get {
-      return dimensions.indices
+      return Int32(dimensions.indices.lowerBound)
+        ..< Int32(dimensions.indices.upperBound)
     }
   }
 
   @_inlineable
-  var startIndex: Int {
+  var startIndex: Int32 {
     @inline(__always)
     get {
-      return dimensions.startIndex
+      return Int32(dimensions.startIndex)
     }
   }
 
   @_inlineable
-  var endIndex: Int {
+  var endIndex: Int32 {
     @inline(__always)
     get {
-      return dimensions.endIndex
-    }
-  }
-
-  /// Access the size of the i-th dimension.
-  /// - Parameter index: the index of a dimension.
-  @_inlineable
-  subscript(index: Int) -> Int32 {
-    @inline(__always)
-    get {
-      return dimensions[index]
-    }
-    @inline(__always)
-    set {
-      dimensions[index] = newValue
+      return Int32(dimensions.endIndex)
     }
   }
 
   /// Access the size of the i-th dimension.
   /// - Parameter index: the index of a dimension.
   @_inlineable
-  subscript(bounds: Range<Int>) -> TensorShape {
+  subscript(index: Int32) -> Int32 {
     @inline(__always)
     get {
-      return TensorShape(Array(dimensions[bounds]))
+      return dimensions[Int(index)]
     }
     @inline(__always)
     set {
+      dimensions[Int(index)] = newValue
+    }
+  }
+
+  /// Access the size of the i-th dimension.
+  /// - Parameter index: the index of a dimension.
+  @_inlineable
+  subscript(bounds: Range<Int32>) -> TensorShape {
+    @inline(__always)
+    get {
+      return TensorShape(
+        Array(dimensions[Int(bounds.lowerBound)..<Int(bounds.upperBound)])
+      )
+    }
+    @inline(__always)
+    set {
+      let bounds = Int(bounds.lowerBound)..<Int(bounds.upperBound)
       dimensions[bounds] = ArraySlice(newValue.dimensions)
     }
   }
