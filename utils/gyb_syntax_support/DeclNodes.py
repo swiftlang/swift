@@ -86,19 +86,21 @@ DECL_NODES = [
 
     # else-if-directive-clause -> '#elseif' expr stmt-list
     Node('ElseifDirectiveClause', kind='Syntax',
+         traits=['WithStatements'],
          children=[
              Child('PoundElseif', kind='PoundElseifToken'),
              Child('Condition', kind='Expr'),
-             Child('Body', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList'),
          ]),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
+         traits=['WithStatements'],
          children=[
              Child('PoundIf', kind='PoundIfToken'),
              Child('Condition', kind='Expr'),
-             Child('Body', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList'),
              Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
                    is_optional=True),
              Child('ElseClause', kind='ElseDirectiveClause',
@@ -254,8 +256,9 @@ DECL_NODES = [
 
     # source-file = code-block-item-list eof
     Node('SourceFile', kind='Syntax',
+         traits=['WithStatements'],
          children=[
-             Child('Items', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList'),
              Child('EOFToken', kind='EOFToken')
          ]),
 
@@ -408,9 +411,10 @@ DECL_NODES = [
 
     # else-directive-clause -> '#else' stmt-list
     Node('ElseDirectiveClause', kind='Syntax',
+         traits=['WithStatements'],
          children=[
              Child('PoundElse', kind='PoundElseToken'),
-             Child('Body', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList'),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'

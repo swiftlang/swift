@@ -255,9 +255,10 @@ STMT_NODES = [
     # switch-case -> switch-case-label stmt-list
     #              | default-label stmt-list
     Node('SwitchCase', kind='Syntax',
+         traits=['WithStatements'],
          children=[
              Child('Label', kind='Syntax'),
-             Child('Body', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList'),
          ]),
 
     # switch-default-label -> 'default' ':'
