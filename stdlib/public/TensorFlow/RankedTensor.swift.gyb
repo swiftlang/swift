@@ -294,7 +294,7 @@ public extension ${TensorXD} where Scalar : Numeric {
   }
 }
 
-public extension ${TensorXD} where Scalar : FloatingPoint {
+public extension ${TensorXD} where Scalar == Float {
   /// Creates a ${TensorXD} with the specified shape, randomly sampling
   /// scalar values from a normal distribution.
   ///
@@ -302,16 +302,12 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
   ///   - shape: The dimensions of the ${TensorXD}.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
-  ///   - seed: A random seed for the operation.
   ///
   @_inlineable @inline(__always)
-  init(
-    randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
-    seed: Int32 = 0
-  ) {
-    self.init(
-      base: Tensor(randomNormal: shape, mean: mean, stddev: stddev, seed: seed)
-    )
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    precondition(shape.count == ${rank},
+                 "The given shape doesn't match rank ${rank}")
+    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev))
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -321,11 +317,44 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
   ///   - shape: The dimensions of the tensor.
   ///   - min: The lower bound of the distribution.
   ///   - max: The upper bound of the distribution.
-  ///   - seed: A random seed for the operation.
   ///
   @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape, seed: Int32 = 0) {
-    self.init(base: Tensor(randomUniform: shape, seed: seed))
+  init(randomUniform shape: TensorShape) {
+    precondition(shape.count == ${rank},
+                 "The given shape doesn't match rank ${rank}")
+    self.init(base: Tensor(randomUniform: shape))
+  }
+}
+
+public extension ${TensorXD} where Scalar == Double {
+  /// Creates a ${TensorXD} with the specified shape, randomly sampling
+  /// scalar values from a normal distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the ${TensorXD}.
+  ///   - mean: The mean of the distribution.
+  ///   - stddev: The standard deviation of the distribution.
+  ///
+  @_inlineable @inline(__always)
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    precondition(shape.count == ${rank},
+                 "The given shape doesn't match rank ${rank}")
+    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev))
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - min: The lower bound of the distribution.
+  ///   - max: The upper bound of the distribution.
+  ///
+  @_inlineable @inline(__always)
+  init(randomUniform shape: TensorShape) {
+    precondition(shape.count == ${rank},
+                 "The given shape doesn't match rank ${rank}")
+    self.init(base: Tensor(randomUniform: shape))
   }
 }
 

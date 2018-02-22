@@ -257,7 +257,7 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Factory initializers for numeric tensors
+// Numeric initialization
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
@@ -308,10 +308,63 @@ public extension Tensor where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Factory methods for floating point tensors
+// Random initialization
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar : FloatingPoint {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#else
+import Glibc
+#endif
+
+fileprivate let randomSeed: Void = srandom(UInt32(time(nil)))
+
+fileprivate func randomStandardUniform() -> Int {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  return Int(arc4random())
+#else
+  _ = randomSeed
+  return random()
+#endif
+}
+
+internal extension Float {
+  @_versioned
+  static func randomUniform() -> Float {
+    return Float(randomStandardUniform()) / 0xFFFFFFFF
+  }
+
+  private static var boxMullerHelper = randomUniform()
+
+  /// Random value from normal distribution using the Box-Muller method.
+  @_versioned
+  static func randomNormal() -> Float {
+    let tmp = randomUniform()
+    let result = sqrt(-2 * log(tmp)) * cos(2 * .pi * boxMullerHelper)
+    boxMullerHelper = result
+    return result
+  }
+}
+
+internal extension Double {
+  @_versioned
+  static func randomUniform() -> Double {
+    return Double(randomStandardUniform()) / 0xFFFFFFFF
+  }
+
+  private static var boxMullerHelper = randomUniform()
+
+  /// Random value from normal distribution using the Box-Muller method.
+  @_versioned
+  static func randomNormal() -> Double {
+    let tmp = randomUniform()
+    let result = sqrt(-2 * log(tmp)) * cos(2 * .pi * boxMullerHelper)
+    boxMullerHelper = result
+    return result
+  }
+}
+
+public extension Tensor where Scalar == Float {
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a normal distribution.
   ///
@@ -319,22 +372,39 @@ public extension Tensor where Scalar : FloatingPoint {
   ///   - shape: The dimensions of the tensor.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
-  ///   - seed: A random seed for the operation.
   ///
   @_inlineable @inline(__always)
-  init(
-    randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
-    seed: Int32 = 0
-  ) {
-    // NOTE: First seed value (87654321) is the DEFAULT_GRAPH_SEED value defined
-    // in tensorflow/python/framework/random_seed.py.
-    let standardNormal: Tensor<Scalar> = #tfop(
-      "RandomStandardNormal",
-      Tensor<Int32>(shape.dimensions),
-      seed: 87654321, seed2: seed,
-      dtype: Scalar.self, T: Int32.self
-    )
-    self = standardNormal * stddev + mean
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
+    self = Tensor(shape: shape, scalars: scalars) * stddev + mean
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  @_inlineable @inline(__always)
+  init(randomUniform shape: TensorShape) {
+    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomUniform() }
+    self.init(shape: shape, scalars: scalars)
+  }
+}
+
+public extension Tensor where Scalar == Double {
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a normal distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - mean: The mean of the distribution.
+  ///   - stddev: The standard deviation of the distribution.
+  ///
+  @_inlineable @inline(__always)
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
+    self = Tensor(shape: shape, scalars: scalars) * stddev + mean
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -345,12 +415,9 @@ public extension Tensor where Scalar : FloatingPoint {
   ///   - seed: A random seed for the operation.
   ///
   @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape, seed: Int32 = 0) {
-    self.init(
-      handle: #tfop("RandomUniform", Tensor<Int32>(shape.dimensions),
-                    seed: 87654321, seed2: seed, dtype: Scalar.self,
-                    T: Int32.self)
-    )
+  init(randomUniform shape: TensorShape) {
+    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomUniform() }
+    self.init(shape: shape, scalars: scalars)
   }
 }
 
