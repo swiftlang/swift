@@ -13,10 +13,10 @@ import StdlibUnittest
 
 var ModelTests = TestSuite("Model")
 
-ModelTests.testCPU("StraightLineXORTraining") {
+ModelTests.testCPUAndGPU("StraightLineXORTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
-  // FIXME: This test fails on both CPU and GPU when --config=cuda is on.
+  // FIXME: GPU training won't converge.
 #if CUDA
   return
 #endif
@@ -71,13 +71,13 @@ ModelTests.testCPU("StraightLineXORTraining") {
   } while i < iterationCount
 
   // Check results
-  expectLT(loss, 0.0001)
+  expectLT(loss, 0.01)
 }
 
-ModelTests.testCPU("XORClassifierTraining") {
+ModelTests.testCPUAndGPU("XORClassifierTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
-  // FIXME: This test fails on both CPU and GPU when --config=cuda is on.
+  // FIXME: GPU training won't converge.
 #if CUDA
   return
 #endif
