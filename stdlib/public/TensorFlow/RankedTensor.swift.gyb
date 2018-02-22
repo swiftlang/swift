@@ -131,9 +131,12 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   public init(identicallyRanked other: Tensor<Scalar>) {
     // NOTE: Precondition written using Assert op instead of Swift
     // `precondition` to prevent send/receive.
+    // FIXME: Remove #if when Assert works with a GPU build.
+#if false
     let rankTensor = Tensor<Int32>(${rank})
     let condition: Tensor<Bool> = other.rankTensor == rankTensor
     #tfop("Assert", condition, [rankTensor, other.rankTensor]) as Void
+#endif
     self.init(base: other)
   }
 
@@ -165,10 +168,13 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
   public init(shape: TensorShape, repeating repeatedValue: Scalar) {
     // NOTE: Precondition written using Assert op instead of Swift
     // `precondition` to prevent send/receive.
+    // FIXME: Remove #if when Assert works with a GPU build.
+#if false
     let rankTensor = Tensor<Int32>(${rank})
     let shapeTensor = Tensor<Int32>(shape.dimensions)
     let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
     #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
+#endif
     self.init(base: Tensor(shape: shape, repeating: repeatedValue))
   }
 }
@@ -260,10 +266,13 @@ public extension ${TensorXD} where Scalar : Numeric {
   init(zeros shape: TensorShape) {
     // NOTE: Precondition written using Assert op instead of Swift
     // `precondition` to prevent send/receive.
+    // FIXME: Remove #if when Assert works with a GPU build.
+#if false
     let rankTensor = Tensor<Int32>(${rank})
     let shapeTensor = Tensor<Int32>(shape.dimensions)
     let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
     #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
+#endif
     self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
@@ -274,10 +283,13 @@ public extension ${TensorXD} where Scalar : Numeric {
   init(ones shape: TensorShape) {
     // NOTE: Precondition written using Assert op instead of Swift
     // `precondition` to prevent send/receive.
+    // FIXME: Remove #if when Assert works with a GPU build.
+#if false
     let rankTensor = Tensor<Int32>(${rank})
     let shapeTensor = Tensor<Int32>(shape.dimensions)
     let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
     #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
+#endif
     self.init(base: Tensor<Scalar>(ones: shape))
   }
 }
@@ -297,12 +309,6 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
     randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
     seed: Int32 = 0
   ) {
-    // NOTE: Precondition written using Assert op instead of Swift
-    // `precondition` to prevent send/receive.
-    let rankTensor = Tensor<Int32>(${rank})
-    let shapeTensor = Tensor<Int32>(shape.dimensions)
-    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
-    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(
       base: Tensor(randomNormal: shape, mean: mean, stddev: stddev, seed: seed)
     )
@@ -319,12 +325,6 @@ public extension ${TensorXD} where Scalar : FloatingPoint {
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape, seed: Int32 = 0) {
-    // NOTE: Precondition written using Assert op instead of Swift
-    // `precondition` to prevent send/receive.
-    let rankTensor = Tensor<Int32>(${rank})
-    let shapeTensor = Tensor<Int32>(shape.dimensions)
-    let condition: Tensor<Bool> = shapeTensor.scalarCountTensor == rankTensor
-    #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
     self.init(base: Tensor(randomUniform: shape, seed: seed))
   }
 }
