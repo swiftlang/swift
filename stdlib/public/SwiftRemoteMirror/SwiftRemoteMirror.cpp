@@ -15,6 +15,7 @@
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
+#include "swift/SwiftRemoteMirror/SwiftRemoteMirrorLegacyInterop.h"
 
 #ifdef __APPLE__
 #include <mach-o/getsect.h>
@@ -131,14 +132,13 @@ swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
   success = findSection(Header, "__swift5_typeref", info.type_references) || success;
   success = findSection(Header, "__swift5_reflstr", info.reflection_strings) || success;
   
-  if (success) {
-    info.LocalStartAddress = reinterpret_cast<uintptr_t>(Buf);
-    info.RemoteStartAddress = imageStart;
-    swift_reflection_addReflectionInfo(ContextRef, info);
-    return 1;
-  } else {
+  if (!success)
     return 0;
-  }
+  
+  info.LocalStartAddress = reinterpret_cast<uintptr_t>(Buf);
+  info.RemoteStartAddress = imageStart;
+  swift_reflection_addReflectionInfo(ContextRef, info);
+  return 1;
 }
 #endif
 

@@ -17,8 +17,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_REFLECTION_SWIFT_REFLECTION_H
-#define SWIFT_REFLECTION_SWIFT_REFLECTION_H
+#ifndef SWIFT_REMOTE_MIRROR_H
+#define SWIFT_REMOTE_MIRROR_H
 
 #include "MemoryReaderInterface.h"
 #include "SwiftRemoteMirrorTypes.h"
