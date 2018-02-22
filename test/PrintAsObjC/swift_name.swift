@@ -38,6 +38,6 @@ public enum TestE : Int{
 	case A1
 	case B1
 }
-// CHECK: typedef SWIFT_ENUM(NSInteger, TestE)
+// CHECK: typedef SWIFT_ENUM(NSInteger, TestE, closed)
 // CHECK-NEXT: {{^}} A2 SWIFT_COMPILE_NAME("A1") = 0,
 // CHECK-NEXT: {{^}} TestEB1 = 1,

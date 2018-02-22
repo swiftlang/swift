@@ -3116,6 +3116,11 @@ bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
   if (!accessScope.isPublic())
     return true;
 
+  // All other checks are use-site specific; with no further information, the
+  // enum must be treated non-exhaustively.
+  if (!useDC)
+    return false;
+
   // Enums in the same module as the use site are exhaustive /unless/ the use
   // site is inlinable.
   if (useDC->getParentModule() == containingModule)
