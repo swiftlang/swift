@@ -250,7 +250,7 @@ void finalizeSourceFile(RootContextData &RootData,
   if (SF.hasSyntaxRoot()) {
     auto SourceRaw = SF.getSyntaxRoot().getRaw();
     auto Decls =
-        SourceRaw->getChild(SourceFileSyntax::Cursor::Items)->getLayout();
+        SourceRaw->getChild(SourceFileSyntax::Cursor::Statements)->getLayout();
     std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
     EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
   }
