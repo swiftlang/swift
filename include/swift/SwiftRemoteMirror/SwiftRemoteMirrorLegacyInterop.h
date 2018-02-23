@@ -158,6 +158,12 @@ struct SwiftReflectionInteropContext {
 
 typedef SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
+/// A stub for 'ownsObject' that always returns true. Used for the legacy library.
+static inline int swift_reflection_interop_ownsObjectStub(
+  SwiftReflectionContextRef ContextRef, uintptr_t Object) {
+  return 1;
+}
+
 static inline void swift_reflection_interop_loadFunctions(
   struct SwiftReflectionInteropContext *Context, void *Handle, int IsLegacy) {
 #ifndef __cplusplus
@@ -176,21 +182,20 @@ static inline void swift_reflection_interop_loadFunctions(
   } while (0)
 #define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name)
   
-  if (IsLegacy)
+  if (IsLegacy) {
     LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext");
-  else
-    LOAD(createReflectionContext);
-  
-  LOAD(destroyReflectionContext);
-  if (!IsLegacy) {
     LOAD_NAMED(addReflectionInfoLegacy, "swift_reflection_addReflectionInfo");
+    Functions->ownsObject = swift_reflection_interop_ownsObjectStub;
   } else {
+    LOAD(createReflectionContext);
     LOAD(addReflectionInfo);
     LOAD(addImage);
+    LOAD(ownsObject);
   }
+  
+  LOAD(destroyReflectionContext);
   LOAD(readIsaMask);
   LOAD(typeRefForMetadata);
-  LOAD(ownsObject);
   LOAD(typeRefForInstance);
   LOAD(typeRefForMangledTypeName);
   LOAD(infoForTypeRef);
@@ -415,8 +420,7 @@ swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef Con
                                             uintptr_t Object) {
   swift_typeref_interop_t Result;
   FOREACH_LIBRARY {
-    if (Library->Functions.ownsObject != NULL
-        && !Library->Functions.ownsObject(Library->Context, Object))
+    if (!Library->Functions.ownsObject(Library->Context, Object))
       continue;
     swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
                                                                      Object);
@@ -441,7 +445,7 @@ swift_reflection_interop_typeRefForMangledTypeName(
   swift_typeref_interop_t Result;
   FOREACH_LIBRARY {
     swift_typeref_t Typeref = Library->Functions.typeRefForMangledTypeName(
-      ContextRef, MangledName, Length);
+      Library->Context, MangledName, Length);
     if (Typeref == 0)
       continue;
     
@@ -468,11 +472,90 @@ swift_reflection_interop_genericArgumentOfTypeRef(
   return Result;
 }
 
+swift_typeinfo_t
+swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  return Library->Functions.infoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
+}
+
+swift_childinfo_t
+swift_reflection_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                swift_typeref_interop_t OpaqueTypeRef,
+                                unsigned Index) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  return Library->Functions.childOfTypeRef(Library->Context,
+                                           OpaqueTypeRef.Typeref,
+                                           Index);
+}
+
+swift_typeinfo_t
+swift_reflection_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                 swift_metadata_interop_t Metadata) {
+  DECLARE_LIBRARY(Metadata.Library);
+  return Library->Functions.infoForMetadata(Library->Context, Metadata.Metadata);
+}
+
+swift_childinfo_t
+swift_reflection_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                 swift_metadata_interop_t Metadata,
+                                 unsigned Index) {
+  DECLARE_LIBRARY(Metadata.Library);
+  return Library->Functions.childOfMetadata(Library->Context, Metadata.Metadata, Index);
+}
+
+swift_typeinfo_t
+swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                         uintptr_t Object) {
+  swift_typeinfo_t Result = {};
+  FOREACH_LIBRARY {
+    if (!Library->Functions.ownsObject(Library->Context, Object))
+      continue;
+    
+    Result = Library->Functions.infoForInstance(Library->Context, Object);
+    if (Result.Kind == SWIFT_UNKNOWN)
+      continue;
+    
+    return Result;
+  }
+  
+  Result.Kind = SWIFT_UNKNOWN;
+  return Result;
+}
+
+swift_childinfo_t
+swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
+                                         uintptr_t Object,
+                                         unsigned Index) {
+  FOREACH_LIBRARY {
+    if (!Library->Functions.ownsObject(Library->Context, Object))
+      continue;
+    
+    return Library->Functions.childOfInstance(Library->Context, Object, Index);
+  }
+  
+  swift_childinfo_t Result = {};
+  Result.Kind = SWIFT_UNKNOWN;
+  return Result;
+}
+
 unsigned
 swift_reflection_interop_genericArgumentCountOfTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   return Library->Functions.genericArgumentCountOfTypeRef(OpaqueTypeRef.Typeref);
+}
+
+swift_typeref_interop_t
+swift_reflection_genericArgumentOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                          swift_typeref_interop_t OpaqueTypeRef,
+                                          unsigned Index) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  swift_typeref_interop_t Result;
+  Result.Typeref = Library->Functions.genericArgumentOfTypeRef(OpaqueTypeRef.Typeref,
+                                                               Index);
+  Result.Library = OpaqueTypeRef.Library;
+  return Result;
 }
 
 #undef FOREACH_LIBRARY
