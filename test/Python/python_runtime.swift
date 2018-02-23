@@ -17,9 +17,9 @@ PythonRuntimeTestSuite.test("check-version") {
 PythonRuntimeTestSuite.test("pylist") {
   let list = PyVal([0, 1, 2])
   expectEqual("[0, 1, 2]", list.description)
-  expectEqual(3, Python.len.call(args: list))
-  expectEqual("[0, 1, 2]", Python.str.call(args: list))
-  expectEqual("<type 'list'>", Python.str.call(args: Python.type.call(args: list)))
+  expectEqual(3, Python.len.call(list))
+  expectEqual("[0, 1, 2]", Python.str.call(list))
+  expectEqual("<type 'list'>", Python.str.call(Python.type.call(list)))
 
   let polymorphicList = PyVal(["a", 2, true, 1.5])
   expectEqual("a", polymorphicList[0])
@@ -33,8 +33,8 @@ PythonRuntimeTestSuite.test("pylist") {
 }
 
 PythonRuntimeTestSuite.test("pydict") {
-  let dict = PyVal(["a": 1, 1: 0.5])
-  expectEqual(2, Python.len.call(args: dict))
+  let dict = ["a": 1, 1: 0.5] as PyVal
+  expectEqual(2, Python.len.call(dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
 
@@ -66,10 +66,12 @@ PythonRuntimeTestSuite.test("binary-ops") {
 PythonRuntimeTestSuite.test("comparable") {
   let pyValArray: [PyVal] = [-1, 10, 1, 0, 0]
   expectEqual([-1, 0, 0, 1, 10], pyValArray.sorted())
+  let pyValArray2: PyVal = [-1, 10, 1, 0, 0]
+  expectEqual([-1, 0, 0, 1, 10], pyValArray2.sorted())
 }
 
 PythonRuntimeTestSuite.test("range-iter") {
-  for (index, val) in Python.range.call(args: PyVal(5)).enumerated() {
+  for (index, val) in Python.range.call(5).enumerated() {
     expectEqual(PyVal(index), val)
   }
 }
