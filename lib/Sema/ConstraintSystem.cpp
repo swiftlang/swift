@@ -1957,6 +1957,23 @@ DeclName OverloadChoice::getName() const {
 }
 
 bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
-  return isDecl() &&
-         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  if (!isDecl())
+    return false;
+
+  auto *decl = getDecl();
+  if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    return false;
+
+  auto itfType = decl->getInterfaceType();
+  if (!itfType->getAs<AnyFunctionType>())
+    return true;
+
+  switch (getFunctionRefKind()) {
+  case FunctionRefKind::Unapplied:
+  case FunctionRefKind::Compound:
+    return false;
+  case FunctionRefKind::SingleApply:
+  case FunctionRefKind::DoubleApply:
+    return true;
+  }
 }

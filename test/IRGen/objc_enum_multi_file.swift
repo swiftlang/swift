@@ -16,9 +16,6 @@ func useFoo(_ x: Foo) -> Int32 {
   // CHECK-DAG: i32 0, label %[[CASE_A:.+]]
   // CHECK: ]
 
-  // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: unreachable
-
   switch x {
     // CHECK: <label>:[[CASE_B]]
     // CHECK-NEXT: br label %[[FINAL:.+]]
@@ -36,6 +33,10 @@ func useFoo(_ x: Foo) -> Int32 {
     return 10
   }
 
+  // CHECK: <label>:[[DEFAULT]]
+  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK-NEXT: unreachable
+
   // CHECK: <label>:[[FINAL]]
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
@@ -48,9 +49,6 @@ func useBar(_ x: Bar) -> Int32 {
   // CHECK-DAG: i32 7, label %[[CASE_C:.+]]
   // CHECK-DAG: i32 5, label %[[CASE_A:.+]]
   // CHECK: ]
-
-  // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: unreachable
 
   switch x {
   // CHECK: <label>:[[CASE_B]]
@@ -68,6 +66,10 @@ func useBar(_ x: Bar) -> Int32 {
   case .A:
     return 10
   }
+
+  // CHECK: <label>:[[DEFAULT]]
+  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]

@@ -1196,14 +1196,14 @@ public:
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
 struct SILDebugVariable {
-  SILDebugVariable() : Constant(true), ArgNo(0) {}
-  SILDebugVariable(bool Constant, unsigned ArgNo)
-    : Constant(Constant), ArgNo(ArgNo) {}
+  SILDebugVariable() : ArgNo(0), Constant(false) {}
+  SILDebugVariable(bool Constant, uint16_t ArgNo)
+      : ArgNo(ArgNo), Constant(Constant) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
-    : Name(Name), Constant(Constant), ArgNo(ArgNo) {}
+      : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
   StringRef Name;
-  bool Constant;
-  unsigned ArgNo;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -1212,18 +1212,21 @@ class TailAllocatedDebugVariable {
   union {
     uint32_t RawValue;
     struct {
+      /// Whether this is a debug variable at all.
+      unsigned HasValue : 1;
+      /// True if this is a let-binding.
+      unsigned Constant : 1;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       unsigned ArgNo : 16;
-      unsigned Constant : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      unsigned NameLength : 15;
+      unsigned NameLength : 14;
     } Data;
   };
 public:
-  TailAllocatedDebugVariable(SILDebugVariable DbgVar, char *buf);
+  TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf);
   TailAllocatedDebugVariable(uint32_t RawValue) : RawValue(RawValue) {}
   uint32_t getRawValue() const { return RawValue; }
 
@@ -1234,12 +1237,14 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const  { return Data.Constant; }
 
-  SILDebugVariable get(VarDecl *VD, const char *buf) const {
+  Optional<SILDebugVariable> get(VarDecl *VD, const char *buf) const {
+    if (!Data.HasValue)
+      return None;
     if (VD)
-      return {VD->getName().empty() ? "" : VD->getName().str(), VD->isLet(),
-              getArgNo()};
+      return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
+                              VD->isLet(), getArgNo());
     else
-      return {getName(buf), isLet(), getArgNo()};
+      return SILDebugVariable(getName(buf), isLet(), getArgNo());
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -1272,12 +1277,12 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands,
                  SILFunction &F,
-                 SILDebugVariable Var);
+                 Optional<SILDebugVariable> Var);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
                                 SILOpenedArchetypesState &OpenedArchetypes,
-                                SILDebugVariable Var);
+                                Optional<SILDebugVariable> Var);
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return SILInstruction::Bits.AllocStackInst.NumOperands;
@@ -1297,7 +1302,7 @@ public:
   VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
-  SILDebugVariable getVarInfo() const {
+  Optional<SILDebugVariable> getVarInfo() const {
     auto RawValue = SILInstruction::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
     return VI.get(getDecl(), getTrailingObjects<char>());
@@ -1514,12 +1519,12 @@ class AllocBoxInst final
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               SILDebugVariable Var);
+               Optional<SILDebugVariable> Var);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               SILOpenedArchetypesState &OpenedArchetypes,
-                              SILDebugVariable Var);
+                              Optional<SILDebugVariable> Var);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -1536,7 +1541,7 @@ public:
   VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
-  SILDebugVariable getVarInfo() const {
+  Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 
@@ -3629,7 +3634,7 @@ public:
   /// or null if we don't have one.
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
-  SILDebugVariable getVarInfo() const {
+  Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   }
 };
@@ -3655,7 +3660,7 @@ public:
   /// or null if we don't have one.
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
-  SILDebugVariable getVarInfo() const {
+  Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 };

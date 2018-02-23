@@ -14,3 +14,13 @@
 # utils/gyb_sourcekit_support/ directory as a module.
 #
 # ----------------------------------------------------------------------------
+from UIDs import UID_KEYS
+from UIDs import UID_KINDS
+from UIDs import UID_REQUESTS
+
+
+def check_uid_duplication():
+    all_external_names = [K.externalName for K in UID_KEYS] + \
+        [R.externalName for R in UID_REQUESTS] +              \
+        [K.externalName for K in UID_KINDS]
+    return len(all_external_names) == len(set(all_external_names))

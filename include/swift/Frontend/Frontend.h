@@ -34,7 +34,6 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -49,6 +48,7 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class SILModule;
 
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
@@ -371,6 +371,15 @@ class CompilerInstance {
   void createSILModule();
 
 public:
+  // Out of line to avoid having to import SILModule.h.
+  CompilerInstance();
+  ~CompilerInstance();
+
+  CompilerInstance(const CompilerInstance &) = delete;
+  void operator=(const CompilerInstance &) = delete;
+  CompilerInstance(CompilerInstance &&) = delete;
+  void operator=(CompilerInstance &&) = delete;
+
   SourceManager &getSourceMgr() { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
@@ -398,9 +407,7 @@ public:
   /// Set the SIL module for this compilation instance.
   ///
   /// The CompilerInstance takes ownership of the given SILModule object.
-  void setSILModule(std::unique_ptr<SILModule> M) {
-    TheSILModule = std::move(M);
-  }
+  void setSILModule(std::unique_ptr<SILModule> M);
 
   SILModule *getSILModule() {
     return TheSILModule.get();

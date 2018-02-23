@@ -1477,6 +1477,8 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();
   auto Trace = Invocation.getFrontendOptions().TraceStats;
+  auto ProfileEvents = Invocation.getFrontendOptions().ProfileEvents;
+  auto ProfileEntities = Invocation.getFrontendOptions().ProfileEntities;
   SourceManager *SM = &Instance->getSourceMgr();
   clang::SourceManager *CSM = nullptr;
   if (auto *clangImporter = static_cast<ClangImporter *>(
@@ -1485,7 +1487,8 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   }
   return llvm::make_unique<UnifiedStatsReporter>(
       "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
-      OptType, StatsOutputDir, SM, CSM, Trace);
+      OptType, StatsOutputDir, SM, CSM, Trace,
+      ProfileEvents, ProfileEntities);
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,

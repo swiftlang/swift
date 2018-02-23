@@ -2276,14 +2276,10 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   // If we entered an initializer context, contextualize any
   // auto-closures we might have created.
-  if (initContext) {
+  if (initContext && !hadError) {
     // Check safety of error-handling in the declaration, too.
-    if (!hadError) {
-      checkInitializerErrorHandling(initContext, init);
-    }
-
-    if (!hadError)
-      (void)contextualizeInitializer(initContext, init);
+    checkInitializerErrorHandling(initContext, init);
+    (void)contextualizeInitializer(initContext, init);
   }
 
   if (hadError) {
@@ -3125,9 +3121,15 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::dump(Expr *E) {
-  auto getTypeOfExpr = [&](const Expr *E) -> Type { return getType(E); };
+  auto getTypeOfExpr = [&](const Expr *E) -> Type {
+    if (hasType(E))
+      return getType(E);
+    return Type();
+  };
   auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
-    return getType(TL);
+    if (hasType(TL))
+      return getType(TL);
+    return Type();
   };
 
   E->dump(getTypeOfExpr, getTypeOfTypeLoc);

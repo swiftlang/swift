@@ -4511,15 +4511,15 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto createRootClass = [=](Identifier name,
-                                 DeclContext *dc = nullptr) -> ClassDecl * {
+      auto createFakeRootClass = [=](Identifier name,
+                                     DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
                                           /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        AccessLevel::Open,
+                                                        AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
@@ -4547,7 +4547,7 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
+        auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
@@ -4579,7 +4579,7 @@ namespace {
 
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
-          auto result = createRootClass(name);
+          auto result = createFakeRootClass(name);
           result->setImplicit();
           auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
@@ -4602,13 +4602,16 @@ namespace {
       if (declaredNative && nativeDecl)
         return nativeDecl;
 
+      auto access = AccessLevel::Open;
+      if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
+          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+        access = AccessLevel::Public;
+      }
+
       // Create the class declaration and record it.
-      auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                AccessLevel::Open,
-                                Impl.importSourceLoc(decl->getLocStart()),
-                                name,
-                                Impl.importSourceLoc(decl->getLocation()),
-                                None, nullptr, dc);
+      auto result = Impl.createDeclWithClangNode<ClassDecl>(
+          decl, access, Impl.importSourceLoc(decl->getLocStart()), name,
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -7875,11 +7878,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
-  UnifiedStatsReporter::FrontendStatsTracer Tracer;
-  if (SwiftContext.Stats)
-    Tracer = SwiftContext.Stats->getStatsTracer("import-clang-decl",
-                                                ClangDecl);
-
+  FrontendStatsTracer StatsTracer(SwiftContext.Stats,
+                                  "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
@@ -8346,12 +8346,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  RecursiveSharedTimer::Guard guard;
-  if (auto s = D->getASTContext().Stats) {
-    guard = s->getFrontendRecursiveSharedTimers()
-                .ClangImporter__Implementation__loadAllMembers.getGuard();
-  }
 
+  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
@@ -8601,17 +8597,20 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
+    } else {
+      OS << "<unnamed-clang-decl>";
     }
   }
 
-  static inline void printClangShortLoc(raw_ostream &OS,
+  static inline bool printClangShortLoc(raw_ostream &OS,
                                         clang::SourceManager *CSM,
                                         clang::SourceLocation L) {
     if (!L.isValid() || !L.isFileID())
-      return;
+      return false;
     auto PLoc = CSM->getPresumedLoc(L);
     OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
        << ':' << PLoc.getColumn();
+    return true;
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -8621,8 +8620,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (CSM) {
       const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
       auto Range = CD->getSourceRange();
-      printClangShortLoc(OS, CSM, Range.getBegin());
-      OS << '-';
+      if (printClangShortLoc(OS, CSM, Range.getBegin()))
+        OS << '-';
       printClangShortLoc(OS, CSM, Range.getEnd());
     }
   }
@@ -8630,13 +8629,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static ClangDeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const clang::Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
+  return &TF;
 }

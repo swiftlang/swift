@@ -22,6 +22,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitcode/BitstreamReader.h"

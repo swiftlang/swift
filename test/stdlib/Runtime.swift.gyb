@@ -803,9 +803,11 @@ Reflection.test("Enum/MultiPayloadTagBitsNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Plus\n" +
       "  - a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.SE30\n" +
       "  ▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Classic\n" +
-      "    - Classic: 16\n" +
+      "    ▿ Classic: (1 element)\n" +
+      "      - mhz: 16\n" +
       "  ▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Performa\n" +
-      "    - Performa: 220\n"
+      "    ▿ Performa: (1 element)\n" +
+      "      - model: 220\n"
 
     expectEqual(expected, output)
   }
@@ -849,11 +851,13 @@ Reflection.test("Enum/MultiPayloadSpareBitsNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.MacPaint\n" +
       "  - a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.FileMaker\n" +
       "  ▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
-      "    ▿ ClarisWorks: a.Floppy #0\n" +
-      "      - capacity: 800\n" +
+      "    ▿ ClarisWorks: (1 element)\n" +
+      "      ▿ floppy: a.Floppy #0\n" +
+      "        - capacity: 800\n" +
       "  ▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.HyperCard\n" +
-      "    ▿ HyperCard: a.CDROM #1\n" +
-      "      - capacity: 600\n"
+      "    ▿ HyperCard: (1 element)\n" +
+      "      ▿ cdrom: a.CDROM #1\n" +
+      "        - capacity: 600\n"
 
     expectEqual(expected, output)
   }
@@ -885,9 +889,11 @@ Reflection.test("Enum/MultiPayloadTagBitsSmallNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.MacPaint\n" +
       "  - a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.FileMaker\n" +
       "  ▿ a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
-      "    - ClarisWorks: true\n" +
+      "    ▿ ClarisWorks: (1 element)\n" +
+      "      - floppy: true\n" +
       "  ▿ a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.HyperCard\n" +
-      "    - HyperCard: false\n"
+      "    ▿ HyperCard: (1 element)\n" +
+      "      - cdrom: false\n"
 
     expectEqual(expected, output)
   }
@@ -920,9 +926,11 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIe\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIgs\n" +
       "  ▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Centris\n" +
-      "    - Centris: 4096\n" +
+      "    ▿ Centris: (1 element)\n" +
+      "      - ram: 4096\n" +
       "  ▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Quadra\n" +
-      "    - Quadra: \"160MB\"\n" +
+      "    ▿ Quadra: (1 element)\n" +
+      "      - hdd: \"160MB\"\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBook170\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBookDuo220\n"
 

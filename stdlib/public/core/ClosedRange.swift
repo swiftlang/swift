@@ -13,7 +13,7 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range.
 
-/// A closed range that forms a collection of consecutive values.
+/// An interval from a lower bound up to, and including, an upper bound.
 ///
 /// You create a `ClosedRange` instance by using the closed range
 /// operator (`...`).
@@ -23,41 +23,42 @@
 /// A `ClosedRange` instance contains both its lower bound and its
 /// upper bound.
 ///
-///     print(throughFive.contains(3))      // Prints "true"
-///     print(throughFive.contains(10))     // Prints "false"
-///     print(throughFive.contains(5))      // Prints "true"
+///     throughFive.contains(3)
+///     // true
+///     throughFive.contains(10)
+///     // false
+///     throughFive.contains(5)
+///     // true
 ///
 /// Because a closed range includes its upper bound, a closed range whose lower
-/// bound is equal to the upper bound contains one element. Therefore, a
+/// bound is equal to the upper bound contains that value. Therefore, a
 /// `ClosedRange` instance cannot represent an empty range.
 ///
 ///     let zeroInclusive = 0...0
-///     print(zeroInclusive.isEmpty)
-///     // Prints "false"
-///     print(zeroInclusive.count)
-///     // Prints "1"
+///     zeroInclusive.contains(0)
+///     // true
+///     zeroInclusive.isEmpty
+///     // false
 ///
-/// You can use a `for`-`in` loop or any sequence or collection method with a
-/// countable range. The elements of the range are the consecutive values from
-/// its lower bound up to, and including, its upper bound.
+/// Using a Closed Range as a Collection of Consecutive Values
+/// ----------------------------------------------------------
 ///
-///     for n in throughFive.suffix(3) {
+/// When a closed range uses integers as its lower and upper bounds, or any
+/// other type that conforms to the `Strideable` protocol with an integer
+/// stride, you can use that range in a `for`-`in` loop or with any sequence or
+/// collection method. The elements of the range are the consecutive values
+/// from its lower bound up to, and including, its upper bound.
+///
+///     for n in 3...5 {
 ///         print(n)
 ///     }
 ///     // Prints "3"
 ///     // Prints "4"
 ///     // Prints "5"
 ///
-/// You can create a countable range over any type that conforms to the
-/// `Strideable` protocol and uses an integer as its associated `Stride` type.
-/// By default, Swift's integer and pointer types are usable as the bounds of
-/// a countable range.
-///
 /// Because floating-point types such as `Float` and `Double` are their own
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
-/// you need to test whether values are contained within a closed interval
-/// bound by floating-point values, see the `ClosedRange` type. If you need to
-/// iterate over consecutive floating-point values, see the
+/// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
 @_fixed_layout
 public struct ClosedRange<Bound: Comparable> {
@@ -65,9 +66,6 @@ public struct ClosedRange<Bound: Comparable> {
   public let lowerBound: Bound
 
   /// The range's upper bound.
-  ///
-  /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `index(after:)`.
   public let upperBound: Bound
 
   /// Creates an instance with the given bounds.
@@ -294,7 +292,13 @@ where Bound : Strideable, Bound.Stride : SignedInteger
 
   @_inlineable
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
-    return element >= self.lowerBound && element <= self.upperBound
+    return lowerBound <= element && element <= upperBound
+  }
+
+  @_inlineable
+  public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return lowerBound <= element && element <= upperBound
+              ? .inRange(element) : nil
   }
 }
 

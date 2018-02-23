@@ -4,9 +4,7 @@
 // CHECK-DAG: ![[SINODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64",{{.*}} identifier: [[SI:.*]])
 // CHECK-DAG: ![[SFNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Float",{{.*}} identifier: [[SF:.*]])
 // CHECK-DAG: ![[VOIDNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$SytD",{{.*}} identifier: [[VOID:.*]])
-func bar() {
-    print("bar()", terminator: "")
-}
+func bar() {}
 func baz(_ i: Float) -> Int64 { return 0; }
 func barz(_ i: Float, _ j: Float) -> Int64 { return 0; }
 func main() -> Int64 {
