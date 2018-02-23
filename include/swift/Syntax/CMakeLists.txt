@@ -1,6 +1,4 @@
-set(line_directive "#line" "%(line)d" "\"%(file)s\"")
-set(SWIFT_GYB_FLAGS
-  --line-directive "'${line_directive}'")
+set(SWIFT_GYB_FLAGS "--line-directive \"#line \"%(line)d\" \"%(file)s\"\" ")
 
 set(generated_include_sources
     SyntaxKind.h.gyb

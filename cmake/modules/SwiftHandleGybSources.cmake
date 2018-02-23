@@ -37,6 +37,8 @@ function(handle_gyb_source_single dependency_out_var_name)
       GYB_SINGLE # prefix
       "${options}" "${single_value_args}" "${multi_value_args}" ${ARGN})
 
+separate_arguments(SWIFT_GYB_FLAGS WINDOWS_COMMAND "${SWIFT_GYB_FLAGS}")
+
   set(gyb_flags
       ${SWIFT_GYB_FLAGS}
       ${GYB_SINGLE_FLAGS})
@@ -74,7 +76,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMENT "Generating ${basename} from ${GYB_SINGLE_SOURCE} ${GYB_SINGLE_COMMENT}"
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
       SOURCES "${GYB_SINGLE_SOURCE}"
-      IDEMPOTENT)
+      VERBATIM)
   set("${dependency_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 endfunction()
 
