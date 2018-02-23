@@ -45,7 +45,6 @@ UID_KEYS = [
     KEY('Severity', 'key.severity'),
     KEY('Offset', 'key.offset'),
     KEY('Length', 'key.length'),
-    KEY('Lengthddd', 'key.length'),
     KEY('SourceFile', 'key.sourcefile'),
     KEY('SerializedSyntaxTree', 'key.serialized_syntax_tree'),
     KEY('SourceText', 'key.sourcetext'),
