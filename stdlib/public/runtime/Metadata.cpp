@@ -21,6 +21,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
@@ -2240,15 +2241,12 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   case ExistentialTypeRepresentation::Class:
     return true;
   // Opaque existential containers uniquely own their contained value.
-  case ExistentialTypeRepresentation::Opaque:
-  {
+  case ExistentialTypeRepresentation::Opaque: {
     // We can't take from a shared existential box without checking uniqueness.
     auto *opaque =
         reinterpret_cast<const OpaqueExistentialContainer *>(container);
-    auto *vwt = opaque->Type->getValueWitnesses();
-    return vwt->isValueInline();
+    return opaque->isValueInline();
   }
-    
   // References to boxed existential containers may be shared.
   case ExistentialTypeRepresentation::Error: {
     // We can only take the value if the box is a bridged NSError, in which case
@@ -2275,13 +2273,7 @@ const {
   
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
-    auto *vwt = opaque->Type->getValueWitnesses();
-    if (!vwt->isValueInline()) {
-      unsigned alignMask = vwt->getAlignmentMask();
-      unsigned size = vwt->size;
-      swift_deallocObject(*reinterpret_cast<HeapObject **>(&opaque->Buffer),
-                          size, alignMask);
-    }
+    opaque->deinit();
     break;
   }
   
@@ -2303,18 +2295,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
-    auto *type = opaqueContainer->Type;
-    auto *vwt = type->getValueWitnesses();
-
-    if (vwt->isValueInline())
-      return reinterpret_cast<const OpaqueValue *>(&opaqueContainer->Buffer);
-
-    unsigned alignMask = vwt->getAlignmentMask();
-    // Compute the byte offset of the object in the box.
-    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-    auto *bytePtr = reinterpret_cast<const char *>(
-        *reinterpret_cast<HeapObject *const *const>(&opaqueContainer->Buffer));
-    return reinterpret_cast<const OpaqueValue *>(bytePtr + byteOffset);
+    return opaqueContainer->projectValue();
   }
   case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
