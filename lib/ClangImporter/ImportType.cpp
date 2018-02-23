@@ -705,6 +705,9 @@ namespace {
         }
 #endif
         hint = underlyingResult.Hint;
+        if (hint.Kind == ImportHint::ObjCBridged)
+          if (type->getDecl()->hasAttr<clang::SwiftNonbridgedAttr>())
+            hint = ImportHint::ObjCPointer;
 
         // If the imported typealias is unavailable, return the
         // underlying type.
