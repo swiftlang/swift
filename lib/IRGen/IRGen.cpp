@@ -126,7 +126,8 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
-std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
+           std::string>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
@@ -140,7 +141,7 @@ swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
 void setModuleFlags(IRGenModule &IGM) {
@@ -516,24 +517,18 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  std::string Error;
-  const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
-  if (!Target) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, Triple.str(), Error);
-    return nullptr;
-  }
-
-  CodeGenOpt::Level OptLevel = (Opts.shouldOptimize() ?
-                                  CodeGenOpt::Default // -Os
-                                  : CodeGenOpt::None);
+  CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
+                                   ? CodeGenOpt::Default // -Os
+                                   : CodeGenOpt::None;
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
   std::string CPU;
+  std::string EffectiveClangTriple;
   std::vector<std::string> targetFeaturesArray;
-  std::tie(TargetOpts, CPU, targetFeaturesArray)
+  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple)
     = getIRTargetOptions(Opts, Ctx);
+  const llvm::Triple &EffectiveTriple = llvm::Triple(EffectiveClangTriple);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
@@ -544,13 +539,23 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
     targetFeatures = features.getString();
   }
 
+  std::string Error;
+  const Target *Target =
+      TargetRegistry::lookupTarget(EffectiveTriple.str(), Error);
+  if (!Target) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, EffectiveTriple.str(),
+                       Error);
+    return nullptr;
+  }
+
+
   // Create a target machine.
-  llvm::TargetMachine *TargetMachine =
-      Target->createTargetMachine(Triple.str(), CPU, targetFeatures, TargetOpts,
-                                  Reloc::PIC_, CodeModel::Default, OptLevel);
+  llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
+      EffectiveTriple.str(), CPU, targetFeatures, TargetOpts, Reloc::PIC_,
+      CodeModel::Default, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                       Triple.str(), "no LLVM target machine");
+                       EffectiveTriple.str(), "no LLVM target machine");
     return nullptr;
   }
   return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
