@@ -1895,54 +1895,6 @@ struct TargetWitnessTable {
 
 using WitnessTable = TargetWitnessTable<InProcess>;
 
-/// The basic layout of an opaque (non-class-bounded) existential type.
-template <typename Runtime>
-struct TargetOpaqueExistentialContainer {
-  ValueBuffer Buffer;
-  const TargetMetadata<Runtime> *Type;
-  // const void *WitnessTables[];
-
-  const TargetWitnessTable<Runtime> **getWitnessTables() {
-    return reinterpret_cast<const TargetWitnessTable<Runtime> **>(this + 1);
-  }
-
-  const TargetWitnessTable<Runtime> * const *getWitnessTables() const {
-    return reinterpret_cast<const TargetWitnessTable<Runtime> * const *>(
-                                                                      this + 1);
-  }
-
-  void copyTypeInto(swift::TargetOpaqueExistentialContainer<Runtime> *dest,
-                    unsigned numTables) const {
-    dest->Type = Type;
-    for (unsigned i = 0; i != numTables; ++i)
-      dest->getWitnessTables()[i] = getWitnessTables()[i];
-  }
-};
-using OpaqueExistentialContainer
-  = TargetOpaqueExistentialContainer<InProcess>;
-
-/// The basic layout of a class-bounded existential type.
-template <typename ContainedValue>
-struct ClassExistentialContainerImpl {
-  ContainedValue Value;
-
-  const WitnessTable **getWitnessTables() {
-    return reinterpret_cast<const WitnessTable**>(this + 1);
-  }
-  const WitnessTable * const *getWitnessTables() const {
-    return reinterpret_cast<const WitnessTable* const *>(this + 1);
-  }
-
-  void copyTypeInto(ClassExistentialContainerImpl *dest,
-                    unsigned numTables) const {
-    for (unsigned i = 0; i != numTables; ++i)
-      dest->getWitnessTables()[i] = getWitnessTables()[i];
-  }
-};
-using ClassExistentialContainer = ClassExistentialContainerImpl<void *>;
-using WeakClassExistentialContainer =
-  ClassExistentialContainerImpl<WeakReference>;
-
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.
@@ -1985,6 +1937,7 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   OpaqueValue *projectValue(OpaqueValue *container) const {
     return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*)container));
   }
+
   /// Get the dynamic type from an existential container of the type described
   /// by this metadata.
   const TargetMetadata<Runtime> *
