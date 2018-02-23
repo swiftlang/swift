@@ -1094,10 +1094,8 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     };
     auto conformances = getASTContext().AllocateCopy(conformanceArray);
 
-    SILValue nativeError =
-      B.createInitExistentialRef(loc, nativeErrorTy, bridgedErrorTy,
-                                 bridgedError.forward(*this), conformances);
-    return emitManagedRValueWithCleanup(nativeError);
+    return B.createInitExistentialRef(loc, nativeErrorTy, bridgedErrorTy,
+                                      bridgedError, conformances);
   }
 
   // Otherwise, we need to call a runtime function to potential substitute
