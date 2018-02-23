@@ -2119,6 +2119,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
+                if [[ ! "${SKIP_BUILD_FOUNDATION}" ]]; then
+                  FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                  cmake_options+=(
+                    -DFOUNDATION_BUILD_DIR="${FOUNDATION_BUILD_DIR}/Foundation"
+                  )
+                fi
+
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
                     -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
