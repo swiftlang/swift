@@ -47,7 +47,7 @@ extension Unicode {
       // Ignore zero valued collation elements. They don't participate in the
       // ordering relation.
       if element != 0 {
-        hasher._append(Int(truncatingIfNeeded: element))
+        hasher.append(Int(truncatingIfNeeded: element))
       }
     }
   }
@@ -74,7 +74,7 @@ extension Unicode {
       // Ignore zero valued collation elements. They don't participate in the
       // ordering relation.
       if element != 0 {
-        hasher._append(Int(truncatingIfNeeded: element))
+        hasher.append(Int(truncatingIfNeeded: element))
       }
     }
   }

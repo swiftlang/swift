@@ -183,7 +183,7 @@ public struct _UnsafeHasher {
     // to assume it may mutate the hashable we're visiting. We know that won't
     // be the case (the stdlib owns the hash function), but the only way to tell
     // this to the compiler is to pretend the state update is pure.
-    _state.pointee._append(value)
+    _state.pointee.append(value)
     return self
   }
 
@@ -195,13 +195,13 @@ public struct _UnsafeHasher {
 
   @inline(__always)
   internal func _appending(_ value: Int) -> _UnsafeHasher {
-    _state.pointee._append(value)
+    _state.pointee.append(value)
     return self
   }
 
   @inline(__always)
   internal func _finalized() -> Int {
-    return _state.pointee._finalize()
+    return _state.pointee.finalize()
   }
 }
 
@@ -215,7 +215,7 @@ internal struct _QuickHasher {
   }
 
   @inline(__always)
-  internal mutating func _append(_ value: Int) {
+  internal mutating func append(_ value: Int) {
     if _hash == 0 {
       _hash = value
       return
@@ -224,9 +224,9 @@ internal struct _QuickHasher {
   }
 
   @inline(__always)
-  internal mutating func _finalize() -> Int {
+  internal mutating func finalize() -> Int {
     return _mixInt(_hash)
   }
 }
 
-internal typealias _Hasher = _QuickHasher
+internal typealias _Hasher = _SipHash13
