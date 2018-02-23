@@ -437,5 +437,7 @@ const InputFile &FrontendInputsAndOutputs::inputNamed(StringRef name) const {
           name);
   auto iterator = InputsByName.find(correctedFile);
   assert(iterator != InputsByName.end() && "Unknown input");
-  return AllInputs[iterator->second];
+  const InputFile &r = AllInputs[iterator->second];
+  assert(r.isPrimary() && "mapped a non-primary");
+  return r;
 }
