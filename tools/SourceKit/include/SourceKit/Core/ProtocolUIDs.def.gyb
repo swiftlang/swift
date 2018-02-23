@@ -1,8 +1,7 @@
 %{
   # -*- mode: Python -*-
-  from gyb_sourcekit_support.UIDs import UID_KEYS
-  from gyb_sourcekit_support.UIDs import UID_REQUESTS
-  from gyb_sourcekit_support.UIDs import UID_KINDS
+  from gyb_sourcekit_support import *
+  assert check_uid_duplication(), "Found UID duplication"
   # Ignore the following admonition; it applies to the resulting .def file only
 }%
 //// Automatically Generated From ProtocolUIDs.def.gyb.
