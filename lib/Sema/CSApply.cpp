@@ -2412,19 +2412,21 @@ namespace {
       // it to return a TensorHandle<T> and then use the init(handle:)
       // initializer of the expected result type to project it back to the type
       // that we want.
-      if (tensorProto && !expr->getType()->is<UnresolvedType>() &&
-          tc.conformsToProtocol(expr->getType(), tensorProto, cs.DC,
+      const auto exprType = cs.getType(expr);
+      assert(exprType && "expr Type cannot be NULL!");
+      if (tensorProto && !exprType->is<UnresolvedType>() &&
+          tc.conformsToProtocol(exprType, tensorProto, cs.DC,
                                 ConformanceCheckFlags::Used)) {
-        auto resultTy = expr->getType();
+        auto resultTy = exprType;
         // Look up the handle member on our type, to get the concrete
         // TensorHandle<T> type to use for this value.
         auto handleId = ctx.getIdentifier("handle");
-        auto lookup = tc.lookupMember(cs.DC, expr->getType(),
+        auto lookup = tc.lookupMember(cs.DC, exprType,
                                       DeclName(handleId));
         assert(lookup && "TensorProtocol didn't have a handle member?");
         auto decl = lookup.front().getValueDecl();
         auto handleTy =
-          expr->getType()->getTypeOfMember(cs.DC->getParentModule(), decl);
+            exprType->getTypeOfMember(cs.DC->getParentModule(), decl);
 
         // Now that we have the handle type, switch the ObjectLiteralExpr to be
         // that type, and build the original TensorProtocol type by using the
@@ -2455,8 +2457,10 @@ namespace {
       // value and pass that instead.
       bool changedArg = false;
       for (auto &elt : tuple->getElements().drop_front()) {
-        if (!tensorProto || elt->getType()->is<UnresolvedType>() ||
-            !tc.conformsToProtocol(elt->getType(), tensorProto, cs.DC,
+        auto eltType = cs.getType(elt);
+        assert(eltType && "elt Type cannot be NULL!");
+        if (!tensorProto || eltType->is<UnresolvedType>() ||
+            !tc.conformsToProtocol(eltType, tensorProto, cs.DC,
                                    ConformanceCheckFlags::Used))
           continue;
 
