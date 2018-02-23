@@ -459,19 +459,6 @@ swift_reflection_interop_typeRefForMangledTypeName(
   return Result;
 }
 
-swift_typeref_interop_t
-swift_reflection_interop_genericArgumentOfTypeRef(
-  SwiftReflectionInteropContextRef ContextRef,
-  swift_typeref_interop_t OpaqueTypeRef,
-  unsigned Index) {
-  DECLARE_LIBRARY(OpaqueTypeRef.Library);
-  swift_typeref_interop_t Result;
-  Result.Typeref = Library->Functions.genericArgumentOfTypeRef(OpaqueTypeRef.Typeref,
-                                                                Index);
-  Result.Library = OpaqueTypeRef.Library;
-  return Result;
-}
-
 swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef) {
@@ -480,9 +467,9 @@ swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef Context
 }
 
 swift_childinfo_t
-swift_reflection_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
-                                swift_typeref_interop_t OpaqueTypeRef,
-                                unsigned Index) {
+swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                       swift_typeref_interop_t OpaqueTypeRef,
+                                        unsigned Index) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   return Library->Functions.childOfTypeRef(Library->Context,
                                            OpaqueTypeRef.Typeref,
@@ -490,16 +477,16 @@ swift_reflection_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
 }
 
 swift_typeinfo_t
-swift_reflection_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
-                                 swift_metadata_interop_t Metadata) {
+swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   return Library->Functions.infoForMetadata(Library->Context, Metadata.Metadata);
 }
 
 swift_childinfo_t
-swift_reflection_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
-                                 swift_metadata_interop_t Metadata,
-                                 unsigned Index) {
+swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_metadata_interop_t Metadata,
+                                        unsigned Index) {
   DECLARE_LIBRARY(Metadata.Library);
   return Library->Functions.childOfMetadata(Library->Context, Metadata.Metadata, Index);
 }
@@ -547,15 +534,75 @@ swift_reflection_interop_genericArgumentCountOfTypeRef(
 }
 
 swift_typeref_interop_t
-swift_reflection_genericArgumentOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
-                                          swift_typeref_interop_t OpaqueTypeRef,
-                                          unsigned Index) {
+swift_reflection_interop_genericArgumentOfTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef,
+  unsigned Index) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   swift_typeref_interop_t Result;
   Result.Typeref = Library->Functions.genericArgumentOfTypeRef(OpaqueTypeRef.Typeref,
                                                                Index);
   Result.Library = OpaqueTypeRef.Library;
   return Result;
+}
+
+static inline int
+swift_reflection_interop_projectExistential(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_addr_t ExistentialAddress,
+                                            swift_typeref_interop_t ExistentialTypeRef,
+                                            swift_typeref_interop_t *OutInstanceTypeRef,
+                                            swift_addr_t *OutStartOfInstanceData) {
+  DECLARE_LIBRARY(ExistentialTypeRef.Library);
+  int Success = Library->Functions.projectExistential(Library->Context,
+                                                      ExistentialAddress,
+                                                      ExistentialTypeRef.Typeref,
+                                                      &OutInstanceTypeRef->Typeref,
+                                                      OutStartOfInstanceData);
+  if (!Success)
+    return 0;
+  
+  OutInstanceTypeRef->Library = ExistentialTypeRef.Library;
+  return 1;
+}
+
+static inline void
+swift_reflection_interop_dumpTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                     swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  Library->Functions.dumpTypeRef(OpaqueTypeRef.Typeref);
+}
+
+void swift_reflection_interop_dumpInfoForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  Library->Functions.dumpInfoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
+}
+
+void swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                                  swift_metadata_interop_t Metadata) {
+  DECLARE_LIBRARY(Metadata.Library);
+  Library->Functions.dumpInfoForMetadata(Library->Context, Metadata.Metadata);
+}
+
+void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                                  uintptr_t Object) {
+  FOREACH_LIBRARY {
+    if (!Library->Functions.ownsObject(Library->Context, Object))
+      continue;
+    
+    Library->Functions.dumpInfoForInstance(Library->Context, Object);
+    return;
+  }
+}
+
+size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
+                                         const char *MangledName,
+                                         size_t Length,
+                                         char *OutDemangledName,
+                                         size_t MaxLength) {
+  FOREACH_LIBRARY {
+    return Library->Functions.demangle(MangledName, Length, OutDemangledName, MaxLength);
+  }
+  return 0;
 }
 
 #undef FOREACH_LIBRARY
