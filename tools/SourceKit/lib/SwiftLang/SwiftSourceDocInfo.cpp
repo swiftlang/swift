@@ -496,6 +496,11 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
 static StringRef getSourceToken(unsigned Offset,
                                 ImmutableTextSnapshotRef Snap) {
   auto MemBuf = Snap->getBuffer()->getInternalBuffer();
+
+  // FIXME: Invalid offset shouldn't reach here.
+  if (Offset >= MemBuf->getBufferSize())
+    return StringRef();
+
   SourceManager SM;
   auto MemBufRef = llvm::MemoryBuffer::getMemBuffer(MemBuf->getBuffer(),
                                                  MemBuf->getBufferIdentifier());
