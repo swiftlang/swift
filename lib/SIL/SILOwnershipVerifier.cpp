@@ -587,6 +587,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCSuperMethod)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, SuperMethod)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -598,7 +599,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCSuperMethod)
                       !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
     return {compatible, UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};       \
   }
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SuperMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ClassifyBridgeObject)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
