@@ -148,7 +148,9 @@ extension PyRef : PythonConvertible {
   }
 
   /// Python convertible values may always be converted to Python.
-  public var pythonValue : PyVal { return PyVal(self) }
+  public var pythonValue: PyVal {
+    return PyVal(self)
+  }
 }
 
 extension PyVal : PythonConvertible {
@@ -164,10 +166,10 @@ extension PyVal : PythonConvertible {
 // MARK: ThrowingPyVal Implementation
 //===----------------------------------------------------------------------===//
 
-extension PyVal {
+public extension PyVal {
   /// Return a version of this value that may be called.  It throws a Swift
   /// error if the underlying Python function throws a Python exception.
-  public var throwing : ThrowingPyVal {
+  var throwing: ThrowingPyVal {
     return ThrowingPyVal(self)
   }
 }
@@ -232,9 +234,10 @@ public struct ThrowingPyVal {
   /// exception, if the callee isn't callable, or if there is some other
   /// problem, we throw a Swift error.
   @discardableResult
-  public func call<T : PythonConvertible>
-    (argArray args: [T],
-     kwargs: [(String, PythonConvertible)] = []) throws -> PyVal {
+  public func call<T : PythonConvertible>(
+    argArray args: [T],
+    kwargs: [(String, PythonConvertible)] = []
+  ) throws -> PyVal {
     // Make sure state errors are not around.
     if PyErr_Occurred() != nil {
       // FIXME: This should be an assert, but the failure mode in playgrounds
@@ -301,6 +304,7 @@ public struct ThrowingPyVal {
     }
     return try callee.throwing.call(argArray: args, kwargs: kwargs)
   }
+
   @discardableResult
   public func call(member name: String,
                    _ args: PythonConvertible...,
@@ -326,6 +330,7 @@ public struct ThrowingPyVal {
 
     return (elt0, elt1, elt2)
   }
+
   public func get4Tuple() throws -> (PyVal, PyVal, PyVal, PyVal) {
     let ct = state.checking
     guard let elt0 = ct[0], let elt1 = ct[1],
@@ -342,11 +347,11 @@ public struct ThrowingPyVal {
 // MARK: CheckingPyVal Implementation
 //===----------------------------------------------------------------------===//
 
-extension PyVal {
+public extension PyVal {
   /// Return a version of this value that may have member access operations
   /// performed on it.  These operations can fail and return an optional when
   /// the underlying Python operations fail.
-  public var checking : CheckingPyVal {
+  var checking : CheckingPyVal {
     return CheckingPyVal(self)
   }
 }
@@ -589,14 +594,14 @@ public struct PythonInterface {
   // things like Python.open" naturally resolve to Python.get(member: "open")
   // and all the builtin functions are therefore available naturally and don't
   // have to be enumerated here.
-  public var isinstance : PyVal { return builtins["isinstance"] }
-  public var len : PyVal { return builtins["len"] }
-  public var open : PyVal { return builtins["open"] }
-  public var print : PyVal { return builtins["print"] }
-  public var range : PyVal { return builtins["range"] }
-  public var repr : PyVal { return builtins["repr"] }
-  public var str : PyVal { return builtins["str"] }
-  public var type : PyVal { return builtins["type"] }
+  public var isinstance: PyVal { return builtins["isinstance"] }
+  public var len: PyVal { return builtins["len"] }
+  public var open: PyVal { return builtins["open"] }
+  public var print: PyVal { return builtins["print"] }
+  public var range: PyVal { return builtins["range"] }
+  public var repr: PyVal { return builtins["repr"] }
+  public var str: PyVal { return builtins["str"] }
+  public var type: PyVal { return builtins["type"] }
 }
 
 
@@ -631,7 +636,7 @@ private func pyTuple<T : Collection>(_ vals : T) -> OwnedPyObject
   return t
 }
 
-extension PyVal {
+public extension PyVal {
   /// FIXME: This should be subsumed by Swift ranges + strides.  Python has a
   /// very extravagent model though, it isn't clear how best to represent this
   /// in Swift.
@@ -643,22 +648,24 @@ extension PyVal {
   /// We also need conditional conformances to allow range if PyVal's to be a
   /// Slice.  We can probably get away with a bunch of overloads for now given
   /// that slices are typically used with concrete operands.
-  public init(slice start: PythonConvertible, _ end: PythonConvertible,
-              _ step: PythonConvertible? = nil) {
+  init(slice start: PythonConvertible, _ end: PythonConvertible,
+       _ step: PythonConvertible? = nil) {
     self.init(owned: pySlice(start, end, step))
   }
 
   // Tuples will require explicit support until Tuples can conform to protocols,
   // which is probably a long time.
-  public init(tuple elts: PythonConvertible...) {
+  init(tuple elts: PythonConvertible...) {
     self.init(tupleContentsOf: elts)
   }
-  public init<T : Collection>(tupleContentsOf elts: T)
-      where T.Element == PythonConvertible {
+
+  init<T : Collection>(tupleContentsOf elts: T)
+    where T.Element == PythonConvertible {
     self.init(owned: pyTuple(elts.map { $0.pythonValue }))
   }
-  public init<T : Collection>(tupleContentsOf elts: T)
-      where T.Element : PythonConvertible {
+
+  init<T : Collection>(tupleContentsOf elts: T)
+    where T.Element : PythonConvertible {
     self.init(owned: pyTuple(elts))
   }
 }
@@ -716,6 +723,7 @@ extension String : PythonConvertible {
 
     self = String(cString: cStringVal)
   }
+
   public var pythonValue : PyVal {
     _ = Python // ensure Python is initialized.
     let v = self.utf8CString.withUnsafeBufferPointer {
@@ -744,6 +752,7 @@ extension Int : PythonConvertible {
 
     self = value
   }
+
   public var pythonValue : PyVal {
     _ = Python // ensure Python is initialized.
     return PyVal(owned: PyInt_FromLong(self))
@@ -811,12 +820,14 @@ extension Double : PythonConvertible {
 public protocol IntXPyVal : PythonConvertible, FixedWidthInteger {
   associatedtype ParentPythonIntType : PythonConvertible, FixedWidthInteger
 }
-extension IntXPyVal {
-  public init?(_ pyValue: PyVal) {
+
+public extension IntXPyVal {
+  init?(_ pyValue: PyVal) {
     guard let i = ParentPythonIntType(pyValue) else { return nil }
     self = Self(i)
   }
-  public var pythonValue : PyVal {
+
+  var pythonValue : PyVal {
     return ParentPythonIntType(self).pythonValue
   }
 }
@@ -951,7 +962,7 @@ extension PyVal : SignedNumeric {
 
 // Define conformance to Comparable and Equatable
 extension PyVal : Hashable, Comparable, Equatable {
-  public static func <(lhs: PyVal, rhs: PyVal) -> Bool {
+  public static func < (lhs: PyVal, rhs: PyVal) -> Bool {
     if let cmp = lhs.checking.get(member: "__cmp__") {
       guard let cmpResult = Int(cmp.call(rhs)) else {
         fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
@@ -963,7 +974,8 @@ extension PyVal : Hashable, Comparable, Equatable {
     }
     return ltResult
   }
-  public static func==(lhs: PyVal, rhs: PyVal) -> Bool {
+
+  public static func == (lhs: PyVal, rhs: PyVal) -> Bool {
     if let cmp = lhs.checking.get(member: "__cmp__") {
       guard let cmpResult = Int(cmp.call(rhs)) else {
         fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
@@ -975,6 +987,7 @@ extension PyVal : Hashable, Comparable, Equatable {
     }
     return eqResult
   }
+
   public var hashValue: Int {
     guard let hash = Int(self.call(member: "__hash__")) else {
       fatalError("cannot use __hash__ on \(self)")
