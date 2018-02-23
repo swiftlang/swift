@@ -161,8 +161,6 @@ SingleValueInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
                           SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist);
 
-void recalcDomTreeForCCBOpt(DominanceInfo *DT, SILFunction &F);
-
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {

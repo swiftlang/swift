@@ -220,3 +220,11 @@ sil @borrowClosure : $@convention(thin) () -> () {
   %empty = tuple ()
   return %empty : $()
 }
+
+sil @dontAssert : $@convention(thin) (Builtin.Int64) -> (@out Builtin.Int64) {
+bb0(%0 : @trivial $*Builtin.Int64, %1 : @trivial $Builtin.Int64):
+  store %1 to [trivial] %0 : $*Builtin.Int64
+  %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  unreachable
+}

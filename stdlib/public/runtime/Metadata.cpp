@@ -1434,6 +1434,10 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::Demangler Dem;
+  // Resolve symbolic references to a unique mangling that can be encoded in
+  // the class name.
+  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
+
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
   // Remangle that into a new type mangling string.
@@ -1512,12 +1516,12 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     }
 
     // Copy the field offsets.
-    if (description->Class.hasFieldOffsetVector()) {
+    if (description->hasFieldOffsetVector()) {
       unsigned fieldOffsetVector =
-        description->Class.getFieldOffsetVectorOffset(ancestor);
+        description->getFieldOffsetVectorOffset(ancestor);
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
-             description->Class.NumFields * sizeof(uintptr_t));
+             description->NumFields * sizeof(uintptr_t));
     }
     ancestor = ancestor->SuperClass;
   }
@@ -2831,9 +2835,8 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // The number of mandatory requirements, i.e. requirements lacking
   // default implementations.
-  size_t numMandatoryRequirements =
-    protocol->NumMandatoryRequirements + WitnessTableFirstRequirementOffset;
-  assert(numPatternWitnesses >= numMandatoryRequirements);
+  assert(numPatternWitnesses >= protocol->NumMandatoryRequirements +
+                                    WitnessTableFirstRequirementOffset);
 
   // The total number of requirements.
   size_t numRequirements =
@@ -3011,4 +3014,14 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
 
 void *swift::allocateMetadata(size_t size, size_t alignment) {
   return MetadataAllocator().Allocate(size, alignment);
+}
+
+template<>
+bool Metadata::satisfiesClassConstraint() const {
+  // existential types marked with @objc satisfy class requirement.
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this))
+    return existential->isObjC();
+
+  // or it's a class.
+  return isAnyClass();
 }

@@ -377,13 +377,15 @@ ManagedValue Transform::transform(ManagedValue v,
   if (v.getType() == loweredResultTy)
     return v;
 
-  OptionalTypeKind outputOTK, inputOTK;
-  CanType inputObjectType = inputSubstType.getOptionalObjectType(inputOTK);
-  CanType outputObjectType = outputSubstType.getOptionalObjectType(outputOTK);
+  bool inputIsOptional, outputIsOptional;
+  CanType inputObjectType =
+      inputSubstType.getOptionalObjectType(inputIsOptional);
+  CanType outputObjectType =
+      outputSubstType.getOptionalObjectType(outputIsOptional);
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
-  if (outputOTK != OTK_None && inputOTK == OTK_None) {
+  if (outputIsOptional && !inputIsOptional) {
     return SGF.emitInjectOptional(
         Loc, expectedTL, ctxt, [&](SGFContext objectCtxt) {
           return transform(v, inputOrigType, inputSubstType,
@@ -394,8 +396,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // If the value is an optional, but the desired formal type isn't an
   // optional or Any, force it.
-  if (inputOTK != OTK_None && outputOTK == OTK_None
-      && !outputSubstType->isExistentialType()) {
+  if (inputIsOptional && !outputIsOptional &&
+      !outputSubstType->isExistentialType()) {
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
@@ -404,11 +406,11 @@ ManagedValue Transform::transform(ManagedValue v,
     if (v.getType() == loweredResultTy)
       return v;
 
-    inputOTK = OTK_None;
+    inputIsOptional = false;
   }
 
   // Optional-to-optional conversion.
-  if (inputOTK != OTK_None && outputOTK != OTK_None) {
+  if (inputIsOptional && outputIsOptional) {
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {
@@ -817,13 +819,15 @@ static ManagedValue manageParam(SILGenFunction &SGF,
   llvm_unreachable("bad parameter convention");
 }
 
-void SILGenFunction::collectThunkParams(SILLocation loc,
-                                        SmallVectorImpl<ManagedValue> &params) {
+void SILGenFunction::collectThunkParams(
+    SILLocation loc, SmallVectorImpl<ManagedValue> &params,
+    SmallVectorImpl<SILArgument *> *indirectResults) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes()) {
     auto paramTy = F.mapTypeIntoContext(resultTy);
     SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
-    (void)arg;
+    if (indirectResults)
+      indirectResults->push_back(arg);
   }
 
   // Add the parameters.
@@ -841,7 +845,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
 static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
                           ManagedValue result, TemporaryInitialization &temp) {
   if (result.isInContext()) return;
-  result.forwardInto(SGF, loc, temp.getAddress());
+  result.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, temp.getAddress());
   temp.finishInitialization(SGF);
 }
 
@@ -1116,7 +1120,11 @@ namespace {
         SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
 
         auto payload = tupleTemp->getManagedAddress();
-        return ManagedValue(optionalBuf, payload.getCleanup());
+        if (payload.hasCleanup()) {
+          payload.forward(SGF);
+          return SGF.emitManagedBufferWithCleanup(optionalBuf);
+        }
+        return ManagedValue::forUnmanaged(optionalBuf);
       }
     }
 
@@ -1146,15 +1154,20 @@ namespace {
 
       auto payload = tupleTemp->getManagedAddress();
       if (SGF.silConv.useLoweredAddresses()) {
-        return ManagedValue(existentialBuf, payload.getCleanup());
+        // We always need to return the existential buf with a cleanup even if
+        // we stored trivial values, since SILGen maintains the invariant that
+        // forwarding a non-trivial value (i.e. an Any) into memory must be done
+        // at +1.
+        payload.forward(SGF);
+        return SGF.emitManagedBufferWithCleanup(existentialBuf);
       }
+
       // We are under opaque value(s) mode - load the any and init an opaque
-      auto loadedPayload = SGF.emitManagedLoadCopy(Loc, payload.getValue());
+      auto loadedPayload = SGF.B.createLoadCopy(Loc, payload);
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
-      SILValue loadedOpaque = SGF.B.createInitExistentialValue(
-          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
+      return SGF.B.createInitExistentialValue(
+          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload,
           /*Conformances=*/{});
-      return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 
     /// Handle a tuple that has been exploded in both the input and
@@ -2829,7 +2842,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
       extInfo = extInfo.withIsPseudogeneric();
 
   // Add the function type as the parameter.
-  auto contextConvention = ParameterConvention::Direct_Guaranteed;
+  auto contextConvention =
+      SILType::getPrimitiveObjectType(sourceType).isTrivial(this->getModule())
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
@@ -2903,7 +2919,8 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   // Declare the thunk.
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto toType = expectedType;
+  auto toType = expectedType->getWithExtInfo(
+      expectedType->getExtInfo().withNoEscape(false));
   auto thunkType = SGF.buildThunkType(sourceType, toType,
                                       inputSubstType,
                                       outputSubstType,
@@ -2942,12 +2959,206 @@ static ManagedValue createThunk(SILGenFunction &SGF,
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
                              subs, fn.ensurePlusOne(SGF, loc).forward(SGF),
-                             SILType::getPrimitiveObjectType(expectedType));
-  if (expectedType->isNoEscape()) {
-    thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
-                                            expectedTL.getLoweredType());
+                             SILType::getPrimitiveObjectType(toType));
+
+  if (!expectedType->isNoEscape()) {
+    return SGF.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
   }
-  return SGF.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
+
+  // Handle the escaping to noescape conversion.
+  assert(expectedType->isNoEscape());
+  SingleValueInstruction *noEscapeThunkFn = SGF.B.createConvertEscapeToNoEscape(
+      loc, thunkedFn, expectedTL.getLoweredType());
+  SGF.enterPostponedCleanup(thunkedFn);
+  return SGF.emitManagedRValueWithCleanup(noEscapeThunkFn);
+}
+
+static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
+    SILGenFunction &SGF, CanSILFunctionType &noEscapingType,
+    CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
+    SubstitutionMap &contextSubs) {
+
+  assert(escapingType->getExtInfo() ==
+         noEscapingType->getExtInfo().withNoEscape(false));
+
+  // Strip the closure properties.
+  auto extInfo = noEscapingType->getExtInfo()
+                     .withRepresentation(SILFunctionType::Representation::Thin)
+                     .withNoEscape(false);
+
+  // Inherit the context's generic signature if the closure uses generic
+  // parameters.
+  assert(noEscapingType->hasArchetype() == escapingType->hasArchetype());
+  CanGenericSignature genericSig;
+  if (noEscapingType->hasArchetype()) {
+    genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
+    genericEnv = SGF.F.getGenericEnvironment();
+    auto subsArray = SGF.F.getForwardingSubstitutions();
+    contextSubs = genericSig->getSubstitutionMap(subsArray);
+  }
+
+  auto substIntoThunkContext = [&](CanType t) -> CanType {
+    return t.subst(
+      [&](SubstitutableType *type) -> Type {
+        return Type(type).subst(contextSubs);
+      },
+      LookUpConformanceInSubstitutionMap(contextSubs),
+      SubstFlags::AllowLoweredTypes)
+        ->getCanonicalType();
+  };
+
+  escapingType = cast<SILFunctionType>(substIntoThunkContext(escapingType));
+  noEscapingType = cast<SILFunctionType>(substIntoThunkContext(noEscapingType));
+
+  // If our parent function was pseudogeneric, this thunk must also be
+  // pseudogeneric, since we have no way to pass generic parameters.
+  if (genericSig)
+    if (SGF.F.getLoweredFunctionType()->isPseudogeneric())
+      extInfo = extInfo.withIsPseudogeneric();
+
+  // Add the function type as the parameter.
+  auto contextConvention =
+      SILType::getPrimitiveObjectType(noEscapingType).isTrivial(SGF.getModule())
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
+  SmallVector<SILParameterInfo, 4> params;
+  params.append(noEscapingType->getParameters().begin(),
+                noEscapingType->getParameters().end());
+  params.push_back({noEscapingType,
+                    noEscapingType->getExtInfo().hasContext()
+                      ? contextConvention
+                      : ParameterConvention::Direct_Unowned});
+
+  // Map the parameter and expected types out of context to get the interface
+  // type of the thunk.
+  SmallVector<SILParameterInfo, 4> interfaceParams;
+  interfaceParams.reserve(params.size());
+  for (auto &param : params) {
+    auto paramIfaceTy = param.getType()->mapTypeOutOfContext();
+    interfaceParams.push_back(
+      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
+                       param.getConvention()));
+  }
+
+  SmallVector<SILYieldInfo, 4> interfaceYields;
+  for (auto &yield : noEscapingType->getYields()) {
+    auto yieldIfaceTy = yield.getType()->mapTypeOutOfContext();
+    auto interfaceYield =
+      yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+    interfaceYields.push_back(interfaceYield);
+  }
+
+  SmallVector<SILResultInfo, 4> interfaceResults;
+  for (auto &result : noEscapingType->getResults()) {
+    auto resultIfaceTy = result.getType()->mapTypeOutOfContext();
+    auto interfaceResult =
+      result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
+    interfaceResults.push_back(interfaceResult);
+  }
+
+  Optional<SILResultInfo> interfaceErrorResult;
+  if (noEscapingType->hasErrorResult()) {
+    auto errorResult = noEscapingType->getErrorResult();
+    auto errorIfaceTy = errorResult.getType()->mapTypeOutOfContext();
+    interfaceErrorResult = SILResultInfo(
+        errorIfaceTy->getCanonicalType(genericSig),
+        noEscapingType->getErrorResult().getConvention());
+  }
+
+  // The type of the thunk function.
+  return SILFunctionType::get(genericSig, extInfo,
+                              noEscapingType->getCoroutineKind(),
+                              ParameterConvention::Direct_Unowned,
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
+                              SGF.getASTContext());
+}
+
+static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
+  PrettyStackTraceSILFunction stackTrace(
+      "emitting withoutAcutallyEscaping thunk in", &SGF.F);
+
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+
+  FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
+
+  SmallVector<ManagedValue, 8> params;
+  SmallVector<SILArgument*, 8> indirectResults;
+  SGF.collectThunkParams(loc, params, &indirectResults);
+
+  ManagedValue fnValue = params.pop_back_val();
+  auto fnType = fnValue.getType().castTo<SILFunctionType>();
+
+  SmallVector<SILValue, 8> argValues;
+  if (!indirectResults.empty()) {
+    for (auto *result : indirectResults)
+      argValues.push_back(SILValue(result));
+  }
+
+  // Forward indirect result arguments.
+
+   // Add the rest of the arguments.
+  forwardFunctionArguments(SGF, loc, fnType, params, argValues);
+
+  auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
+                                          : fnValue.forward(SGF);
+  SILValue result =
+      SGF.emitApplyWithRethrow(loc, fun,
+                               /*substFnType*/ fnValue.getType(),
+                               /*substitutions*/ {}, argValues);
+
+  scope.pop();
+  SGF.B.createReturn(loc, result);
+}
+
+ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
+    SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
+
+  auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
+  // TODO: maybe this should use a more explicit instruction.
+  assert(escapingFnTy->getExtInfo() == noEscapingFunctionValue.getType()
+                                           .castTo<SILFunctionType>()
+                                           ->getExtInfo()
+                                           .withNoEscape(false));
+
+  GenericEnvironment *genericEnv = nullptr;
+  SubstitutionMap contextSubs;
+  auto noEscapingFnTy =
+      noEscapingFunctionValue.getType().castTo<SILFunctionType>();
+
+  auto thunkType = buildWithoutActuallyEscapingThunkType(
+      *this, noEscapingFnTy, escapingFnTy, genericEnv, contextSubs);
+
+  auto *thunk = SGM.getOrCreateReabstractionThunk(
+      thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
+
+  if (thunk->empty()) {
+    thunk->setGenericEnvironment(genericEnv);
+    SILGenFunction thunkSGF(SGM, *thunk);
+    buildWithoutActuallyEscapingThunkBody(thunkSGF);
+  }
+
+  CanSILFunctionType substFnType = thunkType;
+  SmallVector<Substitution, 4> subs;
+  if (auto genericSig = thunkType->getGenericSignature()) {
+    genericSig->getSubstitutions(contextSubs, subs);
+    substFnType = thunkType->substGenericArgs(F.getModule(), contextSubs);
+  }
+
+  // Create it in our current function.
+  auto thunkValue = B.createFunctionRef(loc, thunk);
+  SILValue noEscapeValue =
+      noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
+  SingleValueInstruction *thunkedFn = B.createPartialApply(
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnType), subs,
+      noEscapeValue,
+      SILType::getPrimitiveObjectType(escapingFnTy));
+
+  // We need to ensure the 'lifetime' of the trivial values context captures. As
+  // long as we rerpresent these captures by the same value the following works.
+  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);
+
+  return emitManagedRValueWithCleanup(thunkedFn);
 }
 
 ManagedValue Transform::transformFunction(ManagedValue fn,
@@ -2985,18 +3196,25 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
 
   // We do not, conversion is trivial.
   auto expectedEI = expectedFnType->getExtInfo();
-  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation());
+  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation())
+                   .withNoEscape(fnType->getRepresentation() ==
+                                         SILFunctionType::Representation::Thick
+                                     ? fnType->isNoEscape()
+                                     : expectedFnType->isNoEscape());
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
                          fnType->getWitnessMethodConformanceOrNone());
-  // Apply any ABI-compatible conversions before doing thin-to-thick.
+
+  // Apply any ABI-compatible conversions before doing thin-to-thick or
+  // escaping->noescape conversion.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);
     fn = SGF.B.createConvertFunction(Loc, fn, resTy);
   }
 
   // Now do thin-to-thick if necessary.
-  if (newFnType != expectedFnType) {
+  if (newFnType != expectedFnType &&
+      fnType->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
     assert(expectedEI.getRepresentation() ==
            SILFunctionTypeRepresentation::Thick &&
            "all other conversions should have been handled by "
@@ -3004,6 +3222,20 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
     fn = SGF.emitManagedRValueWithCleanup(
         SGF.B.createThinToThickFunction(Loc, fn.forward(SGF), resTy));
+  } else if (newFnType != expectedFnType) {
+    // Escaping to noescape conversion.
+    assert(expectedFnType->getRepresentation() ==
+               SILFunctionTypeRepresentation::Thick &&
+           fnType->getRepresentation() ==
+               SILFunctionTypeRepresentation::Thick &&
+           !fnType->isNoEscape() && expectedFnType->isNoEscape() &&
+           "Expect a escaping to noescape conversion");
+    SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
+    auto fnValue = fn.forward(SGF);
+    SGF.enterPostponedCleanup(fnValue);
+    SingleValueInstruction *noEscapeThunkFn =
+        SGF.B.createConvertEscapeToNoEscape(Loc, fnValue, resTy);
+    fn = SGF.emitManagedRValueWithCleanup(noEscapeThunkFn);
   }
 
   return fn;
@@ -3280,7 +3512,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   case WitnessDispatchKind::Static:
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
+    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);

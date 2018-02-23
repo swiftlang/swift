@@ -637,7 +637,7 @@ bool SILFunctionType::isNoReturnFunction() {
 
 SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
   SILModule &M = F.getModule();
-  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl(OTK_Optional);
+  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl();
   BoundGenericType *BoundEnumDecl =
       BoundGenericType::get(OptionalDecl, Type(), {getSwiftRValueType()});
   AbstractionPattern Pattern(F.getLoweredFunctionType()->getGenericSignature(),

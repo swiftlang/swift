@@ -102,7 +102,8 @@ bool isIncidentalUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
-/// If V is a convert_function, return its operand recursively.
+/// If V is a convert_function or convert_escape_to_noescape return its operand
+/// recursively.
 SILValue stripConvertFunctions(SILValue V);
 
 /// Given an address accessed by an instruction that reads or modifies
@@ -137,6 +138,13 @@ struct LLVM_LIBRARY_VISIBILITY FindClosureResult {
 /// IsReabstractionThunk flag set to true if the closure is indirectly captured
 /// by a reabstraction thunk.
 FindClosureResult findClosureForAppliedArg(SILValue V);
+
+/// Visit each address accessed by the given memory operation.
+///
+/// This only visits instructions that modify memory in some user-visible way,
+/// which could be considered part of a formal access.
+void visitAccessedAddress(SILInstruction *I,
+                          std::function<void(Operand *)> visitor);
 
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.

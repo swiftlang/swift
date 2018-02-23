@@ -613,12 +613,6 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
-WARNING(deprecated_redecl_by_optionality, none,
-        "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
-        (DeclName, Type, Type))
-NOTE(deprecated_redecl_by_optionality_note, none,
-     "overloading by kind of optional is deprecated and will be removed in a future release", ())
-
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,none,
@@ -968,6 +962,9 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+ERROR(type_invalid_dml,none,
+      "@dynamicMemberLookup attribute requires %0 to have a "
+      "'subscript(dynamicMember:)' member with a string index", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1425,6 +1422,10 @@ ERROR(cf_class_cannot_conform_to_objc_protocol,none,
 ERROR(objc_runtime_visible_cannot_conform_to_objc_protocol,none,
       "class %0 cannot conform to @objc protocol %1 because "
       "the class is only visible via the Objective-C runtime",
+      (Type, Type))
+ERROR(objc_generics_cannot_conditionally_conform,none,
+      "type %0 cannot conditionally conform to protocol %1 because "
+      "the type uses the Objective-C generics model",
       (Type, Type))
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
@@ -2859,6 +2860,8 @@ ERROR(assignment_lhs_is_immutable_property,none,
       "cannot assign to property: %0", (StringRef))
 ERROR(assignment_subscript_has_immutable_base,none,
       "cannot assign through subscript: %0", (StringRef))
+ERROR(assignment_dynamic_property_has_immutable_base,none,
+      "cannot assign through dynamic lookup property: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
 

@@ -39,7 +39,7 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            BufferID)),
       CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
-      Enabled(SF.shouldKeepSyntaxInfo()) {
+      Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
   Storage.reserve(128);
 }
@@ -250,7 +250,7 @@ void finalizeSourceFile(RootContextData &RootData,
   if (SF.hasSyntaxRoot()) {
     auto SourceRaw = SF.getSyntaxRoot().getRaw();
     auto Decls =
-        SourceRaw->getChild(SourceFileSyntax::Cursor::Items)->getLayout();
+        SourceRaw->getChild(SourceFileSyntax::Cursor::Statements)->getLayout();
     std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
     EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
   }

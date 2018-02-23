@@ -48,9 +48,7 @@ struct A2X<T : StaticArrayProtocol> : StaticArrayProtocol {
 
 struct StaticArray<
   T : StaticArrayProtocol
-> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {
-  typealias Indices = CountableRange<Int>
-  
+> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {  
   init(_ defaultValue : T.ElemTy) { values = T(defaultValue) }
   var values : T
   func get(_ idx: Int) -> T.ElemTy { return values.get(idx) }

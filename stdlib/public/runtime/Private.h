@@ -291,6 +291,39 @@ public:
 
   void *allocateMetadata(size_t size, size_t align);
 
+  Demangle::NodePointer
+  _buildDemanglingForContext(const ContextDescriptor *context,
+                             llvm::ArrayRef<NodePointer> demangledGenerics,
+                             bool concretizedGenerics,
+                             Demangle::Demangler &Dem);
+  
+  /// Symbolic reference resolver that produces the demangling tree for the
+  /// referenced context.
+  class ResolveToDemanglingForContext {
+    Demangle::Demangler &Dem;
+  public:
+    explicit ResolveToDemanglingForContext(Demangle::Demangler &Dem)
+      : Dem(Dem) {}
+    
+    Demangle::NodePointer operator()(int32_t offset, const void *base) {
+      auto descriptor =
+        (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
+      
+      return _buildDemanglingForContext(descriptor, {}, false, Dem);
+    }
+  };
+
+  /// Check whether a type conforms to a protocol.
+  ///
+  /// \param value - can be null, in which case the question should
+  ///   be answered abstractly if possible
+  /// \param conformance - if non-null, and the protocol requires a
+  ///   witness table, and the type implements the protocol, the witness
+  ///   table will be placed here
+  bool _conformsToProtocol(const OpaqueValue *value,
+                           const Metadata *type,
+                           const ProtocolDescriptor *protocol,
+                           const WitnessTable **conformance);
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

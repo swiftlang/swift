@@ -130,7 +130,10 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/PatternNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/StmtNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/TypeNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py")
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Traits.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/__init__.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/UIDs.py")
 
   foreach (src ${${sources_var_name}})
     string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")

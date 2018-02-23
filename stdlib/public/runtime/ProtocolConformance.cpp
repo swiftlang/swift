@@ -747,15 +747,16 @@ bool swift::_checkGenericRequirements(
     // Check the requirement.
     switch (req.getKind()) {
     case GenericRequirementKind::Protocol: {
-      // Look for a witness table to satisfy this conformance.
-      auto witnessTable =
-        swift_conformsToProtocol(subjectType, req.getProtocol());
-      if (!witnessTable) return true;
+      const WitnessTable *witnessTable = nullptr;
+      if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+                               &witnessTable))
+        return true;
 
-      // If this requirement provides an extra argument, add the witness table
-      // as that argument.
-      if (req.getFlags().hasExtraArgument())
+      // If we need a witness table, add it.
+      if (req.getProtocol()->Flags.needsWitnessTable()) {
+        assert(witnessTable);
         extraArguments.push_back(witnessTable);
+      }
 
       continue;
     }
@@ -777,8 +778,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::Layout: {
       switch (req.getLayout()) {
       case GenericRequirementLayoutKind::Class:
-        // Check whether the subject type is a class.
-        if (!subjectType->isAnyClass()) return true;
+        if (!subjectType->satisfiesClassConstraint())
+          return true;
         continue;
       }
 

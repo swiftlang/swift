@@ -1032,6 +1032,10 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(copy->getUses().begin(), copy->getUses().end());
       continue;
     }
+    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
+       uses.append(cvt->getUses().begin(), cvt->getUses().end());
+      continue;
+    }
     // @noescape block storage can be passed as an Optional (Nullable).
     if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
@@ -1072,6 +1076,96 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
 }
 #endif
 
+// Check if the given memory instruction obviously initializes the memory
+// object at `root`. Initialization does not require exclusivity enforcement
+// because uninitialized variables can't be captured.
+static bool isSafeInitialization(SILInstruction *memInst, SILValue root) {
+  // Local variable initialization is already filtered out by the check for
+  // temporary buffer access. Handle globals.
+  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(root)) {
+    // There doesn't seem to be a better way to check for initialization than
+    // scanning for the preceding alloc_global.
+    SILGlobalVariable *var = globalAddr->getReferencedGlobal();
+    auto I = globalAddr->getIterator();
+    auto beginI = globalAddr->getParent()->begin();
+    while (I != beginI) {
+      --I;
+      if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(I)) {
+        if (allocGlobal->getReferencedGlobal() == var)
+          return true;
+      }
+      if (I->mayReadOrWriteMemory())
+        break;
+    }
+  }
+  return false;
+}
+
+// Check that the given address-type operand is guarded by begin/end access
+// markers.
+static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
+  SILValue address = memOper->get();
+  SILInstruction *memInst = memOper->getUser();
+
+  auto error = [address, memInst]() {
+    llvm::dbgs() << "Memory access not protected by begin_access:\n";
+    memInst->printInContext(llvm::dbgs());
+    llvm::dbgs() << "Accessing: " << address;
+    llvm::dbgs() << "In function:\n";
+    memInst->getFunction()->print(llvm::dbgs());
+    abort();
+  };
+
+  if (auto apply = ApplySite::isa(memInst)) {
+    SILArgumentConvention conv =
+        apply.getArgumentConvention(apply.getCalleeArgIndex(*memOper));
+    // Captured addresses currently use the @inout_aliasable convention. They
+    // are considered an access at any call site that uses the closure. However,
+    // those accesses are never explictly protected by access markers. Instead,
+    // exclusivity uses AccessSummaryAnalysis to check for conflicts. Here, we
+    // can simply ignore any @inout_aliasable arguments.
+    if (conv == SILArgumentConvention::Indirect_InoutAliasable)
+      return;
+
+    assert(!isa<PartialApplyInst>(memInst)
+           && "partial apply can only capture an address as inout_aliasable");
+    // TODO: We currently assume @in/@in_guaranteed are only used for
+    // pass-by-value arguments. i.e. the address points a local copy of the
+    // argument, which is only passed by address for abstraction
+    // reasons. However, in the future, @in_guaranteed may be used for
+    // borrowed values, which should be recognized as a formal read.
+    if (conv != SILArgumentConvention::Indirect_Inout)
+      return;
+  }
+
+  // Strip off address projections, but not ref_element_addr.
+  SILValue base = findAccessedAddressBase(address);
+  // `base` is null for address producers that are only used for local
+  // initialization.
+  if (!base || !isPossibleFormalAccessBase(base))
+    return;
+
+  // Skip local non-lvalue accesses. There are many local initialization
+  // patterns that don't require access markers.
+  if (!isa<ApplySite>(memInst)
+      && (isa<AllocStackInst>(base) || isa<AllocBoxInst>(base))) {
+    return;
+  }
+
+  if (isSafeInitialization(memInst, base))
+    return;
+
+  // Otherwise, the address base should be an in-scope begin_access.
+  if (auto *BAI = dyn_cast<BeginAccessInst>(base)) {
+    const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
+    AccessInfo &Info = Accesses[Storage];
+    if (!Info.hasAccessesInProgress())
+      error();
+    return;
+  }
+  error();
+}
+
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                    AccessSummaryAnalysis *ASA) {
   // The implementation relies on the following SIL invariants:
@@ -1091,6 +1185,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 
   if (Fn.empty())
     return;
+
+  bool VerifyMemOps = Fn.getModule().getOptions().VerifyExclusivity;
 
   // Collects calls the Standard Library swap() for Fix-Its.
   llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
@@ -1164,6 +1260,12 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
         continue;
       }
 
+      if (VerifyMemOps && I.mayReadOrWriteMemory()) {
+        visitAccessedAddress(&I, [&Accesses](Operand *memOper) {
+          checkAccessedAddress(memOper, Accesses);
+        });
+      }
+
       if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         // Record calls to swap() for potential Fix-Its.
         if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
@@ -1215,6 +1317,10 @@ public:
 
 private:
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     SILFunction *Fn = getFunction();
     // This is a staging flag. Eventually the ability to turn off static
     // enforcement will be removed.

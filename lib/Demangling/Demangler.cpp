@@ -39,6 +39,8 @@ static bool isDeclName(Node::Kind kind) {
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
     case Node::Kind::InfixOperator:
+    case Node::Kind::UnresolvedSymbolicReference:
+    case Node::Kind::SymbolicReference:
       return true;
     default:
       return false;
@@ -63,7 +65,10 @@ static bool isAnyGeneric(Node::Kind kind) {
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::OtherNominalType:
     case Node::Kind::TypeAlias:
+    case Node::Kind::SymbolicReference:
+    case Node::Kind::UnresolvedSymbolicReference:
       return true;
     default:
       return false;
@@ -117,6 +122,21 @@ static bool isFunctionAttr(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
+llvm::StringRef
+swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
+  if (!base)
+    return {};
+
+  auto end = base;
+  while (*end != '\0') {
+    // Skip over symbolic references.
+    if (*end == '\1')
+      end += 4;
+    ++end;
+  }
+  return StringRef(base, end - base);
+}
+
 int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   if (mangledName.empty()) return 0;
 
@@ -149,6 +169,94 @@ bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
 
 llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
   return mangledName.drop_front(getManglingPrefixLength(mangledName));
+}
+
+static bool isAliasNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isAliasNode(Node->getChild(0));
+  case Demangle::Node::Kind::TypeAlias:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isAlias(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isAliasNode(Dem.demangleType(mangledName));
+}
+
+static bool isClassNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isClassNode(Node->getChild(0));
+  case Demangle::Node::Kind::Class:
+  case Demangle::Node::Kind::BoundGenericClass:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isClass(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isClassNode(Dem.demangleType(mangledName));
+}
+
+static bool isEnumNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isEnumNode(Node->getChild(0));
+  case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::BoundGenericEnum:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isEnum(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isEnumNode(Dem.demangleType(mangledName));
+}
+
+static bool isProtocolNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isProtocolNode(Node->getChild(0));
+  case Demangle::Node::Kind::Protocol:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isProtocolNode(Dem.demangleType(dropSwiftManglingPrefix(mangledName)));
+}
+
+static bool isStructNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isStructNode(Node->getChild(0));
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::BoundGenericStructure:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isStructNode(Dem.demangleType(mangledName));
 }
 
 namespace swift {
@@ -428,9 +536,32 @@ NodePointer Demangler::demangleTypeMangling() {
   TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
+  
+NodePointer Demangler::demangleSymbolicReference(const void *at) {
+  // The symbolic reference is a 4-byte machine integer encoded in the following
+  // four bytes.
+  int32_t value;
+  memcpy(&value, Text.data() + Pos, 4);
+  Pos += 4;
+  
+  // Use the resolver, if any, to produce the demangling tree the symbolic
+  // reference represents.
+  NodePointer resolved = nullptr;
+  if (SymbolicReferenceResolver)
+    resolved = SymbolicReferenceResolver(value, at);
+  // With no resolver, or a resolver that failed, simply preserve the raw
+  // information in the node.
+  if (!resolved)
+    resolved = createNode(Node::Kind::UnresolvedSymbolicReference, value);
+  
+  // Register the result as a substitution.
+  addSubstitution(resolved);
+  return resolved;
+}
 
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
+    case '\1': return demangleSymbolicReference(Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
@@ -1109,11 +1240,35 @@ NodePointer Demangler::demangleBoundGenericType() {
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx) {
-  if (!Nominal || Nominal->getNumChildren() < 2)
+  // TODO: This would be a lot easier if we represented bound generic args
+  // flatly in the demangling tree, since that's how they're mangled and also
+  // how the runtime generally wants to consume them.
+  
+  if (!Nominal)
     return nullptr;
 
   if (TypeListIdx >= TypeLists.size())
     return nullptr;
+
+  // Associate a symbolic reference with all remaining generic arguments.
+  if (Nominal->getKind() == Node::Kind::SymbolicReference
+      || Nominal->getKind() == Node::Kind::UnresolvedSymbolicReference) {
+    auto remainingTypeList = createNode(Node::Kind::TypeList);
+    for (unsigned i = TypeLists.size() - 1;
+         i >= TypeListIdx && i < TypeLists.size();
+         --i) {
+      auto list = TypeLists[i];
+      for (auto child : *list) {
+        remainingTypeList->addChild(child, *this);
+      }
+    }
+    return createWithChildren(Node::Kind::BoundGenericOtherNominalType,
+                              createType(Nominal), remainingTypeList);
+  }
+
+  if (Nominal->getNumChildren() < 2)
+    return nullptr;
+
   NodePointer args = TypeLists[TypeListIdx++];
 
   // Generic arguments for the outermost type come first.
@@ -1157,6 +1312,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
       break;
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
+      break;
+    case Node::Kind::OtherNominalType:
+      kind = Node::Kind::BoundGenericOtherNominalType;
       break;
     default:
       return nullptr;

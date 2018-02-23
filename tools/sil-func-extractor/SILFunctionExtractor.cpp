@@ -212,7 +212,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   // After running this pass all of the functions we will remove
   // should consist only of one basic block terminated by
   // UnreachableInst.
-  performSILDiagnoseUnreachable(M, nullptr);
+  performSILDiagnoseUnreachable(M);
 
   // Now mark all of these functions as public and remove their bodies.
   for (auto &F : DeadFunctions) {

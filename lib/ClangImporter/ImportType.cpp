@@ -1238,8 +1238,8 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_UnsafeMutablePointer)
       return Type();
 
-    OptionalTypeKind OTK;
-    auto insideOptionalType = elementType->getOptionalObjectType(OTK);
+    bool isOptional;
+    auto insideOptionalType = elementType->getOptionalObjectType(isOptional);
     if (!insideOptionalType)
       insideOptionalType = elementType;
 
@@ -1255,10 +1255,8 @@ static ImportedType adjustTypeForConcreteImport(
            "signature of Unmanaged has changed");
 
     auto resultTy = boundGenericTy->getGenericArgs().front();
-    if (OTK != OTK_None) {
-      assert(OTK != OTK_ImplicitlyUnwrappedOptional);
+    if (isOptional)
       resultTy = OptionalType::get(resultTy);
-    }
 
     StringRef pointerName;
     if (importKind == ImportTypeKind::CFRetainedOutParameter)
@@ -1509,8 +1507,7 @@ ImportedType ClangImporter::Implementation::importPropertyType(
 /// Apply the @noescape attribute
 static Type applyNoEscape(Type type) {
   // Recurse into optional types.
-  OptionalTypeKind optKind;
-  if (Type objectType = type->getOptionalObjectType(optKind)) {
+  if (Type objectType = type->getOptionalObjectType()) {
     return OptionalType::get(applyNoEscape(objectType));
   }
 
@@ -1951,8 +1948,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
       clangDecl->getMethodFamily() == clang::OMF_performSelector) {
     // performSelector methods that return 'id' should be imported into Swift
     // as returning Unmanaged<AnyObject>.
-    Type nonOptionalTy =
-        swiftResultTy->getOptionalObjectType(OptionalityOfReturn);
+    bool resultIsOptional;
+    Type nonOptionalTy = swiftResultTy->getOptionalObjectType(resultIsOptional);
     if (!nonOptionalTy)
       nonOptionalTy = swiftResultTy;
 
@@ -1962,7 +1959,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
     if (nonOptionalTy->isAnyClassReferenceType()) {
       swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
-      if (OptionalityOfReturn != OTK_None)
+      if (resultIsOptional)
         swiftResultTy = OptionalType::get(swiftResultTy);
     }
   }

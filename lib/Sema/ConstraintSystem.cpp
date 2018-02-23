@@ -1074,7 +1074,7 @@ void ConstraintSystem::openGeneric(
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto contextTy = genericEnv->mapTypeIntoContext(gp);
+    auto contextTy = GenericEnvironment::mapTypeIntoContext(genericEnv, gp);
     if (auto *archetype = contextTy->getAs<ArchetypeType>())
       locatorPtr = getConstraintLocator(
           locator.withPathElement(LocatorPathElt(archetype)));
@@ -1389,6 +1389,29 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     return;
   }
 
+  // Performance hack: if there are two generic overloads, and one is
+  // more specialized than the other, prefer the more-specialized one.
+  if (!favoredChoice && choices.size() == 2 &&
+      choices[0].isDecl() && choices[1].isDecl() &&
+      isa<AbstractFunctionDecl>(choices[0].getDecl()) &&
+      cast<AbstractFunctionDecl>(choices[0].getDecl())->isGeneric() &&
+      isa<AbstractFunctionDecl>(choices[1].getDecl()) &&
+      cast<AbstractFunctionDecl>(choices[1].getDecl())->isGeneric()) {
+    switch (TC.compareDeclarations(DC, choices[0].getDecl(),
+                                   choices[1].getDecl())) {
+    case Comparison::Better:
+      favoredChoice = const_cast<OverloadChoice *>(&choices[0]);
+      break;
+
+    case Comparison::Worse:
+      favoredChoice = const_cast<OverloadChoice *>(&choices[1]);
+      break;
+
+    case Comparison::Unordered:
+      break;
+    }
+  }
+
   SmallVector<Constraint *, 4> overloads;
   
   // As we do for other favored constraints, if a favored overload has been
@@ -1542,7 +1565,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type openedFullType;
 
   bool isDynamicResult = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-  bool createdDynamicResultDisjunction = false;
+  bool bindConstraintCreated = false;
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -1556,7 +1579,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup: {
     // Retrieve the type of a reference to the specific declaration choice.
     if (auto baseTy = choice.getBaseType()) {
       assert(!baseTy->hasTypeParameter());
@@ -1599,6 +1623,19 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       //
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
+
+      // Deal with values declared as implicitly unwrapped, or
+      // functions with return types that are implicitly unwrapped.
+      if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+        // Build the disjunction to attempt binding both T? and T (or
+        // function returning T? and function returning T).
+        Type ty = createTypeVariable(locator, TVO_CanBindToInOut);
+        buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType,
+                                                       locator);
+        addConstraint(ConstraintKind::Bind, boundType,
+                      OptionalType::get(ty->getRValueType()), locator);
+        bindConstraintCreated = true;
+      }
       refType = OptionalType::get(refType->getRValueType());
     }
     // For a non-subscript declaration found via dynamic lookup, strip
@@ -1673,7 +1710,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         refType = OptionalType::get(refType->getRValueType());
       }
 
-      createdDynamicResultDisjunction = true;
+      bindConstraintCreated = true;
     }
 
     // If the declaration is unavailable, note that in the score.
@@ -1681,6 +1718,32 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       increaseScore(SK_Unavailable);
     }
 
+    if (kind == OverloadChoiceKind::DynamicMemberLookup) {
+      // DynamicMemberLookup results are always a (dynamicMember:T1)->T2
+      // subscript.
+      auto refFnType = refType->castTo<FunctionType>();
+
+      // If this is a dynamic member lookup, then the decl we have is for the
+      // subscript(dynamicMember:) member, but the type we need to return is the
+      // result of the subscript.  Dig through it.
+      refType = refFnType->getResult();
+
+      // Before we drop the argument type on the floor, we need to constrain it
+      // to having a literal conformance to ExpressibleByStringLiteral.  This
+      // makes the index default to String if otherwise unconstrained.
+      assert(refFnType->getParams().size() == 1 &&
+             "subscript always has one arg");
+      auto argType = refFnType->getParams()[0].getPlainType();
+      
+      auto protoKind = KnownProtocolKind::ExpressibleByStringLiteral;
+      auto protocol = getTypeChecker().getProtocol(choice.getDecl()->getLoc(),
+                                                   protoKind);
+      if (!protocol)
+        break;
+      addConstraint(ConstraintKind::LiteralConformsTo, argType,
+                    protocol->getDeclaredType(),
+                    locator);
+    }
     break;
   }
 
@@ -1732,6 +1795,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
     // Increase the score so that actual subscripts get preference.
     increaseScore(SK_KeyPathSubscript);
+    break;
   }
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
@@ -1762,8 +1826,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
-  // We created appropriate disjunctions for dynamic result above.
-  if (!createdDynamicResultDisjunction) {
+  // In some cases we already created the appropriate bind constraints.
+  if (!bindConstraintCreated) {
     if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
@@ -1807,8 +1871,6 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // FIXME: It's kind of weird in general that we have to look
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
-
-      auto *module = cs.DC->getParentModule();
 
       if (lookupBaseType->mayHaveMembers()) {
         auto subs = lookupBaseType->getContextSubstitutionMap(
@@ -1876,13 +1938,16 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return getDecl()->getFullName();
       
-    case OverloadChoiceKind::KeyPathApplication: {
+    case OverloadChoiceKind::KeyPathApplication:
       // TODO: This should probably produce subscript(keyPath:), but we
       // don't currently pre-filter subscript overload sets by argument
       // keywords, so "subscript" is still the name that keypath subscripts
       // are looked up by.
       return DeclBaseName::createSubscript();
-    }
+    
+    case OverloadChoiceKind::DynamicMemberLookup:
+      return DeclName(DynamicNameAndFRK.getPointer());
+      
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
@@ -1892,6 +1957,23 @@ DeclName OverloadChoice::getName() const {
 }
 
 bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
-  return isDecl() &&
-         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  if (!isDecl())
+    return false;
+
+  auto *decl = getDecl();
+  if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    return false;
+
+  auto itfType = decl->getInterfaceType();
+  if (!itfType->getAs<AnyFunctionType>())
+    return true;
+
+  switch (getFunctionRefKind()) {
+  case FunctionRefKind::Unapplied:
+  case FunctionRefKind::Compound:
+    return false;
+  case FunctionRefKind::SingleApply:
+  case FunctionRefKind::DoubleApply:
+    return true;
+  }
 }

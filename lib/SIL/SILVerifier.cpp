@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
@@ -473,30 +474,31 @@ public:
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
     if (!DS->InlinedCallSite) {
-      SILDebugVariable VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I)) {
+      Optional<SILDebugVariable> VarInfo;
+      if (auto *DI = dyn_cast<AllocStackInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<AllocBoxInst>(I)) {
+      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueAddrInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
         VarInfo = DI->getVarInfo();
-      }
 
-      if (unsigned ArgNo = VarInfo.ArgNo) {
-        // It is a function argument.
-        if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
-          require(DebugVars[ArgNo] == VarInfo.Name,
-                  "Scope contains conflicting debug variables for one function "
-                  "argument");
-        } else {
-          // Reserve enough space.
-          while (DebugVars.size() <= ArgNo) {
-            DebugVars.push_back(StringRef());
+      if (VarInfo)
+        if (unsigned ArgNo = VarInfo->ArgNo) {
+          // It is a function argument.
+          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+            require(
+                DebugVars[ArgNo] == VarInfo->Name,
+                "Scope contains conflicting debug variables for one function "
+                "argument");
+          } else {
+            // Reserve enough space.
+            while (DebugVars.size() <= ArgNo) {
+              DebugVars.push_back(StringRef());
+            }
           }
-        }
-        DebugVars[ArgNo] = VarInfo.Name;
+          DebugVars[ArgNo] = VarInfo->Name;
       }
     }
 
@@ -572,10 +574,7 @@ public:
     }
 
     // Optionals should have had their objects lowered.
-    OptionalTypeKind optKind;
-    if (auto objectType = rvalueType.getOptionalObjectType(optKind)) {
-      require(optKind == OTK_Optional,
-              "ImplicitlyUnwrappedOptional is not legal in SIL values");
+    if (auto objectType = rvalueType.getOptionalObjectType()) {
       return checkLegalSILType(F, objectType, I);
     }
 
@@ -2901,8 +2900,10 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
-    auto adjustedOperandExtInfo = opFTy->getExtInfo().withRepresentation(
-                                           SILFunctionType::Representation::Thick);
+    auto adjustedOperandExtInfo =
+        opFTy->getExtInfo()
+            .withRepresentation(SILFunctionType::Representation::Thick)
+            .withNoEscape(resFTy->isNoEscape());
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }
@@ -3462,8 +3463,12 @@ public:
         if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
           SILType bbArgTy = dest->getArguments()[0]->getType();
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          if (F.getModule().getStage() != SILStage::Lowered) {
+            // During the lowered stage, a function type might have different
+            // signature
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
           require(!dest->getArguments()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
@@ -3814,7 +3819,7 @@ public:
           
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty: {
-          bool hasIndices = !component.getComputedPropertyIndices().empty();
+          bool hasIndices = !component.getSubscriptIndices().empty();
         
           // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
           {
@@ -3900,7 +3905,7 @@ public:
                     "setter should have no results");
           }
           
-          for (auto &index : component.getComputedPropertyIndices()) {
+          for (auto &index : component.getSubscriptIndices()) {
             auto opIndex = index.Operand;
             auto contextType =
               index.LoweredType.subst(F.getModule(), patternSubs);
@@ -3911,11 +3916,11 @@ public:
                     "pattern index formal type doesn't match lowered type");
           }
           
-          if (!component.getComputedPropertyIndices().empty()) {
+          if (!component.getSubscriptIndices().empty()) {
             // Equals should be
             // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
             {
-              auto equals = component.getComputedPropertyIndexEquals();
+              auto equals = component.getSubscriptIndexEquals();
               require(equals, "key path pattern with indexes must have equals "
                               "operator");
               
@@ -3947,7 +3952,7 @@ public:
             {
               // Hash should be
               // <Sig...> @convention(thin) (RawPointer) -> Int
-              auto hash = component.getComputedPropertyIndexHash();
+              auto hash = component.getSubscriptIndexHash();
               require(hash, "key path pattern with indexes must have hash "
                             "operator");
               
@@ -3975,11 +3980,51 @@ public:
                       "result should be Int");
             }
           } else {
-            require(!component.getComputedPropertyIndexEquals()
-                    && !component.getComputedPropertyIndexHash(),
+            require(!component.getSubscriptIndexEquals()
+                    && !component.getSubscriptIndexHash(),
                     "component without indexes must not have equals/hash");
           }
 
+          break;
+        }
+        case KeyPathPatternComponent::Kind::External: {
+          // The component type should match the substituted type of the
+          // referenced property.
+          auto decl = component.getExternalDecl();
+          auto sig = decl->getInnermostDeclContext()
+                         ->getGenericSignatureOfContext()
+                         ->getCanonicalSignature();
+          auto subs =
+                sig->getSubstitutionMap(component.getExternalSubstitutions());
+          auto substType = component.getExternalDecl()->getStorageInterfaceType()
+            .subst(subs);
+          require(substType->isEqual(component.getComponentType()),
+                  "component type should make storage type of referenced "
+                  "declaration");
+
+          // Index types should match the lowered index types expected by the
+          // external declaration.
+          if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+            auto indexParams = sub->getIndices();
+            require(indexParams->size() == component.getSubscriptIndices().size(),
+                    "number of subscript indices should match referenced decl");
+            for (unsigned i : indices(*indexParams)) {
+              auto param = (*indexParams)[i];
+              auto &index = component.getSubscriptIndices()[i];
+              auto paramTy = param->getInterfaceType()->getCanonicalType();
+              auto substParamTy = paramTy.subst(subs);
+              auto loweredTy = F.getModule().Types.getLoweredType(
+                AbstractionPattern(sig, paramTy), substParamTy);
+              requireSameType(index.LoweredType, loweredTy,
+                            "index lowered types should match referenced decl");
+              require(index.FormalType == substParamTy->getCanonicalType(),
+                      "index formal types should match referenced decl");
+            }
+          } else {
+            require(component.getSubscriptIndices().empty(),
+                    "external var reference should not apply indices");
+          }
+          
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalChain: {

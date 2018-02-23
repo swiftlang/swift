@@ -900,11 +900,10 @@ private:
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile,
-                                          std::move(sil),
-                                          "REPLLine",
-                                          getGlobalLLVMContext(),
-                                          RC.CurIRGenElem);
+    const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
+    auto LineModule = performIRGeneration(
+        IRGenOpts, REPLInputFile, std::move(sil), "REPLLine", PSPs,
+        getGlobalLLVMContext(), RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
@@ -989,8 +988,9 @@ public:
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
+    std::string Triple;
     std::vector<std::string> Features;
-    std::tie(TargetOpt, CPU, Features)
+    std::tie(TargetOpt, CPU, Features, Triple)
       = getIRTargetOptions(IRGenOpts, CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
@@ -1001,7 +1001,6 @@ public:
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
-    IRGenOpts.OutputFilenames.clear();
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;

@@ -386,12 +386,16 @@ Runtime.test("Generic class ObjC runtime names") {
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }
 
+@objc protocol P {}
+struct AnyObjStruct<T: AnyObject> {}
+
 Runtime.test("typeByName") {
   // Make sure we don't crash if we have foreign classes in the
   // table -- those don't have NominalTypeDescriptors
   print(CFArray.self)
   expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
   expectTrue(_typeByName("DoesNotExist") == nil)
+  expectTrue(_typeByName("1a12AnyObjStructVyAA1P_pG") == AnyObjStruct<P>.self)
 }
 
 Runtime.test("casting AnyObject to class metatypes") {
@@ -464,34 +468,6 @@ var nsStringCanaryCount = 0
   @objc override func character(at index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
-}
-
-RuntimeFoundationWrappers.test(
-  "_stdlib_compareNSStringDeterministicUnicodeCollation/NoLeak"
-) {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    _stdlib_compareNSStringDeterministicUnicodeCollation(a, b)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test(
-  "_stdlib_compareNSStringDeterministicUnicodeCollationPtr/NoLeak"
-) {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
-    _stdlib_compareNSStringDeterministicUnicodeCollationPointer(ptrA, ptrB)
-  }
-  expectEqual(0, nsStringCanaryCount)
 }
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {

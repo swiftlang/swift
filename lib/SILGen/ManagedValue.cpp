@@ -110,29 +110,22 @@ SILValue ManagedValue::forward(SILGenFunction &SGF) const {
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                SILValue address) {
-  if (!hasCleanup() && getOwnershipKind() != ValueOwnershipKind::Trivial)
-    return copyUnmanaged(SGF, loc).forwardInto(SGF, loc, address);
-
-  if (hasCleanup())
-    forwardCleanup(SGF);
-
+  assert(isPlusOne(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
-  SGF.emitSemanticStore(loc, getValue(), address,
-                        addrTL, IsInitialization);
+  SGF.emitSemanticStore(loc, forward(SGF), address, addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                               SILValue address) {
-  if (hasCleanup())
-    forwardCleanup(SGF);
-  
+  assert(isPlusOne(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
-  SGF.emitSemanticStore(loc, getValue(), address, addrTL,
+  SGF.emitSemanticStore(loc, forward(SGF), address, addrTL,
                         IsNotInitialization);
 }
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                Initialization *dest) {
+  assert(isPlusOne(SGF));
   dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
   dest->finishInitialization(SGF);
 }
@@ -203,10 +196,19 @@ void ManagedValue::dump(raw_ostream &os, unsigned indent) const {
 
 ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
                                          SILLocation loc) const {
-  // guaranteed-normal-args-todo: We only copy here when guaranteed normal args
-  // are explicitly enabled. Otherwise, this always just returns self.
-  if (SGF.getOptions().EnableGuaranteedNormalArguments && !hasCleanup()) {
+  if (!hasCleanup()) {
     return copy(SGF, loc);
   }
   return *this;
 }
+
+bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
+  // Ignore trivial values and objects with trivial value ownership kind.
+  if (getType().isTrivial(SGF.F.getModule()) ||
+      (getType().isObject() &&
+       getOwnershipKind() == ValueOwnershipKind::Trivial))
+    return true;
+  return hasCleanup();
+}
+
+bool ManagedValue::isPlusZero() const { return hasCleanup(); }

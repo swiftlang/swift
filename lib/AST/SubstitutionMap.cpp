@@ -269,6 +269,10 @@ addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type].push_back(conformance);
 }
 
+SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
+  return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
+}
+
 SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
   return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));

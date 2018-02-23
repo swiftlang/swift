@@ -379,8 +379,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
       (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(), FnID,
-      genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(),
+      F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -1100,6 +1100,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::CopyBlockInst:
@@ -1942,7 +1943,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       };
       auto handleComputedIndices
         = [&](const KeyPathPatternComponent &component) {
-          auto indices = component.getComputedPropertyIndices();
+          auto indices = component.getSubscriptIndices();
           ListOfValues.push_back(indices.size());
           for (auto &index : indices) {
             ListOfValues.push_back(index.Operand);
@@ -1954,9 +1955,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           }
           if (!indices.empty()) {
             ListOfValues.push_back(
-              addSILFunctionRef(component.getComputedPropertyIndexEquals()));
+              addSILFunctionRef(component.getSubscriptIndexEquals()));
             ListOfValues.push_back(
-              addSILFunctionRef(component.getComputedPropertyIndexHash()));
+              addSILFunctionRef(component.getSubscriptIndexHash()));
           }
         };
     
@@ -1990,6 +1991,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       case KeyPathPatternComponent::Kind::OptionalWrap:
         handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
         break;
+      case KeyPathPatternComponent::Kind::External:
+        llvm_unreachable("todo");
       }
     }
     

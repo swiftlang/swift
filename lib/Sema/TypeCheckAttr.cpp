@@ -70,47 +70,49 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
-  IGNORED_ATTR(CDecl)
-  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Available)
+  IGNORED_ATTR(CDecl)
+  IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
+  IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(DowngradeExhaustivityCheck)
+  IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(FixedLayout)
+  IGNORED_ATTR(Implements)
+  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Inlineable)
+  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
-  IGNORED_ATTR(RestatedObjCConformance)
+  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
   IGNORED_ATTR(RequiresStoredPropertyInits)
+  IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(ShowInInterface)
+  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Specialize)
+  IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
-  IGNORED_ATTR(ShowInInterface)
-  IGNORED_ATTR(DiscardableResult)
-  IGNORED_ATTR(Implements)
-  IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(DowngradeExhaustivityCheck)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
-  IGNORED_ATTR(ClangImporterSynthesizedType)
+  IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -791,8 +793,10 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
+    IGNORED_ATTR(DowngradeExhaustivityCheck)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
@@ -800,6 +804,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
@@ -811,33 +816,33 @@ public:
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(ObjCBridged)
+    IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(ObjCNonLazyRealization)
     IGNORED_ATTR(ObjCRuntimeName)
-    IGNORED_ATTR(RestatedObjCConformance)
     IGNORED_ATTR(Optional)
-    IGNORED_ATTR(Ownership)
     IGNORED_ATTR(Override)
+    IGNORED_ATTR(Ownership)
     IGNORED_ATTR(RawDocComment)
-    IGNORED_ATTR(Semantics)
-    IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(Transparent)
-    IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
-    IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Testable)
-    IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(RestatedObjCConformance)
+    IGNORED_ATTR(Semantics)
     IGNORED_ATTR(ShowInInterface)
-    IGNORED_ATTR(ObjCMembers)
+    IGNORED_ATTR(SILGenName)
+    IGNORED_ATTR(SILStored)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
-    IGNORED_ATTR(DowngradeExhaustivityCheck)
-    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
-    IGNORED_ATTR(ClangImporterSynthesizedType)
+    IGNORED_ATTR(SynthesizedProtocol)
+    IGNORED_ATTR(Testable)
+    IGNORED_ATTR(Transparent)
+    IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
   
   void visitCDeclAttr(CDeclAttr *attr);
 
+  void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
+  
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
@@ -916,6 +921,73 @@ static bool iswatchOS(TypeChecker &TC) {
 
 static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
+}
+
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
+/// requirement.
+bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                     DeclContext *DC,
+                                                     TypeChecker &TC) {
+  // The only thing that we care about is that the index list has exactly one
+  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+  auto indices = decl->getIndices();
+  
+  auto EBSL =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  
+  return indices->size() == 1 &&
+    !indices->get(0)->isVariadic() &&
+    TC.conformsToProtocol(indices->get(0)->getType(),
+                          EBSL, DC, ConformanceCheckOptions());
+}
+
+/// The @dynamicMemberLookup attribute is only allowed on types that have at
+/// least one subscript member declared like this:
+///
+/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
+///   (dynamicMember name: KeywordType) -> LookupValue { get }
+///
+/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
+/// manually check the requirements here.
+///
+void AttributeChecker::
+visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
+  // This attribute is only allowed on nominal types.
+  auto decl = cast<NominalTypeDecl>(D);
+  auto type = decl->getDeclaredType();
+  
+  // Lookup our subscript.
+  auto subscriptName =
+    DeclName(TC.Context, DeclBaseName::createSubscript(),
+             TC.Context.Id_dynamicMember);
+  
+  auto lookupOptions = defaultMemberTypeLookupOptions;
+  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+  
+  // Lookup the implementations of our subscript.
+  auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
+  
+  // If we have none, then there is no attribute.
+  if (candidates.empty()) {
+    TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
+    attr->setInvalid();
+    return;
+  }
+
+  
+  // If none of the ones we find are acceptable, then reject one.
+  auto oneCandidate = candidates.front();
+  candidates.filter([&](LookupResultEntry entry)->bool {
+    auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
+  });
+  
+  if (candidates.empty()) {
+    TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
+                diag::type_invalid_dml, type);
+    attr->setInvalid();
+  }
 }
 
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {

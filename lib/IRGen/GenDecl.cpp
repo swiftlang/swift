@@ -465,6 +465,7 @@ public:
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   PrettySourceFileEmission StackEntry(SF);
+  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile, &SF);
 
   // Emit types and other global decls.
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
@@ -553,12 +554,11 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
-  if (SwiftProtocols.empty()
-      && ProtocolConformances.empty()
-      && RuntimeResolvableTypes.empty()
-      && (!ObjCInterop || (ObjCProtocols.empty() &&
-                           ObjCClasses.empty() &&
-                           ObjCCategoryDecls.empty())))
+  if (SwiftProtocols.empty() && ProtocolConformances.empty() &&
+      RuntimeResolvableTypes.empty() &&
+      (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
+                        ObjCCategoryDecls.empty())) &&
+      FieldDescriptors.empty())
     return;
   
   // Find the entry point.
@@ -720,6 +720,14 @@ void IRGenModule::emitRuntimeRegistration() {
     RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
   }
 
+  if (!FieldDescriptors.empty()) {
+    auto *records = emitFieldDescriptors();
+    auto *begin =
+        llvm::ConstantExpr::getBitCast(records, FieldDescriptorPtrPtrTy);
+    auto *size = llvm::ConstantInt::get(SizeTy, FieldDescriptors.size());
+    RegIGF.Builder.CreateCall(getRegisterFieldDescriptorsFn(), {begin, size});
+  }
+
   RegIGF.Builder.CreateRetVoid();
 }
 
@@ -801,7 +809,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
         return getAddrOfLLVMVariableOrGOTEquivalent(
                                 LinkEntity::forNominalTypeDescriptor(nominal),
                                 Alignment(4),
-                                NominalTypeDescriptorTy,
+                                TypeContextDescriptorTy,
                                 shouldBeIndirect);
       }
     }
@@ -1098,6 +1106,16 @@ void IRGenModule::finishEmitAfterTopLevel() {
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *Nominal) {
+  // We may have emitted a partial type context descriptor with some empty
+  // fields, and then later discovered we're emitting complete metadata.
+  // Remove existing definitions of the type context so that we can regenerate
+  // a complete descriptor.
+  auto existingContext = dyn_cast_or_null<llvm::GlobalVariable>(
+    IGM.getAddrOfTypeContextDescriptor(Nominal)->stripPointerCasts());
+  if (existingContext && !existingContext->isDeclaration()) {
+    existingContext->setInitializer(nullptr);
+  }
+
   if (auto sd = dyn_cast<StructDecl>(Nominal)) {
     return emitStructMetadata(IGM, sd);
   } else if (auto ed = dyn_cast<EnumDecl>(Nominal)) {
@@ -1131,9 +1149,31 @@ void IRGenerator::emitTypeMetadataRecords() {
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyMetadata.empty() ||
+         !LazyTypeContextDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
-         !LazyFieldTypeAccessors.empty() ||
+         !LazyFieldTypes.empty() ||
          !LazyWitnessTables.empty()) {
+
+    while (!LazyFieldTypes.empty()) {
+      auto info = LazyFieldTypes.pop_back_val();
+      auto &IGM = *info.IGM;
+
+      for (auto fieldType : info.fieldTypes) {
+        if (fieldType->hasArchetype())
+          continue;
+
+        // All of the required attributes are going to be preserved
+        // by field reflection metadata in the mangled name, so
+        // there is no need to worry about ownership semantics here.
+        if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldType))
+          fieldType = refStorTy.getReferentType();
+
+        // Make sure that all of the field type metadata is forced,
+        // otherwise there might be a problem when fields are accessed
+        // through reflection.
+        (void)irgen::getOrCreateTypeMetadataAccessFunction(IGM, fieldType);
+      }
+    }
 
     // Emit any lazy type metadata we require.
     while (!LazyMetadata.empty()) {
@@ -1144,10 +1184,13 @@ void IRGenerator::emitLazyDefinitions() {
         emitLazyTypeMetadata(*IGM.get(), Nominal);
       }
     }
-    while (!LazyFieldTypeAccessors.empty()) {
-      auto accessor = LazyFieldTypeAccessors.pop_back_val();
-      emitFieldTypeAccessor(*accessor.IGM, accessor.type, accessor.fn,
-                            accessor.fieldTypes);
+    while (!LazyTypeContextDescriptors.empty()) {
+      NominalTypeDecl *Nominal = LazyTypeContextDescriptors.pop_back_val();
+      assert(scheduledLazyTypeContextDescriptors.count(Nominal) == 1);
+      if (eligibleLazyMetadata.count(Nominal) != 0) {
+        CurrentIGMPtr IGM = getGenModule(Nominal->getDeclContext());
+        emitLazyTypeContextDescriptor(*IGM.get(), Nominal);
+      }
     }
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
@@ -2263,7 +2306,8 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
     // forward declaration.
     if (definitionType) {
       assert(existing->isDeclaration() && "already defined");
-      assert(entry->getType()->getPointerElementType() == defaultType);
+      assert(entry->getType()->getPointerElementType() == defaultType
+          || entry->getType()->getPointerElementType() == definition.getType());
       updateLinkageForDefinition(*this, existing, entity);
 
       // If the existing entry is a variable of the right type,
@@ -2352,6 +2396,9 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     auto foreignCandidate
       = getAddrOfForeignTypeMetadataCandidate(entity.getType());
     (void)foreignCandidate;
+  } else if (entity.isObjCClassRef()) {
+    (void)getAddrOfObjCClassRef(
+                  const_cast<ClassDecl *>(cast<ClassDecl>(entity.getDecl())));
   } else {
     getAddrOfLLVMVariable(entity, alignment, ConstantInit(),
                           defaultType, DebugTypeInfo());
@@ -2442,14 +2489,14 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     typeKind = TypeMetadataRecordKind::IndirectObjCClass;
     defaultTy = IGM.TypeMetadataPtrTy;
     defaultPtrTy = IGM.TypeMetadataPtrTy;
-    entity = LinkEntity::forObjCClass(clas);
+    entity = LinkEntity::forObjCClassRef(clas);
   } else {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
     typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
-    defaultTy = IGM.NominalTypeDescriptorTy;
-    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
+    defaultTy = IGM.TypeContextDescriptorTy;
+    defaultPtrTy = IGM.TypeContextDescriptorPtrTy;
   }
 
   return {typeKind, *entity, defaultTy, defaultPtrTy};
@@ -2671,8 +2718,8 @@ namespace {
 
       auto nominal = Conformance->getType()->getAnyNominal();
       irgen::addGenericRequirements(IGM, B,
-                                    nominal->getGenericSignatureOfContext(),
-                                    Conformance->getConditionalRequirements());
+        nominal->getGenericSignatureOfContext(),
+        Conformance->getConditionalRequirements());
     }
   };
 }
@@ -2821,6 +2868,52 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   var->setAlignment(4);
   addUsedGlobal(var);
   
+  return var;
+}
+
+llvm::Constant *IRGenModule::emitFieldDescriptors() {
+  std::string sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = "swift5_fieldmd";
+    break;
+  case llvm::Triple::COFF:
+    sectionName = ".swift5_fieldmd";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit field records table for "
+                     "the selected object format.");
+  }
+
+  // Do nothing if the list is empty.
+  if (FieldDescriptors.empty())
+    return nullptr;
+
+  // Define the global variable for the field record list.
+  // We have to do this before defining the initializer since the entries will
+  // contain offsets relative to themselves.
+  auto arrayTy =
+      llvm::ArrayType::get(FieldDescriptorPtrTy, FieldDescriptors.size());
+
+  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+  // resolve relocations relative to it.
+  auto var = new llvm::GlobalVariable(
+      Module, arrayTy,
+      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage,
+      /*initializer*/ nullptr, "\x01l_type_metadata_table");
+
+  SmallVector<llvm::Constant *, 8> elts;
+  for (auto *descriptor : FieldDescriptors)
+    elts.push_back(
+        llvm::ConstantExpr::getBitCast(descriptor, FieldDescriptorPtrTy));
+
+  var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
+  var->setSection(sectionName);
+  var->setAlignment(4);
+  addUsedGlobal(var);
   return var;
 }
 
@@ -3208,11 +3301,11 @@ IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
 /// must always be for purposes of defining it.
 llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                                       ConstantInit definition) {
-  IRGen.addLazyTypeMetadata(D);
+  IRGen.addLazyTypeContextDescriptor(D);
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
-                               NominalTypeDescriptorTy,
+                               TypeContextDescriptorTy,
                                DebugTypeInfo());
 }
 

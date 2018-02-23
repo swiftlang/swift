@@ -439,10 +439,9 @@ static bool isLegalSILType(CanType type) {
     return true;
   }
 
-  // Optionals are legal if their object type is legal and they're Optional.
-  OptionalTypeKind optKind;
-  if (auto objectType = type.getOptionalObjectType(optKind)) {
-    return (optKind == OTK_Optional && isLegalSILType(objectType));
+  // Optionals are legal if their object type is legal.
+  if (auto objectType = type.getOptionalObjectType()) {
+    return isLegalSILType(objectType);
   }
 
   // Reference storage types are legal if their object type is legal.
@@ -502,26 +501,25 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getOptionalObjectType(OptionalTypeKind &kind) {
+Type TypeBase::getOptionalObjectType(bool &isOptional) {
   if (auto boundTy = getAs<BoundGenericEnumType>()) {
     if (boundTy->getDecl()->isOptionalDecl()) {
-      kind = OTK_Optional;
+      isOptional = true;
       return boundTy->getGenericArgs()[0];
     }
   }
-  kind = OTK_None;
+  isOptional = false;
   return Type();
 }
 
-CanType CanType::getOptionalObjectTypeImpl(CanType type,
-                                           OptionalTypeKind &kind) {
+CanType CanType::getOptionalObjectTypeImpl(CanType type, bool &isOptional) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type)) {
     if (boundTy->getDecl()->isOptionalDecl()) {
-      kind = OTK_Optional;
+      isOptional = true;
       return boundTy.getGenericArgs()[0];
     }
   }
-  kind = OTK_None;
+  isOptional = false;
   return CanType();
 }
 
@@ -684,13 +682,10 @@ Type TypeBase::getWithoutImmediateLabel() {
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
-    OptionalTypeKind resultOTK;
-    if (auto objectType = getOptionalObjectType(resultOTK)) {
+    if (auto objectType = getOptionalObjectType()) {
       assert(!newResultType->getOptionalObjectType());
       return OptionalType::get(
-          resultOTK,
-          objectType->replaceCovariantResultType(
-              newResultType, uncurryLevel));
+          objectType->replaceCovariantResultType(newResultType, uncurryLevel));
     }
 
     return newResultType;

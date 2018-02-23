@@ -9,11 +9,13 @@
     "Character.swift",
     "CharacterUnicodeScalars.swift",
     "ICU.swift",
+    "NormalizedCodeUnitIterator.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
     "StringCharacterView.swift",
     "StringComparable.swift",
+    "StringComparison.swift",
     "StringObject.swift",
     "StringGuts.swift",
     "StringGraphemeBreaking.swift",  
@@ -22,6 +24,7 @@
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
+    "StringNormalization.swift",
     "StringRangeReplaceableCollection.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
@@ -120,9 +123,8 @@
     "Dump.swift",
     "Mirror.swift",
     "Mirrors.swift",
-    "ObjCMirrors.swift",
-    "ObjectIdentifier.swift",
-    "ReflectionLegacy.swift"
+    "ReflectionMirror.swift",
+    "ObjectIdentifier.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
@@ -151,6 +153,9 @@
   "Protocols": [
     "CompilerProtocols.swift",
     "ShadowProtocols.swift"
+  ],
+  "Playground": [
+    "PlaygroundDisplay.swift"
   ],
   "Misc": [
     "AnyHashable.swift",

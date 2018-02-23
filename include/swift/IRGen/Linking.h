@@ -723,6 +723,9 @@ public:
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
   }
+  bool isObjCClassRef() const {
+    return getKind() == Kind::ObjCClassRef;
+  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const {
@@ -730,9 +733,12 @@ public:
         getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
 
-    if (getKind() == Kind::SILFunction)
+    if (getKind() == Kind::SILFunction) {
       if (auto clangOwner = getSILFunction()->getClangNodeOwner())
         return clangOwner->isWeakImported(module);
+      if (getSILFunction()->isWeakLinked())
+        return getSILFunction()->isAvailableExternally();
+    }
 
     if (!isDeclKind(getKind()))
       return false;

@@ -3867,13 +3867,11 @@ public:
 
   static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
                                      TupleExpr *Tuple, unsigned &Pos,
-                                     bool &HasName,
-                                     llvm::SmallVectorImpl<Type> &TupleEleTypes) {
+                                     bool &HasName) {
     auto &SM = DC.getASTContext().SourceMgr;
     Pos = 0;
     for (auto E : Tuple->getElements()) {
       if (SM.isBeforeInBuffer(E->getEndLoc(), Target->getStartLoc())) {
-        TupleEleTypes.push_back(E->getType());
         Pos ++;
         continue;
       }
@@ -3974,36 +3972,65 @@ public:
     }
   }
 
-  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
-                                      SmallVectorImpl<Type> &PossibleTypes,
-                                      unsigned &Position, bool &HasName,
-                                      bool RemoveUnlikelyOverloads) {
-    if (auto Ty = CallE->getFn()->getType()) {
-      if (auto FT = Ty->getAs<FunctionType>()) {
-        PossibleTypes.push_back(FT->getInput());
+  static bool collectionInputTypes(DeclContext &DC, CallExpr *callExpr,
+                                   SmallVectorImpl<Type> &possibleTypes) {
+    auto *fnExpr = callExpr->getFn();
+
+    if (auto type = fnExpr->getType()) {
+      if (auto *funcType = type->getAs<AnyFunctionType>())
+        possibleTypes.push_back(funcType->getInput());
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+      if (auto *decl = DRE->getDecl()) {
+        auto declType = decl->getInterfaceType();
+        if (auto *funcType = declType->getAs<AnyFunctionType>())
+          possibleTypes.push_back(funcType->getInput());
       }
+    } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
+      for (auto *decl : OSRE->getDecls()) {
+        auto declType = decl->getInterfaceType();
+        if (auto *funcType = declType->getAs<AnyFunctionType>())
+          possibleTypes.push_back(funcType->getInput());
+      }
+    } else {
+      ConcreteDeclRef ref = nullptr;
+      auto fnType = getTypeOfCompletionContextExpr(DC.getASTContext(),
+                                                   &DC, CompletionTypeCheckKind::Normal,
+                                                   fnExpr, ref);
+
+      if (!fnType)
+        return false;
+
+      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>())
+        possibleTypes.push_back(AFT->getInput());
     }
-    if (auto TAG = dyn_cast<TupleExpr>(CallE->getArg())) {
-      llvm::SmallVector<Type, 3> TupleEleTypesBeforeTarget;
-      if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName,
-                                  TupleEleTypesBeforeTarget))
-        return false;
-      if (PossibleTypes.empty() &&
-          !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
-        return false;
-      if (RemoveUnlikelyOverloads) {
-        removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
-        return !PossibleTypes.empty();
-      }
-    } else if (isa<ParenExpr>(CallE->getArg())) {
-      Position = 0;
-      HasName = false;
-      if (PossibleTypes.empty() &&
-          !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
-        return false;
-    } else
+
+    return !possibleTypes.empty();
+  }
+
+  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE,
+                                      Expr *CCExpr,
+                                      SmallVectorImpl<Type> &PossibleTypes,
+                                      unsigned &Position, bool &HasName) {
+    if (!collectionInputTypes(DC, CallE, PossibleTypes))
       return false;
-    return true;
+
+    if (auto *tuple = dyn_cast<TupleExpr>(CallE->getArg())) {
+      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
+          HasName = !tuple->getElementName(i).empty();
+          Position = i;
+          return true;
+        }
+      }
+
+      return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
+    } else if (auto *paren = dyn_cast<ParenExpr>(CallE->getArg())) {
+      HasName = false;
+      Position = 0;
+      return true;
+    }
+
+    return false;
   }
 
   static bool
@@ -4014,7 +4041,7 @@ public:
     unsigned Position;
     bool HasName;
     if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
-                                HasName, true)) {
+                                HasName)) {
       collectArgumentExpectation(Position, HasName, PossibleTypes,
                                  CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
       return !ExpectedTypes.empty() || !ExpectedNames.empty();
@@ -4026,10 +4053,14 @@ public:
     SmallVector<Type, 2> PossibleTypes;
     unsigned Position;
     bool HasName;
-    return collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
-                                   HasName, true) &&
-           lookupArgCompletionsAtPosition(Position, HasName, PossibleTypes,
-                                          CCExpr->getStartLoc());
+    bool hasPossibleArgTypes = collectPossibleArgTypes(DC, CallE, CCExpr,
+                                                       PossibleTypes, Position,
+                                                       HasName);
+    bool hasCompletions = lookupArgCompletionsAtPosition(Position, HasName,
+                                                         PossibleTypes,
+                                                         CCExpr->getStartLoc());
+
+    return hasPossibleArgTypes && hasCompletions;
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -5062,7 +5093,13 @@ public:
         if (SM.isBeforeInBuffer(AE->getEqualLoc(), ParsedExpr->getStartLoc())) {
 
           // The destination is of the expected type.
-          Callback(AE->getDest()->getType());
+          auto *destExpr = AE->getDest();
+          if (auto type = destExpr->getType()) {
+            Callback(type);
+          } else if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
+            if (auto *decl = DRE->getDecl())
+              Callback(decl->getInterfaceType());
+          }
         }
         break;
       }
@@ -5436,7 +5473,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::AssignmentRHS : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    if (auto destType = AssignmentExpr->getDest()->getType())
+    if (auto destType = ParsedExpr->getType())
       Lookup.setExpectedTypes(destType->getRValueType());
     Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;

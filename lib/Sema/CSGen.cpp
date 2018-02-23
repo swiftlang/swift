@@ -828,7 +828,20 @@ namespace {
 
     Type firstArgTy = argTupleTy->getElement(0).getType()->getWithoutParens();
     Type secondArgTy = argTupleTy->getElement(1).getType()->getWithoutParens();
-    
+
+    auto isOptionalWithMatchingObjectType = [](Type optional,
+                                               Type object) -> bool {
+      if (auto objTy = optional->getRValueType()->getOptionalObjectType())
+        return objTy->getRValueType()->isEqual(object->getRValueType());
+
+      return false;
+    };
+
+    auto isPotentialForcingOpportunity = [&](Type first, Type second) -> bool {
+      return isOptionalWithMatchingObjectType(first, second) ||
+             isOptionalWithMatchingObjectType(second, first);
+    };
+
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
       auto valueTy = value->getInterfaceType();
@@ -882,14 +895,14 @@ namespace {
       
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
-      
-      return
-        (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
-                              secondArgTy) ||
-         isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
-                              firstArgTy)) &&
-         firstParamTy->isEqual(secondParamTy) &&
-        (!contextualTy || contextualTy->isEqual(resultTy));
+
+      return (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
+                                   secondArgTy) ||
+              isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
+                                   firstArgTy)) &&
+             firstParamTy->isEqual(secondParamTy) &&
+             !isPotentialForcingOpportunity(firstArgTy, secondArgTy) &&
+             (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
     favorCallOverloads(expr, CS, isFavoredDecl);
@@ -1259,9 +1272,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
-      if (constr->getFailability() != OTK_None) {
-        result = OptionalType::get(constr->getFailability(), result);
-      }
+      if (constr->getFailability() != OTK_None)
+        result = OptionalType::get(result);
 
       return result;
     }
@@ -1350,7 +1362,7 @@ namespace {
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openUnboundGenericType(type, locator);
-      E->getTypeLoc().setType(type, /*validated=*/true);
+      CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }
 
@@ -2522,7 +2534,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(fromExpr);
       auto locator = CS.getConstraintLocator(expr);
@@ -2551,7 +2563,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
@@ -2585,7 +2597,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(fromExpr);
       auto locator = CS.getConstraintLocator(expr);
@@ -2614,7 +2626,7 @@ namespace {
       // FIXME: Locator for the cast type?
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       // Add a checked cast constraint.
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3204,6 +3216,7 @@ namespace {
 
             auto *TE = TypeExpr::createImplicit(joinTy, CS.getASTContext());
             CS.cacheType(TE);
+            CS.setType(TE->getTypeLoc(), joinTy);
 
             auto *DSE = new (CS.getASTContext())
                 DotSelfExpr(TE, SourceLoc(), SourceLoc(), CS.getType(TE));
@@ -3452,6 +3465,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
                                     SmallVectorImpl<Type> &PossibleTypes) {
   PrettyStackTraceExpr stackTrace(DC.getASTContext(),
                                   "type-checking unresolved member", Parent);
+
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3469,7 +3483,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   }
 
   SmallVector<Solution, 3> solutions;
-  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::Allow)) {
+  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::UnresolvedType)) {
     return false;
   }
 

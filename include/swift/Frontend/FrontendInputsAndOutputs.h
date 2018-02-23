@@ -14,6 +14,8 @@
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
@@ -43,9 +45,24 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
+  SupplementaryOutputPaths SupplementaryOutputs;
+
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
+
+  const SupplementaryOutputPaths &supplementaryOutputs() const {
+    return SupplementaryOutputs;
+  }
+  SupplementaryOutputPaths &supplementaryOutputs() {
+    return SupplementaryOutputs;
+  }
+
+  /// When performing a compilation for zero or one primary input file,
+  /// this will hold the PrimarySpecificPaths.
+  /// In a future PR, each InputFile will hold its own PrimarySpecificPaths and
+  /// this will go away.
+  PrimarySpecificPaths PrimarySpecificPathsForAtMostOnePrimary;
 
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
@@ -164,10 +181,16 @@ public:
 private:
   friend class ArgsToFrontendOptionsConverter;
 
-  void setMainOutputs(ArrayRef<std::string> outputFiles);
+  void
+  setMainAndSupplementaryOutputs(ArrayRef<std::string> outputFiles,
+                                 SupplementaryOutputPaths supplementaryOutputs);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
+
+  bool hasInputsProducingMainOutputs() const {
+    return countOfInputsProducingMainOutputs() != 0;
+  }
 
   const InputFile &firstInputProducingOutput() const;
   const InputFile &lastInputProducingOutput() const;
@@ -193,8 +216,29 @@ public:
 
   // Supplementary outputs
 
+  unsigned countOfFilesProducingSupplementaryOutput() const;
+
   void forEachInputProducingSupplementaryOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
+
+  /// Assumes there is not more than one primary input file, if any.
+  /// Otherwise, you would need to call getPrimarySpecificPathsForPrimary
+  /// to tell it which primary input you wanted the outputs for.
+
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+
+  bool hasDependenciesPath() const;
+  bool hasReferenceDependenciesPath() const;
+  bool hasObjCHeaderOutputPath() const;
+  bool hasLoadedModuleTracePath() const;
+  bool hasModuleOutputPath() const;
+  bool hasModuleDocOutputPath() const;
+  bool hasTBDPath() const;
+
+  bool hasDependencyTrackerPath() const;
 };
 
 } // namespace swift

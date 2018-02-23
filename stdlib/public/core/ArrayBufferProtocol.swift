@@ -126,7 +126,7 @@ internal protocol _ArrayBufferProtocol
   var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol where Indices == CountableRange<Int>{
+extension _ArrayBufferProtocol where Indices == Range<Int>{
 
   @_inlineable
   @_versioned
@@ -142,7 +142,7 @@ extension _ArrayBufferProtocol where Indices == CountableRange<Int>{
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
-      subRange: Range(buffer.indices),
+      subRange: buffer.indices,
       initializing: newBuffer.firstElementAddress)
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }

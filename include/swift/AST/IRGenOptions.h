@@ -64,9 +64,6 @@ enum class IRGenEmbedMode : unsigned {
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
-  /// The name of the first input file, used by the debug info.
-  std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -187,19 +184,6 @@ public:
         EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
-
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  /// This function is used by (at least)
-  /// lldb/source/Symbol/SwiftASTContext.cpp:4603
-  /// FIXME: This function should go away in favor of
-  /// Instance.getFrontendOptions().InputsAndOutputs.getSingleOutputFilename
-  /// when batch mode handles all contingencies.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

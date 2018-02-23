@@ -19,6 +19,8 @@
 #ifndef SWIFT_DEMANGLE_SWIFT_DEMANGLE_H
 #define SWIFT_DEMANGLE_SWIFT_DEMANGLE_H
 
+#include <swift/SwiftDemangle/Platform.h>
+
 /// @{
 /// Version constants for libswiftDemangle library.
 
@@ -40,8 +42,9 @@ extern "C" {
 /// \returns the length of the demangled function name (even if greater than the
 /// size of the output buffer) or 0 if the input is not a Swift-mangled function
 /// name (in which cases \p OutputBuffer is left untouched).
-size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuffer,
-                                       size_t Length);
+SWIFT_DEMANGLE_LINKAGE
+size_t swift_demangle_getDemangledName(const char *MangledName,
+                                       char *OutputBuffer, size_t Length);
 
 /// \brief Demangle Swift function names with module names and implicit self
 /// and metatype type names in function signatures stripped.
@@ -49,6 +52,7 @@ size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuff
 /// \returns the length of the demangled function name (even if greater than the
 /// size of the output buffer) or 0 if the input is not a Swift-mangled function
 /// name (in which cases \p OutputBuffer is left untouched).
+SWIFT_DEMANGLE_LINKAGE
 size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  char *OutputBuffer,
                                                  size_t Length);
@@ -59,6 +63,7 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
 /// \returns true if the function conforms to the Swift calling convention.
 /// The return value is unspecified if the \p MangledName does not refer to a
 /// function symbol.
+SWIFT_DEMANGLE_LINKAGE
 int swift_demangle_hasSwiftCallingConvention(const char *MangledName);
 
 #ifdef __cplusplus
@@ -91,6 +96,7 @@ extern "C" {
 /// \returns the length of the demangled function name (even if greater than the
 /// size of the output buffer) or 0 if the input is not a Swift-mangled function
 /// name (in which cases \p OutputBuffer is left untouched).
+SWIFT_DEMANGLE_LINKAGE
 size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
                               size_t Length);
 

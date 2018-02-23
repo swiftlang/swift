@@ -762,6 +762,10 @@ namespace {
       return true;
     }
 
+    bool visitValueToBridgeObjectInst(ValueToBridgeObjectInst *i) {
+      return true;
+    }
+
     bool visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
       return true;
     }

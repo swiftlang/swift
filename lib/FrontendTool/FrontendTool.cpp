@@ -104,12 +104,15 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  const FrontendOptions &opts,
                                  const InputFile &input) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath, EC,
+      llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.DependenciesFilePath, EC.message());
+    diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -185,17 +188,21 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 
 static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
-                                          DependencyTracker &depTracker,
+                                          DependencyTracker *depTracker,
                                           const FrontendOptions &opts) {
-  if (opts.LoadedModuleTracePath.empty())
+  if (opts.InputsAndOutputs.supplementaryOutputs()
+          .LoadedModuleTracePath.empty())
     return false;
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
-                           llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath, EC,
+      llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        opts.LoadedModuleTracePath, EC.message());
+    ctxt.Diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -203,7 +210,7 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
   llvm::SmallVector<std::string, 16> swiftModules;
 
   // Canonicalise all the paths by opening them.
-  for (auto &dep : depTracker.getDependencies()) {
+  for (auto &dep : depTracker->getDependencies()) {
     llvm::SmallString<256> buffer;
     StringRef realPath;
     int FD;
@@ -291,12 +298,12 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool writeSIL(SILModule &SM, CompilerInstance &Instance,
+static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
+                     CompilerInstance &Instance,
                      CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
   return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                  opts.InputsAndOutputs.getSingleOutputFilename(),
-                  opts.EmitSortedSIL);
+                  PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
 static bool printAsObjCIfNeeded(const std::string &outputPath, ModuleDecl *M,
@@ -475,10 +482,12 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
     C.NumDependencies = D->getDependencies().size();
   }
 
-  if (auto *R = Instance.getReferencedNameTracker()) {
-    C.NumReferencedTopLevelNames = R->getTopLevelNames().size();
-    C.NumReferencedDynamicNames = R->getDynamicLookupNames().size();
-    C.NumReferencedMemberNames = R->getUsedMembers().size();
+  for (auto SF : Instance.getPrimarySourceFiles()) {
+    if (auto *R = SF->getReferencedNameTracker()) {
+      C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
+      C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
+      C.NumReferencedMemberNames += R->getUsedMembers().size();
+    }
   }
 
   if (!Instance.getPrimarySourceFiles().empty()) {
@@ -535,6 +544,7 @@ struct PostSILGenInputs {
   std::unique_ptr<SILModule> TheSILModule;
   bool ASTGuaranteedToCorrespondToSIL;
   ModuleOrSourceFile ModuleOrPrimarySourceFile;
+  PrimarySpecificPaths PSPs;
 };
 
 static bool precompileBridgingHeader(CompilerInvocation &Invocation,
@@ -599,7 +609,10 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
   IRGenOpts.OutputKind =
       getOutputKind(Invocation.getFrontendOptions().RequestedAction);
 
-  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
+  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(),
+                     Invocation.getFrontendOptions()
+                         .InputsAndOutputs.getSingleOutputFilename(),
+                     Stats);
 }
 
 static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
@@ -723,9 +736,11 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
-static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
-  if (Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty())
+static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
+    CompilerInvocation &Invocation, CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.supplementaryOutputs()
+          .ReferenceDependenciesFilePath.empty())
     return;
   if (Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
@@ -733,15 +748,20 @@ static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                              *Instance.getDependencyTracker(),
-                              Invocation.getFrontendOptions());
+    std::string referenceDependenciesFilePath =
+        Invocation.getPrimarySpecificPathsForSourceFile(*SF)
+            .SupplementaryOutputs.ReferenceDependenciesFilePath;
+    emitReferenceDependenciesIfNeeded(Instance.getASTContext().Diags, SF,
+                                      *Instance.getDependencyTracker(),
+                                      referenceDependenciesFilePath);
   }
 }
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  StringRef TBDPath = Invocation.getFrontendOptions().TBDPath;
+  StringRef TBDPath = Invocation.getFrontendOptions()
+                          .InputsAndOutputs.supplementaryOutputs()
+                          .TBDPath;
   if (TBDPath.empty())
     return false;
   auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
@@ -758,7 +778,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   auto mod = Instance.getMainModule();
   if (auto SM = Instance.takeSILModule()) {
     std::deque<PostSILGenInputs> PSGIs;
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForAtMostOnePrimary();
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod, PSPs});
     return PSGIs;
   }
 
@@ -774,8 +796,10 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
     // SILModule for the entire module.
     auto SM = performSILGeneration(mod, SILOpts, true);
     std::deque<PostSILGenInputs> PSGIs;
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     PSGIs.push_back(PostSILGenInputs{
-        std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
+        std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod, PSPs});
     return PSGIs;
   }
   // If there are primary source files, build a separate SILModule for
@@ -784,7 +808,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (auto *PrimaryFile = Instance.getPrimarySourceFile()) {
     auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
     std::deque<PostSILGenInputs> PSGIs;
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile});
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
     return PSGIs;
   }
   // If there are primary inputs but no primary _source files_, there might be
@@ -796,22 +822,21 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
         auto SM = performSILGeneration(*SASTF, SILOpts, None);
+        const PrimarySpecificPaths PSPs =
+            Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
-            PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
+            PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod, PSPs});
       }
   }
   return PSGIs;
 }
 
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats);
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -827,7 +852,7 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
   if (Action == FrontendOptions::ActionType::EmitSyntax) {
-    Instance.getASTContext().LangOpts.KeepSyntaxInfoInSourceFile = true;
+    Instance.getASTContext().LangOpts.BuildSyntaxTree = true;
     Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
   }
 
@@ -836,12 +861,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-    if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
-      return compileLLVMIR(Invocation, Instance, Stats);
-
-  ReferencedNameTracker nameTracker;
-  if (!opts.ReferenceDependenciesFilePath.empty())
-    Instance.setReferencedNameTracker(&nameTracker);
+  if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
+    return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action))
     Instance.performParseOnly();
@@ -884,13 +905,14 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.DependenciesFilePath.empty())
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
-  emitReferenceDependenciesIfNeeded(Invocation, Instance);
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
-  (void)emitLoadedModuleTraceIfNeeded(Context, *Instance.getDependencyTracker(),
+  (void)emitLoadedModuleTraceIfNeeded(Context, Instance.getDependencyTracker(),
                                       opts);
 
   if (Context.hadError()) {
@@ -909,9 +931,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError =
-        printAsObjCIfNeeded(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
+        opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexDataIfNeeded(
         Instance.getPrimarySourceFile(), Invocation, Instance);
@@ -933,6 +955,7 @@ static bool performCompile(CompilerInstance &Instance,
                                       std::move(PSGI.TheSILModule),
                                       PSGI.ASTGuaranteedToCorrespondToSIL,
                                       PSGI.ModuleOrPrimarySourceFile,
+                                      PSGI.PSPs,
                                       moduleIsPublic,
                                       ReturnValue, observer, Stats))
       return true;
@@ -977,12 +1000,13 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 
 static SerializationOptions
 computeSerializationOptions(const CompilerInvocation &Invocation,
+                            const SupplementaryOutputPaths &outs,
                             bool moduleIsPublic) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader)
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -1037,9 +1061,10 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
-static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
+static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
                          ASTContext &Context, ModuleOrSourceFile MSF) {
-  const std::string &moduleOutputPath = opts.ModuleOutputPath;
+  const std::string &moduleOutputPath =
+      PSPs.SupplementaryOutputs.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
 
   SerializationOptions serializationOpts;
@@ -1052,19 +1077,22 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
 }
 
 static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
+                       const PrimarySpecificPaths &PSPs,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
-                       llvm::GlobalVariable *&HashGlobal) {
+                       llvm::GlobalVariable *&HashGlobal,
+                       ArrayRef<std::string> parallelOutputFilenames) {
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
-                                       std::move(SM), OutputFilename,
+                                       std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, 0, &HashGlobal)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
-                                       std::move(SM), OutputFilename,
-                                       LLVMContext, &HashGlobal);
+                                       std::move(SM), OutputFilename, PSPs,
+                                       LLVMContext, parallelOutputFilenames,
+                                       &HashGlobal);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
@@ -1145,15 +1173,12 @@ static bool generateCode(CompilerInvocation &Invocation,
                      EffectiveLanguageVersion, OutputFilename, Stats);
 }
 
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats) {
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1170,13 +1195,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    return writeSIL(*SM, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                 Instance.getASTContext(), MSF);
+    serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1202,11 +1226,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (opts.ModuleOutputPath.empty())
+    const SupplementaryOutputPaths &outs = PSPs.SupplementaryOutputs;
+    if (outs.ModuleOutputPath.empty())
       return;
 
     SerializationOptions serializationOpts =
-        computeSerializationOptions(Invocation, moduleIsPublic);
+        computeSerializationOptions(Invocation, outs, moduleIsPublic);
     serialize(MSF, serializationOpts, SM.get());
   };
 
@@ -1231,22 +1256,26 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
-  (void)printAsObjCIfNeeded(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+  (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
+                            Instance.getMainModule(),
                             opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                        Instance.getASTContext(), MSF);
+    return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
 
   const bool haveModulePath =
-      !opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty();
+      !PSPs.SupplementaryOutputs.ModuleOutputPath.empty() ||
+      !PSPs.SupplementaryOutputs.ModuleDocOutputPath.empty();
   if (haveModulePath && !SM->isSerialized())
     SM->serialize();
 
   if (haveModulePath) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
+      // What if MSF is a module?
+      // emitIndexDataIfNeeded already handles that case;
+      // it'll index everything.
+      return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
                                    Instance) ||
              Context.hadError();
     }
@@ -1257,7 +1286,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL)
-    return writeSIL(*SM, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation);
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
          "All actions not requiring IRGen must have been handled!");
@@ -1276,12 +1305,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
+  StringRef OutputFilename = PSPs.OutputFilename;
+  std::vector<std::string> ParallelOutputFilenames = Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  generateIR(IRGenOpts, std::move(SM),
-             Invocation.getFrontendOptions()
-                 .InputsAndOutputs.getSingleOutputFilename(),
-             MSF, IRModule, HashGlobal);
+  generateIR(
+      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, IRModule, HashGlobal,
+      ParallelOutputFilenames);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
@@ -1301,10 +1331,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                           *IRModule))
     return true;
 
-  return generateCode(Invocation, Instance,
-                      Invocation.getFrontendOptions()
-                          .InputsAndOutputs.getSingleOutputFilename(),
-                      IRModule.get(), HashGlobal, Stats) ||
+  return generateCode(Invocation, Instance, OutputFilename, IRModule.get(),
+                      HashGlobal, Stats) ||
          HadError;
 }
 
@@ -1339,7 +1367,8 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
       return true;
     }
   } else {
-    StringRef moduleToken = opts.ModuleOutputPath;
+    StringRef moduleToken =
+        opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath;
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
@@ -1448,6 +1477,8 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();
   auto Trace = Invocation.getFrontendOptions().TraceStats;
+  auto ProfileEvents = Invocation.getFrontendOptions().ProfileEvents;
+  auto ProfileEntities = Invocation.getFrontendOptions().ProfileEntities;
   SourceManager *SM = &Instance->getSourceMgr();
   clang::SourceManager *CSM = nullptr;
   if (auto *clangImporter = static_cast<ClangImporter *>(
@@ -1456,7 +1487,8 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   }
   return llvm::make_unique<UnifiedStatsReporter>(
       "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
-      OptType, StatsOutputDir, SM, CSM, Trace);
+      OptType, StatsOutputDir, SM, CSM, Trace,
+      ProfileEvents, ProfileEntities);
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
@@ -1564,7 +1596,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::NoneAction) {
     Instance->getDiags().diagnose(SourceLoc(),
-                                 diag::error_missing_frontend_action);
+                                  diag::error_missing_frontend_action);
     return finishDiagProcessing(1);
   }
 
@@ -1577,7 +1609,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
-      Invocation.getFrontendOptions().SerializedDiagnosticsPath;
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.supplementaryOutputs()
+            .SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1612,10 +1646,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+  if (!Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .ReferenceDependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 

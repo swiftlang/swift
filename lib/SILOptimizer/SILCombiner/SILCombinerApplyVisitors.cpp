@@ -155,7 +155,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   auto Args = PAI->getArguments();
   Params = Params.drop_front(Params.size() - Args.size());
 
-  llvm::SmallVector<std::pair<SILValue, unsigned>, 8> ArgsToHandle;
+  llvm::SmallVector<std::pair<SILValue, uint16_t>, 8> ArgsToHandle;
   for (unsigned i : indices(Args)) {
     SILValue Arg = Args[i];
     SILParameterInfo Param = Params[i];
@@ -197,8 +197,8 @@ bool PartialApplyCombiner::allocateTemporaries() {
     SILValue Arg = ArgWithIdx.first;
     Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
     // Create a new temporary at the beginning of a function.
-    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(),
-                                        {/*Constant*/ true, ArgWithIdx.second});
+    SILDebugVariable DbgVar(/*Constant*/ true, ArgWithIdx.second);
+    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(), DbgVar);
     Builder.setInsertionPoint(PAI);
     // Copy argument into this temporary.
     Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
@@ -377,7 +377,7 @@ SILInstruction *PartialApplyCombiner::combine() {
     auto *User = Use->getUser();
 
     // Recurse through conversions.
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
+    if (auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(User)) {
       // TODO: Handle argument conversion. All the code in this file needs to be
       // cleaned up and generalized. The argument conversion handling in
       // optimizeApplyOfConvertFunctionInst should apply to any combine
@@ -389,9 +389,9 @@ SILInstruction *PartialApplyCombiner::combine() {
       auto EscapingCalleeTy =
           ConvertCalleeTy->getWithExtInfo(
             ConvertCalleeTy->getExtInfo().withNoEscape(false));
-      if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
-        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
-
+      assert(Use->get()->getType().castTo<SILFunctionType>() ==
+             EscapingCalleeTy);
+      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }
     // If this use of a partial_apply is not

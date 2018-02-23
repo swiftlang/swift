@@ -2,11 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
-// REQUIRES: rdar36740859
 
 import Foundation
 import StdlibUnittest
 import SwiftSyntax
+import SwiftLang
 
 var ParseFile = TestSuite("ParseFile")
 
@@ -31,7 +31,8 @@ ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
   expectDoesNotThrow({
     let currentFileContents = try String(contentsOf: currentFile)
-    let parsed = try SourceFileSyntax.parse(currentFile)
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SwiftLang.parse(currentFile))
     expectEqual("\(parsed)", currentFileContents)
   })
 }

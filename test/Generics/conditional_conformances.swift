@@ -39,7 +39,7 @@ func takes_P5<X: P5>(_: X) {}
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free<T>
 // CHECK-NEXT: (normal_conformance type=Free<T> protocol=P2
-// CHECK-NEXT:   conforms_to: τ_0_0 P1)
+// CHECK-NEXT:   conforms_to: T P1)
 extension Free: P2 where T: P1 {}
 func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())
@@ -54,7 +54,7 @@ func free_bad<U>(_: U) {
 struct Constrained<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Constrained<T>
 // CHECK-NEXT: (normal_conformance type=Constrained<T> protocol=P2
-// CHECK-NEXT:   conforms_to: τ_0_0 P3)
+// CHECK-NEXT:   conforms_to: T P3)
 extension Constrained: P2 where T: P3 {}
 func constrained_good<U: P1 & P3>(_: U) {
     takes_P2(Constrained<U>())
@@ -79,7 +79,7 @@ extension RedundantSuper: P2 where T: P1 {}
 struct OverlappingSub<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=OverlappingSub<T>
 // CHECK-NEXT: (normal_conformance type=OverlappingSub<T> protocol=P2
-// CHECK-NEXT:   conforms_to: τ_0_0 P4)
+// CHECK-NEXT:   conforms_to: T P4)
 extension OverlappingSub: P2 where T: P4 {}
 func overlapping_sub_good<U: P4>(_: U) {
     takes_P2(OverlappingSub<U>())
@@ -95,7 +95,7 @@ func overlapping_sub_bad<U: P1>(_: U) {
 struct SameType<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType<Int>
 // CHECK-NEXT: (normal_conformance type=SameType<T> protocol=P2
-// CHECK-NEXT:   same_type: τ_0_0 Int)
+// CHECK-NEXT:   same_type: T Int)
 extension SameType: P2 where T == Int {}
 func same_type_good() {
     takes_P2(SameType<Int>())
@@ -109,7 +109,7 @@ func same_type_bad<U>(_: U) {
 struct SameTypeGeneric<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric<T, T>
 // CHECK-NEXT: (normal_conformance type=SameTypeGeneric<T, U> protocol=P2
-// CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
+// CHECK-NEXT:   same_type: T U)
 extension SameTypeGeneric: P2 where T == U {}
 func same_type_generic_good<U, V>(_: U, _: V)
   where U: Assoc, V: Assoc, U.AT == V.AT
@@ -131,8 +131,8 @@ func same_type_bad<U, V>(_: U, _: V) {
 struct Infer<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer<Constrained<U>, U>
 // CHECK-NEXT: (normal_conformance type=Infer<T, U> protocol=P2
-// CHECK-NEXT:   same_type: τ_0_0 Constrained<τ_0_1>
-// CHECK-NEXT:   conforms_to:  τ_0_1 P1)
+// CHECK-NEXT:   same_type: T Constrained<U>
+// CHECK-NEXT:   conforms_to:  U P1)
 extension Infer: P2 where T == Constrained<U> {}
 func infer_good<U: P1>(_: U) {
     takes_P2(Infer<Constrained<U>, U>())
@@ -147,7 +147,7 @@ func infer_bad<U: P1, V>(_: U, _: V) {
 struct InferRedundant<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant<Constrained<U>, U>
 // CHECK-NEXT: (normal_conformance type=InferRedundant<T, U> protocol=P2
-// CHECK-NEXT:   same_type: τ_0_0 Constrained<τ_0_1>)
+// CHECK-NEXT:   same_type: T Constrained<U>)
 extension InferRedundant: P2 where T == Constrained<U> {}
 func infer_redundant_good<U: P1>(_: U) {
     takes_P2(InferRedundant<Constrained<U>, U>())
@@ -167,7 +167,7 @@ class C3: C2 {}
 struct ClassFree<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassFree<T>
 // CHECK-NEXT: (normal_conformance type=ClassFree<T> protocol=P2
-// CHECK-NEXT:   superclass: τ_0_0 C1)
+// CHECK-NEXT:   superclass: T C1)
 extension ClassFree: P2 where T: C1 {}
 func class_free_good<U: C1>(_: U) {
     takes_P2(ClassFree<U>())
@@ -180,7 +180,7 @@ func class_free_bad<U>(_: U) {
 struct ClassMoreSpecific<T: C1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassMoreSpecific<T>
 // CHECK-NEXT: (normal_conformance type=ClassMoreSpecific<T> protocol=P2
-// CHECK-NEXT:   superclass: τ_0_0 C3)
+// CHECK-NEXT:   superclass: T C3)
 extension ClassMoreSpecific: P2 where T: C3 {}
 func class_more_specific_good<U: C3>(_: U) {
     takes_P2(ClassMoreSpecific<U>())
@@ -216,11 +216,11 @@ func subclass_bad() {
 struct InheritEqual<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P2
-// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+// CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
-// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+// CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P5 where T: P1 {}
 func inheritequal_good<U: P1>(_: U) {
   takes_P2(InheritEqual<U>())
@@ -248,11 +248,11 @@ extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to pro
 struct InheritMore<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P2
-// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+// CHECK-NEXT:    conforms_to: T P1)
 extension InheritMore: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
-// CHECK-NEXT:    conforms_to: τ_0_0 P4)
+// CHECK-NEXT:    conforms_to: T P4)
 extension InheritMore: P5 where T: P4 {}
 func inheritequal_good_good<U: P4>(_: U) {
   takes_P2(InheritMore<U>())
@@ -315,13 +315,13 @@ extension TwoDisjointConformances: P2 where T == String {}
 struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, T>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
-// CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
+// CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, T>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, U> protocol=P2
-// CHECK-NEXT:   conforms_to: τ_0_0 P1
-// CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
+// CHECK-NEXT:   conforms_to: T P1
+// CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceBad: P2 where T: P1, T == U {}
 
 // Checking of conditional requirements for existential conversions.
@@ -359,4 +359,12 @@ func passesConditionallyNotF7(x21: X2<X1>) {
   // expected-error@-1{{'<T where T : P7> (T) -> ()' requires that 'X1.A' (aka 'X0') conform to 'P7'}}
   // expected-note@-2{{requirement specified as 'X1.A' (aka 'X0') : 'P7'}}
   // expected-note@-3{{requirement from conditional conformance of 'X2<X1>' to 'P7'}}
+}
+
+
+public struct SR6990<T, U> {}
+extension SR6990: Sequence where T == Int {
+    public typealias Element = Float
+    public typealias Iterator = IndexingIterator<[Float]>
+    public func makeIterator() -> Iterator { fatalError() }
 }

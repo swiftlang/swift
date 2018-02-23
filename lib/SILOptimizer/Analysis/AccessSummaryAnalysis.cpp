@@ -138,6 +138,10 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<ConvertFunctionInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+    return llvm::all_of(cast<ConvertEscapeToNoEscapeInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
   case SILInstructionKind::PartialApplyInst:
     return partialApplyUse->get() != cast<PartialApplyInst>(user)->getCallee();
 
