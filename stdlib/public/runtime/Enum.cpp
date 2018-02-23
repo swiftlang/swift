@@ -184,7 +184,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   
   // The total size includes space for the tag.
   unsigned totalSize = payloadSize + getNumTagBytes(payloadSize,
-                                enumType->Description->Enum.getNumEmptyCases(),
+                                enumType->getDescription()->getNumEmptyCases(),
                                 numPayloads);
 
   auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
@@ -296,7 +296,7 @@ swift::swift_storeEnumTagMultiPayload(OpaqueValue *value,
                                       const EnumMetadata *enumType,
                                       unsigned whichCase) {
   auto layout = getMultiPayloadLayout(enumType);
-  unsigned numPayloads = enumType->Description->Enum.getNumPayloadCases();
+  unsigned numPayloads = enumType->getDescription()->getNumPayloadCases();
   if (whichCase < numPayloads) {
     // For a payload case, store the tag after the payload area.
     storeMultiPayloadTag(value, layout, whichCase);
@@ -322,7 +322,7 @@ unsigned
 swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                      const EnumMetadata *enumType) {
   auto layout = getMultiPayloadLayout(enumType);
-  unsigned numPayloads = enumType->Description->Enum.getNumPayloadCases();
+  unsigned numPayloads = enumType->getDescription()->getNumPayloadCases();
 
   unsigned tag = loadMultiPayloadTag(value, layout);
   if (tag < numPayloads) {

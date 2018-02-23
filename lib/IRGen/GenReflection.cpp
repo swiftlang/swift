@@ -963,7 +963,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
     }
 
   FieldTypeMetadataBuilder builder(*this, Decl);
-  builder.emit();
+  FieldDescriptors.push_back(builder.emit());
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {

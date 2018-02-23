@@ -307,26 +307,30 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolConformanceDescriptorPtrTy
     = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
-  NominalTypeDescriptorTy
+  TypeContextDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
-  NominalTypeDescriptorPtrTy
-    = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+  TypeContextDescriptorPtrTy
+    = TypeContextDescriptorTy->getPointerTo(DefaultAS);
 
-  ClassNominalTypeDescriptorTy =
+  ClassContextDescriptorTy =
         llvm::StructType::get(LLVMContext, {
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int16Ty,
-    Int16Ty,
-    Int32Ty,
+    Int32Ty, // context flags
+    Int32Ty, // parent
+    Int32Ty, // name
+    Int32Ty, // kind
+    Int32Ty, // accessor function
+    Int32Ty, // num fields
+    Int32Ty, // field offset vector
+    Int32Ty, // is_reflectable flag
+    Int32Ty, // (Generics Descriptor) argument offset
+    Int32Ty, // (Generics Descriptor) num params
+    Int32Ty, // (Generics Descriptor) num requirements
+    Int32Ty, // (Generics Descriptor) num key arguments
+    Int32Ty, // (Generics Descriptor) num extra arguments
+    Int32Ty, // (VTable Descriptor) offset
+    Int32Ty, // (VTable Descriptor) size
+    Int32Ty, // (Methods Descriptor) accessor
+    Int32Ty, // (Methods Descriptor) flags
   }, /*packed=*/true);
 
   MethodDescriptorStructTy
@@ -345,6 +349,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   FieldDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.field_descriptor");
   FieldDescriptorPtrTy = FieldDescriptorTy->getPointerTo(DefaultAS);
+  FieldDescriptorPtrPtrTy = FieldDescriptorPtrTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)

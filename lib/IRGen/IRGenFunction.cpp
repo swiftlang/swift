@@ -431,3 +431,28 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
   return Address(slotPtr, objectAlignment);
 }
+
+void IRGenFunction::emitTrap(bool EmitUnreachable) {
+  if (IGM.IRGen.Opts.shouldOptimize()) {
+    // Emit unique side-effecting inline asm calls in order to eliminate
+    // the possibility that an LLVM optimization or code generation pass
+    // will merge these blocks back together again. We emit an empty asm
+    // string with the side-effect flag set, and with a unique integer
+    // argument for each cond_fail we see in the function.
+    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+    llvm::Type *argTys = {asmArgTy};
+    llvm::FunctionType *asmFnTy =
+        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+    llvm::InlineAsm *inlineAsm =
+        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+    Builder.CreateAsmCall(inlineAsm,
+                          llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
+  }
+
+  // Emit the trap instruction.
+  llvm::Function *trapIntrinsic =
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+  Builder.CreateCall(trapIntrinsic, {});
+  if (EmitUnreachable)
+    Builder.CreateUnreachable();
+}

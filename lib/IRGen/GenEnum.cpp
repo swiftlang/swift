@@ -158,21 +158,7 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   TI->initializeWithTake(IGF, dest, src, T, isOutlined);
 }
 
-llvm::Constant *EnumImplStrategy::emitCaseNames() const {
-  // Build the list of case names, payload followed by no-payload.
-  llvm::SmallString<64> fieldNames;
-  for (auto &payloadCase : getElementsWithPayload()) {
-    fieldNames.append(payloadCase.decl->getName().str());
-    fieldNames.push_back('\0');
-  }
-  for (auto &noPayloadCase : getElementsWithNoPayload()) {
-    fieldNames.append(noPayloadCase.decl->getName().str());
-    fieldNames.push_back('\0');
-  }
-  // The final null terminator is provided by getAddrOfGlobalString.
-  return IGM.getAddrOfGlobalString(fieldNames,
-                                   /*willBeRelativelyAddressed*/ true);
-}
+bool EnumImplStrategy::isReflectable() const { return true; }
 
 unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
   llvm_unreachable("don't need payload size for this enum kind");
@@ -1109,11 +1095,11 @@ namespace {
       llvm_unreachable("no extra inhabitants");
     }
 
-    llvm::Constant *emitCaseNames() const override {
+    bool isReflectable() const override {
       // C enums have arbitrary values and we don't preserve the mapping
-      // between the case and raw value at runtime, so don't emit any
-      // case names at all so that reflection can give up in this case.
-      return nullptr;
+      // between the case and raw value at runtime, so don't mark it as
+      // reflectable.
+      return false;
     }
   };
   

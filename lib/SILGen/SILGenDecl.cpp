@@ -385,7 +385,7 @@ public:
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
                               Optional<MarkUninitializedInst::Kind> kind,
-                              unsigned ArgNo, SILGenFunction &SGF)
+                              uint16_t ArgNo, SILGenFunction &SGF)
       : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
@@ -400,8 +400,8 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILValue allocBox =
-        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
+    SILDebugVariable DbgVar(decl->isLet(), ArgNo);
+    SILValue allocBox = SGF.B.createAllocBox(decl, boxType, DbgVar);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
@@ -577,10 +577,11 @@ public:
     // lifetime.
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
+    SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
     if (address)
-      SGF.B.createDebugValueAddr(PrologueLoc, value);
+      SGF.B.createDebugValueAddr(PrologueLoc, value, DbgVar);
     else
-      SGF.B.createDebugValue(PrologueLoc, value);
+      SGF.B.createDebugValue(PrologueLoc, value, DbgVar);
   }
   
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,

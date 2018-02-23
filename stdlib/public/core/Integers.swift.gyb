@@ -1585,12 +1585,18 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
 }
 
 extension BinaryInteger {
+  /// Creates a new value equal to zero.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     self = 0
   }
 
+  /// Returns `-1` if this value is negative and `1` if it's positive;
+  /// otherwise, `0`.
+  ///
+  /// - Returns: The sign of this number, expressed as an integer of the same
+  ///   type.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func signum() -> Self {
@@ -1835,6 +1841,7 @@ extension Int {
     return other - self
   }
 
+  // FIXME(ABI): using Int as the parameter type is wrong.
   /// Returns a value that is offset the specified distance from this value.
   ///
   /// Use the `advanced(by:)` method in generic code to offset a value by a
@@ -1846,7 +1853,6 @@ extension Int {
   ///
   /// - Parameter n: The distance to advance this value.
   /// - Returns: A value that is offset from this value by `n`.
-  // FIXME(ABI): using Int as the parameter type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func advanced(by n: Int) -> Int {
@@ -3000,6 +3006,7 @@ public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
+  /// A type that represents an integer literal.
   public typealias IntegerLiteralType = ${Self}
 
 

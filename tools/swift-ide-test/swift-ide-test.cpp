@@ -897,6 +897,7 @@ public:
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::AttributeId: Id = "attr-id"; break;
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
     case SyntaxNodeKind::EditorPlaceholder: Id = "placeholder"; break;
@@ -927,6 +928,7 @@ public:
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::AttributeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::EditorPlaceholder: Col = llvm::raw_ostream::YELLOW; break;
@@ -1611,18 +1613,21 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Structure:
       case NodeKind::Class:
       case NodeKind::Enum:
+      case NodeKind::OtherNominalType:
         break;
 
       case NodeKind::BoundGenericStructure:
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericOtherNominalType:
         // Base type
         typeNode = node->getFirstChild();
         // Nominal type
         node = typeNode->getFirstChild();
         assert(node->getKind() == NodeKind::Structure ||
                node->getKind() == NodeKind::Class ||
-               node->getKind() == NodeKind::Enum);
+               node->getKind() == NodeKind::Enum ||
+               node->getKind() == NodeKind::OtherNominalType);
         break;
 
       default:

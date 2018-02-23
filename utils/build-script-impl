@@ -2731,22 +2731,21 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
-                if [[ ! "${LLDB_TEST_SWIFT_ONLY}" ]]; then
-                    # Run the gtests.
-                    if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                        set_lldb_xcodebuild_options
-                        # Run the LLDB unittests (gtests).
-                        with_pushd ${LLDB_SOURCE_DIR} \
-                                   call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                        rc=$?
-                        if [[ "$rc" -ne 0 ]] ; then
-                            >&2 echo "error: LLDB gtests failed"
-                            exit 1
-                        fi
-                    else
-                        with_pushd ${lldb_build_dir} \
-                            ${NINJA_BIN} check-lldb-unit
+                # Run the unittests.
+                # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                    set_lldb_xcodebuild_options
+                    # Run the LLDB unittests (gtests).
+                    with_pushd ${LLDB_SOURCE_DIR} \
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                    rc=$?
+                    if [[ "$rc" -ne 0 ]] ; then
+                        >&2 echo "error: LLDB gtests failed"
+                        exit 1
                     fi
+                else
+                    with_pushd ${lldb_build_dir} \
+                        ${NINJA_BIN} check-lldb-lit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
@@ -2808,6 +2807,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_TEST_DEBUG_SERVER=""
                 fi
 
+                # Options to find the just-built libddispatch and Foundation.
+                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
+                    DOTEST_EXTRA=""
+                else
+                    # This assumes that there are no spaces in any on these paths.
+                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/Foundation/usr/lib/swift"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
+                fi
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2818,7 +2830,8 @@ for host in "${ALL_HOSTS[@]}"; do
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_TEST_CATEGORIES} \
                            ${LLDB_DOTEST_CC_OPTS} \
-                           ${LLDB_FORMATTER_OPTS}
+                           ${LLDB_FORMATTER_OPTS} \
+                           -E "${DOTEST_EXTRA}"
                 continue
                 ;;
             llbuild)

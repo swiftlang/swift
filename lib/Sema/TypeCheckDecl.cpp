@@ -3949,9 +3949,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
-    UnifiedStatsReporter::FrontendStatsTracer Tracer;
-    if (TC.Context.Stats)
-      Tracer = TC.Context.Stats->getStatsTracer("typecheck-decl", decl);
+    FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -6527,6 +6525,7 @@ public:
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
+    UNINTERESTING_ATTR(WeakLinked)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

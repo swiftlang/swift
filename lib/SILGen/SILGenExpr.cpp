@@ -1409,7 +1409,10 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
   ty = ty.getObjectType();
-  auto alloc = B.createAllocStack(loc, ty);
+  Optional<SILDebugVariable> DbgVar;
+  if (auto *VD = loc.getAsASTNode<VarDecl>())
+    DbgVar = SILDebugVariable(VD->isLet(), 0);
+  auto alloc = B.createAllocStack(loc, ty, DbgVar);
   enterDeallocStackCleanup(alloc);
   return alloc;
 }

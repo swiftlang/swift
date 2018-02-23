@@ -117,21 +117,28 @@ static void collectTypeDependentOperands(
 //===----------------------------------------------------------------------===//
 
 template <typename INST>
-static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
+static void *allocateDebugVarCarryingInst(SILModule &M,
+                                          Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
-  return M.allocateInst(sizeof(INST) + Var.Name.size() +
+  return M.allocateInst(sizeof(INST) + (Var ? Var->Name.size() : 0) +
                             sizeof(Operand) * Operands.size(),
                         alignof(INST));
 }
 
-TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
-                                                       char *buf) {
-  Data.ArgNo = Var.ArgNo;
-  Data.Constant = Var.Constant;
-  Data.NameLength = Var.Name.size();
-  assert(Data.ArgNo == Var.ArgNo && "Truncation");
-  assert(Data.NameLength == Var.Name.size() && "Truncation");
-  memcpy(buf, Var.Name.data(), Var.Name.size());
+TailAllocatedDebugVariable::TailAllocatedDebugVariable(
+    Optional<SILDebugVariable> Var, char *buf) {
+  if (!Var) {
+    RawValue = 0;
+    return;
+  }
+
+  Data.HasValue = true;
+  Data.Constant = Var->Constant;
+  Data.ArgNo = Var->ArgNo;
+  Data.NameLength = Var->Name.size();
+  assert(Data.ArgNo == Var->ArgNo && "Truncation");
+  assert(Data.NameLength == Var->Name.size() && "Truncation");
+  memcpy(buf, Var->Name.data(), Data.NameLength);
 }
 
 StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
@@ -141,7 +148,7 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
-                               SILDebugVariable Var)
+                               Optional<SILDebugVariable> Var)
     : InstructionBase(Loc, elementType.getAddressType()) {
   SILInstruction::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
@@ -157,7 +164,7 @@ AllocStackInst *
 AllocStackInst::create(SILDebugLocation Loc,
                        SILType elementType, SILFunction &F,
                        SILOpenedArchetypesState &OpenedArchetypes,
-                       SILDebugVariable Var) {
+                       Optional<SILDebugVariable> Var) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                elementType.getSwiftRValueType());
@@ -167,8 +174,6 @@ AllocStackInst::create(SILDebugLocation Loc,
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var);
 }
 
-/// getDecl - Return the underlying variable declaration associated with this
-/// allocation, or null if this is a temporary allocation.
 VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
@@ -234,7 +239,7 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, SILDebugVariable Var)
+                           SILFunction &F, Optional<SILDebugVariable> Var)
     : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
                                       SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -244,18 +249,16 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
                                    SILFunction &F,
                                    SILOpenedArchetypesState &OpenedArchetypes,
-                                   SILDebugVariable Var) {
+                                   Optional<SILDebugVariable> Var) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
-                                                   Var.Name.size());
+                                                   Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
 }
 
-/// getDecl - Return the underlying variable declaration associated with this
-/// allocation, or null if this is a temporary allocation.
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
@@ -273,7 +276,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
 }
 
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILDebugVariable Var)
+                                       SILValue Operand,
+                                       SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
       VarInfo(Var, getTrailingObjects<char>()) {}
 

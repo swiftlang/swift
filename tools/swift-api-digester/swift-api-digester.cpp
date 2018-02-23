@@ -383,6 +383,7 @@ public:
   StringRef getUsr() const { return Usr; }
   StringRef getLocation() const { return Location; }
   StringRef getModuleName() const {return ModuleName;}
+  StringRef getHeaderName() const;
   void addDeclAttribute(SDKDeclAttrKind DAKind);
   ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
   swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
@@ -395,6 +396,12 @@ public:
   bool isDeprecated() const;
   bool isStatic() const { return IsStatic; };
 };
+
+StringRef SDKNodeDecl::getHeaderName() const {
+  if (Location.empty())
+    return StringRef();
+  return llvm::sys::path::filename(Location.split(":").first);
+}
 
 class SDKNodeRoot :public SDKNode {
   /// This keeps track of all decl descendants with USRs.
@@ -1540,12 +1547,12 @@ namespace swift {
           StringRef Usr = D->getUsr();
           StringRef Location = D->getLocation();
           StringRef ModuleName = D->getModuleName();
-
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DK);
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_location).data(), Location);
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_moduleName).data(),
                           ModuleName);
+
           if (auto isStatic = D->isStatic())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_static).data(), isStatic);
 
@@ -2665,13 +2672,24 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     }
   };
 
-  struct DiagBase {
+  struct MetaInfo {
     StringRef ModuleName;
-    DiagBase(StringRef ModuleName): ModuleName(ModuleName) {}
+    StringRef HeaderName;
+    MetaInfo(const SDKNodeDecl *Node):
+      ModuleName(Node->getModuleName()), HeaderName(Node->getHeaderName()) {}
+  };
+
+  struct DiagBase {
+    MetaInfo Info;
+    DiagBase(MetaInfo Info): Info(Info) {}
     virtual ~DiagBase() = default;
     void outputModule() const {
-      if (options::PrintModule)
-        llvm::outs() << ModuleName << ": ";
+      if (options::PrintModule) {
+        llvm::outs() << Info.ModuleName;
+        if (!Info.HeaderName.empty())
+          llvm::outs() << "(" << Info.HeaderName << ")";
+        llvm::outs() << ": ";
+      }
     }
     virtual void output() const = 0;
   };
@@ -2680,8 +2698,8 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     DeclKind Kind;
     StringRef Name;
     bool IsDeprecated;
-    RemovedDeclDiag(StringRef ModuleName, DeclKind Kind, StringRef Name,
-                    bool IsDeprecated): DiagBase(ModuleName), Kind(Kind),
+    RemovedDeclDiag(MetaInfo Info, DeclKind Kind, StringRef Name,
+                    bool IsDeprecated): DiagBase(Info), Kind(Kind),
                                         Name(Name), IsDeprecated(IsDeprecated) {}
     bool operator<(RemovedDeclDiag Other) const;
     void output() const override;
@@ -2693,9 +2711,9 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     DeclKind AddedKind;
     StringRef RemovedName;
     StringRef AddedName;
-    MovedDeclDiag(StringRef ModuleName, DeclKind RemovedKind, DeclKind AddedKind,
+    MovedDeclDiag(MetaInfo Info, DeclKind RemovedKind, DeclKind AddedKind,
                   StringRef RemovedName, StringRef AddedName):
-      DiagBase(ModuleName), RemovedKind(RemovedKind), AddedKind(AddedKind),
+      DiagBase(Info), RemovedKind(RemovedKind), AddedKind(AddedKind),
       RemovedName(RemovedName), AddedName(AddedName) {}
     bool operator<(MovedDeclDiag other) const;
     void output() const override;
@@ -2707,9 +2725,9 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     DeclKind KindAfter;
     StringRef NameBefore;
     StringRef NameAfter;
-    RenamedDeclDiag(StringRef ModuleName, DeclKind KindBefore, DeclKind KindAfter,
+    RenamedDeclDiag(MetaInfo Info, DeclKind KindBefore, DeclKind KindAfter,
                     StringRef NameBefore, StringRef NameAfter):
-                      DiagBase(ModuleName),
+                      DiagBase(Info),
                       KindBefore(KindBefore), KindAfter(KindAfter),
                       NameBefore(NameBefore), NameAfter(NameAfter) {}
     bool operator<(RenamedDeclDiag Other) const;
@@ -2722,12 +2740,12 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     StringRef DeclName;
     StringRef AttrBefore;
     StringRef AttrAfter;
-    DeclAttrDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
+    DeclAttrDiag(MetaInfo Info, DeclKind Kind, StringRef DeclName,
                  StringRef AttrBefore, StringRef AttrAfter):
-                   DiagBase(ModuleName), Kind(Kind), DeclName(DeclName),
+                   DiagBase(Info), Kind(Kind), DeclName(DeclName),
                    AttrBefore(AttrBefore), AttrAfter(AttrAfter) {}
-    DeclAttrDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
-                 StringRef AttrAfter): DeclAttrDiag(ModuleName, Kind, DeclName,
+    DeclAttrDiag(MetaInfo Info, DeclKind Kind, StringRef DeclName,
+                 StringRef AttrAfter): DeclAttrDiag(Info, Kind, DeclName,
                                                     StringRef(), AttrAfter) {}
 
     bool operator<(DeclAttrDiag Other) const;
@@ -2741,9 +2759,9 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     StringRef TypeNameBefore;
     StringRef TypeNameAfter;
     StringRef Description;
-    DeclTypeChangeDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
+    DeclTypeChangeDiag(MetaInfo Info, DeclKind Kind, StringRef DeclName,
                        StringRef TypeNameBefore, StringRef TypeNameAfter,
-                       StringRef Description): DiagBase(ModuleName),
+                       StringRef Description): DiagBase(Info),
       Kind(Kind), DeclName(DeclName), TypeNameBefore(TypeNameBefore),
       TypeNameAfter(TypeNameAfter), Description(Description) {}
     bool operator<(DeclTypeChangeDiag Other) const;
@@ -2888,6 +2906,7 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
 void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   assert(Node->isAnnotatedAs(Anno));
   auto &Ctx = Node->getSDKContext();
+  MetaInfo ScreenInfo(Node);
   switch(Anno) {
   case NodeAnnotation::Removed: {
     // If we can find a type alias decl with the same name of this type, we
@@ -2896,7 +2915,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
-        MovedDecls.Diags.emplace_back(Node->getModuleName(),
+        MovedDecls.Diags.emplace_back(ScreenInfo,
                                       Node->getDeclKind(),
                                       Added->getDeclKind(),
                                       Node->getFullyQualifiedName(),
@@ -2920,7 +2939,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    RemovedDecls.Diags.emplace_back(Node->getModuleName(),
+    RemovedDecls.Diags.emplace_back(ScreenInfo,
                                     Node->getDeclKind(),
                                     Node->getFullyQualifiedName(),
                                     Node->isDeprecated());
@@ -2928,28 +2947,28 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   }
   case NodeAnnotation::Rename: {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    RenamedDecls.Diags.emplace_back(Node->getModuleName(),
+    RenamedDecls.Diags.emplace_back(ScreenInfo,
                                     Node->getDeclKind(), Count->getDeclKind(),
                                     Node->getFullyQualifiedName(),
                                     Count->getFullyQualifiedName());
     return;
   }
   case NodeAnnotation::NowMutating: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
+    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         Ctx.buffer("mutating"));
     return;
   }
   case NodeAnnotation::NowThrowing: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
+    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         Ctx.buffer("throwing"));
     return;
   }
   case NodeAnnotation::StaticChange: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
+    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                         Ctx.buffer(Node->isStatic() ? "not static" : "static"));
@@ -2967,7 +2986,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       llvm_unreachable("Unhandled Ownership in switch.");
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
+    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                   getOwnershipDescription(Node->getOwnership()),
@@ -2991,6 +3010,7 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
   auto *Parent = dyn_cast<SDKNodeDecl>(Node->getParent());
   if (!Parent || Parent->isSDKPrivate())
     return;
+  MetaInfo ScreenInfo(Parent);
   SDKContext &Ctx = Node->getSDKContext();
   if (Node->isAnnotatedAs(NodeAnnotation::Updated)) {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
@@ -3003,7 +3023,7 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
         SDKNodeAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
       if (Node->getPrintedName() != Count->getPrintedName())
-        TypeChangedDecls.Diags.emplace_back(Parent->getModuleName(),
+        TypeChangedDecls.Diags.emplace_back(ScreenInfo,
                                             Parent->getDeclKind(),
                                             Parent->getFullyQualifiedName(),
                                             Node->getPrintedName(),

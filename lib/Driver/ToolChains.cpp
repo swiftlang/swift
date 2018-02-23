@@ -167,6 +167,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments, options::OPT_trace_stats_events);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_stats_events);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_stats_entities);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
@@ -178,6 +180,18 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
+
+  if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {
+    // Add -Xcc -working-directory before any other -Xcc options to ensure it is
+    // overridden by an explicit -Xcc -working-directory, although having a
+    // different working directory is probably incorrect.
+    SmallString<128> workingDirectory(A->getValue());
+    llvm::sys::fs::make_absolute(workingDirectory);
+    arguments.push_back("-Xcc");
+    arguments.push_back("-working-directory");
+    arguments.push_back("-Xcc");
+    arguments.push_back(inputArgs.MakeArgString(workingDirectory));
+  }
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);

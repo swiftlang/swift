@@ -1004,6 +1004,7 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "${Self}.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }

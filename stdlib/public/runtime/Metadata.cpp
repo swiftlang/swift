@@ -1516,12 +1516,12 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     }
 
     // Copy the field offsets.
-    if (description->Class.hasFieldOffsetVector()) {
+    if (description->hasFieldOffsetVector()) {
       unsigned fieldOffsetVector =
-        description->Class.getFieldOffsetVectorOffset(ancestor);
+        description->getFieldOffsetVectorOffset(ancestor);
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
-             description->Class.NumFields * sizeof(uintptr_t));
+             description->NumFields * sizeof(uintptr_t));
     }
     ancestor = ancestor->SuperClass;
   }

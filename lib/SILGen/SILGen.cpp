@@ -707,9 +707,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
-    UnifiedStatsReporter::FrontendStatsTracer Tracer;
-    if (getASTContext().Stats)
-      Tracer = getASTContext().Stats->getStatsTracer("emit-SIL", fd);
+    FrontendStatsTracer Tracer(getASTContext().Stats, "emit-SIL", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);

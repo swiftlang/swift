@@ -1620,9 +1620,12 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     }
 
     // An inlinable constructor in a class must always be delegating,
-    // unless the class is formally '@_fixed_layout'.
-    if (!isDelegating &&
-        ClassD->isFormallyResilient() &&
+    // unless the class is '@_fixed_layout'.
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for classes in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

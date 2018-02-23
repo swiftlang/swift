@@ -280,6 +280,7 @@ namespace sil_block {
                      BCFixed<2>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
+                     BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner

@@ -30,7 +30,6 @@
 // -- is imported C typedef, is class, is nonunique
 // CHECK-64-SAME: <i32 0x1000_0010>
 // CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
-// CHECK-64-SAME: @get_field_types_CCMutableRefrigerator
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{
 // CHECK-64-SAME: @initialize_metadata_CCMutableRefrigerator

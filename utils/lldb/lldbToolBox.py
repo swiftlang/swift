@@ -8,6 +8,8 @@ to the swift checkout.
 """
 
 import os
+import subprocess
+import tempfile
 
 REPO_BASE = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir,
                                          os.pardir, os.pardir))
@@ -26,5 +28,31 @@ def import_llvm_dataformatters(debugger):
     print("Loaded LLVM data formatters.")
 
 
+VIEWCFG_PATH = os.path.join(SWIFT_REPO, "utils", "viewcfg")
+BLOCKIFYASM_PATH = os.path.join(SWIFT_REPO, "utils", "dev-scripts",
+                                "blockifyasm")
+
+
+def create_swift_disassemble_viewcfg(debugger, command, exec_ctx, result,
+                                     internal_dict):
+    """
+    This function disassembles the current assembly frame into a temporary file
+    and then uses that temporary file as input to blockifyasm | viewcfg. This
+    will cause a pdf of the cfg to be opened on Darwin.
+    """
+    d = exec_ctx.frame.Disassemble()
+
+    with tempfile.TemporaryFile() as f:
+        f.write(d)
+        f.flush()
+        f.seek(0)
+        p1 = subprocess.Popen([BLOCKIFYASM_PATH], stdin=f,
+                              stdout=subprocess.PIPE)
+        subprocess.Popen([VIEWCFG_PATH], stdin=p1.stdout)
+        p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+
+
 def __lldb_init_module(debugger, internal_dict):
     import_llvm_dataformatters(debugger)
+    debugger.HandleCommand('command script add disassemble-asm-cfg '
+                           '-f lldbToolBox.create_swift_disassemble_viewcfg')
