@@ -2412,7 +2412,7 @@ namespace {
       // it to return a TensorHandle<T> and then use the init(handle:)
       // initializer of the expected result type to project it back to the type
       // that we want.
-      const auto exprType = cs.getType(expr);
+      auto exprType = cs.getType(expr);
       assert(exprType && "expr Type cannot be NULL!");
       if (tensorProto && !exprType->is<UnresolvedType>() &&
           tc.conformsToProtocol(exprType, tensorProto, cs.DC,
