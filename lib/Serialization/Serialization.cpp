@@ -850,6 +850,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD
