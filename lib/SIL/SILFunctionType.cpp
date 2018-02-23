@@ -593,36 +593,43 @@ private:
 
     assert(numEltTypes > 0);
 
-    // If we don't have 'self', we don't need to do anything special.
-    if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
-      CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
-                                                 /*canonicalVararg*/true)
-                      ->getCanonicalType();
+    auto handleParameter = [&](AbstractionPattern pattern,
+                               ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
       // materializable -- if it doesn't contain an l-value type -- then it's
       // a valid target for substitution and we should not expand it.
-      if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
-        auto flags = (params.size() == 1)
-                   ? params.front().getParameterFlags()
-                   : ParameterTypeFlags();
-        if (flags.isShared()) {
-          visitSharedType(origType, ty, extInfo.getSILRepresentation());
+      auto silExtInfo = extInfo.getSILRepresentation();
+      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+        if (paramFlags.isShared()) {
+          visitSharedType(pattern, ty, silExtInfo);
         } else {
-          visit(origType, ty);
+          visit(pattern, ty);
         }
         return;
       }
 
       for (auto i : indices(tty.getElementTypes())) {
-        if (tty->getElement(i).getParameterFlags().isShared()) {
-          visitSharedType(origType.getTupleElementType(i),
-                          tty.getElementType(i),
-                          extInfo.getSILRepresentation());
+        auto patternEltTy = pattern.getTupleElementType(i);
+        auto trueEltTy = tty.getElementType(i);
+        auto flags = tty->getElement(i).getParameterFlags();
+        if (flags.isShared()) {
+          visitSharedType(patternEltTy, trueEltTy, silExtInfo);
         } else {
-          visit(origType.getTupleElementType(i), tty.getElementType(i));
+          visit(patternEltTy, trueEltTy);
         }
       }
+    };
+
+    // If we don't have 'self', we don't need to do anything special.
+    if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
+      CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
+                                                 /*canonicalVararg*/true)
+                      ->getCanonicalType();
+      auto flags = (params.size() == 1) ? params.front().getParameterFlags()
+                                        : ParameterTypeFlags();
+
+      handleParameter(origType, flags, ty);
       return;
     }
 
@@ -630,25 +637,11 @@ private:
 
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {
-      CanType ty =  params[i].getType();
-      CanTupleType tty = dyn_cast<TupleType>(ty);
+      CanType ty = params[i].getType();
       AbstractionPattern eltPattern = origType.getTupleElementType(i);
-      // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-        if (params[i].isShared()) {
-          visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
-        } else {
-          visit(eltPattern, ty);
-        }
-        continue;
-      }
+      auto flags = params[i].getParameterFlags();
 
-      assert(eltPattern.isTuple());
-      for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
-        visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
-      }
+      handleParameter(eltPattern, flags, ty);
     }
 
     // Process the self parameter.  Note that we implicitly drop self
