@@ -27,6 +27,16 @@
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
 
+typedef struct swift_metadata_interop {
+  uintptr_t Metadata;
+  int Library;
+} swift_metadata_interop_t;
+
+typedef struct swift_typeref_interop {
+  swift_typeref_t Typeref;
+  int Library;
+} swift_typeref_interop_t;
+
 typedef struct swift_reflection_legacy_info {
   swift_reflection_section_t fieldmd;
   swift_reflection_section_t assocty;
@@ -73,7 +83,9 @@ struct SwiftReflectionFunctions {
   
   swift_typeref_t (*typeRefForMetadata)(SwiftReflectionContextRef ContextRef,
                                         uintptr_t Metadata);
-
+  
+  int (*ownsObject)(SwiftReflectionContextRef ContextRef, uintptr_t Object);
+  
   swift_typeref_t (*typeRefForInstance)(SwiftReflectionContextRef ContextRef,
                                         uintptr_t Object);
 
@@ -129,30 +141,38 @@ struct SwiftReflectionFunctions {
                      size_t MaxLength);
 };
 
-struct SwiftReflectionInteropContext {
+struct SwiftReflectionInteropContextLibrary {
   SwiftReflectionContextRef Context;
   struct SwiftReflectionFunctions Functions;
-  int HasFunctions;
-  
-  SwiftReflectionContextRef LegacyContext;
-  struct SwiftReflectionFunctions LegacyFunctions;
-  int HasLegacyFunctions;
-  
+  int IsLegacy;
+};
+
+struct SwiftReflectionInteropContext {
   void *ReaderContext;
   ReadBytesFunction ReadBytes;
+  
+  // Currently we support at most two libraries.
+  struct SwiftReflectionInteropContextLibrary Libraries[2];
+  int LibraryCount;
 };
 
 typedef SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
-static inline int swift_reflection_interop_loadFunctions(
-  struct SwiftReflectionFunctions *functions, void *Handle, int IsLegacy) {
+static inline void swift_reflection_interop_loadFunctions(
+  struct SwiftReflectionInteropContext *Context, void *Handle, int IsLegacy) {
 #ifndef __cplusplus
 #define decltype(x) void *
 #endif
 
+  if (Handle == NULL)
+    return;
+
+  struct SwiftReflectionFunctions *Functions = &Context
+    ->Libraries[Context->LibraryCount].Functions;
+
 #define LOAD_NAMED(field, symbol) do { \
-    functions->field = (decltype(functions->field))dlsym(Handle, symbol); \
-    if (functions->field == NULL) return 0; \
+    Functions->field = (decltype(Functions->field))dlsym(Handle, symbol); \
+    if (Functions->field == NULL) return; \
   } while (0)
 #define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name)
   
@@ -170,6 +190,7 @@ static inline int swift_reflection_interop_loadFunctions(
   }
   LOAD(readIsaMask);
   LOAD(typeRefForMetadata);
+  LOAD(ownsObject);
   LOAD(typeRefForInstance);
   LOAD(typeRefForMangledTypeName);
   LOAD(infoForTypeRef);
@@ -184,7 +205,9 @@ static inline int swift_reflection_interop_loadFunctions(
   LOAD(dumpTypeRef);
   LOAD(dumpInfoForTypeRef);
   
-  return 1;
+  Context->LibraryCount++;
+  
+  return;
   
 #undef LOAD
 #undef LOAD_NAMED
@@ -193,8 +216,18 @@ static inline int swift_reflection_interop_loadFunctions(
 #endif
 }
 
+#define FOREACH_LIBRARY \
+  for (struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[0]; \
+       Library < &ContextRef->Libraries[ContextRef->LibraryCount]; \
+       ++Library)
+#define LIBRARY_INDEX (Library - ContextRef->Libraries)
+#define DECLARE_LIBRARY(index) \
+  struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[index]
+
 static int swift_reflection_interop_readBytesAdapter(void *reader_context,
-  swift_addr_t address, void *dest, uint64_t size) {
+                                                     swift_addr_t address,
+                                                     void *dest,
+                                                     uint64_t size) {
   SwiftReflectionInteropContextRef Context =
     (SwiftReflectionInteropContextRef)reader_context;
 
@@ -221,29 +254,41 @@ swift_reflection_interop_createReflectionContext(
     GetStringLengthFunction getStringLength,
     GetSymbolAddressFunction getSymbolAddress) {
   
-  SwiftReflectionInteropContextRef Context =
-    (SwiftReflectionInteropContextRef)calloc(sizeof(*Context), 1);
+  SwiftReflectionInteropContextRef ContextRef =
+    (SwiftReflectionInteropContextRef)calloc(sizeof(*ContextRef), 1);
   
-  Context->HasFunctions = swift_reflection_interop_loadFunctions(
-    &Context->Functions, LibraryHandle, 0);
-  Context->HasLegacyFunctions = swift_reflection_interop_loadFunctions(
-    &Context->LegacyFunctions, LegacyLibraryHandle, 1);
+  swift_reflection_interop_loadFunctions(ContextRef, LibraryHandle, 0);
+  swift_reflection_interop_loadFunctions(ContextRef, LegacyLibraryHandle, 1);
   
-  if (Context->HasFunctions) {
-    Context->Context = Context->Functions.createReflectionContext(ReaderContext,
+  if (ContextRef->LibraryCount == 0) {
+    free(ContextRef);
+    return NULL;
+  }
+  
+  FOREACH_LIBRARY {
+    if (Library->IsLegacy) {
+      Library->Context = Library->Functions.createReflectionContextLegacy(
+        ContextRef, getPointerSize, getSizeSize,
+        swift_reflection_interop_readBytesAdapter, getStringLength, getSymbolAddress);
+    } else {
+      Library->Context = Library->Functions.createReflectionContext(ReaderContext,
       getPointerSize, getSizeSize, readBytes, getStringLength, getSymbolAddress);
+    }
   }
   
-  if (Context->HasLegacyFunctions) {
-    Context->LegacyContext = Context->LegacyFunctions.createReflectionContextLegacy(
-      Context, getPointerSize, getSizeSize, swift_reflection_interop_readBytesAdapter,
-      getStringLength, getSymbolAddress);
+  ContextRef->ReaderContext = ReaderContext;
+  ContextRef->ReadBytes = readBytes;
+  
+  return ContextRef;
+}
+
+static inline void
+swift_reflection_interop_destroyReflectionContext(
+  SwiftReflectionInteropContextRef ContextRef) {
+  FOREACH_LIBRARY {
+    Library->Functions.destroyReflectionContext(Library->Context);
   }
-  
-  Context->ReaderContext = ReaderContext;
-  Context->ReadBytes = readBytes;
-  
-  return Context;
+  free(ContextRef);
 }
 
 #ifndef __LP64__
@@ -266,8 +311,11 @@ swift_reflection_interop_findSection(MachHeader *Header, const char *Name,
 }
 
 static inline int
-swift_reflection_interop_addImageLegacy(SwiftReflectionInteropContextRef ContextRef,
-                                        swift_addr_t imageStart, uint64_t imageLength) {
+swift_reflection_interop_addImageLegacy(
+  SwiftReflectionInteropContextRef ContextRef,
+  struct SwiftReflectionInteropContextLibrary *Library,
+  swift_addr_t imageStart,
+  uint64_t imageLength) {
   if (imageLength < sizeof(MachHeader)) {
     return 0;
   }
@@ -314,7 +362,7 @@ swift_reflection_interop_addImageLegacy(SwiftReflectionInteropContextRef Context
   info.LocalStartAddress = (uintptr_t)Buf;
   info.RemoteStartAddress = imageStart;
   
-  ContextRef->LegacyFunctions.addReflectionInfoLegacy(ContextRef->LegacyContext, info);
+  Library->Functions.addReflectionInfoLegacy(Library->Context, info);
   return 1;
 }
 
@@ -323,24 +371,113 @@ swift_reflection_interop_addImageLegacy(SwiftReflectionInteropContextRef Context
 static inline int
 swift_reflection_interop_addImage(SwiftReflectionInteropContextRef ContextRef,
                                   swift_addr_t imageStart, uint64_t imageLength) {
-  if (ContextRef->HasFunctions) {
-    int Success = ContextRef->Functions.addImage(ContextRef->Context,
-                                                 imageStart,
-                                                 imageLength);
-    if (Success)
+  FOREACH_LIBRARY {
+    int Success;
+    if (Library->IsLegacy) {
+      Success = swift_reflection_interop_addImageLegacy(ContextRef,
+                                                        Library,
+                                                        imageStart,
+                                                        imageLength);
+    } else {
+      Success = Library->Functions.addImage(Library->Context, imageStart, imageLength);
+    }
+    if (Success) {
       return 1;
+    }
   }
-  
-  if (ContextRef->HasLegacyFunctions) {
-    int Success = swift_reflection_interop_addImageLegacy(ContextRef,
-                                                          imageStart,
-                                                          imageLength);
-    if (Success)
-      return 1;
-  }
-  
   return 0;
 }
+
+static inline int
+swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef,
+                                     uintptr_t *outIsaMask) {
+  FOREACH_LIBRARY {
+    int Success = Library->Functions.readIsaMask(Library->Context, outIsaMask);
+    if (Success)
+      return 1;
+  }
+  return 0;
+}
+
+static inline swift_typeref_interop_t
+swift_reflection_interop_typeRefForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_metadata_interop_t Metadata) {
+  DECLARE_LIBRARY(Metadata.Library);
+  swift_typeref_interop_t Result;
+  Result.Typeref = Library->Functions.
+    typeRefForMetadata(Library->Context, Metadata.Metadata);
+  Result.Library = Metadata.Library;
+  return Result;
+}
+
+static inline swift_typeref_interop_t
+swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                            uintptr_t Object) {
+  swift_typeref_interop_t Result;
+  FOREACH_LIBRARY {
+    if (Library->Functions.ownsObject != NULL
+        && !Library->Functions.ownsObject(Library->Context, Object))
+      continue;
+    swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
+                                                                     Object);
+    if (Typeref == 0)
+      continue;
+    
+    Result.Typeref = Typeref;
+    Result.Library = LIBRARY_INDEX;
+    return Result;
+  }
+  
+  Result.Typeref = 0;
+  Result.Library = 0;
+  return Result;
+}
+
+swift_typeref_interop_t
+swift_reflection_interop_typeRefForMangledTypeName(
+  SwiftReflectionInteropContextRef ContextRef,
+  const char *MangledName,
+  uint64_t Length) {
+  swift_typeref_interop_t Result;
+  FOREACH_LIBRARY {
+    swift_typeref_t Typeref = Library->Functions.typeRefForMangledTypeName(
+      ContextRef, MangledName, Length);
+    if (Typeref == 0)
+      continue;
+    
+    Result.Typeref = Typeref;
+    Result.Library = LIBRARY_INDEX;
+    return Result;
+  }
+  
+  Result.Typeref = 0;
+  Result.Library = 0;
+  return Result;
+}
+
+swift_typeref_interop_t
+swift_reflection_interop_genericArgumentOfTypeRef(
+  SwiftReflectionInteropContextRef ContextRef,
+  swift_typeref_interop_t OpaqueTypeRef,
+  unsigned Index) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  swift_typeref_interop_t Result;
+  Result.Typeref = Library->Functions.genericArgumentOfTypeRef(OpaqueTypeRef.Typeref,
+                                                                Index);
+  Result.Library = OpaqueTypeRef.Library;
+  return Result;
+}
+
+unsigned
+swift_reflection_interop_genericArgumentCountOfTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  return Library->Functions.genericArgumentCountOfTypeRef(OpaqueTypeRef.Typeref);
+}
+
+#undef FOREACH_LIBRARY
+#undef LIBRARY_INDEX
+#undef DECLARE_LIBRARY
 
 #endif // __APPLE__
 

@@ -57,6 +57,10 @@ public:
   const void *startAddress() const {
     return Begin;
   }
+  
+  const void *endAddress() const {
+    return End;
+  }
 
   const_iterator begin() const {
     return const_iterator(Begin, End);
@@ -333,6 +337,10 @@ public:
 
   void addReflectionInfo(ReflectionInfo I) {
     ReflectionInfos.push_back(I);
+  }
+  
+  const std::vector<ReflectionInfo> &getReflectionInfos() {
+    return ReflectionInfos;
   }
 
 private:

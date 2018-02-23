@@ -79,6 +79,19 @@ public:
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
+  
+  bool ownsMetadata(StoredPointer MetadataAddress) {
+    for (auto &Info : getBuilder().getReflectionInfos()) {
+      auto Slide = Info.RemoteStartAddress
+                 - Info.LocalStartAddress
+                 + Info.TypeReference.SectionOffset;
+      auto LocalMetadataAddress = reinterpret_cast<void *>(MetadataAddress - Slide);
+      if (Info.TypeReference.Metadata.startAddress() <= LocalMetadataAddress
+          && LocalMetadataAddress < Info.TypeReference.Metadata.endAddress())
+        return true;
+    }
+    return false;
+  }
 
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
