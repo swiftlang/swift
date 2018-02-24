@@ -61,7 +61,7 @@ public:
 
   bool isPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const {
+  const std::string &file() const {
     assert(!Filename.empty());
     return Filename;
   }

@@ -427,12 +427,12 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
                                                                        Diags);
 
-  auto nameToStem =
+  std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
               outputFilenames->front() != "-" &&
               !llvm::sys::fs::is_directory(outputFilenames->front())
           ? outputFilenames->front()
-          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;

@@ -61,10 +61,10 @@ bool FrontendInputsAndOutputs::isReadingFromStdin() const {
   return hasSingleInput() && getFilenameOfFirstInput() == "-";
 }
 
-StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
+const std::string &FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
   assert(hasInputs());
   const InputFile &inp = AllInputs[0];
-  StringRef f = inp.file();
+  const std::string &f = inp.file();
   assert(!f.empty());
   return f;
 }
@@ -151,7 +151,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
 
 bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
-    StringRef Input(getFilenameOfFirstInput());
+    const std::string &Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
   }
@@ -162,7 +162,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
-    StringRef Input(getFilenameOfFirstInput());
+    const std::string &Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   // If we have one primary input and it's a filename with extension "sil",

@@ -87,7 +87,7 @@ public:
 
   const InputFile &lastInput() const { return AllInputs.back(); }
 
-  StringRef getFilenameOfFirstInput() const;
+  const std::string &getFilenameOfFirstInput() const;
 
   bool isReadingFromStdin() const;
 

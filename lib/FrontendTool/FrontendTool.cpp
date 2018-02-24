@@ -100,7 +100,7 @@ static std::string displayName(StringRef MainExecutablePath) {
 
 /// Emits a Make-style dependencies file.
 static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker &depTracker,
+                                         DependencyTracker *depTracker,
                                          const FrontendOptions &opts,
                                          const InputFile &input) {
   StringRef dependenciesFilePath = input.dependenciesFilePath();
@@ -148,7 +148,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
-           reversePathSortedFilenames(depTracker.getDependencies()))
+           reversePathSortedFilenames(depTracker->getDependencies()))
       out << ' ' << escape(path);
     out << '\n';
   });
@@ -157,7 +157,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 }
 
 static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker &depTracker,
+                                         DependencyTracker *depTracker,
                                          const FrontendOptions &opts) {
   return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
@@ -924,7 +924,7 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   (void)emitMakeDependenciesIfNeeded(Context.Diags,
-                                     *Instance.getDependencyTracker(), opts);
+                                     Instance.getDependencyTracker(), opts);
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 

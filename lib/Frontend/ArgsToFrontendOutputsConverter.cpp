@@ -100,9 +100,10 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
   ArrayRef<std::string> outputFileArguments =
       outputDirectoryArgument.empty() ? ArrayRef<std::string>(*outputArguments)
                                       : ArrayRef<std::string>();
-  const StringRef firstInput = inputsAndOutputs.hasSingleInput()
-                                   ? inputsAndOutputs.getFilenameOfFirstInput()
-                                   : StringRef();
+  const std::string &firstInput =
+      inputsAndOutputs.hasSingleInput()
+          ? inputsAndOutputs.getFilenameOfFirstInput()
+          : std::string();
   const FrontendOptions::ActionType requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(args);
 
@@ -127,7 +128,7 @@ OutputFilesComputer::OutputFilesComputer(
     const llvm::opt::ArgList &args, DiagnosticEngine &diags,
     const FrontendInputsAndOutputs &inputsAndOutputs,
     std::vector<std::string> outputFileArguments,
-    const StringRef outputDirectoryArgument, const StringRef firstInput,
+    const StringRef outputDirectoryArgument, const std::string &firstInput,
     const FrontendOptions::ActionType requestedAction,
     const llvm::opt::Arg *moduleNameArg, const StringRef suffix,
     const bool hasTextualOutput)
@@ -203,7 +204,7 @@ Optional<std::string> OutputFilesComputer::deriveOutputFileForDirectory(
 
 std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
-  StringRef nameToStem =
+  std::string nameToStem =
       input.isPrimary()
           ? input.file()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
