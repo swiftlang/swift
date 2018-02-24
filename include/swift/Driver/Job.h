@@ -177,6 +177,12 @@ public:
   /// first primary input.
   StringRef getAdditionalOutputForType(types::ID type) const;
 
+  /// Assuming (and asserting) that the number of additional outputs of type \p
+  /// type is either zero or the same as the number of primary \c Inputs, return
+  /// all the additional (not primary) outputs of type \p type associated with
+  /// the primary inputs.
+  SmallVector<StringRef, 16> getAdditionalOutputsForType(types::ID type) const;
+
   /// Assuming (and asserting) that there is only one input pair, return any
   /// output -- primary or additional -- of type \p type associated with that
   /// the sole primary input.

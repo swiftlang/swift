@@ -113,6 +113,7 @@ void CommandOutput::setAdditionalOutputForType(types::ID Type,
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
       "additional", this, Inputs[0].Primary, Type, OutputFilename);
   assert(Inputs.size() >= 1);
+  assert(!OutputFilename.empty());
 
   // If we're given an "additional" output with the same type as the primary,
   // and we've not yet had such an additional type added, we treat it as a
@@ -129,6 +130,19 @@ StringRef CommandOutput::getAdditionalOutputForType(types::ID Type) const {
     return StringRef();
   assert(Inputs.size() >= 1);
   return getOutputForInputAndType(Inputs[0].Primary, Type);
+}
+
+SmallVector<StringRef, 16>
+CommandOutput::getAdditionalOutputsForType(types::ID Type) const {
+  SmallVector<StringRef, 16> V;
+  if (AdditionalOutputTypes.count(Type) != 0) {
+    for (auto const &I : Inputs) {
+      auto Out = getOutputForInputAndType(I.Primary, Type);
+      V.push_back(Out);
+    }
+  }
+  assert(V.empty() || V.size() == Inputs.size());
+  return V;
 }
 
 StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
