@@ -3,4 +3,4 @@
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t/def_class.swiftmodule %t/stage1.swiftmodule
 // RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -I %t %S/class.swift | %FileCheck %s -check-prefix=SIL
 
-// SIL-LABEL: sil public_external [transparent] [serialized] @$SSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
+// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$SSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
