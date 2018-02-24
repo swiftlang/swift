@@ -349,7 +349,9 @@ public:
   /// SIL). If so, diagnostics should not be reapplied.
   bool wasDeserializedCanonical() const { return WasDeserializedCanonical; }
 
-  void setWasDeserializedCanonical() { WasDeserializedCanonical = true; }
+  void setWasDeserializedCanonical(bool val = true) {
+    WasDeserializedCanonical = val;
+  }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
