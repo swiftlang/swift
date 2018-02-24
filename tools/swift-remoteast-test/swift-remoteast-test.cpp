@@ -13,6 +13,7 @@
 // on live swift executables.
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/InProcessMemoryReader.h"
 #include "swift/Runtime/Metadata.h"
@@ -143,14 +144,20 @@ struct Observer : public FrontendObserver {
 } // end anonymous namespace
 
 int main(int argc, const char *argv[]) {
+  const char *extraArgs[] = {
+    "-interpret",
+    "-parse-stdlib",
+    "-import-module",
+    STDLIB_NAME
+  };
   unsigned numForwardedArgs = argc
       - 1  // we drop argv[0]
-      + 1; // -interpret
+      + llvm::array_lengthof(extraArgs);
 
   SmallVector<const char *, 8> forwardedArgs;
   forwardedArgs.reserve(numForwardedArgs);
   forwardedArgs.append(&argv[1], &argv[argc]);
-  forwardedArgs.push_back("-interpret");
+  forwardedArgs.append(std::begin(extraArgs), std::end(extraArgs));
   assert(forwardedArgs.size() == numForwardedArgs);
 
   Observer observer;
