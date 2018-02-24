@@ -79,33 +79,18 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
 #endif
 }
 
-@_versioned
-@_silgen_name("NSArray_getObjects")
-func NSArray_getObjects(
-  nsArray: AnyObject,
-  objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
-  rangeLocation: Int,
-  rangeLength: Int)
-
 extension NSArray {
   @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
-    _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
+    _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>, range: NSRange
   ) {
-    return NSArray_getObjects(
-      nsArray: self,
-      objects: objects,
-      rangeLocation: range.location,
-      rangeLength: range.length)
+    let cfSelf = self as CFArray
+    let cfRange = CFRange(location: range.location, length: range.length)
+    let rawPtr = UnsafeMutableRawPointer(objects)
+    let reboundPtr = rawPtr.assumingMemoryBound(to: UnsafeRawPointer?.self)
+    CFArrayGetValues(cfSelf, cfRange, reboundPtr)
   }
 }
-
-@_silgen_name("NSDictionary_getObjects")
-func NSDictionary_getObjects(
-  nsDictionary: NSDictionary,
-  objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
-  andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
-)
 
 extension NSDictionary {
   @nonobjc // FIXME: there should be no need in this attribute.
@@ -113,10 +98,14 @@ extension NSDictionary {
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
     andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
   ) {
-    return NSDictionary_getObjects(
-      nsDictionary: self,
-      objects: objects,
-      andKeys: keys)
+    let cfSelf = self as CFDictionary
+    let rawObjectsPtr = UnsafeMutableRawPointer(objects)
+    let reboundObjectsPtr =
+      rawObjectsPtr?.assumingMemoryBound(to: UnsafeRawPointer?.self)
+    let rawKeysPtr = UnsafeMutableRawPointer(keys)
+    let reboundKeysPtr =
+      rawKeysPtr?.assumingMemoryBound(to: UnsafeRawPointer?.self)
+    CFDictionaryGetKeysAndValues(cfSelf, reboundKeysPtr, reboundObjectsPtr)
   }
 }
 
