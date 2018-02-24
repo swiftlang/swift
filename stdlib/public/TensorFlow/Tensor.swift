@@ -114,6 +114,12 @@ func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
 
+@_versioned @_inlineable @inline(__always)
+func _TFMakeHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
+  -> TensorHandle<Scalar> {
+  return Scalar._makeHoistable(fn)
+}
+
 //===----------------------------------------------------------------------===//
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
@@ -375,8 +381,11 @@ public extension Tensor where Scalar == Float {
   ///
   @_inlineable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
-    self = Tensor(shape: shape, scalars: scalars) * stddev + mean
+    let handle : TensorHandle<Scalar> = _TFMakeHoistable {
+      let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
+      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+    }
+    self = Tensor(handle: handle).toDevice() * stddev + mean
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -387,8 +396,13 @@ public extension Tensor where Scalar == Float {
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape) {
-    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomUniform() }
-    self.init(shape: shape, scalars: scalars)
+    let handle : TensorHandle<Scalar> = _TFMakeHoistable {
+      let scalars = (0..<shape.contiguousSize).map {
+        _ in Scalar.randomUniform()
+      }
+      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+    }
+    self = Tensor(handle: handle).toDevice()
   }
 }
 

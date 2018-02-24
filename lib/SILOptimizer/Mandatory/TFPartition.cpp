@@ -72,6 +72,11 @@ enum class PartitioningClass {
   /// as methods.
   GetScalarOrDie,
 
+  /// This is an apply instruction of the __tf_hoistable family.  While it may
+  /// appear that these functions have side effects, it is well known that they
+  /// may be hoisted above the start of the function safely ignoring them.
+  Hoistable,
+
   /// Scalar instructions that check for overflow like "sadd.with.overflow" and
   /// friends.
   OverflowCheckingInst,
@@ -96,6 +101,8 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
     if (auto fn = apply->getCalleeFunction()) {
       if (fn->getName().startswith("__tf_get_scalar_or_die_"))
         return PartitioningClass::GetScalarOrDie;
+      if (fn->getName().startswith("__tf_hoistable_"))
+        return PartitioningClass::Hoistable;
     }
   }
 
@@ -1057,13 +1064,22 @@ static bool canMoveInstruction(SILInstruction *inst) {
     return true;
   }
 
+  // PartialApply instructions can be moved around.  They aren't marked as
+  // having side effects because they take their argument as +1, but we can
+  // still move it around.
+  if (isa<PartialApplyInst>(inst))
+    return true;
+
   // __tf_get_scalar_or_die cannot be marked as having no side effects because
   // it takes a +1 value as its argument.  That said, it is safe to hoist and
   // sink it.
-  if (classifyInst(inst) == PartitioningClass::GetScalarOrDie)
+  switch (classifyInst(inst)) {
+  case PartitioningClass::GetScalarOrDie:
+  case PartitioningClass::Hoistable:
     return true;
-
-  return false;
+  default:
+    return false;
+  }
 }
 
 /// The specified instruction is in the region dominated by the start point of

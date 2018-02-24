@@ -119,3 +119,14 @@ public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
   let b = Tensor(scalar)
   return (b+b).toHost()
 }
+
+// Verify that we are able to run randomUniform on the device, or at least hoist
+// it to being an argument so we don't get copy-ins.
+public func randomUniformHoisting() -> Tensor<Float> {
+  let x = Tensor<Float>(ones: [2, 2, 2])
+  let y = Tensor<Float>(randomUniform: [2, 2, 2])
+  let z = Tensor<Float>(randomUniform: [2, 2, 2])
+
+  return (x+y+z).toHost()
+}
+

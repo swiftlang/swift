@@ -49,6 +49,12 @@ public protocol AccelerableByTensorFlow {
   /// This converts a scalar to a 0d TensorHandle that contains the value.
   /// Users should call the _TFMakeScalarTensor wrapper function.
   static func _makeScalarTensor(_ scalar: Self) -> TensorHandle<Self>
+
+  /// This indicates that it is safe to hoist the specified computation that
+  /// creates a tensor to being a parameter that is passed in from outside of
+  /// the tensor program.
+  static func _makeHoistable(_ fn: () -> TensorHandle<Self>)
+    -> TensorHandle<Self>
 }
 
 // This is the implementation of the _getScalarOrDie requirement for each
@@ -56,7 +62,8 @@ public protocol AccelerableByTensorFlow {
 // global _TFGetScalarOrDie function in order to ensure that the noinline
 // SIL functions below have non-generic type signatures.  This is important for
 // the inner workings of the partitioning pass.
-private func _TFGetScalarOrDieImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
+private
+func _TFGetScalarOrDieImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
   return handle.makeHostCopy().scalar!
 }
 
@@ -65,7 +72,8 @@ private func _TFGetScalarOrDieImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Sc
 // global _TFGetScalar function in order to ensure that the noinline
 // SIL functions below have non-generic type signatures.  This is important for
 // the inner workings of the partitioning pass.
-private func _TFGetScalarImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
+private
+func _TFGetScalarImpl<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
   return handle.makeHostCopy().scalar
 }
 
@@ -92,6 +100,11 @@ extension Bool : AccelerableByTensorFlow {
   public static func _makeScalarTensor(_ scalar: Bool) -> TensorHandle<Bool> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
+  @_silgen_name("__tf_hoistable_Bool") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Bool>)
+    -> TensorHandle<Bool> {
+    return fn()
+  }
 }
 
 extension Int8 : AccelerableByTensorFlow {
@@ -109,6 +122,11 @@ extension Int8 : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Int8) -> TensorHandle<Int8> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Int8") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Int8>)
+    -> TensorHandle<Int8> {
+    return fn()
   }
 }
 
@@ -128,6 +146,11 @@ extension UInt8 : AccelerableByTensorFlow {
   public static func _makeScalarTensor(_ scalar: UInt8) -> TensorHandle<UInt8> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
+  @_silgen_name("__tf_hoistable_UInt8") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<UInt8>)
+    -> TensorHandle<UInt8> {
+    return fn()
+  }
 }
 
 extension Int16 : AccelerableByTensorFlow {
@@ -145,6 +168,11 @@ extension Int16 : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Int16) -> TensorHandle<Int16> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Int16") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Int16>)
+    -> TensorHandle<Int16> {
+    return fn()
   }
 }
 
@@ -165,6 +193,11 @@ extension UInt16 : AccelerableByTensorFlow {
   -> TensorHandle<UInt16> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
+  @_silgen_name("__tf_hoistable_UInt16") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<UInt16>)
+    -> TensorHandle<UInt16> {
+    return fn()
+  }
 }
 
 extension Int32 : AccelerableByTensorFlow {
@@ -182,6 +215,11 @@ extension Int32 : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Int32) -> TensorHandle<Int32> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Int32") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Int32>)
+    -> TensorHandle<Int32> {
+    return fn()
   }
 }
 
@@ -202,6 +240,11 @@ extension UInt32 : AccelerableByTensorFlow {
   -> TensorHandle<UInt32> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
+  @_silgen_name("__tf_hoistable_UInt32") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<UInt32>)
+    -> TensorHandle<UInt32> {
+    return fn()
+  }
 }
 
 extension Int64 : AccelerableByTensorFlow {
@@ -219,6 +262,11 @@ extension Int64 : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Int64) -> TensorHandle<Int64> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Int64") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Int64>)
+    -> TensorHandle<Int64> {
+    return fn()
   }
 }
 
@@ -239,6 +287,11 @@ extension UInt64 : AccelerableByTensorFlow {
   -> TensorHandle<UInt64> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
+  @_silgen_name("__tf_hoistable_UInt64") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<UInt64>)
+    -> TensorHandle<UInt64> {
+    return fn()
+  }
 }
 
 extension Float : AccelerableByTensorFlow {
@@ -256,6 +309,11 @@ extension Float : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Float) -> TensorHandle<Float> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Float") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Float>)
+    -> TensorHandle<Float> {
+    return fn()
   }
 }
 
@@ -275,5 +333,10 @@ extension Double : AccelerableByTensorFlow {
   public static func _makeScalarTensor(_ scalar: Double)
   -> TensorHandle<Double> {
     return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_Double") @_optimize(none) @inline(never)
+  public static func _makeHoistable(_ fn: () -> TensorHandle<Double>)
+    -> TensorHandle<Double> {
+    return fn()
   }
 }
