@@ -962,26 +962,6 @@ struct AbstractPropertyStruct<T> : AbstractPropertyProtocol {
   var a : T
 }
 
-// Allow _silgen_name accessors without bodies.
-var _silgen_nameGet1: Int {
-  @_silgen_name("get1") get
-  set { }
-}
-
-var _silgen_nameGet2: Int {
-  set { }
-  @_silgen_name("get2") get
-}
-
-var _silgen_nameGet3: Int {
-  @_silgen_name("get3") get
-}
-
-var _silgen_nameGetSet: Int {
-  @_silgen_name("get4") get
-  @_silgen_name("set4") set
-}
-
 
 
 // <rdar://problem/16375910> reject observing properties overriding readonly properties

@@ -6,8 +6,8 @@
 // RUN: %target-jit-run -lLinkMe %s -L %t 2>&1
 // RUN: not %target-jit-run -lLinkMe %s 2>&1
 
-// RUN: %target-jit-run -lLinkMe -DUSE_DIRECTLY %s -L %t 2>&1
-// RUN: not --crash %target-jit-run -DUSE_DIRECTLY -lLinkMe %s 2>&1
+// RUN: %target-jit-run -lLinkMe -DUSE_DIRECTLY -parse-stdlib %s -L %t 2>&1
+// RUN: not --crash %target-jit-run -DUSE_DIRECTLY -parse-stdlib -lLinkMe %s 2>&1
 // REQUIRES: executable_test
 
 
@@ -16,7 +16,7 @@
 // REQUIRES: swift_interpreter
 // REQUIRES: OS=macosx
 
-
+import Swift
 import Darwin
 #if IMPORT
   import LinkMe

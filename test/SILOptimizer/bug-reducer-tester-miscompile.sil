@@ -15,7 +15,7 @@
 // We use a driver file to ensure that we are not dependent on how main/start
 // are setup on our platform. The c function interface that we use is very
 // standard, so we should be ok to rely on it. Lets compile it.
-// RUN: %target-swift-frontend -c %S/Inputs/bug-reducer-tester-miscompile-driver.swift -o %t/main.o
+// RUN: %target-swift-frontend -c %S/Inputs/bug-reducer-tester-miscompile-driver.swift -parse-stdlib -o %t/main.o
 
 // Now test the base case. We emit a sib file/etc to make sure all of the
 // components of our test work, even though we could just use a sil file

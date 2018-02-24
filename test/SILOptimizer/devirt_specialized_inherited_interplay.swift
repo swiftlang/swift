@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -Xllvm -sil-inline-generics -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -Xllvm -sil-inline-generics -O %s -emit-sil -parse-stdlib | %FileCheck %s
 
 // This file consists of tests for making sure that protocol conformances and
 // inherited conformances work well together when applied to each other. The
@@ -41,6 +41,8 @@
 // CHECK: apply [[F8]]
 // CHECK-NOT: dealloc_ref
 // CHECK: return
+
+import Swift
 
 @_silgen_name("unknown0")
 func unknown0() -> ()

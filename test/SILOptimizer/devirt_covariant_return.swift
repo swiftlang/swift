@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all -parse-stdlib | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier
@@ -23,6 +23,8 @@
 // CHECK: apply
 // CHECK: tuple
 // CHECK: return
+
+import Swift
 
 @_silgen_name("unknown1a")
 func unknown1a() -> ()

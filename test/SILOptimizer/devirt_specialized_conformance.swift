@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=ObjectOutliner %s -emit-sil -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=ObjectOutliner %s -emit-sil -sil-verify-all -parse-stdlib | %FileCheck %s
 
 // Make sure that we completely inline/devirtualize/substitute all the way down
 // to unknown1.

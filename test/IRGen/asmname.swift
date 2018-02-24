@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -parse-stdlib | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
+import Swift
 
 // Non-Swift _silgen_name definitions
 

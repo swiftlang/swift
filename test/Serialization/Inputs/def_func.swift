@@ -1,3 +1,5 @@
+import Swift
+
 public func getZero() -> Int {
   return 0
 }

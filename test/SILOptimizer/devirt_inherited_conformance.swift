@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil -parse-stdlib | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
@@ -13,6 +13,8 @@
 // CHECK: apply [[UNKNOWN3a]]
 // CHECK: return
 
+import Swift
+
 @_silgen_name("unknown1a")
 func unknown1a() -> ()
 @_silgen_name("unknown1b")
@@ -25,8 +27,6 @@ func unknown2b() -> ()
 func unknown3a() -> ()
 @_silgen_name("unknown3b")
 func unknown3b() -> ()
-
-struct Int32 {}
 
 protocol P {
   // We do not specialize typealias's correctly now.

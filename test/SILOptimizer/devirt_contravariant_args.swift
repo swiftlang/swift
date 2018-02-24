@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -sil-inline-threshold 1000 -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -sil-inline-threshold 1000 -sil-verify-all -parse-stdlib | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
@@ -9,6 +9,9 @@
 // CHECK: function_ref unknownC0
 // CHECK: return
 // CHECK-NEXT: }
+
+// Filling in for the standard library.
+precedencegroup CastingPrecedence {}
 
 @_silgen_name("unknownC0")
 func unknownC0(_ c : C0) -> ()
