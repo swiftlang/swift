@@ -199,8 +199,7 @@ public:
   bool ImportUnderlyingModule = false;
 
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
-  /// by the Clang importer as part of semantic analysis if the ModuleOutputPath
-  /// for the primary input being compiled is not empty.
+  /// by the Clang importer as part of semantic analysis.
   bool SerializeBridgingHeader = false;
 
   /// Indicates whether or not the frontend should print statistics upon

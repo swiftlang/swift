@@ -80,18 +80,18 @@ bool FrontendInputsAndOutputs::forEachInput(
 // Primaries:
 
 const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
-  assert(!PrimaryInputs.empty());
-  return AllInputs[PrimaryInputs.front()];
+  assert(!PrimaryInputsInOrder.empty());
+  return AllInputs[PrimaryInputsInOrder.front()];
 }
 
 const InputFile &FrontendInputsAndOutputs::lastPrimaryInput() const {
-  assert(!PrimaryInputs.empty());
-  return AllInputs[PrimaryInputs.back()];
+  assert(!PrimaryInputsInOrder.empty());
+  return AllInputs[PrimaryInputsInOrder.back()];
 }
 
 bool FrontendInputsAndOutputs::forEachPrimaryInput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
-  for (unsigned i : PrimaryInputs)
+  for (unsigned i : PrimaryInputsInOrder)
     if (fn(AllInputs[i]))
       return true;
   return false;
@@ -111,7 +111,9 @@ void FrontendInputsAndOutputs::
 
 const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
   assertMustNotBeMoreThanOnePrimaryInput();
-  return PrimaryInputs.empty() ? nullptr : &AllInputs[PrimaryInputs.front()];
+  return PrimaryInputsInOrder.empty()
+             ? nullptr
+             : &AllInputs[PrimaryInputsInOrder.front()];
 }
 
 const InputFile &
@@ -131,7 +133,7 @@ std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
 }
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
-  return inputNamed(file).isPrimary();
+  return primaryInputNamed(file) != nullptr;
 }
 
 unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
@@ -223,16 +225,17 @@ bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
 
 void FrontendInputsAndOutputs::clearInputs() {
   AllInputs.clear();
-  InputsByName.clear();
-  PrimaryInputs.clear();
+  PrimaryInputsByName.clear();
+  PrimaryInputsInOrder.clear();
 }
 
 void FrontendInputsAndOutputs::addInput(const InputFile &input) {
   const unsigned index = AllInputs.size();
   AllInputs.push_back(input);
-  InputsByName.insert(std::make_pair(AllInputs.back().file(), index));
-  if (input.isPrimary())
-    PrimaryInputs.push_back(index);
+  if (input.isPrimary()) {
+    PrimaryInputsInOrder.push_back(index);
+    PrimaryInputsByName.insert(std::make_pair(AllInputs.back().file(), index));
+  }
 }
 
 void FrontendInputsAndOutputs::addInputFile(StringRef file,
@@ -426,16 +429,20 @@ FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() const {
 const PrimarySpecificPaths &
 FrontendInputsAndOutputs::getPrimarySpecificPathsForPrimary(
     StringRef filename) const {
-  const InputFile &f = inputNamed(filename);
-  return f.getPrimarySpecificPaths();
+  const InputFile *f = primaryInputNamed(filename);
+  return f->getPrimarySpecificPaths();
 }
 
-const InputFile &FrontendInputsAndOutputs::inputNamed(StringRef name) const {
+const InputFile *
+FrontendInputsAndOutputs::primaryInputNamed(StringRef name) const {
   assert(!name.empty() && "input files have names");
-  std::string correctedFile =
+  StringRef correctedFile =
       InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
           name);
-  auto iterator = InputsByName.find(correctedFile);
-  assert(iterator != InputsByName.end() && "Unknown input");
-  return AllInputs[iterator->second];
+  auto iterator = PrimaryInputsByName.find(correctedFile);
+  if (iterator == PrimaryInputsByName.end())
+    return nullptr;
+  const InputFile *f = &AllInputs[iterator->second];
+  assert(f->isPrimary() && "PrimaryInputsByName should only include primries");
+  return f;
 }

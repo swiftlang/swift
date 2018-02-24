@@ -35,9 +35,8 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
-  llvm::StringMap<unsigned> InputsByName;
-
-  std::vector<unsigned> PrimaryInputs;
+  llvm::StringMap<unsigned> PrimaryInputsByName;
+  std::vector<unsigned> PrimaryInputsInOrder;
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
@@ -74,7 +73,8 @@ public:
 
   std::vector<std::string> getInputFilenames() const;
 
-  const InputFile &inputNamed(StringRef name) const;
+  /// \return nullptr if not a primry input file.
+  const InputFile *primaryInputNamed(StringRef name) const;
 
   unsigned inputCount() const { return AllInputs.size(); }
 
@@ -91,7 +91,7 @@ public:
 
   bool isReadingFromStdin() const;
 
-  /// If \p fn returns true, exits early and returns true;
+  /// If \p fn returns true, exits early and returns true.
   bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   // Primaries:
@@ -103,7 +103,7 @@ public:
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
-  unsigned primaryInputCount() const { return PrimaryInputs.size(); }
+  unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 
   // Primary count readers:
 
@@ -133,10 +133,8 @@ public:
 
   const InputFile &getRequiredUniquePrimaryInput() const;
 
-  /// Should combine all primaries for stats reporter
-  /// Today, just answers "batch" if > 1, so it could
-  /// return a StringRef, but someday will have to fabricate
-  /// a temporary string.
+  /// FIXME: Should combine all primaries for the result
+  /// instead of just answering "batch" if there is more than one primary.
   std::string getStatsFileMangledInputName() const;
 
   bool isInputPrimary(StringRef file) const;
@@ -188,7 +186,7 @@ public:
   /// generates the main output, even though it will include code
   /// generated from all of them.
   ///
-  /// If \pfn returns true, return early and return true.
+  /// If \p fn returns true, return early and return true.
   bool forEachInputProducingAMainOutputFile(
       llvm::function_ref<bool(const InputFile &)> fn) const;
 

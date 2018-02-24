@@ -121,7 +121,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
   llvm::SmallString<256> pathBuf;
   auto escape = [&](StringRef raw) -> StringRef {
     pathBuf.clear();
-    
+
     static const char badChars[] = " $#:\n";
     size_t prev = 0;
     for (auto index = raw.find_first_of(badChars); index != StringRef::npos;
@@ -148,7 +148,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
-         reversePathSortedFilenames(depTracker.getDependencies()))
+           reversePathSortedFilenames(depTracker.getDependencies()))
       out << ' ' << escape(path);
     out << '\n';
   });
@@ -837,9 +837,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return PSGIs;
 }
 
+/// Emits index data for all primary inputs, or the main module.
 static bool
-emitIndexDataForAllPrimariesOrModuleIfNeeded(CompilerInvocation &Invocation,
-                                             CompilerInstance &Instance) {
+emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   bool hadEmitIndexDataError = false;
   if (Instance.getPrimarySourceFiles().empty())
     return emitIndexDataIfNeeded(nullptr, Invocation, Instance);
@@ -933,7 +933,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
-    (void)emitIndexDataForAllPrimariesOrModuleIfNeeded(Invocation, Instance);
+    (void)emitIndexData(Invocation, Instance);
     return true;
   }
 
@@ -950,8 +950,7 @@ static bool performCompile(CompilerInstance &Instance,
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
-    const bool hadEmitIndexDataError =
-        emitIndexDataForAllPrimariesOrModuleIfNeeded(Invocation, Instance);
+    const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
     return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
@@ -1630,7 +1629,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // SourceFile?
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
-    const std::string SerializedDiagnosticsPath =
+    StringRef SerializedDiagnosticsPath =
         Invocation.getSerializedDiagnosticsPathForAtMostOnePrimary();
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(

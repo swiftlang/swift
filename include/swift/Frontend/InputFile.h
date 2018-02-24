@@ -68,8 +68,7 @@ public:
 
   /// Return Swift-standard file name from a buffer name set by
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
-  static std::string
-  convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+  static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
   }
