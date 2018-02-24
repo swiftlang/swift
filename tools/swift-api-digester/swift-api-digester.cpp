@@ -67,7 +67,9 @@ namespace  {
     DumpSwiftModules,
     CompareSDKs,
     DiagnoseSDKs,
+    // The following two are for testing purposes
     DeserializeDiffItems,
+    DeserializeSDK,
   };
 } // end anonymous namespace
 
@@ -135,7 +137,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Diagnose SDK content in JSON file"),
           clEnumValN(ActionType::DeserializeDiffItems,
                      "deserialize-diff",
-                     "Deserialize diff items in a JSON file")));
+                     "Deserialize diff items in a JSON file"),
+          clEnumValN(ActionType::DeserializeSDK,
+                     "deserialize-sdk",
+                     "Deserialize sdk digester in a JSON file")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -287,6 +292,22 @@ static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
+/// We don't dump individual extension declaration in the digester. However,
+/// we still want to detect whether an extension's applicability changes. Therefore,
+/// by using ParentExtensionInfo, we keep track of extension's information in
+/// each member of the extension.
+class ParentExtensionInfo {
+  friend struct SDKNodeInitInfo;
+  friend class SDKNode;
+  std::vector<StringRef> Requirements;
+
+  void *operator new(size_t Bytes, SDKContext &C) {
+    return C.allocator().Allocate<ParentExtensionInfo>();
+  }
+public:
+  ArrayRef<StringRef> getGenericRequirements() const { return Requirements; }
+};
+
 struct SDKNodeInitInfo {
   SDKContext &Ctx;
   StringRef Name;
@@ -303,6 +324,8 @@ struct SDKNodeInitInfo {
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   StringRef SuperclassUsr;
+  ParentExtensionInfo *ExtInfo = nullptr;
+
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
@@ -372,12 +395,15 @@ class SDKNodeDecl : public SDKNode {
   bool IsStatic;
   uint8_t Ownership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
+  // Non-null ExtInfo implies this decl is defined in an type extension.
+  ParentExtensionInfo *ExtInfo;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
     DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
     ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)) {}
+    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)),
+    ExtInfo(Info.ExtInfo) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -395,6 +421,11 @@ public:
   bool isSDKPrivate() const;
   bool isDeprecated() const;
   bool isStatic() const { return IsStatic; };
+  bool isFromExtension() const { return ExtInfo; }
+  const ParentExtensionInfo& getExtensionInfo() const {
+    assert(isFromExtension());
+    return *ExtInfo;
+  }
 };
 
 StringRef SDKNodeDecl::getHeaderName() const {
@@ -893,6 +924,14 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                                       cast<llvm::yaml::MappingNode>(&Mapping)));
       }
       break;
+    case KeyKind::KK_parentExtensionReqs: {
+      assert(!Info.ExtInfo);
+      Info.ExtInfo = new (Ctx) ParentExtensionInfo();
+      for (auto &Req : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+        Info.ExtInfo->Requirements.push_back(GetScalarString(&Req));
+      }
+      break;
+    }
     case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
       break;
@@ -1194,7 +1233,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
     ModuleName(VD->getModuleContext()->getName().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
     IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
-    Ownership(getOwnership(VD)) {
+    Ownership(getOwnership(VD)), ExtInfo(nullptr) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1203,6 +1242,18 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
   }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
+
+  // If the decl is declared in an extension, calculate the extension info.
+  if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
+    ExtInfo = new (Ctx) ParentExtensionInfo();
+    // Print each generic requirement to the extension info.
+    for (auto Req: Ext->getGenericRequirements()) {
+      llvm::SmallString<32> Result;
+      llvm::raw_svector_ostream OS(Result);
+      Req.print(OS, PrintOptions::printInterface());
+      ExtInfo->Requirements.emplace_back(Ctx.buffer(OS.str()));
+    }
+  }
 }
 
 SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
@@ -1576,6 +1627,15 @@ namespace swift {
                               Super);
             }
           }
+          if (D->isFromExtension()) {
+            // Even if we don't have any requirements on this parent extension,
+            // we still want to have this key present to indicate the member
+            // is from an extension.
+            auto Reqs = D->getExtensionInfo().getGenericRequirements();
+            out.mapRequired(getKeyContent(Ctx,
+                                          KeyKind::KK_parentExtensionReqs).data(),
+                            Reqs);
+          }
           auto Attributes = D->getDeclAttributes();
           if (!Attributes.empty())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
@@ -1628,6 +1688,16 @@ namespace swift {
       static SDKDeclAttrKind& element(Output &, ArrayRef<SDKDeclAttrKind> &seq,
                                    size_t index) {
         return const_cast<SDKDeclAttrKind&>(seq[index]);
+      }
+    };
+    template<>
+    struct ArrayTraits<ArrayRef<StringRef>> {
+      static size_t size(Output &out, ArrayRef<StringRef> &seq) {
+        return seq.size();
+      }
+      static StringRef& element(Output &, ArrayRef<StringRef> &seq,
+                                   size_t index) {
+        return const_cast<StringRef&>(seq[index]);
       }
     };
   } // namespace json
@@ -3497,6 +3567,23 @@ static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
   return 0;
 }
 
+/// Mostly for testing purposes, this function de-serializes the SDK dump in
+/// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
+/// the contents in dumpPath and OutputPath should be identical.
+static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  if (!fs::exists(dumpPath)) {
+    llvm::errs() << dumpPath << " does not exist\n";
+    return 1;
+  }
+  SDKContext Ctx;
+  SwiftDeclCollector Collector(Ctx);
+  Collector.deSerialize(dumpPath);
+  Collector.serialize(OutputPath);
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   INITIALIZE_LLVM(argc, argv);
 
@@ -3532,12 +3619,16 @@ int main(int argc, char *argv[]) {
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1]);
+  case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
     if (options::SDKJsonPaths.size() != 1) {
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+    if (options::Action == ActionType::DeserializeDiffItems)
+      return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+    else
+      return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile);
   }
   case ActionType::None:
     llvm::errs() << "Action required\n";
