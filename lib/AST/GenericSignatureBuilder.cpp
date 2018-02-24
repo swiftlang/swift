@@ -239,6 +239,12 @@ public:
     rewrite = replacementPath;
   }
 
+  /// Remove the rewrite rule.
+  void removeRewriteRule() {
+    assert(hasRewriteRule());
+    assocTypeAndHasRewrite.setInt(false);
+  }
+
   /// Retrieve the path to which this node will be rewritten.
   const RewritePath &getRewriteRule() const {
     assert(hasRewriteRule());
@@ -289,6 +295,54 @@ public:
   /// Merge the given rewrite tree into \c other.
   void mergeInto(RewriteTreeNode *other);
 
+  /// An action to perform for the given rule
+  class RuleAction {
+    enum Kind {
+      /// No action; continue traversal.
+      None,
+
+      /// Stop traversal.
+      Stop,
+
+      /// Remove the given rule completely.
+      Remove,
+
+      /// Replace the right-hand side of the rule with the given new path.
+      Replace,
+    } kind;
+
+    RewritePath path;
+
+    RuleAction(Kind kind, RewritePath path = {})
+      : kind(kind), path(path) { }
+
+    friend class RewriteTreeNode;
+
+  public:
+    static RuleAction none() { return RuleAction(None); }
+    static RuleAction stop() { return RuleAction(Stop); }
+    static RuleAction remove() { return RuleAction(Remove); }
+
+    static RuleAction replace(RewritePath path) {
+      return RuleAction(Replace, std::move(path));
+    }
+
+    operator Kind() const { return kind; }
+  };
+
+  /// Callback function for enumerating rules in a tree.
+  using EnumerateCallback =
+    RuleAction(RelativeRewritePath lhs, const RewritePath &rhs);
+
+  /// Enumerate all of the rewrite rules, calling \c fn with the left and
+  /// right-hand sides of each rule.
+  ///
+  /// \returns true if the action function returned \c Stop at any point.
+  bool enumerateRules(llvm::function_ref<EnumerateCallback> fn) {
+    SmallVector<AssociatedTypeDecl *, 4> lhs;
+    return enumerateRulesRec(fn, lhs);
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
@@ -296,9 +350,12 @@ public:
   void dump(llvm::raw_ostream &out, bool lastChild = true) const;
 
 private:
-  /// Merge the given rewrite tree into \c other.
-  void mergeIntoRec(RewriteTreeNode *other,
-                    llvm::SmallVectorImpl<AssociatedTypeDecl *> &matchPath);
+  /// Enumerate all of the rewrite rules, calling \c fn with the left and
+  /// right-hand sides of each rule.
+  ///
+  /// \returns true if the action function returned \c Stop at any point.
+  bool enumerateRulesRec(llvm::function_ref<EnumerateCallback> &fn,
+                         llvm::SmallVectorImpl<AssociatedTypeDecl *> &lhs);
 };
 }
 
@@ -3268,28 +3325,53 @@ RewriteTreeNode::bestMatch(GenericParamKey base, RelativeRewritePath path,
 }
 
 void RewriteTreeNode::mergeInto(RewriteTreeNode *other) {
-  SmallVector<AssociatedTypeDecl *, 4> matchPath;
-  mergeIntoRec(other, matchPath);
-}
-
-void RewriteTreeNode::mergeIntoRec(
-                     RewriteTreeNode *other,
-                     llvm::SmallVectorImpl<AssociatedTypeDecl *> &matchPath) {
   // FIXME: A destructive version of this operation would be more efficient,
   // since we generally don't care about \c other after doing this.
-  if (auto assocType = getMatch())
-    matchPath.push_back(assocType);
+  (void)enumerateRules([other](RelativeRewritePath lhs,
+                               const RewritePath &rhs) {
+    other->addRewriteRule(lhs, rhs);
+    return RuleAction::none();
+  });
+}
 
-  // Add this rewrite rule, if there is one.
-  if (hasRewriteRule())
-    other->addRewriteRule(matchPath, rewrite);
+bool RewriteTreeNode::enumerateRulesRec(
+                            llvm::function_ref<EnumerateCallback> &fn,
+                            llvm::SmallVectorImpl<AssociatedTypeDecl *> &lhs) {
+  if (auto assocType = getMatch())
+    lhs.push_back(assocType);
+
+  SWIFT_DEFER {
+    if (auto assocType = getMatch())
+      lhs.pop_back();
+  };
+
+  // If there is a rewrite rule, invoke the callback.
+  if (hasRewriteRule()) {
+    switch (RuleAction action = fn(lhs, getRewriteRule())) {
+    case RuleAction::None:
+      break;
+
+    case RuleAction::Stop:
+      return true;
+
+    case RuleAction::Remove:
+      removeRewriteRule();
+      break;
+
+    case RuleAction::Replace:
+      removeRewriteRule();
+      setRewriteRule(action.path);
+      break;
+    }
+  }
 
   // Recurse into the child nodes.
-  for (auto child : children)
-    child->mergeIntoRec(other, matchPath);
+  for (auto child : children) {
+    if (child->enumerateRulesRec(fn, lhs))
+      return true;
+  }
 
-  if (getMatch())
-    matchPath.pop_back();
+  return false;
 }
 
 void RewriteTreeNode::dump() const {
