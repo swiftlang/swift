@@ -14,6 +14,8 @@
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
+import Swift
+
 /// A type that has different `CustomStringConvertible` and
 /// `CustomDebugStringConvertible` representations.
 ///

@@ -6,7 +6,7 @@ add_swift_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
   Subprocess.swift
 
   SWIFT_MODULE_DEPENDS SwiftPrivate
-  SWIFT_COMPILE_FLAGS
+  SWIFT_COMPILE_FLAGS -parse-stdlib
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin
   SWIFT_MODULE_DEPENDS_TVOS Darwin

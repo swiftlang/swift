@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 protocol Resettable : AnyObject {
   func reset()
 }

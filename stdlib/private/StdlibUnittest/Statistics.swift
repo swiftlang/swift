@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// For a given p-value, returns the critical chi-square value for
 /// a distribution with 1 degree of freedom.
 func _chiSquaredUniform1DFCritical(_ pValue: Double) -> Double {

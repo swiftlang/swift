@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// A type that does not conform to any protocols.
 ///
 /// This type can be used to check that generic functions don't rely on any

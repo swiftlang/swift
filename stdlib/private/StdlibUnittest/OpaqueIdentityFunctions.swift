@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 @_silgen_name("getPointer")
 func _getPointer(_ x: OpaquePointer) -> OpaquePointer
 

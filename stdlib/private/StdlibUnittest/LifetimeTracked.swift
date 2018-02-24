@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// A type that tracks the number of live instances.
 ///
 /// To be useful in more contexts, `LifetimeTracked` conforms to various

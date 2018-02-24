@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
 import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)

@@ -1,6 +1,7 @@
 
 set(swift_stdlib_unittest_compile_flags
-  "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
+  "-Xfrontend" "-disable-objc-attr-requires-foundation-module"
+  "-parse-stdlib")
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
 endif()
@@ -31,7 +32,6 @@ add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   StringConvertible.swift.gyb
   TestHelpers.swift
   TypeIndexed.swift
-  GetOSVersion.mm
 
   SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateLibcExtras
   SWIFT_MODULE_DEPENDS_IOS Darwin Foundation

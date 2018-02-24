@@ -36,6 +36,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+import Swift
 import SwiftPrivate
 import SwiftPrivateLibcExtras
 import SwiftPrivatePthreadExtras

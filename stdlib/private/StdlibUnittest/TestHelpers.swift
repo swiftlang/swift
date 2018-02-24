@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 class DummyClass {}
 
 // Used by the weak.mm runtime tests. All that matters is that the returned

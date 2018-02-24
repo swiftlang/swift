@@ -14,6 +14,8 @@
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
+import Swift
+
 public func checkStrideable<S : Strideable>(
   instances: [S],
   distances: [S.Stride],

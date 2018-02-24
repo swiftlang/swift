@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 // namespace
 public enum SwiftRuntime {
   public enum MetadataKind : Int {
