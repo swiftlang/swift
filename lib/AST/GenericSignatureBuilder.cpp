@@ -289,7 +289,7 @@ public:
   /// \param path The path to match.
   /// \param prefixLength The length of the prefix leading up to \c path.
   Optional<std::pair<unsigned, RewritePath>>
-  bestMatch(GenericParamKey base, RelativeRewritePath path,
+  bestRewritePath(GenericParamKey base, RelativeRewritePath path,
             unsigned prefixLength);
 
   /// Merge the given rewrite tree into \c other.
@@ -3293,7 +3293,7 @@ void RewriteTreeNode::enumerateRewritePathsImpl(
 }
 
 Optional<std::pair<unsigned, RewritePath>>
-RewriteTreeNode::bestMatch(GenericParamKey base, RelativeRewritePath path,
+RewriteTreeNode::bestRewritePath(GenericParamKey base, RelativeRewritePath path,
                            unsigned prefixLength) {
   Optional<std::pair<unsigned, RewritePath>> best;
   unsigned bestAdjustedLength = 0;
@@ -3525,7 +3525,7 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(equivClass)) {
       // Find the best rewrite rule for the path starting at startIndex.
       auto match =
-        rootNode->bestMatch(genericParamType,
+        rootNode->bestRewritePath(genericParamType,
                             llvm::makeArrayRef(path).slice(startIndex),
                             startIndex);
 
