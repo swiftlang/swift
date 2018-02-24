@@ -3,8 +3,7 @@
 class C {}
 class D : C {}
 
-@_silgen_name("consume")
-func consume(_: [C])  // note, returns ()
+func consume(_: [C]) {} // note, returns ()
 
 // Assert/crash while emitting diagnostic for coercion from () to Bool
 // in the context of a collection cast.

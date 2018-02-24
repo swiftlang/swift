@@ -1,0 +1,1 @@
+func exit() -> Never { fatalError() }

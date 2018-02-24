@@ -182,8 +182,7 @@ class SomeClass {
 
 
 // Implicit conversions (in this case to @convention(block)) are ok.
-@_silgen_name("whatever") 
-func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)  // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
+func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void) {} // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
 func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-warning{{@noescape is the default and is deprecated}} {{31-41=}}
   takeNoEscapeAsObjCBlock(fn)
 }

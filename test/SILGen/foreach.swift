@@ -6,20 +6,11 @@
 
 class C {}
 
-@_silgen_name("loopBodyEnd")
-func loopBodyEnd() -> ()
-
-@_silgen_name("condition")
-func condition() -> Bool
-
-@_silgen_name("loopContinueEnd")
-func loopContinueEnd() -> ()
-
-@_silgen_name("loopBreakEnd")
-func loopBreakEnd() -> ()
-
-@_silgen_name("funcEnd")
-func funcEnd() -> ()
+func loopBodyEnd() -> () {}
+func condition() -> Bool {}
+func loopContinueEnd() -> () {}
+func loopBreakEnd() -> () {}
+func funcEnd() -> () {}
 
 struct TrivialStruct {
   var value: Int32
@@ -62,13 +53,13 @@ protocol GenericCollection : Collection {
 // CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]([[VAR:%.*]] : @trivial $Int):
-// CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_END_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[CONT_BLOCK]]:
 // CHECK:   destroy_value [[ITERATOR_BOX]]
-// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @{{[^ ]+}}funcEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach13trivialStructyySaySiGF'
@@ -131,7 +122,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
-// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBreakEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BREAK_FUNC]]()
 // CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
 //
@@ -139,12 +130,12 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_CONTINUE_END:bb[0-9]+]], [[LOOP_END_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_CONTINUE_END]]:
-// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @{{[^ ]+}}loopContinueEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[LOOP_END_BLOCK]]:
-// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
 //
@@ -153,7 +144,7 @@ func trivialStructBreak(_ xx: [Int]) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
-// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @{{[^ ]+}}funcEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach26trivialStructContinueBreakyySaySiGF'
@@ -238,7 +229,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
-// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBreakEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BREAK_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -248,14 +239,14 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_CONTINUE_END:bb[0-9]+]], [[LOOP_END_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_CONTINUE_END]]:
-// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @{{[^ ]+}}loopContinueEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[LOOP_END_BLOCK]]:
-// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -267,7 +258,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<P>> }
-// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @{{[^ ]+}}funcEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach24existentialContinueBreakyySayAA1P_pGF'
@@ -403,7 +394,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
-// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBreakEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BREAK_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -413,14 +404,14 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_CONTINUE_END:bb[0-9]+]], [[LOOP_END_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_CONTINUE_END]]:
-// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @{{[^ ]+}}loopContinueEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[LOOP_END_BLOCK]]:
-// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -432,7 +423,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
-// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @{{[^ ]+}}funcEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF'
@@ -513,7 +504,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
-// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BREAK_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBreakEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BREAK_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -523,14 +514,14 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   cond_br {{%.*}}, [[LOOP_CONTINUE_END:bb[0-9]+]], [[LOOP_END_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_CONTINUE_END]]:
-// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @{{[^ ]+}}loopContinueEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[LOOP_END_BLOCK]]:
-// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   destroy_addr [[T0]]
 // CHECK:   dealloc_stack [[T0]]
@@ -542,7 +533,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
-// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @{{[^ ]+}}funcEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_addr [[COLLECTION]]
 // CHECK: } // end sil function '$S7foreach30genericCollectionContinueBreakyyxs0C0RzlF'
@@ -640,7 +631,7 @@ func tupleElements(_ xx: [(C, C)]) {
 // CHECK:   br [[CONT_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]([[VAL:%.*]]  : @trivial $Int):
-// CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @{{[^ ]+}}loopBodyEnd{{[^ ]+}} : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_END_FUNC]]
 func unusedArgPattern(_ xx: [Int]) {
   for _ in xx {

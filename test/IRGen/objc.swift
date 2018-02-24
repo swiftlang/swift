@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s %S/Inputs/objc_helper.swift -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -67,9 +67,6 @@ class Octogenarian : Contrarian {
   // Override of @nonobjc can be @objc.
   @objc override func eviscerate() {}
 }
-
-@_silgen_name("unknown")
-func unknown(_ x: id) -> id
 
 // CHECK:    define hidden swiftcc %objc_object* @"$S4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
 // CHECK-NOT:  call {{.*}} @swift_unknownRetain

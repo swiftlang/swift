@@ -34,14 +34,6 @@ func WEXITSTATUS(_ status: Int32) -> Int32 {
   return (status >> 8) & 0xFF
 }
 
-// FIXME: "environ" should be in the Darwin overlay too
-@_silgen_name("_NSGetEnviron")
-func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
-
-var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
-  return _NSGetEnviron().pointee
-}
-
 func driver() {
   // Create a pipe to connect the archiver to the unarchiver.
   var pipes: [Int32] = [0, 0]

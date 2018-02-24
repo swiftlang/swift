@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
-@_silgen_name("action")
-func action(_ n:Int) -> ()
+@inline(never)
+func action(_ n:Int) -> () {}
 
 // public class
 open class Base1 {

@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-@_silgen_name("opaque")
-func opaque() -> Int
-
 func test_constantFoldAnd1() -> Int {
   while true && true {
     return 42

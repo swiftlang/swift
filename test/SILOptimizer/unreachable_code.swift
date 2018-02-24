@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %empty-directory(%t)
+// RUN: cp %s %t/main.swift
+// RUN: %target-swift-frontend -emit-sil -primary-file %t/main.swift %S/Inputs/exit.swift -o /dev/null -verify
+
 func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
@@ -146,8 +149,6 @@ func testSwitchEnum(_ xi: Int) -> Int {
   return x
 }
 
-@_silgen_name("exit") func exit() -> Never
-
 func reachableThroughNonFoldedPredecessor(fn: @autoclosure () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()
@@ -176,7 +177,7 @@ func intConstantTest2() -> Int{
 
 func test_single_statement_closure(_ fn:() -> ()) {}
 test_single_statement_closure() {
-    exit() // no-warning
+  exit() // no-warning
 }
 
 class C { }
@@ -292,10 +293,6 @@ func noReturnInDefer() {
   }
 }
 
-while true {
-}
- // no warning!
-
 
 // SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
 struct SR1010<T> {
@@ -350,3 +347,9 @@ class Derived : Base {
     while true {}
   }
 }
+
+// NOTE: This is testing the behavior of top-level code at the end of a file,
+// do not change it!
+while true {
+}
+ // no warning!

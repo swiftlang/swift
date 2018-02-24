@@ -1,0 +1,1 @@
+func takesNoEscapeClosure(fn : () -> Int) {}

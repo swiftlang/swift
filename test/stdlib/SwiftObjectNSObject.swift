@@ -13,7 +13,7 @@
 // RUN: %empty-directory(%t)
 // 
 // RUN: %target-clang %S/Inputs/SwiftObjectNSObject/SwiftObjectNSObject.m -c -o %t/SwiftObjectNSObject.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
+// RUN: %target-build-swift %s -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -import-objc-header %S/Inputs/SwiftObjectNSObject/SwiftObjectNSObject.h -o %t/SwiftObjectNSObject
 // RUN: %target-run %t/SwiftObjectNSObject 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 
@@ -33,9 +33,6 @@ class D : C {
   @objc override func cInstanceOverride() -> Int { return 7 }
   @objc override class func cClassOverride() -> Int { return 8 }
 }
-
-@_silgen_name("TestSwiftObjectNSObject") 
-func TestSwiftObjectNSObject(_ c: C, _ d: D)
 
 // This check is for NSLog() output from TestSwiftObjectNSObject().
 // CHECK: c ##SwiftObjectNSObject.C##

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift -module-name new_module
+// RUN: %target-swift-frontend -emit-module -o %t %S/../Inputs/empty.swift -module-name new_module
 // RUN: not %target-swift-frontend %s -typecheck -I %t -show-diagnostics-after-fatal 2>&1 | %FileCheck %s
 
 import swift // CHECK: error: {{cannot load module 'Swift' as 'swift'|no such module 'swift'}}

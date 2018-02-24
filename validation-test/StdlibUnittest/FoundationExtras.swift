@@ -1,6 +1,8 @@
-// RUN: %target-run-simple-swift
-// REQUIRES: executable_test
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -import-objc-header %S/Inputs/FoundationExtras.h -o %t/main
+// RUN: %target-run %t/main
 
+// REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import StdlibUnittest
@@ -71,15 +73,13 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(String)") {
   }
 }
 
-@_silgen_name("objc_autorelease")
-func objc_autorelease(_ ref: AnyObject)
-
 FoundationExtrasTests.test("objc_autorelease()") {
   autoreleasepool {
     // Check that objc_autorelease indeed autoreleases.
     objc_autorelease(LifetimeTracked(101))
     expectEqual(1, LifetimeTracked.instances)
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 FoundationExtrasTests.test("autoreleasepoolIfUnoptimizedReturnAutoreleased()/autorelease") {

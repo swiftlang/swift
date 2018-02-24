@@ -184,8 +184,7 @@ class HasUnmanaged : NSObject {
   @objc var ref: Unmanaged<AnyObject>?
 }
 
-@_silgen_name("autoreleasing_user")
-func useAutoreleasingUnsafeMutablePointer(_ a: AutoreleasingUnsafeMutablePointer<NSObject>)
+func useAutoreleasingUnsafeMutablePointer(_ a: AutoreleasingUnsafeMutablePointer<NSObject>) {}
 
 class NonObjCClassWithObjCProperty {
   var property: NSObject

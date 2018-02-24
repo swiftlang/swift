@@ -110,7 +110,7 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
 // CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
-// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @{{[^ ]+}}_convertObjCBoolToBool{{[^ ]+}} : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-ios-i386: }
@@ -130,7 +130,7 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
 // CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
-// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @{{[^ ]+}}_convertObjCBoolToBool{{[^ ]+}} : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-macosx-x86_64: }
@@ -160,7 +160,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-ios-i386-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
 // CHECK-ios-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-ios-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @{{[^ ]+}}_convertBoolToObjCBool{{[^ ]+}} : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-i386:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
@@ -171,7 +171,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-macosx-x86_64-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
 // CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-macosx-x86_64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @{{[^ ]+}}_convertBoolToObjCBool{{[^ ]+}} : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-macosx-x86_64:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()

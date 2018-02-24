@@ -11,11 +11,13 @@ public struct ObjCBool {
   }
 }
 
-@_silgen_name("swift_BoolToObjCBool")
-public func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool
+public func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
+  return x ? ObjCBool(value: 1) : ObjCBool(value: 0)
+}
 
-@_silgen_name("swift_ObjCBoolToBool")
-public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool
+public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
+  return x.boolValue
+}
 
 
 public struct Selector : ExpressibleByStringLiteral {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -verify
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/exit.swift -emit-sil -verify
 
 func singleBlock() -> Int {
   _ = 0
@@ -17,8 +17,10 @@ func diagnoseNoCaseEnumMissingReturn() -> NoCasesButNotNever {
 func diagnoseNeverMissingBody() -> Never {
 } // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}} 
 
-_ = { () -> Never in
-}() // expected-error {{closure with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}-
+func testClosure() {
+  _ = { () -> Never in
+  }() // expected-error {{closure with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}-
+}
 
 func diagnoseNeverWithBody(i : Int) -> Never {
   if (i == -1) {
@@ -57,8 +59,6 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   var x = 0
   x += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
-
-@_silgen_name("exit") func exit () -> Never
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {

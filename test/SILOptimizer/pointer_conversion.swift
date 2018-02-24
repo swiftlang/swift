@@ -1,19 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s %S/Inputs/pointer_conversion_helper.swift | %FileCheck %s
 // REQUIRES: optimized_stdlib
-
-// Opaque, unoptimizable functions to call.
-@_silgen_name("takesConstRawPointer")
-func takesConstRawPointer(_ x: UnsafeRawPointer)
-@_silgen_name("takesOptConstRawPointer")
-func takesOptConstRawPointer(_ x: UnsafeRawPointer?)
-@_silgen_name("takesMutableRawPointer")
-func takesMutableRawPointer(_ x: UnsafeMutableRawPointer)
-@_silgen_name("takesOptMutableRawPointer")
-func takesOptMutableRawPointer(_ x: UnsafeMutableRawPointer?)
-
-// Opaque function for generating values
-@_silgen_name("get")
-func get<T>() -> T
 
 // The purpose of these tests is to make sure the storage is never released
 // before the call to the opaque function.
@@ -24,7 +10,7 @@ public func testArray() {
   takesConstRawPointer(array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
-  // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesConstRawPointer{{[^ ]+}}
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -40,7 +26,7 @@ public func testArrayToOptional() {
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
-  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesOptConstRawPointer{{[^ ]+}}
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -55,7 +41,7 @@ public func testMutableArray() {
   takesMutableRawPointer(&array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $_ContiguousArrayStorageBase
-  // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesMutableRawPointer{{[^ ]+}}
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -72,7 +58,7 @@ public func testMutableArrayToOptional() {
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $_ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
-  // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesOptMutableRawPointer{{[^ ]+}}
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -95,7 +81,7 @@ public func testOptionalArray() {
   // CHECK: [[CALL_BRANCH]]([[OPT_POINTER:%.+]] : $Optional<UnsafeRawPointer>, [[OWNER:%.+]] : $Optional<AnyObject>):
   // CHECK-NOT: release
   // CHECK-NEXT: [[DEP_OPT_POINTER:%.+]] = mark_dependence [[OPT_POINTER]] : $Optional<UnsafeRawPointer> on [[OWNER]] : $Optional<AnyObject>
-  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesOptConstRawPointer{{[^ ]+}}
   // CHECK-NEXT: apply [[FN]]([[DEP_OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -127,7 +113,7 @@ public func arrayLiteralPromotion() {
   // Call the function.
   // CHECK: [[PTR:%.+]] = mark_dependence
 
-  // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
+  // CHECK: [[FN:%.+]] = function_ref @{{[^ ]+}}takesConstRawPointer{{[^ ]+}}
   // CHECK: apply [[FN]]([[PTR]])
   
   // Release the heap value.
