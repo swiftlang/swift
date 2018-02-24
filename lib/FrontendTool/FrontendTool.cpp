@@ -40,6 +40,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
@@ -1511,10 +1512,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
+  INITIALIZE_LLVM();
 
   PrintingDiagnosticConsumer PDC;
 

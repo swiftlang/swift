@@ -44,7 +44,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
 } // namespace llvm
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Swift SIL Pass Pipeline Dumper\n");

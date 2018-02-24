@@ -62,7 +62,8 @@ static void printValidationInfo(llvm::StringRef data) {
 }
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   // Command line handling.
   llvm::cl::list<std::string> InputNames(
