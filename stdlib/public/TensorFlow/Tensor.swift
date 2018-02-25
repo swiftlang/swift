@@ -115,9 +115,9 @@ func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
 }
 
 @_versioned @_inlineable @inline(__always)
-func _TFMakeHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
+func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
   -> TensorHandle<Scalar> {
-  return Scalar._makeHoistable(fn)
+  return Scalar._hoistableClosure(fn)
 }
 
 //===----------------------------------------------------------------------===//
@@ -381,7 +381,7 @@ public extension Tensor where Scalar == Float {
   ///
   @_inlineable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    let handle : TensorHandle<Scalar> = _TFMakeHoistable {
+    let handle : TensorHandle<Scalar> = _TFHoistable {
       let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
       return _TFTensorFromScalars(scalars, shape: shape.dimensions)
     }
@@ -396,9 +396,9 @@ public extension Tensor where Scalar == Float {
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape) {
-    let handle : TensorHandle<Scalar> = _TFMakeHoistable {
-      let scalars = (0..<shape.contiguousSize).map {
-        _ in Scalar.randomUniform()
+    let handle : TensorHandle<Scalar> = _TFHoistable {
+      let scalars = (0..<shape.contiguousSize).map { _ in
+        Scalar.randomUniform()
       }
       return _TFTensorFromScalars(scalars, shape: shape.dimensions)
     }
