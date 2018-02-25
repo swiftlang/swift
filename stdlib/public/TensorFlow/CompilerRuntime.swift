@@ -29,10 +29,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux) || os(FreeBSD)
-  import Glibc
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
 #else
-  import Darwin
+import Glibc
 #endif
 import CTensorFlow
 
