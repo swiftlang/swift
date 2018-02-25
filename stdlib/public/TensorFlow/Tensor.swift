@@ -340,13 +340,13 @@ internal extension Float {
     return Float(randomStandardUniform()) / 0xFFFFFFFF
   }
 
-  private static var boxMullerHelper = randomUniform()
+  private static var boxMullerHelper: Float = randomUniform()
 
   /// Random value from normal distribution using the Box-Muller method.
   @_versioned
   static func randomNormal() -> Float {
     let tmp = randomUniform()
-    let result = sqrt(-2 * log(tmp)) * cos(2 * .pi * boxMullerHelper)
+    let result = sqrtf(-2 * logf(tmp)) * cosf(2 * .pi * boxMullerHelper)
     boxMullerHelper = result
     return result
   }
@@ -358,7 +358,7 @@ internal extension Double {
     return Double(randomStandardUniform()) / 0xFFFFFFFF
   }
 
-  private static var boxMullerHelper = randomUniform()
+  private static var boxMullerHelper: Double = randomUniform()
 
   /// Random value from normal distribution using the Box-Muller method.
   @_versioned
