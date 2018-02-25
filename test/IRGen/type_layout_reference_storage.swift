@@ -4,8 +4,8 @@ class C {}
 protocol P: class {}
 protocol Q: class {}
 
-// CHECK: @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMP" = internal global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
-// CHECK: define private %swift.type* @create_generic_metadata_ReferenceStorageTypeLayout
+// CHECK: @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
+// CHECK: define internal %swift.type* @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
 struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   var z: T
 
