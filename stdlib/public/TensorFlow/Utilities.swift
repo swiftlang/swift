@@ -94,8 +94,9 @@ typealias CTFEOp = OpaquePointer
 // Logging
 //===----------------------------------------------------------------------===//
 
-#if os(macOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 let stderr = __stderrp
+let stdout = __stdoutp
 #endif
 
 /// Log to standard error.
