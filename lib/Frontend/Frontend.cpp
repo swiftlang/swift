@@ -84,21 +84,23 @@ CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
       .MainInputFilenameForDebugInfo;
 }
 
-StringRef
+const std::string &
 CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ObjCHeaderOutputPath;
 }
-StringRef CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
+const std::string &
+CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ModuleOutputPath;
 }
-StringRef CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
+const std::string &
+CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
-StringRef
+const std::string &
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.SerializedDiagnosticsPath;

@@ -302,11 +302,11 @@ public:
   const std::string &getOutputFilenameForAtMostOnePrimary() const;
   const std::string &
   getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
-  StringRef getObjCHeaderOutputPathForAtMostOnePrimary() const;
-  StringRef getModuleOutputPathForAtMostOnePrimary() const;
-  StringRef
+  const std::string &getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  const std::string &getModuleOutputPathForAtMostOnePrimary() const;
+  const std::string &
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
-  StringRef getSerializedDiagnosticsPathForAtMostOnePrimary() const;
+  const std::string &getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 };
 
 /// A class which manages the state and execution of the compiler.

@@ -86,13 +86,13 @@ public:
   // FrontendInputsAndOutputs. They merely make the call sites
   // a bit shorter. Add more forwarding methods as needed.
 
-  StringRef dependenciesFilePath() const {
+  const std::string &dependenciesFilePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.DependenciesFilePath;
   }
-  StringRef loadedModuleTracePath() const {
+  const std::string &loadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
-  StringRef TBDPath() const {
+  const std::string &TBDPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.TBDPath;
   }
 };

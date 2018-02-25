@@ -103,7 +103,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts,
                                          const InputFile &input) {
-  StringRef dependenciesFilePath = input.dependenciesFilePath();
+  const std::string &dependenciesFilePath = input.dependenciesFilePath();
   if (dependenciesFilePath.empty())
     return false;
 
@@ -185,10 +185,10 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
-static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
-                                          DependencyTracker *depTracker,
-                                          StringRef loadedModuleTracePath,
-                                          StringRef moduleName) {
+static bool
+emitLoadedModuleTraceIfNeeded(ASTContext &ctxt, DependencyTracker *depTracker,
+                              const std::string &loadedModuleTracePath,
+                              StringRef moduleName) {
   if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;
@@ -765,7 +765,7 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
   return Invocation.getFrontendOptions()
       .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
           [&](const InputFile &input) -> bool {
-            StringRef TBDPath = input.TBDPath();
+            const std::string &TBDPath = input.TBDPath();
             if (TBDPath.empty())
               return false;
             auto installName =
@@ -1629,7 +1629,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // SourceFile?
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
-    StringRef SerializedDiagnosticsPath =
+    const std::string &SerializedDiagnosticsPath =
         Invocation.getSerializedDiagnosticsPathForAtMostOnePrimary();
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
