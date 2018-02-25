@@ -449,20 +449,6 @@ public extension AccelerableByTensorFlow {
 }
 
 public extension Tensor {
-  /// Returns a rank-lifted Tensor with a leading dimension of 1.
-  @_inlineable @inline(__always)
-  func rankLifted() -> Tensor {
-    return expandingShape(at: 0)
-  }
-
-  /// Returns a shape-expanded Tensor, with a dimension of 1 inserted at the
-  /// specified shape index.
-  @_inlineable @inline(__always)
-  func expandingShape(at shapeIndex: Int32) -> Tensor {
-    return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
-                 Tdim: Int32.self)
-  }
-
   /// Broadcast to the same shape as the specified Tensor.
   /// - Precondition: The number of scalars matches the shape of the specified
   ///   Tensor.
@@ -481,6 +467,12 @@ public extension Tensor {
   /// Reshape to the specified Tensor representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
+  // FIXME: Uncomment @differentiable attribute when differenting with respect
+  // to `self` is fixed.
+  // @differentiable(
+  //   withRespectTo: (self),
+  //   gradient: _adjointReshaped(toShape:partial:seed:)
+  // )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return #tfop("Reshape", handle, newShape)
   }
@@ -492,10 +484,34 @@ public extension Tensor {
     return reshaped(to: [-1])
   }
 
-  /// Remove dimensions of size 1 from the shape of a tensor.
+  /// Returns a rank-lifted Tensor with a leading dimension of 1.
   @_inlineable @inline(__always)
-  func squeezed() -> Tensor {
-    return #tfop("Squeeze", handle)
+  func rankLifted() -> Tensor {
+    return expandingShape(at: 0)
+  }
+
+  /// Returns a shape-expanded Tensor, with a dimension of 1 inserted at the
+  /// specified shape index.
+  @_inlineable @inline(__always)
+  // FIXME: Uncomment @differentiable attribute when differenting with respect
+  // to `self` is fixed.
+  // @differentiable(
+  //   withRespectTo: (self),
+  //   gradient: _adjointExpandingShape(at:partial:seed:)
+  // )
+  func expandingShape(at shapeIndex: Int32) -> Tensor {
+    return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
+                 Tdim: Int32.self)
+  }
+
+  /// Remove the specified dimensions of size 1 from the shape of a tensor. If
+  /// no dimensions are specified, then all dimensions of size 1 will be
+  /// removed.
+  // NOTE: the gradient for variadic `squeezed` is difficult to express because
+  // ExpandDims only expands one axis at a time.
+  @_inlineable @inline(__always)
+  func squeezingShape(at axes: Int32...) -> Tensor {
+    return #tfop("Squeeze", handle, squeeze_dims: axes)
   }
 
   /// Reshape to scalar.
