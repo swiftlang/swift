@@ -2127,10 +2127,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // It is a tuple if there is more than 1 argument.
       SmallVector<TupleTypeElt, 8> retElts;
       for (auto *param : primalParams)
-        retElts.push_back(param->getType());
+        retElts.push_back(param->getInterfaceType());
       retTy = TupleType::get(retElts, primal->getASTContext());
     } else {
-      retTy = primalParams[0]->getType();
+      retTy = primalParams[0]->getInterfaceType();
     }
   }
   // If 'withRespectTo:' is specified, make sure it's valid and compute the
@@ -2167,7 +2167,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           return;
         }
         lastIndex = index;
-        retElts.push_back(param->getType());
+        retElts.push_back(param->getInterfaceType());
         break;
       }
       case AutoDiffArgument::Kind::Self: {
@@ -2209,23 +2209,35 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   SmallVector<FunctionType::Param, 8> argTypes;
   // The first few arguments are the same as those of the primal function.
   for (auto *param : primalParams)
-    argTypes.push_back(FunctionType::Param(param->getType()));
+    argTypes.push_back(FunctionType::Param(param->getInterfaceType()));
 
   // The rest are the partial and the seed, both of the same type
   // as the primal result.
   FunctionType::Param seedTy(primal->getResultInterfaceType());
   argTypes.append(2, seedTy);
 
-  // FIXME: Use the same generic signature as the primal function.
-  // Compute the expected adjoint function type.
-  FunctionType *expectedAdjointFnTy =
-    FunctionType::get(argTypes, retTy, AnyFunctionType::ExtInfo());
-  // If it's a method, create curried function type.
-  if (selfDecl) {
-    FunctionType::Param selfParam(selfDecl->getType());
+  // Compute the expected adjoint function type, using the same generic
+  // signature as the primal function.
+  AnyFunctionType *expectedAdjointFnTy = nullptr;
+
+  auto getFunctionType = [&](GenericSignature *genSig,
+                             ArrayRef<AnyFunctionType::Param> params,
+                             Type result) -> AnyFunctionType * {
+    AnyFunctionType::ExtInfo extInfo;
+    if (genSig)
+      return GenericFunctionType::get(genSig, params, result, extInfo);
+    return FunctionType::get(params, result, extInfo);
+  };
+
+  auto primalGenSig = primal->getGenericSignature();
+  if (!selfDecl) {
+    expectedAdjointFnTy = getFunctionType(primalGenSig, argTypes, retTy);
+  } else {
     expectedAdjointFnTy =
-      FunctionType::get({ selfParam }, expectedAdjointFnTy,
-                        AnyFunctionType::ExtInfo());
+      FunctionType::get(argTypes, retTy, FunctionType::ExtInfo());
+    FunctionType::Param selfParam(selfDecl->getInterfaceType());
+    expectedAdjointFnTy = getFunctionType(primalGenSig, { selfParam },
+                                          expectedAdjointFnTy);
   }
 
   // Resolved adjoint function.
@@ -2238,30 +2250,55 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // If it's an unresolved dot expression, this must be a class method or an
   // instance method.
   if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(expr)) {
-    // FIXME: Resolve using the constraint system.
-    // As a workaround, we look up the function directly in the current
-    // declaration context.
+    // Look up the function directly in the current type context.
     auto typeCtx = primal->getInnermostTypeContext();
-    auto lookup = TC.lookupMember(primal->getInnermostTypeContext(),
-                                  typeCtx->getDeclaredInterfaceType(),
+    auto lookup = TC.lookupMember(typeCtx, typeCtx->getDeclaredInterfaceType(),
                                   attr->getGradFuncName());
-    // Currently we don't support ambiguous or overloaded adjoint identifiers.
-    if (lookup.size() != 1) {
-      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
-                  diag::differentiable_attr_ambiguous_adjoint_identifier,
-                  attr->getGradFuncName());
-      return;
+    // Declare error flags.
+    bool exprIsNotFunction = false;
+    bool gradientOverloadNotFound = false;
+    for (auto lookupResult : lookup) {
+      auto funcDecl = dyn_cast<FuncDecl>(lookupResult.getValueDecl());
+      // Set flag if the lookup result is not a function declaration.
+      if (!funcDecl) {
+        exprIsNotFunction = true;
+        continue;
+      }
+      auto funcDeclType = funcDecl->getInterfaceType()
+        ->getUnlabeledType(primal->getASTContext());
+      // Set flag if the lookup result does not have the expected adjoint type.
+      if (!funcDeclType->isEqual(expectedAdjointFnTy)) {
+        gradientOverloadNotFound = true;
+        continue;
+      }
+      // If more than one lookup result has the expected adjoint type, then
+      // the adjoint is ambgiuous.
+      if (resolvedAdjoint) {
+        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+                    diag::differentiable_attr_ambiguous_adjoint_identifier,
+                    attr->getGradFuncName());
+        return;
+      }
+      // Resolve the adjoint function.
+      resolvedAdjoint = funcDecl;
     }
-    auto funcDecl = dyn_cast<FuncDecl>(lookup[0].getValueDecl());
-    // If it's not a function, emit an error.
-    if (!funcDecl) {
-      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
-                  diag::differentiable_attr_specified_adjoint_not_function,
-                  attr->getGradFuncName());
-      return;
+    // If the adjoint function could not be resolved, check error flags.
+    if (!resolvedAdjoint) {
+      if (gradientOverloadNotFound) {
+        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+                    diag::differentiable_attr_gradient_overload_not_found,
+                    attr->getGradFuncName(),
+                    expectedAdjointFnTy->getRValueType());
+        return;
+      }
+      if (exprIsNotFunction) {
+        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+                    diag::differentiable_attr_specified_adjoint_not_function,
+                    attr->getGradFuncName());
+        return;
+      }
+      llvm_unreachable("Adjoint function could not be resolved");
     }
-    // Successfully resolved the adjoint function.
-    resolvedAdjoint = funcDecl;
   }
   // If it's resolved to a type, it's not what we want.
   else if (isa<TypeExpr>(expr))
@@ -2279,18 +2316,27 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   attr->getGradFuncName());
       return;
     }
-    // If the primal and the adjoint have different parents, it's an error.
-    if (primal->getParent() != funcDecl->getParent()) {
+    // If the primal and the adjoint have different parents, or if they both
+    // have no type context and are in different modules, then it's an error.
+    auto contextMismatch = [&](FuncDecl *decl1, FuncDecl *decl2) {
+      if (!decl1->getInnermostTypeContext() &&
+          !decl2->getInnermostTypeContext() &&
+          decl1->getParentModule() != decl2->getParentModule())
+        return true;
+      if (decl1->getParent() != decl2->getParent())
+        return true;
+      return false;
+    };
+
+    if (contextMismatch(primal, funcDecl)) {
       TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
                   diag::differentiable_attr_adjoint_not_same_type_context,
                   attr->getGradFuncName());
       return;
     }
     // Otherwise, the primal and the adjoint are declared in the same
-    // declaration context, which must be the module here, then save this
-    // candidate for further type checking.
-    if (funcDecl->getParent() == primal->getParent())
-      resolvedAdjoint = funcDecl;
+    // context. Save this candidate for further type checking.
+    resolvedAdjoint = funcDecl;
   }
   // Overloaded names are not supported.
   // FIXME: Resolve using the expected adjoint type.
@@ -2308,9 +2354,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   assert(resolvedAdjoint && "Adjoint should've been resolved");
 
-  // FIXME: Handle generic functions.
-  // FIXME: Handle 'where' clause.
-
   // Get the interface type of the resolved adjoint. Verify that it's equal to
   // the expected adjoint type.
   auto adjointType = resolvedAdjoint->getInterfaceType()
@@ -2319,7 +2362,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
                 diag::differentiable_attr_gradient_overload_not_found,
                 attr->getGradFuncName(), expectedAdjointFnTy->getRValueType());
-    return; // error occurred.
+    return;
   }
 
   // Done checking @differentiable attribute. Memorize the function reference
