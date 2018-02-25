@@ -2291,13 +2291,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                     expectedAdjointFnTy->getRValueType());
         return;
       }
-      if (exprIsNotFunction) {
-        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
-                    diag::differentiable_attr_specified_adjoint_not_function,
-                    attr->getGradFuncName());
-        return;
-      }
-      llvm_unreachable("Adjoint function could not be resolved");
+      assert(exprIsNotFunction && "Adjoint function could not be resolved");
+      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+                  diag::differentiable_attr_specified_adjoint_not_function,
+                  attr->getGradFuncName());
+      return;
     }
   }
   // If it's resolved to a type, it's not what we want.
@@ -2318,17 +2316,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     }
     // If the primal and the adjoint have different parents, or if they both
     // have no type context and are in different modules, then it's an error.
-    auto contextMismatch = [&](FuncDecl *decl1, FuncDecl *decl2) {
+    auto inCompatibleContexts = [&](FuncDecl *decl1, FuncDecl *decl2) {
       if (!decl1->getInnermostTypeContext() &&
           !decl2->getInnermostTypeContext() &&
-          decl1->getParentModule() != decl2->getParentModule())
+          decl1->getParentModule() == decl2->getParentModule())
         return true;
-      if (decl1->getParent() != decl2->getParent())
+      if (decl1->getParent() == decl2->getParent())
         return true;
       return false;
     };
 
-    if (contextMismatch(primal, funcDecl)) {
+    if (!inCompatibleContexts(primal, funcDecl)) {
       TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
                   diag::differentiable_attr_adjoint_not_same_type_context,
                   attr->getGradFuncName());
