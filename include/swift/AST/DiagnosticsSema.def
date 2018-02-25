@@ -3000,6 +3000,16 @@ WARNING(type_inferred_to_undesirable_type,none,
         "which may be unexpected", (Identifier, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
+
+WARNING(unowned_assignment_immediate_deallocation,none,
+        "instance will be immediately deallocated as %0 is "
+        "%select{a 'strong'|a 'weak'|an 'unowned'|an 'unowned'}1 "
+        "%select{variable|property}2",
+        (Identifier, /*Ownership*/unsigned, /*Is Property*/unsigned))
+NOTE(unowned_assignment_requires_strong,none,
+     "a strong reference is required to prevent the instance from being "
+     "deallocated", ())
+
 ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
       "collection downcast in cast pattern is not implemented; use an explicit "
       "downcast to %0 instead", (Type))
