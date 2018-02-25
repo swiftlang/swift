@@ -80,7 +80,7 @@ public func testStraightLineXORTraining() {
   // Training data
   let inputBatch = Tensor<Float>(
     [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-    )
+  )
   let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]])
 
   // Parameters
@@ -97,7 +97,7 @@ public func testStraightLineXORTraining() {
     let o1 = sigmoid(l1)
     let mmul2 = o1 ⊗ w2
     let l2 = mmul2 + b2
-    let pred = sigmoid(l2) 
+    let pred = sigmoid(l2)
 
     // Loss
     let sub = outputBatch - pred
@@ -163,5 +163,3 @@ public func sinkTensorToScalarCrash() {
 
   opaqueGenericFunction(loss)
 }
-
-

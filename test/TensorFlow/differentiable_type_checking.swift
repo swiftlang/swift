@@ -148,3 +148,108 @@ func dmeow1(_ x: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
 func dmeow2(_ x: Float, _: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
   return (x, x)
 }
+
+// Test cross-declaration references.
+// NOTE: Cross-declaration references across files is not tested because it is
+// difficult to set up and requires creating a new test target. Since the
+// TensorFlow library will declare primals/adjoints in separate files,
+// successful compilation of the library itself is a sufficient test.
+
+// Primal in struct definition, adjoint in extension.
+struct E1 {
+  @differentiable(gradient: adjoint)
+  func primal(x: Float) -> Float {
+    return x
+  }
+}
+extension E1 {
+  func adjoint(x: Float, _: Float, _: Float) -> Float {
+    return x
+  }
+}
+
+// Primal and adjoint in separate struct extensions.
+struct E2 {}
+extension E2 {
+  @differentiable(gradient: adjoint)
+  func primal(x: Float) -> Float {
+    return x
+  }
+}
+extension E2 {
+  func adjoint(x: Float, _: Float, _: Float) -> Float {
+    return x
+  }
+}
+
+// Primal and adjoint in separate struct extensions, with matching generic
+// constraints.
+struct E3<T> {}
+extension E3 where T == Float {
+  @differentiable(gradient: adjoint_same_constraint)
+  func primal(x: Float) -> Float {
+    return x
+  }
+}
+extension E3 where T == Float {
+  func adjoint_same_constraint(x: Float, _: Float, _: Float) -> Float {
+    return x
+  }
+}
+
+struct E4<T> {}
+extension E4 {
+  @differentiable(gradient: adjoint_no_constraint)
+  func primal(x: Float) -> Float {
+    return x
+  }
+}
+extension E4 {
+  func adjoint_no_constraint(x: Float, _: Float, _: Float) -> Float {
+    return x
+  }
+}
+
+// Primal and adjoint in separate struct extensions, with non-matching
+// generic constraints.
+struct E5<T> {}
+extension E5 {
+  @differentiable(gradient: adjoint_diff_constraint)
+  // expected-error @-1 {{'adjoint_diff_constraint' does not have expected type '<T> (E5<T>) -> (Float, Float, Float) -> Float'}}
+  func primal(x: Float) -> Float {
+    return x
+  }
+}
+extension E5 where T == Float {
+  func adjoint_diff_constraint(x: Float, _: Float, _: Float) -> Float {
+    return x
+  }
+}
+
+// Generic functions with no constraints.
+func dbaz1<T>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+  return (y, x)
+}
+@differentiable(gradient: dbaz1(_:_:primal:seed:)) // ok!
+func baz1<T>(_ x: T, _ y: T) -> T {
+  return x
+}
+
+// Generic functions with matching constraints.
+func dbaz2<T : FloatingPoint>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+  return (1, 1)
+}
+@differentiable(gradient: dbaz2(_:_:primal:seed:)) // ok!
+func baz2<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x + y
+}
+
+// Generic functions with different constraints.
+func dbaz3<T : Numeric>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+  return (1, 1)
+}
+@differentiable(gradient: dbaz3(_:_:primal:seed:))
+// expected-error @-1 {{'dbaz3(_:_:primal:seed:)' does not have expected type '<T where T : FloatingPoint> (T, T, T, T) -> (T, T)'}}
+func baz3<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x + y
+}

@@ -69,8 +69,6 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
     }
   }
 
-  /// - TODO(danielzheng): Add an 'array' property, which returns a RankedArray
-  /// (to be implemented in Arrays.swift.gyb).
   @_inlineable
   public var scalars: [Scalar] {
     @inline(__always)
