@@ -57,6 +57,20 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
+  // NS_RETURNS_RETAINED by family (-copy)
+  @objc(copyDuplicate) func makeDuplicate() -> Gizmo { return self }
+  // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC13makeDuplicateSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
+  // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC13makeDuplicateSo5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
+  // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK-NEXT:   destroy_value [[THIS_COPY]]
+  // CHECK-NEXT:   return [[RES]]
+  // CHECK-NEXT: }
+
   // Override the normal family conventions to make this non-consuming and
   // returning at +0.
   @objc func initFoo() -> Gizmo { return self }

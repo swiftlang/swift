@@ -1744,61 +1744,49 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   return result;
 }
 
-/// Get the ObjC selector family a SILDeclRef implicitly belongs to.
+/// Get the ObjC selector family a foreign SILDeclRef belongs to.
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
+  assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor)
-      return getSelectorFamily(FD->getName());
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsGetter:
-      // Getter selectors can belong to families if their name begins with the
-      // wrong thing.
-      if (accessor->getStorage()->isObjC() || c.isForeign) {
-        auto declName = accessor->getStorage()->getBaseName();
-        switch (declName.getKind()) {
-        case DeclBaseName::Kind::Normal:
-          return getSelectorFamily(declName.getIdentifier());
-        case DeclBaseName::Kind::Subscript:
-          return SelectorFamily::None;
-        case DeclBaseName::Kind::Destructor:
-          return SelectorFamily::None;
-        }
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+        break;
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::IsMaterializeForSet:
+        llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
-      return SelectorFamily::None;
-
-      // Other accessors are never selector family members.
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
-      return SelectorFamily::None;
     }
+
+    return getSelectorFamily(FD->getObjCSelector().getSelectorPieces().front());
   }
   case SILDeclRef::Kind::Initializer:
-    case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
 
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::IVarDestroyer:
+    return SelectorFamily::None;
+
+  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return SelectorFamily::None;
+    llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
