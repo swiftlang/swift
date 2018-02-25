@@ -3222,9 +3222,6 @@ namespace {
 
       asImpl().addDependentData();
       
-      // Save a slot for the field type vector address to be instantiated into.
-      asImpl().addFieldTypeVectorReferenceSlot();
-
       // Lay out the template data.
       super::layout();
       
@@ -3279,10 +3276,6 @@ namespace {
                                 T &&...args) {
       FillOps.push_back({type, conf});
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
-    }
-    
-    void addFieldTypeVectorReferenceSlot() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy->getPointerTo());
     }
     
     // Can be overridden by subclassers to emit other dependent metadata.
