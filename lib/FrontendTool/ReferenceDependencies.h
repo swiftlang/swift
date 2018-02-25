@@ -34,7 +34,7 @@ reversePathSortedFilenames(const llvm::ArrayRef<std::string> paths);
 /// Emit a Swift-style dependencies file for \p SF.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                DependencyTracker &depTracker,
-                               StringRef outputPath);
+                               const std::string &outputPath);
 } // end namespace swift
 
 #endif

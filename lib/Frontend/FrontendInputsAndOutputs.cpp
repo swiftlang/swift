@@ -327,7 +327,7 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
 }
 
 void FrontendInputsAndOutputs::forEachOutputFilename(
-    llvm::function_ref<void(StringRef)> fn) const {
+    llvm::function_ref<void(const std::string &)> fn) const {
   (void)forEachInputProducingAMainOutputFile(
       [&](const InputFile &input) -> bool {
         fn(input.outputFilename());
@@ -335,10 +335,10 @@ void FrontendInputsAndOutputs::forEachOutputFilename(
       });
 }
 
-StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
+const std::string &FrontendInputsAndOutputs::getSingleOutputFilename() const {
   assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed();
-  return hasInputs() ? StringRef(lastInputProducingOutput().outputFilename())
-                     : StringRef();
+  return hasInputs() ? lastInputProducingOutput().outputFilename()
+                     : std::string();
 }
 
 bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {

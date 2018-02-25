@@ -192,11 +192,12 @@ public:
 
   std::vector<std::string> copyOutputFilenames() const;
 
-  void forEachOutputFilename(llvm::function_ref<void(StringRef)> fn) const;
+  void
+  forEachOutputFilename(llvm::function_ref<void(const std::string &)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const;
+  const std::string &getSingleOutputFilename() const;
 
   bool isOutputFilenameStdout() const;
   bool isOutputFileDirectory() const;

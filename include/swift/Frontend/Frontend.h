@@ -236,8 +236,7 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-
-  StringRef getOutputFilename() const {
+  const std::string &getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 

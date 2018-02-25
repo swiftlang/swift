@@ -39,7 +39,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(StringRef)> fn) const;
+                         std::function<void(const std::string &)> fn) const;
 
   bool isOutputFileDirectory() const;
 

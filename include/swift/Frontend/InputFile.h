@@ -73,7 +73,7 @@ public:
     return filename.equals("<stdin>") ? "-" : filename;
   }
 
-  StringRef outputFilename() const { return PSPs.OutputFilename; }
+  const std::string &outputFilename() const { return PSPs.OutputFilename; }
 
   const PrimarySpecificPaths &getPrimarySpecificPaths() const { return PSPs; }
 

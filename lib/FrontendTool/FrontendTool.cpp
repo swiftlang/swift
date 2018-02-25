@@ -139,7 +139,7 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
-  opts.forAllOutputPaths(input, [&](StringRef targetName) {
+  opts.forAllOutputPaths(input, [&](const std::string &targetName) {
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
@@ -750,7 +750,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    std::string referenceDependenciesFilePath =
+    const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty())
@@ -1490,7 +1490,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   std::string InputName =
       FEOpts.InputsAndOutputs.getStatsFileMangledInputName();
   StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-  StringRef OutFile =
+  const std::string &OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();

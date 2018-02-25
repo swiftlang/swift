@@ -125,7 +125,7 @@ swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
 
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                       DependencyTracker &depTracker,
-                                      StringRef outputPath) {
+                                      const std::string &outputPath) {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
   
   // Before writing to the dependencies file path, preserve any previous file
