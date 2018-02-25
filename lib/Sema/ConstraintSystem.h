@@ -2776,22 +2776,6 @@ private:
       if (x.FullyBound || x.SubtypeOfExistentialType)
         return false;
 
-      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
-      llvm::set_intersect(intersection, y.Sources);
-
-      // Some relational constraints dictate certain
-      // ordering when it comes to attempting binding
-      // of type variables, where left-hand side is
-      // always more preferrable than right-hand side.
-      for (const auto *constraint : intersection) {
-        if (constraint->getKind() != ConstraintKind::Subtype)
-          continue;
-
-        auto lhs = constraint->getFirstType();
-        if (auto *typeVar = lhs->getAs<TypeVariableType>())
-          return x.TypeVar == typeVar;
-      }
-
       // If the only difference is default types,
       // prioritize bindings with fewer of them.
       return x.NumDefaultableBindings < y.NumDefaultableBindings;
