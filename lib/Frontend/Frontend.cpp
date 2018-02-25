@@ -73,10 +73,11 @@ CompilerInvocation::getPrimarySpecificPathsForSourceFile(
   return getPrimarySpecificPathsForPrimary(SF.getFilename());
 }
 
-StringRef CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const {
+const std::string &
+CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename;
 }
-StringRef
+const std::string &
 CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
     const {
   return getPrimarySpecificPathsForAtMostOnePrimary()

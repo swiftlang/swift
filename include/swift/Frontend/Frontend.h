@@ -299,8 +299,9 @@ public:
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 
-  StringRef getOutputFilenameForAtMostOnePrimary() const;
-  StringRef getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
+  const std::string &getOutputFilenameForAtMostOnePrimary() const;
+  const std::string &
+  getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
   StringRef getObjCHeaderOutputPathForAtMostOnePrimary() const;
   StringRef getModuleOutputPathForAtMostOnePrimary() const;
   StringRef
