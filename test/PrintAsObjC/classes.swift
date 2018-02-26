@@ -226,6 +226,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initializeEvenMoreThings;
+// CHECK-NEXT: + (Methods * _Nonnull)newWithFoo:(NSInteger)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -286,6 +287,8 @@ class NotObjC {}
   @objc func initAllTheThings() {}
   @objc(initTheOtherThings) func setUpOtherThings() {}
   @objc func initializeEvenMoreThings() {}
+
+  @objc(newWithFoo:) class func make(foo: Int) -> Methods { return Methods() }
 }
 
 typealias AliasForNSRect = NSRect
