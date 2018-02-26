@@ -3835,7 +3835,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     return false;
 
   // Make sure we know how to map the selector appropriately.
-  if (Result && SD->getObjCSubscriptKind(this) == ObjCSubscriptKind::None) {
+  if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
     SourceRange IndexRange = SD->getIndices()->getSourceRange();
     diagnose(SD->getLoc(), diag::objc_invalid_subscript_key_type,
              getObjCDiagnosticAttrKind(Reason), IndicesType)

@@ -73,9 +73,8 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
 std::pair<Identifier, ObjCSelector> swift::objc_translation::
 getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
   ASTContext &Ctx = VD->getASTContext();
-  LazyResolver *Resolver = Ctx.getLazyResolver();
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
+    return {Identifier(), FD->getObjCSelector(PreferredName)};
   } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
     if (PreferredName)
       return {PreferredName.getBaseIdentifier(), ObjCSelector()};
