@@ -134,6 +134,24 @@ namespace {
     }
   };
 
+  // Some key path components need to serialize additional Substitutions or
+  // ProtocolConformances after the main record is emitted.
+  struct ConformanceOrSubstitution {
+    enum { ProtocolConformance, SubstitutionList } Kind;
+    union {
+      swift::ProtocolConformanceRef Conformance;
+      swift::SubstitutionList Substitutions;
+    };
+    
+    ConformanceOrSubstitution(ProtocolConformanceRef c)
+      : Kind(ProtocolConformance), Conformance(c)
+    {}
+    
+    ConformanceOrSubstitution(swift::SubstitutionList s)
+      : Kind(SubstitutionList), Substitutions(s)
+    {}
+  };
+
   class SILSerializer {
     Serializer &S;
     ASTContext &Ctx;
@@ -182,6 +200,9 @@ namespace {
     /// Holds the list of DefaultWitnessTables.
     std::vector<BitOffset> DefaultWitnessTableOffset;
     uint32_t /*DeclID*/ NextDefaultWitnessTableID = 1;
+    
+    /// Holds the list of Properties.
+    std::vector<BitOffset> PropertyOffset;
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
@@ -224,6 +245,7 @@ namespace {
     void writeSILGlobalVar(const SILGlobalVariable &g);
     void writeSILWitnessTable(const SILWitnessTable &wt);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    void writeSILProperty(const SILProperty &prop);
 
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
@@ -241,6 +263,11 @@ namespace {
     void writeOneOperandLayout(SILInstructionKind valueKind,
                                unsigned attrs,
                                SILValue operand);
+
+    void writeKeyPathPatternComponent(
+                    const KeyPathPatternComponent &component,
+                    SmallVectorImpl<ValueID> &ListOfValues,
+                    SmallVectorImpl<ConformanceOrSubstitution> &serializeAfter);
 
     /// Helper function to determine if given the current state of the
     /// deserialization if the function body for F should be deserialized.
@@ -556,6 +583,96 @@ void SILSerializer::writeConversionLikeInstruction(const SingleValueInstruction 
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
   writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
                                I->getOperand(0));
+}
+
+void
+SILSerializer::writeKeyPathPatternComponent(
+                   const KeyPathPatternComponent &component,
+                   SmallVectorImpl<ValueID> &ListOfValues,
+                   SmallVectorImpl<ConformanceOrSubstitution> &serializeAfter) {
+  
+  auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
+    ListOfValues.push_back((unsigned)kind);
+    ListOfValues.push_back(S.addTypeRef(component.getComponentType()));
+  };
+  auto handleComputedId = [&](KeyPathPatternComponent::ComputedPropertyId id) {
+    switch (id.getKind()) {
+    case KeyPathPatternComponent::ComputedPropertyId::Property:
+      ListOfValues.push_back(
+        (unsigned)KeyPathComputedComponentIdKindEncoding::Property);
+      ListOfValues.push_back(S.addDeclRef(id.getProperty()));
+      break;
+    case KeyPathPatternComponent::ComputedPropertyId::Function:
+      ListOfValues.push_back(
+        (unsigned)KeyPathComputedComponentIdKindEncoding::Function);
+      ListOfValues.push_back(addSILFunctionRef(id.getFunction()));
+      break;
+    case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
+      ListOfValues.push_back(
+        (unsigned)KeyPathComputedComponentIdKindEncoding::DeclRef);
+      handleSILDeclRef(S, id.getDeclRef(), ListOfValues);
+      break;
+    }
+  };
+  auto handleComputedIndices
+    = [&](const KeyPathPatternComponent &component) {
+      auto indices = component.getSubscriptIndices();
+      ListOfValues.push_back(indices.size());
+      for (auto &index : indices) {
+        ListOfValues.push_back(index.Operand);
+        ListOfValues.push_back(S.addTypeRef(index.FormalType));
+        ListOfValues.push_back(
+          S.addTypeRef(index.LoweredType.getSwiftRValueType()));
+        ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
+        serializeAfter.push_back(index.Hashable);
+      }
+      if (!indices.empty() &&
+          component.getKind() != KeyPathPatternComponent::Kind::External) {
+        ListOfValues.push_back(
+          addSILFunctionRef(component.getSubscriptIndexEquals()));
+        ListOfValues.push_back(
+          addSILFunctionRef(component.getSubscriptIndexHash()));
+      }
+    };
+
+  switch (component.getKind()) {
+  case KeyPathPatternComponent::Kind::StoredProperty:
+    handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
+    ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
+    break;
+  case KeyPathPatternComponent::Kind::GettableProperty:
+    handleComponentCommon(KeyPathComponentKindEncoding::GettableProperty);
+    handleComputedId(component.getComputedPropertyId());
+    ListOfValues.push_back(
+                  addSILFunctionRef(component.getComputedPropertyGetter()));
+    handleComputedIndices(component);
+    break;
+  case KeyPathPatternComponent::Kind::SettableProperty:
+    handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
+    handleComputedId(component.getComputedPropertyId());
+    ListOfValues.push_back(
+                  addSILFunctionRef(component.getComputedPropertyGetter()));
+    ListOfValues.push_back(
+                  addSILFunctionRef(component.getComputedPropertySetter()));
+    handleComputedIndices(component);
+    break;
+  case KeyPathPatternComponent::Kind::OptionalChain:
+    handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
+    break;
+  case KeyPathPatternComponent::Kind::OptionalForce:
+    handleComponentCommon(KeyPathComponentKindEncoding::OptionalForce);
+    break;
+  case KeyPathPatternComponent::Kind::OptionalWrap:
+    handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
+    break;
+  case KeyPathPatternComponent::Kind::External:
+    handleComponentCommon(KeyPathComponentKindEncoding::External);
+    ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
+    ListOfValues.push_back(component.getExternalSubstitutions().size());
+    serializeAfter.push_back(component.getExternalSubstitutions());
+    handleComputedIndices(component);
+    break;
+  }
 }
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
@@ -1915,85 +2032,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(0);
     }
     
-    SmallVector<ProtocolConformanceRef, 4> hashableConformances;
+    SmallVector<ConformanceOrSubstitution, 4> serializeAfter;
     
     for (auto &component : pattern->getComponents()) {
-      auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
-        ListOfValues.push_back((unsigned)kind);
-        ListOfValues.push_back(S.addTypeRef(component.getComponentType()));
-      };
-      auto handleComputedId = [&](KeyPathPatternComponent::ComputedPropertyId id) {
-        switch (id.getKind()) {
-        case KeyPathPatternComponent::ComputedPropertyId::Property:
-          ListOfValues.push_back(
-            (unsigned)KeyPathComputedComponentIdKindEncoding::Property);
-          ListOfValues.push_back(S.addDeclRef(id.getProperty()));
-          break;
-        case KeyPathPatternComponent::ComputedPropertyId::Function:
-          ListOfValues.push_back(
-            (unsigned)KeyPathComputedComponentIdKindEncoding::Function);
-          ListOfValues.push_back(addSILFunctionRef(id.getFunction()));
-          break;
-        case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
-          ListOfValues.push_back(
-            (unsigned)KeyPathComputedComponentIdKindEncoding::DeclRef);
-          handleSILDeclRef(S, id.getDeclRef(), ListOfValues);
-          break;
-        }
-      };
-      auto handleComputedIndices
-        = [&](const KeyPathPatternComponent &component) {
-          auto indices = component.getSubscriptIndices();
-          ListOfValues.push_back(indices.size());
-          for (auto &index : indices) {
-            ListOfValues.push_back(index.Operand);
-            ListOfValues.push_back(S.addTypeRef(index.FormalType));
-            ListOfValues.push_back(
-              S.addTypeRef(index.LoweredType.getSwiftRValueType()));
-            ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
-            hashableConformances.push_back(index.Hashable);
-          }
-          if (!indices.empty()) {
-            ListOfValues.push_back(
-              addSILFunctionRef(component.getSubscriptIndexEquals()));
-            ListOfValues.push_back(
-              addSILFunctionRef(component.getSubscriptIndexHash()));
-          }
-        };
-    
-      switch (component.getKind()) {
-      case KeyPathPatternComponent::Kind::StoredProperty:
-        handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
-        ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
-        break;
-      case KeyPathPatternComponent::Kind::GettableProperty:
-        handleComponentCommon(KeyPathComponentKindEncoding::GettableProperty);
-        handleComputedId(component.getComputedPropertyId());
-        ListOfValues.push_back(
-                      addSILFunctionRef(component.getComputedPropertyGetter()));
-        handleComputedIndices(component);
-        break;
-      case KeyPathPatternComponent::Kind::SettableProperty:
-        handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
-        handleComputedId(component.getComputedPropertyId());
-        ListOfValues.push_back(
-                      addSILFunctionRef(component.getComputedPropertyGetter()));
-        ListOfValues.push_back(
-                      addSILFunctionRef(component.getComputedPropertySetter()));
-        handleComputedIndices(component);
-        break;
-      case KeyPathPatternComponent::Kind::OptionalChain:
-        handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
-        break;
-      case KeyPathPatternComponent::Kind::OptionalForce:
-        handleComponentCommon(KeyPathComponentKindEncoding::OptionalForce);
-        break;
-      case KeyPathPatternComponent::Kind::OptionalWrap:
-        handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
-        break;
-      case KeyPathPatternComponent::Kind::External:
-        llvm_unreachable("todo");
-      }
+      writeKeyPathPatternComponent(component,
+                                   ListOfValues, serializeAfter);
     }
     
     for (auto &operand : KPI->getAllOperands()) {
@@ -2008,8 +2051,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
          S.addTypeRef(KPI->getType().getSwiftRValueType()),
          (unsigned)KPI->getType().getCategory(),
          ListOfValues);
-    for (auto conformance : hashableConformances) {
-      S.writeConformance(conformance, SILAbbrCodes);
+    for (auto &confOrSub : serializeAfter) {
+      switch (confOrSub.Kind) {
+      case ConformanceOrSubstitution::ProtocolConformance:
+        S.writeConformance(confOrSub.Conformance, SILAbbrCodes);
+        break;
+      case ConformanceOrSubstitution::SubstitutionList:
+        S.writeSubstitutions(confOrSub.Substitutions, SILAbbrCodes);
+        break;
+      }
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
     S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
@@ -2082,7 +2132,7 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
   }
-
+  
   if (!DefaultWitnessTableList.empty()) {
     writeIndexTable(List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
                     DefaultWitnessTableList);
@@ -2090,6 +2140,12 @@ void SILSerializer::writeIndexTables() {
                 sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
                 DefaultWitnessTableOffset);
   }
+
+  if (!PropertyOffset.empty()) {
+    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
+                PropertyOffset);
+  }
+  
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -2136,6 +2192,34 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         toStableVTableEntryKind(entry.TheKind),
         toStableSILLinkage(entry.Linkage),
         ListOfValues);
+  }
+}
+
+void SILSerializer::writeSILProperty(const SILProperty &prop) {
+  PropertyOffset.push_back(Out.GetCurrentBitNo());
+  
+  SmallVector<ValueID, 4> componentValues;
+  SmallVector<ConformanceOrSubstitution, 4> serializeAfter;
+  
+  writeKeyPathPatternComponent(prop.getComponent(),
+                               componentValues, serializeAfter);
+  
+  PropertyLayout::emitRecord(
+    Out, ScratchRecord,
+    SILAbbrCodes[PropertyLayout::Code],
+    S.addDeclRef(prop.getDecl()),
+    prop.isSerialized(),
+    componentValues);
+  
+  for (auto &confOrSub : serializeAfter) {
+    switch (confOrSub.Kind) {
+    case ConformanceOrSubstitution::ProtocolConformance:
+      S.writeConformance(confOrSub.Conformance, SILAbbrCodes);
+      break;
+    case ConformanceOrSubstitution::SubstitutionList:
+      S.writeSubstitutions(confOrSub.Substitutions, SILAbbrCodes);
+      break;
+    }
   }
 }
 
@@ -2304,6 +2388,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableEntryLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
+  registerSILAbbr<PropertyLayout>();
 
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
@@ -2337,6 +2422,13 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
         vt.getClass()->isChildContextOf(assocDC))
       writeSILVTable(vt);
+  }
+  
+  // Write out property descriptors.
+  for (const SILProperty &prop : SILMod->getPropertyList()) {
+    if ((ShouldSerializeAll || prop.isSerialized()) &&
+        prop.getDecl()->getInnermostDeclContext()->isChildContextOf(assocDC))
+      writeSILProperty(prop);
   }
 
   // Write out fragile WitnessTables.

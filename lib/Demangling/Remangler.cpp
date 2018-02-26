@@ -1403,6 +1403,11 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Buffer << "Mn";
 }
 
+void Remangler::manglePropertyDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MV";
+}
+
 void Remangler::mangleNonObjCAttribute(Node *node) {
   Buffer << "TO";
 }

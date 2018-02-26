@@ -1506,6 +1506,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::NominalTypeDescriptor:
+  case Kind::PropertyDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
@@ -1601,6 +1602,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
 
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return ::isAvailableExternally(IGM, getDecl());
@@ -3297,12 +3299,21 @@ IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
                                SizeTy, DebugTypeInfo());
 }
 
-/// Return the address of a nominal type descriptor.  Right now, this
-/// must always be for purposes of defining it.
+/// Return the address of a nominal type descriptor.
 llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                                       ConstantInit definition) {
   IRGen.addLazyTypeContextDescriptor(D);
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               TypeContextDescriptorTy,
+                               DebugTypeInfo());
+}
+
+/// Return the address of a property descriptor.
+llvm::Constant *IRGenModule::getAddrOfPropertyDescriptor(AbstractStorageDecl *D,
+                                                      ConstantInit definition) {
+  auto entity = LinkEntity::forPropertyDescriptor(D);
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
                                TypeContextDescriptorTy,
@@ -3442,9 +3453,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PoundDiagnostic:
       continue;
 
-    case DeclKind::PatternBinding:
     case DeclKind::Var:
     case DeclKind::Subscript:
+    case DeclKind::PatternBinding:
     case DeclKind::Func:
     case DeclKind::Accessor:
     case DeclKind::Constructor:

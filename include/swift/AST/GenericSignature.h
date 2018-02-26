@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_GENERIC_SIGNATURE_H
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
+#include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Types.h"
@@ -338,7 +339,7 @@ public:
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
   
-  void print(raw_ostream &OS) const;
+  void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void dump() const;
   std::string getAsString() const;
 };

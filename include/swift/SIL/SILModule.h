@@ -32,6 +32,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -103,6 +104,7 @@ public:
   using FunctionListType = llvm::ilist<SILFunction>;
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
+  using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using CoverageMapListType = llvm::ilist<SILCoverageMap>;
@@ -119,6 +121,7 @@ private:
   friend SILLayout;
   friend SILType;
   friend SILVTable;
+  friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
   friend Lowering::SILGenModule;
@@ -184,6 +187,9 @@ private:
 
   // The list of SILCoverageMaps in the module.
   CoverageMapListType coverageMaps;
+  
+  // The list of SILProperties in the module.
+  PropertyListType properties;
 
   /// This is the underlying raw stream of OptRecordStream.
   ///
@@ -458,10 +464,13 @@ public:
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
                           std::unique_ptr<llvm::raw_ostream> &&RawStream);
 
+  PropertyListType &getPropertyList() { return properties; }
+  const PropertyListType &getPropertyList() const { return properties; }
+  
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
- SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
     return GlobalVariableMap.lookup(name);
   }
 
