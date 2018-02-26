@@ -2381,7 +2381,6 @@ extension ${Self} {
 %end
 
 #if _runtime(_ObjC)
-@inline(never) 
 @_versioned internal
 func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
   return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
