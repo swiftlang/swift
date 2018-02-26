@@ -962,30 +962,50 @@ extension PyVal : SignedNumeric {
 
 // Define conformance to Comparable and Equatable
 extension PyVal : Hashable, Comparable, Equatable {
-  public static func < (lhs: PyVal, rhs: PyVal) -> Bool {
-    if let cmp = lhs.checking.get(member: "__cmp__") {
-      guard let cmpResult = Int(cmp.call(rhs)) else {
-        fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
-      }
-      return cmpResult == -1
+  // Comparable/Equatable are implemented using rich comparison. This tries at first
+  // the dedicated function, e.g. __eq__ for equality and if this does not work
+  // 3 way comparison is used.
+  // This is coherent with how comparison is handled in the python interpreter.
+  private func compared(to other: PyVal, byOp: Int32) -> Bool {
+    let lhsObj = self.ownedPyObject
+    let rhsObj = other.ownedPyObject
+    defer {
+      Py_DecRef(lhsObj)
+      Py_DecRef(rhsObj)
     }
-    guard let ltResult = Bool(lhs.call(member: "__lt__", rhs)) else {
-      fatalError("cannot use __lt__ on \(lhs) and \(rhs)")
+    assert(PyErr_Occurred() == nil,
+           "Python error occurred somewhere but wasn't handled")
+    switch PyObject_RichCompareBool(lhsObj, rhsObj, byOp) {
+    case 0: return false
+    case 1: return true
+    default:
+      try! throwPythonErrorIfPresent()
+      fatalError("No result or error returned when comparing \(self) to \(other)")
     }
-    return ltResult
   }
 
   public static func == (lhs: PyVal, rhs: PyVal) -> Bool {
-    if let cmp = lhs.checking.get(member: "__cmp__") {
-      guard let cmpResult = Int(cmp.call(rhs)) else {
-        fatalError("cannot use __cmp__ on \(lhs) and \(rhs)")
-      }
-      return cmpResult == 0
-    }
-    guard let eqResult = Bool(lhs.call(member: "__eq__", rhs)) else {
-      fatalError("cannot use __eq__ on \(lhs) and \(rhs)")
-    }
-    return eqResult
+    return lhs.compared(to: rhs, byOp: Py_EQ)
+  }
+
+  public static func != (lhs: PyVal, rhs: PyVal) -> Bool {
+    return lhs.compared(to: rhs, byOp: Py_NE)
+  }
+
+  public static func < (lhs: PyVal, rhs: PyVal) -> Bool {
+    return lhs.compared(to: rhs, byOp: Py_LT)
+  }
+
+  public static func <= (lhs: PyVal, rhs: PyVal) -> Bool {
+    return lhs.compared(to: rhs, byOp: Py_LE)
+  }
+
+  public static func > (lhs: PyVal, rhs: PyVal) -> Bool {
+    return lhs.compared(to: rhs, byOp: Py_GT)
+  }
+
+  public static func >= (lhs: PyVal, rhs: PyVal) -> Bool {
+    return lhs.compared(to: rhs, byOp: Py_GE)
   }
 
   public var hashValue: Int {

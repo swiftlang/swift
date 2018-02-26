@@ -71,6 +71,8 @@ PythonRuntimeTestSuite.test("comparable") {
   expectEqual([-1, 0, 0, 1, 10], pyValArray.sorted())
   let pyValArray2: PyVal = [-1, 10, 1, 0, 0]
   expectEqual([-1, 0, 0, 1, 10], pyValArray2.sorted())
+  let pyValArray3: [PyVal] = ["a", 10, "b", "b", 0]
+  expectEqual([0, 10, "a", "b", "b"], pyValArray3.sorted())
 }
 
 PythonRuntimeTestSuite.test("range-iter") {
