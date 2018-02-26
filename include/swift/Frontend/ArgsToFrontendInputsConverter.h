@@ -46,7 +46,9 @@ class ArgsToFrontendInputsConverter {
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
+  /// A place to keep alive any buffers that are loaded as part of setting up
+  /// the frontend inputs.
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> ConfigurationFileBuffers;
 
   llvm::SetVector<StringRef> Files;
 
@@ -54,7 +56,14 @@ public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags,
                                 const llvm::opt::ArgList &args);
 
-  Optional<FrontendInputsAndOutputs> convert();
+  /// Produces a FrontendInputsAndOutputs object with the inputs populated from
+  /// the arguments the converter was initialized with.
+  ///
+  /// \param buffers If present, buffers read in the processing of the frontend
+  /// inputs will be saved here. These should only be used for debugging
+  /// purposes.
+  Optional<FrontendInputsAndOutputs> convert(
+      SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
 
 private:
   bool enforceFilelistExclusion();

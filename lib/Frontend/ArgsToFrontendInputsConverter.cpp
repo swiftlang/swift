@@ -13,6 +13,7 @@
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
@@ -35,9 +36,22 @@ ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
-Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert() {
+Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
+  SWIFT_DEFER {
+    if (buffers) {
+      std::move(ConfigurationFileBuffers.begin(),
+                ConfigurationFileBuffers.end(),
+                std::back_inserter(*buffers));
+      // Clearing the original list of buffers isn't strictly necessary, but
+      // makes the behavior more sensible if we were to call convert() again.
+      ConfigurationFileBuffers.clear();
+    }
+  };
+
   if (enforceFilelistExclusion())
     return None;
+
   if (FilelistPathArg ? readInputFilesFromFilelist()
                       : readInputFilesFromCommandLine())
     return None;
@@ -115,7 +129,7 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
        llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
                         llvm::line_iterator()))
     fn(file);
-  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
+  ConfigurationFileBuffers.push_back(std::move(*filelistBufferOrError));
   return false;
 }
 

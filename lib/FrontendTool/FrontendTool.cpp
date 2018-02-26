@@ -41,6 +41,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
@@ -1626,9 +1627,31 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::sys::fs::current_path(workingDirectory);
 
   // Parse arguments.
-  if (Invocation.parseArgs(Args, Instance->getDiags(), workingDirectory)) {
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
+  if (Invocation.parseArgs(Args, Instance->getDiags(),
+                           &configurationFileBuffers, workingDirectory)) {
     return finishDiagProcessing(1);
   }
+
+  // Make an array of PrettyStackTrace objects to dump the configuration files
+  // we used to parse the arguments. These are RAII objects, so they and the
+  // buffers they refer to must be kept alive in order to be useful. (That is,
+  // we want them to be alive for the entire rest of performFrontend.)
+  //
+  // This can't be a SmallVector or similar because PrettyStackTraces can't be
+  // moved (or copied)...and it can't be an array of non-optionals because
+  // PrettyStackTraces can't be default-constructed. So we end up with a
+  // dynamically-sized array of optional PrettyStackTraces, which get
+  // initialized by iterating over the buffers we collected above.
+  auto configurationFileStackTraces =
+      llvm::make_unique<Optional<PrettyStackTraceFileContents>[]>(
+        configurationFileBuffers.size());
+  for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
+           &configurationFileStackTraces[0],
+           [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
+              Optional<PrettyStackTraceFileContents> &trace) {
+    trace.emplace(*buffer);
+  });
 
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
