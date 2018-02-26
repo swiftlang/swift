@@ -163,41 +163,6 @@ uint32_t Global1 = 0;
 uint32_t Global2 = 0;
 uint32_t Global3 = 0;
 
-/// The general structure of a generic metadata.
-template <typename Instance, unsigned NumArguments>
-struct GenericMetadataTest {
-  GenericMetadata Header;
-  Instance Template;
-  void *Storage[NumArguments];
-};
-
-GenericMetadataTest<StructMetadata, 1> MetadataTest1 = {
-  // Header
-  {
-    // allocation function
-    [](GenericMetadata *pattern, const void *args) -> Metadata * {
-      auto metadata = swift_allocateGenericValueMetadata(pattern, args);
-      auto metadataWords = reinterpret_cast<const void**>(metadata);
-      auto argsWords = reinterpret_cast<const void* const*>(args);
-      metadataWords[2] = argsWords[0];
-      return metadata;
-    },
-    3 * sizeof(void*), // metadata size
-    1, // num arguments
-    0, // address point
-    {} // private data
-  },
-
-  // Fields
-  {
-    MetadataKind::Struct,
-    reinterpret_cast<const TypeContextDescriptor*>(&Global1)
-  },
-
-  // Arguments
-  {nullptr}
-};
-
 struct TestObjContainer {
   swift_once_t token;
   HeapObject obj;
@@ -283,47 +248,6 @@ TEST(Concurrent, ConcurrentMap) {
     size_t hash = (i * 123512) % 0xFFFF ;
     EXPECT_TRUE(Map.find(hash));
   }
-}
-
-
-TEST(MetadataTest, getGenericMetadata) {
-  auto metadataTemplate = (GenericMetadata*) &MetadataTest1;
-
-  void *args[] = { &Global2 };
-
-  auto result1 = RaceTest_ExpectEqual<const Metadata *>(
-    [&]() -> const Metadata * {
-      auto inst = static_cast<const StructMetadata*>
-        (swift_getGenericMetadata(metadataTemplate, args));
-
-      auto fields = reinterpret_cast<void * const *>(inst);
-
-      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ(reinterpret_cast<const TypeContextDescriptor *>(&Global1),
-                inst->Description);
-
-      EXPECT_EQ(&Global2, fields[2]);
-
-      return inst;
-    });
-
-  args[0] = &Global3;
-
-  RaceTest_ExpectEqual<const Metadata *>(
-    [&]() -> const Metadata * {
-      auto inst = static_cast<const StructMetadata*>
-        (swift_getGenericMetadata(metadataTemplate, args));
-      EXPECT_NE(inst, result1);
-
-      auto fields = reinterpret_cast<void * const *>(inst);
-      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ(reinterpret_cast<const TypeContextDescriptor *>(&Global1),
-                inst->Description);
-
-      EXPECT_EQ(&Global3, fields[2]);
-
-      return inst;
-    });
 }
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
@@ -602,53 +526,6 @@ TEST(MetadataTest, getExistentialMetadata) {
       return special;
     });
 }
-
-static SWIFT_CC(swift) void destroySuperclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
-
-struct {
-  void *Prefix[4];
-  FullMetadata<ClassMetadata> Metadata;
-} SuperclassWithPrefix = {
-  { &Global1, &Global3, &Global2, &Global3 },
-  { { { &destroySuperclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
-      0, 0, 0, sizeof(SuperclassWithPrefix),
-      sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
-};
-ClassMetadata * const SuperclassWithPrefix_AddressPoint =
-  &SuperclassWithPrefix.Metadata;
-
-static SWIFT_CC(swift) void destroySubclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
-
-struct {
-  GenericMetadata Header;
-  FullMetadata<ClassMetadata> Pattern;
-  void *Suffix[3];
-} GenericSubclass = {
-  {
-    // allocation function
-    [](GenericMetadata *pattern, const void *args) -> Metadata* {
-      auto metadata =
-        swift_allocateGenericClassMetadata(pattern, args,
-                                           SuperclassWithPrefix_AddressPoint, 0);
-      char *bytes = (char*) metadata + sizeof(ClassMetadata);
-      auto metadataWords = reinterpret_cast<const void**>(bytes);
-      auto argsWords = reinterpret_cast<const void* const *>(args);
-      metadataWords[2] = argsWords[0];
-      return metadata;
-    },
-    sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix), // pattern size
-    1, // num arguments
-    sizeof(HeapMetadataHeader), // address point
-    {} // private data
-  },
-  { { { &destroySubclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
-      0, 0, 0,
-      sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
-      sizeof(HeapMetadataHeader) } },
-  { &Global2, &Global1, &Global2 }
-};
 
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
   ProtocolDescriptorFlags().withSwift(true)
