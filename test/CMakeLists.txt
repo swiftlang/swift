@@ -256,7 +256,7 @@ foreach(SDK ${SWIFT_SDKS})
 
       if(SWIFT_ENABLE_TENSORFLOW)
         list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_path=${SWIFT_TENSORFLOW_PATH_FOR_TARGET}")
+            "--param" "swift_tensorflow_path=${SWIFT_TENSORFLOW_TARGET_LIB_DIR}")
       endif()
 
       execute_process(COMMAND

@@ -744,16 +744,22 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
-        if args.swift_tensorflow_path_for_host:
+        if args.swift_enable_tensorflow:
+            assert args.swift_tensorflow_host_lib_dir, "Missing --swift-tensorflow-host-lib-dir"
+            assert args.swift_tensorflow_host_include_dir, "Missing --swift-tensorflow-host-include-dir"
             impl_args += [
-                "--swift-tensorflow-path-for-host",
-                args.swift_tensorflow_path_for_host,
+                "--swift-enable-tensorflow",
+                "--swift-tensorflow-host-lib-dir", args.swift_tensorflow_host_lib_dir,
+                "--swift-tensorflow-host-include-dir", args.swift_tensorflow_host_include_dir,
             ]
-            if args.swift_tensorflow_path_for_target:
-                impl_args += [
-                    "--swift-tensorflow-path-for-target",
-                    args.swift_tensorflow_path_for_target,
-                ]
+            if args.swift_tensorflow_target_lib_dir:
+              impl_args += [
+                "--swift-tensorflow-target-lib-dir", args.swift_tensorflow_target_lib_dir,
+              ]
+            if args.swift_tensorflow_target_include_dir:
+              impl_args += [
+                "--swift-tensorflow-target-include-dir", args.swift_tensorflow_target_include_dir,
+              ]
 
         impl_args += args.build_script_impl_args
 

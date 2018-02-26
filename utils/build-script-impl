@@ -252,8 +252,11 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-    swift-tensorflow-path-for-host     ""        "If set, dir with TensorFlow libs linked into swiftc"
-    swift-tensorflow-path-for-target   ""        "If set, dir with TensorFlow libs linked into swift programs (default: path-to-tensorflow-for-host setting)"
+    swift-enable-tensorflow            ""        "If true, enable compiling with TensorFlow"
+    swift-tensorflow-host-lib-dir      ""        "Path to host TensorFlow libraries"
+    swift-tensorflow-host-include-dir      ""        "Path to host TensorFlow headers"
+    swift-tensorflow-target-include-dir    ""        "Path to target Tensorflow headers"
+    swift-tensorflow-target-lib-dir        ""        "Path to target TensorFlow libraries"
 )
 
 # Centralized access point for traced command invocation.
@@ -1849,15 +1852,20 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${SWIFT_TENSORFLOW_PATH_FOR_HOST}" ]] ; then
-        if [[ ! "${SWIFT_TENSORFLOW_PATH_FOR_TARGET}" ]] ; then
-            SWIFT_TENSORFLOW_PATH_FOR_TARGET="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
+    if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]] ; then
+        if [[ ! "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
+            SWIFT_TENSORFLOW_TARGET_LIB_DIR="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+        fi
+        if [[ ! "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
+            SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR="${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
         fi
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
-            -DSWIFT_TENSORFLOW_PATH_FOR_HOST:PATH="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
-            -DSWIFT_TENSORFLOW_PATH_FOR_TARGET:PATH="${SWIFT_TENSORFLOW_PATH_FOR_TARGET}"
+            -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+            -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
+            -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
+            -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
         )
     fi
 
@@ -2204,16 +2212,21 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLDB_ENABLE:BOOL=TRUE
                         -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
-                    if [[ "${SWIFT_TENSORFLOW_PATH_FOR_HOST}" ]] ; then
-                        if [[ ! "${SWIFT_TENSORFLOW_PATH_FOR_TARGET}" ]] ; then
-                            SWIFT_TENSORFLOW_PATH_FOR_TARGET="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
-                        fi
-                        lldb_cmake_options=(
-                            "${lldb_cmake_options[@]}"
-                            -DLLDB_ENABLE_TENSORFLOW:BOOL=TRUE
-                            -DLLDB_TENSORFLOW_PATH_FOR_HOST:PATH="${SWIFT_TENSORFLOW_PATH_FOR_HOST}"
-                            -DLLDB_TENSORFLOW_PATH_FOR_TARGET:PATH="${SWIFT_TENSORFLOW_PATH_FOR_TARGET}"
-                        )
+                    if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]] ; then
+                      if [[ ! "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
+                          SWIFT_TENSORFLOW_TARGET_LIB_DIR="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+                      fi
+                      if [[ ! "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
+                          SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR="${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
+                      fi
+                      lldb__cmake_options=(
+                          "${swift_cmake_options[@]}"
+                          -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+                          -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+                          -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+                          -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
+                          -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
+                      )
                     fi
                 fi
 
@@ -2662,14 +2675,16 @@ for host in "${ALL_HOSTS[@]}"; do
         # tree... but we are not building llvm with libcxx in tree when we build
         # swift. So we need to do configure's work here.
         if [[ "${product}" == "llvm" ]]; then
-            # Find the location of the c++ header dir.
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname ${HOST_CXX})
-              HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
-            elif [[ "$(uname -s)" == "Haiku" ]] ; then
-              HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
-            else # Linux
-              HOST_CXX_HEADERS_DIR="/usr/include/c++"
+            if [[ -z $HOST_CXX_HEADERS_DIR ]]; then
+                # Find the location of the c++ header dir.
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                  HOST_CXX_DIR=$(dirname ${HOST_CXX})
+                  HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+                elif [[ "$(uname -s)" == "Haiku" ]] ; then
+                  HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
+                else # Linux
+                  HOST_CXX_HEADERS_DIR="/usr/include/c++"
+                fi
             fi
 
             # Find the path in which the local clang build is expecting to find

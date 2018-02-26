@@ -899,13 +899,20 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Build settings specific to TensorFlow support')
 
-    option('--swift-tensorflow-path-for-host', store_path,
-           help='If set, directory with TensorFlow libraries to be '
-                'linked into swiftc')
-    option('--swift-tensorflow-path-for-target', store_path,
-           help='If set, directory with TensorFlow libraries to be '
-                'linked with the TensorFlow runtime library '
-                '(default: path-to-tensorflow-for-host setting)')
+    option('--swift-enable-tensorflow', toggle_true,
+           help='If true, enable TensorFlow extensions.')
+    option('--swift-tensorflow-host-lib-dir', store_path,
+           help='Directory for linking compile time tensorflow libraries.')
+    option('--swift-tensorflow-target-lib-dir', store_path,
+           help='Directory for linking TensorFlow executables. '
+                'Defaults to --swift-tensorflow-host-lib-dir',
+          default='')
+    option('--swift-tensorflow-host-include-dir', store_path,
+           help='Directory with TensorFlow include files.')
+    option('--swift-tensorflow-target-include-dir', store_path,
+           default='',
+           help='Directory with TensorFlow include files. '
+                'Defaults to host include dir.')
 
     # -------------------------------------------------------------------------
     return builder.build()

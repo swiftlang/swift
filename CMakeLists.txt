@@ -281,12 +281,15 @@ option(SWIFT_REPORT_STATISTICS
 #
 # User-configurable TensorFlow specific options.
 #
+set(SWIFT_TENSORFLOW_HOST_LIB_DIR "" CACHE PATH
+    "If set, directory with TensorFlow host libraries to be linked into swiftc.")
+set(SWIFT_TENSORFLOW_TARGET_LIB_DIR "" CACHE PATH
+    "If set, directory with TensorFlow target libraries to be linked into swift programs.")
 
-set(SWIFT_TENSORFLOW_PATH_FOR_HOST "" CACHE PATH
-    "If set, dir with TensorFlow libs to be linked into swiftc")
-
-set(SWIFT_TENSORFLOW_PATH_FOR_TARGET "" CACHE PATH
-    "If set, dir with TensorFlow libs to be linked into swift programs (default: PATH_TO_TENSORFLOW_FOR_HOST setting)")
+set(SWIFT_TENSORFLOW_HOST_INCLUDE_DIR "" CACHE PATH
+    "If set, directory with host TensorFlow headers.")
+set(SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR "" CACHE PATH
+    "If set, directory with target TensorFlow headers.")
 
 #
 # User-configurable experimental options.  Do not use in production builds.

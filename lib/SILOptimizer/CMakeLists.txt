@@ -1,10 +1,10 @@
 set(swiftSILOptimizerPrivateLibraries "")
 if(SWIFT_ENABLE_TENSORFLOW)
   include_directories(BEFORE
-    "${SWIFT_TENSORFLOW_PATH_FOR_HOST}/include"
+    "${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
   )
   set(swiftSILOptimizerPrivateLibraries
-    "${SWIFT_TENSORFLOW_PATH_FOR_HOST}/lib/libtensorflow.so")
+    "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/libtensorflow.so")
 endif()
 add_subdirectory(ARC)
 add_subdirectory(Analysis)
