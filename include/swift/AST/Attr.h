@@ -105,13 +105,18 @@ public:
   
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
-  
-  bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
-  Ownership getOwnership() const {
-    if (has(TAK_sil_weak)) return Ownership::Weak;
-    if (has(TAK_sil_unowned)) return Ownership::Unowned;
-    if (has(TAK_sil_unmanaged)) return Ownership::Unmanaged;
-    return Ownership::Strong;
+
+  bool hasOwnership() const {
+    return getOwnership() != ReferenceOwnership::Strong;
+  }
+  ReferenceOwnership getOwnership() const {
+    if (has(TAK_sil_weak))
+      return ReferenceOwnership::Weak;
+    if (has(TAK_sil_unowned))
+      return ReferenceOwnership::Unowned;
+    if (has(TAK_sil_unmanaged))
+      return ReferenceOwnership::Unmanaged;
+    return ReferenceOwnership::Strong;
   }
   
   void clearOwnership() {
@@ -965,24 +970,27 @@ public:
 
 
 /// Represents weak/unowned/unowned(unsafe) decl modifiers.
-class OwnershipAttr : public DeclAttribute {
-  const Ownership ownership;
+class ReferenceOwnershipAttr : public DeclAttribute {
+  const ReferenceOwnership ownership;
+
 public:
-  OwnershipAttr(SourceRange range, Ownership kind)
-    : DeclAttribute(DAK_Ownership, range.Start, range, /*Implicit=*/false),
-      ownership(kind) {}
+  ReferenceOwnershipAttr(SourceRange range, ReferenceOwnership kind)
+      : DeclAttribute(DAK_ReferenceOwnership, range.Start, range,
+                      /*Implicit=*/false),
+        ownership(kind) {}
 
-  OwnershipAttr(Ownership kind) : OwnershipAttr(SourceRange(), kind) {}
+  ReferenceOwnershipAttr(ReferenceOwnership kind)
+      : ReferenceOwnershipAttr(SourceRange(), kind) {}
 
-  Ownership get() const { return ownership; }
+  ReferenceOwnership get() const { return ownership; }
 
   /// Returns a copy of this attribute without any source information.
-  OwnershipAttr *clone(ASTContext &context) const {
-    return new (context) OwnershipAttr(get());
+  ReferenceOwnershipAttr *clone(ASTContext &context) const {
+    return new (context) ReferenceOwnershipAttr(get());
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Ownership;
+    return DA->getKind() == DAK_ReferenceOwnership;
   }
 };
 

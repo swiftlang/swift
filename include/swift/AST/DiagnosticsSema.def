@@ -1913,7 +1913,7 @@ ERROR(override_argument_name_mismatch,none,
 ERROR(override_ownership_mismatch,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
-      (/*Ownership*/unsigned, /*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned, /*ReferenceOwnership*/unsigned))
 ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
@@ -3150,22 +3150,22 @@ ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
 ERROR(invalid_ownership_type,none,
       "'%select{strong|weak|unowned|unowned}0' may only be applied to "
       "class and class-bound protocol types, not %1",
-      (/*Ownership*/unsigned, Type))
+      (/*ReferenceOwnership*/unsigned, Type))
 ERROR(invalid_ownership_protocol_type,none,
       "'%select{strong|weak|unowned|unowned}0' must not be applied to "
       "non-class-bound %1; consider adding a protocol conformance that has a class bound",
-      (/*Ownership*/unsigned, Type))
+      (/*ReferenceOwnership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 ERROR(ownership_invalid_in_protocols,none,
       "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
-      (/*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned))
 WARNING(ownership_invalid_in_protocols_compat_warning,none,
       "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
       "in a protocol and will be disallowed in future versions",
-      (/*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned))
 
 // required
 ERROR(required_initializer_nonclass,none,

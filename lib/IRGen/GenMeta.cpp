@@ -2103,13 +2103,13 @@ namespace {
       auto &C = IGF.IGM.Context;
       CanType referent;
       switch (type->getOwnership()) {
-      case Ownership::Strong:
+      case ReferenceOwnership::Strong:
         llvm_unreachable("shouldn't be a ReferenceStorageType");
-      case Ownership::Weak:
+      case ReferenceOwnership::Weak:
         referent = type.getReferentType().getOptionalObjectType();
         break;
-      case Ownership::Unmanaged:
-      case Ownership::Unowned:
+      case ReferenceOwnership::Unmanaged:
+      case ReferenceOwnership::Unowned:
         referent = type.getReferentType();
         break;
       }
@@ -2130,7 +2130,7 @@ namespace {
       //
       // FIXME: This sounds wrong, an Objective-C tagged pointer could be
       // stored in an unmanaged reference for instance.
-      if (type->getOwnership() == Ownership::Unmanaged) {
+      if (type->getOwnership() == ReferenceOwnership::Unmanaged) {
         auto metatype = CanMetatypeType::get(C.TheNativeObjectType);
         return emitFromValueWitnessTable(metatype);
       }
@@ -2157,7 +2157,7 @@ namespace {
 
       // Get the reference storage type of the builtin object whose value
       // witness we can borrow.
-      if (type->getOwnership() == Ownership::Weak)
+      if (type->getOwnership() == ReferenceOwnership::Weak)
         valueWitnessReferent = OptionalType::get(valueWitnessReferent)
           ->getCanonicalType();
 

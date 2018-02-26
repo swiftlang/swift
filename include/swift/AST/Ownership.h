@@ -26,7 +26,7 @@ namespace swift {
 /// Different kinds of reference ownership supported by Swift.
 // This enum is used in diagnostics. If you add a case here, the diagnostics
 // must be updated as well.
-enum class Ownership : uint8_t {
+enum class ReferenceOwnership : uint8_t {
   /// \brief a strong reference (the default semantics)
   Strong,
 
@@ -39,7 +39,7 @@ enum class Ownership : uint8_t {
   /// \brief an 'unowned(unsafe)' reference
   Unmanaged,
 };
-  
+
 } // end namespace swift
 
 #endif

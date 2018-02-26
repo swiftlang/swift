@@ -2169,7 +2169,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   switch (DA->getKind()) {
   case DAK_RawDocComment:
-  case DAK_Ownership: // Serialized as part of the type.
+  case DAK_ReferenceOwnership: // Serialized as part of the type.
   case DAK_AccessControl:
   case DAK_SetterAccess:
   case DAK_ObjCBridged:
@@ -3478,12 +3478,13 @@ static uint8_t getRawStableSILCoroutineKind(
 
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
-static uint8_t getRawStableOwnership(swift::Ownership ownership) {
+static uint8_t
+getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   switch (ownership) {
-  SIMPLE_CASE(Ownership, Strong)
-  SIMPLE_CASE(Ownership, Weak)
-  SIMPLE_CASE(Ownership, Unowned)
-  SIMPLE_CASE(Ownership, Unmanaged)
+  SIMPLE_CASE(ReferenceOwnership, Strong)
+  SIMPLE_CASE(ReferenceOwnership, Weak)
+  SIMPLE_CASE(ReferenceOwnership, Unowned)
+  SIMPLE_CASE(ReferenceOwnership, Unmanaged)
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -3890,7 +3891,8 @@ void Serializer::writeType(Type ty) {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
-    auto stableOwnership = getRawStableOwnership(refTy->getOwnership());
+    auto stableOwnership =
+        getRawStableReferenceOwnership(refTy->getOwnership());
     ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            stableOwnership,
                                   addTypeRef(refTy->getReferentType()));

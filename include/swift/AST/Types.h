@@ -4752,15 +4752,18 @@ protected:
 private:
   Type Referent;
 public:
-  static ReferenceStorageType *get(Type referent, Ownership ownership,
+  static ReferenceStorageType *get(Type referent, ReferenceOwnership ownership,
                                    const ASTContext &C);
 
   Type getReferentType() const { return Referent; }
-  Ownership getOwnership() const {
+  ReferenceOwnership getOwnership() const {
     switch (getKind()) {
-    case TypeKind::WeakStorage: return Ownership::Weak;
-    case TypeKind::UnownedStorage: return Ownership::Unowned;
-    case TypeKind::UnmanagedStorage: return Ownership::Unmanaged;
+    case TypeKind::WeakStorage:
+      return ReferenceOwnership::Weak;
+    case TypeKind::UnownedStorage:
+      return ReferenceOwnership::Unowned;
+    case TypeKind::UnmanagedStorage:
+      return ReferenceOwnership::Unmanaged;
     default: llvm_unreachable("Unhandled reference storage type");
     }
   }
@@ -4772,10 +4775,10 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
-  static CanReferenceStorageType get(CanType referent, Ownership ownership) {
-    return CanReferenceStorageType(ReferenceStorageType::get(referent,
-                                                   ownership,
-                                                   referent->getASTContext()));
+static CanReferenceStorageType get(CanType referent,
+                                   ReferenceOwnership ownership) {
+  return CanReferenceStorageType(ReferenceStorageType::get(
+      referent, ownership, referent->getASTContext()));
   }
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
@@ -4789,8 +4792,8 @@ class UnownedStorageType : public ReferenceStorageType {
 
 public:
   static UnownedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnownedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unowned, C));
+    return static_cast<UnownedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unowned, C));
   }
 
   /// Is this unowned storage type known to be loadable within the given
@@ -4820,8 +4823,8 @@ class UnmanagedStorageType : public ReferenceStorageType {
 
 public:
   static UnmanagedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnmanagedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unmanaged, C));
+    return static_cast<UnmanagedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unmanaged, C));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4845,8 +4848,8 @@ class WeakStorageType : public ReferenceStorageType {
 
 public:
   static WeakStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<WeakStorageType*>(
-                    ReferenceStorageType::get(referent, Ownership::Weak, C));
+    return static_cast<WeakStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Weak, C));
   }
 
   // Implement isa/cast/dyncast/etc.

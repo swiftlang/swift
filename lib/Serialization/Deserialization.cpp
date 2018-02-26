@@ -2967,7 +2967,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     var->setInterfaceType(interfaceType);
 
     if (auto referenceStorage = interfaceType->getAs<ReferenceStorageType>())
-      AddAttribute(new (ctx) OwnershipAttr(referenceStorage->getOwnership()));
+      AddAttribute(
+          new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
     configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
@@ -3995,15 +3996,19 @@ getActualSILCoroutineKind(uint8_t rep) {
   }
 }
 
-/// Translate from the serialization Ownership enumerators, which are
+/// Translate from the serialization ReferenceOwnership enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static
-Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
+static Optional<swift::ReferenceOwnership>
+getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   switch (raw) {
-  case serialization::Ownership::Strong:   return swift::Ownership::Strong;
-  case serialization::Ownership::Unmanaged:return swift::Ownership::Unmanaged;
-  case serialization::Ownership::Unowned:  return swift::Ownership::Unowned;
-  case serialization::Ownership::Weak:     return swift::Ownership::Weak;
+  case serialization::ReferenceOwnership::Strong:
+    return swift::ReferenceOwnership::Strong;
+  case serialization::ReferenceOwnership::Unmanaged:
+    return swift::ReferenceOwnership::Unmanaged;
+  case serialization::ReferenceOwnership::Unowned:
+    return swift::ReferenceOwnership::Unowned;
+  case serialization::ReferenceOwnership::Weak:
+    return swift::ReferenceOwnership::Weak;
   }
   return None;
 }
@@ -4326,8 +4331,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::ReferenceStorageTypeLayout::readRecord(scratch, rawOwnership,
                                                         objectTypeID);
 
-    auto ownership =
-      getActualOwnership((serialization::Ownership) rawOwnership);
+    auto ownership = getActualReferenceOwnership(
+        (serialization::ReferenceOwnership)rawOwnership);
     if (!ownership.hasValue()) {
       error();
       break;

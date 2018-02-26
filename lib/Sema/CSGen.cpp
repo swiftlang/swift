@@ -2014,8 +2014,8 @@ namespace {
                                           TVO_CanBindToInOut);
 
         // For weak variables, use Optional<T>.
-        if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
-          if (OA->get() == Ownership::Weak) {
+        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+          if (OA->get() == ReferenceOwnership::Weak) {
             ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
             if (!ty) return Type();
           }

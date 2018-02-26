@@ -311,13 +311,13 @@ using AssociativityField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum Ownership : uint8_t {
+enum ReferenceOwnership : uint8_t {
   Strong = 0,
   Weak,
   Unowned,
   Unmanaged,
 };
-using OwnershipField = BCFixed<2>;
+using ReferenceOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -800,8 +800,8 @@ namespace decls_block {
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,
-    OwnershipField,  // ownership
-    TypeIDField      // implementation type
+    ReferenceOwnershipField, // ownership
+    TypeIDField              // implementation type
   >;
 
   using UnboundGenericTypeLayout = BCRecordLayout<
@@ -1410,7 +1410,8 @@ namespace decls_block {
   >;
 
   // Stub layouts, unused.
-  using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
+  using ReferenceOwnershipDeclAttrLayout
+    = BCRecordLayout<ReferenceOwnership_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
   using AccessControlDeclAttrLayout = BCRecordLayout<AccessControl_DECL_ATTR>;
   using SetterAccessDeclAttrLayout = BCRecordLayout<SetterAccess_DECL_ATTR>;
