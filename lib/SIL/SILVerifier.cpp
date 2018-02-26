@@ -3996,7 +3996,7 @@ public:
           auto substType = component.getExternalDecl()->getStorageInterfaceType()
             .subst(subs);
           require(substType->isEqual(component.getComponentType()),
-                  "component type should make storage type of referenced "
+                  "component type should match storage type of referenced "
                   "declaration");
 
           // Index types should match the lowered index types expected by the

@@ -84,6 +84,7 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
+  External,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
@@ -116,7 +117,8 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_NAMES,
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
-    SIL_DEFAULT_WITNESS_TABLE_OFFSETS
+    SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_PROPERTY_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -166,6 +168,7 @@ namespace sil_block {
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
+    SIL_PROPERTY,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -198,6 +201,15 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
+  >;
+  
+  using PropertyLayout = BCRecordLayout<
+    SIL_PROPERTY,
+    DeclIDField,          // Property decl
+    BCFixed<1>,           // Is serialized
+    BCArray<ValueIDField> // Encoded key path component
+    // Any substitutions or conformances required for the key path component
+    // follow.
   >;
 
   using WitnessTableLayout = BCRecordLayout<
