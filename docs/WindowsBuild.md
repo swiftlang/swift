@@ -141,8 +141,8 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DICU_I18N_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
  -DICU_UC_LIB_NAME="icuuc"^
  -DICU_I18N_LIB_NAME="icuin"^
- -DSWIFT_INCLUDE_DOCS=FALSE^
- -DSWIFT_INCLUDE_TESTS=FALSE^
+ -DSWIFT_INCLUDE_DOCS=TRUE^
+ -DSWIFT_INCLUDE_TESTS=TRUE^
  -DCMAKE_C_COMPILER="<path-to-llvm-bin>/clang-cl.exe"^
  -DCMAKE_CXX_COMPILER="<path-to-llvm-bin>/bin/clang-cl.exe"^
  -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
@@ -187,8 +187,8 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DICU_I18N_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
  -DICU_UC_LIB_NAME="icuuc"^
  -DICU_I18N_LIB_NAME="icuin"^
- -DSWIFT_INCLUDE_DOCS=FALSE^
- -DSWIFT_INCLUDE_TESTS=FALSE^
+ -DSWIFT_INCLUDE_DOCS=TRUE^
+ -DSWIFT_INCLUDE_TESTS=TRUE^
  -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
