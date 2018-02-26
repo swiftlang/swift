@@ -135,7 +135,7 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
@@ -616,11 +616,11 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
   return Impl.PlusFunctionOnString;
 }
 
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
     if (!Impl.NAME##Decl) \
       Impl.NAME##Decl = dyn_cast_or_null<DECL_CLASS>( \
-        findStdlibType(*this, #NAME, NUM_GENERIC_PARAMS)); \
+        findStdlibType(*this, IDSTR, NUM_GENERIC_PARAMS)); \
     return Impl.NAME##Decl; \
   }
 #include "swift/AST/KnownStdlibTypes.def"

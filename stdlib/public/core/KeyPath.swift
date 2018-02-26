@@ -49,21 +49,27 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   
   @_inlineable // FIXME(sil-serialize-all)
   final public var hashValue: Int {
-    var hash = 0
-    withBuffer {
+    return _defaultHashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    return withBuffer {
+      var hasher = hasher
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        hash ^= _mixInt(component.value.hashValue)
+        hasher = hasher.appending(component.value)
         if let type = type {
-          hash ^= _mixInt(unsafeBitCast(type, to: Int.self))
+          hasher = hasher.appending(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
       }
+      return hasher
     }
-    return hash
   }
+  
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(a: AnyKeyPath, b: AnyKeyPath) -> Bool {
     // Fast-path identical objects
@@ -452,12 +458,17 @@ internal struct ComputedPropertyID: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var hashValue: Int {
-    var hash = 0
-    hash ^= _mixInt(value)
-    hash ^= _mixInt(isStoredProperty ? 13 : 17)
-    hash ^= _mixInt(isTableOffset ? 19 : 23)
-    return hash
+    return _defaultHashValue(for: self)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    return hasher
+      .appending(value)
+      .appending(isStoredProperty)
+      .appending(isTableOffset)
+  }
+
 }
 
 @_versioned // FIXME(sil-serialize-all)
