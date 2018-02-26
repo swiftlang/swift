@@ -506,17 +506,6 @@ public:
     if (LocKind == SILLocation::RegularKind)
       return;
 
-#if 0
-    // FIXME: This check was tautological before the removal of
-    // AutoreleaseReturnInst, and it turns out that we're violating it.
-    // Fix incoming.
-    if (LocKind == SILLocation::CleanupKind ||
-        LocKind == SILLocation::InlinedKind)
-      require(InstKind != SILInstructionKind::ReturnInst ||
-              InstKind != SILInstructionKind::AutoreleaseReturnInst,
-        "cleanup and inlined locations are not allowed on return instructions");
-#endif
-
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
       require(InstKind == SILInstructionKind::BranchInst ||
