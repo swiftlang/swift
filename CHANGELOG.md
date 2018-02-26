@@ -23,6 +23,12 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* Public classes may now have internal `required` initializers. The rule for
+  `required` initializers is that they must be available everywhere the class
+  can be subclassed, but previously we said that `required` initializers on
+  public classes needed to be public themselves. (This limitation is a holdover
+  from before the introduction of the open/public distinction in Swift 3.)
+
 * C macros containing casts are no longer imported to Swift if the type in the
   cast is unavailable or deprecated, or produces some other diagnostic when
   referenced. (These macros were already only imported under very limited
