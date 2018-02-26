@@ -2412,10 +2412,28 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       return RValue::forInContext();
     }
   }
-    
+
+  llvm::SmallVector<RValue, 8> tupleElts;
+  bool hasAtleastOnePlusOneValue = false;
+  for (Expr *elt : E->getElements()) {
+    RValue RV = SGF.emitRValue(elt);
+    hasAtleastOnePlusOneValue |= RV.isPlusOne(SGF);
+    tupleElts.emplace_back(std::move(RV));
+  }
+
+  // Once we have found if we have any plus one arguments, add each element of
+  // tuple elts into result, making sure each value is at plus 1.
   RValue result(type);
-  for (Expr *elt : E->getElements())
-    result.addElement(SGF.emitRValue(elt));
+  if (hasAtleastOnePlusOneValue) {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]).ensurePlusOne(SGF, E));
+    }
+  } else {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]));
+    }
+  }
+
   return result;
 }
 
@@ -2756,7 +2774,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
            shuffleIndex != TupleShuffleExpr::Variadic &&
            "Only argument tuples can have default initializers & varargs");
 
-    result.addElement(std::move(elements[shuffleIndex]));
+    result.addElement(std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
     return result;
   }
 
@@ -2777,7 +2795,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // separately.
     if (shuffleIndex != TupleShuffleExpr::Variadic) {
       // Map from a different tuple element.
-      result.addElement(std::move(elements[shuffleIndex]));
+      result.addElement(
+          std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
       continue;
     }
 
@@ -2799,8 +2818,9 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     ManagedValue varargs = emitVarargs(SGF, E, field.getVarargBaseTy(),
                                        variadicValues,
                                        E->getVarargsArrayType());
-    result.addElement(RValue(SGF, E, field.getType()->getCanonicalType(),
-                             varargs));
+    result.addElement(
+        RValue(SGF, E, field.getType()->getCanonicalType(), varargs)
+            .ensurePlusOne(SGF, E));
     break;
   }
   
