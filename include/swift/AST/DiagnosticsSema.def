@@ -3176,7 +3176,9 @@ NOTE(required_initializer_here,none,
       "'required' initializer is declared in superclass here", ())
 
 ERROR(required_initializer_not_accessible,none,
-      "'required' initializer must be as accessible as its enclosing type", ())
+      "'required' initializer must be accessible wherever class %0 can be "
+      "subclassed",
+      (DeclName))
 ERROR(required_initializer_missing_keyword,none,
       "'required' modifier must be present on all overrides of a required "
       "initializer", ())
