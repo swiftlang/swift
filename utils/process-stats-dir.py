@@ -411,7 +411,7 @@ def compare_to_csv_baseline(args):
     return write_comparison(args, old_stats, new_stats)
 
 
-# Summarize immediate difference between two stats-dirs, optionally
+# Summarize immediate difference between two stats-dirs, optionally.
 def compare_stats_dirs(args):
     if len(args.remainder) != 2:
         raise ValueError("Expected exactly 2 stats-dirs")
