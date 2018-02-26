@@ -2811,8 +2811,14 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
+
+      // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
+
+      // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
+
+      // uint32_t IsReflectable;
       B.addInt32(1); // struct always reflectable
 
       addFieldTypes(IGM, getType(), properties);
@@ -2868,9 +2874,14 @@ namespace {
         = PayloadSizeOffset / IGM.getPointerSize();
       assert(PayloadSizeOffsetInWords < 0x100 &&
              "payload size offset too far from address point for runtime");
+
+      // uint32_t NumPayloadCasesAndPayloadSizeOffset;
       B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
-      // # empty cases
+
+      // uint32_t NumEmptyCases;
       B.addInt32(strategy.getElementsWithNoPayload().size());
+
+      // uint32_t IsReflectable;
       B.addInt32(strategy.isReflectable());
 
       addFieldTypes(IGM, strategy.getElementsWithPayload());
@@ -3010,8 +3021,14 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
+
+      // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
+
+      // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
+
+      // uint32_t IsReflectable;
       B.addInt32(1); // class is always reflectable
 
       addFieldTypes(IGM, getType(), properties);
