@@ -40,7 +40,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
       TensorShape.swift
       Utilities.swift
       INCORPORATE_OBJECT_LIBRARIES swiftTensorFlowInit
-      PRIVATE_LINK_LIBRARIES "libtensorflow.so"
+      PRIVATE_LINK_LIBRARIES "tensorflow"
       SWIFT_MODULE_DEPENDS SwiftOnoneSupport
       SWIFT_MODULE_DEPENDS_LINUX Glibc
       SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
