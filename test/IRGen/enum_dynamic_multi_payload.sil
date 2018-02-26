@@ -20,8 +20,6 @@ class C {}
 
 sil_vtable C {}
 
-// CHECK: @"$S26enum_dynamic_multi_payload8EitherOrOMP" = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
-
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.
 // CHECK-64-LABEL: define{{( protected)?}} swiftcc { i64, i8 } @fixed_instances_dont_use_spare_bits(i64, i8)
@@ -419,7 +417,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   return undef : $()
 }
 
-// CHECK: define{{( protected)?}} private %swift.type* [[CREATE_GENERIC_METADATA]](%swift.type_pattern*, i8**) {{.*}} {
+// CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**) {{.*}} {
 // CHECK:   [[BUF:%.*]] = alloca [2 x i8**]
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 

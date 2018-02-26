@@ -16,7 +16,7 @@ public func requestType<T>(_ c: Sub<T>) {
   print(T.self)
 }
 
-// FILE2-LABEL: define private %swift.type* @create_generic_metadata_Sub(%swift.type_pattern*, i8**)
+// FILE2-LABEL: define internal %swift.type* @"$S4test3SubCMi"(%swift.type_descriptor*, i8**)
 // FILE2:   [[T_ADDR:%.*]] = bitcast i8** %1 to %swift.type**
 // FILE2:   [[T:%.*]] = load %swift.type*, %swift.type** %2
 // FILE2:   [[CLASSMETADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata
