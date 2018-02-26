@@ -140,6 +140,10 @@ class LinkEntity {
     /// The pointer is a ClassDecl*.
     ClassMetadataBaseOffset,
 
+    /// The property descriptor for a public property or subscript.
+    /// The pointer is an AbstractStorageDecl*.
+    PropertyDescriptor,
+
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
@@ -478,6 +482,12 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
   }
 

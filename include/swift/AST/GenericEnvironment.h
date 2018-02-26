@@ -29,11 +29,24 @@
 
 namespace swift {
 
+class ArchetypeType;
 class GenericSignatureBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
 class SILType;
+
+/// Query function suitable for use as a \c TypeSubstitutionFn that queries
+/// the mapping of interface types to archetypes.
+class QueryInterfaceTypeSubstitutions {
+  const GenericEnvironment *self;
+  
+public:
+  QueryInterfaceTypeSubstitutions(const GenericEnvironment *self)
+  : self(self) { }
+  
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
@@ -66,23 +79,12 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   GenericEnvironment(GenericSignature *signature,
                      GenericSignatureBuilder *builder);
 
-  friend class ArchetypeType;
-  friend class GenericSignatureBuilder;
+  friend ArchetypeType;
+  friend GenericSignatureBuilder;
   
   GenericSignatureBuilder *getGenericSignatureBuilder() const { return Builder; }
 
-  /// Query function suitable for use as a \c TypeSubstitutionFn that queries
-  /// the mapping of interface types to archetypes.
-  class QueryInterfaceTypeSubstitutions {
-    const GenericEnvironment *self;
-
-  public:
-    QueryInterfaceTypeSubstitutions(const GenericEnvironment *self)
-      : self(self) { }
-
-    Type operator()(SubstitutableType *type) const;
-  };
-  friend class QueryInterfaceTypeSubstitutions;
+  friend QueryInterfaceTypeSubstitutions;
 
 public:
   GenericSignature *getGenericSignature() const {

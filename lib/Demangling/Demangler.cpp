@@ -1464,6 +1464,9 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
     }
+    case 'V':
+      return createWithChild(Node::Kind::PropertyDescriptor,
+                             popNode(isEntity));
     case 'X':
       return demanglePrivateContextDescriptor();
     default:
