@@ -19,6 +19,7 @@
 #define SWIFT_RUNTIME_EXISTENTIALMETADATAIMPL_H
 
 #include "MetadataImpl.h"
+#include "swift/Runtime/ExistentialContainer.h"
 
 namespace swift {
 namespace metadataimpl {

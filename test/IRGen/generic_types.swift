@@ -10,11 +10,11 @@
 
 // CHECK-LABEL: @"$S13generic_types1ACMP" = internal global
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_A,
-// CHECK-native-SAME: i32 104,
-// CHECK-objc-SAME:   i32 288,
+// CHECK-native-SAME: i32 96,
+// CHECK-objc-SAME:   i32 280,
 // CHECK-SAME:   i16 1,
-// CHECK-native-SAME: i16 24,
-// CHECK-objc-SAME:   i16 208,
+// CHECK-native-SAME: i16 16,
+// CHECK-objc-SAME:   i16 200,
 // CHECK-SAME:   [{{[0-9]+}} x i8*] zeroinitializer,
 // CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD",
 // CHECK-SAME:   i8** @"$SBoWV",
@@ -39,11 +39,11 @@
 
 // CHECK-LABEL: @"$S13generic_types1BCMP" = internal global
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
-// CHECK-native-SAME: i32 104,
-// CHECK-objc-SAME:   i32 288,
+// CHECK-native-SAME: i32 96,
+// CHECK-objc-SAME:   i32 280,
 // CHECK-SAME:   i16 1,
-// CHECK-native-SAME: i16 24,
-// CHECK-objc-SAME:   i16 208,
+// CHECK-native-SAME: i16 16,
+// CHECK-objc-SAME:   i16 200,
 // CHECK-SAME:   [{{[0-9]+}} x i8*] zeroinitializer,
 // CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD",
 // CHECK-SAME:   i8** @"$SBoWV",
