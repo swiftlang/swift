@@ -229,6 +229,13 @@ public extension ${TensorXD} {
   init(_ scalars: ${elementArrayLiteral}...) {
     self.init(scalars)
   }
+
+  /// Creates a ${TensorXD} by broadcasting the given scalar to a {rank}-D
+  /// shape with all dimensions being 1.
+  @_inlineable @inline(__always)
+  init(broadcasting scalar: Scalar) {
+    self.init(shape: ${[1] * rank}, scalars: [scalar])
+  }
 }
 
 public extension AccelerableByTensorFlow {

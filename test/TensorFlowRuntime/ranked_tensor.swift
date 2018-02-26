@@ -32,9 +32,12 @@ RankedTensorTests.testCPUAndGPU("Initializers") {
   let vector = Tensor1D([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
   let matrix = Tensor2D([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
   let tensor = Tensor3D(identicallyRanked: Tensor<Float>(ones: [2, 3, 4]))
+  let broadcasted4DScalar = Tensor4D(broadcasting: 4)
   expectEqual([1, 2, 3, 4, 5, 6], vector.array)
   expectEqual(Array2D(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]), matrix.array)
   expectEqual(Array3D(shape: [2, 3, 4], repeating: 1), tensor.array)
+  expectEqual(Array4D(shape: [1, 1, 1, 1], scalars: [4]),
+              broadcasted4DScalar.array)
 }
 
 RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
