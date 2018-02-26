@@ -12,6 +12,9 @@
 
 if(SWIFT_ENABLE_TENSORFLOW)
   # Edit the module map to refer to the right directory.
+  include_directories(BEFORE
+    "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
+  )
   configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_template"
         "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_configured")
@@ -48,7 +51,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
   add_swift_library(swiftTensorFlowInit OBJECT_LIBRARY TARGET_LIBRARY
       ctensorflow_init.cpp
       "${output_dir}/${modulemap_output}"
-      C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
+      C_COMPILE_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}"
       LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}"
       INSTALL_IN_COMPONENT never_install)
 

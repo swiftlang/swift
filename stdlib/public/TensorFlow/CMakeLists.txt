@@ -11,7 +11,6 @@
 #===----------------------------------------------------------------------===#
 
 if(SWIFT_ENABLE_TENSORFLOW)
-  link_directories(${SWIFT_TENSORFLOW_PATH_FOR_TARGET}/lib)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
   set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
@@ -40,11 +39,18 @@ if(SWIFT_ENABLE_TENSORFLOW)
       TensorShape.swift
       Utilities.swift
       INCORPORATE_OBJECT_LIBRARIES swiftTensorFlowInit
-      PRIVATE_LINK_LIBRARIES "tensorflow"
+      PRIVATE_LINK_LIBRARIES "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so"
       SWIFT_MODULE_DEPENDS SwiftOnoneSupport
+      SWIFT_MODULE_DEPENDS_IOS Darwin
+      SWIFT_MODULE_DEPENDS_OSX Darwin
+      SWIFT_MODULE_DEPENDS_TVOS Darwin
+      SWIFT_MODULE_DEPENDS_WATCHOS Darwin
       SWIFT_MODULE_DEPENDS_LINUX Glibc
+      SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+      SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+      SWIFT_MODULE_DEPENDS_HAIKU Glibc
       SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
       LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
       INSTALL_IN_COMPONENT stdlib
-      EXTRA_RPATH "${SWIFT_TENSORFLOW_PATH_FOR_TARGET}/lib")
+      EXTRA_RPATH "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}")
 endif()
