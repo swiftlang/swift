@@ -27,6 +27,8 @@
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
 
+#define SWIFT_LEGACY_METADATA_MIN_VERSION 3
+
 typedef struct swift_metadata_interop {
   uintptr_t Metadata;
   int Library;
@@ -52,10 +54,11 @@ typedef int (*ReadBytesFunctionLegacy)(void *reader_context, swift_addr_t addres
                                        void *dest, uint64_t size);
 
 struct SwiftReflectionFunctions {
+  uint16_t (*getSupportedMetadataVersion)(void);
+
   SwiftReflectionContextRef (*createReflectionContext)(
     void *ReaderContext,
-    PointerSizeFunction getPointerSize,
-    SizeSizeFunction getSizeSize,
+    uint8_t PointerSize,
     ReadBytesFunction readBytes,
     GetStringLengthFunction getStringLength,
     GetSymbolAddressFunction getSymbolAddress);
@@ -77,7 +80,7 @@ struct SwiftReflectionFunctions {
                                   swift_reflection_legacy_info_t Info);
 
   int (*addImage)(SwiftReflectionContextRef ContextRef,
-                  swift_addr_t imageStart, uint64_t imageLength);
+                  swift_addr_t imageStart);
 
   int (*readIsaMask)(SwiftReflectionContextRef ContextRef, uintptr_t *outIsaMask);
   
@@ -150,13 +153,18 @@ struct SwiftReflectionInteropContextLibrary {
 struct SwiftReflectionInteropContext {
   void *ReaderContext;
   ReadBytesFunction ReadBytes;
+  uint64_t (*GetStringLength)(void *reader_context,
+                              swift_addr_t address);
+  swift_addr_t (*GetSymbolAddress)(void *reader_context,
+                                   const char *name,
+                                   uint64_t name_length);
   
   // Currently we support at most two libraries.
   struct SwiftReflectionInteropContextLibrary Libraries[2];
   int LibraryCount;
 };
 
-typedef SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
+typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
 /// A stub for 'ownsObject' that always returns true. Used for the legacy library.
 static inline int swift_reflection_interop_ownsObjectStub(
@@ -173,14 +181,20 @@ static inline void swift_reflection_interop_loadFunctions(
   if (Handle == NULL)
     return;
 
-  struct SwiftReflectionFunctions *Functions = &Context
-    ->Libraries[Context->LibraryCount].Functions;
+  struct SwiftReflectionInteropContextLibrary *Library = &Context
+    ->Libraries[Context->LibraryCount];
+  struct SwiftReflectionFunctions *Functions = &Library->Functions;
 
 #define LOAD_NAMED(field, symbol) do { \
     Functions->field = (decltype(Functions->field))dlsym(Handle, symbol); \
     if (Functions->field == NULL) return; \
   } while (0)
 #define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name)
+  
+  LOAD(getSupportedMetadataVersion);
+  uint16_t version = Functions->getSupportedMetadataVersion();
+  if (version < SWIFT_LEGACY_METADATA_MIN_VERSION)
+    return;
   
   if (IsLegacy) {
     LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext");
@@ -210,6 +224,7 @@ static inline void swift_reflection_interop_loadFunctions(
   LOAD(dumpTypeRef);
   LOAD(dumpInfoForTypeRef);
   
+  Library->IsLegacy = IsLegacy;
   Context->LibraryCount++;
   
   return;
@@ -248,13 +263,31 @@ static int swift_reflection_interop_readBytesAdapter(void *reader_context,
   return 1;
 }
 
+static uint8_t swift_reflection_interop_getSizeAdapter(void *reader_context) {
+  // Legacy library doesn't pay attention to these anyway.
+  return sizeof(void *);
+}
+
+static uint64_t swift_reflection_interop_GetStringLengthAdapter(
+  void *reader_context, swift_addr_t address) {
+  SwiftReflectionInteropContextRef Context =
+    (SwiftReflectionInteropContextRef)reader_context;
+  return Context->GetStringLength(Context->ReaderContext, address);
+}
+
+static swift_addr_t swift_reflection_interop_GetSymbolAddressAdapter(
+  void *reader_context, const char *name, uint64_t name_length) {
+  SwiftReflectionInteropContextRef Context =
+    (SwiftReflectionInteropContextRef)reader_context;
+  return Context->GetSymbolAddress(Context->ReaderContext, name, name_length);
+}
+
 static inline SwiftReflectionInteropContextRef
 swift_reflection_interop_createReflectionContext(
     void *ReaderContext,
     void *LibraryHandle,
     void *LegacyLibraryHandle,
-    PointerSizeFunction getPointerSize,
-    SizeSizeFunction getSizeSize,
+    uint8_t PointerSize,
     ReadBytesFunction readBytes,
     GetStringLengthFunction getStringLength,
     GetSymbolAddressFunction getSymbolAddress) {
@@ -273,16 +306,21 @@ swift_reflection_interop_createReflectionContext(
   FOREACH_LIBRARY {
     if (Library->IsLegacy) {
       Library->Context = Library->Functions.createReflectionContextLegacy(
-        ContextRef, getPointerSize, getSizeSize,
-        swift_reflection_interop_readBytesAdapter, getStringLength, getSymbolAddress);
+        ContextRef,
+        swift_reflection_interop_getSizeAdapter, swift_reflection_interop_getSizeAdapter,
+        swift_reflection_interop_readBytesAdapter,
+        swift_reflection_interop_GetStringLengthAdapter,
+        swift_reflection_interop_GetSymbolAddressAdapter);
     } else {
       Library->Context = Library->Functions.createReflectionContext(ReaderContext,
-      getPointerSize, getSizeSize, readBytes, getStringLength, getSymbolAddress);
+      PointerSize, readBytes, getStringLength, getSymbolAddress);
     }
   }
   
   ContextRef->ReaderContext = ReaderContext;
   ContextRef->ReadBytes = readBytes;
+  ContextRef->GetStringLength = getStringLength;
+  ContextRef->GetSymbolAddress = getSymbolAddress;
   
   return ContextRef;
 }
@@ -319,25 +357,35 @@ static inline int
 swift_reflection_interop_addImageLegacy(
   SwiftReflectionInteropContextRef ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
-  swift_addr_t imageStart,
-  uint64_t imageLength) {
-  if (imageLength < sizeof(MachHeader)) {
-    return 0;
-  }
-  
+  swift_addr_t imageStart) {
   FreeBytesFunction FreeFunction;
   void *FreeContext;
-  const void *Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
-                                          imageStart,
-                                          imageLength,
-                                          &FreeFunction,
-                                          &FreeContext);
-  // TODO: free the stuff when we're done
+  const void *Buf;
+  Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
+                              imageStart,
+                              sizeof(MachHeader),
+                              &FreeFunction,
+                              &FreeContext);
+  if (Buf == NULL)
+    return 0;
   
-  auto Header = (MachHeader *)Buf;
+  MachHeader *Header = (MachHeader *)Buf;
+  
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
+    FreeFunction(Buf, ContextRef->ReaderContext);
     return 0;
   }
+  
+  uint32_t Length = Header->sizeofcmds;
+  FreeFunction(Buf, ContextRef->ReaderContext);
+  
+  Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
+                              imageStart,
+                              Length,
+                              &FreeFunction,
+                              &FreeContext);
+  Header = (MachHeader *)Buf;
+  // TODO: free the stuff when we're done
   
   swift_reflection_legacy_info_t info = {};
   
@@ -375,16 +423,15 @@ swift_reflection_interop_addImageLegacy(
 /// Returns true on success, false if the image's memory couldn't be read.
 static inline int
 swift_reflection_interop_addImage(SwiftReflectionInteropContextRef ContextRef,
-                                  swift_addr_t imageStart, uint64_t imageLength) {
+                                  swift_addr_t imageStart) {
   FOREACH_LIBRARY {
     int Success;
     if (Library->IsLegacy) {
       Success = swift_reflection_interop_addImageLegacy(ContextRef,
                                                         Library,
-                                                        imageStart,
-                                                        imageLength);
+                                                        imageStart);
     } else {
-      Success = Library->Functions.addImage(Library->Context, imageStart, imageLength);
+      Success = Library->Functions.addImage(Library->Context, imageStart);
     }
     if (Success) {
       return 1;

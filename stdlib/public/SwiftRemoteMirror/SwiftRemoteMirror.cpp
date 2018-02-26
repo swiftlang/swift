@@ -31,6 +31,7 @@ using NativeReflectionContext
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
+  std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
   
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
@@ -52,15 +53,18 @@ swift_reflection_getSupportedMetadataVersion() {
 
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
-                                         PointerSizeFunction getPointerSize,
-                                         SizeSizeFunction getSizeSize,
+                                         uint8_t PointerSize,
                                          ReadBytesFunction readBytes,
                                          GetStringLengthFunction getStringLength,
                                          GetSymbolAddressFunction getSymbolAddress) {
+  assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
+  auto getSize = PointerSize == 4
+    ? [](void *){ return (uint8_t)4; }
+    : [](void *){ return (uint8_t)8; };
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    getPointerSize,
-    getSizeSize,
+    getSize,
+    getSize,
     readBytes,
     getStringLength,
     getSymbolAddress
@@ -106,27 +110,54 @@ static bool findSection(MachHeader *Header, const char *Name,
 
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
-                          swift_addr_t imageStart, uint64_t imageLength) {
+                          swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
-  
-  if (imageLength < sizeof(MachHeader)) {
-    return 0;
-  }
   
   const void *Buf;
   std::function<void()> FreeFunc;
-  std::tie(Buf, FreeFunc) = Context->getReader().readBytes(RemoteAddress(imageStart),
-                                                           imageLength);
-  if (Buf == nullptr) {
-    return 0;
-  }
   
-  ContextRef->freeFuncs.push_back(FreeFunc);
+  // Read the mach header and get the size of the commands.
+  std::tie(Buf, FreeFunc) = Context->getReader().readBytes(RemoteAddress(imageStart),
+                                                           sizeof(MachHeader));
+  if (Buf == nullptr)
+    return 0;
   
   auto Header = reinterpret_cast<MachHeader *>(Buf);
+
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
+    FreeFunc();
     return 0;
   }
+  
+  auto Length = Header->sizeofcmds;
+  FreeFunc();
+  
+  // Read the commands.
+  std::tie(Buf, FreeFunc) = Context->getReader().readBytes(RemoteAddress(imageStart),
+                                                           Length);
+  if (Buf == nullptr)
+    return 0;
+  
+  // Find the TEXT segment and figure out where the end is.
+  Header = reinterpret_cast<MachHeader *>(Buf);
+  unsigned long TextSize;
+  auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
+  if (TextSegment == nullptr) {
+    FreeFunc();
+    return 0;
+  }
+  
+  auto TextEnd = TextSegment - reinterpret_cast<const uint8_t *>(Buf) + TextSize;
+  FreeFunc();
+  
+  // Read everything including the TEXT segment.
+  std::tie(Buf, FreeFunc) = Context->getReader().readBytes(RemoteAddress(imageStart),
+                                                           TextEnd);
+  if (Buf == nullptr)
+    return 0;
+  
+  // Read all the metadata parts.
+  Header = reinterpret_cast<MachHeader *>(Buf);
   
   swift_reflection_info_t info = {};
   
@@ -140,12 +171,26 @@ swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
   success = findSection(Header, "__swift5_typeref", info.type_references) || success;
   success = findSection(Header, "__swift5_reflstr", info.reflection_strings) || success;
   
-  if (!success)
+  if (!success) {
+    FreeFunc();
     return 0;
+  }
+  
+  ContextRef->freeFuncs.push_back(FreeFunc);
   
   info.LocalStartAddress = reinterpret_cast<uintptr_t>(Buf);
   info.RemoteStartAddress = imageStart;
   swift_reflection_addReflectionInfo(ContextRef, info);
+  
+  unsigned long DataSize;
+  auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+  if (DataSegment != nullptr) {
+    auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf)
+                          + imageStart;
+    auto DataSegmentEnd = DataSegmentStart + DataSize;
+    ContextRef->dataSegments.push_back(std::make_tuple(DataSegmentStart, DataSegmentEnd));
+  }
+  
   return 1;
 }
 #endif
@@ -177,7 +222,15 @@ swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Obje
   auto MetadataAddress = Context->readMetadataFromInstance(Object);
   if (!MetadataAddress)
     return 0;
-  return Context->ownsMetadata(*MetadataAddress);
+  
+  for (auto Image : ContextRef->dataSegments) {
+    swift_addr_t Start, End;
+    std::tie(Start, End) = Image;
+    if (Start <= *MetadataAddress && *MetadataAddress < End)
+      return 1;
+  }
+  
+  return 0;
 }
 
 swift_typeref_t

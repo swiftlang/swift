@@ -189,7 +189,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
                                         NumReflectionInfos * sizeof(*Images));
   
   for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    swift_reflection_addImage(RC, Images[i].Start, Images[i].Size);
+    swift_reflection_addImage(RC, Images[i].Start);
   }
   
   free(Images);
@@ -287,8 +287,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
       SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
         (void*)&Pipe,
-        PipeMemoryReader_getPointerSize,
-        PipeMemoryReader_getSizeSize,
+        sizeof(void *),
         PipeMemoryReader_readBytes,
         PipeMemoryReader_getStringLength,
         PipeMemoryReader_getSymbolAddress);

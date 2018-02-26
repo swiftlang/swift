@@ -44,8 +44,7 @@ swift_reflection_getSupportedMetadataVersion();
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(
     void *ReaderContext,
-    PointerSizeFunction getPointerSize,
-    SizeSizeFunction getSizeSize,
+    uint8_t PointerSize,
     ReadBytesFunction readBytes,
     GetStringLengthFunction getStringLength,
     GetSymbolAddressFunction getSymbolAddress);
@@ -64,7 +63,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
 /// Returns true on success, false if the image's memory couldn't be read.
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
-                          swift_addr_t imageStart, uint64_t imageLength);
+                          swift_addr_t imageStart);
 #endif
 
 /// Returns a boolean indicating if the isa mask was successfully
