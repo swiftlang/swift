@@ -69,8 +69,8 @@ public struct LazyCompactMapSequence<Base : Sequence, Element> {
   /// Creates an instance with elements `transform(x)!` for each element
   /// `x` of base where `transform(x)` is not nil.
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(_base: Base, transform: @escaping (Base.Element) -> Element?) {
+  public // @testable
+  init(_base: Base, transform: @escaping (Base.Element) -> Element?) {
     self._base = _base
     self._transform = transform
   } 
@@ -159,8 +159,8 @@ public struct LazyCompactMapCollection<Base: Collection, Element> {
   /// Creates an instance with elements `transform(x)!` for each element
   /// `x` of base where `transform(x)` is not nil.
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(_base: Base, transform: @escaping (Base.Element) -> Element?) {
+  public // @testable
+  init(_base: Base, transform: @escaping (Base.Element) -> Element?) {
     self._base = _base
     self._transform = transform
   }
@@ -651,3 +651,5 @@ extension LazyCompactMapCollection {
     )
   }
 }
+
+public typealias LazyCompactMapIterator<T, E> = LazyCompactMapSequence<T, E>.Iterator where T: Sequence
