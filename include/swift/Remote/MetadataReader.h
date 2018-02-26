@@ -919,7 +919,7 @@ private:
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
         if (descriptorAddress || !skipArtificialSubclasses)
-          return static_cast<uintptr_t>(descriptorAddress);
+          return static_cast<StoredPointer>(descriptorAddress);
 
         auto superclassMetadataAddress = classMeta->SuperClass;
         if (!superclassMetadataAddress)
@@ -942,7 +942,7 @@ private:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
-      return reinterpret_cast<uintptr_t>(valueMeta->getDescription());
+      return valueMeta->getDescription();
     }
 
     default:
