@@ -1,3 +1,4 @@
+import textwrap
 from AttributeNodes import ATTRIBUTE_NODES
 from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
@@ -90,3 +91,12 @@ def create_node_map():
 
 def is_visitable(node):
     return not node.is_base() and not node.collection_element
+
+
+def dedented_lines(description):
+    """
+    Each line of the provided string with leading whitespace stripped.
+    """
+    if not description:
+        return []
+    return textwrap.dedent(description).split('\n')
