@@ -984,16 +984,24 @@ public:
 enum class TypeContextDescriptorFlags: uint16_t {
   /// Set if the context descriptor is includes metadata for dynamically
   /// constructing a class's vtables at metadata instantiation time.
-  HasVTable = 0x8000u,
+  ///
+  /// Only meaningful for class descriptors.
+  Class_HasVTable = 0x8000u,
   
   /// Set if the context descriptor is for a class with resilient ancestry.
-  HasResilientSuperclass = 0x4000u,
+  ///
+  /// Only meaningful for class descriptors.
+  Class_HasResilientSuperclass = 0x4000u,
   
   /// Set if the type represents an imported C tag type.
+  ///
+  /// Meaningful for all type-descriptor kinds.
   IsCTag = 0x2000u,
   
   /// Set if the type represents an imported C typedef type.
-  IsCTypedef = 0x1000u,
+  ///
+  /// Meaningful for all type-descriptor kinds.
+  IsCTypedef = 0x1000u
 };
 
 enum class GenericParamKind : uint8_t {

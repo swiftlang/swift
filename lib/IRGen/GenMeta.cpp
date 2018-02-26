@@ -2939,11 +2939,12 @@ namespace {
       uint16_t flags = 0;
       if (!getType()->isForeign()) {
         if (VTableSize != 0)
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasVTable;
+          flags |= (uint16_t)TypeContextDescriptorFlags::Class_HasVTable;
 
         auto &layout = IGM.getClassMetadataLayout(getType());
         if (layout.hasResilientSuperclass())
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasResilientSuperclass;
+          flags |= (uint16_t)
+            TypeContextDescriptorFlags::Class_HasResilientSuperclass;
       }
       
       flags |= getClangImportedFlags();

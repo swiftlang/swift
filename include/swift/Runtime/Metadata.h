@@ -3065,12 +3065,12 @@ public:
   /// if this is a class descriptor with a vtable descriptor for runtime
   /// vtable instantiation.
   static constexpr const uint16_t HasVTableFlag =
-    uint16_t(TypeContextDescriptorFlags::HasVTable);
+    uint16_t(TypeContextDescriptorFlags::Class_HasVTable);
   /// This bit is set in the context descriptor header's kind-specific flags
   /// if this is a class descriptor with a resilient superclass.
   static constexpr const uint16_t HasResilientSuperclassFlag =
-    uint16_t(TypeContextDescriptorFlags::HasResilientSuperclass);
-  
+    uint16_t(TypeContextDescriptorFlags::Class_HasResilientSuperclass);
+
   /// The number of stored properties in the class, not including its
   /// superclasses. If there is a field offset vector, this is its length.
   uint32_t NumFields;

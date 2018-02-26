@@ -984,7 +984,7 @@ private:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
       hasVTable = flags.getKindSpecificFlags()
-                   & (uint16_t)TypeContextDescriptorFlags::HasVTable;
+                   & (uint16_t)TypeContextDescriptorFlags::Class_HasVTable;
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
