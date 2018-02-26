@@ -5015,7 +5015,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
-SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage) {
+SILDeclRef SILGenModule::getGetterDeclRef(AbstractStorageDecl *storage) {
   auto *getter = storage->getGetter();
   return SILDeclRef(getter, SILDeclRef::Kind::Func)
     .asForeign(requiresForeignEntryPoint(getter));
@@ -5054,7 +5054,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   return emission.apply(c);
 }
 
-SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage) {
+SILDeclRef SILGenModule::getSetterDeclRef(AbstractStorageDecl *storage) {
   auto *setter = storage->getSetter();
   return SILDeclRef(setter, SILDeclRef::Kind::Func)
     .asForeign(requiresForeignEntryPoint(setter));
@@ -5120,7 +5120,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 }
 
 SILDeclRef
-SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
+SILGenModule::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
   return SILDeclRef(storage->getMaterializeForSetFunc(),
                     SILDeclRef::Kind::Func);
 }
@@ -5197,8 +5197,8 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                             optionalCallback, callbackStorage);
 }
 
-SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
-                                               AccessKind accessKind) {
+SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage,
+                                             AccessKind accessKind) {
   FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
   return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }
