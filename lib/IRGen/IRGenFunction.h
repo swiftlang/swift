@@ -280,7 +280,6 @@ public:
   void emitTrap(bool EmitUnreachable);
 
 private:
-  unsigned NumTrapBarriers = 0;
   llvm::Instruction *AllocaIP;
   const SILDebugScope *DbgScope;
 
