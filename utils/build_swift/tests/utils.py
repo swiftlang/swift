@@ -19,13 +19,35 @@ from contextlib import contextmanager
 
 
 __all__ = [
+    'add_metaclass',
     'redirect_stderr',
     'redirect_stdout',
     'TestCase',
+
+    'UTILS_PATH',
 ]
 
 
+UTILS_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__),
+    os.pardir,
+    os.pardir,
+))
+
+
 # -----------------------------------------------------------------------------
+
+def add_metaclass(metacls):
+    def wrapper(cls):
+        body = vars(cls).copy()
+
+        body.pop('__dict__', None)
+        body.pop('__weakref__', None)
+
+        return metacls(cls.__name__, cls.__bases__, body)
+
+    return wrapper
+
 
 @contextmanager
 def redirect_stderr(stream=None):
