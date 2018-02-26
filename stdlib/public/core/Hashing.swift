@@ -149,7 +149,7 @@ func _mixUInt(_ value: UInt) -> UInt {
 }
 
 @_inlineable // FIXME(sil-serialize-all)
-@_transparent
+@inline(never)
 public // @testable
 func _mixInt(_ value: Int) -> Int {
 #if arch(i386) || arch(arm)
@@ -200,7 +200,8 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 /// code that creates the synthesized AST nodes.
 ///
 /// [ref]: https://pdfs.semanticscholar.org/03bf/7be88e88ba047c6ab28036d0f28510299226.pdf
-@_transparent
+@inline(never)
+@effects(readonly)
 public // @testable
 func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   // Use a magic number based on the golden ratio
