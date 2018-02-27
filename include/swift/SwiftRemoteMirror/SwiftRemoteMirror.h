@@ -86,6 +86,10 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
 
+uintptr_t
+swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
+                                   uintptr_t Object);
+
 /// Returns an opaque type reference for a class or closure context
 /// instance pointer, or NULL if one can't be constructed.
 ///

@@ -46,9 +46,9 @@ echo "Testing 5 with only mirror lib 5"
 /tmp/test /tmp/libtest5.dylib "-" "$mirrorlib5"
 echo ""
 
-echo "Testing 5 with only mirror lib 4"
-/tmp/test /tmp/libtest5.dylib "$mirrorlib4" "-"
-echo ""
+#echo "Testing 5 with only mirror lib 4"
+#/tmp/test /tmp/libtest5.dylib "$mirrorlib4" "-"
+#echo ""
 
 echo "Testing 5 with no mirror libs"
 /tmp/test /tmp/libtest5.dylib "-" "-" || true

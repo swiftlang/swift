@@ -145,6 +145,16 @@ swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Obje
   return Context->ownsObject(RemoteAddress(Object));
 }
 
+uintptr_t
+swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
+                                   uintptr_t Object) {
+  auto Context = ContextRef->nativeContext;
+  auto MetadataAddress = Context->readMetadataFromInstance(Object);
+  if (!MetadataAddress)
+    return 0;
+  return *MetadataAddress;
+}
+
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {

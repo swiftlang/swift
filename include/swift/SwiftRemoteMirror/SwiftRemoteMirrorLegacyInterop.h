@@ -90,6 +90,8 @@ struct SwiftReflectionFunctions {
   
   int (*ownsObject)(SwiftReflectionContextRef ContextRef, uintptr_t Object);
   
+  uintptr_t (*metadataForObject)(SwiftReflectionContextRef ContextRef, uintptr_t Object);
+  
   swift_typeref_t (*typeRefForInstance)(SwiftReflectionContextRef ContextRef,
                                         uintptr_t Object);
 
@@ -182,6 +184,14 @@ struct SwiftReflectionInteropContext {
 
 typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
+#define FOREACH_LIBRARY \
+  for (struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[0]; \
+       Library < &ContextRef->Libraries[ContextRef->LibraryCount]; \
+       ++Library)
+#define LIBRARY_INDEX (Library - ContextRef->Libraries)
+#define DECLARE_LIBRARY(index) \
+  struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[index]
+
 static inline int swift_reflection_interop_libraryOwnsObject(
   struct SwiftReflectionInteropContext *ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
@@ -189,11 +199,26 @@ static inline int swift_reflection_interop_libraryOwnsObject(
   if (!Library->IsLegacy)
     return Library->Functions.ownsObject(Library->Context, Object);
   
-  // The legacy library doesn't have this. Do it ourselves.
+  // The legacy library doesn't have this. Do it ourselves if we can. We need
+  // metadataForObject from a non-legacy library to do it.
+  uintptr_t Metadata = 0;
+  FOREACH_LIBRARY {
+    if (Library->IsLegacy)
+      continue;
+    
+    Metadata = Library->Functions.metadataForObject(Library->Context, Object);
+    break;
+  }
+  
+  // If we couldn't retrieve metadata, assume it's ours.
+  if (Metadata == 0)
+    return 1;
+  
+  // Search the data segment list to see if the metadata is in one of them.
   struct SwiftReflectionInteropContextLegacyDataSegmentList *Node =
     ContextRef->LegacyDataSegmentList;
   while (Node != NULL) {
-    if (Node->Start <= Object && Object < Node->End)
+    if (Node->Start <= Metadata && Metadata < Node->End)
       return 1;
     Node = Node->Next;
   }
@@ -232,6 +257,7 @@ static inline void swift_reflection_interop_loadFunctions(
     LOAD(addReflectionInfo);
     LOAD(addImage);
     LOAD(ownsObject);
+    LOAD(metadataForObject);
   }
   
   LOAD(destroyReflectionContext);
@@ -262,14 +288,6 @@ static inline void swift_reflection_interop_loadFunctions(
 #undef decltype
 #endif
 }
-
-#define FOREACH_LIBRARY \
-  for (struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[0]; \
-       Library < &ContextRef->Libraries[ContextRef->LibraryCount]; \
-       ++Library)
-#define LIBRARY_INDEX (Library - ContextRef->Libraries)
-#define DECLARE_LIBRARY(index) \
-  struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[index]
 
 static int swift_reflection_interop_readBytesAdapter(void *reader_context,
                                                      swift_addr_t address,
