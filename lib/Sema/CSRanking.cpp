@@ -1007,13 +1007,57 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Compare the type variable bindings.
   auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
-    // If the type variable isn't one for which we should be looking at the
-    // bindings, don't.
-    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
-      continue;
-
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
+
+    auto &impl = binding.typeVar->getImpl();
+
+    if (auto *locator = impl.getLocator()) {
+      auto path = locator->getPath();
+      if (!path.empty() &&
+          path.back().getKind() == ConstraintLocator::ClosureResult) {
+        // Since we support `() -> T` to `() -> Void` and
+        // `() -> Never` to `() -> T` conversions, it's always
+        // preferable to pick `T` rather than `Never` with
+        // all else being equal.
+        if (type2->isUninhabited())
+          ++score1;
+
+        if (type1->isUninhabited())
+          ++score2;
+
+        /*
+         FIXME: This breaks some code in source compatibility suite
+
+        if (type1->isEqual(type2) ||
+            type1->isMaterializable() != type2->isMaterializable())
+          continue;
+
+        bool isOptional1;
+        bool isOptional2;
+
+        type1->getOptionalObjectType(isOptional1);
+        type2->getOptionalObjectType(isOptional2);
+
+        if (isOptional1 != isOptional2)
+          continue;
+
+        // For simple types prefer supertypes in the closure
+        // result position because otherwise we'd have to generate
+        // a thunk to model function conversion.
+        if (tc.isSubtypeOf(type1, type2, cs.DC))
+          ++score2;
+
+        if (tc.isSubtypeOf(type2, type1, cs.DC))
+          ++score1;
+        */
+      }
+    }
+
+    // If the type variable isn't one for which we should be looking at the
+    // bindings, don't.
+    if (!impl.prefersSubtypeBinding())
+      continue;
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
