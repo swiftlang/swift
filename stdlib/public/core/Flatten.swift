@@ -233,7 +233,7 @@ extension FlattenCollection.Index : Comparable {
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   public var hashValue: Int {
-    return _combineHashValues(_inner?.hashValue ?? 0, _outer.hashValue)
+    return _hashValue(for: self)
   }
 
   public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
