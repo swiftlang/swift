@@ -2078,6 +2078,24 @@ Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
   return None;
 }
 
+/// Translate from the serialization VarDeclSpecifier enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static Optional<swift::VarDecl::Specifier>
+getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::VarDeclSpecifier::ID: \
+    return swift::VarDecl::Specifier::ID;
+  CASE(Let)
+  CASE(Var)
+  CASE(InOut)
+  CASE(Shared)
+  }
+#undef CASE
+  return None;
+}
+
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
                                   serialization::DeclID getter,
@@ -2894,7 +2912,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned specifier;
+    unsigned rawSpecifier;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
@@ -2902,7 +2920,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
-                                       isImplicit, isObjC, isStatic, specifier,
+                                       isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        storageKind, interfaceTypeID,
@@ -2954,9 +2972,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto var = createDecl<VarDecl>(/*IsStatic*/isStatic,
-                                   (VarDecl::Specifier)specifier,
-                                   /*IsCaptureList*/false, SourceLoc(), name,
+    auto specifier = getActualVarDeclSpecifier(
+        (serialization::VarDeclSpecifier)rawSpecifier);
+    if (!specifier) {
+      error();
+      return nullptr;
+    }
+
+    auto var = createDecl<VarDecl>(/*IsStatic*/ isStatic, *specifier,
+                                   /*IsCaptureList*/ false, SourceLoc(), name,
                                    Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     var->setIsGetterMutating(isGetterMutating);
@@ -3003,18 +3027,25 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   case decls_block::PARAM_DECL: {
     IdentifierID argNameID, paramNameID;
     DeclContextID contextID;
-    unsigned specifier;
+    unsigned rawSpecifier;
     TypeID interfaceTypeID;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
-                                         contextID, specifier, interfaceTypeID);
+                                         contextID, rawSpecifier,
+                                         interfaceTypeID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto param = createDecl<ParamDecl>((VarDecl::Specifier)specifier,
-                                       SourceLoc(), SourceLoc(),
+    auto specifier = getActualVarDeclSpecifier(
+        (serialization::VarDeclSpecifier)rawSpecifier);
+    if (!specifier) {
+      error();
+      return nullptr;
+    }
+
+    auto param = createDecl<ParamDecl>(*specifier, SourceLoc(), SourceLoc(),
                                        getIdentifier(argNameID), SourceLoc(),
                                        getIdentifier(paramNameID), Type(), DC);
 
