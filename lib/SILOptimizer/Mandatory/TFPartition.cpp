@@ -674,8 +674,9 @@ private:
   void markInstruction(SILInstruction &inst, Marking mark);
   void markArgument(SILArgument *arg, SILInstruction *user);
   void markValue(SILValue value, SILInstruction *user);
-
   void sinkValueIntoRegionForPromotion(SILInstruction *&inst);
+
+  void promoteCopyToMove();
 
   // Rewriting the host function.
   PartitionedTensorProgram
@@ -889,6 +890,14 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
     return shouldPromoteToTensorOp(op);
   }
 
+  // We can handle (struct_extract x, 0) if x is __tf_get_scalar_or_die.
+  if (auto *SE = dyn_cast<StructExtractInst>(inst)) {
+    auto *op = dyn_cast<SILInstruction>((SILNode*)SE->getOperand());
+    if (op && SE->getFieldNo() == 0 &&
+        classifyInst(op) == PartitioningClass::GetScalarOrDie)
+      return ScalarPromoteClass::ShouldPromote;
+  }
+
   // Check to see if we know how to promote this to a tensor operation.  If not,
   // we reject it.
   auto scalarClass = classifyPromotedScalarOp(inst).second;
@@ -1055,6 +1064,8 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
 /// arbitrary other instructions.  This is basically "side effect free" in the
 /// most liberal sense.
 static bool canMoveInstruction(SILInstruction *inst) {
+  // Instructions that SIL knows are always side-effect-free can generally be
+  // moved.
   if (inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None) {
     if (isa<TermInst>(inst))
       return false;
@@ -1064,15 +1075,11 @@ static bool canMoveInstruction(SILInstruction *inst) {
     return true;
   }
 
-  // PartialApply instructions can be moved around.  They aren't marked as
-  // having side effects because they take their argument as +1, but we can
-  // still move it around.
+  // Some other instructions have side effects because they take their argument
+  // as +1, but we can still move them around.
   if (isa<PartialApplyInst>(inst))
     return true;
 
-  // __tf_get_scalar_or_die cannot be marked as having no side effects because
-  // it takes a +1 value as its argument.  That said, it is safe to hoist and
-  // sink it.
   switch (classifyInst(inst)) {
   case PartitioningClass::GetScalarOrDie:
   case PartitioningClass::Hoistable:
@@ -1321,6 +1328,83 @@ findNCAOfTensorOps(ArrayRef<SILInstruction*> tensorOps,
   return ncaBlock;
 }
 
+/// Optimize the host code (and avoid copies back to the host in some cases) by
+/// changing scalar operations marked as "Copy" into "Move" when all of their
+/// users are known to be moved or deleted.
+void TFFunctionPartition::promoteCopyToMove() {
+  // Keep a worklist of instructions to process, allowing us to mark operands
+  // of instructions that are used by other instructions that get moved over.
+
+  // TODO: This should be an optimistic algorithm in general, and should include
+  // arguments as well.  This would allow moving over of cyclic references.
+  SmallVector<SILInstruction*, 16> worklist;
+  for (auto &markInfo : markedInstructions) {
+    auto *inst = markInfo.first;
+    if (markInfo.second == Marking::Copy)
+      worklist.push_back(inst);
+  }
+
+  // Iteratively process instructions until we converge.
+  SmallVector<SILInstruction*, 4> additionalInstsToDelete;
+
+  while (!worklist.empty()) {
+    auto *inst = worklist.pop_back_val();
+    auto mii = markedInstructions.find(inst);
+
+    // Ignore terminators or instructions that are not marked as copies.
+    if (mii == markedInstructions.end() || mii->second != Marking::Copy ||
+        isa<TermInst>(inst))
+      continue;
+
+    additionalInstsToDelete.clear();
+    bool canMove = true;
+    for (auto result : inst->getResults())
+      for (auto *use : result->getUses()) {
+        auto *user = use->getUser();
+        // If this user is marked for deletion or to be moved, then it won't
+        // require the instruction to be around.
+        auto it = markedInstructions.find(user);
+        if (it != markedInstructions.end() &&
+            (it->second == Marking::Move || it->second == Marking::Delete))
+          continue;
+
+        // If this is a debug_value or retain/release instruction that becomes
+        // obsolete if we move the value, then keep track of it, but keep going.
+        if (isUserIgnoredByPartitioning(user)) {
+          additionalInstsToDelete.push_back(user);
+          continue;
+        }
+
+        // Otherwise, there are host instructions that need this value.  Leave
+        // the computation on the host.
+        canMove = false;
+        break;
+      }
+
+    // If we can't move this instruction, then ignore it but keep processing
+    // worklist entries.
+    if (!canMove)
+      continue;
+
+    // Okay, we can move this instruction.
+    markedInstructions[inst] = Marking::Move;
+
+    // Make sure to delete any debug_value or refcounting instructions this
+    // uses.
+    for (auto inst : additionalInstsToDelete)
+      markedInstructions[inst] = Marking::Delete;
+
+    // Moving this over means that any operands of the instruction may have
+    // become movable.  Add them (back?) to the worklist for further
+    // consideration.
+    for (auto &op : inst->getAllOperands()) {
+      if (auto opInst = op.get()->getDefiningInstruction())
+        worklist.push_back(opInst);
+    }
+  }
+}
+
+
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
@@ -1334,7 +1418,8 @@ bool TFFunctionPartition::markFunction() {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
       auto *inst = &*I++;
 
-      // If this is a well known function that can be decoded into an op, so do.
+      // If this is a well known function that can be transformed into an op, do
+      // so first.
       if (auto apply = dyn_cast<ApplyInst>(inst))
         if (auto fn = apply->getCalleeFunction())
           inst = SILTensorOpInfo::decodeApply(apply, fn->getName());
@@ -1409,55 +1494,8 @@ bool TFFunctionPartition::markFunction() {
   // Optimize the host code (and avoid copies back to the host in some cases) by
   // changing scalar operations marked as "Copy" into "Move" when all of their
   // users are known to be moved or deleted.
-  //
-  // TODO: This should be an iterative optimistic algorithm in general, allowing
-  // moving over of cyclic references.  Start simple for now.
-  SmallVector<SILInstruction*, 4> additionalInstsToDelete;
-  for (auto &markInfo : markedInstructions) {
-    auto *inst = markInfo.first;
-    if (markInfo.second != Marking::Copy ||
-        isa<TermInst>(inst))
-      continue;
+  promoteCopyToMove();
 
-    unsigned instToDeleteSize = additionalInstsToDelete.size();
-    bool canMove = true;
-    for (auto result : inst->getResults())
-      for (auto *use : result->getUses()) {
-        auto *user = use->getUser();
-        // If this user is marked for deletion or to be moved, then it won't
-        // require the instruction to be around.
-        auto it = markedInstructions.find(user);
-        if (it != markedInstructions.end() &&
-            (it->second == Marking::Move || it->second == Marking::Delete))
-          continue;
-
-        // If this is a debug_value or retain/release instruction that becomes
-        // obsolete if we move the value, then keep track of it, but keep going.
-        if (isUserIgnoredByPartitioning(user)) {
-          additionalInstsToDelete.push_back(user);
-          continue;
-        }
-
-        // Otherwise, there are host instructions that need this value.  Leave
-        // the computation on the host.
-        canMove = false;
-        break;
-      }
-
-    if (canMove) {
-      markInfo.second = Marking::Move;
-    } else {
-      // If we're keeping it on the host, don't remove any of the instructions
-      // we would delete only if moving it.
-      additionalInstsToDelete.resize(instToDeleteSize);
-    }
-  }
-
-  // We may have decided to delete some new instructions.  This wasn't added in
-  // the loop above because that would invalidate the DenseMap iterator.  Add
-  // these values now.
-  for (auto inst : additionalInstsToDelete)
-    markedInstructions[inst] = Marking::Delete;
 
   // Not that we know all of the instructions we'll be moving over, find the end
   // point by finding the nearest common post dominating ancestor of the marked
@@ -1587,6 +1625,7 @@ public:
   }
 
   void visitTupleExtractInst(TupleExtractInst *inst);
+  void visitStructExtractInst(StructExtractInst *inst);
 
   void visitBranchInst(BranchInst *inst);
   void visitCondBranchInst(CondBranchInst *inst);
@@ -1836,6 +1875,13 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 /// We clone over tuple_extract(x, 0) into x's value.  The only time
 /// tuple_extract instructions get marked is when this is safe.
 void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
+  assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
+  ValueMap[inst] = remapValue(inst->getOperand());
+}
+
+/// We clone over struct_extract(x, 0) into x's value.  The only time we mark
+/// a struct_extract is when this is safe.
+void PartitionCloner::visitStructExtractInst(StructExtractInst *inst) {
   assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
   ValueMap[inst] = remapValue(inst->getOperand());
 }

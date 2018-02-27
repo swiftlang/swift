@@ -432,31 +432,13 @@ static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
 }
 
 SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
-  // We have to handle two kinds of operands: SIL address operands and normal
-  // values.
-  if (!v->getType().isAddress()) {
-    // If we have a normal operand, handle the form where a StructInst is
-    // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
-    if (auto *SI = dyn_cast<StructInst>(v))
-      if (SI->getNumOperands() == 1)
-        return SI->getOperand(0);
+  // If we have a normal operand, handle the form where a StructInst is
+  // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
+  if (auto *SI = dyn_cast<StructInst>(v))
+    if (SI->getNumOperands() == 1)
+      return SI->getOperand(0);
 
-    return v;
-  }
-
-  // Because we're often coming from generic code, we frequently get a value
-  // passed by-address.  Check for an alloc_stack with a single store to it and
-  // consume the stored value.
-  if (auto *ASI = dyn_cast<AllocStackInst>(v)) {
-    if (auto *store = ASI->getSingleUserOfType<StoreInst>())
-      return getScalarOperand(store->getSrc());
-  }
-
-  // Otherwise this is a by-address value that we can't handle:
-  // FIXME: The proper way to deal with this is with a deabstraction pass,
-  // which will guarantee generic specialization promotes the builtin operand
-  // to never be an address.
-  return SILValue();
+  return v;
 }
 
 /// If the specified value is a valid value for an attribute, return the
@@ -1149,6 +1131,9 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Move this into deabstraction when it exists.
 SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
+
+  // TODO: Canonicalize metatypes into constants!
+
   SmallVector<SILValue, 8> operands;
 
   std::string name = "__tfop_" + opName.str();

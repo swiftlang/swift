@@ -556,8 +556,13 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         else
           TF_SetAttrInt(op, name.c_str(), (int64_t)value);
       } else if (auto *fli = dyn_cast<FloatLiteralInst>(operand)) {
-        auto value = fli->getValue().convertToFloat();
-        TF_SetAttrFloat(op, name.c_str(), value);
+        auto value = fli->getValue();
+        // TensorFlow only supports 32-bit float attributes.  If we got a 16 or
+        // 64 bit one, convert it to float.
+        bool losesInfo = false;
+        value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                      &losesInfo);
+        TF_SetAttrFloat(op, name.c_str(), value.convertToFloat());
       } else if (auto *sli = dyn_cast<StringLiteralInst>(operand)) {
         assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
                "only byte encodings are supported");
@@ -651,8 +656,11 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       if (typeName == "Float" || typeName == "Double") {
         SmallVector<float, 4> values;
         for (auto elt : elements) {
-          auto *fli = cast<FloatLiteralInst>(elt);
-          values.push_back(fli->getValue().convertToFloat());
+          auto value = cast<FloatLiteralInst>(elt)->getValue();
+          bool losesInfo = false;
+          value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                        &losesInfo);
+          values.push_back(value.convertToFloat());
         }
         TF_SetAttrFloatList(op, name.c_str(), values.data(), values.size());
         break;

@@ -130,7 +130,7 @@ public func testStraightLineXORTraining() {
 
 
 // This testcase exposed bb argument and source location manipulation problems.
-public func testEagerLoop() -> Int32 { // expected-note 4 {{value used here}}
+public func testEagerLoop() -> Int32 { // expected-note 5 {{value used here}}
   var a = Tensor<Int32>(6)
   var count = Tensor<Int32>(0)
   while (a != 1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
@@ -140,7 +140,7 @@ public func testEagerLoop() -> Int32 { // expected-note 4 {{value used here}}
       a = 3 * a + 1
     }
     // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
-    count += 1  // expected-warning 6 {{implicitly copied}}
+    count += 1  // expected-warning 7 {{implicitly copied}}
   }
   return count.scalar!  // expected-note {{value used here}}
 }
@@ -162,4 +162,20 @@ public func sinkTensorToScalarCrash() {
   }
 
   opaqueGenericFunction(loss)
+}
+
+public extension Tensor {
+  // This is a theoretical operation that takes a generic scalar value as an
+  // attribute.
+  @_inlineable @inline(__always)
+  func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
+    return #tfop("ExampleOp", handle, axis: axis, axisType: T.self)
+  }
+}
+
+public func testGenericThing() {
+  let a = Tensor<Float>(zeros: [1,2])
+  // expected-error @+1 {{Op type not registered 'ExampleOp'}}
+  let b = a.genericAttr(axis: 42)
+  _ = b+b
 }
