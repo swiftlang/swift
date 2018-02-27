@@ -319,6 +319,27 @@ static SILFunction *getCalleeFunction(
   // would be a good optimization to handle and would be as simple as inserting
   // a cast.
   auto skipFuncConvert = [](SILValue CalleeValue) {
+    // We can also allow a thin @escape to noescape conversion as such:
+    // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
+    // %2 = convert_function %1 :
+    //      $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
+    // %3 = thin_to_thick_function %2 :
+    //  $@convention(thin) @noescape () -> () to
+    //            $@noescape @callee_guaranteed () -> ()
+    // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
+    if (auto *ThinToNoescapeCast = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+      auto FromCalleeTy =
+          ThinToNoescapeCast->getOperand()->getType().castTo<SILFunctionType>();
+      if (FromCalleeTy->getExtInfo().hasContext())
+        return CalleeValue;
+      auto ToCalleeTy = ThinToNoescapeCast->getType().castTo<SILFunctionType>();
+      auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
+          ToCalleeTy->getExtInfo().withNoEscape(false));
+      if (FromCalleeTy != EscapingCalleeTy)
+        return CalleeValue;
+      return ThinToNoescapeCast->getOperand();
+    }
+
     auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
     if (!CFI)
       return CalleeValue;
