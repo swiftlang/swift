@@ -14,13 +14,15 @@ void *Load(char *path) {
   return Handle;
 }
 
-void NopFree(const void *bytes, void *context) {}
+void NopFree(void *reader_context, const void *bytes, void *context) {
+  assert(reader_context == (void *)0xdeadbeef);
+  assert(context == (void *)0xfeedface);
+}
 
 const void *ReadBytes(void *context, swift_addr_t address, uint64_t size,
-                      FreeBytesFunction *outFreeFunction, void **outFreeContext) {
+                      void **outFreeContext) {
   assert(context == (void *)0xdeadbeef);
-  *outFreeFunction = NopFree;
-  *outFreeContext = NULL;
+  *outFreeContext = (void *)0xfeedface;
   return (void *)address;
 }
 
@@ -59,6 +61,7 @@ int main(int argc, char **argv) {
       Mirror5Handle,
       Mirror4Handle,
       sizeof(void *),
+      NopFree,
       ReadBytes,
       GetStringLength,
       GetSymbolAddress);

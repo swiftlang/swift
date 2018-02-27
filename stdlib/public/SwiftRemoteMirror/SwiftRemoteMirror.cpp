@@ -54,20 +54,22 @@ swift_reflection_getSupportedMetadataVersion() {
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,
-                                         ReadBytesFunction readBytes,
-                                         GetStringLengthFunction getStringLength,
-                                         GetSymbolAddressFunction getSymbolAddress) {
+                                         FreeBytesFunction Free,
+                                         ReadBytesFunction ReadBytes,
+                                         GetStringLengthFunction GetStringLength,
+                                         GetSymbolAddressFunction GetSymbolAddress) {
   assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
-  auto getSize = PointerSize == 4
+  auto GetSize = PointerSize == 4
     ? [](void *){ return (uint8_t)4; }
     : [](void *){ return (uint8_t)8; };
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    getSize,
-    getSize,
-    readBytes,
-    getStringLength,
-    getSymbolAddress
+    GetSize,
+    GetSize,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
   };
 
   return new SwiftReflectionContext(ReaderImpl);

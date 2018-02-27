@@ -32,13 +32,12 @@ extern "C" {
 // in the system library, so we use 'swift_addr_t'.
 typedef uint64_t swift_addr_t;
 
-typedef void (*FreeBytesFunction)(const void *bytes, void *context);
+typedef void (*FreeBytesFunction)(void *reader_context, const void *bytes, void *context);
 
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
 typedef uint8_t (*SizeSizeFunction)(void *reader_context);
 typedef const void *(*ReadBytesFunction)(void *reader_context, swift_addr_t address,
                                          uint64_t size,
-                                         FreeBytesFunction *outFreeFunction,
                                          void **outFreeContext);
 typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
                                             swift_addr_t address);
@@ -57,6 +56,9 @@ typedef struct MemoryReaderImpl {
   /// Get the size in bytes of the target's size type.
   SizeSizeFunction getSizeSize;
 
+  /// Free memory returned from readBytes.
+  FreeBytesFunction free;
+
   // FIXME: -Wdocumentation complains about \param and \returns on function pointers.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -65,14 +67,11 @@ typedef struct MemoryReaderImpl {
   ///
   /// \param address the address in the target address space
   /// \param size the number of bytes to read
-  /// \param outFreeFunction on return, a function that the caller will invoke to free
-  ///                        the returned memory, or NULL if no action needs to be taken
-  ///                        to free the memory
   /// \param outFreeContext on return, an arbitrary context pointer that the caller will
   ///                       pass to the free function
   /// \returns A pointer to the requested memory, or NULL if the memory could not be read.
-  ///          If outFreeFunction is non-NULL, the caller must invoke it on the returned
-  ///          pointer once it's done using it.
+  ///          The caller must invoke the free function on the returned pointer once it's
+  ///          done using the memory.
   ReadBytesFunction readBytes;
 
   /// Get the string length at the given address.

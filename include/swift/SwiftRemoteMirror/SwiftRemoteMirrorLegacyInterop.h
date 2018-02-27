@@ -59,9 +59,10 @@ struct SwiftReflectionFunctions {
   SwiftReflectionContextRef (*createReflectionContext)(
     void *ReaderContext,
     uint8_t PointerSize,
-    ReadBytesFunction readBytes,
-    GetStringLengthFunction getStringLength,
-    GetSymbolAddressFunction getSymbolAddress);
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress);
   
   SwiftReflectionContextRef (*createReflectionContextLegacy)(
     void *ReaderContext,
@@ -152,6 +153,7 @@ struct SwiftReflectionInteropContextLibrary {
 
 struct SwiftReflectionInteropContext {
   void *ReaderContext;
+  FreeBytesFunction FreeBytes;
   ReadBytesFunction ReadBytes;
   uint64_t (*GetStringLength)(void *reader_context,
                               swift_addr_t address);
@@ -251,15 +253,14 @@ static int swift_reflection_interop_readBytesAdapter(void *reader_context,
   SwiftReflectionInteropContextRef Context =
     (SwiftReflectionInteropContextRef)reader_context;
 
-  FreeBytesFunction FreeFunction;
   void *FreeContext;
   const void *ptr = Context->ReadBytes(Context->ReaderContext, address, size,
-                                       &FreeFunction, &FreeContext);
+                                       &FreeContext);
   if (ptr == NULL)
     return 0;
   
   memcpy(dest, ptr, size);
-  FreeFunction(ptr, FreeContext);
+  Context->FreeBytes(Context->ReaderContext, ptr, FreeContext);
   return 1;
 }
 
@@ -288,9 +289,10 @@ swift_reflection_interop_createReflectionContext(
     void *LibraryHandle,
     void *LegacyLibraryHandle,
     uint8_t PointerSize,
-    ReadBytesFunction readBytes,
-    GetStringLengthFunction getStringLength,
-    GetSymbolAddressFunction getSymbolAddress) {
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress) {
   
   SwiftReflectionInteropContextRef ContextRef =
     (SwiftReflectionInteropContextRef)calloc(sizeof(*ContextRef), 1);
@@ -313,14 +315,15 @@ swift_reflection_interop_createReflectionContext(
         swift_reflection_interop_GetSymbolAddressAdapter);
     } else {
       Library->Context = Library->Functions.createReflectionContext(ReaderContext,
-      PointerSize, readBytes, getStringLength, getSymbolAddress);
+      PointerSize, FreeBytes, ReadBytes, GetStringLength, GetSymbolAddress);
     }
   }
   
   ContextRef->ReaderContext = ReaderContext;
-  ContextRef->ReadBytes = readBytes;
-  ContextRef->GetStringLength = getStringLength;
-  ContextRef->GetSymbolAddress = getSymbolAddress;
+  ContextRef->FreeBytes = FreeBytes;
+  ContextRef->ReadBytes = ReadBytes;
+  ContextRef->GetStringLength = GetStringLength;
+  ContextRef->GetSymbolAddress = GetSymbolAddress;
   
   return ContextRef;
 }
@@ -358,13 +361,11 @@ swift_reflection_interop_addImageLegacy(
   SwiftReflectionInteropContextRef ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
   swift_addr_t imageStart) {
-  FreeBytesFunction FreeFunction;
   void *FreeContext;
   const void *Buf;
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
                               imageStart,
                               sizeof(MachHeader),
-                              &FreeFunction,
                               &FreeContext);
   if (Buf == NULL)
     return 0;
@@ -372,17 +373,16 @@ swift_reflection_interop_addImageLegacy(
   MachHeader *Header = (MachHeader *)Buf;
   
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
-    FreeFunction(Buf, ContextRef->ReaderContext);
+    ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
     return 0;
   }
   
   uint32_t Length = Header->sizeofcmds;
-  FreeFunction(Buf, ContextRef->ReaderContext);
+  ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
   
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
                               imageStart,
                               Length,
-                              &FreeFunction,
                               &FreeContext);
   Header = (MachHeader *)Buf;
   // TODO: free the stuff when we're done

@@ -95,14 +95,14 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
   }
 }
 
-static void PipeMemoryReader_freeBytes(const void *bytes, void *context) {
+static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
+                                       void *context) {
   free((void *)bytes);
 }
 
 static
 const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
                                        uint64_t Size,
-                                       FreeBytesFunction *outFreeFunction,
                                        void **outFreeContext) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
@@ -115,7 +115,6 @@ const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
   void *Buf = malloc(Size);
   PipeMemoryReader_collectBytesFromPipe(Reader, Buf, Size);
   
-  *outFreeFunction = PipeMemoryReader_freeBytes;
   *outFreeContext = NULL;
   
   return Buf;
@@ -288,6 +287,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
         (void*)&Pipe,
         sizeof(void *),
+        PipeMemoryReader_freeBytes,
         PipeMemoryReader_readBytes,
         PipeMemoryReader_getStringLength,
         PipeMemoryReader_getSymbolAddress);

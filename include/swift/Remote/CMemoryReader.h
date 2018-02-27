@@ -76,13 +76,14 @@ public:
 
   std::tuple<const void *, std::function<void()>>
     readBytes(RemoteAddress address, uint64_t size) override {
-      FreeBytesFunction freeFunc;
-      void *freeContext;
-      auto ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
-                                &freeFunc, &freeContext);
-      auto freeLambda = [=]{ freeFunc(ptr, freeContext); };
+      void *FreeContext;
+      auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
+                                &FreeContext);
+      auto ReaderContext = Impl.reader_context;
+      auto Free = Impl.free;
+      auto freeLambda = [=]{ Free(ReaderContext, Ptr, FreeContext); };
       
-      return std::make_tuple(ptr, freeLambda);
+      return std::make_tuple(Ptr, freeLambda);
   }
 };
 

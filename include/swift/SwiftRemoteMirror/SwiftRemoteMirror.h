@@ -45,9 +45,10 @@ SwiftReflectionContextRef
 swift_reflection_createReflectionContext(
     void *ReaderContext,
     uint8_t PointerSize,
-    ReadBytesFunction readBytes,
-    GetStringLengthFunction getStringLength,
-    GetSymbolAddressFunction getSymbolAddress);
+    FreeBytesFunction Free,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress);
 
 /// Destroys an opaque reflection context.
 void
