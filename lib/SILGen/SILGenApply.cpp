@@ -299,6 +299,7 @@ private:
     return cast<FunctionType>(substFormalType);
   }
 
+  /// Constructor for Callee::forIndirect.
   Callee(ManagedValue indirectValue,
          AbstractionPattern origFormalType,
          CanFunctionType substFormalType,
@@ -310,6 +311,7 @@ private:
       Loc(l)
   {}
 
+  /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType,
          CanAnyFunctionType substFormalType,
@@ -323,6 +325,8 @@ private:
   {
   }
 
+  /// Constructor called by all for* factory methods except forDirect and
+  /// forIndirect.
   Callee(Kind methodKind, SILGenFunction &SGF, SILDeclRef methodName,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
          SubstitutionList subs, SILLocation l)
