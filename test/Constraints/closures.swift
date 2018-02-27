@@ -630,7 +630,6 @@ func rdar33429010_2() {
   let iter = I_33429010()
   var acc: Int = 0 // expected-warning {{}}
   let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0 + $1 })
-  // expected-warning@-1 {{result of operator '+' is unused}}
   let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0.rdar33429010_incr($1) })
 }
 
@@ -651,4 +650,17 @@ func rdar36054961() {
   bar(dict: ["abc": { str, range, _ in
      str.replaceSubrange(range, with: str[range].reversed())
   }])
+}
+
+func rdar37790062() {
+  struct S<T> {
+    init(_ a: () -> T, _ b: () -> T) {}
+  }
+
+  func foo() -> Int { return 42 }
+  func bar() -> Void {}
+  func baz() -> (String, Int) { return ("question", 42) }
+
+  _ = S({ foo() }, { bar() }) // Ok, should infer T to be 'Void'
+  _ = S({ baz() }, { bar() }) // Ok, should infer T to be 'Void'
 }
