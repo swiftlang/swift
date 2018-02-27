@@ -163,6 +163,17 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
+/// If the specified value is a single-element struct_inst wrapper, look through
+/// them.
+static SILValue getValueInsideStructInst(SILValue value) {
+  // Dig through one-argument struct insts.
+  while (auto structVal = dyn_cast<StructInst>(value)) {
+    if (structVal->getNumOperands() != 1)
+      break;
+    value = structVal->getOperand(0);
+  }
+  return value;
+}
 
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
@@ -216,8 +227,9 @@ static bool decodeArrayElements(SILValue value,
 
       // The initializer elements are the tail elements of the object_inst, see
       // if they are all decodable.
-      for (auto elt : init->getTailElements())
-        elements.push_back(elt);
+      for (auto elt : init->getTailElements()) {
+        elements.push_back(getValueInsideStructInst(elt));
+      }
 
       return true;
     } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(inst)) {
@@ -301,7 +313,7 @@ static bool decodeArrayElements(SILValue value,
     if (arrayInsts) arrayInsts->insert(store);
 
     // If we got a store to a valid index, it must be our element.
-    elements[index] = store->getOperand(0);
+    elements[index] = getValueInsideStructInst(store->getOperand(0));
 
     // Track how many elements we see so we can know if we got them all.
     --numElements;
@@ -431,16 +443,6 @@ static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
     B.emitDestroyValueOperation(loc, array);
 }
 
-SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
-  // If we have a normal operand, handle the form where a StructInst is
-  // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
-  if (auto *SI = dyn_cast<StructInst>(v))
-    if (SI->getNumOperands() == 1)
-      return SI->getOperand(0);
-
-  return v;
-}
-
 /// If the specified value is a valid value for an attribute, return the
 /// instruction that provides the value, otherwise null.
 SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
@@ -508,10 +510,6 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       return si;
     }
   }
-
-  // Simplify scalar operands in general.
-  v = getScalarOperand(v);
-  if (!v) return nullptr;
 
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
@@ -949,9 +947,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
       }
 
       // If it isn't a TensorHandle or metatype, it must be a scalar.
-      auto scalar = getScalarOperand(operand);
-
-      auto scalarType = scalar->getType().getSwiftRValueType();
+      auto scalarType = operand->getType().getSwiftRValueType();
       if (convertSwiftTypeToTF(scalarType) == 0)
         return "operand has unrecognized type '" +
                operand->getType().getSwiftRValueType()->getString() + "'";
@@ -1070,6 +1066,10 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
 /// 'handle' out of it.
 static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
                                               SILBuilder &B) {
+  // If we already have a TensorHandle, just use it.
+  if (isTensorHandle(v->getType()))
+    return v;
+
   assert(v->getType().getSwiftRValueType()->getStructOrBoundGenericStruct() &&
          "Support more general conformances to TensorProtocol");
 
@@ -1160,7 +1160,6 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
       // Non-array values are scalars.
       auto elt = getArrayElementType(opTy.getSwiftRValueType());
       if (!elt) {
-        operand = getScalarOperand(operand);
         operands.push_back(operand);
         name += opName;
         continue;
