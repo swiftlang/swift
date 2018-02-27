@@ -56,7 +56,7 @@ KNOWN_SETTINGS=(
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
-    lldb-test-swift-only        ""               "when running lldb tests, only include Swift-specific tests"
+    lldb-test-swift-only        "1"               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -2355,9 +2355,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
-                    # We disable all bindings, since llbuild builds before Swift
-                    # and can't use the unbuilt `swiftc`.
-                    -DLLBUILD_SUPPORT_BINDINGS:=
+                    -DLLBUILD_SUPPORT_BINDINGS:=Swift
                 )
                 ;;
             swiftpm)
@@ -2733,7 +2731,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
-                # Run the gtests.
+                # Run the unittests.
+                # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
@@ -2746,7 +2745,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 else
                     with_pushd ${lldb_build_dir} \
-                        ninja check-lldb-unit
+                        ${NINJA_BIN} check-lldb-lit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
@@ -2808,6 +2807,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_TEST_DEBUG_SERVER=""
                 fi
 
+                # Options to find the just-built libddispatch and Foundation.
+                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
+                    DOTEST_EXTRA=""
+                else
+                    # This assumes that there are no spaces in any on these paths.
+                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/Foundation/usr/lib/swift"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
+                fi
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2818,7 +2830,8 @@ for host in "${ALL_HOSTS[@]}"; do
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_TEST_CATEGORIES} \
                            ${LLDB_DOTEST_CC_OPTS} \
-                           ${LLDB_FORMATTER_OPTS}
+                           ${LLDB_FORMATTER_OPTS} \
+                           -E "${DOTEST_EXTRA}"
                 continue
                 ;;
             llbuild)
@@ -3000,9 +3013,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "Test command: ${dry_run_command_output}"
 
                     if [[ ! "${test_paths}" ]]; then
-                        sh -e -x -c "${dry_run_command_output}"
+                        env bash -ex <(echo -e "${dry_run_command_output}")
                     else
-                        sh -e -x -c "${dry_run_command_output} $(echo ${test_paths[@]})"
+                        env bash -ex <(echo -e "${dry_run_command_output}" "${test_paths[@]}")
                     fi
                 else
                     call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}

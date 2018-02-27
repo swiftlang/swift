@@ -152,12 +152,6 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
-  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
-
-  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
-  
   /// The declaration of Swift.UnsafeMutableRawPointer.memory.
   VarDecl *UnsafeMutableRawPointerMemoryDecl = nullptr;
 
@@ -293,7 +287,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
     llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -645,43 +638,6 @@ ProtocolDecl *ASTContext::getErrorDecl() const {
   return getProtocol(KnownProtocolKind::Error);
 }
 
-EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_None:
-    llvm_unreachable("not optional");
-  case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalDecl();
-  case OTK_Optional:
-    return getOptionalDecl();
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
-}
-
-EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_Optional:
-    return getOptionalSomeDecl();
-  case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalSomeDecl();
-  case OTK_None:
-    llvm_unreachable("getting Some decl for non-optional type?");
-  }
-  llvm_unreachable("bad OTK");
-}
-
-EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
-  switch (kind) {
-  case OTK_Optional:
-    return getOptionalNoneDecl();
-  case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalNoneDecl();
-  case OTK_None:
-    llvm_unreachable("getting None decl for non-optional type?");
-  }
-  llvm_unreachable("bad OTK");
-}
-
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!Impl.OptionalSomeDecl)
     Impl.OptionalSomeDecl = getOptionalDecl()->getUniqueElement(/*hasVal*/true);
@@ -692,20 +648,6 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
     Impl.OptionalNoneDecl =getOptionalDecl()->getUniqueElement(/*hasVal*/false);
   return Impl.OptionalNoneDecl;
-}
-
-EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
-  if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
-    Impl.ImplicitlyUnwrappedOptionalSomeDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/true);
-  return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
-}
-
-EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
-  if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
-    Impl.ImplicitlyUnwrappedOptionalNoneDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/false);
-  return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
 static VarDecl *getPointeeProperty(VarDecl *&cache,
@@ -1460,7 +1402,7 @@ void ASTContext::loadObjCMethods(
 
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG
-  SharedTimer("verifyAllLoadedModules");
+  FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
   for (auto &loader : Impl.ModuleLoaders)
     loader->verifyAllModules();
 
@@ -2134,7 +2076,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
-    llvm::capacity_in_bytes(ImplicitlyUnwrappedOptionalTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
@@ -3454,7 +3395,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
     return entry = new (C, arena) UnownedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
   case Ownership::Weak:
-    assert(T->getAnyOptionalObjectType() &&
+    assert(T->getOptionalObjectType() &&
            "object of weak storage type is not optional");
     return entry = new (C, arena)
                WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);
@@ -4041,17 +3982,6 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
                                                properties);
 }
 
-Type OptionalType::get(OptionalTypeKind which, Type valueType) {
-  switch (which) {
-  // It wouldn't be unreasonable for this method to just ignore
-  // OTK_None if we made code more convenient to write.
-  case OTK_None: llvm_unreachable("building a non-optional type!");
-  case OTK_Optional: return OptionalType::get(valueType);
-  case OTK_ImplicitlyUnwrappedOptional: return ImplicitlyUnwrappedOptionalType::get(valueType);
-  }
-  llvm_unreachable("bad optional type kind");
-}
-
 OptionalType *OptionalType::get(Type base) {
   auto properties = base->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -4062,18 +3992,6 @@ OptionalType *OptionalType::get(Type base) {
   if (entry) return entry;
 
   return entry = new (C, arena) OptionalType(C, base, properties);
-}
-
-ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base) {
-  auto properties = base->getRecursiveProperties();
-  auto arena = getArena(properties);
-
-  const ASTContext &C = base->getASTContext();
-
-  auto *&entry = C.Impl.getArena(arena).ImplicitlyUnwrappedOptionalTypes[base];
-  if (entry) return entry;
-
-  return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
@@ -4482,6 +4400,13 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
       addTrivial(getIdentifier(#SWIFT_TYPE_NAME), stdlib);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+      // Even though we may never import types directly as Int or UInt
+      // (e.g. on 64-bit Windows, where CLong maps to Int32 and
+      // CLongLong to Int64), it's always possible to convert an Int
+      // or UInt to a C type.
+      addTrivial(getIdentifier("Int"), stdlib);
+      addTrivial(getIdentifier("UInt"), stdlib);
     }
 
     if (auto darwin = getLoadedModule(Id_Darwin)) {

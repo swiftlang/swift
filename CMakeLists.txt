@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.4.3)
 
+# TODO: Fix RPATH usage to be CMP0068 compliant
+# Disable Policy CMP0068 for CMake 3.9
+# rdar://37725888
+if(POLICY CMP0068)
+  cmake_policy(SET CMP0068 OLD)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -10,6 +17,8 @@ cmake_host_system_information(
 set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
 # Put linking in that category
 set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
+
+ENABLE_LANGUAGE(C)
 
 # First include general CMake utilities.
 include(SwiftUtils)
@@ -372,6 +381,10 @@ endif()
 
 if(SWIFT_BUILT_STANDALONE)
   project(Swift C CXX ASM)
+endif()
+
+if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
+  include(ClangClCompileRules)
 endif()
 
 precondition(CMAKE_SYSTEM_NAME)

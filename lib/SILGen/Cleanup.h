@@ -129,6 +129,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class CleanupStateRestorationScope;
   friend class SharedBorrowFormalEvaluation;
   friend class FormalEvaluationScope;
+  friend class PostponedCleanup;
 
 public:
   CleanupManager(SILGenFunction &SGF)

@@ -30,6 +30,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
@@ -40,12 +41,14 @@ namespace swift {
 namespace irgen {
   class Callee;
   class ConstantReference;
+  class ConstantStructBuilder;
   class Explosion;
   class FieldTypeInfo;
   class FunctionPointer;
   class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
+  enum RequireMetadata_t : bool;
   class Size;
   class StructLayout;
   enum class SymbolReferenceKind : unsigned char;
@@ -124,6 +127,16 @@ namespace irgen {
   llvm::Constant *emitForeignTypeMetadataInitializer(IRGenModule &IGM,
                                                      CanType type,
                                                      Size &addressPointOffset);
+
+  /// Emit a type context descriptor that was demanded by a reference from
+  /// other generated definitions.
+  void emitLazyTypeContextDescriptor(IRGenModule &IGM,
+                                     NominalTypeDecl *type,
+                                     RequireMetadata_t requireMetadata);
+
+  /// Emit type metadata that was demanded by a reference from other
+  /// generated definitions.
+  void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type);
 
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);
@@ -317,6 +330,25 @@ namespace irgen {
   /// Use the argument as the 'self' type metadata.
   void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                      CanType abstractType);
+
+  /// Description of the metadata emitted by adding generic requirements.
+  struct GenericRequirementsMetadata {
+    unsigned NumRequirements = 0;
+    unsigned NumGenericKeyArguments = 0;
+    unsigned NumGenericExtraArguments = 0;
+  };
+
+  /// Add generic requirements to the given constant struct builder.
+  ///
+  /// \param sig The generic signature against which the requirements are
+  /// described.
+  ///
+  /// \param requirements The requirements to add.
+  GenericRequirementsMetadata addGenericRequirements(
+                                          IRGenModule &IGM,
+                                          ConstantStructBuilder &B,
+                                          GenericSignature *sig,
+                                          ArrayRef<Requirement> requirements);
 
 } // end namespace irgen
 } // end namespace swift

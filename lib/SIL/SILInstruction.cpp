@@ -742,6 +742,10 @@ namespace {
       return true;
     }
 
+    bool visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *RHS) {
+      return true;
+    }
+
     bool visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *RHS) {
       return true;
     }
@@ -755,6 +759,10 @@ namespace {
     }
 
     bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
+      return true;
+    }
+
+    bool visitValueToBridgeObjectInst(ValueToBridgeObjectInst *i) {
       return true;
     }
 

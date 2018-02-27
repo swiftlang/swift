@@ -121,13 +121,12 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
     bool canBridgeBool = (rep == SILFunctionTypeRepresentation::ObjCMethod);
 
     // Look through optional types.
-    OptionalTypeKind optKind;
-    if (auto valueTy = t->getAnyOptionalObjectType(optKind)) {
+    if (auto valueTy = t->getOptionalObjectType()) {
       pattern = pattern.transformType([](CanType patternTy) {
-        return CanType(patternTy->getAnyOptionalObjectType());
+        return CanType(patternTy->getOptionalObjectType());
       });
       auto ty = getLoweredCBridgedType(pattern, valueTy, canBridgeBool, false);
-      return ty ? OptionalType::get(optKind, ty) : ty;
+      return ty ? OptionalType::get(ty) : ty;
     }
     return getLoweredCBridgedType(pattern, t, canBridgeBool,
                                   purpose == ForResult);

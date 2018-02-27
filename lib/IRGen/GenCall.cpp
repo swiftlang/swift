@@ -1601,6 +1601,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
+  assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
   llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
@@ -1919,6 +1920,8 @@ void CallEmission::setFromCallee() {
 
     // Fill in the context pointer if necessary.
     if (!contextPtr) {
+      assert(!CurCallee.getOrigFunctionType()->isNoEscape() &&
+             "Missing context?");
       contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
     }
   }
@@ -3369,14 +3372,17 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
   return Callee(std::move(info), fn, blockPtr);
 }
 
-Callee irgen::getSwiftFunctionPointerCallee(IRGenFunction &IGF,
-                                            llvm::Value *fnPtr,
-                                            llvm::Value *dataPtr,
-                                            CalleeInfo &&calleeInfo) {
+Callee irgen::getSwiftFunctionPointerCallee(
+    IRGenFunction &IGF, llvm::Value *fnPtr, llvm::Value *dataPtr,
+    CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
 
   FunctionPointer fn(fnPtr, sig);
-
+  if (castOpaqueToRefcountedContext) {
+    assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
+           "Expecting trivial closure context");
+    dataPtr = IGF.Builder.CreateBitCast(dataPtr, IGF.IGM.RefCountedPtrTy);
+  }
   return Callee(std::move(calleeInfo), fn, dataPtr);
 }
 

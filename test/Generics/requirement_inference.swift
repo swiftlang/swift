@@ -429,3 +429,34 @@ struct Bar<U: P32> {}
 // CHECK: Generic signature: <V where V : P34>
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P34>
 func conditionalConformance2<V>(_: Bar<Foo<V>>) {}
+
+// Mentioning a nested type that is conditional should infer that requirement (SR 6850)
+
+protocol P35 {}
+protocol P36 {
+    func foo()
+}
+
+struct ConditionalNested<T> {}
+
+extension ConditionalNested where T: P35 {
+    struct Inner {}
+}
+
+// CHECK: Generic signature: <T where T : P35, T : P36>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P35, τ_0_0 : P36>
+extension ConditionalNested.Inner: P36 where T: P36 {
+    func foo() {}
+
+    struct Inner2 {}
+}
+
+// CHECK-LABEL: conditionalNested1@
+// CHECK: Generic signature: <U where U : P35>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P35>
+func conditionalNested1<U>(_: [ConditionalNested<U>.Inner?]) {}
+
+// CHECK-LABEL: conditionalNested2@
+// CHECK: Generic signature: <U where U : P35, U : P36>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P35, τ_0_0 : P36>
+func conditionalNested2<U>(_: [ConditionalNested<U>.Inner.Inner2?]) {}

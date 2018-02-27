@@ -114,7 +114,7 @@ public:
     }
 
     for (const Job *J : Cmd.getInputs()) {
-      ArrayRef<std::string> OutFiles = J->getOutput().getPrimaryOutputFilenames();
+      auto OutFiles = J->getOutput().getPrimaryOutputFilenames();
       if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
         Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
       } else {
@@ -133,8 +133,7 @@ public:
       }
     }
     types::forAllTypes([&](types::ID Ty) {
-      const std::string &Output =
-          Cmd.getOutput().getAdditionalOutputForType(Ty);
+      auto Output = Cmd.getOutput().getAdditionalOutputForType(Ty);
       if (!Output.empty())
         Outputs.push_back(OutputPair(Ty, Output));
     });

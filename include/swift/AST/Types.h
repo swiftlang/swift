@@ -69,7 +69,6 @@ namespace swift {
   class ModuleDecl;
   class ModuleType;
   class ProtocolConformance;
-  enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
 
@@ -573,6 +572,12 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
+  /// \brief Determine whether this type can dynamically be an optional type.
+  ///
+  /// \param includeExistential Whether an existential type should be considered
+  /// such a type.
+  bool canDynamicallyBeOptionalType(bool includeExistential);
+
   /// Determine whether this type contains a type parameter somewhere in it.
   bool hasTypeParameter() {
     return getRecursiveProperties().hasTypeParameter();
@@ -993,29 +998,22 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is ImplicitlyUnwrappedOptional<T>; otherwise, return
-  /// the null type.
-  Type getImplicitlyUnwrappedOptionalObjectType();
-
-  /// Return T if this type is Optional<T> or ImplicitlyUnwrappedOptional<T>;
-  /// otherwise, return the null type.
-  Type getAnyOptionalObjectType(OptionalTypeKind &kind);
-  Type getAnyOptionalObjectType() {
-    OptionalTypeKind ignored;
-    return getAnyOptionalObjectType(ignored);
-  }
+  /// Return T if this type is Optional<T>; otherwise, return the null
+  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
+  /// otherwise.
+  Type getOptionalObjectType(bool &isOptional);
 
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes();
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals);
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
@@ -3845,6 +3843,12 @@ public:
     return getExtInfo().isNoEscape();
   }
 
+  /// Thick swift noescape function types are trivial.
+  bool isTrivialNoEscape() const {
+    return isNoEscape() &&
+           getRepresentation() == SILFunctionTypeRepresentation::Thick;
+  }
+
   bool isNoReturnFunction(); // Defined in SILType.cpp
 
   class ABICompatibilityCheckResult {
@@ -3853,6 +3857,7 @@ public:
     enum innerty {
       None,
       DifferentFunctionRepresentations,
+      ABIEscapeToNoEscapeConversion,
       DifferentNumberOfResults,
       DifferentReturnValueConventions,
       ABIIncompatibleReturnValues,
@@ -3872,6 +3877,10 @@ public:
     ABICompatibilityCheckResult() = delete;
 
     bool isCompatible() const { return kind == innerty::None; }
+    bool isCompatibleUpToNoEscapeConversion() {
+      return kind == innerty::None ||
+             kind == innerty::ABIEscapeToNoEscapeConversion;
+    }
 
     bool hasPayload() const { return payload.hasValue(); }
     uintptr_t getPayload() const { return payload.getValue(); }
@@ -4093,38 +4102,9 @@ public:
   /// Return a uniqued optional type with the specified base type.
   static OptionalType *get(Type baseTy);
 
-  /// Build one of the optional type sugar kinds.
-  ///
-  /// It's a bit unnatural to have this on OptionalType, but we don't
-  /// have an abstract common class, and polluting TypeBase with it
-  /// would be unfortunate.  If we ever make an AnyOptionalType,
-  /// we can move it there.
-  ///
-  /// \param kind - can't be OTK_None
-  static Type get(OptionalTypeKind kind, Type baseTy);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;
-  }
-};
-
-/// The type T!, which is always sugar for a library type.
-class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
-  ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
-                        RecursiveTypeProperties properties)
-    : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
-                           properties) {
-    //llvm_unreachable("ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
-  }
-
-public:
-  /// Return a uniqued optional type with the specified base type.
-  static ImplicitlyUnwrappedOptionalType *get(Type baseTy);
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ImplicitlyUnwrappedOptional;
   }
 };
 
@@ -5022,6 +5002,14 @@ inline bool TypeBase::isOpenedExistentialWithError() {
             openedExistentialType->isExistentialWithError());
   }
   return false;
+}
+
+inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
+  CanType T = getCanonicalType();
+  auto isArchetypeOrExistential = isa<ArchetypeType>(T) ||
+    (includeExistential && T.isExistentialType());
+
+  return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
 inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {

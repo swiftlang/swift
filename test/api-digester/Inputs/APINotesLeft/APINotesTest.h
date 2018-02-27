@@ -10,3 +10,9 @@ extern int ANTGlobalValue;
   +(void) plusPrint;
   -(int) getPropertyA;
 @end
+
+@protocol ObjcProt
+  -(void) ProtMemberFunc;
+  -(void) ProtMemberFunc2;
+  -(void) ProtMemberFunc3;
+@end

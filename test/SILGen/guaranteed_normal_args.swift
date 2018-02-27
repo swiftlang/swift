@@ -185,10 +185,10 @@ extension FakeDictionary {
   // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
   // CHECK:   [[TMP_X:%.*]] = alloc_stack $(Key, Value)
   // CHECK:   [[TMP_X_0:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 0
+  // CHECK:   [[TMP_X_1:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 1
   // CHECK:   [[TMP_0:%.*]] = alloc_stack $Key
   // CHECK:   copy_addr [[X_0]] to [initialization] [[TMP_0]]
   // CHECK:   copy_addr [take] [[TMP_0]] to [initialization] [[TMP_X_0]]
-  // CHECK:   [[TMP_X_1:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 1
   // CHECK:   [[TMP_1:%.*]] = alloc_stack $Value
   // CHECK:   copy_addr [[X_1]] to [initialization] [[TMP_1]]
   // CHECK:   copy_addr [take] [[TMP_1]] to [initialization] [[TMP_X_1]]
@@ -213,4 +213,12 @@ extension Unmanaged {
     Builtin.unsafeGuaranteedEnd(token)
     return result
   }
+}
+
+// Make sure that we properly forward x into memory and don't crash.
+public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Builtin.BridgeObject {
+  // y would normally be 0._builtinWordValue. We don't want to define that
+  // conformance.
+  let object = Builtin.castToBridgeObject(x, y)
+  return object
 }

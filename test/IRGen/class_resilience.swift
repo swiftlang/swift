@@ -27,7 +27,6 @@
 // CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|24}}
 
 // CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [15 x i8] c"ResilientChild\00"
-// CHECK: [[RESILIENTCHILD_FIELDS:@.*]] = private constant [7 x i8] c"field\00\00"
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has resilient superclass
@@ -38,8 +37,6 @@
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
-// --       field names,
-// CHECK-SAME:   [7 x i8]* [[RESILIENTCHILD_FIELDS]]
 // CHECK-SAME: }>
 
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[INT]] 0
@@ -470,7 +467,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericChild metadata initialization function
 
-// CHECK-LABEL: define private %swift.type* @create_generic_metadata_ResilientGenericChild(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**)
 
 // Get the superclass size and address point...
 
@@ -492,5 +489,5 @@ extension ResilientGenericOutsideParent {
 // CHECK-64:           [[OFFSET_ZEXT:%.*]] = zext i32 [[OFFSET]] to i64
 // CHECK-64:           store [[INT]] [[OFFSET_ZEXT]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
 
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 5)
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}} @"$S16class_resilience21ResilientGenericChildCMP" to i8**), [[INT]] {{[0-9]+}}, [[INT]] {{[0-9]+}}, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 5)
 // CHECK:              ret %swift.type* [[METADATA]]

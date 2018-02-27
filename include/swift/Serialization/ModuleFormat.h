@@ -54,7 +54,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 393; // SILLinkage::PublicNonABI
+/// Don't worry about adhering to the 80-column limit for this line.
+const uint16_t VERSION_MINOR = 400; // Last change: sil_property
 
 using DeclIDField = BCFixed<31>;
 
@@ -790,8 +791,6 @@ namespace decls_block {
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
-  using ImplicitlyUnwrappedOptionalTypeLayout =
-    SyntaxSugarTypeLayout<UNCHECKED_OPTIONAL_TYPE>;
 
   using DictionaryTypeLayout = BCRecordLayout<
     DICTIONARY_TYPE,
@@ -1290,6 +1289,7 @@ namespace decls_block {
   using XRefTypePathPieceLayout = BCRecordLayout<
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
+    IdentifierIDField, // private discriminator
     BCFixed<1>         // restrict to protocol extension
   >;
 

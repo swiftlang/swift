@@ -47,6 +47,8 @@ public:
     Projected operator->() const { return operator*(); }
     iterator &operator++() { Ptr++; return *this; }
     iterator operator++(int) { return iterator(Ptr++); }
+    iterator &operator--() { Ptr--; return *this; }
+    iterator operator--(int) { return iterator(Ptr--); }
     bool operator==(iterator rhs) const { return Ptr == rhs.Ptr; }
     bool operator!=(iterator rhs) const { return Ptr != rhs.Ptr; }
 

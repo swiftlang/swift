@@ -137,10 +137,18 @@ namespace swift {
   /// Creates a lazy type resolver for use in lookups.
   OwnedResolver createLazyResolver(ASTContext &Ctx);
 
-  typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
+  struct ExtensionInfo {
+    // The extension with the declarations to apply.
+    ExtensionDecl *Ext;
+    // The extension that enables the former to apply, if any (i.e. a
+    // conditional
+    // conformance to Foo enables 'extension Foo').
+    ExtensionDecl *EnablingExt;
+    bool IsSynthesized;
+  };
 
-  typedef llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)>
-    ExtensionGroupOperation;
+  typedef llvm::function_ref<void(ArrayRef<ExtensionInfo>)>
+      ExtensionGroupOperation;
 
   class SynthesizedExtensionAnalyzer {
     struct Implementation;

@@ -14,7 +14,7 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.opaque*)
 
 public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
@@ -35,7 +35,7 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK: [[STRUCT_LOC:%.*]] = call %swift.opaque* [[initializeWithCopy]](%swift.opaque* noalias [[STRUCT_ADDR]], %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 
 // CHECK: [[FN:%.*]] = bitcast i8* %2 to void (%swift.opaque*, %swift.opaque*, %swift.refcounted*)*
-// CHECK: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[STRUCT_ADDR]], %swift.refcounted* swiftself %3)
+// CHECK: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[STRUCT_ADDR]], %swift.refcounted* swiftself %15)
 
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
@@ -83,7 +83,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.opaque*)
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
@@ -93,7 +93,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK: [[ARG:%.*]] = bitcast %T17struct_resilience6MySizeV* %1 to i8*
 // CHECK: call void @llvm.memcpy{{.*}}(i8* [[COPY]], i8* [[ARG]], {{i32 8|i64 16}}, i32 {{.*}}, i1 false)
 // CHECK: [[FN:%.*]] = bitcast i8* %2
-// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* {{.*}} %0, {{.*}} [[TEMP]], %swift.refcounted* swiftself %3)
+// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* {{.*}} %0, {{.*}} [[TEMP]], %swift.refcounted* swiftself %{{.*}})
 // CHECK: ret void
 
   return f(s)

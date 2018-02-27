@@ -21,9 +21,9 @@
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
@@ -53,6 +53,8 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
+  case tok::pound_warning:
+  case tok::pound_error:
   case tok::pound_sourceLocation:
     return true;
 
@@ -87,6 +89,7 @@ bool Parser::isStartOfStmt() {
 
 ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::semi)) {
+    SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
@@ -110,6 +113,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
       CodeCompletion->completeStmtOrExpr();
+    SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -226,7 +230,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConditionalBlockKind) {
-  SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+  SyntaxParsingContext ItemListContext(SyntaxContext,
+                                       SyntaxKind::CodeBlockItemList);
 
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
@@ -262,9 +267,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
-    SyntaxParsingContext StmtContext(SyntaxContext, SyntaxContextKind::Stmt);
+    SyntaxParsingContext NodeContext(SyntaxContext, SyntaxKind::CodeBlockItem);
 
     if (Tok.is(tok::r_brace)) {
+      SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
       assert(IsTopLevel);
       diagnose(Tok, diag::extra_rbrace)
         .fixItRemove(Tok.getLoc());
@@ -273,8 +279,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     // Eat invalid tokens instead of allowing them to produce downstream errors.
-    if (consumeIf(tok::unknown))
+    if (Tok.is(tok::unknown)) {
+      SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
+      consumeToken();
       continue;
+    }
            
     bool NeedParseErrorRecovery = false;
     ASTNode Result;
@@ -409,6 +418,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (NeedParseErrorRecovery) {
+      SyntaxContext->createNodeInPlace(SyntaxKind::CodeBlockItem);
+      SyntaxContext->setTransparent();
+
+      SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+      SyntaxParsingContext StmtCtxt(SyntaxContext, SyntaxContextKind::Stmt);
       // If we had a parse error, skip to the start of the next stmt, decl or
       // '{'.
       //
@@ -507,6 +521,8 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::pound_line:
   case tok::pound_sourceLocation:
   case tok::pound_if:
+  case tok::pound_error:
+  case tok::pound_warning:
     assert((LabelInfo || tryLoc.isValid()) &&
            "unlabeled directives should be handled earlier");
     // Bailout, and let parseBraceItems() parse them.
@@ -671,8 +687,9 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
-  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if,
-                tok::pound_endif, tok::pound_else, tok::pound_elseif) &&
+  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if, 
+                tok::pound_error, tok::pound_warning, tok::pound_endif,
+                tok::pound_else, tok::pound_elseif) &&
       !isStartOfStmt() && !isStartOfDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
@@ -2021,13 +2038,22 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
         cases.emplace_back(ICD);
 
         for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl*>() && isa<IfConfigDecl>(Entry.get<Decl*>()))
+          if (Entry.is<Decl*>() && 
+              (isa<IfConfigDecl>(Entry.get<Decl*>())))
             // Don't hoist nested '#if'.
             continue;
 
-          assert(Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>()));
+          assert((Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>())) ||
+                 (Entry.is<Decl*>() && 
+                   isa<PoundDiagnosticDecl>(Entry.get<Decl*>())));
           cases.push_back(Entry);
         }
+      }
+    } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
+      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
+      Status |= PoundDiagnosticResult;
+      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
+        cases.emplace_back(PDD);
       }
     } else {
       // If there are non-case-label statements at the start of the switch body,

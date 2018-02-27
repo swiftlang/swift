@@ -208,7 +208,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -327,6 +326,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.EnableKeyPathResilience |= Args.hasArg(OPT_enable_key_path_resilience);
+  
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
   Opts.UseDarwinPreStableABIBit = false;
 #else
@@ -529,11 +530,6 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
-  if (Opts.shouldOptimize() && Opts.EnforceExclusivityDynamic) {
-    Diags.diagnose(SourceLoc(),
-                   diag::warning_argument_not_supported_with_optimization,
-                   A->getOption().getPrefixedName() + A->getValue());
-  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -699,7 +695,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
-  if (Opts.shouldOptimize())
+  if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
+                               OPT_disable_verify_exclusivity)) {
+    Opts.VerifyExclusivity
+      = A->getOption().matches(OPT_enable_verify_exclusivity);
+  }
+  if (Opts.shouldOptimize() && !Opts.VerifyExclusivity)
     Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
@@ -825,18 +826,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  // TODO: investigate whether these should be removed, in favor of definitions
-  // in other classes.
-  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const InputFile *input =
-                 FrontendOpts.InputsAndOutputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->file();
-  } else if (FrontendOpts.InputsAndOutputs.hasSingleInput()) {
-    Opts.MainInputFilename =
-        FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
-  }
-  Opts.OutputFilenames = FrontendOpts.InputsAndOutputs.copyOutputFilenames();
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

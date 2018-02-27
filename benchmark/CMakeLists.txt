@@ -59,6 +59,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest
     single-source/DictTest2
     single-source/DictTest3
+    single-source/DictTest4
     single-source/DictionaryBridge
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
@@ -113,6 +114,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
+    single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
     single-source/RangeAssignment
@@ -120,8 +122,10 @@ set(SWIFT_BENCH_MODULES
     single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
+    single-source/RemoveWhere
     single-source/ReversedCollections
     single-source/RomanNumbers
+    single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray

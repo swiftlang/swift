@@ -568,6 +568,7 @@ class TargetFunctionTypeFlags {
     ConventionShift   = 16U,
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
+    EscapingMask      = 0x04000000U,
   };
   int_type Data;
   
@@ -598,6 +599,12 @@ public:
                                              (hasFlags ? ParamFlagsMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withEscaping(bool isEscaping) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~EscapingMask) |
+                                             (isEscaping ? EscapingMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -606,6 +613,10 @@ public:
   
   bool throws() const {
     return bool(Data & ThrowsMask);
+  }
+
+  bool isEscaping() const {
+    return bool (Data & EscapingMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }

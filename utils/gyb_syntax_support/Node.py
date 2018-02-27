@@ -16,12 +16,15 @@ class Node(object):
     subclass.
     """
 
-    def __init__(self, name, kind=None, children=None,
-                 element=None, element_name=None, element_choices=None):
+    def __init__(self, name, description=None, kind=None, traits=None,
+                 children=None, element=None, element_name=None,
+                 element_choices=None):
         self.syntax_kind = name
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
+        self.description = description
 
+        self.traits = traits or []
         self.children = children or []
         self.base_kind = kind
         self.base_type = kind_to_type(self.base_kind)

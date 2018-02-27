@@ -147,6 +147,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
@@ -855,6 +856,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DynamicMemberLookup:
       break;
     }
     
@@ -979,7 +981,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
         auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
-        if (!fnTy->getResult()->getAnyOptionalObjectType())
+        if (!fnTy->getResult()->getOptionalObjectType())
           return false;
 
         // Check that the standard library hasn't added another overload of
@@ -987,11 +989,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
         auto inputTypes = inputTupleTy->getElementTypes();
         assert(inputTypes.size() == 2);
-        assert(inputTypes[0]->getAnyOptionalObjectType());
+        assert(inputTypes[0]->getOptionalObjectType());
         auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
         assert(autoclosure->isAutoClosure());
         auto secondParamTy = autoclosure->getResult();
-        assert(secondParamTy->getAnyOptionalObjectType());
+        assert(secondParamTy->getOptionalObjectType());
         (void)secondParamTy;
 
         return true;
@@ -1026,32 +1028,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // If one type is an implicitly unwrapped optional of the other,
-    // prefer the non-optional.    
-    bool type1Better = false;
-    bool type2Better = false;
-    if (auto type1Obj = type1->getImplicitlyUnwrappedOptionalObjectType()) {
-      if (type1Obj->isEqual(type2))
-        type2Better = true;
-    }
-    if (auto type2Obj = type2->getImplicitlyUnwrappedOptionalObjectType()) {
-      if (type2Obj->isEqual(type1))
-        type1Better = true;
-    }
-
-    if (type1Better || type2Better) {
-      if (type1Better)
-        ++score1;
-      if (type2Better)
-        ++score2;
-      continue;
-    }
-
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    auto type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
+    auto type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;

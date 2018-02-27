@@ -18,9 +18,9 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Strings.h"
 

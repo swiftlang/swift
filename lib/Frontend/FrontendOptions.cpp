@@ -94,6 +94,19 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
+  switch (action) {
+  case FrontendOptions::ActionType::Parse:
+  case FrontendOptions::ActionType::DumpParse:
+  case FrontendOptions::ActionType::EmitSyntax:
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+  case FrontendOptions::ActionType::EmitImportedModules:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void FrontendOptions::forAllOutputPaths(
     const InputFile &input, std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
@@ -104,10 +117,9 @@ void FrontendOptions::forAllOutputPaths(
       fn(input.outputFilename());
   }
   const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
+      &InputsAndOutputs.supplementaryOutputs().ModuleOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -182,11 +194,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
-         !canActionEmitDependencies(RequestedAction);
-}
-
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -218,11 +225,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
-}
-
-bool FrontendOptions::canActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -251,11 +254,6 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
-         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -287,14 +285,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
-}
-
-bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {
@@ -395,4 +385,14 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitIR:
     return true;
   }
+}
+
+PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
+  return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
+}
+
+PrimarySpecificPaths
+FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
+  return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
 }

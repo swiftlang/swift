@@ -119,7 +119,6 @@ func testExplicitConstructors3P() {
 // EXPLICIT_CONSTRUCTORS_3P: Begin completions
 // EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: ['(']{#(a): Int#}[')'][#ExplicitConstructors3#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#}[')'][#ExplicitConstructors3#]{{; name=.+$}}
-// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: freeFunc()[#Void#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_3P: End completions
 }
 

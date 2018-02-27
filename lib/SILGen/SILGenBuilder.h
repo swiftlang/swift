@@ -92,6 +92,13 @@ public:
                                   SILType substFnTy, SubstitutionList subs,
                                   ArrayRef<ManagedValue> args,
                                   SILType closureTy);
+  ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
+                                  SILType substFnTy, SubstitutionList subs,
+                                  ArrayRef<ManagedValue> args,
+                                  SILType closureTy) {
+    return createPartialApply(loc, fn.getValue(), substFnTy, subs, args,
+                              closureTy);
+  }
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
                              SubstitutionList subs, ArrayRef<SILValue> args);
@@ -306,6 +313,11 @@ public:
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
+  using SILBuilder::createOpenExistentialMetatype;
+  ManagedValue createOpenExistentialMetatype(SILLocation loc,
+                                             ManagedValue value,
+                                             SILType openedType);
+
   /// Convert a @convention(block) value to AnyObject.
   ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
                                       SILType type);
@@ -322,6 +334,7 @@ public:
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy);
 
+  using SILBuilder::createStore;
   /// Forward \p value into \p address.
   ///
   /// This will forward value's cleanup (if it has one) into the equivalent
@@ -347,92 +360,16 @@ public:
   ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
                                        SILType destType);
 
+  using SILBuilder::createRefToBridgeObject;
+  ManagedValue createRefToBridgeObject(SILLocation loc, ManagedValue mv,
+                                       SILValue bits);
+
   using SILBuilder::createBranch;
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            ArrayRef<ManagedValue> Args);
 
   using SILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
-};
-
-class SwitchCaseFullExpr;
-
-/// A class for building switch enums that handles all of the ownership
-/// requirements for the user.
-///
-/// It assumes that the user passes in a block that takes in a ManagedValue and
-/// returns a ManagedValue for the blocks exit argument. Should return an empty
-/// ManagedValue to signal no result.
-class SwitchEnumBuilder {
-public:
-  using NormalCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
-  using DefaultCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
-
-  enum class DefaultDispatchTime { BeforeNormalCases, AfterNormalCases };
-
-private:
-  struct NormalCaseData {
-    EnumElementDecl *decl;
-    SILBasicBlock *block;
-    NullablePtr<SILBasicBlock> contBlock;
-    NormalCaseHandler handler;
-    ProfileCounter count;
-
-    NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
-                   NullablePtr<SILBasicBlock> contBlock,
-                   NormalCaseHandler handler, ProfileCounter count)
-        : decl(decl), block(block), contBlock(contBlock), handler(handler),
-          count(count) {}
-    ~NormalCaseData() = default;
-  };
-
-  struct DefaultCaseData {
-    SILBasicBlock *block;
-    NullablePtr<SILBasicBlock> contBlock;
-    DefaultCaseHandler handler;
-    DefaultDispatchTime dispatchTime;
-    ProfileCounter count;
-
-    DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
-                    DefaultCaseHandler handler,
-                    DefaultDispatchTime dispatchTime, ProfileCounter count)
-        : block(block), contBlock(contBlock), handler(handler),
-          dispatchTime(dispatchTime), count(count) {}
-    ~DefaultCaseData() = default;
-  };
-
-  SILGenBuilder &builder;
-  SILLocation loc;
-  ManagedValue optional;
-  llvm::Optional<DefaultCaseData> defaultBlockData;
-  llvm::SmallVector<NormalCaseData, 8> caseDataArray;
-
-public:
-  SwitchEnumBuilder(SILGenBuilder &builder, SILLocation loc,
-                    ManagedValue optional)
-      : builder(builder), loc(loc), optional(optional) {}
-
-  void addDefaultCase(
-      SILBasicBlock *defaultBlock, NullablePtr<SILBasicBlock> contBlock,
-      DefaultCaseHandler handle,
-      DefaultDispatchTime dispatchTime = DefaultDispatchTime::AfterNormalCases,
-      ProfileCounter count = ProfileCounter()) {
-    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime,
-                             count);
-  }
-
-  void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
-               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle,
-               ProfileCounter count = ProfileCounter()) {
-    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
-  }
-
-  void emit() &&;
-
-private:
-  SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
 };
 
 } // namespace Lowering

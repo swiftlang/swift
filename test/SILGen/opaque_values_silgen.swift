@@ -680,11 +680,11 @@ func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // Tests support for address only let closures under opaque value mode - they are not by-address anymore
 // ---
-// CHECK-LABEL: sil private @$S20opaque_values_silgen21s330___addrLetClosureyxxlFxycfU_xycfU_ : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil private @$S20opaque_values_silgen21s330___addrLetClosureyxxlFxyXEfU_xyXEfU_ : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   return [[COPY_ARG]] : $T
-// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s330___addrLetClosureyxxlFxycfU_xycfU_'
+// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s330___addrLetClosureyxxlFxyXEfU_xyXEfU_'
 func s330___addrLetClosure<T>(_ x:T) -> T {
   return { { x }() }()
 }

@@ -43,34 +43,31 @@ RequirementEnvironment::RequirementEnvironment(
   auto concreteType = conformanceDC->getSelfInterfaceType();
   auto *conformanceSig = conformanceDC->getGenericSignatureOfContext();
 
-  // Build a substitution map from the generic parameters of the conforming
-  // type to the synthetic environment.
+  // This is a substitution function from the generic parameters of the
+  // conforming type to the synthetic environment.
   //
   // For structs, enums and protocols, this is a 1:1 mapping; for classes,
   // we increase the depth of each generic parameter by 1 so that we can
   // introduce a class-bound 'Self' parameter.
-  auto substConcreteType = concreteType;
-  SubstitutionMap conformanceToSyntheticEnvMap;
-  if (conformanceSig) {
-    conformanceToSyntheticEnvMap = conformanceSig->getSubstitutionMap(
-      [&](SubstitutableType *type) {
-        auto *genericParam = cast<GenericTypeParamType>(type);
-        if (covariantSelf) {
-          return GenericTypeParamType::get(
-              genericParam->getDepth() + 1,
-              genericParam->getIndex(),
-              ctx);
-        }
+  //
+  // This is a raw function rather than a substitution map because we need to
+  // keep generic parameters as generic, even if the conformanceSig (the best
+  // way to create the substitution map) equates them to concrete types.
+  auto conformanceToSyntheticTypeFn = [&](SubstitutableType *type) {
+    auto *genericParam = cast<GenericTypeParamType>(type);
+    if (covariantSelf) {
+      return GenericTypeParamType::get(genericParam->getDepth() + 1,
+                                       genericParam->getIndex(), ctx);
+    }
 
-        return GenericTypeParamType::get(
-            genericParam->getDepth(),
-            genericParam->getIndex(),
-            ctx);
-      },
-      MakeAbstractConformanceForGenericType());
+    return GenericTypeParamType::get(genericParam->getDepth(),
+                                     genericParam->getIndex(), ctx);
+  };
+  auto conformanceToSyntheticConformanceFn =
+      MakeAbstractConformanceForGenericType();
 
-    substConcreteType = concreteType.subst(conformanceToSyntheticEnvMap);
-  }
+  auto substConcreteType = concreteType.subst(
+      conformanceToSyntheticTypeFn, conformanceToSyntheticConformanceFn);
 
   // Calculate the depth at which the requirement's generic parameters
   // appear in the synthetic signature.
@@ -171,9 +168,9 @@ RequirementEnvironment::RequirementEnvironment(
   // Now, add all generic parameters from the conforming type.
   if (conformanceSig) {
     for (auto param : conformanceSig->getGenericParams()) {
-      builder.addGenericParameter(
-          Type(param).subst(conformanceToSyntheticEnvMap)
-              ->castTo<GenericTypeParamType>());
+      auto substParam = Type(param).subst(conformanceToSyntheticTypeFn,
+                                          conformanceToSyntheticConformanceFn);
+      builder.addGenericParameter(substParam->castTo<GenericTypeParamType>());
     }
   }
 
@@ -186,7 +183,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig->getRequirements()) {
-      if (auto req = rawReq.subst(conformanceToSyntheticEnvMap))
+      if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
+                                  conformanceToSyntheticConformanceFn))
         builder.addRequirement(*req, source, nullptr);
     }
   }

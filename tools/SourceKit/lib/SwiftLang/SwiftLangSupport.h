@@ -91,7 +91,8 @@ public:
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
-  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang);
+  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
+             bool BuildSyntaxTree);
   void readSyntaxInfo(EditorConsumer& consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -354,9 +355,9 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
-  static void printFullyAnnotatedSynthesizedDeclaration(
-                                            const swift::ValueDecl *VD,
-                                            swift::NominalTypeDecl *Target,
+  static void
+  printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                            swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it

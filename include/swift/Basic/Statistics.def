@@ -19,9 +19,6 @@
 //   - Subsystem is a token to be stringified as a name prefix
 //   - Id is an identifier suitable for use in C++
 //
-// FRONTEND_RECURSIVE_SHARED_TIMER(Id)
-//   - Id is an identifier suitable for use in C++
-//
 //===----------------------------------------------------------------------===//
 
 /// Driver statistics are collected for driver processes
@@ -218,14 +215,4 @@ FRONTEND_STATISTIC(IRModule, NumIRInsts)
 /// of the frontend job, which should be the same as the size of
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
-#endif
-
-/// Frontend timers for recursive routines
-#ifdef FRONTEND_RECURSIVE_SHARED_TIMER
-
-/// Time spent in  NominalTypeDecl::lookupDirect.
-FRONTEND_RECURSIVE_SHARED_TIMER(NominalTypeDecl__lookupDirect)
-
-/// Time spent in ClangImporter::Implementation::loadAllMembers.
-FRONTEND_RECURSIVE_SHARED_TIMER(ClangImporter__Implementation__loadAllMembers)
 #endif

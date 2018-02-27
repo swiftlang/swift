@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
@@ -448,7 +449,7 @@ private:
     if (clangTy->isPointerType()
         && clangTy->getPointeeType().isConstQualified()) {
       // Peek through optionals.
-      if (auto substObjTy = substTy.getAnyOptionalObjectType())
+      if (auto substObjTy = substTy.getOptionalObjectType())
         substTy = substObjTy;
 
       // Void pointers aren't usefully indirectable.
@@ -780,7 +781,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 
   // These conventions wrap the result type in a level of optionality.
   case ForeignErrorConvention::NilResult:
-    assert(!substFormalResultType->getAnyOptionalObjectType());
+    assert(!substFormalResultType->getOptionalObjectType());
     substFormalResultType =
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
@@ -1723,19 +1724,12 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  /// Does the given selector start with the given string as a
-  /// prefix, in the sense of the selector naming conventions?
-  auto hasPrefix = [](StringRef text, StringRef prefix) {
-    if (!text.startswith(prefix)) return false;
-    if (text.size() == prefix.size()) return true;
-    assert(text.size() > prefix.size());
-    return !clang::isLowercase(text[prefix.size()]);
-  };
+  StringRef firstWord = camel_case::getFirstWord(text);
 
   auto result = SelectorFamily::None;
   if (false) /*for #define purposes*/;
 #define CHECK_PREFIX(LABEL, PREFIX) \
-  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
+  else if (firstWord == PREFIX) result = SelectorFamily::LABEL;
   FOREACH_FAMILY(CHECK_PREFIX)
 #undef CHECK_PREFIX
 
@@ -1744,61 +1738,49 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   return result;
 }
 
-/// Get the ObjC selector family a SILDeclRef implicitly belongs to.
+/// Get the ObjC selector family a foreign SILDeclRef belongs to.
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
+  assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor)
-      return getSelectorFamily(FD->getName());
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsGetter:
-      // Getter selectors can belong to families if their name begins with the
-      // wrong thing.
-      if (accessor->getStorage()->isObjC() || c.isForeign) {
-        auto declName = accessor->getStorage()->getBaseName();
-        switch (declName.getKind()) {
-        case DeclBaseName::Kind::Normal:
-          return getSelectorFamily(declName.getIdentifier());
-        case DeclBaseName::Kind::Subscript:
-          return SelectorFamily::None;
-        case DeclBaseName::Kind::Destructor:
-          return SelectorFamily::None;
-        }
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+        break;
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::IsMaterializeForSet:
+        llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
-      return SelectorFamily::None;
-
-      // Other accessors are never selector family members.
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
-      return SelectorFamily::None;
     }
+
+    return getSelectorFamily(FD->getObjCSelector().getSelectorPieces().front());
   }
   case SILDeclRef::Kind::Initializer:
-    case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
 
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::IVarDestroyer:
+    return SelectorFamily::None;
+
+  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return SelectorFamily::None;
+    llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -2146,11 +2128,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
   bool derivedWasOptional = false;
-  if (auto object = derived.getAnyOptionalObjectType()) {
+  if (auto object = derived.getOptionalObjectType()) {
     derivedWasOptional = true;
     derived = object;
   }
-  if (auto object = base.getAnyOptionalObjectType()) {
+  if (auto object = base.getOptionalObjectType()) {
     base = object;
   }
 
@@ -2405,7 +2387,7 @@ public:
   /// Optionals need to have their object types substituted by these rules.
   CanType visitBoundGenericEnumType(CanBoundGenericEnumType origType) {
     // Only use a special rule if it's Optional.
-    if (!origType->getDecl()->classifyAsOptionalType()) {
+    if (!origType->getDecl()->isOptionalDecl()) {
       return visitType(origType);
     }
 
@@ -2778,8 +2760,8 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
       continue;
 
     // Optional and IUO are interchangeable if their elements are.
-    auto aObject = aa.getAnyOptionalObjectType();
-    auto bObject = bb.getAnyOptionalObjectType();
+    auto aObject = aa.getOptionalObjectType();
+    auto bObject = bb.getOptionalObjectType();
     if (aObject && bObject && areABICompatibleParamsOrReturns(aObject, bObject))
       continue;
     // Optional objects are ABI-interchangeable with non-optionals;
@@ -2890,6 +2872,12 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 
+  // This needs to be checked last because the result implies everying else has
+  // already been checked and this is the only difference.
+  if (isNoEscape() != other->isNoEscape() &&
+      (getRepresentation() == SILFunctionType::Representation::Thick))
+    return ABICompatibilityCheckResult::ABIEscapeToNoEscapeConversion;
+
   return ABICompatibilityCheckResult::None;
 }
 
@@ -2918,6 +2906,8 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "Differing parameter convention";
   case innerty::ABIIncompatibleParameterType:
     return "ABI incompatible parameter type.";
+  case innerty::ABIEscapeToNoEscapeConversion:
+    return "Escape to no escape conversion";
   }
   llvm_unreachable("Covered switch isn't completely covered?!");
 }

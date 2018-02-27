@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
-// See test/Compatibility/tuple_arguments.swift for the Swift 3 behavior.
+// See test/Compatibility/tuple_arguments_3.swift for the Swift 3 behavior.
+// See test/Compatibility/tuple_arguments_4.swift for the Swift 4 behavior.
 
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
@@ -42,10 +43,10 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (3) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (3)
+  var d = (a, b)
 
   concrete(a)
   concrete((a))
@@ -550,9 +551,9 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (a, b)
 
   _ = InitTwo(a, b)
   _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
@@ -1015,9 +1016,9 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (a, b)
 
   _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit<(Int, Int)>((a, b))
@@ -1641,4 +1642,32 @@ public extension Optional {
     where Wrapped == (Value) -> Result {
     return value.apply(self)
   }
+}
+
+// https://bugs.swift.org/browse/SR-6837
+do {
+  func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
+  func takePair(_ pair: (Int, Int?)) {}
+  takeFn(fn: takePair) // expected-error {{cannot convert value of type '((Int, Int?)) -> ()' to expected argument type '(Int, Int?) -> ()'}}
+  takeFn(fn: { (pair: (Int, Int?)) in } ) // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  takeFn { (pair: (Int, Int?)) in } // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+}
+
+// https://bugs.swift.org/browse/SR-6796
+do {
+  func f(a: (() -> Void)? = nil) {}
+  func log<T>() -> ((T) -> Void)? { return nil }
+
+  f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+
+  func logNoOptional<T>() -> (T) -> Void { }
+  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '(() -> Void)?'}}
+
+  func g() {}
+  g(()) // expected-error {{argument passed to call that takes no arguments}}
+
+  func h(_: ()) {} // expected-note {{'h' declared here}}
+  h() // expected-error {{missing argument for parameter #1 in call}}
 }

@@ -1341,6 +1341,14 @@ entry(%0 : $@convention(thin) (AnyObject) -> Optional<AnyObject>):
   %1 = convert_function %0 : $@convention(thin) (AnyObject) -> Optional<AnyObject> to $@convention(thin) (Optional<AnyObject>) -> AnyObject
   return %1 : $@convention(thin) (Optional<AnyObject>) -> AnyObject
 }
+// CHECK-LABEL: sil @convert_function_trivial
+// CHECK:  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+// CHECK: return
+sil @convert_function_trivial : $@convention(thin) (@owned @callee_guaranteed (AnyObject) -> Optional<AnyObject>) -> () {
+entry(%0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject>):
+  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+  return undef : $()
+}
 
 sil @meta_metatype : $@convention(thin) () -> @thick Beth.Type.Type {
 entry:

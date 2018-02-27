@@ -13,19 +13,19 @@
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
 ///
-/// TODO: This is currently a module transform so that closures can be
-/// transformed after their parent scope is analyzed. This isn't a big problem
-/// now because AccessMarkerElimination is also a module pass that follows this
-/// pass. However, we would like to mostly eliminate module transforms. This
-/// could be done by changing the PassManager to follow CloseScopeAnalysis. A
-/// new ClosureTransform type would be pipelined just like FunctionTransform,
-/// but would have an entry point that handled a parent closure scope and all
-/// its children in one invocation. For function pipelining to be upheld, we
-/// would need to verify that BasicCalleeAnalysis never conflicts with
-/// ClosureScopeAnalysis. i.e. we could never create a caller->callee edge when
-/// the callee is passed as a function argument. Normal FunctionTransforms would
-/// then be called on each closure function and its parent scope before calling
-/// the ClosureTransform.
+/// TODO: This is currently a module transform so that it can process closures
+/// after analyzing their parent scope. This isn't a big problem now because
+/// AccessMarkerElimination is also a module pass that follows this pass, so all
+/// markers will still be present when this pass runs. However, we would like to
+/// mostly eliminate module transforms. This could be done by changing the
+/// PassManager to follow ClosureScopeAnalysis. A new ClosureTransform type
+/// would be pipelined just like FunctionTransform, but would have an entry
+/// point that handled a parent closure scope and all its children in one
+/// invocation. For function pipelining to be upheld, we would need to verify
+/// that BasicCalleeAnalysis never conflicts with ClosureScopeAnalysis. i.e. we
+/// could never create a caller->callee edge when the callee is passed as a
+/// function argument. Normal FunctionTransforms would then be called on each
+/// closure function and its parent scope before calling the ClosureTransform.
 ///
 /// FIXME: handle boxes used by copy_value when neither copy is captured.
 ///
@@ -456,6 +456,8 @@ void SelectEnforcement::updateCapture(AddressCapture capture) {
       return;
     }
     switch (user->getKind()) {
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+    case SILInstructionKind::MarkDependenceInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::BeginBorrowInst:
     case SILInstructionKind::CopyValueInst:
@@ -521,6 +523,12 @@ struct SourceAccess {
 };
 
 /// The pass.
+///
+/// This can't be a SILFunctionTransform because DynamicCaptures need to be
+/// recorded while analyzing a closure's parent scopes before processing the
+/// closures.
+///
+/// TODO: Make this a "ClosureTransform". See the file-level comments above.
 class AccessEnforcementSelection : public SILModuleTransform {
   // Reference back to the known dynamically enforced non-escaping closure
   // arguments in this module. Parent scopes are processed before the closures
@@ -633,6 +641,10 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
       //  
       // FIXME: When we have borrowed arguments, a "read" needs to be enforced
       // on the caller side.
+      return SourceAccess::getStaticAccess();
+
+    case SILArgumentConvention::Indirect_Out:
+      // We use an initialized 'out' argument as a parameter.
       return SourceAccess::getStaticAccess();
 
     default:

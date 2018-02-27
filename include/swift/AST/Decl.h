@@ -23,6 +23,7 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -107,6 +108,7 @@ enum class DescriptiveDeclKind : uint8_t {
   EnumCase,
   TopLevelCode,
   IfConfig,
+  PoundDiagnostic,
   PatternBinding,
   Var,
   Param,
@@ -589,6 +591,14 @@ protected:
   SWIFT_INLINE_BITFIELD(IfConfigDecl, Decl, 1,
     /// Whether this decl is missing its closing '#endif'.
     HadMissingEnd : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
+    /// `true` if the diagnostic is an error, `false` if it's a warning.
+    IsError : 1,
+
+    /// Whether this diagnostic has already been emitted.
+    HasBeenEmitted : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -2059,6 +2069,52 @@ public:
   }
 };
 
+class StringLiteralExpr;
+
+class PoundDiagnosticDecl : public Decl {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  StringLiteralExpr *Message;
+
+public:
+  PoundDiagnosticDecl(DeclContext *Parent, bool IsError, SourceLoc StartLoc,
+                      SourceLoc EndLoc, StringLiteralExpr *Message)
+    : Decl(DeclKind::PoundDiagnostic, Parent), StartLoc(StartLoc),
+      EndLoc(EndLoc), Message(Message) {
+      Bits.PoundDiagnosticDecl.IsError = IsError;
+      Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
+    }
+
+  DiagnosticKind getKind() {
+    return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
+  }
+
+  StringLiteralExpr *getMessage() { return Message; }
+
+  bool isError() {
+    return Bits.PoundDiagnosticDecl.IsError;
+  }
+
+  bool hasBeenEmitted() {
+    return Bits.PoundDiagnosticDecl.HasBeenEmitted;
+  }
+
+  void markEmitted() {
+    Bits.PoundDiagnosticDecl.HasBeenEmitted = true;
+  }
+  
+  SourceLoc getEndLoc() const { return EndLoc; };
+  SourceLoc getLoc() const { return StartLoc; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(StartLoc, EndLoc);
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PoundDiagnostic;
+  }
+};
+
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
@@ -2244,9 +2300,7 @@ public:
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
 
-  bool hasValidSignature() const {
-    return hasInterfaceType() && !isBeingValidated();
-  }
+  bool hasValidSignature() const;
 
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
@@ -2930,10 +2984,9 @@ public:
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  /// classifyAsOptionalType - Decide whether this declaration is one
-  /// of the library-intrinsic Optional<T> or ImplicitlyUnwrappedOptional<T> types.
-  OptionalTypeKind classifyAsOptionalType() const;
-  
+  /// Is this the decl for Optional<T>?
+  bool isOptionalDecl() const;
+
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
@@ -4338,6 +4391,13 @@ public:
   /// \brief Do we need to use resilient access patterns when accessing this
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
+
+  /// Returns the interface type of elements of storage represented by this
+  /// declaration.
+  ///
+  /// For variables, this is the type of the variable itself.
+  /// For subscripts, this is the type of the subscript element.
+  Type getStorageInterfaceType() const;
 
   /// Does the storage use a behavior?
   bool hasBehavior() const {

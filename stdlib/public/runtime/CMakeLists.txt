@@ -30,7 +30,7 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    Reflection.mm
+    ReflectionMirror.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
@@ -48,6 +48,7 @@ set(swift_runtime_sources
     Errors.cpp
     ErrorDefaultImpls.cpp
     Exclusivity.cpp
+    ExistentialContainer.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp

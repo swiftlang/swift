@@ -910,6 +910,8 @@ private:
 public:
   TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
   TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
+  TypeChecker(const TypeChecker&) = delete;
+  TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
@@ -1809,11 +1811,15 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
+  /// Request nominal layout for any types that could be sources of typemetadata
+  /// or conformances.
+  void requestRequiredNominalTypeLayoutForParameters(ParameterList *PL);
+
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
-  
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -2547,6 +2553,13 @@ public:
   const StringRef Message;
 };
 
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
+/// requirement.
+bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                              DeclContext *DC,
+                                              TypeChecker &TC);
+  
 } // end namespace swift
 
 #endif

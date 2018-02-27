@@ -249,7 +249,17 @@ to be invoked with the sil function body. Note,
 ``sil-mode-display-function-cfg`` does not take any arguments.
 
 **NOTE** viewcfg must be in the $PATH for viewcfg to work.
+
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
+
+There is another useful script to view the CFG of a disassembled function:
+``./utils/dev-scripts/blockifyasm``.
+It splits a disassembled function up into basic blocks which can then be
+used with viewcfg::
+
+    (lldb) disassemble
+      <copy-paste output to file.s>
+    $ blockifyasm < file.s | viewcfg
 
 Using Breakpoints
 ~~~~~~~~~~~~~~~~~
@@ -448,7 +458,7 @@ That will write the types log to the file passed to the -f option.
 
 **NOTE** Module loading can happen as a side-effect of other operations in lldb
  (e.g. the "file" command). To be sure that one has enabled logging before /any/
- module loading has occured, place the command into either::
+ module loading has occurred, place the command into either::
 
    ~/.lldbinit
    $PWD/.lldbinit
@@ -473,8 +483,8 @@ following non-exhaustive list of state:
 1. The unparsed, textual expression passed to the compiler.
 2. The parsed expression.
 3. The initial SILGen.
-4. SILGen after SILLinking has occured.
-5. SILGen after SILLinking and Guaranteed Optimizations have occured.
+4. SILGen after SILLinking has occurred.
+5. SILGen after SILLinking and Guaranteed Optimizations have occurred.
 6. The resulting LLVM IR.
 7. The assembly code that will be used by the JIT.
 

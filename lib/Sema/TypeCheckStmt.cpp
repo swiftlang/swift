@@ -599,16 +599,7 @@ public:
       return nullptr;
     }
     
-    // If the sequence is an implicitly unwrapped optional, force it.
     Expr *sequence = S->getSequence();
-    if (auto objectTy
-          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
-      sequence = new (TC.Context) ForceValueExpr(sequence,
-                                                 sequence->getEndLoc());
-      sequence->setType(objectTy);
-      sequence->setImplicit();
-      S->setSequence(sequence);
-    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
@@ -840,6 +831,13 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto node : S->getRawCases()) {
+      if (!node.is<Decl*>()) continue;
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+    }
+
     auto cases = S->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
@@ -1032,7 +1030,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
           type->isUninhabited() ||
-          type->lookThroughAllAnyOptionalTypes()->isVoid());
+          type->lookThroughAllOptionalTypes()->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(TypeChecker &TC, LiteralExpr *LE) {
@@ -1426,6 +1424,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
+  for (auto paramList : AFD->getParameterLists())
+    requestRequiredNominalTypeLayoutForParameters(paramList);
+
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;
   
@@ -1619,9 +1620,12 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     }
 
     // An inlinable constructor in a class must always be delegating,
-    // unless the class is formally '@_fixed_layout'.
-    if (!isDelegating &&
-        ClassD->isFormallyResilient() &&
+    // unless the class is '@_fixed_layout'.
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for classes in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -52,7 +53,7 @@ struct LValueWritebackCleanup : Cleanup {
   void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "LValueWritebackCleanup\n"
-                 << "State: " << getState() << "Depth: " << Depth.getDepth()
+                 << "State: " << getState() << " Depth: " << Depth.getDepth()
                  << "\n";
 #endif
   }
@@ -266,6 +267,13 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
 
   ManagedValue temp = std::move(*this).materializeIntoTemporary(SGF, loc, base);
 
+  if (SGF.getOptions().VerifyExclusivity) {
+    // Begin an access of the temporary. It is unenforced because enforcement
+    // isn't required for RValues.
+    SILValue accessAddress = UnenforcedFormalAccess::enter(
+        SGF, loc, temp.getValue(), SILAccessKind::Modify);
+    temp = std::move(temp).transform(accessAddress);
+  }
   // Push a writeback for the temporary.
   pushWriteback(SGF, loc, std::move(clonedComponent), base,
                 MaterializedLValue(temp));
@@ -473,6 +481,93 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                 MaterializedLValue());
 
   return addr;
+}
+
+// Find the base of the formal access at `address`. If the base requires an
+// access marker, then create a begin_access on `address`. Return the
+// address to be used for the access.
+//
+// FIXME: In order to generate more consistent and verifiable SIL patterns, or
+// subobject projections, create the access on the base address and recreate the
+// projection.
+SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
+                                       SILValue address, SILAccessKind kind) {
+  if (!SGF.getOptions().VerifyExclusivity)
+    return address;
+
+  SILValue base = findAccessedAddressBase(address);
+  if (!base || !isPossibleFormalAccessBase(base))
+    return address;
+
+  auto BAI =
+      SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe);
+  beginAccessPtr = BeginAccessPtr(BAI, DeleterCheck());
+
+  return BAI;
+}
+
+void UnenforcedAccess::endAccess(SILGenFunction &SGF) {
+  emitEndAccess(SGF);
+  beginAccessPtr.release();
+}
+
+void UnenforcedAccess::emitEndAccess(SILGenFunction &SGF) {
+  if (!beginAccessPtr)
+    return;
+
+  SGF.B.createEndAccess(beginAccessPtr->getLoc(), beginAccessPtr.get(),
+                        /*abort*/ false);
+}
+
+// Emit an end_access marker when executing a cleanup (on a side branch).
+void UnenforcedFormalAccess::emitEndAccess(SILGenFunction &SGF) {
+  access.emitEndAccess(SGF);
+}
+
+// End the access when existing the FormalEvaluationScope.
+void UnenforcedFormalAccess::finishImpl(SILGenFunction &SGF) {
+  access.endAccess(SGF);
+}
+
+namespace {
+struct UnenforcedAccessCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
+
+  UnenforcedAccessCleanup() : Depth() {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation loc) override {
+    auto &evaluation = *SGF.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalAccess::Unenforced);
+    auto &formalAccess = static_cast<UnenforcedFormalAccess &>(evaluation);
+    formalAccess.emitEndAccess(SGF);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "UnenforcedAccessCleanup\n"
+                 << "State: " << getState() << " Depth: " << Depth.getDepth()
+                 << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+SILValue UnenforcedFormalAccess::enter(SILGenFunction &SGF, SILLocation loc,
+                                       SILValue address, SILAccessKind kind) {
+  assert(SGF.InFormalEvaluationScope);
+
+  UnenforcedAccess access;
+  SILValue accessAddress = access.beginAccess(SGF, loc, address, kind);
+  if (!access.beginAccessPtr)
+    return address;
+
+  auto &cleanup = SGF.Cleanups.pushCleanup<UnenforcedAccessCleanup>();
+  CleanupHandle handle = SGF.Cleanups.getTopCleanup();
+  auto &context = SGF.FormalEvalContext;
+  context.push<UnenforcedFormalAccess>(loc, std::move(access), handle);
+  cleanup.Depth = context.stable_begin();
+
+  return accessAddress;
 }
 
 namespace {
@@ -1126,6 +1221,9 @@ namespace {
       SILValue buffer =
         SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
 
+      // Postpone cleanup for noescape closures.
+      PostponedCleanup postpone(SGF, true);
+
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
       std::unique_ptr<LogicalPathComponent> clonedComponent(
@@ -1183,6 +1281,7 @@ namespace {
       // access for stored properties with didSet.
       pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
 
+      postpone.end();
       return ManagedValue::forLValue(materialized.temporary.getValue());
     }
 
@@ -1255,6 +1354,7 @@ namespace {
         // indirectly.
         SILValue baseAddress;
         SILValue baseMetatype;
+        UnenforcedAccess baseAccess;
         if (base) {
           if (base.getType().isAddress()) {
             baseAddress = base.getValue();
@@ -1265,6 +1365,10 @@ namespace {
                                             baseFormalType);
 
             baseAddress = SGF.emitTemporaryAllocation(loc, base.getType());
+            // Create an unenforced formal access for the temporary base, which
+            // is passed @inout to the callback.
+            baseAddress = baseAccess.beginAccess(SGF, loc, baseAddress,
+                                                 SILAccessKind::Modify);
             if (base.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
               SGF.B.createStoreBorrow(loc, base.getValue(), baseAddress);
             } else {
@@ -1294,6 +1398,9 @@ namespace {
                             baseAddress,
                             baseMetatype
                           }, false);
+
+        if (baseAccess.beginAccessPtr)
+          baseAccess.endAccess(SGF);
       }
 
       // Continue.
@@ -2208,20 +2315,18 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind,
                                           LValueOptions options) {
   // Handle an opaque lvalue that refers to an opened existential.
-  auto known = SGF.OpaqueValueExprs.find(e);
-  if (known != SGF.OpaqueValueExprs.end()) {
-    // Dig the open-existential expression out of the list.
-    OpenExistentialExpr *opened = known->second;
-    SGF.OpaqueValueExprs.erase(known);
+  auto known = SGF.OpaqueLValues.find(e);
+  if (known != SGF.OpaqueLValues.end()) {
+    // Dig the opened address out of the list.
+    SILValue opened = known->second.first;
+    CanType openedType = known->second.second;
+    SGF.OpaqueLValues.erase(known);
 
-    // Do formal evaluation of the underlying existential lvalue.
-    auto lv = visitRec(opened->getExistentialValue(), accessKind, options);
-    lv = SGF.emitOpenExistentialLValue(
-        opened, std::move(lv),
-        CanArchetypeType(opened->getOpenedArchetype()),
-        e->getType()->getWithoutSpecifierType()->getCanonicalType(),
-        accessKind);
-    return lv;
+    // Continue formal evaluation of the lvalue from this address.
+    return LValue::forAddress(ManagedValue::forLValue(opened),
+                              None,
+                              AbstractionPattern(openedType),
+                              openedType);
   }
 
   assert(SGF.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
@@ -2513,40 +2618,23 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
 LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
                                               AccessKind accessKind,
                                               LValueOptions options) {
-  // If the opaque value is not an lvalue, open the existential immediately.
-  if (!e->getOpaqueValue()->getType()->is<LValueType>()) {
-    return SGF.emitOpenExistentialExpr<LValue>(e,
-                                               [&](Expr *subExpr) -> LValue {
-                                                 return visitRec(subExpr,
-                                                                 accessKind,
-                                                                 options);
-                                               });
-  }
-
-  // Record the fact that we're opening this existential. The actual
-  // opening operation will occur when we see the OpaqueValueExpr.
-  bool inserted = SGF.OpaqueValueExprs.insert({e->getOpaqueValue(), e}).second;
-  (void)inserted;
-  assert(inserted && "already have this opened existential?");
-
-  // Visit the subexpression.
-  LValue lv = visitRec(e->getSubExpr(), accessKind, options);
-
-  // Sanity check that we did see the OpaqueValueExpr.
-  assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
-         "opened existential not removed?");
-  return lv;
+  return SGF.emitOpenExistentialExpr<LValue>(e,
+                                             [&](Expr *subExpr) -> LValue {
+                                               return visitRec(subExpr,
+                                                               accessKind,
+                                                               options);
+                                             });
 }
 
 static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &SGF,
                           const LValueTypeData &baseTypeData) {
   EnumElementDecl *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-  
+
   return {
-    baseTypeData.OrigFormalType.getAnyOptionalObjectType(),
-    baseTypeData.SubstFormalType.getAnyOptionalObjectType(),
-    baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
+      baseTypeData.OrigFormalType.getOptionalObjectType(),
+      baseTypeData.SubstFormalType.getOptionalObjectType(),
+      baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
   };
 }
 

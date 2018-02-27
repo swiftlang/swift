@@ -43,3 +43,21 @@ entry:
   dealloc_stack %s : $*Builtin.Int64
   return %g : $@callee_owned (@in Builtin.Int64) -> ()
 }
+
+sil @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil @partial_apply_convert
+// CHECK:   convert_escape_to_noescape %{{.*}} : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+sil @partial_apply_convert : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  %e = partial_apply [callee_guaranteed] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  %n = convert_escape_to_noescape %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %n2 = mark_dependence %n : $@noescape @callee_guaranteed () -> () on %e : $@callee_guaranteed () -> ()
+  %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %f2(%n2) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  release_value %e : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}

@@ -125,6 +125,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumCase);
   TRIVIAL_KIND(TopLevelCode);
   TRIVIAL_KIND(IfConfig);
+  TRIVIAL_KIND(PoundDiagnostic);
   TRIVIAL_KIND(PatternBinding);
   TRIVIAL_KIND(PrecedenceGroup);
   TRIVIAL_KIND(InfixOperator);
@@ -235,6 +236,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumCase, "case");
   ENTRY(TopLevelCode, "top-level code");
   ENTRY(IfConfig, "conditional block");
+  ENTRY(PoundDiagnostic, "diagnostic");
   ENTRY(PatternBinding, "pattern binding");
   ENTRY(Var, "var");
   ENTRY(Param, "parameter");
@@ -480,7 +482,14 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailableAttr::getVersionAvailability().
+  auto *containingModule = getModuleContext();
+  if (containingModule == fromModule)
+    return false;
+
+  if (getAttrs().hasAttribute<WeakLinkedAttr>())
+    return true;
+
+  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
@@ -769,6 +778,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PostfixOperator:
   case DeclKind::EnumCase:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     llvm_unreachable("not a ValueDecl");
@@ -794,7 +804,10 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
-    return getBestImportKind(type->getAnyNominal());
+    auto *nominal = type->getAnyNominal();
+    if (!nominal)
+      return ImportKind::Type;
+    return getBestImportKind(nominal);
   }
 
   case DeclKind::Accessor:
@@ -1237,7 +1250,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
       if (const auto *varDecl = typedPattern->getSingleVar())
         // Lazy storage is never user accessible.
         if (!varDecl->isUserAccessible())
-          if (typedPattern->getTypeLoc().getType()->getAnyOptionalObjectType())
+          if (typedPattern->getTypeLoc().getType()->getOptionalObjectType())
             return true;
     }
   }
@@ -1535,6 +1548,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     assert(!isa<ValueDecl>(this));
@@ -1578,6 +1592,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     llvm_unreachable("Not a ValueDecl");
@@ -1696,18 +1711,6 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
-  // Translate implicitly unwrapped optionals into strict optionals.
-  if (auto inOutTy = type->getAs<InOutType>()) {
-    if (auto uncheckedOptOf =
-            inOutTy->getObjectType()
-                ->getImplicitlyUnwrappedOptionalObjectType()) {
-      type = InOutType::get(OptionalType::get(uncheckedOptOf));
-    }
-  } else if (auto uncheckedOptOf =
-                 type->getImplicitlyUnwrappedOptionalObjectType()) {
-    type = OptionalType::get(uncheckedOptOf);
-  }
-
   return mapSignatureType(ctx, type);
 }
 
@@ -1748,10 +1751,10 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     if (isInitializer) {
       if (auto inOutTy = type->getAs<InOutType>()) {
         if (auto objectType =
-                inOutTy->getObjectType()->getAnyOptionalObjectType()) {
+                inOutTy->getObjectType()->getOptionalObjectType()) {
           type = InOutType::get(objectType);
         }
-      } else if (auto objectType = type->getAnyOptionalObjectType()) {
+      } else if (auto objectType = type->getOptionalObjectType()) {
         type = objectType;
       }
     }
@@ -1962,6 +1965,10 @@ void ValueDecl::setInterfaceType(Type type) {
            "Archetype in interface type");
   }
   TypeAndAccess.setPointer(type);
+}
+
+bool ValueDecl::hasValidSignature() const {
+  return hasInterfaceType() && !isBeingValidated();
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
@@ -2485,15 +2492,8 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension = extension;
 }
 
-OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
-  const ASTContext &ctx = getASTContext();
-  if (this == ctx.getOptionalDecl()) {
-    return OTK_Optional;
-  } else if (this == ctx.getImplicitlyUnwrappedOptionalDecl()) {
-    return OTK_ImplicitlyUnwrappedOptional;
-  } else {
-    return OTK_None;
-  }
+bool NominalTypeDecl::isOptionalDecl() const {
+  return this == getASTContext().getOptionalDecl();
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -3282,7 +3282,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // Optionals preserve variance.
-  if (auto optType = type->getAnyOptionalObjectType()) {
+  if (auto optType = type->getOptionalObjectType()) {
     return findProtocolSelfReferences(proto, optType,
                                       skipAssocTypes);
   }
@@ -4568,7 +4568,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
 
   // If the index type is an object type in Objective-C, we have a
   // keyed subscript.
-  if (Type objectTy = indexTy->getAnyOptionalObjectType())
+  if (Type objectTy = indexTy->getOptionalObjectType())
     indexTy = objectTy;
 
   return ObjCSubscriptKind::Keyed;
@@ -5481,7 +5481,11 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // always delegating. This occurs if the struct type is not fixed layout,
   // and the constructor is either inlinable or defined in another module.
   if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
-    if (NTD->isFormallyResilient() &&
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for structs in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (NTD->isResilient() &&
         getResilienceExpansion() == ResilienceExpansion::Minimal) {
       Kind = BodyInitKind::Delegating;
 
@@ -5676,6 +5680,10 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const Decl *D = static_cast<const Decl *>(Entity);
     if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
       VD->getFullName().print(OS, false);
+    } else {
+      OS << "<"
+         << Decl::getDescriptiveKindName(D->getDescriptiveKind())
+         << ">";
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -5689,12 +5697,25 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static DeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName, const Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Decl *>() {
+  return &TF;
 }
+
+TypeOrExtensionDecl::TypeOrExtensionDecl(NominalTypeDecl *D) : Decl(D) {}
+TypeOrExtensionDecl::TypeOrExtensionDecl(ExtensionDecl *D) : Decl(D) {}
+
+Decl *TypeOrExtensionDecl::getAsDecl() const {
+  if (auto NTD = Decl.dyn_cast<NominalTypeDecl *>())
+    return NTD;
+
+  return Decl.get<ExtensionDecl *>();
+}
+DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
+  return getAsDecl()->getInnermostDeclContext();
+}
+NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
+  return getAsDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+}
+bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }

@@ -171,6 +171,9 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
+  /// Whether cross-module references to this function should use weak linking.
+  unsigned IsWeakLinked : 1;
+
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
@@ -214,6 +217,11 @@ private:
   /// Eliminator runs on a function, we only see a non-semantic-arc world and
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
+
+  /// Set if the function body was deserialized from canonical SIL. This implies
+  /// that the function's home module performed SIL diagnostics prior to
+  /// serialization.
+  bool WasDeserializedCanonical = false;
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
@@ -336,6 +344,13 @@ public:
     HasQualifiedOwnership = false;
   }
 
+  /// Returns true if this function was deserialized from canonical
+  /// SIL. (.swiftmodule files contain canonical SIL; .sib files may be 'raw'
+  /// SIL). If so, diagnostics should not be reapplied.
+  bool wasDeserializedCanonical() const { return WasDeserializedCanonical; }
+
+  void setWasDeserializedCanonical() { WasDeserializedCanonical = true; }
+
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
@@ -437,6 +452,16 @@ public:
   /// Return whether this function may be referenced by C code.
   bool hasCReferences() const { return HasCReferences; }
   void setHasCReferences(bool value) { HasCReferences = value; }
+
+  /// Returns whether this function's symbol must always be weakly referenced
+  /// across module boundaries.
+  bool isWeakLinked() const { return IsWeakLinked; }
+  /// Forces IRGen to treat references to this function as weak across module
+  /// boundaries (i.e. if it has external linkage).
+  void setWeakLinked(bool value = true) {
+    assert(!IsWeakLinked && "already set");
+    IsWeakLinked = value;
+  }
 
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const {

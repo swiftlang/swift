@@ -177,8 +177,6 @@ namespace {
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
       auto IR = Visit(type.getTypePtr());
-      assert(!IR.AbstractType ||
-             !IR.AbstractType->getImplicitlyUnwrappedOptionalObjectType());
       return IR;
     }
 
@@ -1161,10 +1159,6 @@ static ImportedType adjustTypeForConcreteImport(
     bool allowNSUIntegerAsInt, Bridgeability bridging, OptionalTypeKind optKind,
     bool resugarNSErrorPointer) {
 
-  // We never expect an IUO type to be passed in.
-  assert(!importedType ||
-         !importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   if (importKind == ImportTypeKind::Abstract) {
     return {importedType, false};
   }
@@ -1188,8 +1182,6 @@ static ImportedType adjustTypeForConcreteImport(
   if (!importedType)
     return {Type(), false};
 
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
   auto maybeImportNSErrorPointer = [&]() -> Type {
     if (importKind != ImportTypeKind::Parameter)
@@ -1200,7 +1192,7 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
       return Type();
 
-    auto elementObj = elementType->getAnyOptionalObjectType();
+    auto elementObj = elementType->getOptionalObjectType();
     if (!elementObj)
       return Type();
 
@@ -1232,7 +1224,6 @@ static ImportedType adjustTypeForConcreteImport(
   };
 
   if (Type result = maybeImportNSErrorPointer()) {
-    assert(!result->getImplicitlyUnwrappedOptionalObjectType());
     return {result, false};
   }
 
@@ -1247,8 +1238,8 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_UnsafeMutablePointer)
       return Type();
 
-    OptionalTypeKind OTK;
-    auto insideOptionalType = elementType->getAnyOptionalObjectType(OTK);
+    bool isOptional;
+    auto insideOptionalType = elementType->getOptionalObjectType(isOptional);
     if (!insideOptionalType)
       insideOptionalType = elementType;
 
@@ -1264,10 +1255,8 @@ static ImportedType adjustTypeForConcreteImport(
            "signature of Unmanaged has changed");
 
     auto resultTy = boundGenericTy->getGenericArgs().front();
-    if (OTK != OTK_None) {
-      assert(OTK != OTK_ImplicitlyUnwrappedOptional);
+    if (isOptional)
       resultTy = OptionalType::get(resultTy);
-    }
 
     StringRef pointerName;
     if (importKind == ImportTypeKind::CFRetainedOutParameter)
@@ -1278,11 +1267,9 @@ static ImportedType adjustTypeForConcreteImport(
     resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                     pointerName,
                                                     resultTy);
-    assert(!resultTy->getImplicitlyUnwrappedOptionalObjectType());
     return resultTy;
   };
   if (Type outParamTy = maybeImportCFOutParameter()) {
-    assert(!outParamTy->getImplicitlyUnwrappedOptionalObjectType());
     importedType = outParamTy;
   }
 
@@ -1381,9 +1368,6 @@ static ImportedType adjustTypeForConcreteImport(
       importedType = OptionalType::get(importedType);
   }
 
-  // We do not expect to return actual IUO types.
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   return {importedType, isIUO};
 }
 
@@ -1437,10 +1421,6 @@ ImportedType ClangImporter::Implementation::importType(
       *this, type, importResult.AbstractType, importKind, importResult.Hint,
       allowNSUIntegerAsInt, bridging, optionality, resugarNSErrorPointer);
 
-  // We should never get an actual IUO type back.
-  assert(!adjustedType ||
-         !adjustedType.getType()->getImplicitlyUnwrappedOptionalObjectType());
-
   return adjustedType;
 }
 
@@ -1451,9 +1431,6 @@ Type ClangImporter::Implementation::importTypeIgnoreIUO(
 
   auto importedType = importType(type, importKind, allowNSUIntegerAsInt,
                                  bridging, optionality, resugarNSErrorPointer);
-
-  assert(!importedType ||
-         !importedType.getType()->getImplicitlyUnwrappedOptionalObjectType());
 
   return importedType.getType();
 }
@@ -1530,8 +1507,7 @@ ImportedType ClangImporter::Implementation::importPropertyType(
 /// Apply the @noescape attribute
 static Type applyNoEscape(Type type) {
   // Recurse into optional types.
-  OptionalTypeKind optKind;
-  if (Type objectType = type->getAnyOptionalObjectType(optKind)) {
+  if (Type objectType = type->getOptionalObjectType()) {
     return OptionalType::get(applyNoEscape(objectType));
   }
 
@@ -1569,9 +1545,6 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t
-      assert(!SwiftContext.getIntDecl()
-                  ->getDeclaredType()
-                  ->getImplicitlyUnwrappedOptionalObjectType());
       return {SwiftContext.getIntDecl()->getDeclaredType(), false};
     default:
       break;
@@ -1829,7 +1802,7 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
             false};
 
   case ForeignErrorConvention::NilResult:
-    if (Type unwrappedTy = importedType.getType()->getAnyOptionalObjectType())
+    if (Type unwrappedTy = importedType.getType()->getOptionalObjectType())
       return {unwrappedTy, false};
     // Check for a bad override.
     if (importedType.getType()->isVoid())
@@ -1975,8 +1948,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
       clangDecl->getMethodFamily() == clang::OMF_performSelector) {
     // performSelector methods that return 'id' should be imported into Swift
     // as returning Unmanaged<AnyObject>.
-    Type nonOptionalTy =
-        swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
+    bool resultIsOptional;
+    Type nonOptionalTy = swiftResultTy->getOptionalObjectType(resultIsOptional);
     if (!nonOptionalTy)
       nonOptionalTy = swiftResultTy;
 
@@ -1986,7 +1959,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
     if (nonOptionalTy->isAnyClassReferenceType()) {
       swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
-      if (OptionalityOfReturn != OTK_None)
+      if (resultIsOptional)
         swiftResultTy = OptionalType::get(swiftResultTy);
     }
   }

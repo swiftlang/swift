@@ -21,7 +21,7 @@ using namespace swift::reflection;
 using namespace swift::remote;
 
 using NativeReflectionContext
-  = swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 uint16_t
 swift_reflection_getSupportedMetadataVersion() {

@@ -636,7 +636,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Type UnderlyingType = VD->getType()->getReferenceStorageReferent();
 
   bool isOptional = false;
-  if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
+  if (Type optionalEltTy = UnderlyingType->getOptionalObjectType()) {
     UnderlyingType = optionalEltTy;
     isOptional = true;
   }

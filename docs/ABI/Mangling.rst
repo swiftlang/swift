@@ -53,6 +53,8 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
+  global ::= nominal-type 'Mi'           // generic type instantiation function
+  global ::= nominal-type 'MI'           // generic type instantiation cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= module 'MXM'                // module descriptor
@@ -350,7 +352,7 @@ Types
   type ::= 'Bt'                              // Builtin.SILToken
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
-  type ::= function-signature 'c'            // function type
+  type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
   type ::= type 'Sg'                         // optional type, shortcut for: type 'ySqG'
@@ -374,9 +376,11 @@ Types
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
-  FUNCTION-KIND ::= 'K'                      // @auto_closure function type
+  FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
+  FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
+  FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
   function-signature ::= params-type params-type throws? // results and parameters
 

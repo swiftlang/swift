@@ -243,6 +243,8 @@ WARNING(unreachable_case,none,
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())
+WARNING(warn_infinite_recursive_function,none,
+        "all paths through this function will call itself", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,

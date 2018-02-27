@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -35,6 +36,9 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  SupplementaryOutputs = other.SupplementaryOutputs;
+  PrimarySpecificPathsForAtMostOnePrimary =
+      other.PrimarySpecificPathsForAtMostOnePrimary;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -43,6 +47,9 @@ operator=(const FrontendInputsAndOutputs &other) {
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  SupplementaryOutputs = other.SupplementaryOutputs;
+  PrimarySpecificPathsForAtMostOnePrimary =
+      other.PrimarySpecificPathsForAtMostOnePrimary;
   return *this;
 }
 
@@ -100,7 +107,7 @@ void FrontendInputsAndOutputs::forEachPrimaryInput(
 }
 
 void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
-  assert(primaryInputCount() < 2 &&
+  assert(!hasMultiplePrimaryInputs() &&
          "have not implemented >1 primary input yet");
 }
 
@@ -284,9 +291,9 @@ void FrontendInputsAndOutputs::forEachInputProducingAMainOutputFile(
       : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
-void FrontendInputsAndOutputs::setMainOutputs(
-    ArrayRef<std::string> outputFiles) {
-  assert(countOfInputsProducingMainOutputs() == outputFiles.size());
+void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
+    ArrayRef<std::string> outputFiles,
+    SupplementaryOutputPaths supplementaryOutputs) {
   if (hasPrimaryInputs()) {
     unsigned i = 0;
     for (auto index : indices(AllInputs)) {
@@ -299,6 +306,19 @@ void FrontendInputsAndOutputs::setMainOutputs(
   } else {
     for (auto i : indices(AllInputs))
       AllInputs[i].setOutputFilename(outputFiles[i]);
+  }
+  SupplementaryOutputs = supplementaryOutputs;
+
+  if (hasUniquePrimaryInput() || (hasInputs() && isWholeModule())) {
+    // When batch mode is fully implemented, each InputFile will own
+    // a PrimarySpecificPaths.
+    PrimarySpecificPathsForAtMostOnePrimary.OutputFilename =
+        getSingleOutputFilename();
+    PrimarySpecificPathsForAtMostOnePrimary.MainInputFilenameForDebugInfo =
+        hasInputsProducingMainOutputs() ? firstInputProducingOutput().file()
+                                        : StringRef();
+    PrimarySpecificPathsForAtMostOnePrimary.SupplementaryOutputs =
+        supplementaryOutputs;
   }
 }
 
@@ -337,10 +357,53 @@ bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
 
 // Supplementary outputs
 
+unsigned
+FrontendInputsAndOutputs::countOfFilesProducingSupplementaryOutput() const {
+  return hasPrimaryInputs() ? primaryInputCount() : hasInputs() ? 1 : 0;
+}
+
 void FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
     llvm::function_ref<void(const InputFile &)> fn) const {
   if (hasPrimaryInputs())
     forEachPrimaryInput(fn);
-  else
+  else if (hasInputs())
     fn(firstInput());
+}
+
+bool FrontendInputsAndOutputs::hasDependenciesPath() const {
+  return !supplementaryOutputs().DependenciesFilePath.empty();
+}
+bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
+  return !supplementaryOutputs().ReferenceDependenciesFilePath.empty();
+}
+bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
+  return !supplementaryOutputs().ObjCHeaderOutputPath.empty();
+}
+bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
+  return !supplementaryOutputs().LoadedModuleTracePath.empty();
+}
+bool FrontendInputsAndOutputs::hasModuleOutputPath() const {
+  return !supplementaryOutputs().ModuleOutputPath.empty();
+}
+bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
+  return !supplementaryOutputs().ModuleDocOutputPath.empty();
+}
+bool FrontendInputsAndOutputs::hasTBDPath() const {
+  return !supplementaryOutputs().TBDPath.empty();
+}
+
+bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
+  return hasDependenciesPath() || hasReferenceDependenciesPath() ||
+         hasLoadedModuleTracePath();
+}
+
+PrimarySpecificPaths
+FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() const {
+  return PrimarySpecificPathsForAtMostOnePrimary;
+}
+
+PrimarySpecificPaths
+FrontendInputsAndOutputs::getPrimarySpecificPathsForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForAtMostOnePrimary(); // just a stub for now
 }

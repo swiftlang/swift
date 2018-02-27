@@ -331,7 +331,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasAssociatedValues());
 
-  if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
+  if (auto objectType = getSwiftRValueType().getOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
@@ -455,8 +455,8 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   return false;
 }
 
-SILType SILType::getAnyOptionalObjectType() const {
-  if (auto objectTy = getSwiftRValueType().getAnyOptionalObjectType()) {
+SILType SILType::getOptionalObjectType() const {
+  if (auto objectTy = getSwiftRValueType().getOptionalObjectType()) {
     return SILType(objectTy, getCategory());
   }
 
@@ -464,7 +464,7 @@ SILType SILType::getAnyOptionalObjectType() const {
 }
 
 SILType SILType::unwrapAnyOptionalType() const {
-  if (auto objectTy = getAnyOptionalObjectType()) {
+  if (auto objectTy = getOptionalObjectType()) {
     return objectTy;
   }
 
@@ -637,7 +637,7 @@ bool SILFunctionType::isNoReturnFunction() {
 
 SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
   SILModule &M = F.getModule();
-  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl(OTK_Optional);
+  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl();
   BoundGenericType *BoundEnumDecl =
       BoundGenericType::get(OptionalDecl, Type(), {getSwiftRValueType()});
   AbstractionPattern Pattern(F.getLoweredFunctionType()->getGenericSignature(),
@@ -655,13 +655,13 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
     return true;
 
   // Either both types should be optional or neither should be.
-  if (auto object1 = type1.getAnyOptionalObjectType()) {
-    auto object2 = type2.getAnyOptionalObjectType();
+  if (auto object1 = type1.getOptionalObjectType()) {
+    auto object2 = type2.getOptionalObjectType();
     if (!object2)
       return false;
     return areOnlyAbstractionDifferent(object1, object2);
   }
-  if (type2.getAnyOptionalObjectType())
+  if (type2.getOptionalObjectType())
     return false;
 
   // Either both types should be tuples or neither should be.
@@ -728,8 +728,8 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
 
   // Optional lowers its contained type. The difference between Optional
   // and IUO is lowered away.
-  SILType loweredObjectType = loweredType.getAnyOptionalObjectType();
-  CanType formalObjectType = formalType.getAnyOptionalObjectType();
+  SILType loweredObjectType = loweredType.getOptionalObjectType();
+  CanType formalObjectType = formalType.getOptionalObjectType();
 
   if (loweredObjectType) {
     return formalObjectType &&

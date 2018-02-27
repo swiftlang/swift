@@ -824,7 +824,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
-  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType())
+  if (type->getReferenceStorageReferent()->getOptionalObjectType())
     return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
@@ -980,63 +980,6 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
             other->getDeclContext()->getModuleScopeContext());
         if (otherFile && otherFile->isSIB())
           continue;
-      }
-
-      // Signatures are the same, but interface types are not. We must
-      // have a type that we've massaged as part of signature
-      // interface type generation. If it's a result of remapping a
-      // function parameter from 'inout T!' to 'inout T?', emit a
-      // warning that these overloads are deprecated and will no
-      // longer be supported in the future.
-      if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
-          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
-            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
-            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
-          }
-
-          if (currFnTy && otherFnTy) {
-            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-
-            if (currParams.size() == otherParams.size()) {
-              auto diagnosed = false;
-              for (unsigned i : indices(currParams)) {
-                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
-                  auto currParamTy = currParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  auto otherParamTy = otherParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  OptionalTypeKind currOTK;
-                  OptionalTypeKind otherOTK;
-                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
-                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
-                  if (currOTK != OTK_None && otherOTK != OTK_None &&
-                      currOTK != otherOTK) {
-                    tc.diagnose(current, diag::deprecated_redecl_by_optionality,
-                                current->getFullName(), currParamTy,
-                                otherParamTy);
-                    tc.diagnose(other, diag::invalid_redecl_prev,
-                                other->getFullName());
-                    tc.diagnose(current,
-                                diag::deprecated_redecl_by_optionality_note);
-                    diagnosed = true;
-                    break;
-                  }
-                }
-              }
-
-              if (diagnosed)
-                break;
-            }
-          }
-        }
       }
 
       // If the conflicting declarations have non-overlapping availability and,
@@ -1937,6 +1880,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     llvm_unreachable("does not have access control");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     // Does not have access control.
   case DeclKind::EnumCase:
     // Handled at the EnumElement level.
@@ -4005,9 +3949,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
-    UnifiedStatsReporter::FrontendStatsTracer Tracer;
-    if (TC.Context.Stats)
-      Tracer = TC.Context.Stats->getStatsTracer("typecheck-decl", decl);
+    FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -4517,20 +4459,24 @@ public:
       {
         // Check for duplicate enum members.
         llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        bool hasErrors = false;
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
-            EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
-            if (auto *RawValueExpr = EED->getRawValueExpr())
-              RawValueExpr->setType(ErrorType::get(TC.Context));
 
             auto PreviousEED = Res.first->second;
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
             TC.diagnose(PreviousEED->getLoc(),
                         diag::previous_decldef, true, EED->getName());
+            hasErrors = true;
           }
         }
+
+        // If one of the cases is invalid, let's mark
+        // whole enum as invalid as well.
+        if (hasErrors)
+          ED->setInvalid();
       }
     }
 
@@ -5614,7 +5560,7 @@ public:
   static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
     // We've hit the result type.
     if (uncurryLevel == 0) {
-      if (auto objectTy = type->getAnyOptionalObjectType())
+      if (auto objectTy = type->getOptionalObjectType())
         return objectTy;
 
       return type;
@@ -5657,34 +5603,24 @@ public:
       if (!paramTy || !parentParamTy)
         return;
 
-      OptionalTypeKind paramOTK;
-      (void)paramTy->getAnyOptionalObjectType(paramOTK);
-      if (paramOTK == OTK_Optional)
-        if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-          return;
-
-      OptionalTypeKind parentOTK;
-      (void)parentParamTy->getAnyOptionalObjectType(parentOTK);
-
       TypeLoc TL = decl->getTypeLoc();
       if (!TL.getTypeRepr())
         return;
 
-      if (paramOTK == OTK_None) {
-        switch (parentOTK) {
-        case OTK_None:
-          return;
-        case OTK_ImplicitlyUnwrappedOptional:
+      bool paramIsOptional;
+      (void)paramTy->getOptionalObjectType(paramIsOptional);
+
+      bool parentIsOptional;
+      (void)parentParamTy->getOptionalObjectType(parentIsOptional);
+
+      if (paramIsOptional == parentIsOptional)
+        return;
+
+      if (!paramIsOptional) {
+        if (parentDecl->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
           if (!treatIUOResultAsError)
             return;
-          break;
-        case OTK_Optional:
-          if (parentDecl->getAttrs()
-                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-            if (!treatIUOResultAsError)
-              return;
-          break;
-        }
 
         emittedError = true;
         auto diag = TC.diagnose(decl->getStartLoc(),
@@ -5701,7 +5637,7 @@ public:
         return;
       }
 
-      if (parentOTK != OTK_None)
+      if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         return;
 
       // Allow silencing this warning using parens.
@@ -5740,18 +5676,17 @@ public:
       if (!resultTy || !parentResultTy)
         return;
 
-      OptionalTypeKind resultOTK;
-      if (!resultTy->getAnyOptionalObjectType(resultOTK))
+      if (!resultTy->getOptionalObjectType())
         return;
 
       TypeRepr *TR = resultTL.getTypeRepr();
 
-      bool resultIsPlainOptional = resultOTK == OTK_Optional;
+      bool resultIsPlainOptional = true;
       if (member->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         resultIsPlainOptional = false;
 
       if (resultIsPlainOptional || treatIUOResultAsError) {
-        if (parentResultTy->getAnyOptionalObjectType())
+        if (parentResultTy->getOptionalObjectType())
           return;
         emittedError = true;
         auto diag = TC.diagnose(resultTL.getSourceRange().Start,
@@ -5768,7 +5703,7 @@ public:
         return;
       }
 
-      if (!parentResultTy->getAnyOptionalObjectType())
+      if (!parentResultTy->getOptionalObjectType())
         return;
 
       // Allow silencing this warning using parens.
@@ -5979,7 +5914,7 @@ public:
               ->getAttrs()
               .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
           matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
-        baseParamTy = baseParamTy->getAnyOptionalObjectType();
+        baseParamTy = baseParamTy->getOptionalObjectType();
         if (baseParamTy->matches(derivedParamTy, matchMode))
           continue;
       }
@@ -6474,9 +6409,9 @@ public:
       
       // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
       bool IsSilentDifference = false;
-      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+      if (auto propertyTyNoOptional = propertyTy->getOptionalObjectType())
         if (auto parentPropertyTyNoOptional =
-            parentPropertyTy->getAnyOptionalObjectType())
+                parentPropertyTy->getOptionalObjectType())
           if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
             IsSilentDifference = true;
       
@@ -6528,6 +6463,7 @@ public:
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(GKInspectable)
@@ -6589,6 +6525,7 @@ public:
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
+    UNINTERESTING_ATTR(WeakLinked)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -7143,6 +7080,15 @@ public:
     TC.checkDeclAttributes(ICD);
   }
 
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+    if (PDD->hasBeenEmitted()) { return; }
+    PDD->markEmitted();
+    TC.diagnose(PDD->getMessage()->getStartLoc(),
+      PDD->isError() ? diag::pound_error : diag::pound_warning,
+      PDD->getMessage()->getValue())
+      .highlight(PDD->getMessage()->getSourceRange());
+  }
+
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (!IsFirstPass) {
       if (CD->getBody()) {
@@ -7344,13 +7290,23 @@ public:
     if (CD->isRequired()) {
       if (auto nominal = CD->getDeclContext()
               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-        auto requiredAccess = std::min(nominal->getFormalAccess(),
-                                       AccessLevel::Public);
-        if (requiredAccess == AccessLevel::Private)
+        AccessLevel requiredAccess;
+        switch (nominal->getFormalAccess()) {
+        case AccessLevel::Open:
+          requiredAccess = AccessLevel::Public;
+          break;
+        case AccessLevel::Public:
+        case AccessLevel::Internal:
+          requiredAccess = AccessLevel::Internal;
+          break;
+        case AccessLevel::FilePrivate:
+        case AccessLevel::Private:
           requiredAccess = AccessLevel::FilePrivate;
+          break;
+        }
         if (CD->getFormalAccess() < requiredAccess) {
-          auto diag = TC.diagnose(CD,
-                                  diag::required_initializer_not_accessible);
+          auto diag = TC.diagnose(CD, diag::required_initializer_not_accessible,
+                                  nominal->getFullName());
           fixItAccess(diag, CD, requiredAccess);
         }
       }
@@ -7615,6 +7571,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8203,6 +8160,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8444,7 +8402,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 #undef CHECK_LITERAL_PROTOCOL
 
     // For optional types, use 'nil'.
-    if (type->getAnyOptionalObjectType())
+    if (type->getOptionalObjectType())
       return std::string("nil");
 
     return None;

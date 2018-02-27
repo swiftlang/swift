@@ -57,11 +57,11 @@ static SingleRawComment::CommentKind getCommentKind(StringRef Comment) {
 SingleRawComment::SingleRawComment(CharSourceRange Range,
                                    const SourceManager &SourceMgr)
     : Range(Range), RawText(SourceMgr.extractText(Range)),
-      Kind(static_cast<unsigned>(getCommentKind(RawText))),
-      EndLine(SourceMgr.getLineNumber(Range.getEnd())) {
+      Kind(static_cast<unsigned>(getCommentKind(RawText))) {
   auto StartLineAndColumn = SourceMgr.getLineAndColumn(Range.getStart());
   StartLine = StartLineAndColumn.first;
   StartColumn = StartLineAndColumn.second;
+  EndLine = SourceMgr.getLineNumber(Range.getEnd());
 }
 
 SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)

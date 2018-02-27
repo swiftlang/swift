@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
+#include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -42,6 +43,7 @@ namespace swift {
 namespace driver {
   class Driver;
   class ToolChain;
+  class OutputInfo;
   class PerformJobsState;
 
 /// An enum providing different levels of output which should be produced
@@ -74,8 +76,18 @@ private:
   /// subsequent BatchJobs.
   const ToolChain &TheToolChain;
 
+  /// The OutputInfo, which the Compilation stores a copy of upon
+  /// construction, and which it may use to build subsequent batch
+  /// jobs itself.
+  OutputInfo TheOutputInfo;
+
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
+
+  /// The OutputFileMap describing the Compilation's outputs, populated both by
+  /// the user-provided output file map (if it exists) and inference rules that
+  /// derive otherwise-unspecified output filenames from context.
+  OutputFileMap DerivedOutputFileMap;
 
   /// The Actions which were used to build the Jobs.
   ///
@@ -144,6 +156,14 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// Indicates whether groups of parallel frontend jobs should be merged
+  /// together and run in composite "batch jobs" when possible, to reduce
+  /// redundant work.
+  bool EnableBatchMode;
+
+  /// Provides a randomization seed to batch-mode partitioning, for debugging.
+  unsigned BatchSeed;
+
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
@@ -177,6 +197,7 @@ private:
 
 public:
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
+              OutputInfo const &OI,
               OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
@@ -184,11 +205,21 @@ public:
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
+              bool EnableBatchMode = false,
+              unsigned BatchSeed = 0,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
+
+  ToolChain const &getToolChain() const {
+    return TheToolChain;
+  }
+
+  OutputInfo const &getOutputInfo() const {
+    return TheOutputInfo;
+  }
 
   UnwrappedArrayView<const Action> getActions() const {
     return llvm::makeArrayRef(Actions);
@@ -218,6 +249,11 @@ public:
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
   ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
 
+  OutputFileMap &getDerivedOutputFileMap() { return DerivedOutputFileMap; }
+  const OutputFileMap &getDerivedOutputFileMap() const {
+    return DerivedOutputFileMap;
+  }
+
   unsigned getNumberOfParallelCommands() const {
     return NumberOfParallelCommands;
   }
@@ -228,7 +264,11 @@ public:
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
   }
-  
+
+  bool getBatchModeEnabled() const {
+    return EnableBatchMode;
+  }
+
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
   }

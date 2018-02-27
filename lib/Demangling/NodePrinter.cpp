@@ -292,6 +292,8 @@ private:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
+    case Node::Kind::SymbolicReference:
+    case Node::Kind::UnresolvedSymbolicReference:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -327,6 +329,8 @@ private:
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
+    case Node::Kind::EscapingAutoClosureType:
+    case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
     case Node::Kind::FieldOffset:
@@ -389,6 +393,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
@@ -414,6 +419,8 @@ private:
     case Node::Kind::TypeMangling:
     case Node::Kind::TypeMetadata:
     case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::TypeMetadataInstantiationCache:
+    case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::Unmanaged:
@@ -854,6 +861,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::Type:
       return needSpaceBeforeType(Type->getFirstChild());
     case Node::Kind::FunctionType:
+    case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::DependentGenericType:
       return false;
@@ -1038,6 +1046,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Index:
     Printer << Node->getIndex();
+    return nullptr;
+  case Node::Kind::NoEscapeFunctionType:
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::EscapingAutoClosureType:
+    Printer << "@autoclosure ";
+    printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
@@ -1399,6 +1414,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "merged ";
     }
     return nullptr;
+  case Node::Kind::SymbolicReference:
+    Printer << "symbolic reference " << Node->getIndex();
+    return nullptr;
+  case Node::Kind::UnresolvedSymbolicReference:
+    Printer << "$" << Node->getIndex();
+    return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
     print(Node->getChild(0));
@@ -1427,6 +1448,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata accessor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::TypeMetadataInstantiationCache:
+    Printer << "type metadata instantiation cache for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::TypeMetadataInstantiationFunction:
+    Printer << "type metadata instantiation function for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
@@ -1447,6 +1476,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ClassMetadataBaseOffset:
     Printer << "class metadata base offset for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::PropertyDescriptor:
+    Printer << "property descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:
@@ -2013,6 +2046,7 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       while (t->getKind() == Node::Kind::DependentGenericType)
         t = t->getChild(1)->getChild(0);
       if (t->getKind() != Node::Kind::FunctionType &&
+          t->getKind() != Node::Kind::NoEscapeFunctionType &&
           t->getKind() != Node::Kind::UncurriedFunctionType &&
           t->getKind() != Node::Kind::CFunctionPointer &&
           t->getKind() != Node::Kind::ThinFunctionType) {

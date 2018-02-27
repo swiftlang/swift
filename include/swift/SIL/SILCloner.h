@@ -886,7 +886,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createDebugValue(
                           Inst->getLoc(), getOpValue(Inst->getOperand()),
-                          Inst->getVarInfo()));
+                          *Inst->getVarInfo()));
 }
 template<typename ImplClass>
 void
@@ -900,8 +900,8 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // Do not remap the location for a debug Instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createDebugValueAddr(
-                          Inst->getLoc(), OpValue, Inst->getVarInfo()));
+  doPostProcess(Inst, getBuilder().createDebugValueAddr(Inst->getLoc(), OpValue,
+                                                        *Inst->getVarInfo()));
 }
 
 
@@ -978,6 +978,16 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
     getBuilder().createConvertFunction(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createConvertEscapeToNoEscape(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()),
+                          getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -1132,6 +1142,15 @@ SILCloner<ImplClass>::visitRefToRawPointerInst(RefToRawPointerInst *Inst) {
     getBuilder().createRefToRawPointer(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitValueToBridgeObjectInst(
+    ValueToBridgeObjectInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createValueToBridgeObject(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

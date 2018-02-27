@@ -192,9 +192,19 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto genericSig = getGenericSignature();
 
-  // If the type doesn't conform to this protocol, fail.
-  if (!genericSig->conformsToProtocol(type, proto))
+  // If the type doesn't conform to this protocol, the result isn't formed
+  // from these requirements.
+  if (!genericSig->conformsToProtocol(type, proto)) {
+    // Check whether the superclass conforms.
+    if (auto superclass = genericSig->getSuperclassBound(type)) {
+      return LookUpConformanceInSignature(*getGenericSignature())(
+                                                 type->getCanonicalType(),
+                                                 superclass,
+                                                 proto->getDeclaredType());
+    }
+
     return None;
+  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
@@ -267,6 +277,10 @@ void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   assert(!isa<ArchetypeType>(type));
   conformanceMap[type].push_back(conformance);
+}
+
+SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
+  return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
 }
 
 SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {

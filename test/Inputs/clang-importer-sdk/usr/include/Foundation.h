@@ -10,6 +10,7 @@
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
+#define NS_NOESCAPE CF_NOESCAPE
 
 typedef struct objc_object { void *isa; } *id;
 
@@ -867,6 +868,7 @@ typedef struct NonNilableReferences {
 @protocol NSProtocolWithOptionalRequirement
 @optional
 -(void)optionalRequirement;
+-(DummyClass *)optionalRequirementMethodWithIUOResult;
 @end
 
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
@@ -1143,3 +1145,15 @@ void install_global_event_handler(_Nullable event_handler handler);
 
 __nullable id returnNullableId(void);
 void takeNullableId(__nullable id);
+
+@interface I
+@end
+
+@protocol OptionalMethods
+@optional
+- (Coat *)optional;
+@end
+
+@interface IUOProperty
+@property (readonly) id<OptionalMethods> iuo;
+@end

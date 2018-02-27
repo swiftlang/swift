@@ -1779,9 +1779,9 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
     return {nullptr, false};
 
   // Unwrap one level of optionality from each.
-  if (Type getterObjectType = getterType->getAnyOptionalObjectType())
+  if (Type getterObjectType = getterType->getOptionalObjectType())
     getterType = getterObjectType;
-  if (Type setterObjectType = setterType->getAnyOptionalObjectType())
+  if (Type setterObjectType = setterType->getOptionalObjectType())
     setterType = setterObjectType;
 
   // If they are still different, fail.
@@ -2043,7 +2043,7 @@ static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
   Type ty = prop->getInterfaceType();
-  if (auto innerTy = ty->getAnyOptionalObjectType())
+  if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
   if (!ty->is<GenericTypeParamType>() && !ty->isAnyClassReferenceType())
     return;
@@ -3177,11 +3177,13 @@ namespace {
 
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
+        bool isBitField = false;
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
           if (field->isBitField()) {
             // We can't represent this struct completely in SIL anymore,
             // but we're still able to define a memberwise initializer.
             hasUnreferenceableStorage = true;
+            isBitField = true;
 
             makeBitFieldAccessors(Impl,
                                   const_cast<clang::RecordDecl *>(decl),
@@ -3195,7 +3197,7 @@ namespace {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
           makeIndirectFieldAccessors(Impl, ind, members, result, VD);
-        } else if (decl->isUnion()) {
+        } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
@@ -4063,7 +4065,7 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
-        assert(!dc->getSelfInterfaceType()->getAnyOptionalObjectType());
+        assert(!dc->getSelfInterfaceType()->getOptionalObjectType());
         isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
@@ -4509,15 +4511,15 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto createRootClass = [=](Identifier name,
-                                 DeclContext *dc = nullptr) -> ClassDecl * {
+      auto createFakeRootClass = [=](Identifier name,
+                                     DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
                                           /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        AccessLevel::Open,
+                                                        AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
@@ -4545,7 +4547,7 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
+        auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
@@ -4577,7 +4579,7 @@ namespace {
 
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
-          auto result = createRootClass(name);
+          auto result = createFakeRootClass(name);
           result->setImplicit();
           auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
@@ -4600,13 +4602,16 @@ namespace {
       if (declaredNative && nativeDecl)
         return nativeDecl;
 
+      auto access = AccessLevel::Open;
+      if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
+          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+        access = AccessLevel::Public;
+      }
+
       // Create the class declaration and record it.
-      auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                AccessLevel::Open,
-                                Impl.importSourceLoc(decl->getLocStart()),
-                                name,
-                                Impl.importSourceLoc(decl->getLocation()),
-                                None, nullptr, dc);
+      auto result = Impl.createDeclWithClangNode<ClassDecl>(
+          decl, access, Impl.importSourceLoc(decl->getLocStart()), name,
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -5266,7 +5271,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!storedUnderlyingType)
     return nullptr;
 
-  if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = storedUnderlyingType->getOptionalObjectType())
     storedUnderlyingType = objTy;
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
@@ -5283,7 +5288,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
       Bridgeability::Full, OTK_None);
-  if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
     computedPropertyUnderlyingType = objTy;
 
   bool isBridged =
@@ -5569,7 +5574,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   // Update the failability appropriately based on the imported method type.
   OptionalTypeKind initOptionality = OTK_None;
   if (importedType.isImplicitlyUnwrapped()) {
-    assert(importedType.getType()->getAnyOptionalObjectType());
+    assert(importedType.getType()->getOptionalObjectType());
     initOptionality = OTK_ImplicitlyUnwrappedOptional;
   } else if (importedType.getType()->getOptionalObjectType()) {
     initOptionality = OTK_Optional;
@@ -6104,18 +6109,21 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
-  OptionalTypeKind failability;
-  (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
+  bool resultIsOptional;
+  (void)oldFnType->getResult()->getOptionalObjectType(resultIsOptional);
 
   // Update the failability appropriately based on the imported method type.
-  if (importedType.isImplicitlyUnwrapped()) {
-    assert(failability != OTK_None);
-    failability = OTK_ImplicitlyUnwrappedOptional;
+  assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());
+  OptionalTypeKind failability = OTK_None;
+  if (resultIsOptional) {
+    failability = OTK_Optional;
+    if (importedType.isImplicitlyUnwrapped())
+      failability = OTK_ImplicitlyUnwrappedOptional;
   }
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
-  if (failability != OTK_None)
+  if (resultIsOptional)
     resultTy = OptionalType::get(resultTy);
 
   type = FunctionType::get(oldFnType->getInput(), resultTy,
@@ -7870,11 +7878,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
-  UnifiedStatsReporter::FrontendStatsTracer Tracer;
-  if (SwiftContext.Stats)
-    Tracer = SwiftContext.Stats->getStatsTracer("import-clang-decl",
-                                                ClangDecl);
-
+  FrontendStatsTracer StatsTracer(SwiftContext.Stats,
+                                  "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
@@ -8341,12 +8346,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  RecursiveSharedTimer::Guard guard;
-  if (auto s = D->getASTContext().Stats) {
-    guard = s->getFrontendRecursiveSharedTimers()
-                .ClangImporter__Implementation__loadAllMembers.getGuard();
-  }
 
+  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
@@ -8596,17 +8597,20 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
+    } else {
+      OS << "<unnamed-clang-decl>";
     }
   }
 
-  static inline void printClangShortLoc(raw_ostream &OS,
+  static inline bool printClangShortLoc(raw_ostream &OS,
                                         clang::SourceManager *CSM,
                                         clang::SourceLocation L) {
     if (!L.isValid() || !L.isFileID())
-      return;
+      return false;
     auto PLoc = CSM->getPresumedLoc(L);
     OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
        << ':' << PLoc.getColumn();
+    return true;
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -8616,8 +8620,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (CSM) {
       const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
       auto Range = CD->getSourceRange();
-      printClangShortLoc(OS, CSM, Range.getBegin());
-      OS << '-';
+      if (printClangShortLoc(OS, CSM, Range.getBegin()))
+        OS << '-';
       printClangShortLoc(OS, CSM, Range.getEnd());
     }
   }
@@ -8625,13 +8629,8 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static ClangDeclTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const clang::Decl *D) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
+  return &TF;
 }

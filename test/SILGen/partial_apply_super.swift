@@ -35,9 +35,9 @@ class Child : Parent {
   // CHECK:   [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
   // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super6ParentC6methodyyFTcTd : $@convention(thin) (@owned Parent) -> @owned @callee_guaranteed () -> ()
   // CHECK:   [[PARTIAL_APPLY:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(thin) (@owned Parent) -> @owned @callee_guaranteed () -> ()
-  // CHECK:   [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super5ChildC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -47,9 +47,9 @@ class Child : Parent {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick Child.Type to $@thick Parent.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super6ParentC11classMethodyyFZTcTd : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
-  // CHECK:   [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -60,9 +60,9 @@ class Child : Parent {
   // CHECK:     [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super6ParentC11finalMethodyyFTc : $@convention(thin) (@owned Parent) -> @owned @callee_guaranteed () -> ()
   // CHECK:     [[APPLIED_SELF:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(thin) (@owned Parent) -> @owned @callee_guaranteed () -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[APPLIED_SELF]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[APPLIED_SELF]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super5ChildC20callFinalSuperMethodyyF'
   func callFinalSuperMethod() {
     doFoo(super.finalMethod)
@@ -72,9 +72,9 @@ class Child : Parent {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick Child.Type to $@thick Parent.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super6ParentC16finalClassMethodyyFZTc : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
   // CHECK: [[APPLIED_SELF:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[APPLIED_SELF]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[APPLIED_SELF]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   class func callFinalSuperClassMethod() {
     doFoo(super.finalClassMethod)
   }
@@ -90,9 +90,9 @@ class GenericChild<A> : GenericParent<A> {
   // CHECK:     [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $GenericChild<A> to $GenericParent<A>
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super13GenericParentC6methodyyFTcTd : $@convention(thin) <τ_0_0> (@owned GenericParent<τ_0_0>) -> @owned @callee_guaranteed () -> ()
   // CHECK:     [[PARTIAL_APPLY:%[0-9]+]] = apply [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(thin) <τ_0_0> (@owned GenericParent<τ_0_0>) -> @owned @callee_guaranteed () -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super12GenericChildC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -102,9 +102,9 @@ class GenericChild<A> : GenericParent<A> {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GenericChild<A>.Type to $@thick GenericParent<A>.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @$S19partial_apply_super13GenericParentC11classMethodyyFZTcTd : $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> @owned @callee_guaranteed () -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> @owned @callee_guaranteed () -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -120,9 +120,9 @@ class ChildToFixedOutsideParent : OutsideParent {
   // CHECK:   [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ChildToFixedOutsideParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
   // CHECK: end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:   [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed OutsideParent) -> ()
-  // CHECK:   [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super25ChildToFixedOutsideParentC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -132,9 +132,9 @@ class ChildToFixedOutsideParent : OutsideParent {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick ChildToFixedOutsideParent.Type to $@thick OutsideParent.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick ChildToFixedOutsideParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> (){{.*}}
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@thick OutsideParent.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -150,9 +150,9 @@ class ChildToResilientOutsideParent : ResilientOutsideParent {
   // CHECK:   [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ChildToResilientOutsideParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   // CHECK:   end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:   [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
-  // CHECK:   [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:   [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super29ChildToResilientOutsideParentC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -162,9 +162,9 @@ class ChildToResilientOutsideParent : ResilientOutsideParent {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick ChildToResilientOutsideParent.Type to $@thick ResilientOutsideParent.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick ChildToResilientOutsideParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -180,9 +180,9 @@ class GrandchildToFixedOutsideChild : OutsideChild {
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GrandchildToFixedOutsideChild, #OutsideChild.method!1 : (OutsideChild) -> () -> (), $@convention(method) (@guaranteed OutsideChild) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed OutsideChild) -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super29GrandchildToFixedOutsideChildC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -192,9 +192,9 @@ class GrandchildToFixedOutsideChild : OutsideChild {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GrandchildToFixedOutsideChild.Type to $@thick OutsideChild.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick GrandchildToFixedOutsideChild.Type, #OutsideChild.classMethod!1 : (OutsideChild.Type) -> () -> (), $@convention(method) (@thick OutsideChild.Type) -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@thick OutsideChild.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -210,9 +210,9 @@ class GrandchildToResilientOutsideChild : ResilientOutsideChild {
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GrandchildToResilientOutsideChild, #ResilientOutsideChild.method!1 : (ResilientOutsideChild) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
   // CHEC:      end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super33GrandchildToResilientOutsideChildC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -222,9 +222,9 @@ class GrandchildToResilientOutsideChild : ResilientOutsideChild {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GrandchildToResilientOutsideChild.Type to $@thick ResilientOutsideChild.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick GrandchildToResilientOutsideChild.Type, #ResilientOutsideChild.classMethod!1 : (ResilientOutsideChild.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideChild.Type) -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@thick ResilientOutsideChild.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -240,9 +240,9 @@ class GenericChildToFixedGenericOutsideParent<A> : GenericOutsideParent<A> {
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GenericChildToFixedGenericOutsideParent<A>, #GenericOutsideParent.method!1 : <A> (GenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super019GenericChildToFixedD13OutsideParentC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -252,9 +252,9 @@ class GenericChildToFixedGenericOutsideParent<A> : GenericOutsideParent<A> {
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GenericChildToFixedGenericOutsideParent<A>.Type to $@thick GenericOutsideParent<A>.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick GenericChildToFixedGenericOutsideParent<A>.Type, #GenericOutsideParent.classMethod!1 : <A> (GenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick GenericOutsideParent<τ_0_0>.Type) -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(method) <τ_0_0> (@thick GenericOutsideParent<τ_0_0>.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }
@@ -270,9 +270,9 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   // CHECK:     [[SUPER_METHOD:%[0-9]+]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GenericChildToResilientGenericOutsideParent<A>, #ResilientGenericOutsideParent.method!1 : <A> (ResilientGenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]] from [[CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
-  // CHECK:     [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK:     [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$S19partial_apply_super023GenericChildToResilientD13OutsideParentC6methodyyF'
   override func method() {
     doFoo(super.method)
@@ -282,9 +282,9 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GenericChildToResilientGenericOutsideParent<A>.Type to $@thick ResilientGenericOutsideParent<A>.Type
   // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick GenericChildToResilientGenericOutsideParent<A>.Type, #ResilientGenericOutsideParent.classMethod!1 : <A> (ResilientGenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick ResilientGenericOutsideParent<τ_0_0>.Type) -> ()
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(method) <τ_0_0> (@thick ResilientGenericOutsideParent<τ_0_0>.Type) -> ()
-  // CHECK: [[CONVERT:%.*]] = convert_function [[PARTIAL_APPLY]]
-  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
-  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[PARTIAL_APPLY]]
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @$S19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   override class func classMethod() {
     doFoo(super.classMethod)
   }

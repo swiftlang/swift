@@ -337,7 +337,7 @@ func convUpcastMetatype(_ c4: @escaping (Parent.Type, Trivial?) -> Child.Type,
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[REABSTRACT_THUNK:%.*]] = function_ref @$SypS2iIegyd_Iegio_S2iIgyd_ypIegxr_TR
+// CHECK:   [[REABSTRACT_THUNK:%.*]] = function_ref @$SypS2iIegyd_Iegio_S2iIgyd_ypIegyr_TR
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[ARG_COPY]])
 // CHECK:   destroy_value [[PA]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -347,11 +347,11 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
   let _: ((Int) -> Int) -> Any = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypS2iIegyd_Iegio_S2iIgyd_ypIegxr_TR : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int, @guaranteed @callee_guaranteed (@in Any) -> @owned @callee_guaranteed (Int) -> Int) -> @out Any
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypS2iIegyd_Iegio_S2iIgyd_ypIegyr_TR : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, @guaranteed @callee_guaranteed (@in Any) -> @owned @callee_guaranteed (Int) -> Int) -> @out Any
 // CHECK:         alloc_stack $Any
-// CHECK:         function_ref @$SS2iIgyd_S2iIgir_TR
+// CHECK:         function_ref @$SS2iIgyd_S2iIegir_TR
 // CHECK-NEXT:    partial_apply
-// CHECK-NEXT:    convert_function
+// CHECK-NEXT:    convert_escape_to_noescape
 // CHECK-NEXT:    init_existential_addr %3 : $*Any, $(Int) -> Int
 // CHECK-NEXT:    store
 // CHECK-NEXT:    apply
@@ -639,18 +639,18 @@ func rdar35702810_anyhashable() {
   let fn_set: (Set<AnyHashable>) -> Void = { _ in }
 
 
-  // CHECK: function_ref @$SSays11AnyHashableVGSgIegx_Say19function_conversion1BCGSgIgx_TR : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
-  // CHECK: partial_apply [callee_guaranteed] %12(%11) : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
-  // CHECK: convert_function %13 : $@callee_guaranteed (@owned Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@owned Optional<Array<B>>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$SSays11AnyHashableVGSgIegx_Say19function_conversion1BCGSgIegx_TR : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
+  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@owned Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@owned Optional<Array<B>>) -> ()
   bar_arr(type: B.self, fn_arr)
 
-  // CHECK: function_ref @$Ss10DictionaryVys11AnyHashableVSiGIegx_ABy19function_conversion1BCSiGIgx_TR : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
-  // CHECK: partial_apply [callee_guaranteed] %21(%20) : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
-  // CHECK: convert_function %22 : $@callee_guaranteed (@owned Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@owned Dictionary<B, Int>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$Ss10DictionaryVys11AnyHashableVSiGIegx_ABy19function_conversion1BCSiGIegx_TR : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
+  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@owned Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@owned Dictionary<B, Int>) -> ()
   bar_map(type: B.self, fn_map)
 
-  // CHECK: function_ref @$Ss3SetVys11AnyHashableVGIegx_ABy19function_conversion1BCGIgx_TR : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
-  // CHECK: partial_apply [callee_guaranteed] %30(%29) : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
-  // CHECK: convert_function %31 : $@callee_guaranteed (@owned Set<B>) -> () to $@noescape @callee_guaranteed (@owned Set<B>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$Ss3SetVys11AnyHashableVGIegx_ABy19function_conversion1BCGIegx_TR : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
+  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@owned Set<B>) -> () to $@noescape @callee_guaranteed (@owned Set<B>) -> ()
   bar_set(type: B.self, fn_set)
 }

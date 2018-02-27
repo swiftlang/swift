@@ -13,5 +13,4 @@ add_swift_library(swiftSyntax STATIC
   Syntax.cpp
   SyntaxArena.cpp
   SyntaxData.cpp
-  UnknownSyntax.cpp
-  SyntaxParsingContext.cpp)
+  UnknownSyntax.cpp)

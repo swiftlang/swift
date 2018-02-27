@@ -43,7 +43,6 @@ class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
-enum OptionalTypeKind : unsigned;
 class ProtocolConformanceRef;
 class ProtocolDecl;
 class ProtocolType;
@@ -65,6 +64,12 @@ typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 /// this substitutable type; otherwise, the replacement type.
 using TypeSubstitutionFn
   = llvm::function_ref<Type(SubstitutableType *dependentType)>;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// replaces archetypes with their interface types.
+struct MapTypeOutOfContext {
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c TypeSubstitutionMap.
@@ -389,8 +394,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getAnyOptionalObjectTypeImpl(CanType type,
-                                              OptionalTypeKind &kind);
+  static CanType getOptionalObjectTypeImpl(CanType type, bool &isOptional);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -457,13 +461,13 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
-  CanType getAnyOptionalObjectType() const {
-    OptionalTypeKind kind;
-    return getAnyOptionalObjectTypeImpl(*this, kind);
+  CanType getOptionalObjectType() const {
+    bool isOptional;
+    return getOptionalObjectTypeImpl(*this, isOptional);
   }
 
-  CanType getAnyOptionalObjectType(OptionalTypeKind &kind) const {
-    return getAnyOptionalObjectTypeImpl(*this, kind);
+  CanType getOptionalObjectType(bool &isOptional) const {
+    return getOptionalObjectTypeImpl(*this, isOptional);
   }
 
   CanType getReferenceStorageReferent() const {

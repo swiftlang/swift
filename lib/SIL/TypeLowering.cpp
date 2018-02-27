@@ -230,8 +230,13 @@ namespace {
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
-      if (type->getExtInfo().hasContext())
+      // Only escaping closures are references.
+      bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
+                             type->getExtInfo().getRepresentation() ==
+                                 SILFunctionType::Representation::Thick;
+      if (type->getExtInfo().hasContext() && !isSwiftEscaping)
         return asImpl().handleReference(type);
+      // No escaping closures are trivial types.
       return asImpl().handleTrivial(type);
     }
 
@@ -465,8 +470,8 @@ namespace {
       // We have to look through optionals here without grabbing the
       // type lowering because the way that optionals are reabstracted
       // can trip recursion checks if we try to build a lowered type.
-      if (D->classifyAsOptionalType()) {
-        return visit(type.getAnyOptionalObjectType());
+      if (D->isOptionalDecl()) {
+        return visit(type.getOptionalObjectType());
       }
 
       // Consult the type lowering.
@@ -1467,16 +1472,15 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 static CanType getLoweredOptionalType(TypeConverter &tc,
                                       AbstractionPattern origType,
                                       CanType substType,
-                                      CanType substObjectType,
-                                      OptionalTypeKind optKind) {
-  assert(substType.getAnyOptionalObjectType() == substObjectType);
+                                      CanType substObjectType) {
+  assert(substType.getOptionalObjectType() == substObjectType);
 
   CanType loweredObjectType =
-    tc.getLoweredType(origType.getAnyOptionalObjectType(), substObjectType)
-      .getSwiftRValueType();
+      tc.getLoweredType(origType.getOptionalObjectType(), substObjectType)
+          .getSwiftRValueType();
 
   // If the object type didn't change, we don't have to rebuild anything.
-  if (loweredObjectType == substObjectType && optKind == OTK_Optional) {
+  if (loweredObjectType == substObjectType) {
     return substType;
   }
 
@@ -1651,10 +1655,8 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
   }
 
   // Lower the object type of optional types.
-  OptionalTypeKind optKind;
-  if (auto substObjectType = substType.getAnyOptionalObjectType(optKind)) {
-    return getLoweredOptionalType(*this, origType, substType,
-                                  substObjectType, optKind);
+  if (auto substObjectType = substType.getOptionalObjectType()) {
+    return getLoweredOptionalType(*this, origType, substType, substObjectType);
   }
 
   // The Swift type directly corresponds to the lowered type.
@@ -2253,11 +2255,11 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
   // Unwrap optionals, but remember that we did.
   bool type1WasOptional = false;
   bool type2WasOptional = false;
-  if (auto object = type1.getAnyOptionalObjectType()) {
+  if (auto object = type1.getOptionalObjectType()) {
     type1WasOptional = true;
     type1 = object;
   }
-  if (auto object = type2.getAnyOptionalObjectType()) {
+  if (auto object = type2.getOptionalObjectType()) {
     type2WasOptional = true;
     type2 = object;
   }

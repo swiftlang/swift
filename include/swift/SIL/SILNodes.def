@@ -312,6 +312,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
                       ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
+                      ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ThinFunctionToPointerInst, thin_function_to_pointer,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(PointerToThinFunctionInst, pointer_to_thin_function,
@@ -352,6 +354,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
 
   SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)

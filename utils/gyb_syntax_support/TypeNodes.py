@@ -101,6 +101,7 @@ TYPE_NODES = [
 
     # tuple-type-element -> identifier? ':'? type-annotation ','?
     Node('TupleTypeElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('InOut', kind='InOutToken',
                    is_optional=True),
@@ -133,6 +134,7 @@ TYPE_NODES = [
 
     # tuple-type -> '(' tuple-type-element-list ')'
     Node('TupleType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Elements', kind='TupleTypeElementList'),
@@ -143,6 +145,7 @@ TYPE_NODES = [
     # function-type -> attribute-list '(' function-type-argument-list ')'
     #   throwing-specifier? '->'? type?
     Node('FunctionType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='TupleTypeElementList'),
@@ -178,6 +181,7 @@ TYPE_NODES = [
     # Dictionary<Int, String>
     #            ^~~~ ^~~~~~
     Node('GenericArgument', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('ArgumentType', kind='Type'),
              Child('TrailingComma', kind='CommaToken',

@@ -521,7 +521,7 @@ SILValue ClosureCloner::getProjectBoxMappedVal(SILValue Operand) {
 void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   if (SILValue Val = getProjectBoxMappedVal(Inst->getOperand())) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-    getBuilder().createDebugValue(Inst->getLoc(), Val, Inst->getVarInfo());
+    getBuilder().createDebugValue(Inst->getLoc(), Val, *Inst->getVarInfo());
     return;
   }
   SILCloner<ClosureCloner>::visitDebugValueAddrInst(Inst);
@@ -1306,6 +1306,9 @@ class CapturePromotionPass : public SILModuleTransform {
   void run() override {
     SmallVector<SILFunction*, 128> Worklist;
     for (auto &F : *getModule()) {
+      if (F.wasDeserializedCanonical())
+        continue;
+
       processFunction(&F, Worklist);
     }
 

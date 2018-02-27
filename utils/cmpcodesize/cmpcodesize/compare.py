@@ -163,7 +163,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
     if old_size is not None and new_size is not None:
         if old_size != 0:
             perc = "%.1f%%" % (
-                (1.0 - float(new_size) / float(old_size)) * 100.0)
+                (float(new_size) / float(old_size) - 1.0) * 100.0)
         else:
             perc = "- "
 

@@ -21,8 +21,8 @@ struct FourInts { var x,y,z,w: Int32 }
 @_alignment(16)
 struct AlignedFourInts { var x: FourInts }
 
-// CHECK:       @"$S11type_layout14TypeLayoutTestVMP" = internal global {{.*}} @create_generic_metadata_TypeLayoutTest
-// CHECK:       define private %swift.type* @create_generic_metadata_TypeLayoutTest
+// CHECK:       @"$S11type_layout14TypeLayoutTestVMn" = hidden constant {{.*}} @"$S11type_layout14TypeLayoutTestVMi"
+// CHECK:       define internal %swift.type* @"$S11type_layout14TypeLayoutTestVMi"
 struct TypeLayoutTest<T> {
   // -- dynamic layout, projected from metadata
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* %T to i8***

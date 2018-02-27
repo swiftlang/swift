@@ -1372,7 +1372,8 @@ static void VisitNodeFunctionType(
     }
   }
   CreateFunctionType(ast, arg_type_result, return_type_result,
-                     /*escaping=*/true, throws, result);
+                     cur_node->getKind() == Demangle::Node::Kind::FunctionType,
+                     throws, result);
 }
 
 static void VisitNodeImplFunctionType(
@@ -2104,6 +2105,7 @@ static void VisitNode(
   case Demangle::Node::Kind::BoundGenericClass:
   case Demangle::Node::Kind::BoundGenericStructure:
   case Demangle::Node::Kind::BoundGenericEnum:
+  case Demangle::Node::Kind::BoundGenericOtherNominalType:
     VisitNodeBoundGeneric(ast, node, result);
     break;
 
@@ -2114,6 +2116,7 @@ static void VisitNode(
   case Demangle::Node::Kind::Structure:
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::OtherNominalType:
   case Demangle::Node::Kind::Protocol:
     VisitNodeNominal(ast, node, result);
     break;
@@ -2161,6 +2164,7 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::FunctionType:
+  case Demangle::Node::Kind::NoEscapeFunctionType:
   case Demangle::Node::Kind::UncurriedFunctionType: // Out of order on
                                                     // purpose.
     VisitNodeFunctionType(ast, node, result);

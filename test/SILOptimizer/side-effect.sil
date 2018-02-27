@@ -489,3 +489,36 @@ bb0(%0 : $*Int32):
 }
 
 sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+
+sil public_external @public_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_public_external_func
+// CHECK-NEXT: <func=rw+-;alloc;trap;readrc>
+sil @call_public_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @public_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil shared_external @shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_shared_external_func
+// CHECK-NEXT: <func=>
+sil @call_shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @shared_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+

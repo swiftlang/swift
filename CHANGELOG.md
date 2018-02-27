@@ -23,12 +23,24 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* Public classes may now have internal `required` initializers. The rule for
+  `required` initializers is that they must be available everywhere the class
+  can be subclassed, but previously we said that `required` initializers on
+  public classes needed to be public themselves. (This limitation is a holdover
+  from before the introduction of the open/public distinction in Swift 3.)
+
 * C macros containing casts are no longer imported to Swift if the type in the
   cast is unavailable or deprecated, or produces some other diagnostic when
   referenced. (These macros were already only imported under very limited
   circumstances with very simple values, so this is unlikely to affect
   real-world code.)
 
+* [SE-0143][]
+
+	Runtime query of conditional conformances is now implemented. Therefore,
+	a dynamic cast such as `value as? P`, where the dynamic type of `value`
+	conditionally conforms to `P`, will succeed when the conditional
+	requirements are met.
 
 Swift 4.1
 ---------

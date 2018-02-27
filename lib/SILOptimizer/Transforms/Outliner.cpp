@@ -1127,7 +1127,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
     unsigned CurIdx = Idx++;
 
     // Look for Optional<NSFoo> type.
-    auto Ty = Param.get()->getType().getAnyOptionalObjectType();
+    auto Ty = Param.get()->getType().getOptionalObjectType();
     if (!Ty)
       continue;
 

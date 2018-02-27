@@ -470,6 +470,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
       Separator = '_';
       break;
 
+    case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass: {
@@ -542,6 +543,16 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
 void Remangler::mangleAutoClosureType(Node *node) {
   mangleChildNodesReversed(node); // argument tuple, result type
   Buffer << "XK";
+}
+
+void Remangler::mangleEscapingAutoClosureType(Node *node) {
+  mangleChildNodesReversed(node); // argument tuple, result type
+  Buffer << "XA";
+}
+
+void Remangler::mangleNoEscapeFunctionType(Node *node) {
+  mangleChildNodesReversed(node); // argument tuple, result type
+  Buffer << "XE";
 }
 
 void Remangler::mangleBoundGenericClass(Node *node) {
@@ -1392,6 +1403,11 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Buffer << "Mn";
 }
 
+void Remangler::manglePropertyDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MV";
+}
+
 void Remangler::mangleNonObjCAttribute(Node *node) {
   Buffer << "TO";
 }
@@ -1686,6 +1702,16 @@ void Remangler::mangleTypeMetadataAccessFunction(Node *node) {
   Buffer << "Ma";
 }
 
+void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MI";
+}
+
+void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mi";
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   mangleChildNodes(node);
   Buffer << "ML";
@@ -1942,6 +1968,19 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   mangleAssocTypePath(node->getChild(1));
   Buffer << "MXA";
 }
+  
+void Remangler::mangleUnresolvedSymbolicReference(Node *node) {
+  Buffer << "$";
+  char bytes[4];
+  uint32_t value = node->getIndex();
+  memcpy(bytes, &value, 4);
+  Buffer << StringRef(bytes, 4);
+}
+
+void Remangler::mangleSymbolicReference(Node *node) {
+  unreachable("should not try to mangle a symbolic reference; "
+              "resolve it to a non-symbolic demangling tree instead");
+}
 
 } // anonymous namespace
 
@@ -1960,11 +1999,13 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType:
       return true;
 
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::OtherNominalType:
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
@@ -1979,7 +2020,8 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
   switch (node->getKind()) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
-    case Node::Kind::Class: {
+    case Node::Kind::Class:
+    case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
       if (isSpecialized(parentOrModule))
@@ -1992,7 +2034,8 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
 
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
-    case Node::Kind::BoundGenericClass: {
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);

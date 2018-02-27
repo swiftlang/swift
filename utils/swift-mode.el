@@ -50,9 +50,9 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "fileprivate" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "lazy" "where"
-                    "private" "public" "internal" "override" "throws" "rethrows"
-                    "open" "associatedtype" "inout" "indirect" "final")
+                    "typealias" "enum" "var" "lazy" "where" "private" "public"
+                    "internal" "override" "open" "associatedtype" "inout"
+                    "indirect" "final")
                   'words) . font-lock-keyword-face)
    ;; Variable decl keywords
    `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
@@ -60,7 +60,7 @@
    ;; Operators
    `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
    ;; Keywords that begin with a number sign
-   `("#\\(if\\|endif\\|elseif\\|else\\|available\\)\\b" . font-lock-string-face)
+   `("#\\(if\\|endif\\|elseif\\|else\\|available\\|error\\|warning\\)\\b" . font-lock-string-face)
    `("#\\(file\\|line\\|column\\|function\\|selector\\)\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
    `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
@@ -68,16 +68,18 @@
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
                     "return" "break" "continue" "fallthrough"  "switch" "case"
-                    "default" "throw" "defer" "try" "catch")
+                    "default" "defer" "catch")
                   'words) . font-lock-keyword-face)
    ;; Decl modifier keywords
    `(,(regexp-opt '("convenience" "dynamic" "mutating" "nonmutating" "optional"
                     "required" "weak" "unowned" "safe" "unsafe")
                   'words) . font-lock-keyword-face)
+   ;; Expression keywords: "Any" and "Self" are included in "Types" above
+   `(,(regexp-opt '("as" "false" "is" "nil" "rethrows" "super" "self" "throw"
+                    "true" "try" "throws")
+                  'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
-   ;; Special Variables
-   '("self" . font-lock-keyword-face)
    ;; Variables
    '("[a-zA-Z_][a-zA-Z_0-9]*" . font-lock-variable-name-face)
    ;; Unnamed variables

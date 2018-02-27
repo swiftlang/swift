@@ -189,6 +189,16 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   EXPECT_EQ(VoidVoid1, VoidVoid2);
   EXPECT_NE(VoidVoid1, F1);
+
+  // Test escaping.
+  auto F10 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F11 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F12 = Builder.createFunctionType(
+      Parameters1, Result, FunctionTypeFlags().withEscaping(false));
+  EXPECT_EQ(F10, F11);
+  EXPECT_NE(F10, F12);
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {

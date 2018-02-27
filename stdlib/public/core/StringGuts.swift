@@ -60,7 +60,7 @@ struct _StringGuts {
 
   init(rawBits: _RawBitPattern) {
     self.init(
-      object: _StringObject(rawBits: rawBits.0),
+      object: _StringObject(noReallyHereAreTheRawBits: rawBits.0),
       otherBits: rawBits.1)
   }
 }

@@ -34,7 +34,6 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -49,6 +48,7 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class SILModule;
 
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
@@ -175,10 +175,12 @@ public:
   }
 
   void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.SerializedDiagnosticsPath = Path;
+    FrontendOpts.InputsAndOutputs.supplementaryOutputs()
+        .SerializedDiagnosticsPath = Path;
   }
   StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.SerializedDiagnosticsPath;
+    return FrontendOpts.InputsAndOutputs.supplementaryOutputs()
+        .SerializedDiagnosticsPath;
   }
 
   LangOptions &getLangOptions() {
@@ -299,6 +301,12 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
+
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -317,7 +325,6 @@ class CompilerInstance {
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
-  ReferencedNameTracker *NameTracker = nullptr;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -364,6 +371,15 @@ class CompilerInstance {
   void createSILModule();
 
 public:
+  // Out of line to avoid having to import SILModule.h.
+  CompilerInstance();
+  ~CompilerInstance();
+
+  CompilerInstance(const CompilerInstance &) = delete;
+  void operator=(const CompilerInstance &) = delete;
+  CompilerInstance(CompilerInstance &&) = delete;
+  void operator=(CompilerInstance &&) = delete;
+
   SourceManager &getSourceMgr() { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
@@ -388,20 +404,10 @@ public:
     return DepTracker;
   }
 
-  void setReferencedNameTracker(ReferencedNameTracker *tracker) {
-    assert(PrimarySourceFiles.empty() && "must be called before performSema()");
-    NameTracker = tracker;
-  }
-  ReferencedNameTracker *getReferencedNameTracker() {
-    return NameTracker;
-  }
-
   /// Set the SIL module for this compilation instance.
   ///
   /// The CompilerInstance takes ownership of the given SILModule object.
-  void setSILModule(std::unique_ptr<SILModule> M) {
-    TheSILModule = std::move(M);
-  }
+  void setSILModule(std::unique_ptr<SILModule> M);
 
   SILModule *getSILModule() {
     return TheSILModule.get();
@@ -521,9 +527,10 @@ private:
                                 Optional<unsigned> BufferID);
 
 public:
-  /// Frees up the ASTContext and SILModule objects that this instance is
-  /// holding on.
-  void freeContextAndSIL();
+  void freeASTContext();
+
+  /// Frees up the SILModule that this instance is holding on to.
+  void freeSILModule();
 
 private:
   /// Load stdlib & return true if should continue, i.e. no error
@@ -575,6 +582,15 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+public:
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
+  PrimarySpecificPaths
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 } // namespace swift

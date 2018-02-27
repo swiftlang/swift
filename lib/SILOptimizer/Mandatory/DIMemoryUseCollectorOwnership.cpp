@@ -1112,7 +1112,9 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Stores to self.
@@ -1128,8 +1130,14 @@ void ElementUseCollector::collectClassSelfUses() {
         }
 
         // A store of a load from the box is ignored.
-        // FIXME: SILGen should not emit these.
-        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+        // SILGen emits these if delegation to another initializer was
+        // interrupted before the initializer was called.
+        SILValue src = SI->getSrc();
+        // Look through conversions.
+        while (auto conversion = dyn_cast<ConversionInst>(src))
+          src = conversion->getConverted();
+        
+        if (auto *LI = dyn_cast<LoadInst>(src))
           if (LI->getOperand() == MUI)
             continue;
 
@@ -1142,6 +1150,14 @@ void ElementUseCollector::collectClassSelfUses() {
     // Ignore end_borrows. These can only come from us being the source of a
     // load_borrow.
     if (isa<EndBorrowInst>(User))
+      continue;
+
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
       continue;
 
     // Loads of the box produce self, so collect uses from them.
@@ -1373,8 +1389,8 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // Skip end_borrow.
-    if (isa<EndBorrowInst>(User))
+    // Skip end_borrow and end_access.
+    if (isa<EndBorrowInst>(User) || isa<EndAccessInst>(User))
       continue;
 
     // ref_element_addr P, #field lookups up a field.
@@ -1411,10 +1427,9 @@ void ElementUseCollector::collectClassSelfUses(
 
     // Look through begin_borrow, upcast, unchecked_ref_cast
     // and copy_value.
-    if (isa<BeginBorrowInst>(User) ||
-        isa<UpcastInst>(User) ||
-        isa<UncheckedRefCastInst>(User) ||
-        isa<CopyValueInst>(User)) {
+    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User)
+        || isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User)
+        || isa<CopyValueInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1492,7 +1507,9 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Ignore end_borrow. If we see an end_borrow it can only come from a
@@ -1500,10 +1517,18 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     if (isa<EndBorrowInst>(User))
       continue;
 
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
+      continue;
+
     // Stores to self.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (Op->getOperandNumber() == 1) {
-        // The initial store of 'self' into the box at the start of the
+        // A store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == MUI->getParent()) {
@@ -1513,8 +1538,14 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
         }
 
         // A store of a load from the box is ignored.
-        // FIXME: SILGen should not emit these.
-        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+        // SILGen emits these if delegation to another initializer was
+        // interrupted before the initializer was called.
+        SILValue src = SI->getSrc();
+        // Look through conversions.
+        while (auto conversion = dyn_cast<ConversionInst>(src))
+          src = conversion->getConverted();
+        
+        if (auto *LI = dyn_cast<LoadInst>(src))
           if (LI->getOperand() == MUI)
             continue;
 

@@ -58,11 +58,6 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
-// Check that the user isn't manually disabling SWIFTCALL.
-#if defined(SWIFT_USE_SWIFTCALL) && !SWIFT_USE_SWIFTCALL
-#error "SWIFT_USE_SWIFTCALL=0 is not supported; swiftcall must always be used."
-#endif
-
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
@@ -210,7 +205,7 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
+BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
   auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
   HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
@@ -222,8 +217,8 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
     // Copy the data.
-    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
-    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    type->vw_initializeWithCopy(refAndObjectAddr.buffer, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.object;
     // Release ownership of the old box.
     swift_release(box);
     return refAndObjectAddr;
@@ -235,11 +230,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
   }
 }
 
-BoxPair::Return swift::swift_allocBox(const Metadata *type) {
-  return _swift_allocBox(type);
-}
-
-static BoxPair::Return _swift_allocBox_(const Metadata *type) {
+BoxPair swift::swift_allocBox(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
@@ -250,8 +241,6 @@ static BoxPair::Return _swift_allocBox_(const Metadata *type) {
 
   return BoxPair{allocation, projection};
 }
-
-auto swift::_swift_allocBox = _swift_allocBox_;
 
 void swift::swift_deallocBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
@@ -870,3 +859,24 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
   return dest;
 }
 
+#ifndef NDEBUG
+
+void HeapObject::dump() const {
+  auto *Self = const_cast<HeapObject *>(this);
+  printf("HeapObject: %p\n", Self);
+  printf("HeapMetadata Pointer: %p.\n", Self->metadata);
+  printf("Strong Ref Count: %d.\n", Self->refCounts.getCount());
+  printf("Unowned Ref Count: %d.\n", Self->refCounts.getUnownedCount());
+  printf("Weak Ref Count: %d.\n", Self->refCounts.getWeakCount());
+  if (Self->metadata->getKind() == MetadataKind::Class) {
+    printf("Uses Native Retain: %s.\n",
+           (objectUsesNativeSwiftReferenceCounting(Self) ? "true" : "false"));
+  } else {
+    printf("Uses Native Retain: Not a class. N/A.\n");
+  }
+  printf("RefCount Side Table: %p.\n", Self->refCounts.getSideTable());
+  printf("Is Deiniting: %s.\n",
+         (Self->refCounts.isDeiniting() ? "true" : "false"));
+}
+
+#endif

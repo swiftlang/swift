@@ -46,6 +46,7 @@ import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
 import DictTest3
+import DictTest4
 import DictionaryBridge
 import DictionaryGroup
 import DictionaryLiteral
@@ -101,6 +102,7 @@ import Prims
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
+import Queue
 import RC4
 import RGBHistogram
 import RangeAssignment
@@ -108,8 +110,10 @@ import RangeIteration
 import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
+import RemoveWhere
 import ReversedCollections
 import RomanNumbers
+import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -188,6 +192,7 @@ registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
+registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
@@ -243,6 +248,8 @@ registerBenchmark(Prims)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
+registerBenchmark(QueueGeneric)
+registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
@@ -250,8 +257,10 @@ registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
+registerBenchmark(RemoveWhere)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
+registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)

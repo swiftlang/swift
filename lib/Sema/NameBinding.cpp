@@ -116,6 +116,22 @@ static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
+static bool isNominalImportKind(ImportKind kind) {
+  switch (kind) {
+  case ImportKind::Module:
+    llvm_unreachable("module imports do not bring in decls");
+  case ImportKind::Struct:
+  case ImportKind::Class:
+  case ImportKind::Enum:
+  case ImportKind::Protocol:
+    return true;
+  case ImportKind::Type:
+  case ImportKind::Var:
+  case ImportKind::Func:
+    return false;
+  }
+}
+
 static const char *getImportKindString(ImportKind kind) {
   switch (kind) {
   case ImportKind::Module:
@@ -198,7 +214,13 @@ void NameBinder::addImport(
     // If we imported a submodule, import the top-level module as well.
     Identifier topLevelName = ID->getModulePath().front().first;
     topLevelModule = Context.getLoadedModule(topLevelName);
-    assert(topLevelModule && "top-level module missing");
+    if (!topLevelModule) {
+      // Clang can sometimes import top-level modules as if they were
+      // submodules.
+      assert(!M->getFiles().empty() &&
+             isa<ClangModuleUnit>(M->getFiles().front()));
+      topLevelModule = M;
+    }
   }
 
   auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
@@ -252,12 +274,30 @@ void NameBinder::addImport(
         diagnose(next, diag::found_candidate);
 
     } else if (!isCompatibleImportKind(ID->getImportKind(), *actualKind)) {
-      diagnose(ID, diag::imported_decl_is_wrong_kind,
-               declPath.front().first,
-               getImportKindString(ID->getImportKind()),
-               static_cast<unsigned>(*actualKind))
-        .fixItReplace(SourceRange(ID->getKindLoc()),
-                      getImportKindString(*actualKind));
+      Optional<InFlightDiagnostic> emittedDiag;
+      if (*actualKind == ImportKind::Type &&
+          isNominalImportKind(ID->getImportKind())) {
+        assert(decls.size() == 1 &&
+               "if we start suggesting ImportKind::Type for, e.g., a mix of "
+               "structs and classes, we'll need a different message here");
+        assert(isa<TypeAliasDecl>(decls.front()) &&
+               "ImportKind::Type is only the best choice for a typealias");
+        auto *typealias = cast<TypeAliasDecl>(decls.front());
+        emittedDiag.emplace(diagnose(ID,
+            diag::imported_decl_is_wrong_kind_typealias,
+            typealias->getDescriptiveKind(),
+            typealias->getDeclaredInterfaceType(),
+            getImportKindString(ID->getImportKind())));
+      } else {
+        emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,
+            declPath.front().first,
+            getImportKindString(ID->getImportKind()),
+            static_cast<unsigned>(*actualKind)));
+      }
+
+      emittedDiag->fixItReplace(SourceRange(ID->getKindLoc()),
+                                getImportKindString(*actualKind));
+      emittedDiag->flush();
 
       if (decls.size() == 1)
         diagnose(decls.front(), diag::decl_declared_here,

@@ -2011,7 +2011,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 
     auto normalizeType = [](Type ty) -> Type {
       ty = ty->getInOutObjectType();
-      if (Type unwrappedTy = ty->getAnyOptionalObjectType())
+      if (Type unwrappedTy = ty->getOptionalObjectType())
         ty = unwrappedTy;
       return ty;
     };
@@ -2047,11 +2047,10 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     Type newOverrideTy = baseTy;
 
     // Preserve optionality if we're dealing with a simple type.
-    OptionalTypeKind OTK;
-    if (Type unwrappedTy = newOverrideTy->getAnyOptionalObjectType())
+    if (Type unwrappedTy = newOverrideTy->getOptionalObjectType())
       newOverrideTy = unwrappedTy;
-    if (overrideTy->getAnyOptionalObjectType(OTK))
-      newOverrideTy = OptionalType::get(OTK, newOverrideTy);
+    if (overrideTy->getOptionalObjectType())
+      newOverrideTy = OptionalType::get(newOverrideTy);
 
     SmallString<32> baseTypeBuf;
     llvm::raw_svector_ostream baseTypeStr(baseTypeBuf);
@@ -3417,7 +3416,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
     // If the subexpression was actually optional, then the pattern must be
     // checking for a type, which forced it to be promoted to a double optional
     // type.
-    if (auto ooType = subExpr->getType()->getAnyOptionalObjectType()) {
+    if (auto ooType = subExpr->getType()->getOptionalObjectType()) {
       if (auto TP = dyn_cast<TypedPattern>(p))
         // Check for 'if let' to produce a tuned diagnostic.
         if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
@@ -3449,7 +3448,211 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
   class UnintendedOptionalBehaviorWalker : public ASTWalker {
     TypeChecker &TC;
-    SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
+    SmallPtrSet<Expr *, 16> IgnoredExprs;
+
+    class OptionalToAnyCoercion {
+    public:
+      Type DestType;
+      CoerceExpr *ParentCoercion;
+
+      bool shouldSuppressDiagnostic() {
+        // If we have a parent CoerceExpr that has the same type as our
+        // Optional-to-Any coercion, don't emit a diagnostic.
+        return ParentCoercion && ParentCoercion->getType()->isEqual(DestType);
+      }
+    };
+
+    /// Returns true iff a coercion from srcType to destType is an
+    /// Optional-to-Any coercion.
+    bool isOptionalToAnyCoercion(Type srcType, Type destType) {
+      size_t difference = 0;
+      return isOptionalToAnyCoercion(srcType, destType, difference);
+    }
+
+    /// Returns true iff a coercion from srcType to destType is an
+    /// Optional-to-Any coercion. On returning true, the value of 'difference'
+    /// will be the difference in the levels of optionality.
+    bool isOptionalToAnyCoercion(Type srcType, Type destType,
+                                 size_t &difference) {
+      SmallVector<Type, 4> destOptionals;
+      auto destValueType =
+        destType->lookThroughAllOptionalTypes(destOptionals);
+
+      if (!destValueType->isAny())
+        return false;
+
+      SmallVector<Type, 4> srcOptionals;
+      srcType->lookThroughAllOptionalTypes(srcOptionals);
+
+      if (srcOptionals.size() > destOptionals.size()) {
+        difference = srcOptionals.size() - destOptionals.size();
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    /// Returns true iff the collection upcast coercion is an Optional-to-Any
+    /// coercion.
+    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
+                                   conversion) {
+      if (!conversion.OrigValue || !conversion.Conversion)
+        return false;
+
+      auto srcType = conversion.OrigValue->getType();
+      auto destType = conversion.Conversion->getType();
+      return isOptionalToAnyCoercion(srcType, destType);
+    }
+
+    /// Looks through OptionalEvaluationExprs and InjectIntoOptionalExprs to
+    /// find a child ErasureExpr, returning nullptr if no such child is found.
+    /// Any intermediate OptionalEvaluationExprs will be marked as ignored.
+    ErasureExpr *findErasureExprThroughOptionalInjections(Expr *E) {
+      while (true) {
+        if (auto *next = dyn_cast<OptionalEvaluationExpr>(E)) {
+          // We don't want to re-visit any intermediate optional evaluations.
+          IgnoredExprs.insert(next);
+          E = next->getSubExpr();
+        } else if (auto *next = dyn_cast<InjectIntoOptionalExpr>(E)) {
+          E = next->getSubExpr();
+        } else {
+          break;
+        }
+      }
+      return dyn_cast<ErasureExpr>(E);
+    }
+
+    void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      SmallString<16> coercionString;
+      coercionString += " as ";
+      coercionString += destType->getWithoutParens()->getString();
+
+      TC.diagnose(E->getLoc(), diag::silence_optional_to_any,
+                  destType, coercionString.substr(1))
+        .highlight(E->getSourceRange())
+        .fixItInsertAfter(E->getEndLoc(), coercionString);
+    }
+
+    void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
+      if (coercion.shouldSuppressDiagnostic())
+        return;
+
+      auto subExpr = E->getSubExpr();
+
+      // Look through any BindOptionalExprs, as the coercion may have started
+      // from a higher level of optionality.
+      while (auto *bindExpr = dyn_cast<BindOptionalExpr>(subExpr))
+        subExpr = bindExpr->getSubExpr();
+
+      // We're taking the source type from the child of any BindOptionalExprs,
+      // and the destination from the parent of any
+      // (InjectIntoOptional/OptionalEvaluation)Exprs in order to take into
+      // account any bindings that need to be done for nested Optional-to-Any
+      // coercions, e.g Int??? to Any?.
+      auto srcType = subExpr->getType();
+      auto destType = coercion.DestType;
+
+      size_t optionalityDifference = 0;
+      if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
+        return;
+
+      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                  /* from */ srcType, /* to */ destType)
+        .highlight(subExpr->getSourceRange());
+
+      if (optionalityDifference == 1) {
+        TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
+          .highlight(subExpr->getSourceRange())
+          .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+      }
+
+      SmallString<4> forceUnwrapString;
+      for (size_t i = 0; i < optionalityDifference; i++)
+        forceUnwrapString += "!";
+
+      TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
+        .highlight(subExpr->getSourceRange())
+        .fixItInsertAfter(subExpr->getEndLoc(), forceUnwrapString);
+
+      emitSilenceOptionalAnyWarningWithCoercion(subExpr, destType);
+    }
+
+    void visitCollectionUpcastExpr(CollectionUpcastConversionExpr *E,
+                                   OptionalToAnyCoercion coercion) {
+      // We only need to consider the valueConversion, as the Key type of a
+      // Dictionary cannot be implicitly coerced to Any.
+      auto valueConversion = E->getValueConversion();
+
+      // We're handling the coercion of the entire collection, so we don't need
+      // to re-visit a nested ErasureExpr for the value.
+      if (auto conversionExpr = valueConversion.Conversion)
+        if (auto *erasureExpr =
+              findErasureExprThroughOptionalInjections(conversionExpr))
+          IgnoredExprs.insert(erasureExpr);
+
+      if (coercion.shouldSuppressDiagnostic() ||
+          !isOptionalToAnyCoercion(valueConversion))
+        return;
+
+      auto subExpr = E->getSubExpr();
+
+      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                  /* from */ subExpr->getType(), /* to */ E->getType())
+        .highlight(subExpr->getSourceRange());
+
+      emitSilenceOptionalAnyWarningWithCoercion(subExpr, E->getType());
+    }
+
+    void visitPossibleOptionalToAnyExpr(Expr *E,
+                                        OptionalToAnyCoercion coercion) {
+      if (auto *upcastExpr =
+          dyn_cast<CollectionUpcastConversionExpr>(E)) {
+        visitCollectionUpcastExpr(upcastExpr, coercion);
+      } else if (auto *erasureExpr = dyn_cast<ErasureExpr>(E)) {
+        visitErasureExpr(erasureExpr, coercion);
+      } else if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(E)) {
+        // The ErasureExpr could be nested within optional injections and
+        // bindings, such as is the case for e.g Int??? to Any?. Try and find
+        // and visit it directly, making sure we don't re-visit it later.
+        auto subExpr = optionalEvalExpr->getSubExpr();
+        if (auto *erasureExpr =
+              findErasureExprThroughOptionalInjections(subExpr)) {
+          visitErasureExpr(erasureExpr, coercion);
+          IgnoredExprs.insert(erasureExpr);
+        }
+      }
+    }
+
+    void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+      // Warn about interpolated segments that contain optionals.
+      for (auto &segment : E->getSegments()) {
+        // Allow explicit casts.
+        if (auto paren = dyn_cast<ParenExpr>(segment))
+          if (isa<ExplicitCastExpr>(paren->getSubExpr()))
+            continue;
+
+        // Bail out if we don't have an optional.
+        if (!segment->getType()->getRValueType()->getOptionalObjectType())
+          continue;
+
+        TC.diagnose(segment->getStartLoc(),
+                    diag::optional_in_string_interpolation_segment)
+          .highlight(segment->getSourceRange());
+
+        // Suggest 'String(describing: <expr>)'.
+        auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
+        TC.diagnose(segment->getLoc(),
+                    diag::silence_optional_in_interpolation_segment_call)
+          .highlight(segment->getSourceRange())
+          .fixItInsert(segmentStart, "String(describing: ")
+          .fixItInsert(segment->getEndLoc(), ")");
+
+        // Suggest inserting a default value.
+        TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+          .highlight(segment->getSourceRange())
+          .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+      }
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -3459,60 +3662,20 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
         if (!CE->hasSingleExpressionBody())
           return { false, E };
 
-      if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
-        if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
-          ErasureCoercedToAny.insert(coercion->getSubExpr());
-      } else if (isa<ErasureExpr>(E) && !ErasureCoercedToAny.count(E) &&
-                 E->getType()->isAny()) {
-        auto subExpr = cast<ErasureExpr>(E)->getSubExpr();
-        auto erasedTy = subExpr->getType();
-        if (erasedTy->getOptionalObjectType()) {
-          TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                      erasedTy)
-              .highlight(subExpr->getSourceRange());
+      if (IgnoredExprs.count(E))
+        return { true, E };
 
-          TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
-          TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), "!");
-          TC.diagnose(subExpr->getLoc(), diag::silence_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), " as Any");
-        }
-      } else if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-        // Warn about interpolated segments that contain optionals.
-        for (auto &segment : literal->getSegments()) {
-          // Allow explicit casts.
-          if (auto paren = dyn_cast<ParenExpr>(segment)) {
-            if (isa<ExplicitCastExpr>(paren->getSubExpr())) {
-              continue;
-            }
-          }
-
-          // Bail out if we don't have an optional.
-          if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
-            continue;
-          }
-
-          TC.diagnose(segment->getStartLoc(),
-                      diag::optional_in_string_interpolation_segment)
-              .highlight(segment->getSourceRange());
-
-          // Suggest 'String(describing: <expr>)'.
-          auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
-          TC.diagnose(segment->getLoc(),
-                      diag::silence_optional_in_interpolation_segment_call)
-            .highlight(segment->getSourceRange())
-            .fixItInsert(segmentStart, "String(describing: ")
-            .fixItInsert(segment->getEndLoc(), ")");
-
-          // Suggest inserting a default value. 
-          TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-            .highlight(segment->getSourceRange())
-            .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
-        }
+      if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        visitInterpolatedStringLiteralExpr(literal);
+      } else if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
+        // If we come across a CoerceExpr, visit its subExpr with the coercion
+        // as the parent, making sure we don't re-visit the subExpr later.
+        auto subExpr = coercion->getSubExpr();
+        visitPossibleOptionalToAnyExpr(subExpr,
+                                       { subExpr->getType(), coercion });
+        IgnoredExprs.insert(subExpr);
+      } else {
+        visitPossibleOptionalToAnyExpr(E, { E->getType(), nullptr });
       }
       return { true, E };
     }
@@ -3680,7 +3843,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     type = type->getWithoutParens();
 
     // Look through optionals.
-    if (auto optObjectTy = type->getAnyOptionalObjectType()) {
+    if (auto optObjectTy = type->getOptionalObjectType()) {
       type = optObjectTy;
       continue;
     }
@@ -3844,7 +4007,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
                 ->getWithoutSpecifierType();
-  while (auto optObjectTy = type->getAnyOptionalObjectType())
+  while (auto optObjectTy = type->getOptionalObjectType())
     type = optObjectTy;
 
   // Omit needless words.

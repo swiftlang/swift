@@ -38,7 +38,7 @@
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
 #endif
 
-FUNCTION(AllocBox, swift_allocBox, C_CC,
+FUNCTION(AllocBox, swift_allocBox, SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
@@ -46,7 +46,7 @@ FUNCTION(AllocBox, swift_allocBox, C_CC,
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
          swift_makeBoxUnique,
-         C_CC,
+         SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind))
@@ -791,27 +791,33 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
+// Metadata *swift_getGenericMetadata(TypeContextDescriptor *type,
 //                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+// Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
+//                                              const void *template,
+//                                              size_t templateSize,
+//                                              size_t templateAddressPoint,
 //                                              const void * const *arguments,
 //                                              objc_class *superclass,
 //                                              size_t numImmediateMembers);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+// Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
+//                                              const void *template,
+//                                              size_t templateSize,
 //                                              const void * const *arguments);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
 // const ProtocolWitnessTable *
@@ -1198,6 +1204,11 @@ FUNCTION(RegisterTypeMetadataRecords,
          RETURNS(VoidTy),
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
          ATTRS(NoUnwind))
+FUNCTION(RegisterFieldDescriptors,
+         swift_registerFieldDescriptors, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(FieldDescriptorPtrPtrTy, SizeTy),
+         ATTRS(NoUnwind))
 
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, C_CC,
@@ -1311,7 +1322,7 @@ FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         ARGS(),
         ATTRS(NoUnwind))
 
-FUNCTION(AllocError, swift_allocError, C_CC,
+FUNCTION(AllocError, swift_allocError, SwiftCC,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind))

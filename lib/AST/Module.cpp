@@ -36,7 +36,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -752,8 +751,10 @@ public:
 };
 
 struct SourceFile::SourceFileSyntaxInfo {
+  const bool Enable;
   /// The root of the syntax tree representing the source file.
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
+  SourceFileSyntaxInfo(bool Enable): Enable(Enable) {}
 };
 
 bool SourceFile::hasSyntaxRoot() const {
@@ -1329,10 +1330,10 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepSyntaxInfo)
+                       bool KeepParsedTokens, bool BuildSyntaxTree)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo()) {
+    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1341,7 +1342,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepSyntaxInfo) {
+  if (KeepParsedTokens) {
     AllCorrectedTokens = std::vector<Token>();
   }
 }
@@ -1349,20 +1350,31 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
 SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldKeepSyntaxInfo() && "Disabled");
+  assert(shouldCollectToken() && "Disabled");
   return *AllCorrectedTokens;
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldKeepSyntaxInfo() && "Disabled");
+  assert(shouldCollectToken() && "Disabled");
   return *AllCorrectedTokens;
 }
 
-bool SourceFile::shouldKeepSyntaxInfo() const {
+bool SourceFile::shouldCollectToken() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
     return (bool)AllCorrectedTokens;
+  case SourceFileKind::REPL:
+  case SourceFileKind::SIL:
+    return false;
+  }
+}
+
+bool SourceFile::shouldBuildSyntaxTree() const {
+  switch (Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return SyntaxInfo.Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
@@ -1458,6 +1470,11 @@ TypeRefinementContext *SourceFile::getTypeRefinementContext() {
 
 void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
   TRC = Root;
+}
+
+void SourceFile::createReferencedNameTracker() {
+  assert(!ReferencedNames && "This file already has a name tracker.");
+  ReferencedNames.emplace(ReferencedNameTracker());
 }
 
 //===----------------------------------------------------------------------===//

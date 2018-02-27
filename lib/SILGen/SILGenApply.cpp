@@ -1383,9 +1383,9 @@ public:
       // class type of the 'Self' parameter with AnyObject.
       auto member = SILDeclRef(fd).asForeign();
 
-      auto substFormalType =
-        cast<FunctionType>(dynamicMemberRef->getType()->getCanonicalType()
-                                            .getAnyOptionalObjectType());
+      auto substFormalType = cast<FunctionType>(dynamicMemberRef->getType()
+                                                    ->getCanonicalType()
+                                                    .getOptionalObjectType());
       substFormalType = CanFunctionType::get(
         dynamicMemberRef->getBase()->getType()->getCanonicalType(),
         substFormalType, AnyFunctionType::ExtInfo());
@@ -1642,7 +1642,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ManagedValue fn, SubstitutionList subs,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
-                                 ApplyOptions options, SGFContext evalContext) {
+                                 ApplyOptions options, SGFContext evalContext,
+                                 PostponedCleanup &postponedCleanup) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -1702,6 +1703,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Emit the raw application.
   loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
+  postponedCleanup.end();
   SILValue rawDirectResult = emitRawApply(*this, loc, fn, subs, args,
                                           substFnType, options,
                                           indirectResultAddrs);
@@ -1821,8 +1823,9 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
       *this, calleeTypeInfo, loc, evalContext);
   ArgumentScope argScope(*this, loc);
+  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
-                   args, calleeTypeInfo, options, evalContext);
+                   args, calleeTypeInfo, options, evalContext, postpone);
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -3978,8 +3981,9 @@ CallEmission::applyNormalCall(SGFContext C) {
 
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
       SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
-  ArgumentScope argScope(SGF, uncurriedSites.back().Loc);
 
+  ArgumentScope argScope(SGF, uncurriedSites.back().Loc);
+  PostponedCleanup postpone(SGF);
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
@@ -4001,10 +4005,10 @@ CallEmission::applyNormalCall(SGFContext C) {
   auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
 
   // Emit the uncurried call.
-  firstLevelResult.value =
-      SGF.emitApply(std::move(resultPlan), std::move(argScope),
-                    uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-                    uncurriedArgs, calleeTypeInfo, options, uncurriedContext);
+  firstLevelResult.value = SGF.emitApply(
+      std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
+      callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
+      uncurriedContext, postpone);
   firstLevelResult.foreignSelf = calleeTypeInfo.foreignSelf;
   return firstLevelResult;
 }
@@ -4119,6 +4123,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   SILValue partialApply =
       SGF.B.createPartialApply(loc, superMethod.getValue(), partialApplyTy,
                                subs, {upcastedSelf.forward(SGF)}, closureTy);
+  assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
   ManagedValue pa = SGF.emitManagedRValueWithCleanup(partialApply);
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
@@ -4326,6 +4331,7 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
     ResultPlanPtr resultPtr =
         ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
     ArgumentScope argScope(SGF, loc);
+    PostponedCleanup postpone(SGF);
 
     std::move(extraSites[i])
         .emit(SGF, origParamType, paramLowering, siteArgs, delayedArgs,
@@ -4336,7 +4342,7 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
 
     result = SGF.emitApply(std::move(resultPtr), std::move(argScope), loc,
                            functionMV, {}, siteArgs, calleeTypeInfo,
-                           ApplyOptions::None, context);
+                           ApplyOptions::None, context, postpone);
   }
 
   return std::move(result);
@@ -4428,8 +4434,10 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
+  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
-                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
+                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx,
+                   postpone);
 }
 
 static StringRef
@@ -5336,8 +5344,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILBasicBlock *hasMemberBB = createBasicBlock();
 
   // The continuation block
-  auto memberMethodTy = e->getType()->getAnyOptionalObjectType();
-  
+  auto memberMethodTy = e->getType()->getOptionalObjectType();
+
   const TypeLowering &optTL = getTypeLowering(e->getType());
   auto loweredOptTy = optTL.getLoweredType();
 
@@ -5362,7 +5370,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
-    auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
+    auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
     CanFunctionType methodTy;
 
     // For a computed variable, we want the getter.
@@ -5470,7 +5478,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
     // The argument to the has-member block is the uncurried method.
     // Build the substituted getter type from the AST nodes.
-    auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
+    auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
     auto indexTy = e->getIndex()->getType()->getCanonicalType();
     auto methodTy = CanFunctionType::get(indexTy,
                                          valueTy);

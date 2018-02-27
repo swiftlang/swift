@@ -8,7 +8,7 @@ final class VarInit {
   }()
 
   // closure #1 () -> Swift.String in variable initialization expression of coverage_force_emission.VarInit.(basicVarInit in _7D375D72BA8B0C53C9AD7E4DBC7FF493) : Swift.String
-  // CHECK: sil_coverage_map {{.*}} $S23coverage_force_emission7VarInitC05basicdE033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvpfiSSycfU_
+  // CHECK: sil_coverage_map {{.*}} $S23coverage_force_emission7VarInitC05basicdE033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvpfiSSyXEfU_
   private var basicVarInit: String = {
     return "Hello"
   }()

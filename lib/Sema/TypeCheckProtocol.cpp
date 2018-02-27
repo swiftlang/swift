@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
@@ -141,98 +142,55 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
   OptionalAdjustmentKind optAdjustment = OptionalAdjustmentKind::None;
-  if (reqt->isObjC()) {
-    OptionalTypeKind reqtOptKind;
-    if (Type reqtValueType
-          = reqtType->getAnyOptionalObjectType(reqtOptKind))
-      reqtType = reqtValueType;
-    OptionalTypeKind witnessOptKind;
-    if (Type witnessValueType 
-          = witnessType->getAnyOptionalObjectType(witnessOptKind))
-      witnessType = witnessValueType;
 
-    switch (reqtOptKind) {
-    case OTK_None:
-      switch (witnessOptKind) {
-      case OTK_None:
-        // Exact match is always okay.
-        break;
+  if (!reqt->isObjC())
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-      case OTK_Optional:
-        if (witnessTypeIsIUO) {
-          optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-          break;
-        }
+  bool reqtIsOptional;
+  if (Type reqtValueType = reqtType->getOptionalObjectType(reqtIsOptional))
+    reqtType = reqtValueType;
+  bool witnessIsOptional;
+  if (Type witnessValueType =
+          witnessType->getOptionalObjectType(witnessIsOptional))
+    witnessType = witnessValueType;
 
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
-          break;
+  // When the requirement is an IUO, all is permitted, because we
+  // assume that the user knows more about the signature than we
+  // have information in the protocol.
+  if (reqtTypeIsIUO)
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
-          break;
-        }
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-        break;
-      }
-      break;
-
-    case OTK_Optional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      if (reqtTypeIsIUO)
-        break;
-
-      if (witnessTypeIsIUO) {
+  if (reqtIsOptional) {
+    if (witnessIsOptional) {
+      if (witnessTypeIsIUO)
         optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
+        break;
+
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
         break;
       }
-
-      switch (witnessOptKind) {
-      case OTK_None:
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
-          break;
-
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
-          break;
-        }
-        break;
-
-      case OTK_Optional:
-        // Exact match is always okay.
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        optAdjustment = OptionalAdjustmentKind::IUOToOptional;
-        break;
-      }
-      break;
-
-    case OTK_ImplicitlyUnwrappedOptional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      break;
     }
-  } else {
-    // FIXME: Until IUOs are removed from the type system, make
-    // sure we turn these both into optionals for the purpose of
-    // comparing types since we could be producing IUOs in some
-    // places and optionals in others.
-    if (auto objTy = reqtType->getImplicitlyUnwrappedOptionalObjectType())
-      reqtType = OptionalType::get(objTy);
-    if (auto objTy = witnessType->getImplicitlyUnwrappedOptionalObjectType())
-      witnessType = OptionalType::get(objTy);
+  } else if (witnessIsOptional) {
+    if (witnessTypeIsIUO) {
+      optAdjustment = OptionalAdjustmentKind::RemoveIUO;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
+        break;
+
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
+        break;
+      }
+    }
   }
 
   return std::make_tuple(reqtType, witnessType, optAdjustment);
@@ -1002,8 +960,14 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      if (!witness->hasInterfaceType())
+      if (!witness->hasValidSignature()) {
         TC.validateDecl(witness);
+
+        if (!witness->hasValidSignature()) {
+          doNotDiagnoseMatches = true;
+          continue;
+        }
+      }
 
       auto match = matchWitness(TC, Proto, conformance, DC,
                                 requirement, witness);
@@ -1365,6 +1329,27 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
         conformance->setInvalid();
         return conformance;
       }
+    }
+  }
+
+  // Not every protocol/type is compatible with conditional conformances.
+  if (!conformance->getConditionalRequirements().empty()) {
+    auto nestedType = canT;
+    // Obj-C generics cannot be looked up at runtime, so we don't support
+    // conditional conformances involving them. Check the full stack of nested
+    // types for any obj-c ones.
+    while (nestedType) {
+      if (auto clas = nestedType->getClassOrBoundGenericClass()) {
+        if (clas->usesObjCGenericsModel()) {
+          TC.diagnose(ComplainLoc,
+                      diag::objc_generics_cannot_conditionally_conform, T,
+                      Proto->getDeclaredType());
+          conformance->setInvalid();
+          return conformance;
+        }
+      }
+
+      nestedType = nestedType.getNominalParent();
     }
   }
 
@@ -3063,6 +3048,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
+  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
+                                  Conformance);
+
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
 
@@ -4075,6 +4063,11 @@ static bool shouldWarnAboutPotentialWitness(
       isUnlabeledInitializerOrSubscript(witness))
     return false;
 
+  // For non-@objc requirements, only warn if the witness comes from an
+  // extension.
+  if (!req->isObjC() && !isa<ExtensionDecl>(witness->getDeclContext()))
+    return false;
+
   // If the score is relatively high, don't warn: this is probably
   // unrelated.  Allow about one typo for every four properly-typed
   // characters, which prevents completely-wacky suggestions in many
@@ -4184,8 +4177,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
 
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl) &&
-      classDecl->getDeclContext()->isModuleScopeContext()) {
+  if (!hasGenericAncestry(classDecl)) {
     return;
   }
 
@@ -4712,6 +4704,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return nullptr;
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
+  if (Decl->isInvalid())
+    return nullptr;
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
