@@ -1917,9 +1917,16 @@ function(_add_swift_executable_single name)
   set(c_compile_flags)
   set(link_flags)
 
-  # Prepare linker search directories.
-  set(library_search_directories
+  # Prepare linker search directories. On Darwin, we want the fat library paths. On
+  # non-Darwin we want the architecture specific versions.
+  is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
+  if (IS_DARWIN)
+      set(library_search_directories
         "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  else()
+      set(library_search_directories
+          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTEXE_SINGLE_ARCHITECTURE}")
+  endif() 
 
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
@@ -1945,7 +1952,6 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
 
-  is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
@@ -1954,12 +1960,19 @@ function(_add_swift_executable_single name)
 
   # Find the names of dependency library targets.
   #
-  # We don't add the ${ARCH} to the target suffix because we want to link
+  # We don't add the ${ARCH} to the target suffix on Darwin because we want to link
   # against fat libraries.
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
-      SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  if (IS_DARWIN)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  else()
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  endif()
 
   handle_swift_sources(
       dependency_target
@@ -2069,12 +2082,19 @@ function(add_swift_target_executable name)
         add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
       endif()
 
-      # Don't add the ${arch} to the suffix.  We want to link against fat
+      # On Darwin, don't add the ${arch} to the suffix.  We want to link against fat
       # libraries.
-      _list_add_string_suffix(
-          "${SWIFTEXE_TARGET_DEPENDS}"
-          "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-          SWIFTEXE_TARGET_DEPENDS_with_suffix)
+      if (IS_DARWIN)
+        _list_add_string_suffix(
+            "${SWIFTEXE_TARGET_DEPENDS}"
+            "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
+            SWIFTEXE_TARGET_DEPENDS_with_suffix)
+      else()
+        _list_add_string_suffix(
+            "${SWIFTEXE_TARGET_DEPENDS}"
+            "${VARIANT_SUFFIX}"
+            SWIFTEXE_TARGET_DEPENDS_with_suffix) 
+      endif()
       _add_swift_executable_single(
           ${VARIANT_NAME}
           ${SWIFTEXE_TARGET_SOURCES}
