@@ -278,6 +278,7 @@ extension LazyMapCollection {
 
 extension LazyMapSequence {
   @_inlineable
+  @available(swift, introduced: 5)
   public func map<ElementOfResult>(
     _ transform: @escaping (Element) -> ElementOfResult
   ) -> LazyMapSequence<Base, ElementOfResult> {
@@ -289,6 +290,7 @@ extension LazyMapSequence {
 
 extension LazyMapCollection {
   @_inlineable
+  @available(swift, introduced: 5)
   public func map<ElementOfResult>(
     _ transform: @escaping (Element) -> ElementOfResult
   ) -> LazyMapCollection<Base, ElementOfResult> {
