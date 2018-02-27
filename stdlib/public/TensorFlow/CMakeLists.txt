@@ -16,6 +16,10 @@ if(SWIFT_ENABLE_TENSORFLOW)
   set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
   set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 
+  include_directories(BEFORE
+    "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
+  )
+
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
