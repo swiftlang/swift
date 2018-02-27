@@ -327,14 +327,6 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
-    /// - NOTE: This initializer must be manually declared, because the
-    /// initializer logic for the variables declared above is large, and we need
-    /// to mark this as inline(__always).
-    /// - TODO: Remove when deabstraction is implemented.
-    @inline(__always)
-    init() {}
-
-    @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = tanh(x ⊗ w1 + b1)
       return tanh(o1 ⊗ w2 + b2)

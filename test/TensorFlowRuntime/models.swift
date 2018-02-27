@@ -93,31 +93,23 @@ ModelTests.testCPUAndGPU("XORClassifierTraining") {
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
-    /// - TODO: Remove when deabstraction is implemented.
-    @inline(__always)
-    init() {}
-
-    @_versioned @_inlineable @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = sigmoid(x ⊗ w1 + b1)
       return sigmoid(o1 ⊗ w2 + b2)
     }
 
-    @_versioned @_inlineable @inline(__always)
     func prediction(for x: Bool, _ y: Bool) -> Bool {
       let input = Tensor<Float>(Tensor([[x, y]]))
       let floatPred = prediction(for: input).scalarized()
       return abs(floatPred - 1) < 0.1
     }
 
-    @_versioned @_inlineable @inline(__always)
     func loss(of prediction: Tensor<Float>,
               from exampleOutput: Tensor<Float>) -> Float {
       return (prediction - exampleOutput).squared()
         .mean(alongAxes: [0, 1]).scalarized()
     }
 
-    @_versioned @_inlineable @inline(__always)
     mutating func train(inputBatch x: Tensor<Float>,
                         outputBatch y: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
