@@ -121,12 +121,6 @@ namespace tf {
     // TODO(clattner): Remove this when deabstraction exists.
     SILInstruction *canonicalizeOperands();
 
-    /// Return the SILValue for the specified scalar operand.
-    SILValue getScalarOperand(unsigned operandNumber) const {
-      return getScalarOperand(inst->getOperand(operandNumber));
-    }
-    static SILValue getScalarOperand(SILValue v);
-
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
     /// attribute.

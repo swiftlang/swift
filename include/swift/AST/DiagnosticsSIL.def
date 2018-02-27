@@ -235,6 +235,11 @@ WARNING(tf_value_implicitly_copied_to_accel, none,
         "%0 implicitly copied to the accelerator, use .toDevice() to make "
         "transfer explicit",
         (StringRef))
+WARNING(tf_value_implicitly_copied_to_accel_always, none,
+        "%0 always cause a copy to the accelerator, use .toDevice() to make "
+        "transfer explicit",
+        (StringRef))
+
 WARNING(tf_value_implicitly_copied_to_host, none,
         "value implicitly copied to the host, use .toHost() to make "
         "transfer explicit",
