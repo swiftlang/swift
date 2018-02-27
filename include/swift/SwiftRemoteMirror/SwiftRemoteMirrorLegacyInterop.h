@@ -260,7 +260,8 @@ static int swift_reflection_interop_readBytesAdapter(void *reader_context,
     return 0;
   
   memcpy(dest, ptr, size);
-  Context->FreeBytes(Context->ReaderContext, ptr, FreeContext);
+  if (Context->FreeBytes != NULL)
+    Context->FreeBytes(Context->ReaderContext, ptr, FreeContext);
   return 1;
 }
 
@@ -373,12 +374,14 @@ swift_reflection_interop_addImageLegacy(
   MachHeader *Header = (MachHeader *)Buf;
   
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
-    ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
+    if (ContextRef->FreeBytes != NULL)
+      ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
     return 0;
   }
   
   uint32_t Length = Header->sizeofcmds;
-  ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
+  if (ContextRef->FreeBytes != NULL)
+    ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
   
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
                               imageStart,

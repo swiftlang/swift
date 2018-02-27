@@ -56,7 +56,7 @@ typedef struct MemoryReaderImpl {
   /// Get the size in bytes of the target's size type.
   SizeSizeFunction getSizeSize;
 
-  /// Free memory returned from readBytes.
+  /// Free memory returned from readBytes. May be NULL if memory never needs to be freed.
   FreeBytesFunction free;
 
   // FIXME: -Wdocumentation complains about \param and \returns on function pointers.

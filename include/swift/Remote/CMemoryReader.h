@@ -79,10 +79,13 @@ public:
       void *FreeContext;
       auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
                                 &FreeContext);
-      auto ReaderContext = Impl.reader_context;
+
       auto Free = Impl.free;
-      auto freeLambda = [=]{ Free(ReaderContext, Ptr, FreeContext); };
+      if (Free == nullptr)
+        return std::make_tuple(Ptr, []{});
       
+      auto ReaderContext = Impl.reader_context;
+      auto freeLambda = [=]{ Free(ReaderContext, Ptr, FreeContext); };
       return std::make_tuple(Ptr, freeLambda);
   }
 };
