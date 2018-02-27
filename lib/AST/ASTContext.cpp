@@ -3566,9 +3566,10 @@ void AnyFunctionType::decomposeInput(
       
   default:
 //    assert(type->is<InOutType>() && "Found naked inout type");
-    result.push_back(AnyFunctionType::Param(type->getInOutObjectType(),
-                                            Identifier(),
-                                            ParameterTypeFlags::fromParameterType(type, false, false)));
+    result.push_back(
+        AnyFunctionType::Param(type->getInOutObjectType(), Identifier(),
+                               ParameterTypeFlags::fromParameterType(
+                                   type, false, ValueOwnership::Default)));
     return;
   }
 }

@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 400; // Last change: sil_property
+const uint16_t VERSION_MINOR = 401; // Last change: ValueOwnership
 
 using DeclIDField = BCFixed<31>;
 
@@ -318,6 +318,15 @@ enum ReferenceOwnership : uint8_t {
   Unmanaged,
 };
 using ReferenceOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum ValueOwnership : uint8_t {
+  Default = 0,
+  InOut,
+  Shared,
+};
+using ValueOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -656,8 +665,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -671,8 +679,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<

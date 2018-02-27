@@ -4013,6 +4013,22 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   return None;
 }
 
+/// Translate from the serialization ValueOwnership enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static Optional<swift::ValueOwnership>
+getActualValueOwnership(serialization::ValueOwnership raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::ValueOwnership::ID: \
+    return swift::ValueOwnership::ID;
+  CASE(Default)
+  CASE(InOut)
+  CASE(Shared)
+#undef CASE
+  }
+  return None;
+}
+
 /// Translate from the serialization ParameterConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
@@ -4153,19 +4169,25 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
+    bool isVariadic, isAutoClosure, isEscaping;
+    unsigned rawOwnership;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, isVariadic,
                                              isAutoClosure, isEscaping,
-                                             isInOut, isShared);
+                                             rawOwnership);
+    auto ownership =
+        getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+    if (!ownership) {
+      error();
+      return nullptr;
+    }
 
     auto underlyingTy = getTypeChecked(underlyingID);
     if (!underlyingTy)
       return underlyingTy.takeError();
-    
+
     typeOrOffset = ParenType::get(
         ctx, underlyingTy.get()->getInOutObjectType(),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
-                           isInOut, isShared));
+        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, *ownership));
     break;
   }
 
@@ -4185,19 +4207,27 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
-      decls_block::TupleTypeEltLayout::readRecord(
-          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping,
-          isInOut, isShared);
+      bool isVariadic, isAutoClosure, isEscaping;
+      unsigned rawOwnership;
+      decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
+                                                  isVariadic, isAutoClosure,
+                                                  isEscaping, rawOwnership);
+
+      auto ownership =
+          getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+      if (!ownership) {
+        error();
+        return nullptr;
+      }
 
       auto elementTy = getTypeChecked(typeID);
       if (!elementTy)
         return elementTy.takeError();
-      
-      elements.emplace_back(
-          elementTy.get()->getInOutObjectType(), getIdentifier(nameID),
-          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
-                             isInOut, isShared));
+
+      elements.emplace_back(elementTy.get()->getInOutObjectType(),
+                            getIdentifier(nameID),
+                            ParameterTypeFlags(isVariadic, isAutoClosure,
+                                               isEscaping, *ownership));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);

@@ -1594,17 +1594,16 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
-      : value((variadic ? Variadic : 0) |
-              (autoclosure ? AutoClosure : 0) |
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
+                     ValueOwnership ownership)
+      : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
-              (inOut ? InOut : 0) |
-              (shared ? Shared : 0)) {}
+              (ownership == ValueOwnership::InOut ? InOut : 0) |
+              (ownership == ValueOwnership::Shared ? Shared : 0)) {}
 
   /// Create one from what's present in the parameter type
-  inline static ParameterTypeFlags fromParameterType(Type paramTy,
-                                                     bool isVariadic,
-                                                     bool isShared);
+  inline static ParameterTypeFlags
+  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1612,6 +1611,15 @@ public:
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+
+    return ValueOwnership::Default;
+  }
 
   ParameterTypeFlags withVariadic(bool variadic) const {
     return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
@@ -5168,7 +5176,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShared) {
+ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      ValueOwnership ownership) {
   bool autoclosure = paramTy->is<AnyFunctionType>() &&
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
@@ -5177,8 +5186,12 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
   // ParameterTypeFlags::fromParameterType entirely.
-  bool inOut = paramTy->is<InOutType>();
-  return {isVariadic, autoclosure, escaping, inOut, isShared};
+  if (paramTy->is<InOutType>()) {
+    assert(ownership == ValueOwnership::Default ||
+           ownership == ValueOwnership::InOut);
+    ownership = ValueOwnership::InOut;
+  }
+  return {isVariadic, autoclosure, escaping, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

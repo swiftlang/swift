@@ -4594,7 +4594,20 @@ public:
   bool isLet() const { return getSpecifier() == Specifier::Let; }
   /// Is this an immutable 'shared' property?
   bool isShared() const { return getSpecifier() == Specifier::Shared; }
-  
+
+  ValueOwnership getValueOwnership() const {
+    switch (getSpecifier()) {
+    case Specifier::Let:
+      return ValueOwnership::Default;
+    case Specifier::Var:
+      return ValueOwnership::Default;
+    case Specifier::InOut:
+      return ValueOwnership::InOut;
+    case Specifier::Shared:
+      return ValueOwnership::Shared;
+    }
+  }
+
   /// Is this an element in a capture list?
   bool isCaptureList() const { return Bits.VarDecl.IsCaptureList; }
 

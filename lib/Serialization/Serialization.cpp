@@ -3488,6 +3488,16 @@ getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   }
   llvm_unreachable("bad ownership kind");
 }
+/// Translate from the AST ownership enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableValueOwnership(swift::ValueOwnership ownership) {
+  switch (ownership) {
+  SIMPLE_CASE(ValueOwnership, Default)
+  SIMPLE_CASE(ValueOwnership, InOut)
+  SIMPLE_CASE(ValueOwnership, Shared)
+  }
+  llvm_unreachable("bad ownership kind");
+}
 
 /// Translate from the AST ParameterConvention enum to the
 /// Serialization enum values, which are guaranteed to be stable.
@@ -3590,12 +3600,14 @@ void Serializer::writeType(Type ty) {
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
     auto paramFlags = parenTy->getParameterFlags();
+    auto rawOwnership =
+        getRawStableValueOwnership(paramFlags.getValueOwnership());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
         paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), paramFlags.isInOut(), paramFlags.isShared());
+        paramFlags.isEscaping(), rawOwnership);
     break;
   }
 
@@ -3608,11 +3620,12 @@ void Serializer::writeType(Type ty) {
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
       auto paramFlags = elt.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
       TupleTypeEltLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
           addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(),
-          paramFlags.isInOut(), paramFlags.isShared());
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
     }
 
     break;
