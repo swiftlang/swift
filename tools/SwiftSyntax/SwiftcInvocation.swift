@@ -111,7 +111,7 @@ enum InvocationError: Error {
 }
 
 // FIXME: This path requires the full <dlfcn.h> interface on Linux.
-//        For now, require `SWIFTC_EXEC` to be set on Linux to find the path
+//        For now, require `SWIFT_EXECUTABLE` to be set on Linux to find the path
 //        to swiftc.
 #if os(macOS)
 
@@ -163,7 +163,7 @@ struct SwiftcRunner {
     #else
     // FIXME: Find an automated way to get at this.
     guard let swiftcPath = ProcessInfo.processInfo
-                                      .environment["SWIFTC_EXEC"] else {
+                                      .environment["SWIFT_EXECUTABLE"] else {
       return nil
     }
     let swiftcURL = URL(fileURLWithPath: swiftcPath)
@@ -207,7 +207,7 @@ struct SwiftcRunner {
       #else
       throw InvocationError.couldNotFindSwiftc(reason:
         """
-        unable to locate swiftc binary; ensure the SWIFTC_EXEC environment
+        unable to locate swiftc binary; ensure the SWIFT_EXECUTABLE environment
         variable is set to the correct path
         """)
       #endif
