@@ -140,18 +140,7 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
   auto Context = ContextRef->nativeContext;
-  auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress)
-    return 0;
-  
-  for (auto Image : ContextRef->dataSegments) {
-    swift_addr_t Start, End;
-    std::tie(Start, End) = Image;
-    if (Start <= *MetadataAddress && *MetadataAddress < End)
-      return 1;
-  }
-  
-  return 0;
+  return Context->ownsObject(RemoteAddress(Object));
 }
 
 swift_typeref_t

@@ -73,6 +73,9 @@ class ReflectionContext
 
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
+  std::vector<std::function<void()>> freeFuncs;
+  std::vector<std::tuple<RemoteAddress, RemoteAddress>> dataSegments;
+
 public:
   using super::getBuilder;
   using super::readDemanglingForContextDescriptor;
@@ -89,6 +92,11 @@ public:
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
+  
+  ~ReflectionContext() {
+    for (auto f : freeFuncs)
+      f();
+  }
 
   MemoryReader &getReader() {
     return *this->Reader;
@@ -183,23 +191,38 @@ public:
 
     this->addReflectionInfo(info);
 
-#if 0 // XXXFIXME: Add a destructor.
-    ContextRef->freeFuncs.push_back(FreeFunc);
+    freeFuncs.push_back(FreeFunc);
 
     unsigned long DataSize;
     auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
     if (DataSegment != nullptr) {
       auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf)
-                            + imageStart;
+                            + ImageStart.getAddressData();
       auto DataSegmentEnd = DataSegmentStart + DataSize;
-      ContextRef->dataSegments.push_back(std::make_tuple(DataSegmentStart, DataSegmentEnd));
+      dataSegments.push_back(std::make_tuple(RemoteAddress(DataSegmentStart),
+                                             RemoteAddress(DataSegmentEnd)));
     }
-#endif
     return true;
   }
-
+  
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
+  }
+  
+  bool ownsObject(RemoteAddress ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress.getAddressData());
+    if (!MetadataAddress)
+      return 0;
+
+    for (auto Segment : dataSegments) {
+      auto Start = std::get<0>(Segment);
+      auto End = std::get<1>(Segment);
+      if (Start.getAddressData() <= *MetadataAddress
+          && *MetadataAddress < End.getAddressData())
+        return 1;
+    }
+  
+    return 0;
   }
   
   /// Return a description of the layout of a class instance with the given
