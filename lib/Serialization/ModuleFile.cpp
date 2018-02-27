@@ -27,6 +27,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -317,7 +318,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      return llvm::djbHash(key.second);
     } else {
       return (hash_value_type)key.first;
     }
@@ -379,7 +380,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -438,7 +439,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -475,7 +476,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -530,7 +531,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      return llvm::djbHash(key.second);
     } else {
       return (hash_value_type)key.first;
     }
@@ -703,7 +704,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -890,7 +891,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {

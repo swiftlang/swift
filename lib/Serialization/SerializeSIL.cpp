@@ -30,6 +30,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -110,7 +111,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      return llvm::djbHash(key.str());
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,

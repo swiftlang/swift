@@ -48,6 +48,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
@@ -168,7 +169,7 @@ public:
       return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
-      return llvm::HashString(k.stringValue);
+      return llvm::djbHash(k.stringValue);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;

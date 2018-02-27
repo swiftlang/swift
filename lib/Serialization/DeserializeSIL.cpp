@@ -29,6 +29,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
 #include <type_traits>
@@ -102,7 +103,7 @@ public:
   external_key_type GetExternalKey(internal_key_type ID) { return ID; }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
