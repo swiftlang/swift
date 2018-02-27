@@ -2,9 +2,8 @@ set(swiftsyntax_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 
 if(FOUNDATION_BUILD_DIR)
   LIST(APPEND swiftsyntax_compile_flags
-    -I"${SWIFTLIB_DIR}"
-    -I"${SWIFTLIB_DIR}/linux"
-    -I"${SWIFTLIB_DIR}/linux/x86_64"
+    # -I"${SWIFTLIB_DIR}"
+    # -I"${SWIFTLIB_DIR}/linux/x86_64"
     -I"${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}"
     -I"${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src"
     -I"${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/swift"
@@ -12,9 +11,8 @@ if(FOUNDATION_BUILD_DIR)
     -I"${FOUNDATION_BUILD_DIR}/usr/lib/swift"
     -I"${FOUNDATION_BUILD_DIR}/usr/lib/swift/CoreFoundation"
 
-    -L"${SWIFTLIB_DIR}"
-    -L"${SWIFTLIB_DIR}/linux"
-    -L"${SWIFTLIB_DIR}/linux/x86_64"
+    # -L"${SWIFTLIB_DIR}"
+    # -L"${SWIFTLIB_DIR}/linux/x86_64"
     -L"${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src"
     -L"${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/swift"
     -L"${FOUNDATION_BUILD_DIR}"
@@ -28,7 +26,7 @@ if(FOUNDATION_BUILD_DIR)
 endif()
 
 add_swift_library(swiftSwiftSyntax SHARED
-  # This file should be listed the first.  Module name is inferred from the
+  # This file should be listed first.  Module name is inferred from the
   # filename.
   SwiftSyntax.swift
   AtomicCache.swift
@@ -54,6 +52,7 @@ add_swift_library(swiftSwiftSyntax SHARED
 
   SWIFT_COMPILE_FLAGS "${swiftsyntax_compile_flags}"
   SWIFT_MODULE_DEPENDS_OSX Foundation
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
   INSTALL_IN_COMPONENT swift-syntax
   IS_STDLIB)
 

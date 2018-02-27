@@ -26,7 +26,7 @@ struct ProcessResult {
   /// The process exit code. A non-zero exit code usually indicates failure.
   let exitCode: Int
 
-  /// The contents of the process's stdout as Data. 
+  /// The contents of the process's stdout as Data.
   let stdoutData: Data
 
   /// The contents of the process's stderr as Data.
@@ -55,40 +55,65 @@ struct ProcessResult {
 ///   - arguments: A list of strings to pass to the process as arguments.
 /// - Returns: A ProcessResult containing stdout, stderr, and the exit code.
 func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
-  // Use an autoreleasepool to prevent memory- and file-descriptor leaks.
-  return autoreleasepool {
-    () -> ProcessResult in
-    
+  let runProcess: () -> ProcessResult = {
+    let process = Process()
     let stdoutPipe = Pipe()
     var stdoutData = Data()
+    let stderrPipe = Pipe()
+    var stderrData = Data()
+
+    // FIXME: `readabilityHandler` is unimplemented on Linux.
+    #if os(macOS)
     stdoutPipe.fileHandleForReading.readabilityHandler = { file in
       stdoutData.append(file.availableData)
     }
-    
-    let stderrPipe = Pipe()
-    var stderrData = Data()
+
     stderrPipe.fileHandleForReading.readabilityHandler = { file in
       stderrData.append(file.availableData)
     }
-    
-    let process = Process()
-    
+
     process.terminationHandler = { process in
       stdoutPipe.fileHandleForReading.readabilityHandler = nil
       stderrPipe.fileHandleForReading.readabilityHandler = nil
     }
-    
+    #endif
+
     process.launchPath = executable.path
     process.arguments = arguments
     process.standardOutput = stdoutPipe
     process.standardError = stderrPipe
     process.launch()
     process.waitUntilExit()
+
+    // FIXME: `readabilityHandler` is unimplemented on Linux.
+    #if !os(macOS)
+    stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+    #endif
+
     return ProcessResult(exitCode: Int(process.terminationStatus),
                          stdoutData: stdoutData,
                          stderrData: stderrData)
   }
+
+  #if os(macOS)
+  // Use an autoreleasepool to prevent memory- and file-descriptor leaks.
+  return autoreleasepool(runProcess)
+  #else
+  return runProcess()
+  #endif
 }
+
+enum InvocationError: Error {
+  case couldNotFindSwiftc(reason: String)
+  case couldNotFindSDK
+  case abort(code: Int)
+}
+
+// FIXME: This path requires the full <dlfcn.h> interface on Linux.
+//        For now, require `SWIFTC_EXEC` to be set on Linux to find the path
+//        to swiftc.
+#if os(macOS)
 
 /// Finds the dylib or executable which the provided address falls in.
 /// - Parameter dsohandle: A pointer to a symbol in the object file you're
@@ -107,12 +132,7 @@ func findFirstObjectFile(for dsohandle: UnsafeRawPointer = #dsohandle) -> URL? {
   let path = String(cString: info.dli_fname)
   return URL(fileURLWithPath: path)
 }
-
-enum InvocationError: Error {
-  case couldNotFindSwiftc
-  case couldNotFindSDK
-  case abort(code: Int)
-}
+#endif
 
 struct SwiftcRunner {
   /// Gets the `swiftc` binary packaged alongside this library.
@@ -131,6 +151,7 @@ struct SwiftcRunner {
   ///                 - libswiftSwiftSyntax.[dylib|so]
   ///         ```
   static func locateSwiftc() -> URL? {
+    #if os(macOS)
     guard let libraryPath = findFirstObjectFile() else { return nil }
     let swiftcURL = libraryPath.deletingLastPathComponent()
                                .deletingLastPathComponent()
@@ -138,6 +159,15 @@ struct SwiftcRunner {
                                .deletingLastPathComponent()
                                .appendingPathComponent("bin")
                                .appendingPathComponent("swiftc")
+    let swiftcPath = swiftcURL.path
+    #else
+    // FIXME: Find an automated way to get at this.
+    guard let swiftcPath = ProcessInfo.processInfo
+                                      .environment["SWIFTC_EXEC"] else {
+      return nil
+    }
+    let swiftcURL = URL(fileURLWithPath: swiftcPath)
+    #endif
     guard FileManager.default.fileExists(atPath: swiftcURL.path) else {
       return nil
     }
@@ -171,7 +201,16 @@ struct SwiftcRunner {
   ///                         to parse.
   init(sourceFile: URL) throws {
     guard let url = SwiftcRunner._swiftcURL else {
-      throw InvocationError.couldNotFindSwiftc
+      #if os(macOS)
+      throw InvocationError.couldNotFindSwiftc(reason:
+        "unable to locate swiftc binary relative to SwiftSyntax module")
+      #else
+      throw InvocationError.couldNotFindSwiftc(reason:
+        """
+        unable to locate swiftc binary; ensure the SWIFTC_EXEC environment
+        variable is set to the correct path
+        """)
+      #endif
     }
     self.swiftcURL = url
     self.sourceFile = sourceFile
