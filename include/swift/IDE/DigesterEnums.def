@@ -90,6 +90,7 @@ KEY(declKind)
 KEY(ownership)
 KEY(superclassUsr)
 KEY(parentExtensionReqs)
+KEY(hasDefaultArg)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
