@@ -15,6 +15,8 @@ mirrorlib5="$4"
 
 SDK=`xcrun --show-sdk-path`
 
+cd `dirname $0`
+
 "$swiftc4" -sdk "$SDK" -emit-library test4.swift -o /tmp/libtest4.dylib
 "$swiftc5" -sdk "$SDK" -emit-library test5.swift -o /tmp/libtest5.dylib
 
