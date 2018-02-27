@@ -24,18 +24,11 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 // CHECK: retain_value %1 : $Tensor<Int32>
 // CHECK: retain_value %2 : $Tensor<Int32>
 //
-// CHECK-NOT: retain {{%.*}}
-// CHECK-NOT: release {{%.*}}
-//
 // We're passing 3 TensorHandle's into the StartTensorComputation call.
 // CHECK: alloc_stack $(OpaquePointer, OpaquePointer, OpaquePointer)
 // CHECK: function_ref @_swift_tfc_StartTensorComputation
 
-// CHECK-NOT: retain
-// CHECK-NOT: release
-
 // Compiler generates 3 releases to balance the above 3 retains above.
-// CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
 //
@@ -43,9 +36,10 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 //
 // These final releases balances the original instructions that generated the
 // handles.
+// CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
-// CHECK: strong_release {{.*}} : $TensorHandle<Int32>
+// CHECK: release_value {{.*}} : $Tensor<Int32>
 // CHECK-LABEL: ---
 
 
