@@ -3769,6 +3769,10 @@ namespace {
           initialWritebackScope(std::move(writebackScope)),
           expectedSiteCount(callee.getParameterListCount()) {}
 
+    /// A factory method for decomposing the apply expr \p e into a call
+    /// emission.
+    static CallEmission forApplyExpr(SILGenFunction &SGF, Expr *e);
+
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
     void addCallSite(CallSite &&site) {
@@ -4348,7 +4352,7 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
   return std::move(result);
 }
 
-static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
+CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
   // Set up writebacks for the call(s).
   FormalEvaluationScope writebacks(SGF);
 
@@ -4383,7 +4387,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
-  CallEmission emission = prepareApplyExpr(*this, e);
+  CallEmission emission = CallEmission::forApplyExpr(*this, e);
   return emission.apply(c);
 }
 
@@ -5271,7 +5275,7 @@ RValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
                                                    RValue &&operand) {
   // Walk the function expression, which should produce a reference to the
   // callee, leaving the final curry level unapplied.
-  CallEmission emission = prepareApplyExpr(*this, funcExpr);
+  CallEmission emission = CallEmission::forApplyExpr(*this, funcExpr);
   // Rewrite the operand type to the expected argument type, to handle tuple
   // conversions etc.
   auto funcTy = cast<FunctionType>(funcExpr->getType()->getCanonicalType());
