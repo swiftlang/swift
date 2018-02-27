@@ -24,7 +24,7 @@ class Bar: Cl {
     var x: Int?
 }
 
-// CHECK-LABEL: sil hidden @_T04main5crash4barsSbAA8GenClassCyAA3BarCG_tF
+// CHECK-LABEL: sil hidden @_T04main5crashSbAA8GenClassCyAA3BarCG4bars_tF
 func crash(bars: GenClass<Bar>) -> Bool {
     // CHECK: apply [[FN:%.*]]<Bar, [Bar]>
     return Array(bars.filter { $0.x == nil }).isEmpty
