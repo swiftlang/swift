@@ -562,12 +562,6 @@ void AccessEnforcementSelection::run() {
 }
 
 void AccessEnforcementSelection::processFunction(SILFunction *F) {
-  if (F->wasDeserializedCanonical()) {
-    DEBUG(llvm::dbgs() << "Skipping Access Enforcement Selection of "
-                          "deserialized "
-                       << F->getName() << "\n");
-    return;
-  }
   DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
                      << "\n");
 #ifndef NDEBUG
