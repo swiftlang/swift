@@ -12,9 +12,9 @@
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
-// CHECK: sil @unknown : $@convention(thin) () -> ()
+// CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [serialized] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -36,9 +36,9 @@
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
-// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
+// SIB-CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// SIB-CHECK-LABEL: sil [serialized] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
