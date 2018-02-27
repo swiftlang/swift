@@ -1138,6 +1138,25 @@ public:
     *this << Ctx.getID(AI->getOperand());
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  void visitAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
+    ADRI->getPrimalFunction()->printName(PrintState.OS);
+    if (!ADRI->getArgumentIndices().empty()) {
+      *this << " [wrt ";
+      interleave(ADRI->getArgumentIndices(), [&](unsigned idx) {
+          *this << idx;
+        }, [&]{
+          *this << ", ";
+        });
+      *this << "]";
+    }
+    if (ADRI->isSeedable())
+      *this << " [seedable]";
+    if (ADRI->isPreservingResult())
+      *this << " [preserving_result]";
+    *this << " : " << ADRI->getPrimalFunction()->getLoweredType();
+  }
+
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();

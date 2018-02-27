@@ -326,6 +326,8 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   case TermKind::ThrowInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TermKind::AutoDiffReverseInst:
     llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
@@ -487,6 +489,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TermKind::AutoDiffReverseInst:
     llvm_unreachable("Branch target cannot be replaced for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
