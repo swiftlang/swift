@@ -24,15 +24,57 @@ Optional<ConstraintSystem::PotentialBindings>
 ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   Optional<PotentialBindings> bestBindings;
-  for (auto typeVar : getTypeVariables()) {
-    // Skip any type variables that are bound.
+  llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> cache;
+
+  // First, let's collect all of the possible bindings.
+  for (auto *typeVar : getTypeVariables()) {
     if (typeVar->getImpl().hasRepresentativeOrFixed())
       continue;
 
-    // Get potential bindings.
-    auto bindings = getPotentialBindings(typeVar);
-    if (!bindings)
+    if (auto bindings = getPotentialBindings(typeVar))
+      cache.insert({typeVar, std::move(bindings)});
+  }
+
+  // Now let's see if we could infer something for related type
+  // variables based on other bindings.
+  for (auto *typeVar : getTypeVariables()) {
+    auto cachedBindings = cache.find(typeVar);
+    if (cachedBindings == cache.end())
       continue;
+
+    auto &bindings = cachedBindings->getSecond();
+    // All of the relevant relational constraints associated with
+    // current type variable should be recored by its potential bindings.
+    for (auto *constraint : bindings.Sources) {
+      if (constraint->getKind() != ConstraintKind::Subtype)
+        continue;
+
+      auto lhs = simplifyType(constraint->getFirstType());
+      auto rhs = simplifyType(constraint->getSecondType());
+
+      // We are only interested in 'subtype' constraints which have
+      // type variable on the left-hand side.
+      if (rhs->getAs<TypeVariableType>() != typeVar)
+        continue;
+
+      auto *tv = lhs->getAs<TypeVariableType>();
+      if (!tv)
+        continue;
+
+      auto relatedBindings = cache.find(tv);
+      if (relatedBindings == cache.end())
+        continue;
+
+      for (auto &binding : relatedBindings->getSecond().Bindings) {
+        auto type = binding.BindingType;
+
+        if (ConstraintSystem::typeVarOccursInType(typeVar, type))
+          continue;
+
+        bindings.addPotentialBinding(
+            {type, AllowedBindingKind::Supertypes, binding.BindingSource});
+      }
+    }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -42,7 +84,7 @@ ConstraintSystem::determineBestBindings() {
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
     if (!bestBindings || bindings < *bestBindings)
-      bestBindings = std::move(bindings);
+      bestBindings = bindings;
   }
 
   return bestBindings;
