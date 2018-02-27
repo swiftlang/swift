@@ -19,7 +19,7 @@ var raw = testAlwaysInline(x: false)
 
 var a = AlwaysInlineInitStruct(x: false)
 
-// SIL-LABEL: [always_inline] @$S17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [always_inline] [canonical] @$S17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] @$S17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] @$S17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 
