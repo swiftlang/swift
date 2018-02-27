@@ -30,7 +30,7 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has resilient superclass
-// CHECK-SAME:   <i32 0xC000_0050>
+// CHECK-SAME:   <i32 0xD000_0050>
 // --       name:
 // CHECK-SAME:   [15 x i8]* [[RESILIENTCHILD_NAME]]
 // --       num fields

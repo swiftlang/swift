@@ -2303,7 +2303,7 @@ public:
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::IndirectObjCClass:
       break;
-        
+
     case TypeMetadataRecordKind::Reserved:
       return nullptr;
 
@@ -3004,6 +3004,10 @@ public:
     return MetadataAccessFunction(AccessFunctionPtr.get());
   }
 
+  TypeContextDescriptorFlags getTypeContextDescriptorFlags() const {
+    return TypeContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
   const TargetTypeGenericContextDescriptorHeader<Runtime> &
     getFullGenericContextHeader() const;
 
@@ -3061,15 +3065,13 @@ public:
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
 
-  /// This bit is set in the context descriptor header's kind-specific flags
-  /// if this is a class descriptor with a vtable descriptor for runtime
-  /// vtable instantiation.
-  static constexpr const uint16_t HasVTableFlag =
-    uint16_t(TypeContextDescriptorFlags::Class_HasVTable);
-  /// This bit is set in the context descriptor header's kind-specific flags
-  /// if this is a class descriptor with a resilient superclass.
-  static constexpr const uint16_t HasResilientSuperclassFlag =
-    uint16_t(TypeContextDescriptorFlags::Class_HasResilientSuperclass);
+  /// The superclass of this class.  This pointer can be interpreted
+  /// using the superclass reference kind stored in the type context
+  /// descriptor flags.  It is null if the class has no formal superclass.
+  ///
+  /// Note that SwiftObject, the implicit superclass of all Swift root
+  /// classes when building with ObjC compatibility, does not appear here.
+  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> SuperClass;
 
   /// The number of stored properties in the class, not including its
   /// superclasses. If there is a field offset vector, this is its length.
@@ -3123,12 +3125,11 @@ public:
   }
 
   bool hasVTable() const {
-    return (this->Flags.getKindSpecificFlags() & HasVTableFlag) != 0;
+    return this->getTypeContextDescriptorFlags().class_hasVTable();
   }
 
   bool hasResilientSuperclass() const {
-    return (this->Flags.getKindSpecificFlags() & HasResilientSuperclassFlag)
-      != 0;
+    return this->getTypeContextDescriptorFlags().class_hasResilientSuperclass();
   }
   
   const VTableDescriptorHeader *getVTableDescriptor() const {

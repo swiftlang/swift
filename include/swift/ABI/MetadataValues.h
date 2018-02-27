@@ -21,6 +21,7 @@
 
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/FlagSet.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
@@ -981,27 +982,60 @@ public:
 
 /// Flags for nominal type context descriptors. These values are used as the
 /// kindSpecificFlags of the ContextDescriptorFlags for the type.
-enum class TypeContextDescriptorFlags: uint16_t {
-  /// Set if the context descriptor is includes metadata for dynamically
-  /// constructing a class's vtables at metadata instantiation time.
-  ///
-  /// Only meaningful for class descriptors.
-  Class_HasVTable = 0x8000u,
-  
-  /// Set if the context descriptor is for a class with resilient ancestry.
-  ///
-  /// Only meaningful for class descriptors.
-  Class_HasResilientSuperclass = 0x4000u,
-  
-  /// Set if the type represents an imported C tag type.
-  ///
-  /// Meaningful for all type-descriptor kinds.
-  IsCTag = 0x2000u,
-  
-  /// Set if the type represents an imported C typedef type.
-  ///
-  /// Meaningful for all type-descriptor kinds.
-  IsCTypedef = 0x1000u
+class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    // All of these values are bit offsets or widths.
+    // Generic flags build upwards from 0.
+    // Type-specific flags build downwards from 15.
+
+    /// Set if the type represents an imported C tag type.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsCTag = 0,
+
+    /// Set if the type represents an imported C typedef type.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsCTypedef = 1,
+
+    /// Set if the context descriptor is includes metadata for dynamically
+    /// constructing a class's vtables at metadata instantiation time.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasVTable = 15,
+
+    /// Set if the context descriptor is for a class with resilient ancestry.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasResilientSuperclass = 14,
+
+    /// The kind of reference that this class makes to its superclass
+    /// descriptor.  A TypeMetadataRecordKind.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_SuperclassReferenceKind = 12,
+    Class_SuperclassReferenceKind_width = 2,
+  };
+
+public:
+  explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr TypeContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
+                                class_hasVTable,
+                                class_setHasVTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
+                                class_hasResilientSuperclass,
+                                class_setHasResilientSuperclass)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
+                                 Class_SuperclassReferenceKind_width,
+                                 TypeMetadataRecordKind,
+                                 class_getSuperclassReferenceKind,
+                                 class_setSuperclassReferenceKind)
 };
 
 enum class GenericParamKind : uint8_t {

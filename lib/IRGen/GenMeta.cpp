@@ -2692,19 +2692,23 @@ namespace {
     
     /// Flags to indicate Clang-imported declarations so we mangle them
     /// consistently at runtime.
-    uint16_t getClangImportedFlags() const {
+    void getClangImportedFlags(TypeContextDescriptorFlags &flags) const {
       auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type);
       if (!clangDecl)
-        return 0;
+        return;
       
-      if (isa<clang::TagDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTag;
+      if (isa<clang::TagDecl>(clangDecl)) {
+        flags.setIsCTag(true);
+        return;
+      }
       
       if (isa<clang::TypedefNameDecl>(clangDecl)
-          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTypedef;
+          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+        flags.setIsCTypedef(true);
+        return;
+      }
       
-      return 0;
+      return;
     }
 
     // Subclasses should provide:
@@ -2825,7 +2829,9 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
+      TypeContextDescriptorFlags flags;
+      getClangImportedFlags(flags);
+      return flags.getOpaqueValue();
     }
   };
   
@@ -2888,7 +2894,9 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
+      TypeContextDescriptorFlags flags;
+      getClangImportedFlags(flags);
+      return flags.getOpaqueValue();
     }
   };
   
@@ -2901,6 +2909,8 @@ namespace {
     ClassDecl *getType() {
       return cast<ClassDecl>(Type);
     }
+
+    Optional<TypeEntityReference> SuperClassRef;
 
     // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
@@ -2919,6 +2929,10 @@ namespace {
         VTable = nullptr;
         VTableSize = 0;
         return;
+      }
+
+      if (auto superclassDecl = getType()->getSuperclassDecl()) {
+        SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
       }
 
       auto &layout = IGM.getClassMetadataLayout(getType());
@@ -2947,20 +2961,24 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      uint16_t flags = 0;
+      TypeContextDescriptorFlags flags;
+
       if (!getType()->isForeign()) {
         if (VTableSize != 0)
-          flags |= (uint16_t)TypeContextDescriptorFlags::Class_HasVTable;
+          flags.class_setHasVTable(true);
 
         auto &layout = IGM.getClassMetadataLayout(getType());
         if (layout.hasResilientSuperclass())
-          flags |= (uint16_t)
-            TypeContextDescriptorFlags::Class_HasResilientSuperclass;
+          flags.class_setHasResilientSuperclass(true);
+      }
+
+      if (SuperClassRef) {
+        flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
       }
       
-      flags |= getClangImportedFlags();
+      getClangImportedFlags(flags);
       
-      return flags;
+      return flags.getOpaqueValue();
     }
     
     Size getGenericParamsOffset() {
@@ -3021,6 +3039,13 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
+
+      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
+      if (SuperClassRef) {
+        B.addRelativeAddress(SuperClassRef->getValue());
+      } else {
+        B.addInt32(0);
+      }
 
       // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
