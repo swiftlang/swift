@@ -97,12 +97,14 @@ struct ${Self} {
     self.init(key: _Hashing.secretKey)
   }
 
+  @_versioned
   internal var byteCount: UInt64 {
     @inline(__always) get {
       return tailAndByteCount &>> 56
     }
   }
 
+  @_versioned
   internal var tail: UInt64 {
     @inline(__always) get {
       return tailAndByteCount & ~(0xFF &<< 56)
@@ -121,10 +123,18 @@ struct ${Self} {
 
   @inline(__always)
   public mutating func append(_ value: Int) {
-    let m = UInt64(_truncatingBits: value._lowWord)
     % if word_bits == 64:
-    append(m)
+    append(UInt64(_truncatingBits: value._lowWord))
     % elif word_bits == 32:
+    append(UInt32(_truncatingBits: value._lowWord))
+    % else:
+    fatalError("Unsupported word width")
+    % end
+  }
+
+  @inline(__always)
+  public mutating func append(_ value: UInt32) {
+    let m = UInt64(_truncatingBits: value._lowWord)
     if byteCount & 4 == 0 {
       _sanityCheck(byteCount & 7 == 0 && tail == 0)
       tailAndByteCount = (tailAndByteCount | m) &+ (4 &<< 56)
@@ -133,17 +143,10 @@ struct ${Self} {
       _compress((m &<< 32) | tail)
       tailAndByteCount = (byteCount &+ 4) &<< 56
     }
-    % else:
-    fatalError("Unsupported word width")
-    % end
   }
 
   @inline(__always)
   public mutating func append(_ m: UInt64) {
-    % if word_bits == 64:
-    _compress(m)
-    tailAndByteCount = tailAndByteCount &+ (8 &<< 56)
-    % elif word_bits == 32:
     if byteCount & 4 == 0 {
       _sanityCheck(byteCount & 7 == 0 && tail == 0)
       _compress(m)
@@ -153,9 +156,6 @@ struct ${Self} {
       _compress((m &<< 32) | tail)
       tailAndByteCount = ((byteCount &+ 8) &<< 56) | (m &>> 32)
     }
-    % else:
-    fatalError("Unsupported word width")
-    % end
   }
 
   @inline(__always)
