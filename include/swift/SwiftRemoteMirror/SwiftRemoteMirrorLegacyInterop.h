@@ -151,6 +151,17 @@ struct SwiftReflectionInteropContextLibrary {
   int IsLegacy;
 };
 
+struct SwiftReflectionInteropContextFreeList {
+  struct SwiftReflectionInteropContextFreeList *Next;
+  const void *Pointer;
+  void *Context;
+};
+
+struct SwiftReflectionInteropContextLegacyDataSegmentList {
+  struct SwiftReflectionInteropContextLegacyDataSegmentList *Next;
+  swift_addr_t Start, End;
+};
+
 struct SwiftReflectionInteropContext {
   void *ReaderContext;
   FreeBytesFunction FreeBytes;
@@ -164,14 +175,29 @@ struct SwiftReflectionInteropContext {
   // Currently we support at most two libraries.
   struct SwiftReflectionInteropContextLibrary Libraries[2];
   int LibraryCount;
+  
+  struct SwiftReflectionInteropContextFreeList *FreeList;
+  struct SwiftReflectionInteropContextLegacyDataSegmentList *LegacyDataSegmentList;
 };
 
 typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
-/// A stub for 'ownsObject' that always returns true. Used for the legacy library.
-static inline int swift_reflection_interop_ownsObjectStub(
-  SwiftReflectionContextRef ContextRef, uintptr_t Object) {
-  return 1;
+static inline int swift_reflection_interop_libraryOwnsObject(
+  struct SwiftReflectionInteropContext *ContextRef,
+  struct SwiftReflectionInteropContextLibrary *Library,
+  uintptr_t Object) {
+  if (!Library->IsLegacy)
+    return Library->Functions.ownsObject(Library->Context, Object);
+  
+  // The legacy library doesn't have this. Do it ourselves.
+  struct SwiftReflectionInteropContextLegacyDataSegmentList *Node =
+    ContextRef->LegacyDataSegmentList;
+  while (Node != NULL) {
+    if (Node->Start <= Object && Object < Node->End)
+      return 1;
+    Node = Node->Next;
+  }
+  return 0;
 }
 
 static inline void swift_reflection_interop_loadFunctions(
@@ -201,7 +227,6 @@ static inline void swift_reflection_interop_loadFunctions(
   if (IsLegacy) {
     LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext");
     LOAD_NAMED(addReflectionInfoLegacy, "swift_reflection_addReflectionInfo");
-    Functions->ownsObject = swift_reflection_interop_ownsObjectStub;
   } else {
     LOAD(createReflectionContext);
     LOAD(addReflectionInfo);
@@ -335,6 +360,22 @@ swift_reflection_interop_destroyReflectionContext(
   FOREACH_LIBRARY {
     Library->Functions.destroyReflectionContext(Library->Context);
   }
+  struct SwiftReflectionInteropContextLegacyDataSegmentList *LegacyDataSegmentList
+    = ContextRef->LegacyDataSegmentList;
+  while (LegacyDataSegmentList != NULL) {
+    struct SwiftReflectionInteropContextLegacyDataSegmentList *Next
+      = LegacyDataSegmentList->Next;
+    free(LegacyDataSegmentList);
+    LegacyDataSegmentList = Next;
+  }
+  struct SwiftReflectionInteropContextFreeList *FreeList = ContextRef->FreeList;
+  while (FreeList != NULL) {
+    ContextRef->FreeBytes(ContextRef->ReaderContext,
+                          FreeList->Pointer, FreeList->Context);
+    struct SwiftReflectionInteropContextFreeList *Next = FreeList->Next;
+    free(FreeList);
+    FreeList = Next;
+  }
   free(ContextRef);
 }
 
@@ -361,11 +402,11 @@ static inline int
 swift_reflection_interop_addImageLegacy(
   SwiftReflectionInteropContextRef ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
-  swift_addr_t imageStart) {
+  swift_addr_t ImageStart) {
   void *FreeContext;
   const void *Buf;
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
-                              imageStart,
+                              ImageStart,
                               sizeof(MachHeader),
                               &FreeContext);
   if (Buf == NULL)
@@ -384,12 +425,12 @@ swift_reflection_interop_addImageLegacy(
     ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
   
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
-                              imageStart,
+                              ImageStart,
                               Length,
                               &FreeContext);
   Header = (MachHeader *)Buf;
-  // TODO: free the stuff when we're done
   
+  // Find all the sections and fill out the reflection info.
   swift_reflection_legacy_info_t info = {};
   
   int success = 0;
@@ -412,13 +453,39 @@ swift_reflection_interop_addImageLegacy(
                                                  "__swift3_reflstr",
                                                  &info.reflstr) || success;
   
-  if (!success)
+  if (!success) {
+    if (ContextRef->FreeBytes != NULL)
+      ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
     return 0;
-  
+  }
+    
   info.LocalStartAddress = (uintptr_t)Buf;
-  info.RemoteStartAddress = imageStart;
+  info.RemoteStartAddress = ImageStart;
   
   Library->Functions.addReflectionInfoLegacy(Library->Context, info);
+  
+  // Find the data segment and add it to our list.
+  unsigned long DataSize;
+  const uint8_t *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+  
+  struct SwiftReflectionInteropContextLegacyDataSegmentList *Node =
+    (struct SwiftReflectionInteropContextLegacyDataSegmentList *)malloc(sizeof(*Node));
+  Node->Next = ContextRef->LegacyDataSegmentList;
+  Node->Start = DataSegment - (const uint8_t *)Buf + ImageStart;
+  Node->End = Node->Start + DataSize;
+  ContextRef->LegacyDataSegmentList = Node;
+  
+  // If the buffer needs to be freed, save buffer and free context to free it when the
+  //  reflection context is destroyed.
+  if (ContextRef->FreeBytes != NULL) {
+    struct SwiftReflectionInteropContextFreeList *Node =
+      (struct SwiftReflectionInteropContextFreeList *)malloc(sizeof(*Node));
+    Node->Next = ContextRef->FreeList;
+    Node->Pointer = Buf;
+    Node->Context = FreeContext;
+    ContextRef->FreeList = Node;
+  }
+  
   return 1;
 }
 
@@ -470,7 +537,7 @@ swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef Con
                                             uintptr_t Object) {
   swift_typeref_interop_t Result;
   FOREACH_LIBRARY {
-    if (!Library->Functions.ownsObject(Library->Context, Object))
+    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
       continue;
     swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
                                                                      Object);
@@ -546,7 +613,7 @@ swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef Contex
                                          uintptr_t Object) {
   swift_typeinfo_t Result = {};
   FOREACH_LIBRARY {
-    if (!Library->Functions.ownsObject(Library->Context, Object))
+    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
       continue;
     
     Result = Library->Functions.infoForInstance(Library->Context, Object);
@@ -565,7 +632,7 @@ swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef Contex
                                          uintptr_t Object,
                                          unsigned Index) {
   FOREACH_LIBRARY {
-    if (!Library->Functions.ownsObject(Library->Context, Object))
+    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
       continue;
     
     return Library->Functions.childOfInstance(Library->Context, Object, Index);
@@ -636,7 +703,7 @@ void swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextR
 void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                                   uintptr_t Object) {
   FOREACH_LIBRARY {
-    if (!Library->Functions.ownsObject(Library->Context, Object))
+    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
       continue;
     
     Library->Functions.dumpInfoForInstance(Library->Context, Object);
