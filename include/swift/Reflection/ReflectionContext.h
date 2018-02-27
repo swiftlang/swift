@@ -43,6 +43,7 @@ typedef const struct mach_header_64 MachHeader;
 #endif
 #endif
 
+#ifdef __APPLE__
 template <typename Section>
 static std::pair<Section, bool> findSection(MachHeader *Header,
                                             const char *Name) {
@@ -57,6 +58,7 @@ static std::pair<Section, bool> findSection(MachHeader *Header,
            reinterpret_cast<const void *>(End)},
           true};
 }
+#endif // __APPLE__
 
 namespace swift {
 namespace reflection {
@@ -111,6 +113,7 @@ public:
     getBuilder().dumpAllSections();
   }
 
+#ifdef __APPLE__
   bool addImage(RemoteAddress ImageStart) {
     const void *Buf;
     std::function<void()> FreeFunc;
@@ -204,6 +207,7 @@ public:
     }
     return true;
   }
+#endif // __APPLE__
   
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
