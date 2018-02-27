@@ -25,7 +25,7 @@ import SwiftShims
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _Hashing {
+enum _Hashing {
   // FIXME(ABI)#41 : make this an actual public API.
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI
@@ -48,7 +48,7 @@ struct _Hashing {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _HashingDetail {
+enum _HashingDetail {
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
@@ -185,3 +185,94 @@ func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   x ^= UInt(bitPattern: secondValue) &+ magic &+ (x &<< 6) &+ (x &>> 2)
   return Int(bitPattern: x)
 }
+
+/// An unsafe wrapper around a stateful hash function, presenting a faux purely
+/// functional interface to eliminate ARC overhead.
+///
+/// This is not a true value type; calling `appending` or `finalized` actually
+/// mutates `self`'s state.
+@_fixed_layout
+public struct _UnsafeHasher {
+  @_versioned
+  internal let _rawState: UnsafeMutableRawPointer
+
+  internal var _state: UnsafeMutablePointer<_Hasher> {
+    @inline(__always)
+    get { return _rawState.assumingMemoryBound(to: _Hasher.self) }
+  }
+
+  @inline(__always)
+  @_versioned
+  internal init(_ state: UnsafeMutablePointer<_Hasher>) {
+    self._rawState = UnsafeMutableRawPointer(state)
+  }
+
+  @_versioned
+  @inline(never)
+  @effects(readonly) // FIXME: Unjustified
+  static func hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
+    var hasher = _Hasher()
+    return withUnsafeMutablePointer(to: &hasher) { p in
+      return pointer.pointee._hash(into: _UnsafeHasher(p))._finalized()
+    }
+  }
+
+  @effects(readonly)
+  @inline(never)
+  public func appending(bitPattern value: Int) -> _UnsafeHasher {
+    // The effects attribute is a lie; however, it enables the compiler to
+    // eliminate unnecessary retain/releases protecting Hashable state around
+    // calls to `_Hasher.append(_:)`.
+    //
+    // We don't have a way to describe the side-effects of an opaque function --
+    // if it doesn't have an @effects attribute, the compiler has no choice but
+    // to assume it may mutate the hashable we're visiting. We know that won't
+    // be the case (the stdlib owns the hash function), but the only way to tell
+    // this to the compiler is to pretend the state update is pure.
+    _state.pointee.append(value)
+    return self
+  }
+
+  @_inlineable
+  @inline(__always)
+  public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
+    return value._hash(into: self)
+  }
+
+  @inline(__always)
+  internal func _appending(_ value: Int) -> _UnsafeHasher {
+    _state.pointee.append(value)
+    return self
+  }
+
+  @inline(__always)
+  internal func _finalized() -> Int {
+    return _state.pointee.finalize()
+  }
+}
+
+// FIXME: This is purely for benchmarking; to be removed.
+internal struct _QuickHasher {
+  internal var _hash: Int
+
+  @inline(__always)
+  internal init() {
+    _hash = 0
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: Int) {
+    if _hash == 0 {
+      _hash = value
+      return
+    }
+    _hash = _combineHashValues(_hash, value)
+  }
+
+  @inline(__always)
+  internal mutating func finalize() -> Int {
+    return _mixInt(_hash)
+  }
+}
+
+internal typealias _Hasher = _SipHash13
