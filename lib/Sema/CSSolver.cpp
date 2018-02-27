@@ -1872,25 +1872,36 @@ bool ConstraintSystem::solveSimplified(
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   ++solverState->NumDisjunctions;
-  llvm::SmallVector<Constraint *, 8> constraints;
-  constraints.reserve(disjunction->countActiveNestedConstraints());
-  for (auto *choice : disjunction->getNestedConstraints()) {
-    if (!choice->isDisabled())
-      constraints.push_back(choice);
+  llvm::SmallVector<DisjunctionChoice, 8> choices;
+  choices.reserve(disjunction->countActiveNestedConstraints());
+  for (auto *constraint : disjunction->getNestedConstraints()) {
+    DisjunctionChoice choice(this, disjunction, constraint);
+
+    if (choice.isDisabled())
+      continue;
+
+    // Attempt unavailable choices only if fixes are allowed
+    // because even if such choice forms a solution it would
+    // result in error regardless.
+    if (!shouldAttemptFixes() && choice.isUnavailable())
+      continue;
+
+    choices.push_back(std::move(choice));
   }
 
-  std::sort(constraints.begin(), constraints.end(),
-            [](Constraint *a, Constraint *b) { return a->isFavored(); });
+  std::sort(choices.begin(), choices.end(),
+            [](const DisjunctionChoice &a, const DisjunctionChoice &b) {
+              return a->isFavored();
+            });
 
   // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, disjunction, constraints[index]);
+  for (auto index : indices(choices)) {
+    auto currentChoice = choices[index];
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->first.getConstraint();
+      Constraint *lastChoice = lastSolvedChoice->first;
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
       bool hasFixes = score.Data[SK_Fix] > 0;
@@ -1899,8 +1910,7 @@ bool ConstraintSystem::solveSimplified(
       // that there are no unavailable overload choices present in the
       // solution, and the solution does not involve fixes.
       if (!hasUnavailableOverloads && !hasFixes &&
-          shortCircuitDisjunctionAt(&currentChoice, lastChoice,
-                                    getASTContext()))
+          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
         break;
     }
 

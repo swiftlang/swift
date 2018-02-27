@@ -3248,26 +3248,37 @@ public:
                     Constraint *choice)
       : CS(cs), Disjunction(disjunction), Choice(choice) {}
 
-  Constraint *operator&() const { return Choice; }
-
-  Constraint *getConstraint() const { return Choice; }
-
   Constraint *operator->() const { return Choice; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
-  ValueDecl *getOperatorDecl() const { return getOperatorDecl(Choice); }
+  bool isUnavailable() const {
+    if (auto *decl = getDecl(Choice))
+      return decl->getAttrs().isUnavailable(decl->getASTContext());
+
+    return false;
+  }
+
+  ValueDecl *getOperatorDecl() const {
+    auto *decl = getDecl(Choice);
+    if (!decl)
+      return nullptr;
+
+    return decl->isOperator() ? decl : nullptr;
+  }
 
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables);
+
+  operator Constraint *() { return Choice; }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo() const;
 
-  static ValueDecl *getOperatorDecl(Constraint *constraint) {
+  static ValueDecl *getDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
       return nullptr;
 
@@ -3275,8 +3286,7 @@ private:
     if (choice.getKind() != OverloadChoiceKind::Decl)
       return nullptr;
 
-    auto *decl = choice.getDecl();
-    return decl->isOperator() ? decl : nullptr;
+    return choice.getDecl();
   }
 };
 
