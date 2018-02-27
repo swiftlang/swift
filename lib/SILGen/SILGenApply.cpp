@@ -39,6 +39,10 @@
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+//                             Utility Functions
+//===----------------------------------------------------------------------===//
+
 /// Return the abstraction pattern to use when calling a function value.
 static AbstractionPattern
 getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
@@ -218,6 +222,10 @@ static void convertOwnershipConventionsGivenParamInfos(
               return convertOwnershipConventionGivenParamInfo(SGF, params[i], values[i], loc);
             });
 }
+
+//===----------------------------------------------------------------------===//
+//                                   Callee
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -688,6 +696,12 @@ public:
   }
 };
 
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                           SILGenApply ASTVisitor
+//===----------------------------------------------------------------------===//
+
 /// For ObjC init methods, we generate a shared-linkage Swift allocating entry
 /// point that does the [[T alloc] init] dance. We want to use this native
 /// thunk where we expect to be calling an allocating entry point for an ObjC
@@ -695,6 +709,8 @@ public:
 static bool isConstructorWithGeneratedAllocatorThunk(ValueDecl *vd) {
   return vd->isObjC() && isa<ConstructorDecl>(vd);
 }
+
+namespace {
 
 /// An ASTVisitor for decomposing a nesting of ApplyExprs into an initial
 /// Callee and a list of CallSites. The CallEmission class below uses these
@@ -1827,6 +1843,10 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
                    args, calleeTypeInfo, options, evalContext, postpone);
 }
+
+//===----------------------------------------------------------------------===//
+//                             Argument Emission
+//===----------------------------------------------------------------------===//
 
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
@@ -3678,7 +3698,13 @@ namespace {
       assert(Params.empty() && "didn't consume all the parameters");
     }
   };
+} // end anonymous namespace
 
+//===----------------------------------------------------------------------===//
+//                                  CallSite
+//===----------------------------------------------------------------------===//
+
+namespace {
   /// An application of possibly unevaluated arguments in the form of an
   /// ArgumentSource to a Callee.
   class CallSite {
@@ -3739,7 +3765,13 @@ namespace {
       return std::move(ArgValue);
     }
   };
+} // end anonymous namespace
 
+//===----------------------------------------------------------------------===//
+//                                CallEmission
+//===----------------------------------------------------------------------===//
+
+namespace {
   /// Once the Callee and CallSites have been prepared by SILGenApply,
   /// generate SIL for a fully-formed call.
   ///
@@ -4381,6 +4413,10 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
 
   return emission;
 }
+
+//===----------------------------------------------------------------------===//
+//                           Top Level Entrypoints
+//===----------------------------------------------------------------------===//
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
   CallEmission emission = prepareApplyExpr(*this, e);
