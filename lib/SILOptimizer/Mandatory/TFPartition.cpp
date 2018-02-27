@@ -705,12 +705,44 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
   // Try to make a useful description of the value being copied to help
   // disambiguate.
   std::string description = "value";
+  Diag<StringRef> diagID = diag::tf_value_implicitly_copied_to_accel;
+
   if (auto expr = loc.getAsASTNode<Expr>()) {
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Look through LoadExpr's, since they are just part of accesses to mutable
+    // values.
+    if (auto *load = dyn_cast<LoadExpr>(expr))
+      expr = load->getSubExpr()->getSemanticsProvidingExpr();
+
+    // If this is a reference to a class/existential property, diagnose it
+    // specifically, as dynamic accesses are never deabstracted.
+    if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
+      if (mre->getBase()->getType()->isAnyClassReferenceType()) {
+        description = "properties in classes";
+        diagID = diag::tf_value_implicitly_copied_to_accel_always;
+      } else if (mre->getBase()->getType()->isExistentialType()) {
+        description = "properties in dynamic protocols";
+        diagID = diag::tf_value_implicitly_copied_to_accel_always;
+      }
+    }
+
     if (auto *ae = dyn_cast<ApplyExpr>(expr->getSemanticsProvidingExpr())) {
-      if (isa<ConstructorRefCallExpr>(ae->getFn()))
+      if (auto dsc = dyn_cast<DotSyntaxCallExpr>(ae->getFn())) {
+        // If this is a call to a class/existential method, diagnose it
+        // specifically, as dynamic accesses are never deabstracted.
+        if (dsc->getBase()->getType()->isAnyClassReferenceType()) {
+          description = "class methods";
+          diagID = diag::tf_value_implicitly_copied_to_accel_always;
+        } else if (dsc->getBase()->getType()->isExistentialType()) {
+          description = "dynamic protocol methods";
+          diagID = diag::tf_value_implicitly_copied_to_accel_always;
+        } else {
+          description = "method result";
+        }
+      } else if (isa<ConstructorRefCallExpr>(ae->getFn())) {
         description = "'" + expr->getType()->getString() + "'";
-      else if (isa<DotSyntaxCallExpr>(ae->getFn()))
-        description = "method result";
+      }
     }
   } else if (auto decl = loc.getAsASTNode<Decl>()) {
     if (auto pd = dyn_cast<ParamDecl>(decl))
@@ -718,8 +750,8 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
   }
 
   // Emit the warning.
-  diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-           diag::tf_value_implicitly_copied_to_accel, description)
+  diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(), diagID,
+           description)
     .highlight(loc.getSourceRange());
 
   // If the use is on a different line, emit a note showing where it is.
