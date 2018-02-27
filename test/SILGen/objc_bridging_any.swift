@@ -757,4 +757,5 @@ func bridgeOptionalFunctionToAnyObject(fn: (() -> ())?) -> AnyObject {
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
+// CHECK-NEXT: method #Hashable._hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP5_hash4intos13_UnsafeHasherVAH_tFTW
 // CHECK-NEXT: }
