@@ -39,6 +39,8 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
   // yield is special because it can do arbitrary,
   // potentially-process-terminating things.
   case TermKind::YieldInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TermKind::AutoDiffReverseInst:
     return false;
   case TermKind::TryApplyInst:
     return true;
