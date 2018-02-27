@@ -93,8 +93,7 @@ addOutputsOfType(ArgStringList &Arguments,
                  const char *PrefixArgument = nullptr) {
   bool Added = false;
   for (auto Output : Output.getAdditionalOutputsForType(OutputType)) {
-    if (Output.empty())
-      continue;
+    assert(!Output.empty());
     if (PrefixArgument)
       Arguments.push_back(PrefixArgument);
     Arguments.push_back(Args.MakeArgString(Output));
@@ -726,8 +725,10 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
     addInputsOfType(Arguments, context.Inputs, context.Args, types::TY_SwiftModuleFile);
     addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
     assert(Arguments.size() - origLen >=
-           context.Inputs.size() + context.InputActions.size());
+           context.Inputs.size() + context.InputActions.size() ||
+           context.OI.CompilerOutputType == types::TY_Nothing);
     assert((Arguments.size() - origLen == context.Inputs.size() ||
+            context.OI.CompilerOutputType == types::TY_Nothing ||
             !context.InputActions.empty()) &&
            "every input to MergeModule must generate a swiftmodule");
   }
