@@ -1425,9 +1425,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let nsRange : NSRange
         if let r = range {
             _validateRange(r)
-            nsRange = NSRange(location: r.lowerBound, length: r.upperBound - r.lowerBound)
+            nsRange = NSRange(location: r.lowerBound - startIndex, length: r.upperBound - r.lowerBound)
         } else {
-            nsRange = NSRange(location: 0, length: _backing.length)
+            nsRange = NSRange(location: 0, length: count)
         }
         let result = _backing.withInteriorPointerReference(_sliceRange) {
             $0.range(of: dataToFind, options: options, in: nsRange)
@@ -1435,7 +1435,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if result.location == NSNotFound {
             return nil
         }
-        return result.location..<(result.location + result.length)
+        return (result.location + startIndex)..<((result.location + startIndex) + result.length)
     }
     
     /// Enumerate the contents of the data.
