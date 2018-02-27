@@ -248,15 +248,11 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
       objectFile = objectOwner.get();
     }
 
-#if 0
-    context.addReflectionInfo(findReflectionInfo(objectFile));
-#endif
-    context.addImage(RemoteAddress((uint64_t)(objectFile->getData().begin())));
-
     // Retain the objects that own section memory
     binaryOwners.push_back(std::move(binaryOwner));
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
+    context.addImage(RemoteAddress((uint64_t)(objectFile->getData().begin())));
   }
 
   switch (action) {
