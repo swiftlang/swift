@@ -335,6 +335,60 @@
           ]
         }
       ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo1",
+      "printedName": "foo1(_:b:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo1_1bySi_AA2S1VtF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Int",
+          "printedName": "Int",
+          "hasDefaultArg": true
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "S1",
+          "printedName": "S1"
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo2",
+      "printedName": "foo2(_:b:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo2_1bySi_AA2S1VtF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Int",
+          "printedName": "Int",
+          "hasDefaultArg": true
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "S1",
+          "printedName": "S1"
+        }
+      ]
     }
   ]
 }
