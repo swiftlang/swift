@@ -188,6 +188,14 @@ public extension Tensor {
     self.init(handle: #tfop("Fill", Tensor<Int32>(shape.dimensions),
                             Tensor(repeatedValue)))
   }
+
+  /// Creates a tensor by broadcasting the given scalar to a given rank with
+  /// all dimensions being 1.
+  @_inlineable @inline(__always)
+  init(broadcasting scalar: Scalar, rank: Int32) {
+    let shapeTensor = Tensor<Int32>(shape: [rank], repeating: 1)
+    self.init(handle: #tfop("Fill", shapeTensor, Tensor(scalar)))
+  }
 }
 
 //===----------------------------------------------------------------------===//

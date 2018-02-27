@@ -31,9 +31,12 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 TensorTests.testCPUAndGPU("Initializers") {
   let scalar: Tensor<Float> = 1.0
   let matrix: Tensor<Float> = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+  let broadcastedScalar = Tensor<Float>(broadcasting: 10, rank: 3)
   expectEqual(ShapedArray(shape: [], scalars: [1]), scalar.array)
   expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
               matrix.array)
+  expectEqual(ShapedArray(shape: [1, 1, 1], scalars: [10]),
+              broadcastedScalar.array)
 }
 
 TensorTests.testCPUAndGPU("FactoryInitializers") {
