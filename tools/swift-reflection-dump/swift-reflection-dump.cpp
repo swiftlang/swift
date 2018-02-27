@@ -13,6 +13,10 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
+// FIXME davidino: this needs to be included first to avoid textual
+// replacement. It's silly and needs to be fixed.
+#include "llvm/Object/MachO.h"
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -20,7 +24,6 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "llvm/Object/Archive.h"
-#include "llvm/Object/MachO.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
@@ -245,7 +248,10 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
       objectFile = objectOwner.get();
     }
 
+#if 0
     context.addReflectionInfo(findReflectionInfo(objectFile));
+#endif
+    context.addImage(RemoteAddress((uint64_t)(objectFile->getData().begin())));
 
     // Retain the objects that own section memory
     binaryOwners.push_back(std::move(binaryOwner));

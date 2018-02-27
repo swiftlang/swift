@@ -18,6 +18,10 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#ifdef __APPLE__
+#include <mach-o/getsect.h>
+#endif
+
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -30,6 +34,29 @@
 #include <set>
 #include <vector>
 #include <unordered_map>
+
+#ifdef __APPLE__
+#ifndef __LP64__
+typedef const struct mach_header MachHeader;
+#else
+typedef const struct mach_header_64 MachHeader;
+#endif
+#endif
+
+template <typename Section>
+static std::pair<Section, bool> findSection(MachHeader *Header,
+                                            const char *Name) {
+  unsigned long Size;
+  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
+  if (!Address)
+    return {{nullptr, nullptr}, false};
+
+  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
+
+  return {{reinterpret_cast<const void *>(Address),
+           reinterpret_cast<const void *>(End)},
+          true};
+}
 
 namespace swift {
 namespace reflection {
@@ -74,6 +101,101 @@ public:
 
   void dumpAllSections(std::ostream &OS) {
     getBuilder().dumpAllSections();
+  }
+
+  bool addImage(RemoteAddress ImageStart) {
+    const void *Buf;
+    std::function<void()> FreeFunc;
+
+    std::tie(Buf, FreeFunc) =
+        this->getReader().readBytes(ImageStart, sizeof(MachHeader));
+    if (Buf == nullptr)
+      return false;
+
+    auto Header = reinterpret_cast<MachHeader *>(Buf);
+
+    if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
+      FreeFunc();
+      return false;
+    }
+
+    auto Length = Header->sizeofcmds;
+    FreeFunc();
+
+    // Read the commands.
+    std::tie(Buf, FreeFunc) = this->getReader().readBytes(ImageStart, Length);
+
+    if (Buf == nullptr)
+      return false;
+
+    // Find the TEXT segment and figure out where the end is.
+    Header = reinterpret_cast<MachHeader *>(Buf);
+    unsigned long TextSize;
+    auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
+    if (TextSegment == nullptr) {
+      FreeFunc();
+      return false;
+    }
+    auto TextEnd =
+        TextSegment - reinterpret_cast<const uint8_t *>(Buf) + TextSize;
+    FreeFunc();
+
+    // Read everything including the TEXT segment.
+    std::tie(Buf, FreeFunc) = this->getReader().readBytes(ImageStart, TextEnd);
+
+    if (Buf == nullptr)
+      return false;
+
+    // Read all the metadata parts.
+    Header = reinterpret_cast<MachHeader *>(Buf);
+
+    // The docs say "not all sections may be present." We'll succeed if ANY of
+    // them are present. Not sure if that's the right thing to do.
+    auto FieldMd = findSection<FieldSection>(Header, "__swift5_fieldmd");
+    auto AssocTyMd =
+        findSection<AssociatedTypeSection>(Header, "__swift5_assocty");
+    auto BuiltinTyMd =
+        findSection<BuiltinTypeSection>(Header, "__swift5_builtin");
+    auto CaptureMd = findSection<CaptureSection>(Header, "__swift5_capture");
+    auto TyperefMd = findSection<GenericSection>(Header, "__swift5_typeref");
+    auto ReflStrMd = findSection<GenericSection>(Header, "__swift5_reflstr");
+
+    bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
+                   CaptureMd.second || TyperefMd.second || ReflStrMd.second;
+    if (!success) {
+      FreeFunc();
+      return 0;
+    }
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf);
+    auto RemoteStartAddress =
+        reinterpret_cast<uint64_t>(ImageStart.getAddressData());
+
+    ReflectionInfo info = {
+        {{FieldMd.first.startAddress(), FieldMd.first.endAddress()}, 0},
+        {{AssocTyMd.first.startAddress(), AssocTyMd.first.endAddress()}, 0},
+        {{BuiltinTyMd.first.startAddress(), BuiltinTyMd.first.endAddress()}, 0},
+        {{CaptureMd.first.startAddress(), CaptureMd.first.endAddress()}, 0},
+        {{TyperefMd.first.startAddress(), TyperefMd.first.endAddress()}, 0},
+        {{ReflStrMd.first.startAddress(), ReflStrMd.first.endAddress()}, 0},
+        LocalStartAddress,
+        RemoteStartAddress};
+
+    this->addReflectionInfo(info);
+
+#if 0 // XXXFIXME: Add a destructor.
+    ContextRef->freeFuncs.push_back(FreeFunc);
+
+    unsigned long DataSize;
+    auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+    if (DataSegment != nullptr) {
+      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf)
+                            + imageStart;
+      auto DataSegmentEnd = DataSegmentStart + DataSize;
+      ContextRef->dataSegments.push_back(std::make_tuple(DataSegmentStart, DataSegmentEnd));
+    }
+#endif
+    return true;
   }
 
   void addReflectionInfo(ReflectionInfo I) {

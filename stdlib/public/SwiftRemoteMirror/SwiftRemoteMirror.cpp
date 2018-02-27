@@ -112,7 +112,9 @@ int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
-  
+  return Context->addImage(RemoteAddress(cast<uint64_t>(imageStart)));
+
+#if 0
   const void *Buf;
   std::function<void()> FreeFunc;
   
@@ -192,6 +194,7 @@ swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
   }
   
   return 1;
+#endif
 }
 #endif
 
