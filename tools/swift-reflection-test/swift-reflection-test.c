@@ -73,11 +73,6 @@ uint8_t PipeMemoryReader_getPointerSize(void *Context) {
 }
 
 static
-uint8_t PipeMemoryReader_getSizeSize(void *Context) {
-  return sizeof(size_t);
-}
-
-static
 void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
                                            void *Dest, size_t Size) {
   int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
