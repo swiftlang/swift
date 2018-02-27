@@ -543,12 +543,10 @@ public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self),
-  //   gradient: _adjointTransposed(permutations:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self),
+    gradient: _adjointTransposed(_:partial:seed:)
+  )
   func transposed(withPermutations permutations: Tensor<Int32>) -> Self {
     return #tfop("Transpose", handle, permutations, Tperm: Int32.self)
   }
@@ -1041,12 +1039,10 @@ internal extension Padding {
 
 public extension Tensor where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self, .0),
-  //   gradient: _adjointConvolve2D(input:filter:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self, .0),
+    gradient: _adjointConvolved2D(filter:strides:padding:partial:seed:)
+  )
   func convolved2D(
     withFilter filter: Tensor,
     strides: [Int32],
@@ -1057,13 +1053,11 @@ public extension Tensor where Scalar : FloatingPoint {
   }
 
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self),
-  //   gradient:
-  //     _adjointMaxPooled2D(input:kernelSize:strides:padding:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self),
+    gradient:
+      _adjointMaxPooled(kernelSize:strides:padding:partial:seed:)
+  )
   func maxPooled(
     kernelSize: Tensor<Int32>,
     strides: Tensor<Int32>,
@@ -1085,13 +1079,10 @@ public extension Tensor where Scalar : FloatingPoint {
   }
 
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self),
-  //   gradient:
-  //     _adjointAveragePooled2D(input:kernelSize:strides:padding:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self),
+    gradient: _adjointAveragePooled(kernelSize:strides:padding:partial:seed:)
+  )
   func averagePooled(
     kernelSize: [Int32],
     strides: [Int32],
@@ -1104,19 +1095,18 @@ public extension Tensor where Scalar : FloatingPoint {
 
 public extension Tensor4D where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self, .0),
-  //   gradient: _adjointConvolve2D(input:filter:partial:seed:)
-  // )
   func convolved2D(
     withFilter filter: Tensor4D,
     strides: [Int32],
     padding: Padding
   ) -> Tensor4D {
-    return #tfop("Conv2D", handle, filter, strides: strides,
-                 padding: padding.cName)
+    return Tensor4D(
+      identicallyRanked: base.convolved2D(
+        withFilter: filter.base,
+        strides: strides,
+        padding: padding
+      )
+    )
   }
 
   // NOTE: Conv3D requires the existence of Tensor5D, since the input/filter
