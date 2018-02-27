@@ -2071,6 +2071,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::AutoDiffReverseInst:
+    llvm_unreachable("not supported");
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {

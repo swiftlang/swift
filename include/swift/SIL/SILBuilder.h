@@ -400,6 +400,18 @@ public:
                                                  beginApply));
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  AutoDiffReverseInst *createAutoDiffReverse(SILLocation loc,
+                                             SILFunction *primal,
+                                             ArrayRef<unsigned> argIndices,
+                                             bool seedable,
+                                             bool preservingResult) {
+    return insert(AutoDiffReverseInst::create(getModule(),
+                                              getSILDebugLocation(loc),
+                                              primal, argIndices, seedable,
+                                              preservingResult));
+  }
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {

@@ -918,6 +918,116 @@ public:
             "operand of end_apply must be a begin_apply");
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  void checkAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
+    // AD must be the only instruction in the parent function.
+    SILBasicBlock *BB = ADRI->getParent();
+    require(BB->begin().getNodePtr() == ADRI && BB->end().getNodePtr() == ADRI,
+            "autodiff_reverse must be the only instruction in the function");
+    SILFunction *F = BB->getParent();
+    require(F->begin().getNodePtr() == BB && F->end().getNodePtr() == BB,
+            "autodiff_reverse must be the only instruction in the function");
+    require(ADRI->getPrimalFunction()->isSerialized(),
+            "autodiff_reverse can only differentiate a serialized function");
+    // FIXME: Verify derivative type.
+    auto primalFn = ADRI->getPrimalFunction();
+    auto primalGenSig =
+      primalFn->getGenericEnvironment()->getGenericSignature();
+    auto primalTy = primalFn->getLoweredFunctionType();
+    auto primalParams = primalTy->getParameters();
+    auto primalResults = primalTy->getResults();
+
+    // The primal's result as a single type, i.e. a tuple of results if they are
+    // more than one, or just one result.
+    CanType primalSingleResultTy;
+    if (primalResults.size() == 1) {
+      primalSingleResultTy = primalResults.front().getType();
+    } else {
+      SmallVector<TupleTypeElt, 8> tupleElts;
+      for (auto &primalResult : primalResults)
+        tupleElts.push_back(primalResult.getType());
+      Type tupleTy =
+        TupleType::get(tupleElts, F->getASTContext());
+      primalSingleResultTy = tupleTy->getCanonicalType();
+    }
+
+    // Function that returns the parameter convention for a SIL object type.
+    auto getParamConvention = [&](CanType ty) -> ParameterConvention {
+      auto silTy = SILType::getPrimitiveObjectType(ty);
+      if (silTy.isFormallyPassedIndirectly(
+            ty, F->getModule(), primalGenSig->getCanonicalSignature(),
+              ResilienceExpansion::Last_ResilienceExpansion))
+        return ParameterConvention::Indirect_In;
+      return silTy.isTrivial(F->getModule())
+        ? ParameterConvention::Direct_Unowned
+        : ParameterConvention::Direct_Owned;
+    };
+
+    // Function that returns the result convention for a SIL object type.
+    auto getResultConvention = [&](CanType ty) -> ResultConvention {
+      auto silTy = SILType::getPrimitiveObjectType(ty);
+      return silTy.isTrivial(F->getModule())
+        ? ResultConvention::Unowned : ResultConvention::Owned;
+    };
+
+    // FIXME: Does this verify generic signatures?
+    int lastIndex = -1;
+    SmallVector<unsigned, 8> allArgIndices;
+    ArrayRef<unsigned> argIndices = ADRI->getArgumentIndices();
+    SmallVector<SILParameterInfo, 8> expectedGradParams;
+    SmallVector<SILResultInfo, 8> expectedGradResults;
+    // Collect primal arguments to gradient parameters.
+    for (auto &primalParam : primalParams)
+      expectedGradParams.push_back(primalParam);
+    if (ADRI->isSeedable())
+      expectedGradParams.push_back({
+        primalSingleResultTy,
+        getParamConvention(primalSingleResultTy)
+      });
+    // If no differentiation arguments are specified, all of primal's arguments
+    // are bring differentiated with respect to. For simplicity, we add all
+    // argument indices to a temporary.
+    if (ADRI->getArgumentIndices().empty()) {
+      for (unsigned i = 0; i < primalParams.size(); i++)
+        allArgIndices.push_back(i);
+      argIndices = allArgIndices;
+    }
+    // Collect differentiation arguments to gradient results.
+    for (unsigned i = 0; i < argIndices.size(); i++) {
+      auto index = argIndices[i];
+      require((int)index > lastIndex, "Argument indices must be ascending");
+      auto paramTy = primalParams[index].getType();
+      require(!(paramTy.isAnyClassReferenceType() ||
+                paramTy.isAnyExistentialType()),
+              "Cannot differentiate with respect to reference type or "
+              "existential type");
+      expectedGradResults.push_back({
+        paramTy,
+        getResultConvention(paramTy)
+      });
+      lastIndex = index;
+    }
+    // If preserving result, the original result will be the last result.
+    if (ADRI->isPreservingResult())
+      expectedGradResults.push_back({
+        primalSingleResultTy,
+        getResultConvention(primalSingleResultTy)
+      });
+    // Create an expected function type.
+    auto expectedTy =
+      SILFunctionType::get(primalGenSig, primalTy->getExtInfo(),
+                           primalTy->getCoroutineKind(),
+                           primalTy->getCalleeConvention(),
+                           expectedGradParams, primalTy->getYields(),
+                           expectedGradResults,
+                           primalTy->getOptionalErrorResult(),
+                           F->getASTContext(),
+                           primalTy->getWitnessMethodConformanceOrNone());
+    require(F->getLoweredFunctionType()->isEqual(expectedTy),
+            "The parent function type doesn't match what autodiff_reverse "
+            "expects");
+  }
+
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
     // Certain llvm intrinsic require constant values as their operands.
     // Consequently, these must not be phi nodes (aka. basic block arguments).

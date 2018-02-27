@@ -1487,11 +1487,12 @@ ERROR(sil_attr_differentiable_expected_adjoint_identifier,PointsToFirstBadToken,
 ERROR(sil_attr_differentiable_expected_argument_list,PointsToFirstBadToken,
       "expected an comma-separated list of argument indices, e.g. (0, 1)", ())
 
-ERROR(sil_attr_differentiable_expected_argument_index,PointsToFirstBadToken,
-      "expected an index of argument to differentiate with respect to", ())
-
 ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to end 'differentiable' attribute", ())
+
+// SIL autodiff
+ERROR(sil_reverse_autodiff_expected_argument_index,PointsToFirstBadToken,
+      "expected the index of an argument to differentiate with respect to", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

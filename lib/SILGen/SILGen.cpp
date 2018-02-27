@@ -702,10 +702,12 @@ getLoweredDifferentiationIndices(const AbstractFunctionDecl *AFD,
     // Normal index maps directly to a SIL argument index.
     case AutoDiffArgument::Kind::Index:
       indices.push_back(arg.getIndex());
+      break;
     // 'self' is always the last SIL argument.
     case AutoDiffArgument::Kind::Self:
       // Sema guarantees this case to occur at most once.
       hasSelf = true;
+      break;
     }
   }
   if (hasSelf) {

@@ -563,6 +563,45 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+AutoDiffReverseInst::AutoDiffReverseInst(SILDebugLocation debugLoc,
+                                         SILFunction *primal,
+                                         ArrayRef<unsigned> argIndices,
+                                         bool seedable, bool preservingResult)
+  : InstructionBase(debugLoc), Primal(primal),
+    NumArgIndices(argIndices.size()), Seedable(seedable),
+    PreservingResult(preservingResult) {
+  Primal->incrementRefCount();
+  std::copy(argIndices.begin(), argIndices.end(), getArgumentIndicesData());
+}
+
+AutoDiffReverseInst::~AutoDiffReverseInst() {
+  if (Primal)
+    Primal->decrementRefCount();
+}
+
+AutoDiffReverseInst *
+AutoDiffReverseInst::create(SILModule &M, SILDebugLocation debugLoc,
+                            SILFunction *primal, ArrayRef<unsigned> argIndices,
+                            bool seedable, bool preservingResult) {
+  unsigned size =
+    sizeof(AutoDiffReverseInst) + argIndices.size() * sizeof(unsigned);
+  void *buffer = M.allocate(size, alignof(AutoDiffReverseInst));
+  return ::new (buffer) AutoDiffReverseInst(debugLoc, primal, argIndices,
+                                            seedable, preservingResult);
+}
+
+ArrayRef<unsigned>
+AutoDiffReverseInst::getArgumentIndices() const {
+  return const_cast<AutoDiffReverseInst *>(this)->getArgumentIndices();
+}
+
+void AutoDiffReverseInst::dropPrimalFunction() {
+  if (Primal)
+    Primal->decrementRefCount();
+  Primal = nullptr;
+}
+
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
     : InstructionBase(Loc, F->getLoweredType()),
       Function(F) {
@@ -1088,6 +1127,8 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
   case TermKind::UnwindInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TermKind::AutoDiffReverseInst:
     return true;
   }
 

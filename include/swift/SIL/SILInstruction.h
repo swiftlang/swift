@@ -7769,6 +7769,67 @@ public:
   }
 };
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// AutoDiffReverseInst - Represents the derivative of another SIL function.
+class AutoDiffReverseInst
+  : public InstructionBase<SILInstructionKind::AutoDiffReverseInst,
+                           TermInst> {
+private:
+  friend SILBuilder;
+
+  /// The primal function to be differentiated.
+  SILFunction *Primal;
+  /// The number of arguments of the primal function to differentiate with
+  /// respect to.
+  unsigned NumArgIndices;
+  /// Whether the derivative function is seedable, i.e. able to take
+  /// back-propagated adjoint as the last argument.
+  bool Seedable;
+  /// Whether the derivative function is preserving the result of the original
+  /// function.
+  bool PreservingResult;
+
+  AutoDiffReverseInst(SILDebugLocation debugLoc, SILFunction *primal,
+                      ArrayRef<unsigned> argIndices, bool seedable,
+                      bool preservingResult);
+
+public:
+  ~AutoDiffReverseInst();
+
+  static AutoDiffReverseInst *create(SILModule &M,
+                                     SILDebugLocation debugLoc,
+                                     SILFunction *primal,
+                                     ArrayRef<unsigned> argIndices,
+                                     bool seedable,
+                                     bool preservingResult);
+
+  SILFunction *getPrimalFunction() const { return Primal; }
+
+  void dropPrimalFunction();
+
+  unsigned *getArgumentIndicesData() {
+    return reinterpret_cast<unsigned *>(this+1);
+  }
+
+  MutableArrayRef<unsigned> getArgumentIndices() {
+    return { getArgumentIndicesData(), NumArgIndices };
+  }
+
+  ArrayRef<unsigned> getArgumentIndices() const;
+
+  bool isSeedable() const { return Seedable; }
+
+  bool isPreservingResult() const { return PreservingResult; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::AutoDiffReverseInst;
+  }
+};
+
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
 // ApplyInstBase, so we can not place ApplyInstBase after it.

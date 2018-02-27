@@ -15,6 +15,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+/// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/Differentiation.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
@@ -889,7 +891,6 @@ void SILParser::convertRequirements(SILFunction *F,
 static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
                                     SILParser &SP) {
   auto &P = SP.P;
-  auto &Tok = P.Tok;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
   // Parse 'wrt'.
   if (P.parseSpecificIdentifier(
@@ -901,7 +902,7 @@ static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
   auto parseArg = [&]() -> bool {
     unsigned Index;
     if (P.parseUnsignedInteger(Index, LastLoc,
-                               diag::attr_differentiable_expected_argument))
+          diag::sil_reverse_autodiff_expected_argument_index))
       return true;
     ArgIndices.push_back(Index);
     return false;
@@ -2588,6 +2589,55 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createFunctionRef(InstLoc, Fn);
     break;
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::AutoDiffReverseInst: {
+    SmallVector<unsigned, 8> argIndices;
+    // Parse optional [wrt ...].
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("wrt")) return true;
+      auto parseIndex = [&] {
+        unsigned index;
+        SourceLoc indexLoc;
+        if (P.parseUnsignedInteger(index, indexLoc,
+              diag::sil_reverse_autodiff_expected_argument_index))
+          return true;
+        argIndices.push_back(index);
+        return false;
+      };
+      if (parseIndex())
+        return true;
+      while (P.consumeIf(tok::comma))
+        if (parseIndex())
+          return true;
+      if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+    }
+    // Parse optional [seedable].
+    bool seedable = false;
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("seedable") ||
+          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+      seedable = true;
+    }
+    // Parse optional [preserving_result].
+    bool preservingResult = false;
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("preserving_result") ||
+          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+      preservingResult = true;
+    }
+    SILFunction *primalFn;
+    if (parseSILFunctionRef(InstLoc, primalFn) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createAutoDiffReverse(
+      InstLoc, primalFn, argIndices, seedable, preservingResult);
+    break;
+  }
+
   case SILInstructionKind::BuiltinInst: {
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");

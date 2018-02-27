@@ -880,6 +880,11 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitAutoDiffReverseInst(AutoDiffReverseInst *i) {
+    llvm_unreachable("autodiff_reverse is not valid in canonical SIL");
+  }
+
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);

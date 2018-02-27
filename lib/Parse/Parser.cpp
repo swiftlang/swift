@@ -862,7 +862,6 @@ bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
   auto IntTok = Tok;
   if (parseToken(tok::integer_literal, Loc, D))
     return true;
-  unsigned idx;
   if (IntTok.getText().getAsInteger(0, Result)) {
     diagnose(IntTok.getLoc(), D);
     return true;

@@ -5291,6 +5291,29 @@ destination (if it returns with ``throw``).
 
 The rules on generic substitutions are identical to those of ``apply``.
 
+SWIFT_ENABLE_TENSORFLOW
+autodiff_reverse
+`````````````````
+::
+
+  sil-instruction ::= 'autodiff_reverse' sil-autodiff-arg-indices?
+                      sil-autodiff-seedable? sil-autodiff-preserving-result?
+                      sil-function-name ':' sil-type
+  sil-autodiff-arg-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
+  sil-autodiff-seedable ::= '[' 'seedable' ']'
+  sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
+
+  autodiff_reverse [wrt 0, 1] [seedable] [preserving_result]
+    @foo : $@convention(thin) (Float, Float) -> Float
+
+Marks a function to be the result of automatic differentiation of another
+function. This instruction effectively acts like an attribute, except that it
+guarantees the function has a body.
+
+When used, this instruction must be the only instruction in the parent function.
+This instruction is only valid in raw SIL and is rewritten by the automatic
+differentiation pass.
+
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1334,7 +1334,7 @@ namespace {
       // what we collected in `gradResultTypes`.
       Type gradResult = gradResultTypes.size() == 1
         ? gradResultTypes.front().getType()
-        : gradResult = TupleType::get(gradResultTypes, TC.Context);
+        : TupleType::get(gradResultTypes, TC.Context);
       Type gradTy;
       if (genSig)
         gradTy = GenericFunctionType::get(genSig, primalParams,
