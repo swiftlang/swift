@@ -73,7 +73,7 @@ public:
       free(buffer);
       return std::make_tuple(nullptr, []{});
     }
-    return std::make_tuple(nullptr, [=]{ free(buffer); });
+    return std::make_tuple(buffer, [=]{ free(buffer); });
   }
 
   /// Attempts to read 'size' bytes from the given address in the
