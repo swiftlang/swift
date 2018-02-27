@@ -2182,15 +2182,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
+        // The interface type of `self` must be used to construct the return
+        // type, but `isAnyClassReferenceType` cannot be called on it.
         auto selfTy = primal->getParent()->getSelfTypeInContext();
-        // 'self' cannot be a reference type or an existential type.
+        auto selfInterfaceTy = primal->getParent()->getSelfInterfaceType();
         if (selfTy->isAnyClassReferenceType() || selfTy->isExistentialType()) {
           TC.diagnose(argLoc,
               diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
                       selfTy);
           return;
         }
-        retElts.push_back(selfTy);
+        retElts.push_back(selfInterfaceTy);
         break;
       }
       }

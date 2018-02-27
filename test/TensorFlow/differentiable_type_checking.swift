@@ -226,6 +226,21 @@ extension E5 where T == Float {
   }
 }
 
+// Primal and adjoint in separate struct extensions, differentiating with
+// respect to self.
+struct E6<T> {}
+extension E6 {
+  @differentiable(withRespectTo: (self), gradient: adjoint_wrt_self)
+  func primal123(x: Float) -> Float {
+    return x
+  }
+}
+extension E6 {
+  func adjoint_wrt_self(x: Float, _: Float, _: Float) -> E6 {
+    return self
+  }
+}
+
 // Generic functions with no constraints.
 func dbaz1<T>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
   return (y, x)
