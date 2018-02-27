@@ -3105,12 +3105,6 @@ private:
   }
 
 public:
-  /// Indicates if the type represented by this descriptor
-  /// supports reflection (C and Obj-C enums currently don't).
-  /// FIXME: This is temporarily left as 32-bit integer to avoid
-  ///        changing layout of context descriptor.
-  uint32_t IsReflectable;
-
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
@@ -3221,12 +3215,6 @@ public:
   /// vector.
   uint32_t FieldOffsetVectorOffset;
   
-  /// Indicates if the type represented by this descriptor
-  /// supports reflection (C and Obj-C enums currently don't).
-  /// FIXME: This is temporarily left as 32-bit integer to avoid
-  ///        changing layout of context descriptor.
-  uint32_t IsReflectable;
-
   /// True if metadata records for this type have a field offset vector for
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
@@ -3268,12 +3256,6 @@ public:
 
   /// The number of empty cases in the enum.
   uint32_t NumEmptyCases;
-
-  /// Indicates if the type represented by this descriptor
-  /// supports reflection (C and Obj-C enums currently don't).
-  /// FIXME: This is temporarily left as 32-bit integer to avoid
-  ///        changing layout of context descriptor.
-  uint32_t IsReflectable;
 
   uint32_t getNumPayloadCases() const {
     return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;

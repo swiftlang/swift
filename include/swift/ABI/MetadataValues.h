@@ -998,6 +998,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     IsCTypedef = 1,
 
+    /// Set if the type supports reflection.  C and Objective-C enums
+    /// currently don't.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsReflectable = 2,
+
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
     ///
@@ -1023,6 +1029,7 @@ public:
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

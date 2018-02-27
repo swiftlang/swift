@@ -4,8 +4,8 @@ class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$S14class_metadata1ACMn" =
-//   Flags. -2147483568 == 0x8000_0050 == HasVTable | Unique | Class
-// CHECK-SAME: i32 -2147483568,
+//   Flags. -2147221424 == 0x8004_0050 == HasVTable | Reflectable | Unique | Class
+// CHECK-SAME: i32 -2147221424,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -17,11 +17,11 @@ class A {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-SAME: i32 11,
-//   Is reflectable.
-// CHECK-SAME: i32 1,
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
 //   V-table offset.
-// CHECK-SAME: i32 10,
+// CHECK-32-SAME: i32 13,
+// CHECK-64-SAME: i32 10,
 //   V-table length.
 // CHECK-SAME: i32 1,
 //   V-table entry #1: invocation function.
@@ -33,8 +33,8 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S14class_metadata1BCMn" =
-//   Flags. 80 == 0x50 == Unique | Class
-// CHECK-SAME: i32 80,
+//   Flags. 262224 == 0x0004_0050 == Reflectable | Unique | Class
+// CHECK-SAME: i32 262224,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -46,16 +46,15 @@ class B : A {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-SAME: i32 11,
-//   Is reflectable.
-// CHECK-SAME: i32 1 }>, section
+// CHECK-32-SAME: i32 14 }>, section
+// CHECK-64-SAME: i32 11 }>, section
 
 class C<T> : B {}
 
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S14class_metadata1CCMn" =
-//   Flags. 208 == 0xd0 == Generic | Unique | Class
-// CHECK-SAME: i32 208,
+//   Flags. 262352 == 0x0004_00d0 == Reflectable | Generic | Unique | Class
+// CHECK-SAME: i32 262352,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -67,11 +66,11 @@ class C<T> : B {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-SAME: i32 12,
-//   Is reflectable.
-// CHECK-SAME: i32 1,
+// CHECK-32-SAME: i32 15,
+// CHECK-64-SAME: i32 12,
 //   Argument offset.
-// CHECK-SAME: i32 11,
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
 //   Instantiation function.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMi"
 //   Instantiation cache.
@@ -97,8 +96,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 268435536 == 0x10000050 == IndirectSuperclass | Unique | Class
-// CHECK-SAME: i32 268435536,
+//   Flags. 268697680 == 0x1004_0050 == Reflectable | IndirectSuperclass | Unique | Class
+// CHECK-SAME: i32 268697680,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -110,8 +109,7 @@ class D : E {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-SAME: i32 11,
-//   Is reflectable.
-// CHECK-SAME: i32 1 }>, section
+// CHECK-32-SAME: i32 14 }>, section
+// CHECK-64-SAME: i32 11 }>, section
 
 class E {}

@@ -28,7 +28,7 @@
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
 // -- is imported C typedef, is class, is nonunique
-// CHECK-64-SAME: <i32 0x0002_0010>
+// CHECK-64-SAME: <i32 0x0006_0010>
 // CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{

@@ -2822,14 +2822,14 @@ namespace {
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
 
-      // uint32_t IsReflectable;
-      B.addInt32(1); // struct always reflectable
-
       addFieldTypes(IGM, getType(), properties);
     }
     
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(true); // struct always reflectable
+
       getClangImportedFlags(flags);
       return flags.getOpaqueValue();
     }
@@ -2846,11 +2846,14 @@ namespace {
     
     Size GenericParamsOffset;
     Size PayloadSizeOffset;
+    const EnumImplStrategy &Strategy;
     
   public:
     EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type,
                                  RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata)
+      : super(IGM, Type, requireMetadata),
+        Strategy(getEnumImplStrategy(IGM,
+                     getType()->getDeclaredTypeInContext()->getCanonicalType()))
     {
       auto &layout = IGM.getMetadataLayout(getType());
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
@@ -2867,12 +2870,8 @@ namespace {
     }
     
     void addLayoutInfo() {
-      auto &strategy = getEnumImplStrategy(IGM,
-                     getType()->getDeclaredTypeInContext()->getCanonicalType());
-      
-      
       // # payload cases in the low 24 bits, payload size offset in the high 8.
-      unsigned numPayloads = strategy.getElementsWithPayload().size();
+      unsigned numPayloads = Strategy.getElementsWithPayload().size();
       assert(numPayloads < (1<<24) && "too many payload elements for runtime");
       assert(PayloadSizeOffset % IGM.getPointerAlignment() == Size(0)
              && "payload size not word-aligned");
@@ -2885,16 +2884,16 @@ namespace {
       B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
 
       // uint32_t NumEmptyCases;
-      B.addInt32(strategy.getElementsWithNoPayload().size());
+      B.addInt32(Strategy.getElementsWithNoPayload().size());
 
-      // uint32_t IsReflectable;
-      B.addInt32(strategy.isReflectable());
-
-      addFieldTypes(IGM, strategy.getElementsWithPayload());
+      addFieldTypes(IGM, Strategy.getElementsWithPayload());
     }
     
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(Strategy.isReflectable());
+
       getClangImportedFlags(flags);
       return flags.getOpaqueValue();
     }
@@ -2962,6 +2961,8 @@ namespace {
     
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(true); // class is always reflectable
 
       if (!getType()->isForeign()) {
         if (VTableSize != 0)
@@ -3052,9 +3053,6 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-
-      // uint32_t IsReflectable;
-      B.addInt32(1); // class is always reflectable
 
       addFieldTypes(IGM, getType(), properties);
     }
