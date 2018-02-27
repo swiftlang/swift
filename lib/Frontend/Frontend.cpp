@@ -233,7 +233,7 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
     return false;
 
   if (isInSILMode() ||
-      (input.buffer() == nullptr && isInputSwift() &&
+      (isInputSwift() &&
        llvm::sys::path::filename(input.file()) == "main.swift")) {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = *bufferID;
