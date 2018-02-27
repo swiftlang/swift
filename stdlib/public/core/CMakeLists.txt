@@ -203,8 +203,8 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    list(APPEND swift_core_private_link_libraries
-      ICU_UC ICU_I18N)
+    list(APPEND swift_core_link_flags
+      `icu-config --ldflags`)
   else()
     list(APPEND swift_core_private_link_libraries -licui18n -licuuc -licudata)
   endif()
