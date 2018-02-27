@@ -1429,43 +1429,6 @@ public:
 
 } // end anonymous namespace
 
-/// Emit either an 'apply' or a 'try_apply', with the error branch of
-/// the 'try_apply' simply branching out of all cleanups and throwing.
-SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
-                                              SILValue fn,
-                                              SILType substFnType,
-                                              SubstitutionList subs,
-                                              ArrayRef<SILValue> args) {
-  CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(silFnType, SGM.M);
-  SILType resultType = fnConv.getSILResultType();
-
-  if (!silFnType->hasErrorResult()) {
-    return B.createApply(loc, fn, substFnType, resultType, subs, args);
-  }
-
-  SILBasicBlock *errorBB = createBasicBlock();
-  SILBasicBlock *normalBB = createBasicBlock();
-  B.createTryApply(loc, fn, substFnType, subs, args, normalBB, errorBB);
-
-  // Emit the rethrow logic.
-  {
-    B.emitBlock(errorBB);
-    SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
-                                                ValueOwnershipKind::Owned);
-
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {error});
-
-    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
-    B.createThrow(loc, error);
-  }
-
-  // Enter the normal path.
-  B.emitBlock(normalBB);
-  return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
-}
-
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
                                 SGFContext C,
                                 StringLiteralExpr::Encoding encoding) {
@@ -1651,201 +1614,6 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
       return true;
   }
   return false;
-}
-
-/// Emit a function application, assuming that the arguments have been
-/// lowered appropriately for the abstraction level but that the
-/// result does need to be turned back into something matching a
-/// formal type.
-RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
-                                 ArgumentScope &&argScope, SILLocation loc,
-                                 ManagedValue fn, SubstitutionList subs,
-                                 ArrayRef<ManagedValue> args,
-                                 const CalleeTypeInfo &calleeTypeInfo,
-                                 ApplyOptions options, SGFContext evalContext,
-                                 PostponedCleanup &postponedCleanup) {
-  auto substFnType = calleeTypeInfo.substFnType;
-  auto substResultType = calleeTypeInfo.substResultType;
-
-  // Create the result plan.
-  SmallVector<SILValue, 4> indirectResultAddrs;
-  resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
-
-  // If the function returns an inner pointer, we'll need to lifetime-extend
-  // the 'self' parameter.
-  SILValue lifetimeExtendedSelf;
-  bool hasAlreadyLifetimeExtendedSelf = false;
-  if (hasUnownedInnerPointerResult(substFnType)) {
-    auto selfMV = args.back();
-    lifetimeExtendedSelf = selfMV.getValue();
-
-    switch (substFnType->getParameters().back().getConvention()) {
-    case ParameterConvention::Direct_Owned:
-      // If the callee will consume the 'self' parameter, let's retain it so we
-      // can keep it alive.
-      lifetimeExtendedSelf = B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
-      break;
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned:
-      // We'll manually manage the argument's lifetime after the
-      // call. Disable its cleanup, forcing a copy if it was emitted +0.
-      if (selfMV.hasCleanup()) {
-        selfMV.forwardCleanup(*this);
-      } else {
-        lifetimeExtendedSelf = selfMV.copyUnmanaged(*this, loc).forward(*this);
-      }
-      break;
-
-    case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      // We may need to support this at some point, but currently only imported
-      // objc methods are returns_inner_pointer.
-      llvm_unreachable("indirect self argument to method that"
-                       " returns_inner_pointer?!");
-    }
-  }
-
-  // If there's a foreign error parameter, fill it in.
-  ManagedValue errorTemp;
-  if (auto foreignError = calleeTypeInfo.foreignError) {
-    unsigned errorParamIndex =
-        calleeTypeInfo.foreignError->getErrorParameterIndex();
-
-    // This is pretty evil.
-    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
-
-    std::tie(errorTemp, errorArgSlot) =
-        resultPlan->emitForeignErrorArgument(*this, loc).getValue();
-  }
-
-  // Emit the raw application.
-  loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
-  postponedCleanup.end();
-  SILValue rawDirectResult = emitRawApply(*this, loc, fn, subs, args,
-                                          substFnType, options,
-                                          indirectResultAddrs);
-
-  // Pop the argument scope.
-  argScope.pop();
-
-  // Explode the direct results.
-  SILFunctionConventions substFnConv(substFnType, SGM.M);
-  SmallVector<ManagedValue, 4> directResults;
-  auto addManagedDirectResult = [&](SILValue result,
-                                    const SILResultInfo &resultInfo) {
-    auto &resultTL = getTypeLowering(resultInfo.getType());
-
-    switch (resultInfo.getConvention()) {
-    case ResultConvention::Indirect:
-      assert(!substFnConv.isSILIndirect(resultInfo)
-             && "indirect direct result?");
-      break;
-
-    case ResultConvention::Owned:
-      break;
-
-    // For autoreleased results, the reclaim is implicit, so the value is
-    // effectively +1.
-    case ResultConvention::Autoreleased:
-      break;
-
-    // Autorelease the 'self' value to lifetime-extend it.
-    case ResultConvention::UnownedInnerPointer:
-      assert(lifetimeExtendedSelf
-             && "did not save lifetime-extended self param");
-      if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, B.getDefaultAtomicity());
-        hasAlreadyLifetimeExtendedSelf = true;
-      }
-      LLVM_FALLTHROUGH;
-
-    case ResultConvention::Unowned:
-      // Unretained. Retain the value.
-      result = resultTL.emitCopyValue(B, loc, result);
-      break;
-    }
-
-    directResults.push_back(emitManagedRValueWithCleanup(result, resultTL));
-  };
-
-  auto directSILResults = substFnConv.getDirectSILResults();
-  if (directSILResults.empty()) {
-    // Nothing to do.
-  } else if (substFnConv.getNumDirectSILResults() == 1) {
-    addManagedDirectResult(rawDirectResult, *directSILResults.begin());
-  } else {
-    llvm::SmallVector<std::pair<SILValue, const SILResultInfo &>, 8> copiedResults;
-    {
-      Scope S(Cleanups, CleanupLocation::get(loc));
-
-      // First create an rvalue cleanup for our direct result.
-      ManagedValue managedDirectResult = emitManagedRValueWithCleanup(rawDirectResult);
-      // Then borrow the managed direct result.
-      ManagedValue borrowedDirectResult = managedDirectResult.borrow(*this, loc);
-      // Then create unmanaged copies of the direct result and forward the
-      // result as expected by addManageDirectResult.
-      unsigned Index = 0;
-      for (const SILResultInfo &directResult : directSILResults) {
-        ManagedValue elt = B.createTupleExtract(loc, borrowedDirectResult, Index,
-                                                substFnConv.getSILType(directResult));
-        SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
-        // We assume that unowned inner pointers, autoreleased values, and
-        // indirect values are never returned in tuples.
-        // FIXME: can this assertion be removed without lowered addresses?
-        assert(directResult.getConvention() == ResultConvention::Owned
-               || directResult.getConvention() == ResultConvention::Unowned
-               || !substFnConv.useLoweredAddresses());
-        copiedResults.push_back({v, directResult});
-        ++Index;
-      }
-      // Then allow the cleanups to be emitted in the proper reverse order.
-    }
-    // Finally add our managed direct results.
-    for (auto p : copiedResults) {
-      addManagedDirectResult(p.first, p.second);
-    }
-  }
-
-  // If there was a foreign error convention, consider it.
-  // TODO: maybe this should happen after managing the result if it's
-  // not a result-checking convention?
-  if (auto foreignError = calleeTypeInfo.foreignError) {
-    bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
-    emitForeignErrorCheck(loc, directResults, errorTemp,
-                          doesNotThrow, *foreignError);
-  }
-
-  auto directResultsArray = makeArrayRef(directResults);
-  RValue result =
-    resultPlan->finish(*this, loc, substResultType, directResultsArray);
-  assert(directResultsArray.empty() && "didn't claim all direct results");
-
-  return result;
-}
-
-RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
-                                            ManagedValue fn,
-                                            ArrayRef<ManagedValue> args,
-                                            CanType foreignResultType,
-                                            CanType nativeResultType,
-                                            ApplyOptions options,
-                           Optional<SILFunctionTypeRepresentation> overrideRep,
-                     const Optional<ForeignErrorConvention> &foreignError,
-                                            SGFContext evalContext) {
-  auto fnType = fn.getType().castTo<SILFunctionType>();
-  assert(!fnType->isPolymorphic());
-  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern(foreignResultType),
-                                nativeResultType, foreignError,
-                                ImportAsMemberStatus(), overrideRep);
-  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
-      *this, calleeTypeInfo, loc, evalContext);
-  ArgumentScope argScope(*this, loc);
-  PostponedCleanup postpone(*this);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
-                   args, calleeTypeInfo, options, evalContext, postpone);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3526,113 +3294,6 @@ public:
   }
 };
 
-/// Emits SIL instructions to create an enum value. Attempts to avoid
-/// unnecessary copies by emitting the payload directly into the enum
-/// payload, or into the box in the case of an indirect payload.
-ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
-                                            ArgumentSource payload,
-                                            SILType enumTy,
-                                            EnumElementDecl *element,
-                                            SGFContext C) {
-  element = SGM.getLoweredEnumElementDecl(element);
-
-  // Easy case -- no payload
-  if (!payload) {
-    if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
-      return emitManagedRValueWithCleanup(
-        B.createEnum(loc, SILValue(), element,
-                     enumTy.getObjectType()));
-    }
-
-    // Emit the enum directly into the context if possible
-    return B.bufferForExpr(loc, enumTy, getTypeLowering(enumTy), C,
-                           [&](SILValue newAddr) {
-                             B.createInjectEnumAddr(loc, newAddr, element);
-                           });
-  }
-
-  ManagedValue payloadMV;
-  AbstractionPattern origFormalType =
-    (element == getASTContext().getOptionalSomeDecl()
-      ? AbstractionPattern(payload.getSubstType())
-      : SGM.M.Types.getAbstractionPattern(element));
-  auto &payloadTL = getTypeLowering(origFormalType,
-                                    payload.getSubstType());
-
-  SILType loweredPayloadType = payloadTL.getLoweredType();
-
-  // If the payload is indirect, emit it into a heap allocated box.
-  //
-  // To avoid copies, evaluate it directly into the box, being
-  // careful to stage the cleanups so that if the expression
-  // throws, we know to deallocate the uninitialized box.
-  if (element->isIndirect() ||
-      element->getParentEnum()->isIndirect()) {
-    auto boxTy = SGM.M.Types.getBoxTypeForEnumElement(enumTy, element);
-    auto *box = B.createAllocBox(loc, boxTy);
-    auto *addr = B.createProjectBox(loc, box, 0);
-
-    CleanupHandle initCleanup = enterDestroyCleanup(box);
-    Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
-    CleanupHandle uninitCleanup = enterDeallocBoxCleanup(box);
-
-    BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
-
-    std::move(payload).forwardInto(*this, origFormalType,
-                                   &dest, payloadTL);
-
-    payloadMV = dest.getManagedBox();
-    loweredPayloadType = payloadMV.getType();
-  }
-
-  // Loadable with payload
-  if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
-    if (!payloadMV) {
-      // If the payload was indirect, we already evaluated it and
-      // have a single value. Otherwise, evaluate the payload.
-      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    }
-
-    SILValue argValue = payloadMV.forward(*this);
-
-    return emitManagedRValueWithCleanup(
-               B.createEnum(loc, argValue, element,
-                            enumTy.getObjectType()));
-  }
-
-  // Address-only with payload
-  return B.bufferForExpr(
-      loc, enumTy, getTypeLowering(enumTy), C,
-      [&](SILValue bufferAddr) {
-        SILValue resultData =
-          B.createInitEnumDataAddr(loc, bufferAddr, element,
-                                   loweredPayloadType.getAddressType());
-
-        if (payloadMV) {
-          // If the payload was indirect, we already evaluated it and
-          // have a single value. Store it into the result.
-          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                                    StoreOwnershipQualifier::Init);
-        } else if (payloadTL.isLoadable()) {
-          // The payload of this specific enum case might be loadable
-          // even if the overall enum is address-only.
-          payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                                    StoreOwnershipQualifier::Init);
-        } else {
-          // The payload is address-only. Evaluate it directly into
-          // the enum.
-          
-          TemporaryInitialization dest(resultData, CleanupHandle::invalid());
-          std::move(payload).forwardInto(*this, origFormalType,
-                                         &dest, payloadTL);
-        }
-
-        // The payload is initialized, now apply the tag.
-        B.createInjectEnumAddr(loc, bufferAddr, element);
-  });
-}
-
 namespace {
 
 /// A structure for conveniently claiming sets of uncurried parameters.
@@ -4417,6 +4078,340 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
+
+/// Emit a function application, assuming that the arguments have been
+/// lowered appropriately for the abstraction level but that the
+/// result does need to be turned back into something matching a
+/// formal type.
+RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
+                                 ArgumentScope &&argScope, SILLocation loc,
+                                 ManagedValue fn, SubstitutionList subs,
+                                 ArrayRef<ManagedValue> args,
+                                 const CalleeTypeInfo &calleeTypeInfo,
+                                 ApplyOptions options, SGFContext evalContext,
+                                 PostponedCleanup &postponedCleanup) {
+  auto substFnType = calleeTypeInfo.substFnType;
+  auto substResultType = calleeTypeInfo.substResultType;
+
+  // Create the result plan.
+  SmallVector<SILValue, 4> indirectResultAddrs;
+  resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
+
+  // If the function returns an inner pointer, we'll need to lifetime-extend
+  // the 'self' parameter.
+  SILValue lifetimeExtendedSelf;
+  bool hasAlreadyLifetimeExtendedSelf = false;
+  if (hasUnownedInnerPointerResult(substFnType)) {
+    auto selfMV = args.back();
+    lifetimeExtendedSelf = selfMV.getValue();
+
+    switch (substFnType->getParameters().back().getConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // If the callee will consume the 'self' parameter, let's retain it so we
+      // can keep it alive.
+      lifetimeExtendedSelf =
+          B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
+      break;
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
+      // We'll manually manage the argument's lifetime after the
+      // call. Disable its cleanup, forcing a copy if it was emitted +0.
+      if (selfMV.hasCleanup()) {
+        selfMV.forwardCleanup(*this);
+      } else {
+        lifetimeExtendedSelf = selfMV.copyUnmanaged(*this, loc).forward(*this);
+      }
+      break;
+
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+      // We may need to support this at some point, but currently only imported
+      // objc methods are returns_inner_pointer.
+      llvm_unreachable("indirect self argument to method that"
+                       " returns_inner_pointer?!");
+    }
+  }
+
+  // If there's a foreign error parameter, fill it in.
+  ManagedValue errorTemp;
+  if (auto foreignError = calleeTypeInfo.foreignError) {
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
+
+    // This is pretty evil.
+    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
+
+    std::tie(errorTemp, errorArgSlot) =
+        resultPlan->emitForeignErrorArgument(*this, loc).getValue();
+  }
+
+  // Emit the raw application.
+  loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
+  postponedCleanup.end();
+  SILValue rawDirectResult = emitRawApply(
+      *this, loc, fn, subs, args, substFnType, options, indirectResultAddrs);
+
+  // Pop the argument scope.
+  argScope.pop();
+
+  // Explode the direct results.
+  SILFunctionConventions substFnConv(substFnType, SGM.M);
+  SmallVector<ManagedValue, 4> directResults;
+  auto addManagedDirectResult = [&](SILValue result,
+                                    const SILResultInfo &resultInfo) {
+    auto &resultTL = getTypeLowering(resultInfo.getType());
+
+    switch (resultInfo.getConvention()) {
+    case ResultConvention::Indirect:
+      assert(!substFnConv.isSILIndirect(resultInfo) &&
+             "indirect direct result?");
+      break;
+
+    case ResultConvention::Owned:
+      break;
+
+    // For autoreleased results, the reclaim is implicit, so the value is
+    // effectively +1.
+    case ResultConvention::Autoreleased:
+      break;
+
+    // Autorelease the 'self' value to lifetime-extend it.
+    case ResultConvention::UnownedInnerPointer:
+      assert(lifetimeExtendedSelf &&
+             "did not save lifetime-extended self param");
+      if (!hasAlreadyLifetimeExtendedSelf) {
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf,
+                                 B.getDefaultAtomicity());
+        hasAlreadyLifetimeExtendedSelf = true;
+      }
+      LLVM_FALLTHROUGH;
+
+    case ResultConvention::Unowned:
+      // Unretained. Retain the value.
+      result = resultTL.emitCopyValue(B, loc, result);
+      break;
+    }
+
+    directResults.push_back(emitManagedRValueWithCleanup(result, resultTL));
+  };
+
+  auto directSILResults = substFnConv.getDirectSILResults();
+  if (directSILResults.empty()) {
+    // Nothing to do.
+  } else if (substFnConv.getNumDirectSILResults() == 1) {
+    addManagedDirectResult(rawDirectResult, *directSILResults.begin());
+  } else {
+    llvm::SmallVector<std::pair<SILValue, const SILResultInfo &>, 8>
+        copiedResults;
+    {
+      Scope S(Cleanups, CleanupLocation::get(loc));
+
+      // First create an rvalue cleanup for our direct result.
+      ManagedValue managedDirectResult =
+          emitManagedRValueWithCleanup(rawDirectResult);
+      // Then borrow the managed direct result.
+      ManagedValue borrowedDirectResult =
+          managedDirectResult.borrow(*this, loc);
+      // Then create unmanaged copies of the direct result and forward the
+      // result as expected by addManageDirectResult.
+      unsigned Index = 0;
+      for (const SILResultInfo &directResult : directSILResults) {
+        ManagedValue elt =
+            B.createTupleExtract(loc, borrowedDirectResult, Index,
+                                 substFnConv.getSILType(directResult));
+        SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
+        // We assume that unowned inner pointers, autoreleased values, and
+        // indirect values are never returned in tuples.
+        // FIXME: can this assertion be removed without lowered addresses?
+        assert(directResult.getConvention() == ResultConvention::Owned ||
+               directResult.getConvention() == ResultConvention::Unowned ||
+               !substFnConv.useLoweredAddresses());
+        copiedResults.push_back({v, directResult});
+        ++Index;
+      }
+      // Then allow the cleanups to be emitted in the proper reverse order.
+    }
+    // Finally add our managed direct results.
+    for (auto p : copiedResults) {
+      addManagedDirectResult(p.first, p.second);
+    }
+  }
+
+  // If there was a foreign error convention, consider it.
+  // TODO: maybe this should happen after managing the result if it's
+  // not a result-checking convention?
+  if (auto foreignError = calleeTypeInfo.foreignError) {
+    bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
+    emitForeignErrorCheck(loc, directResults, errorTemp, doesNotThrow,
+                          *foreignError);
+  }
+
+  auto directResultsArray = makeArrayRef(directResults);
+  RValue result =
+      resultPlan->finish(*this, loc, substResultType, directResultsArray);
+  assert(directResultsArray.empty() && "didn't claim all direct results");
+
+  return result;
+}
+
+RValue SILGenFunction::emitMonomorphicApply(
+    SILLocation loc, ManagedValue fn, ArrayRef<ManagedValue> args,
+    CanType foreignResultType, CanType nativeResultType, ApplyOptions options,
+    Optional<SILFunctionTypeRepresentation> overrideRep,
+    const Optional<ForeignErrorConvention> &foreignError,
+    SGFContext evalContext) {
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  assert(!fnType->isPolymorphic());
+  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern(foreignResultType),
+                                nativeResultType, foreignError,
+                                ImportAsMemberStatus(), overrideRep);
+  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+      *this, calleeTypeInfo, loc, evalContext);
+  ArgumentScope argScope(*this, loc);
+  PostponedCleanup postpone(*this);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
+                   args, calleeTypeInfo, options, evalContext, postpone);
+}
+
+/// Emit either an 'apply' or a 'try_apply', with the error branch of
+/// the 'try_apply' simply branching out of all cleanups and throwing.
+SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
+                                              SILType substFnType,
+                                              SubstitutionList subs,
+                                              ArrayRef<SILValue> args) {
+  CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
+  SILFunctionConventions fnConv(silFnType, SGM.M);
+  SILType resultType = fnConv.getSILResultType();
+
+  if (!silFnType->hasErrorResult()) {
+    return B.createApply(loc, fn, substFnType, resultType, subs, args);
+  }
+
+  SILBasicBlock *errorBB = createBasicBlock();
+  SILBasicBlock *normalBB = createBasicBlock();
+  B.createTryApply(loc, fn, substFnType, subs, args, normalBB, errorBB);
+
+  // Emit the rethrow logic.
+  {
+    B.emitBlock(errorBB);
+    SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
+                                                ValueOwnershipKind::Owned);
+
+    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
+                    SGM.Types.getEmptyTupleType(), {}, {error});
+
+    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
+    B.createThrow(loc, error);
+  }
+
+  // Enter the normal path.
+  B.emitBlock(normalBB);
+  return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+}
+
+/// Emits SIL instructions to create an enum value. Attempts to avoid
+/// unnecessary copies by emitting the payload directly into the enum
+/// payload, or into the box in the case of an indirect payload.
+ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
+                                            ArgumentSource payload,
+                                            SILType enumTy,
+                                            EnumElementDecl *element,
+                                            SGFContext C) {
+  element = SGM.getLoweredEnumElementDecl(element);
+
+  // Easy case -- no payload
+  if (!payload) {
+    if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
+      return emitManagedRValueWithCleanup(
+          B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
+    }
+
+    // Emit the enum directly into the context if possible
+    return B.bufferForExpr(loc, enumTy, getTypeLowering(enumTy), C,
+                           [&](SILValue newAddr) {
+                             B.createInjectEnumAddr(loc, newAddr, element);
+                           });
+  }
+
+  ManagedValue payloadMV;
+  AbstractionPattern origFormalType =
+      (element == getASTContext().getOptionalSomeDecl()
+           ? AbstractionPattern(payload.getSubstType())
+           : SGM.M.Types.getAbstractionPattern(element));
+  auto &payloadTL = getTypeLowering(origFormalType, payload.getSubstType());
+
+  SILType loweredPayloadType = payloadTL.getLoweredType();
+
+  // If the payload is indirect, emit it into a heap allocated box.
+  //
+  // To avoid copies, evaluate it directly into the box, being
+  // careful to stage the cleanups so that if the expression
+  // throws, we know to deallocate the uninitialized box.
+  if (element->isIndirect() || element->getParentEnum()->isIndirect()) {
+    auto boxTy = SGM.M.Types.getBoxTypeForEnumElement(enumTy, element);
+    auto *box = B.createAllocBox(loc, boxTy);
+    auto *addr = B.createProjectBox(loc, box, 0);
+
+    CleanupHandle initCleanup = enterDestroyCleanup(box);
+    Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
+    CleanupHandle uninitCleanup = enterDeallocBoxCleanup(box);
+
+    BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
+
+    std::move(payload).forwardInto(*this, origFormalType, &dest, payloadTL);
+
+    payloadMV = dest.getManagedBox();
+    loweredPayloadType = payloadMV.getType();
+  }
+
+  // Loadable with payload
+  if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
+    if (!payloadMV) {
+      // If the payload was indirect, we already evaluated it and
+      // have a single value. Otherwise, evaluate the payload.
+      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+    }
+
+    SILValue argValue = payloadMV.forward(*this);
+
+    return emitManagedRValueWithCleanup(
+        B.createEnum(loc, argValue, element, enumTy.getObjectType()));
+  }
+
+  // Address-only with payload
+  return B.bufferForExpr(
+      loc, enumTy, getTypeLowering(enumTy), C, [&](SILValue bufferAddr) {
+        SILValue resultData = B.createInitEnumDataAddr(
+            loc, bufferAddr, element, loweredPayloadType.getAddressType());
+
+        if (payloadMV) {
+          // If the payload was indirect, we already evaluated it and
+          // have a single value. Store it into the result.
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else if (payloadTL.isLoadable()) {
+          // The payload of this specific enum case might be loadable
+          // even if the overall enum is address-only.
+          payloadMV =
+              std::move(payload).getAsSingleValue(*this, origFormalType);
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else {
+          // The payload is address-only. Evaluate it directly into
+          // the enum.
+
+          TemporaryInitialization dest(resultData, CleanupHandle::invalid());
+          std::move(payload).forwardInto(*this, origFormalType, &dest,
+                                         payloadTL);
+        }
+
+        // The payload is initialized, now apply the tag.
+        B.createInjectEnumAddr(loc, bufferAddr, element);
+      });
+}
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
   CallEmission emission = CallEmission::forApplyExpr(*this, e);
