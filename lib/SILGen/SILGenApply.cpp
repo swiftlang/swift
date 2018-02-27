@@ -3634,74 +3634,76 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 }
 
 namespace {
-  /// A structure for conveniently claiming sets of uncurried parameters.
-  struct ParamLowering {
-    ArrayRef<SILParameterInfo> Params;
-    unsigned ClaimedForeignSelf = -1;
-    SILFunctionTypeRepresentation Rep;
-    SILFunctionConventions fnConv;
 
-    ParamLowering(CanSILFunctionType fnType, SILGenFunction &SGF)
-        : Params(fnType->getParameters()), Rep(fnType->getRepresentation()),
-          fnConv(fnType, SGF.SGM.M) {}
+/// A structure for conveniently claiming sets of uncurried parameters.
+struct ParamLowering {
+  ArrayRef<SILParameterInfo> Params;
+  unsigned ClaimedForeignSelf = -1;
+  SILFunctionTypeRepresentation Rep;
+  SILFunctionConventions fnConv;
 
-    ClaimedParamsRef
-    claimParams(AbstractionPattern origParamType, CanType substParamType,
-                const Optional<ForeignErrorConvention> &foreignError,
-                ImportAsMemberStatus foreignSelf) {
-      unsigned count = getFlattenedValueCount(origParamType, substParamType,
-                                              foreignSelf);
-      if (foreignError) count++;
-      
-      if (foreignSelf.isImportAsMember()) {
-        // Claim only the self parameter.
-        assert(ClaimedForeignSelf == (unsigned)-1
-               && "already claimed foreign self?!");
-        if (foreignSelf.isStatic()) {
-          // Imported as a static method, no real self param to claim.
-          return {};
-        }
-        ClaimedForeignSelf = foreignSelf.getSelfIndex();
-        return ClaimedParamsRef(Params[ClaimedForeignSelf],
-                                ClaimedParamsRef::NoSkip);
+  ParamLowering(CanSILFunctionType fnType, SILGenFunction &SGF)
+      : Params(fnType->getParameters()), Rep(fnType->getRepresentation()),
+        fnConv(fnType, SGF.SGM.M) {}
+
+  ClaimedParamsRef
+  claimParams(AbstractionPattern origParamType, CanType substParamType,
+              const Optional<ForeignErrorConvention> &foreignError,
+              ImportAsMemberStatus foreignSelf) {
+    unsigned count =
+        getFlattenedValueCount(origParamType, substParamType, foreignSelf);
+    if (foreignError)
+      count++;
+
+    if (foreignSelf.isImportAsMember()) {
+      // Claim only the self parameter.
+      assert(ClaimedForeignSelf == (unsigned)-1 &&
+             "already claimed foreign self?!");
+      if (foreignSelf.isStatic()) {
+        // Imported as a static method, no real self param to claim.
+        return {};
       }
-      
-      if (ClaimedForeignSelf != (unsigned)-1) {
-        assert(count + 1 == Params.size()
-               && "not claiming all params after foreign self?!");
-        auto result = Params;
-        Params = {};
-        return ClaimedParamsRef(result, ClaimedForeignSelf);
-      }
-      
-      assert(count <= Params.size());
-      auto result = Params.slice(Params.size() - count, count);
-      Params = Params.slice(0, Params.size() - count);
-      return ClaimedParamsRef(result, (unsigned)-1);
+      ClaimedForeignSelf = foreignSelf.getSelfIndex();
+      return ClaimedParamsRef(Params[ClaimedForeignSelf],
+                              ClaimedParamsRef::NoSkip);
     }
-    
-    ArrayRef<SILParameterInfo>
-    claimCaptureParams(ArrayRef<ManagedValue> captures) {
-      auto firstCapture = Params.size() - captures.size();
+
+    if (ClaimedForeignSelf != (unsigned)-1) {
+      assert(count + 1 == Params.size() &&
+             "not claiming all params after foreign self?!");
+      auto result = Params;
+      Params = {};
+      return ClaimedParamsRef(result, ClaimedForeignSelf);
+    }
+
+    assert(count <= Params.size());
+    auto result = Params.slice(Params.size() - count, count);
+    Params = Params.slice(0, Params.size() - count);
+    return ClaimedParamsRef(result, (unsigned)-1);
+  }
+
+  ArrayRef<SILParameterInfo>
+  claimCaptureParams(ArrayRef<ManagedValue> captures) {
+    auto firstCapture = Params.size() - captures.size();
 #ifndef NDEBUG
-      assert(Params.size() >= captures.size()
-             && "more captures than params?!");
-      for (unsigned i = 0; i < captures.size(); ++i) {
-        assert(fnConv.getSILType(Params[i + firstCapture])
-                   == captures[i].getType()
-               && "capture doesn't match param type");
-      }
+    assert(Params.size() >= captures.size() && "more captures than params?!");
+    for (unsigned i = 0; i < captures.size(); ++i) {
+      assert(fnConv.getSILType(Params[i + firstCapture]) ==
+                 captures[i].getType() &&
+             "capture doesn't match param type");
+    }
 #endif
-      
-      auto result = Params.slice(firstCapture, captures.size());
-      Params = Params.slice(0, firstCapture);
-      return result;
-    }
 
-    ~ParamLowering() {
-      assert(Params.empty() && "didn't consume all the parameters");
-    }
-  };
+    auto result = Params.slice(firstCapture, captures.size());
+    Params = Params.slice(0, firstCapture);
+    return result;
+  }
+
+  ~ParamLowering() {
+    assert(Params.empty() && "didn't consume all the parameters");
+  }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -3709,66 +3711,58 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// An application of possibly unevaluated arguments in the form of an
-  /// ArgumentSource to a Callee.
-  class CallSite {
-  public:
-    SILLocation Loc;
-    CanType SubstResultType;
 
-  private:
-    ArgumentSource ArgValue;
-    bool Throws;
+/// An application of possibly unevaluated arguments in the form of an
+/// ArgumentSource to a Callee.
+class CallSite {
+public:
+  SILLocation Loc;
+  CanType SubstResultType;
 
-  public:
-    CallSite(ApplyExpr *apply)
+private:
+  ArgumentSource ArgValue;
+  bool Throws;
+
+public:
+  CallSite(ApplyExpr *apply)
       : Loc(apply), SubstResultType(apply->getType()->getCanonicalType()),
-        ArgValue(apply->getArg()), Throws(apply->throws()) {
-    }
+        ArgValue(apply->getArg()), Throws(apply->throws()) {}
 
-    CallSite(SILLocation loc, ArgumentSource &&value,
-             CanType resultType, bool throws)
-      : Loc(loc), SubstResultType(resultType),
-        ArgValue(std::move(value)), Throws(throws) {
-    }
+  CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
+           bool throws)
+      : Loc(loc), SubstResultType(resultType), ArgValue(std::move(value)),
+        Throws(throws) {}
 
-    CallSite(SILLocation loc, ArgumentSource &&value,
-             CanAnyFunctionType fnType)
-      : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {
-    }
+  CallSite(SILLocation loc, ArgumentSource &&value, CanAnyFunctionType fnType)
+      : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {}
 
-    /// Return the substituted, unlowered AST type of the argument.
-    CanType getSubstArgType() const {
-      return ArgValue.getSubstType();
-    }
+  /// Return the substituted, unlowered AST type of the argument.
+  CanType getSubstArgType() const { return ArgValue.getSubstType(); }
 
-    /// Return the substituted, unlowered AST type of the result of
-    /// this application.
-    CanType getSubstResultType() const {
-      return SubstResultType;
-    }
+  /// Return the substituted, unlowered AST type of the result of
+  /// this application.
+  CanType getSubstResultType() const { return SubstResultType; }
 
-    bool throws() const { return Throws; }
+  bool throws() const { return Throws; }
 
-    /// Evaluate arguments and begin any inout formal accesses.
-    void emit(SILGenFunction &SGF, AbstractionPattern origParamType,
-              ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
-              SmallVectorImpl<DelayedArgument> &delayedArgs,
-              const Optional<ForeignErrorConvention> &foreignError,
-              ImportAsMemberStatus foreignSelf) && {
-      auto params = lowering.claimParams(origParamType, getSubstArgType(),
-                                         foreignError, foreignSelf);
+  /// Evaluate arguments and begin any inout formal accesses.
+  void emit(SILGenFunction &SGF, AbstractionPattern origParamType,
+            ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
+            SmallVectorImpl<DelayedArgument> &delayedArgs,
+            const Optional<ForeignErrorConvention> &foreignError,
+            ImportAsMemberStatus foreignSelf) && {
+    auto params = lowering.claimParams(origParamType, getSubstArgType(),
+                                       foreignError, foreignSelf);
 
-      ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
-                         foreignError, foreignSelf);
-      emitter.emitTopLevel(std::move(ArgValue), origParamType);
-    }
+    ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
+                       foreignError, foreignSelf);
+    emitter.emitTopLevel(std::move(ArgValue), origParamType);
+  }
 
-    /// Take the arguments for special processing, in place of the above.
-    ArgumentSource &&forward() && {
-      return std::move(ArgValue);
-    }
-  };
+  /// Take the arguments for special processing, in place of the above.
+  ArgumentSource &&forward() && { return std::move(ArgValue); }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -3776,181 +3770,179 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// Once the Callee and CallSites have been prepared by SILGenApply,
-  /// generate SIL for a fully-formed call.
+
+/// Once the Callee and CallSites have been prepared by SILGenApply,
+/// generate SIL for a fully-formed call.
+///
+/// The lowered function type of the callee defines an abstraction pattern
+/// for evaluating argument values of tuple type directly into explosions of
+/// scalars where possible.
+///
+/// If there are more call sites than the natural uncurry level, they are
+/// have to be applied recursively to each intermediate callee.
+///
+/// Also inout formal access and parameter and result conventions are
+/// handled here, with some special logic required for calls with +0 self.
+class CallEmission {
+  SILGenFunction &SGF;
+
+  std::vector<CallSite> uncurriedSites;
+  std::vector<CallSite> extraSites;
+  Callee callee;
+  FormalEvaluationScope initialWritebackScope;
+  unsigned expectedSiteCount;
+
+public:
+  /// Create an emission for a call of the given callee.
+  CallEmission(SILGenFunction &SGF, Callee &&callee,
+               FormalEvaluationScope &&writebackScope)
+      : SGF(SGF), callee(std::move(callee)),
+        initialWritebackScope(std::move(writebackScope)),
+        expectedSiteCount(callee.getParameterListCount()) {}
+
+  /// A factory method for decomposing the apply expr \p e into a call
+  /// emission.
+  static CallEmission forApplyExpr(SILGenFunction &SGF, Expr *e);
+
+  /// Add a level of function application by passing in its possibly
+  /// unevaluated arguments and their formal type.
+  void addCallSite(CallSite &&site) {
+    // Append to the main argument list if we have uncurry levels remaining.
+    if (uncurriedSites.size() < expectedSiteCount) {
+      uncurriedSites.push_back(std::move(site));
+      return;
+    }
+
+    // Otherwise, apply these arguments to the result of the previous call.
+    extraSites.push_back(std::move(site));
+  }
+
+  /// Add a level of function application by passing in its possibly
+  /// unevaluated arguments and their formal type
+  template<typename...T>
+  void addCallSite(T &&...args) {
+    addCallSite(CallSite{std::forward<T>(args)...});
+  }
+
+  /// Is this a fully-applied enum element constructor call?
+  bool isEnumElementConstructor() {
+    return (callee.kind == Callee::Kind::EnumElement &&
+            uncurriedSites.size() == expectedSiteCount);
+  }
+
+  /// True if this is a completely unapplied super method call
+  bool isPartiallyAppliedSuperMethod() {
+    return (callee.kind == Callee::Kind::SuperMethod &&
+            uncurriedSites.size() == 1);
+  }
+
+  RValue apply(SGFContext C = SGFContext()) {
+    initialWritebackScope.verify();
+
+    // Emit the first level of call.
+    auto firstLevelResult = applyFirstLevelCallee(C);
+
+    // End of the initial writeback scope.
+    initialWritebackScope.verify();
+    initialWritebackScope.pop();
+
+    // If we do not have any more call sites, bail early and just return the
+    // value.
+    if (extraSites.empty()) {
+      return std::move(firstLevelResult.value);
+    }
+
+    // At this point, firstLevelResult should have a formal type for the
+    // remaining call sites. Do a quick assert to make sure that we have our
+    // rvalue and the relevant foreign type.
+    assert(firstLevelResult.isComplete());
+
+    AbstractionPattern origFormalType =
+        getIndirectApplyAbstractionPattern(SGF, firstLevelResult.formalType);
+    bool formalTypeThrows =
+        !cast<FunctionType>(firstLevelResult.formalType)->getExtInfo().throws();
+
+    // Then handle the remaining call sites.
+    return applyRemainingCallSites(std::move(firstLevelResult.value),
+                                   origFormalType, firstLevelResult.foreignSelf,
+                                   C, formalTypeThrows);
+  }
+
+  // Movable, but not copyable.
+  CallEmission(CallEmission &&e) = default;
+
+private:
+  CallEmission(const CallEmission &) = delete;
+  CallEmission &operator=(const CallEmission &) = delete;
+
+  /// Emit all of the arguments for a normal apply. This means an apply that
+  /// is not:
   ///
-  /// The lowered function type of the callee defines an abstraction pattern
-  /// for evaluating argument values of tuple type directly into explosions of
-  /// scalars where possible.
+  /// 1. A specialized emitter (e.g. an emitter for a builtin).
+  /// 2. A partially applied super method.
+  /// 3. An enum element constructor.
   ///
-  /// If there are more call sites than the natural uncurry level, they are
-  /// have to be applied recursively to each intermediate callee.
+  /// It is though all other initial calls and subsequent callees that we feed
+  /// the first callee into.
   ///
-  /// Also inout formal access and parameter and result conventions are
-  /// handled here, with some special logic required for calls with +0 self.
-  class CallEmission {
-    SILGenFunction &SGF;
+  /// This returns whether or not any arguments were able to throw in
+  /// ApplyOptions.
+  ApplyOptions emitArgumentsForNormalApply(
+      CanFunctionType &formalType, AbstractionPattern &origFormalType,
+      CanSILFunctionType substFnType,
+      const Optional<ForeignErrorConvention> &foreignError,
+      ImportAsMemberStatus foreignSelf,
+      SmallVectorImpl<ManagedValue> &uncurriedArgs,
+      Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
 
-    std::vector<CallSite> uncurriedSites;
-    std::vector<CallSite> extraSites;
-    Callee callee;
-    FormalEvaluationScope initialWritebackScope;
-    unsigned expectedSiteCount;
+  struct FirstLevelApplicationResult {
+    RValue value;
+    CanFunctionType formalType;
+    ImportAsMemberStatus foreignSelf;
 
-  public:
-    /// Create an emission for a call of the given callee.
-    CallEmission(SILGenFunction &SGF, Callee &&callee,
-                 FormalEvaluationScope &&writebackScope)
-        : SGF(SGF), callee(std::move(callee)),
-          initialWritebackScope(std::move(writebackScope)),
-          expectedSiteCount(callee.getParameterListCount()) {}
+    FirstLevelApplicationResult() = default;
 
-    /// A factory method for decomposing the apply expr \p e into a call
-    /// emission.
-    static CallEmission forApplyExpr(SILGenFunction &SGF, Expr *e);
+    // Delete copy constructor/operator,
+    FirstLevelApplicationResult(const FirstLevelApplicationResult &) = delete;
+    FirstLevelApplicationResult &
+    operator=(const FirstLevelApplicationResult &) = delete;
 
-    /// Add a level of function application by passing in its possibly
-    /// unevaluated arguments and their formal type.
-    void addCallSite(CallSite &&site) {
-      // Append to the main argument list if we have uncurry levels remaining.
-      if (uncurriedSites.size() < expectedSiteCount) {
-        uncurriedSites.push_back(std::move(site));
-        return;
-      }
-
-      // Otherwise, apply these arguments to the result of the previous call.
-      extraSites.push_back(std::move(site));
-    }
-    
-    /// Add a level of function application by passing in its possibly
-    /// unevaluated arguments and their formal type
-    template<typename...T>
-    void addCallSite(T &&...args) {
-      addCallSite(CallSite{std::forward<T>(args)...});
+    // This is a move only type.
+    FirstLevelApplicationResult(FirstLevelApplicationResult &&other)
+        : value(std::move(other.value)), formalType(other.formalType),
+          foreignSelf(other.foreignSelf) {}
+    FirstLevelApplicationResult &
+    operator=(FirstLevelApplicationResult &&other) {
+      value = std::move(other.value);
+      formalType = other.formalType;
+      foreignSelf = other.foreignSelf;
+      return *this;
     }
 
-    /// Is this a fully-applied enum element constructor call?
-    bool isEnumElementConstructor() {
-      return (callee.kind == Callee::Kind::EnumElement &&
-              uncurriedSites.size() == expectedSiteCount);
-    }
-
-    /// True if this is a completely unapplied super method call
-    bool isPartiallyAppliedSuperMethod() {
-      return (callee.kind == Callee::Kind::SuperMethod &&
-              uncurriedSites.size() == 1);
-    }
-
-    RValue apply(SGFContext C = SGFContext()) {
-      initialWritebackScope.verify();
-
-      // Emit the first level of call.
-      auto firstLevelResult = applyFirstLevelCallee(C);
-
-      // End of the initial writeback scope.
-      initialWritebackScope.verify();
-      initialWritebackScope.pop();
-
-      // If we do not have any more call sites, bail early and just return the
-      // value.
-      if (extraSites.empty()) {
-        return std::move(firstLevelResult.value);
-      }
-
-      // At this point, firstLevelResult should have a formal type for the
-      // remaining call sites. Do a quick assert to make sure that we have our
-      // rvalue and the relevant foreign type.
-      assert(firstLevelResult.isComplete());
-
-      AbstractionPattern origFormalType =
-          getIndirectApplyAbstractionPattern(SGF, firstLevelResult.formalType);
-      bool formalTypeThrows = !cast<FunctionType>(firstLevelResult.formalType)
-                                   ->getExtInfo()
-                                   .throws();
-
-      // Then handle the remaining call sites.
-      return applyRemainingCallSites(
-          std::move(firstLevelResult.value), origFormalType,
-          firstLevelResult.foreignSelf, C, formalTypeThrows);
-    }
-
-    // Movable, but not copyable.
-    CallEmission(CallEmission &&e) = default;
-
-  private:
-    CallEmission(const CallEmission &) = delete;
-    CallEmission &operator=(const CallEmission &) = delete;
-
-    /// Emit all of the arguments for a normal apply. This means an apply that
-    /// is not:
+    /// Verify some variants around a complete FirstLevelApplicationResult.
     ///
-    /// 1. A specialized emitter (e.g. an emitter for a builtin).
-    /// 2. A partially applied super method.
-    /// 3. An enum element constructor.
-    ///
-    /// It is though all other initial calls and subsequent callees that we feed
-    /// the first callee into.
-    ///
-    /// This returns whether or not any arguments were able to throw in
-    /// ApplyOptions.
-    ApplyOptions emitArgumentsForNormalApply(
-        CanFunctionType &formalType, AbstractionPattern &origFormalType,
-        CanSILFunctionType substFnType,
-        const Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus foreignSelf,
-        SmallVectorImpl<ManagedValue> &uncurriedArgs,
-        Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
-
-    struct FirstLevelApplicationResult {
-      RValue value;
-      CanFunctionType formalType;
-      ImportAsMemberStatus foreignSelf;
-
-      FirstLevelApplicationResult() = default;
-
-      // Delete copy constructor/operator,
-      FirstLevelApplicationResult(const FirstLevelApplicationResult &) = delete;
-      FirstLevelApplicationResult &
-      operator=(const FirstLevelApplicationResult &) = delete;
-
-      // This is a move only type.
-      FirstLevelApplicationResult(FirstLevelApplicationResult &&other)
-          : value(std::move(other.value)), formalType(other.formalType),
-            foreignSelf(other.foreignSelf) {}
-      FirstLevelApplicationResult &
-      operator=(FirstLevelApplicationResult &&other) {
-        value = std::move(other.value);
-        formalType = other.formalType;
-        foreignSelf = other.foreignSelf;
-        return *this;
-      }
-
-      /// Verify some variants around a complete FirstLevelApplicationResult.
-      ///
-      /// The specific invariants is that value is complete and that we have a
-      /// formal type.
-      bool isComplete() const { return value.isComplete() && bool(formalType); }
-    };
-
-    FirstLevelApplicationResult
-    applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
-                            SGFContext C);
-
-    FirstLevelApplicationResult
-    applyPartiallyAppliedSuperMethod(SGFContext C);
-
-    FirstLevelApplicationResult
-    applyEnumElementConstructor(SGFContext C);
-
-    FirstLevelApplicationResult applyNormalCall(SGFContext C);
-
-    FirstLevelApplicationResult applyFirstLevelCallee(SGFContext C);
-
-    RValue applyRemainingCallSites(RValue &&result,
-                                   AbstractionPattern origFormalType,
-                                   ImportAsMemberStatus foreignSelf,
-                                   SGFContext C, bool formalTypeThrows);
+    /// The specific invariants is that value is complete and that we have a
+    /// formal type.
+    bool isComplete() const { return value.isComplete() && bool(formalType); }
   };
+
+  FirstLevelApplicationResult
+  applySpecializedEmitter(SpecializedEmitter &specializedEmitter, SGFContext C);
+
+  FirstLevelApplicationResult applyPartiallyAppliedSuperMethod(SGFContext C);
+
+  FirstLevelApplicationResult applyEnumElementConstructor(SGFContext C);
+
+  FirstLevelApplicationResult applyNormalCall(SGFContext C);
+
+  FirstLevelApplicationResult applyFirstLevelCallee(SGFContext C);
+
+  RValue applyRemainingCallSites(RValue &&result,
+                                 AbstractionPattern origFormalType,
+                                 ImportAsMemberStatus foreignSelf, SGFContext C,
+                                 bool formalTypeThrows);
+};
+
 } // end anonymous namespace
 
 /// This function claims param clauses from the passed in formal type until the
