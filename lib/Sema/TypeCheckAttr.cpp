@@ -2116,7 +2116,6 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  auto *module = D->getModuleContext();
   /// '@differentiable' attribute is OnFunc only, rejected by the early checker.
   auto *primal = cast<FuncDecl>(D);
   auto isInstanceMethod = primal->isInstanceMember();
