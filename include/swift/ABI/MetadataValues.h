@@ -647,7 +647,8 @@ class TargetParameterTypeFlags {
   enum : int_type {
     InOutMask    = 1 << 0,
     SharedMask   = 1 << 1,
-    VariadicMask = 1 << 2,
+    OwnedMask    = 1 << 2,
+    VariadicMask = 1 << 3,
   };
   int_type Data;
 
@@ -666,6 +667,11 @@ public:
                                               (isShared ? SharedMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type> withOwned(bool isOwned) const {
+    return TargetParameterTypeFlags<int_type>((Data & ~OwnedMask) |
+                                              (isOwned ? OwnedMask : 0));
+  }
+
   constexpr TargetParameterTypeFlags<int_type>
   withVariadic(bool isVariadic) const {
     return TargetParameterTypeFlags<int_type>((Data & ~VariadicMask) |
@@ -675,7 +681,19 @@ public:
   bool isNone() const { return Data == 0; }
   bool isInOut() const { return Data & InOutMask; }
   bool isShared() const { return Data & SharedMask; }
+  bool isOwned() const { return Data & OwnedMask; }
   bool isVariadic() const { return Data & VariadicMask; }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
+
+    return ValueOwnership::Default;
+  }
 
   int_type getIntValue() const { return Data; }
 

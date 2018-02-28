@@ -1369,18 +1369,16 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     assert(interfaceTy);
     auto contextTy = declaredParamTy.subst(contextMap);
     assert(contextTy);
+    auto declaredSpecifier = declaredParam->getSpecifier();
 
     SmallString<64> ParamNameBuf;
     {
       llvm::raw_svector_ostream names(ParamNameBuf);
       names << "%arg." << i;
     }
-    auto param = new (Context) ParamDecl(VarDecl::Specifier::Owned,
-                                         SourceLoc(), SourceLoc(),
-                                         Identifier(),
-                                         SourceLoc(),
-                                         Context.getIdentifier(ParamNameBuf),
-                                         contextTy, DC);
+    auto param = new (Context) ParamDecl(
+        declaredSpecifier, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+        Context.getIdentifier(ParamNameBuf), contextTy, DC);
     param->setInterfaceType(interfaceTy);
     param->setImplicit();
     Params.push_back(param);

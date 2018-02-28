@@ -57,6 +57,7 @@ public:
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setShared() { Flags = Flags.withShared(true); }
+  void setOwned() { Flags = Flags.withOwned(true); }
   void setInOut() { Flags = Flags.withInOut(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
@@ -540,6 +541,12 @@ private:
 
       case NodeKind::Shared:
         param.setShared();
+        hasParamFlags = true;
+        node = node->getFirstChild();
+        break;
+
+      case NodeKind::Owned:
+        param.setOwned();
         hasParamFlags = true;
         node = node->getFirstChild();
         break;

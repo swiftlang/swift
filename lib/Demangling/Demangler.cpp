@@ -596,6 +596,9 @@ NodePointer Demangler::demangleOperator() {
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
+    case 'n':
+      return createType(
+          createWithChild(Node::Kind::Owned, popTypeAndGetChild()));
     case 'o': return demangleOperatorIdentifier();
     case 'p': return demangleProtocolListType();
     case 'q': return createType(demangleGenericParamIndex());

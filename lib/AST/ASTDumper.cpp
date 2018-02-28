@@ -950,12 +950,23 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (P->getSpecifier() == VarDecl::Specifier::Var)
+      switch (P->getSpecifier()) {
+      case VarDecl::Specifier::Let:
+        /* nothing */
+        break;
+      case VarDecl::Specifier::Var:
         OS << " mutable";
-      if (P->getSpecifier() == VarDecl::Specifier::InOut)
+        break;
+      case VarDecl::Specifier::InOut:
         OS << " inout";
-      if (P->isShared())
+        break;
+      case VarDecl::Specifier::Shared:
         OS << " shared";
+        break;
+      case VarDecl::Specifier::Owned:
+        OS << " owned";
+        break;
+      }
 
       if (P->isVariadic())
         OS << " variadic";
@@ -2747,6 +2758,12 @@ public:
   
   void visitSharedTypeRepr(SharedTypeRepr *T) {
     printCommon("type_shared") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
+    printCommon("type_owned") << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

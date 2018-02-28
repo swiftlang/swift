@@ -841,6 +841,7 @@ namespace {
               auto parameterFlags = ParameterFlags()
                                         .withInOut(flags.isInOut())
                                         .withShared(flags.isShared())
+                                        .withOwned(flags.isOwned())
                                         .withVariadic(flags.isVariadic());
 
               processor(index, getFunctionParameterRef(param), parameterFlags);

@@ -353,6 +353,7 @@ public:
       auto parameterFlags = ParameterTypeFlags()
                                 .withInOut(flags.isInOut())
                                 .withShared(flags.isShared())
+                                .withOwned(flags.isOwned())
                                 .withVariadic(flags.isVariadic());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));

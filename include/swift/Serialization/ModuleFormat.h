@@ -210,9 +210,10 @@ enum class VarDeclSpecifier : uint8_t {
   Var,
   InOut,
   Shared,
+  Owned,
 };
-using VarDeclSpecifierField = BCFixed<2>;
-  
+using VarDeclSpecifierField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
@@ -325,6 +326,7 @@ enum ValueOwnership : uint8_t {
   Default = 0,
   InOut,
   Shared,
+  Owned
 };
 using ValueOwnershipField = BCFixed<2>;
 
