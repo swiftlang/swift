@@ -100,7 +100,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 #else
     var hasher = _Hasher()
     Unicode.hashASCII(self.buffer, into: &hasher)
-    return hasher._finalize()
+    return hasher.finalize()
 #endif // _runtime(_ObjC)
   }
 }
@@ -120,7 +120,7 @@ extension _UnmanagedString where CodeUnit == UTF16.CodeUnit {
 #else
     var hasher = _Hasher()
     Unicode.hashUTF16(self.buffer, into: &hasher)
-    return hasher._finalize()
+    return hasher.finalize()
 #endif // _runtime(_ObjC)
   }
 }
@@ -142,8 +142,10 @@ extension _UnmanagedOpaqueString {
     let buffer = UnsafeMutableBufferPointer(start: p, count: count)
     _copy(into: buffer)
     var hasher = _Hasher()
-    Unicode.hashASCII(buffer, into: &hasher)
-    return hasher._finalize()
+    Unicode.hashUTF16(
+      UnsafeBufferPointer(start: p, count: count),
+      into: &hasher)
+    return hasher.finalize()
 #endif
   }
 }
