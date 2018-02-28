@@ -229,7 +229,7 @@ func expectedHash(_ bits: [Int]) -> Int {
   for i in bits {
     hasher.append(i)
   }
-  return hasher.finalize()
+  return Int(truncatingIfNeeded: hasher.finalize())
 }
 
 %{
@@ -250,18 +250,15 @@ FixedPoint.test("${Self}.hashValue") {
     let input = get${Self}(${input})
     let output = getInt(input.hashValue)
 
-
     var hasher = _SipHash13()
-%     if self_ty.bits <= word_bits:
-    hasher.append(${prepare_bit_pattern(input, word_bits, True)})
-%     elif self_ty.bits == word_bits * 2:
-    hasher.append(${prepare_bit_pattern(bit_pattern, word_bits, True)})
-    hasher.append(${prepare_bit_pattern(bit_pattern >> 32, word_bits, True)})
+%     if self_ty.bits <= 32:
+    hasher.append(${prepare_bit_pattern(input, 32, False)} as UInt32)
 %     else:
-    fatalError("Unsupported integer width")
+    hasher.append(input)
 %     end
-    let expected = getInt(hasher.finalize())
-    expectEqual(expected, output)
+    let expected = getInt(
+      Int(bitPattern: UInt(truncatingIfNeeded: hasher.finalize())))
+    expectEqual(expected, output, "input: \(input)")
   }
 
 %   end

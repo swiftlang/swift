@@ -3616,14 +3616,15 @@ extension ${Self} : Hashable {
 
   @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    % if bits <= word_bits:
-    return hasher.appending(bitPattern: Int(bitPattern: _lowWord))
+    % if bits == word_bits:
+    return hasher.appending(bits: _lowWord)
+    % elif bits <= 32:
+    return hasher.appending(
+      bits: UInt32(Builtin.${z}extOrBitCast_Int${bits}_Int32(_value)))
+    % elif bits == 2 * word_bits:
+    return hasher.appending(bits: UInt64(_value))
     % else:
-    var hasher = hasher
-    for word in words {
-      hasher = hasher.appending(bitPattern: Int(bitPattern: word))
-    }
-    return hasher
+    fatalError("Unsupported integer width")
     % end
   }
 }

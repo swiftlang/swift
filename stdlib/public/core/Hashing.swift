@@ -208,7 +208,7 @@ public struct _UnsafeHasher {
   }
 
   @_versioned
-  @inline(never)
+  // not @_inlineable
   @effects(readonly) // FIXME: Unjustified
   static func hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
     var hasher = _Hasher()
@@ -217,9 +217,10 @@ public struct _UnsafeHasher {
     }
   }
 
+  @_versioned
+  // not @_inlineable
   @effects(readonly)
-  @inline(never)
-  public func appending(bitPattern value: Int) -> _UnsafeHasher {
+  internal func appending(bits value: UInt) -> _UnsafeHasher {
     // The effects attribute is a lie; however, it enables the compiler to
     // eliminate unnecessary retain/releases protecting Hashable state around
     // calls to `_Hasher.append(_:)`.
@@ -233,6 +234,22 @@ public struct _UnsafeHasher {
     return self
   }
 
+  @_versioned
+  // not @_inlineable
+  @effects(readonly) // See comment in appending(_: UInt)
+  internal func appending(bits value: UInt32) -> _UnsafeHasher {
+    _state.pointee.append(value)
+    return self
+  }
+
+  @_versioned
+  // not @_inlineable
+  @effects(readonly) // See comment in appending(_: UInt)
+  internal func appending(bits value: UInt64) -> _UnsafeHasher {
+    _state.pointee.append(value)
+    return self
+  }
+
   @_inlineable
   @inline(__always)
   public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
@@ -240,19 +257,13 @@ public struct _UnsafeHasher {
   }
 
   @inline(__always)
-  internal func _appending(_ value: Int) -> _UnsafeHasher {
-    _state.pointee.append(value)
-    return self
-  }
-
-  @inline(__always)
   internal func _finalized() -> Int {
-    return _state.pointee.finalize()
+    return Int(_truncatingBits: _state.pointee.finalize()._lowWord)
   }
 }
 
-// FIXME: This is purely for benchmarking; to be removed.
-internal struct _QuickHasher {
+// FIXME(hashing): This is purely for benchmarking; to be removed.
+internal struct _LegacyHasher {
   internal var _hash: Int
 
   @inline(__always)
@@ -262,16 +273,32 @@ internal struct _QuickHasher {
 
   @inline(__always)
   internal mutating func append(_ value: Int) {
-    if _hash == 0 {
-      _hash = value
-      return
-    }
-    _hash = _combineHashValues(_hash, value)
+    _hash = (_hash == 0 ? value : _combineHashValues(_hash, value))
   }
 
   @inline(__always)
-  internal mutating func finalize() -> Int {
-    return _mixInt(_hash)
+  internal mutating func append(_ value: UInt) {
+    append(Int(bitPattern: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt32) {
+    append(Int(truncatingIfNeeded: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt64) {
+    if UInt64.bitWidth > Int.bitWidth {
+      append(Int(truncatingIfNeeded: value ^ (value &>> 32)))
+    } else {
+      append(Int(truncatingIfNeeded: value))
+    }
+  }
+
+  @inline(__always)
+  internal mutating func finalize() -> UInt64 {
+    return UInt64(
+      _truncatingBits: UInt(bitPattern: _mixInt(_hash))._lowWord)
   }
 }
 

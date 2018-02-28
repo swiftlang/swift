@@ -99,14 +99,16 @@ struct ${Self} {
 
   @_versioned
   internal var byteCount: UInt64 {
-    @inline(__always) get {
+    @inline(__always)
+    get {
       return tailAndByteCount &>> 56
     }
   }
 
   @_versioned
   internal var tail: UInt64 {
-    @inline(__always) get {
+    @inline(__always)
+    get {
       return tailAndByteCount & ~(0xFF &<< 56)
     }
   }
@@ -123,6 +125,11 @@ struct ${Self} {
 
   @inline(__always)
   public mutating func append(_ value: Int) {
+    append(UInt(bitPattern: value))
+  }
+
+  @inline(__always)
+  public mutating func append(_ value: UInt) {
     % if word_bits == 64:
     append(UInt64(_truncatingBits: value._lowWord))
     % elif word_bits == 32:
@@ -130,6 +137,11 @@ struct ${Self} {
     % else:
     fatalError("Unsupported word width")
     % end
+  }
+
+  @inline(__always)
+  public mutating func append(_ value: Int32) {
+    append(UInt32(bitPattern: value))
   }
 
   @inline(__always)
@@ -146,6 +158,11 @@ struct ${Self} {
   }
 
   @inline(__always)
+  public mutating func append(_ value: Int64) {
+    append(UInt64(bitPattern: value))
+  }
+
+  @inline(__always)
   public mutating func append(_ m: UInt64) {
     if byteCount & 4 == 0 {
       _sanityCheck(byteCount & 7 == 0 && tail == 0)
@@ -159,7 +176,7 @@ struct ${Self} {
   }
 
   @inline(__always)
-  public mutating func finalize() -> Int {
+  public mutating func finalize() -> UInt64 {
     _compress(tailAndByteCount)
 
     v2 ^= 0xff
@@ -168,7 +185,7 @@ struct ${Self} {
       _SipHashDetail._sipRound(v0: &v0, v1: &v1, v2: &v2, v3: &v3)
     }
 
-    return Int(_truncatingBits: (v0 ^ v1 ^ v2 ^ v3)._lowWord)
+    return (v0 ^ v1 ^ v2 ^ v3)
   }
 }
 % end

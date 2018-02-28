@@ -34,7 +34,7 @@ enum E {
 // CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$S12enum_derived1EO5_hash4intos13_UnsafeHasherVAG_tF"
 // CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO5_hash4intos13_UnsafeHasherVAG_tF"
 // CHECK: [[V:%.*]] = zext i8 %1 to i{{.*}}
-// CHECK: [[R:%.*]] = tail call swiftcc i{{.*}} @"$Ss13_UnsafeHasherV9appending10bitPatternABSi_tF"(i{{.*}} [[V]],
+// CHECK: [[R:%.*]] = tail call swiftcc i{{.*}} @"$Ss13_UnsafeHasherV9appending4bitsABSu_tF"(i{{.*}} [[V]],
 // CHECK: ret i{{.*}} [[R]]
 
 // Derived conformances from extensions
