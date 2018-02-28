@@ -401,11 +401,11 @@ function(_add_variant_link_flags)
       endif()
   endif()
 
-  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_UC}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_UC}")
+  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC}")
   endif()
-  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
+  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -857,17 +857,17 @@ function(_add_swift_library_single target name)
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}")
     endif()
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}")
     endif()
   endif()
 
@@ -1544,7 +1544,7 @@ function(add_swift_library name)
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
           if("${lib}" STREQUAL "ICU_UC")
             list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFT_${sdk}_ICU_UC}")
+                 "${SWIFT_${sdk}_${arch}_ICU_UC}")
             # temporary fix for atomic needing to be
             # after object files for libswiftCore.so
             if("${sdk}" STREQUAL "ANDROID")
@@ -1558,7 +1558,7 @@ function(add_swift_library name)
             endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFT_${sdk}_ICU_I18N}")
+                 "${SWIFT_${sdk}_${arch}_ICU_I18N}")
           elseif(TARGET "${lib}${VARIANT_SUFFIX}")
             list(APPEND swiftlib_private_link_libraries_targets
                 "${lib}${VARIANT_SUFFIX}")
