@@ -1115,8 +1115,8 @@ extension _UnmanagedString where CodeUnit == UInt16 {
       &selfOutputBuffer, selfLength,
       &otherOutputBuffer, otherLength) 
     {
-      let selfSlice = self[selfSegmentEndIdx...]
-      let otherSlice = other[otherSegmentEndIdx...]
+      let selfSlice = self[selfSegmentStartIdx...]
+      let otherSlice = other[otherSegmentStartIdx...]
       return selfSlice._compareStringsPathological(other: otherSlice)
     }
 
