@@ -318,7 +318,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::djbHash(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -380,7 +381,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -438,8 +440,9 @@ public:
     return ID;
   }
 
-  hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+  hash_value_type ComputeHash(iternal_key_type key) {
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -476,7 +479,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -531,7 +535,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::djbHash(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -704,7 +709,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -891,7 +897,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    return llvm::djbHash(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
