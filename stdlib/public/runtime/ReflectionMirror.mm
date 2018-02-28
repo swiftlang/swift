@@ -268,7 +268,7 @@ struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->getDescription();
-    return Description->IsReflectable;
+    return Description->getTypeContextDescriptorFlags().isReflectable();
   }
   
   const char *getInfo(unsigned *tagPtr = nullptr,

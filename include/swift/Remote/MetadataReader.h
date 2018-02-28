@@ -983,8 +983,8 @@ private:
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      hasVTable = flags.getKindSpecificFlags()
-                   & (uint16_t)TypeContextDescriptorFlags::HasVTable;
+      hasVTable = TypeContextDescriptorFlags(flags.getKindSpecificFlags())
+                    .class_hasVTable();
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
@@ -1082,21 +1082,25 @@ private:
         return Reader->readString(RemoteAddress(nameAddress), nodeName);
       };
       
+      bool isTypeContext = false;
       switch (auto contextKind = parent->getKind()) {
       case ContextDescriptorKind::Class:
         if (!getTypeName())
           return nullptr;
         nodeKind = Demangle::Node::Kind::Class;
+        isTypeContext = true;
         break;
       case ContextDescriptorKind::Struct:
         if (!getTypeName())
           return nullptr;
         nodeKind = Demangle::Node::Kind::Structure;
+        isTypeContext = true;
         break;
       case ContextDescriptorKind::Enum:
         if (!getTypeName())
           return nullptr;
         nodeKind = Demangle::Node::Kind::Enum;
+        isTypeContext = true;
         break;
 
       case ContextDescriptorKind::Extension:
@@ -1125,11 +1129,15 @@ private:
       }
 
       // Override the node kind if this was a Clang-imported type.
-      auto flags = parent->Flags.getKindSpecificFlags();
-      if (flags & (uint16_t)TypeContextDescriptorFlags::IsCTag)
-        nodeKind = Demangle::Node::Kind::Structure;
-      else if (flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef)
-        nodeKind = Demangle::Node::Kind::TypeAlias;
+      if (isTypeContext) {
+        auto typeFlags =
+          TypeContextDescriptorFlags(parent->Flags.getKindSpecificFlags());
+
+        if (typeFlags.isCTag())
+          nodeKind = Demangle::Node::Kind::Structure;
+        else if (typeFlags.isCTypedef())
+          nodeKind = Demangle::Node::Kind::TypeAlias;
+      }
 
       nameComponents.emplace_back(nodeKind, nodeName);
       
