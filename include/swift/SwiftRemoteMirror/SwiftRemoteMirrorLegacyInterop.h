@@ -29,16 +29,129 @@
 
 #define SWIFT_LEGACY_METADATA_MIN_VERSION 3
 
+/// The remote representation of a Swift metada pointer as returned by
+/// interop wrappers.
 typedef struct swift_metadata_interop {
   uintptr_t Metadata;
   int Library;
 } swift_metadata_interop_t;
 
+/// The remote representation of a Swift typeref as returned by interop
+/// wrappers.
 typedef struct swift_typeref_interop {
   swift_typeref_t Typeref;
   int Library;
 } swift_typeref_interop_t;
 
+/// The "public" interface follows. All of these functions are the same
+/// as the corresponding swift_reflection_* functions, except for taking
+/// or returning _interop data types in some circumstances.
+
+static inline SwiftReflectionInteropContextRef
+swift_reflection_interop_createReflectionContext(
+    void *ReaderContext,
+    void *LibraryHandle,
+    void *LegacyLibraryHandle,
+    uint8_t PointerSize,
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress);
+
+static inline void
+swift_reflection_interop_destroyReflectionContext(
+  SwiftReflectionInteropContextRef ContextRef);
+
+static inline int
+swift_reflection_interop_addImage(SwiftReflectionInteropContextRef ContextRef,
+                                  swift_addr_t imageStart);
+
+static inline int
+swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef,
+                                     uintptr_t *outIsaMask);
+
+static inline swift_typeref_interop_t
+swift_reflection_interop_typeRefForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_metadata_interop_t Metadata);
+
+static inline swift_typeref_interop_t
+swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                            uintptr_t Object);
+
+swift_typeref_interop_t
+swift_reflection_interop_typeRefForMangledTypeName(
+  SwiftReflectionInteropContextRef ContextRef,
+  const char *MangledName,
+  uint64_t Length);
+
+swift_typeinfo_t
+swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_typeref_interop_t OpaqueTypeRef);
+
+swift_childinfo_t
+swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                       swift_typeref_interop_t OpaqueTypeRef,
+                                        unsigned Index);
+
+swift_typeinfo_t
+swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_metadata_interop_t Metadata);
+
+swift_childinfo_t
+swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                        swift_metadata_interop_t Metadata,
+                                        unsigned Index);
+
+swift_typeinfo_t
+swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                         uintptr_t Object);
+
+swift_childinfo_t
+swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
+                                         uintptr_t Object,
+                                         unsigned Index);
+
+unsigned
+swift_reflection_interop_genericArgumentCountOfTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef);
+
+swift_typeref_interop_t
+swift_reflection_interop_genericArgumentOfTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef,
+  unsigned Index);
+
+static inline int
+swift_reflection_interop_projectExistential(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_addr_t ExistentialAddress,
+                                            swift_typeref_interop_t ExistentialTypeRef,
+                                            swift_typeref_interop_t *OutInstanceTypeRef,
+                                            swift_addr_t *OutStartOfInstanceData);
+
+static inline void
+swift_reflection_interop_dumpTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                     swift_typeref_interop_t OpaqueTypeRef);
+
+void swift_reflection_interop_dumpInfoForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef);
+
+void swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                                  swift_metadata_interop_t Metadata);
+
+void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                                  uintptr_t Object);
+
+size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
+                                         const char *MangledName,
+                                         size_t Length,
+                                         char *OutDemangledName,
+                                         size_t MaxLength);
+
+
+
+/// \name Internal implementation details, clients don't need to use these.
+/// @{
+
+/// The legacy reflection info struct.
 typedef struct swift_reflection_legacy_info {
   swift_reflection_section_t fieldmd;
   swift_reflection_section_t assocty;
@@ -50,6 +163,7 @@ typedef struct swift_reflection_legacy_info {
   uintptr_t RemoteStartAddress;
 } swift_reflection_legacy_info_t;
 
+/// The signature of the legacy ReadBytesFunction.
 typedef int (*ReadBytesFunctionLegacy)(void *reader_context, swift_addr_t address,
                                        void *dest, uint64_t size);
 
@@ -507,8 +621,6 @@ swift_reflection_interop_addImageLegacy(
   return 1;
 }
 
-/// Add reflection information from a loaded Swift image.
-/// Returns true on success, false if the image's memory couldn't be read.
 static inline int
 swift_reflection_interop_addImage(SwiftReflectionInteropContextRef ContextRef,
                                   swift_addr_t imageStart) {
@@ -743,6 +855,8 @@ size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef Contex
 #undef FOREACH_LIBRARY
 #undef LIBRARY_INDEX
 #undef DECLARE_LIBRARY
+
+/// @}
 
 #endif // __APPLE__
 
