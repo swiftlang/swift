@@ -103,7 +103,8 @@ public:
   external_key_type GetExternalKey(internal_key_type ID) { return ID; }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {

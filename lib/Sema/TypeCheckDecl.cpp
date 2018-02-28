@@ -169,7 +169,8 @@ public:
       return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
-      return llvm::djbHash(k.stringValue);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(k.stringValue, 0);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
