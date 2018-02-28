@@ -665,8 +665,7 @@ static void initLLVMModule(const IRGenModule &IGM) {
 }
 
 std::pair<IRGenerator *, IRGenModule *>
-swift::irgen::createIRGenModule(SILModule *SILMod,
-                                StringRef OutputFilename,
+swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
                                 llvm::LLVMContext &LLVMContext) {
 

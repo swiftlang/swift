@@ -439,7 +439,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   assert(!Invocation.getModuleName().empty());
-  Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
   Invocation.getLangOptions().CollectParsedToken = true;
@@ -700,7 +699,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
+    const std::string &File = input.file();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -887,7 +886,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
+    const std::string &File = input.file();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
