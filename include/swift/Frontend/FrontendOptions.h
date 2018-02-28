@@ -39,7 +39,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(const std::string &)> fn) const;
+                         std::function<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -273,8 +273,6 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath() const;
-
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
@@ -282,8 +280,10 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
 private:
   static bool canActionEmitDependencies(ActionType);
