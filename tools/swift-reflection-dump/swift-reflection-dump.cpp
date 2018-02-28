@@ -83,6 +83,75 @@ static T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
+#ifndef __APPLE__
+static SectionRef getSectionRef(const ObjectFile *objectFile,
+                                ArrayRef<StringRef> anySectionNames) {
+  for (auto section : objectFile->sections()) {
+    StringRef sectionName;
+    section.getName(sectionName);
+    for (auto desiredName : anySectionNames) {
+      if (sectionName.equals(desiredName)) {
+        return section;
+      }
+    }
+  }
+  return SectionRef();
+}
+
+template <typename Section>
+static std::pair<Section, uintptr_t>
+findReflectionSection(const ObjectFile *objectFile,
+                      ArrayRef<StringRef> anySectionNames) {
+  auto sectionRef = getSectionRef(objectFile, anySectionNames);
+
+  if (sectionRef.getObject() == nullptr)
+    return {{nullptr, nullptr}, 0};
+
+  StringRef sectionContents;
+  sectionRef.getContents(sectionContents);
+
+  uintptr_t Offset = 0;
+  if (isa<ELFObjectFileBase>(sectionRef.getObject())) {
+    ELFSectionRef S{sectionRef};
+    Offset = sectionRef.getAddress() - S.getOffset();
+  }
+
+  return {{reinterpret_cast<const void *>(sectionContents.begin()),
+           reinterpret_cast<const void *>(sectionContents.end())},
+          Offset};
+}
+
+static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
+  auto fieldSection = findReflectionSection<FieldSection>(
+      objectFile, {"__swift5_fieldmd", ".swift5_fieldmd", "swift5_fieldmd"});
+  auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
+      objectFile, {"__swift5_assocty", ".swift5_assocty", "swift5_assocty"});
+  auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
+      objectFile, {"__swift5_builtin", ".swift5_builtin", "swift5_builtin"});
+  auto captureSection = findReflectionSection<CaptureSection>(
+      objectFile, {"__swift5_capture", ".swift5_capture", "swift5_capture"});
+  auto typeRefSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift5_typeref", ".swift5_typeref", "swift5_typeref"});
+  auto reflectionStringsSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift5_reflstr", ".swift5_reflstr", "swift5_reflstr"});
+
+  // The entire object file is mapped into this process's memory, so the
+  // local/remote mapping is identity.
+  auto startAddress = (uintptr_t)objectFile->getData().begin();
+
+  return {
+      {fieldSection.first, fieldSection.second},
+      {associatedTypeSection.first, associatedTypeSection.second},
+      {builtinTypeSection.first, builtinTypeSection.second},
+      {captureSection.first, captureSection.second},
+      {typeRefSection.first, typeRefSection.second},
+      {reflectionStringsSection.first, reflectionStringsSection.second},
+      /*LocalStartAddress*/ startAddress,
+      /*RemoteStartAddress*/ startAddress,
+  };
+}
+#endif // __APPLE__
+
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
@@ -185,7 +254,12 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
     binaryOwners.push_back(std::move(binaryOwner));
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
+
+#ifdef __APPLE__
     context.addImage(RemoteAddress((uint64_t)(objectFile->getData().begin())));
+#else
+    context.addReflectionInfo(findReflectionInfo(objectFile));
+#endif
   }
 
   switch (action) {
