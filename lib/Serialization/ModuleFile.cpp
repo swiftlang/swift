@@ -440,7 +440,7 @@ public:
     return ID;
   }
 
-  hash_value_type ComputeHash(iternal_key_type key) {
+  hash_value_type ComputeHash(internal_key_type key) {
     // FIXME: DJB seed=0, audit whether the default seed could be used.
     return llvm::djbHash(key, 0);
   }
