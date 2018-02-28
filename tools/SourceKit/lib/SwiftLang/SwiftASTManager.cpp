@@ -439,7 +439,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   assert(!Invocation.getModuleName().empty());
-  Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
   Invocation.getLangOptions().CollectParsedToken = true;

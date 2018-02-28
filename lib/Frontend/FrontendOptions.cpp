@@ -108,7 +108,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
 }
 
 void FrontendOptions::forAllOutputPaths(
-    const InputFile &input, std::function<void(const std::string &)> fn) const {
+    const InputFile &input, std::function<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
     if (InputsAndOutputs.isWholeModule())
@@ -116,14 +116,19 @@ void FrontendOptions::forAllOutputPaths(
     else
       fn(input.outputFilename());
   }
-  const std::string *outputs[] = {
-      &InputsAndOutputs.supplementaryOutputs().ModuleOutputPath,
-      &InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath,
-      &InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath};
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
-  }
+  (void)InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &inp) -> bool {
+        const SupplementaryOutputPaths &outs =
+            inp.getPrimarySpecificPaths().SupplementaryOutputs;
+        const std::string *outputs[] = {&outs.ModuleOutputPath,
+                                        &outs.ModuleDocOutputPath,
+                                        &outs.ObjCHeaderOutputPath};
+        for (const std::string *next : outputs) {
+          if (!next->empty())
+            fn(*next);
+        }
+        return false;
+      });
 }
 
 
@@ -387,12 +392,12 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   }
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
 }

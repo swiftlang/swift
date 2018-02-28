@@ -174,15 +174,6 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.InputsAndOutputs.supplementaryOutputs()
-        .SerializedDiagnosticsPath = Path;
-  }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.InputsAndOutputs.supplementaryOutputs()
-        .SerializedDiagnosticsPath;
-  }
-
   LangOptions &getLangOptions() {
     return LangOpts;
   }
@@ -302,11 +293,20 @@ public:
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForPrimary(StringRef filename) const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
+
+  StringRef getOutputFilenameForAtMostOnePrimary() const;
+  StringRef getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
+  StringRef getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  StringRef getModuleOutputPathForAtMostOnePrimary() const;
+  StringRef
+  getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
+  StringRef getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -584,12 +584,13 @@ private:
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
 public:
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForPrimary(StringRef filename) const;
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
