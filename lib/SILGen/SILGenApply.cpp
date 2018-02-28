@@ -3788,6 +3788,10 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   auto subs = callee.getSubstitutions();
   auto upcastedSelf = uncurriedArgs.back();
 
+  // Make sure that upcasted self is at +1 since we are going to place it into a
+  // partial_apply.
+  upcastedSelf = upcastedSelf.ensurePlusOne(SGF, loc);
+
   auto constantInfo = SGF.getConstantInfo(callee.getMethodName());
   auto functionTy = constantInfo.getSILType();
   ManagedValue superMethod;
@@ -3813,11 +3817,9 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
     partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
 
-  SILValue partialApply =
-      SGF.B.createPartialApply(loc, superMethod.getValue(), partialApplyTy,
-                               subs, {upcastedSelf.forward(SGF)}, closureTy);
+  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod, partialApplyTy,
+                                             subs, {upcastedSelf}, closureTy);
   assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
-  ManagedValue pa = SGF.emitManagedRValueWithCleanup(partialApply);
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
 }
