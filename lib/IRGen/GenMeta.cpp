@@ -2692,19 +2692,23 @@ namespace {
     
     /// Flags to indicate Clang-imported declarations so we mangle them
     /// consistently at runtime.
-    uint16_t getClangImportedFlags() const {
+    void getClangImportedFlags(TypeContextDescriptorFlags &flags) const {
       auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type);
       if (!clangDecl)
-        return 0;
+        return;
       
-      if (isa<clang::TagDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTag;
+      if (isa<clang::TagDecl>(clangDecl)) {
+        flags.setIsCTag(true);
+        return;
+      }
       
       if (isa<clang::TypedefNameDecl>(clangDecl)
-          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTypedef;
+          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+        flags.setIsCTypedef(true);
+        return;
+      }
       
-      return 0;
+      return;
     }
 
     // Subclasses should provide:
@@ -2811,15 +2815,23 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
+
+      // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
+
+      // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-      B.addInt32(1); // struct always reflectable
 
       addFieldTypes(IGM, getType(), properties);
     }
     
     uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
+      TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(true); // struct always reflectable
+
+      getClangImportedFlags(flags);
+      return flags.getOpaqueValue();
     }
   };
   
@@ -2834,11 +2846,14 @@ namespace {
     
     Size GenericParamsOffset;
     Size PayloadSizeOffset;
+    const EnumImplStrategy &Strategy;
     
   public:
     EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type,
                                  RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata)
+      : super(IGM, Type, requireMetadata),
+        Strategy(getEnumImplStrategy(IGM,
+                     getType()->getDeclaredTypeInContext()->getCanonicalType()))
     {
       auto &layout = IGM.getMetadataLayout(getType());
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
@@ -2855,12 +2870,8 @@ namespace {
     }
     
     void addLayoutInfo() {
-      auto &strategy = getEnumImplStrategy(IGM,
-                     getType()->getDeclaredTypeInContext()->getCanonicalType());
-      
-      
       // # payload cases in the low 24 bits, payload size offset in the high 8.
-      unsigned numPayloads = strategy.getElementsWithPayload().size();
+      unsigned numPayloads = Strategy.getElementsWithPayload().size();
       assert(numPayloads < (1<<24) && "too many payload elements for runtime");
       assert(PayloadSizeOffset % IGM.getPointerAlignment() == Size(0)
              && "payload size not word-aligned");
@@ -2868,16 +2879,23 @@ namespace {
         = PayloadSizeOffset / IGM.getPointerSize();
       assert(PayloadSizeOffsetInWords < 0x100 &&
              "payload size offset too far from address point for runtime");
-      B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
-      // # empty cases
-      B.addInt32(strategy.getElementsWithNoPayload().size());
-      B.addInt32(strategy.isReflectable());
 
-      addFieldTypes(IGM, strategy.getElementsWithPayload());
+      // uint32_t NumPayloadCasesAndPayloadSizeOffset;
+      B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
+
+      // uint32_t NumEmptyCases;
+      B.addInt32(Strategy.getElementsWithNoPayload().size());
+
+      addFieldTypes(IGM, Strategy.getElementsWithPayload());
     }
     
     uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
+      TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(Strategy.isReflectable());
+
+      getClangImportedFlags(flags);
+      return flags.getOpaqueValue();
     }
   };
   
@@ -2890,6 +2908,8 @@ namespace {
     ClassDecl *getType() {
       return cast<ClassDecl>(Type);
     }
+
+    Optional<TypeEntityReference> SuperClassRef;
 
     // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
@@ -2908,6 +2928,10 @@ namespace {
         VTable = nullptr;
         VTableSize = 0;
         return;
+      }
+
+      if (auto superclassDecl = getType()->getSuperclassDecl()) {
+        SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
       }
 
       auto &layout = IGM.getClassMetadataLayout(getType());
@@ -2936,19 +2960,26 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      uint16_t flags = 0;
+      TypeContextDescriptorFlags flags;
+
+      flags.setIsReflectable(true); // class is always reflectable
+
       if (!getType()->isForeign()) {
         if (VTableSize != 0)
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasVTable;
+          flags.class_setHasVTable(true);
 
         auto &layout = IGM.getClassMetadataLayout(getType());
         if (layout.hasResilientSuperclass())
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasResilientSuperclass;
+          flags.class_setHasResilientSuperclass(true);
+      }
+
+      if (SuperClassRef) {
+        flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
       }
       
-      flags |= getClangImportedFlags();
+      getClangImportedFlags(flags);
       
-      return flags;
+      return flags.getOpaqueValue();
     }
     
     Size getGenericParamsOffset() {
@@ -3009,9 +3040,19 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
+
+      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
+      if (SuperClassRef) {
+        B.addRelativeAddress(SuperClassRef->getValue());
+      } else {
+        B.addInt32(0);
+      }
+
+      // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
+
+      // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-      B.addInt32(1); // class is always reflectable
 
       addFieldTypes(IGM, getType(), properties);
     }

@@ -2431,14 +2431,20 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
                               Alignment alignment,
                               llvm::Type *defaultType,
                               ConstantReference::Directness forceIndirectness) {
+  // ObjC class references can always be directly referenced, even in
+  // the weird cases where we don't see a definition.
+  if (entity.isObjCClassRef()) {
+    auto value = getAddrOfObjCClassRef(
+      const_cast<ClassDecl *>(cast<ClassDecl>(entity.getDecl())));
+    return { cast<llvm::Constant>(value.getAddress()),
+             ConstantReference::Direct };
+  }
+
   // Ensure the variable is at least forward-declared.
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
       = getAddrOfForeignTypeMetadataCandidate(entity.getType());
     (void)foreignCandidate;
-  } else if (entity.isObjCClassRef()) {
-    (void)getAddrOfObjCClassRef(
-                  const_cast<ClassDecl *>(cast<ClassDecl>(entity.getDecl())));
   } else {
     getAddrOfLLVMVariable(entity, alignment, ConstantInit(),
                           defaultType, DebugTypeInfo());
@@ -2498,47 +2504,40 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, ConstantReference::Indirect};
 }
 
-namespace {
-struct TypeEntityInfo {
-  TypeMetadataRecordKind typeKind;
-  LinkEntity entity;
-  llvm::Type *defaultTy, *defaultPtrTy;
-
-  /// Adjust the flags once we know whether the reference to this entity
-  /// will be indirect.
-  void adjustForKnownRef(ConstantReference &ref) {
-    if (ref.isIndirect() &&
-        typeKind == TypeMetadataRecordKind::DirectNominalTypeDescriptor)
-      typeKind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
-  }
-};
-} // end anonymous namespace
-
-static TypeEntityInfo
-getTypeEntityInfo(IRGenModule &IGM, NominalTypeDecl *nom) {
-  TypeMetadataRecordKind typeKind;
+TypeEntityReference
+IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
+  TypeMetadataRecordKind kind;
   Optional<LinkEntity> entity;
-  llvm::Type *defaultTy, *defaultPtrTy;
+  llvm::Type *defaultTy;
 
-  auto clas = dyn_cast<ClassDecl>(nom);
-  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(IGM, clas)) {
+  auto clas = dyn_cast<ClassDecl>(decl);
+  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(*this, clas)) {
     // A reference to an Objective-C class object.
     assert(clas->isObjC() && "Must have an Objective-C class here");
 
-    typeKind = TypeMetadataRecordKind::IndirectObjCClass;
-    defaultTy = IGM.TypeMetadataPtrTy;
-    defaultPtrTy = IGM.TypeMetadataPtrTy;
+    kind = TypeMetadataRecordKind::IndirectObjCClass;
+    defaultTy = TypeMetadataPtrTy;
     entity = LinkEntity::forObjCClassRef(clas);
   } else {
-    // Conformances for generics and concrete subclasses of generics
-    // are represented by referencing the nominal type descriptor.
-    typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
-    entity = LinkEntity::forNominalTypeDescriptor(nom);
-    defaultTy = IGM.TypeContextDescriptorTy;
-    defaultPtrTy = IGM.TypeContextDescriptorPtrTy;
+    // A reference to a concrete type.
+    // TODO: consider using a symbolic reference (i.e. a symbol string
+    // to be looked up dynamically) for types defined outside the module.
+    kind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
+    entity = LinkEntity::forNominalTypeDescriptor(decl);
+    defaultTy = TypeContextDescriptorTy;
   }
 
-  return {typeKind, *entity, defaultTy, defaultPtrTy};
+  auto ref = getAddrOfLLVMVariableOrGOTEquivalent(
+      *entity, getPointerAlignment(), defaultTy);
+
+  // Adjust the flags now that we know whether the reference to this
+  // entity will be indirect.
+  if (ref.isIndirect()) {
+    assert(kind == TypeMetadataRecordKind::DirectNominalTypeDescriptor);
+    kind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
+  }
+
+  return TypeEntityReference(kind, ref.getValue());
 }
 
 /// Form an LLVM constant for the relative distance between a reference
@@ -2682,16 +2681,12 @@ namespace {
     }
 
     void addConformingType() {
-      // Relative reference to the type entity info, with the type reference
-      // kind mangled in the lower bits.
-      auto typeEntity =
-        getTypeEntityInfo(IGM, Conformance->getType()->getAnyNominal());
-      auto typeRef =
-        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-          typeEntity.entity, IGM.getPointerAlignment(), typeEntity.defaultTy);
-      typeEntity.adjustForKnownRef(typeRef);
-      B.addRelativeAddress(typeRef.getValue());
-      Flags = Flags.withTypeReferenceKind(typeEntity.typeKind);
+      // Add a relative reference to the type, with the type reference
+      // kind stored in the flags.
+      auto ref =
+        IGM.getTypeEntityReference(Conformance->getType()->getAnyNominal());
+      B.addRelativeAddress(ref.getValue());
+      Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
 
     void addWitnessTable() {
@@ -2879,16 +2874,13 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   SmallVector<llvm::Constant *, 8> elts;
   for (auto type : RuntimeResolvableTypes) {
-    auto typeEntity = getTypeEntityInfo(*this, type);
-    auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
-            typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
-    typeEntity.adjustForKnownRef(typeRef);
+    auto ref = getTypeEntityReference(type);
 
     // Form the relative address, with the type refernce kind in the low bits.
     unsigned arrayIdx = elts.size();
     llvm::Constant *relativeAddr =
-      emitDirectRelativeReference(typeRef.getValue(), var, { arrayIdx, 0 });
-    unsigned lowBits = static_cast<unsigned>(typeEntity.typeKind);
+      emitDirectRelativeReference(ref.getValue(), var, { arrayIdx, 0 });
+    unsigned lowBits = static_cast<unsigned>(ref.getKind());
     if (lowBits != 0) {
       relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
                        llvm::ConstantInt::get(RelativeAddressTy, lowBits));
