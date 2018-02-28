@@ -15,7 +15,6 @@
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
-#include "swift/SwiftRemoteMirror/SwiftRemoteMirrorLegacyInterop.h"
 
 #ifdef __APPLE__
 #include <mach-o/getsect.h>
