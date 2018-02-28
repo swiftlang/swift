@@ -675,12 +675,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
+    std::string BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
       BaseName = FEOpts.ModuleName;
-    Opts.SILOutputFileNameForDebugging = BaseName.str();
+    Opts.SILOutputFileNameForDebugging = BaseName;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
