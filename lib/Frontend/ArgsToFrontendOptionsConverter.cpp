@@ -93,9 +93,11 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   computeDumpScopeMapLocations();
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
-          .convert())
+  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+      ArgsToFrontendInputsConverter(Diags, Args).convert();
+  if (!inputsAndOutputs)
     return true;
+  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
   Opts.RequestedAction = determineRequestedAction(Args);
 

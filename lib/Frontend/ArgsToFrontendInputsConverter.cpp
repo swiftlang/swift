@@ -30,33 +30,34 @@ using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args,
-    FrontendInputsAndOutputs &inputsAndOutputs)
-    : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
+    DiagnosticEngine &diags, const ArgList &args)
+    : Diags(diags), Args(args),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
-bool ArgsToFrontendInputsConverter::convert() {
+Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert() {
   if (enforceFilelistExclusion())
-    return true;
+    return None;
   if (FilelistPathArg ? readInputFilesFromFilelist()
                       : readInputFilesFromCommandLine())
-    return true;
+    return None;
   Optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
   if (!primaryFiles)
-    return true;
-  std::set<StringRef> unusedPrimaryFiles =
+    return None;
+
+  FrontendInputsAndOutputs result;
+  std::set<StringRef> unusedPrimaryFiles;
+  std::tie(result, unusedPrimaryFiles) =
       createInputFilesConsumingPrimaries(*primaryFiles);
 
-  if (checkForMissingPrimaryFiles(unusedPrimaryFiles))
-    return true;
+  if (diagnoseUnusedPrimaryFiles(unusedPrimaryFiles))
+    return None;
 
   // Must be set before iterating over inputs needing outputs.
-  InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
-
-  InputsAndOutputs.setBypassBatchModeChecks(
+  result.setBypassBatchModeChecks(
       Args.hasArg(options::OPT_bypass_batch_mode_checks));
-  return false;
+
+  return std::move(result);
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -137,34 +138,38 @@ ArgsToFrontendInputsConverter::readPrimaryFiles() {
   return primaryFiles;
 }
 
-std::set<StringRef>
+std::pair<FrontendInputsAndOutputs, std::set<StringRef>>
 ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
     std::set<StringRef> primaryFiles) {
+  bool hasAnyPrimaryFiles = !primaryFiles.empty();
+
+  FrontendInputsAndOutputs result;
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    InputsAndOutputs.addInput(InputFile(file, isPrimary));
+    result.addInput(InputFile(file, isPrimary));
     if (isPrimary)
       primaryFiles.erase(file);
   }
-  return primaryFiles;
+
+  if (!Files.empty() && !hasAnyPrimaryFiles) {
+    Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+        OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                         Diags);
+    if (userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1)
+      result.setIsSingleThreadedWMO(true);
+  }
+
+  return {std::move(result), std::move(primaryFiles)};
 }
 
-bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
+bool ArgsToFrontendInputsConverter::diagnoseUnusedPrimaryFiles(
     std::set<StringRef> primaryFiles) {
   for (auto &file : primaryFiles) {
     // Catch "swiftc -frontend -c -filelist foo -primary-file
     // some-file-not-in-foo".
-    assert(FilelistPathArg && "Missing primary with no filelist");
+    assert(FilelistPathArg && "Unused primary with no filelist");
     Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                    FilelistPathArg->getValue());
   }
   return !primaryFiles.empty();
-}
-
-bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
-  Optional<std::vector<std::string>> userSuppliedNamesOrErr =
-      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
-                                                                       Diags);
-  return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
-         userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1;
 }
