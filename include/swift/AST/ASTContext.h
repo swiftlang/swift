@@ -471,13 +471,6 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
-  /// Retrieve the declaration of
-  /// Swift._combineHashValues(Int, Int) -> Int.
-  FuncDecl *getCombineHashValuesDecl() const;
-
-  /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
-  FuncDecl *getMixIntDecl() const;
-
   /// Retrieve the declaration of Swift._hashValue<H>(for: H) -> Int.
   FuncDecl *getHashValueForDecl() const;
 
