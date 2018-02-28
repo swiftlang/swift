@@ -2,6 +2,12 @@
 version: 0
 case-sensitive: false
 roots:
+  - name: "@VCToolsInstallDir@/include"
+    type: directory
+    contents:
+      - name: ConcurrencySal.h
+        type: file
+        external-contents: "@VCToolsInstallDir@/include/concurrencysal.h"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared"
     type: directory
     contents:
