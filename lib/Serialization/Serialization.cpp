@@ -48,6 +48,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -100,7 +101,7 @@ namespace {
       switch (key.getKind()) {
         case DeclBaseName::Kind::Normal:
           assert(!key.empty());
-          return llvm::HashString(key.getIdentifier().str());
+          return llvm::djbHash(key.getIdentifier().str());
         case DeclBaseName::Kind::Subscript:
           return static_cast<uint8_t>(DeclNameKind::Subscript);
         case DeclBaseName::Kind::Destructor:
@@ -167,7 +168,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      return llvm::djbHash(key.str());
     }
 
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
@@ -229,7 +230,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key);
+      return llvm::djbHash(key);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -269,7 +270,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      return llvm::djbHash(key.str());
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -312,7 +313,7 @@ namespace {
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         assert(!key.empty());
-        return llvm::HashString(key.getIdentifier().str());
+        return llvm::djbHash(key.getIdentifier().str());
       case DeclBaseName::Kind::Subscript:
         return static_cast<uint8_t>(DeclNameKind::Subscript);
       case DeclBaseName::Kind::Destructor:
@@ -4265,7 +4266,7 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    return llvm::djbHash(key);
   }
 
   std::pair<unsigned, unsigned>
@@ -4636,7 +4637,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       llvm::SmallString<32> scratch;
-      return llvm::HashString(key.getString(scratch));
+      return llvm::djbHash(key.getString(scratch));
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,

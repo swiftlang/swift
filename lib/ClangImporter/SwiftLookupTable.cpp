@@ -33,6 +33,7 @@
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
 using namespace swift;
@@ -1054,7 +1055,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return static_cast<unsigned>(key.first) + llvm::HashString(key.second);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -1297,7 +1298,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(internal_key_type key) {
-      return static_cast<unsigned>(key.first) + llvm::HashString(key.second);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
