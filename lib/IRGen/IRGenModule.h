@@ -97,6 +97,7 @@ namespace swift {
   class SourceLoc;
   class SourceFile;
   class Type;
+  enum class TypeMetadataRecordKind : unsigned;
 
 namespace Lowering {
   class TypeConverter;
@@ -411,6 +412,18 @@ public:
   explicit operator bool() const {
     return ValueAndIsIndirect.getPointer() != nullptr;
   }
+};
+
+/// A reference to a declared type entity.
+class TypeEntityReference {
+  TypeMetadataRecordKind Kind;
+  llvm::Constant *Value;
+public:
+  TypeEntityReference(TypeMetadataRecordKind kind, llvm::Constant *value)
+    : Kind(kind), Value(value) {}
+
+  TypeMetadataRecordKind getKind() const { return Kind; }
+  llvm::Constant *getValue() const { return Value; }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -1111,6 +1124,8 @@ public:
                                   bool isConstant,
                                   ConstantInitFuture init,
                                   llvm::StringRef section = {});
+
+  TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
   ConstantReference getAddrOfTypeMetadata(CanType concreteType,
