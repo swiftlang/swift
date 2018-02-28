@@ -26,8 +26,8 @@ class IRGenModule;
 
 /// Create an IRGen module.
 std::pair<IRGenerator *, IRGenModule *>
-createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
-                  StringRef MainInputFilenameForDebugInfo,
+createIRGenModule(SILModule *SILMod, const std::string &OutputFilename,
+                  const std::string &MainInputFilenameForDebugInfo,
                   llvm::LLVMContext &LLVMContext);
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.

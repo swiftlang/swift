@@ -174,15 +174,6 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.InputsAndOutputs.supplementaryOutputs()
-        .SerializedDiagnosticsPath = Path;
-  }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.InputsAndOutputs.supplementaryOutputs()
-        .SerializedDiagnosticsPath;
-  }
-
   LangOptions &getLangOptions() {
     return LangOpts;
   }
@@ -245,8 +236,7 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-
-  StringRef getOutputFilename() const {
+  const std::string &getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
@@ -302,11 +292,21 @@ public:
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForPrimary(StringRef filename) const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
+
+  const std::string &getOutputFilenameForAtMostOnePrimary() const;
+  const std::string &
+  getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
+  const std::string &getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  const std::string &getModuleOutputPathForAtMostOnePrimary() const;
+  const std::string &
+  getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
+  const std::string &getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -584,12 +584,13 @@ private:
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
 public:
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForPrimary(StringRef filename) const;
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 

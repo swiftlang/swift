@@ -35,6 +35,11 @@ public:
       : OutputFilename(OutputFilename),
         SupplementaryOutputs(SupplementaryOutputs),
         MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo) {}
+
+  bool haveModuleOrModuleDocOutputPaths() const {
+    return !SupplementaryOutputs.ModuleOutputPath.empty() ||
+           !SupplementaryOutputs.ModuleDocOutputPath.empty();
+  }
 };
 } // namespace swift
 

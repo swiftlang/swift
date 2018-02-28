@@ -33,7 +33,7 @@ using namespace llvm::opt;
 
 bool ArgsToFrontendOutputsConverter::convert(
     std::vector<std::string> &mainOutputs,
-    SupplementaryOutputPaths &supplementaryOutputs) {
+    std::vector<SupplementaryOutputPaths> &supplementaryOutputs) {
 
   Optional<OutputFilesComputer> ofc =
       OutputFilesComputer::create(Args, Diags, InputsAndOutputs);
@@ -51,10 +51,7 @@ bool ArgsToFrontendOutputsConverter::convert(
     return true;
 
   mainOutputs = std::move(*mains);
-  assert(supplementaries->size() <= 1 &&
-         "Have not implemented multiple primaries yet");
-  if (!supplementaries->empty())
-    supplementaryOutputs = std::move(supplementaries->front());
+  supplementaryOutputs = std::move(*supplementaries);
   return false;
 }
 
@@ -103,9 +100,10 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
   ArrayRef<std::string> outputFileArguments =
       outputDirectoryArgument.empty() ? ArrayRef<std::string>(*outputArguments)
                                       : ArrayRef<std::string>();
-  const StringRef firstInput = inputsAndOutputs.hasSingleInput()
-                                   ? inputsAndOutputs.getFilenameOfFirstInput()
-                                   : StringRef();
+  const std::string &firstInput =
+      inputsAndOutputs.hasSingleInput()
+          ? inputsAndOutputs.getFilenameOfFirstInput()
+          : std::string();
   const FrontendOptions::ActionType requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(args);
 
@@ -130,7 +128,7 @@ OutputFilesComputer::OutputFilesComputer(
     const llvm::opt::ArgList &args, DiagnosticEngine &diags,
     const FrontendInputsAndOutputs &inputsAndOutputs,
     std::vector<std::string> outputFileArguments,
-    const StringRef outputDirectoryArgument, const StringRef firstInput,
+    const StringRef outputDirectoryArgument, const std::string &firstInput,
     const FrontendOptions::ActionType requestedAction,
     const llvm::opt::Arg *moduleNameArg, const StringRef suffix,
     const bool hasTextualOutput)
@@ -143,21 +141,19 @@ OutputFilesComputer::OutputFilesComputer(
 Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
-  bool hadError = false;
   unsigned i = 0;
-  InputsAndOutputs.forEachInputProducingAMainOutputFile(
-      [&](const InputFile &input) -> void {
+  bool hadError = InputsAndOutputs.forEachInputProducingAMainOutputFile(
+      [&](const InputFile &input) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
                                   : StringRef(OutputFileArguments[i++]);
 
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
-        if (!outputFile) {
-          hadError = true;
-          return;
-        }
+        if (!outputFile)
+          return true;
         outputFiles.push_back(*outputFile);
+        return false;
       });
   return hadError ? None : Optional<std::vector<std::string>>(outputFiles);
 }
@@ -208,7 +204,7 @@ Optional<std::string> OutputFilesComputer::deriveOutputFileForDirectory(
 
 std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
-  StringRef nameToStem =
+  std::string nameToStem =
       input.isPrimary()
           ? input.file()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
@@ -256,15 +252,15 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
 
   std::vector<SupplementaryOutputPaths> outputPaths;
   unsigned i = 0;
-  bool hadError = false;
-  InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &input) -> void {
+  bool hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> bool {
         if (auto suppPaths = computeOutputPathsForOneInput(
-                OutputFiles[i], (*pathsFromUser)[i], input))
+                OutputFiles[i], (*pathsFromUser)[i], input)) {
+          ++i;
           outputPaths.push_back(*suppPaths);
-        else
-          hadError = true;
-        ++i;
+          return false;
+        }
+        return true;
       });
   if (hadError)
     return None;

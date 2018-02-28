@@ -56,19 +56,54 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForPrimary(
+const PrimarySpecificPaths &
+CompilerInvocation::getPrimarySpecificPathsForPrimary(
     StringRef filename) const {
   return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
 }
 
-PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForSourceFile(
+const PrimarySpecificPaths &
+CompilerInvocation::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return getPrimarySpecificPathsForPrimary(SF.getFilename());
+}
+
+const std::string &
+CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename;
+}
+const std::string &
+CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
+    const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .MainInputFilenameForDebugInfo;
+}
+
+const std::string &
+CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.ObjCHeaderOutputPath;
+}
+const std::string &
+CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.ModuleOutputPath;
+}
+const std::string &
+CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.ReferenceDependenciesFilePath;
+}
+const std::string &
+CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.SerializedDiagnosticsPath;
 }
 
 void CompilerInstance::createSILModule() {
@@ -103,9 +138,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.supplementaryOutputs()
-           .ModuleDocOutputPath.empty())
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasModuleDocOutputPath())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   // If we are doing index-while-building, configure lexing and parsing to
@@ -849,20 +882,21 @@ void CompilerInstance::freeASTContext() {
 
 void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode()
     const {
   return getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return Invocation.getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return Invocation.getPrimarySpecificPathsForPrimary(filename);
 }
-PrimarySpecificPaths CompilerInstance::getPrimarySpecificPathsForSourceFile(
+const PrimarySpecificPaths &
+CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }

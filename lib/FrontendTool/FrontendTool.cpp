@@ -99,20 +99,20 @@ static std::string displayName(StringRef MainExecutablePath) {
 }
 
 /// Emits a Make-style dependencies file.
-static bool emitMakeDependencies(DiagnosticEngine &diags,
-                                 DependencyTracker &depTracker,
-                                 const FrontendOptions &opts,
-                                 const InputFile &input) {
+static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
+                                         DependencyTracker *depTracker,
+                                         const FrontendOptions &opts,
+                                         const InputFile &input) {
+  const std::string &dependenciesFilePath = input.dependenciesFilePath();
+  if (dependenciesFilePath.empty())
+    return false;
+
   std::error_code EC;
-  llvm::raw_fd_ostream out(
-      opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath, EC,
-      llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(
-        SourceLoc(), diag::error_opening_output,
-        opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath,
-        EC.message());
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   dependenciesFilePath, EC.message());
     out.clear_error();
     return true;
   }
@@ -139,7 +139,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
-  opts.forAllOutputPaths(input, [&](StringRef targetName) {
+  opts.forAllOutputPaths(input, [&](const std::string &targetName) {
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
@@ -148,7 +148,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
-           reversePathSortedFilenames(depTracker.getDependencies()))
+           reversePathSortedFilenames(depTracker->getDependencies()))
       out << ' ' << escape(path);
     out << '\n';
   });
@@ -156,15 +156,13 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   return false;
 }
 
-static bool emitMakeDependencies(DiagnosticEngine &diags,
-                                 DependencyTracker &depTracker,
-                                 const FrontendOptions &opts) {
-  bool hadError = false;
-  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &f) -> void {
-        hadError = emitMakeDependencies(diags, depTracker, opts, f) || hadError;
+static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
+                                         DependencyTracker *depTracker,
+                                         const FrontendOptions &opts) {
+  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &f) -> bool {
+        return emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
       });
-  return hadError;
 }
 
 namespace {
@@ -187,22 +185,18 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
-static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
-                                          DependencyTracker *depTracker,
-                                          const FrontendOptions &opts) {
-  if (opts.InputsAndOutputs.supplementaryOutputs()
-          .LoadedModuleTracePath.empty())
+static bool
+emitLoadedModuleTraceIfNeeded(ASTContext &ctxt, DependencyTracker *depTracker,
+                              const std::string &loadedModuleTracePath,
+                              StringRef moduleName) {
+  if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;
-  llvm::raw_fd_ostream out(
-      opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath, EC,
-      llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(
-        SourceLoc(), diag::error_opening_output,
-        opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath,
-        EC.message());
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        loadedModuleTracePath, EC.message());
     out.clear_error();
     return true;
   }
@@ -235,7 +229,7 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
   }
 
   LoadedModuleTraceFormat trace = {
-      /*name=*/opts.ModuleName,
+      /*name=*/moduleName,
       /*arch=*/ctxt.LangOpts.Target.getArchName(),
       /*swiftmodules=*/reversePathSortedFilenames(swiftModules)};
 
@@ -255,6 +249,16 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
   return true;
 }
 
+static bool
+emitLoadedModuleTraceForAllPrimariesIfNeeded(ASTContext &ctxt,
+                                             DependencyTracker *depTracker,
+                                             const FrontendOptions &opts) {
+  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> bool {
+        return emitLoadedModuleTraceIfNeeded(
+            ctxt, depTracker, input.loadedModuleTracePath(), opts.ModuleName);
+      });
+}
 
 /// Gets an output stream for the provided output filename, or diagnoses to the
 /// provided AST Context and returns null if there was an error getting the
@@ -739,19 +743,18 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.supplementaryOutputs()
-          .ReferenceDependenciesFilePath.empty())
-    return;
-  if (Instance.getPrimarySourceFiles().empty()) {
+          .InputsAndOutputs.hasReferenceDependenciesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    std::string referenceDependenciesFilePath =
-        Invocation.getPrimarySpecificPathsForSourceFile(*SF)
-            .SupplementaryOutputs.ReferenceDependenciesFilePath;
-    emitReferenceDependenciesIfNeeded(Instance.getASTContext().Diags, SF,
+    const std::string &referenceDependenciesFilePath =
+        Invocation.getReferenceDependenciesFilePathForPrimary(
+            SF->getFilename());
+    if (!referenceDependenciesFilePath.empty())
+      (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                       *Instance.getDependencyTracker(),
                                       referenceDependenciesFilePath);
   }
@@ -759,18 +762,21 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  StringRef TBDPath = Invocation.getFrontendOptions()
-                          .InputsAndOutputs.supplementaryOutputs()
-                          .TBDPath;
-  if (TBDPath.empty())
-    return false;
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
-                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+  return Invocation.getFrontendOptions()
+      .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+          [&](const InputFile &input) -> bool {
+            const std::string &TBDPath = input.TBDPath();
+            if (TBDPath.empty())
+              return false;
+            auto installName =
+                Invocation.getFrontendOptions().TBDInstallName.empty()
+                    ? "lib" + Invocation.getModuleName().str() + ".dylib"
+                    : Invocation.getFrontendOptions().TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
-                  installName);
+            return writeTBD(Instance.getMainModule(),
+                            Invocation.getSILOptions().hasMultipleIGMs(),
+                            TBDPath, installName);
+          });
 }
 
 static std::deque<PostSILGenInputs>
@@ -822,13 +828,25 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
         auto SM = performSILGeneration(*SASTF, SILOpts, None);
-        const PrimarySpecificPaths PSPs =
+        const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
             PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod, PSPs});
       }
   }
   return PSGIs;
+}
+
+/// Emits index data for all primary inputs, or the main module.
+static bool
+emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
+  bool hadEmitIndexDataError = false;
+  if (Instance.getPrimarySourceFiles().empty())
+    return emitIndexDataIfNeeded(nullptr, Invocation, Instance);
+  for (SourceFile *SF : Instance.getPrimarySourceFiles())
+    hadEmitIndexDataError = emitIndexDataIfNeeded(SF, Invocation, Instance) ||
+                            hadEmitIndexDataError;
+  return hadEmitIndexDataError;
 }
 
 static bool performCompileStepsPostSILGen(
@@ -905,20 +923,17 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.InputsAndOutputs.supplementaryOutputs()
-           .DependenciesFilePath.empty())
-    (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
-                               opts);
+  (void)emitMakeDependenciesIfNeeded(Context.Diags,
+                                     Instance.getDependencyTracker(), opts);
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
-  (void)emitLoadedModuleTraceIfNeeded(Context, Instance.getDependencyTracker(),
-                                      opts);
+  (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
+      Context, Instance.getDependencyTracker(), opts);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
-    (void)emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
-                                Instance);
+    (void)emitIndexData(Invocation, Instance);
     return true;
   }
 
@@ -932,11 +947,11 @@ static bool performCompile(CompilerInstance &Instance,
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
     const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
-    const bool hadEmitIndexDataError = emitIndexDataIfNeeded(
-        Instance.getPrimarySourceFile(), Invocation, Instance);
+    const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
+
     return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
 
@@ -1008,7 +1023,7 @@ computeSerializationOptions(const CompilerInvocation &Invocation,
   serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader)
+  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.ExtraClangOptions =
@@ -1263,21 +1278,21 @@ static bool performCompileStepsPostSILGen(
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
 
-  const bool haveModulePath =
-      !PSPs.SupplementaryOutputs.ModuleOutputPath.empty() ||
-      !PSPs.SupplementaryOutputs.ModuleDocOutputPath.empty();
-  if (haveModulePath && !SM->isSerialized())
-    SM->serialize();
+  {
+    const bool haveModulePath = PSPs.haveModuleOrModuleDocOutputPaths();
+    if (haveModulePath && !SM->isSerialized())
+      SM->serialize();
 
-  if (haveModulePath) {
-    if (Action == FrontendOptions::ActionType::MergeModules ||
-        Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      // What if MSF is a module?
-      // emitIndexDataIfNeeded already handles that case;
-      // it'll index everything.
-      return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
-                                   Instance) ||
-             Context.hadError();
+    if (haveModulePath) {
+      if (Action == FrontendOptions::ActionType::MergeModules ||
+          Action == FrontendOptions::ActionType::EmitModuleOnly) {
+        // What if MSF is a module?
+        // emitIndexDataIfNeeded already handles that case;
+        // it'll index everything.
+        return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
+                                     Instance) ||
+               Context.hadError();
+      }
     }
   }
 
@@ -1360,15 +1375,18 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
   }
 
   if (PrimarySourceFile) {
-    if (index::indexAndRecord(
-            PrimarySourceFile, opts.InputsAndOutputs.getSingleOutputFilename(),
-            opts.IndexStorePath, opts.IndexSystemModules, isDebugCompilation,
-            Invocation.getTargetTriple(), *Instance.getDependencyTracker())) {
+    const PrimarySpecificPaths &PSPs =
+        opts.InputsAndOutputs.getPrimarySpecificPathsForPrimary(
+            PrimarySourceFile->getFilename());
+    if (index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
+                              opts.IndexStorePath, opts.IndexSystemModules,
+                              isDebugCompilation, Invocation.getTargetTriple(),
+                              *Instance.getDependencyTracker())) {
       return true;
     }
   } else {
-    StringRef moduleToken =
-        opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath;
+    std::string moduleToken =
+        Invocation.getModuleOutputPathForAtMostOnePrimary();
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
@@ -1472,7 +1490,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   std::string InputName =
       FEOpts.InputsAndOutputs.getStatsFileMangledInputName();
   StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-  StringRef OutFile =
+  const std::string &OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();
@@ -1606,12 +1624,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // arguments are generated by the driver, not directly by a user. The driver
   // is responsible for emitting diagnostics for its own errors. See SR-2683
   // for details.
+  //
+  // FIXME: Do we need one SerializedConsumer per primary? Owned by the
+  // SourceFile?
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
-        Invocation.getFrontendOptions()
-            .InputsAndOutputs.supplementaryOutputs()
-            .SerializedDiagnosticsPath;
+        Invocation.getSerializedDiagnosticsPathForAtMostOnePrimary();
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1646,17 +1665,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.supplementaryOutputs()
-           .DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions()
-           .InputsAndOutputs.supplementaryOutputs()
-           .ReferenceDependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions()
-           .InputsAndOutputs.supplementaryOutputs()
-           .LoadedModuleTracePath.empty()) {
-    Instance->setDependencyTracker(&depTracker);
+  {
+    const FrontendInputsAndOutputs &io =
+        Invocation.getFrontendOptions().InputsAndOutputs;
+    if (io.hasDependencyTrackerPath() ||
+        !Invocation.getFrontendOptions().IndexStorePath.empty()) {
+      Instance->setDependencyTracker(&depTracker);
+    }
   }
 
   if (Instance->setup(Invocation)) {

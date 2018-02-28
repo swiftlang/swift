@@ -39,7 +39,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 }
 
 bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIGMs,
-                     StringRef OutputFilename, StringRef installName) {
+                     const std::string &OutputFilename, StringRef installName) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {

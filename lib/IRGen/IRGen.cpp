@@ -664,11 +664,10 @@ static void initLLVMModule(const IRGenModule &IGM) {
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());
 }
 
-std::pair<IRGenerator *, IRGenModule *>
-swift::irgen::createIRGenModule(SILModule *SILMod,
-                                StringRef OutputFilename,
-                                StringRef MainInputFilenameForDebugInfo,
-                                llvm::LLVMContext &LLVMContext) {
+std::pair<IRGenerator *, IRGenModule *> swift::irgen::createIRGenModule(
+    SILModule *SILMod, const std::string &OutputFilename,
+    const std::string &MainInputFilenameForDebugInfo,
+    llvm::LLVMContext &LLVMContext) {
 
   IRGenOptions Opts;
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);

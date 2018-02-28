@@ -282,8 +282,10 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
 private:
   static bool canActionEmitDependencies(ActionType);

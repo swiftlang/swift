@@ -25,7 +25,7 @@ class FileUnit;
 class FrontendOptions;
 
 bool writeTBD(ModuleDecl *M, bool hasMultipleIGMs,
-              llvm::StringRef OutputFilename, llvm::StringRef installName);
+              const std::string &OutputFilename, llvm::StringRef installName);
 bool inputFileKindCanHaveTBDValidated(InputFileKind kind);
 bool validateTBD(ModuleDecl *M, llvm::Module &IRModule, bool hasMultipleIGMs,
                  bool diagnoseExtraSymbolsInTBD);

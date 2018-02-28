@@ -43,7 +43,7 @@ public:
         Diags(diags) {}
 
   bool convert(std::vector<std::string> &mainOutputs,
-               SupplementaryOutputPaths &supplementaryOutputs);
+               std::vector<SupplementaryOutputPaths> &supplementaryOutputs);
 
   /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.
@@ -57,7 +57,7 @@ class OutputFilesComputer {
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const std::vector<std::string> OutputFileArguments;
   const std::string OutputDirectoryArgument;
-  const StringRef FirstInput;
+  const std::string &FirstInput;
   const FrontendOptions::ActionType RequestedAction;
   const llvm::opt::Arg *const ModuleNameArg;
   const StringRef Suffix;
@@ -66,7 +66,8 @@ class OutputFilesComputer {
   OutputFilesComputer(const llvm::opt::ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
                       std::vector<std::string> outputFileArguments,
-                      StringRef outputDirectoryArgument, StringRef firstInput,
+                      StringRef outputDirectoryArgument,
+                      const std::string &firstInput,
                       FrontendOptions::ActionType requestedAction,
                       const llvm::opt::Arg *moduleNameArg, StringRef suffix,
                       bool hasTextualOutput);
