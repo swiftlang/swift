@@ -446,6 +446,8 @@ void SILType::dump() const {
 
 namespace {
   
+class SILPrinter;
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -2017,114 +2019,10 @@ public:
     
     *this << "root $" << KPI->getPattern()->getRootType();
 
-    auto printComponentIndices =
-      [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
-        *this << '[';
-        interleave(indices,
-          [&](const KeyPathPatternComponent::Index &i) {
-            *this << "%$" << i.Operand << " : $"
-                  << i.FormalType << " : "
-                  << i.LoweredType;
-          }, [&]{
-            *this << ", ";
-          });
-        *this << ']';
-      };
-
     for (auto &component : pattern->getComponents()) {
       *this << "; ";
-      
-      switch (auto kind = component.getKind()) {
-      case KeyPathPatternComponent::Kind::StoredProperty: {
-        auto prop = component.getStoredPropertyDecl();
-        *this << "stored_property #";
-        printValueDecl(prop, PrintState.OS);
-        *this << " : $" << component.getComponentType();
-        break;
-      }
-      case KeyPathPatternComponent::Kind::GettableProperty:
-      case KeyPathPatternComponent::Kind::SettableProperty: {
-        *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
-                    ? "gettable_property $" : "settable_property $")
-              << component.getComponentType() << ", "
-              << " id ";
-        auto id = component.getComputedPropertyId();
-        switch (id.getKind()) {
-        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-          auto declRef = id.getDeclRef();
-          *this << declRef << " : "
-                << declRef.getDecl()->getInterfaceType();
-          break;
-        }
-        case KeyPathPatternComponent::ComputedPropertyId::Function: {
-          id.getFunction()->printName(PrintState.OS);
-          *this << " : " << id.getFunction()->getLoweredType();
-          break;
-        }
-        case KeyPathPatternComponent::ComputedPropertyId::Property: {
-          *this << "##";
-          printValueDecl(id.getProperty(), PrintState.OS);
-          break;
-        }
-        }
-        *this << ", getter ";
-        component.getComputedPropertyGetter()->printName(PrintState.OS);
-        *this << " : "
-              << component.getComputedPropertyGetter()->getLoweredType();
-        if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
-          *this << ", setter ";
-          component.getComputedPropertySetter()->printName(PrintState.OS);
-          *this << " : "
-                << component.getComputedPropertySetter()->getLoweredType();
-        }
-        
-        if (!component.getSubscriptIndices().empty()) {
-          *this << ", indices ";
-          printComponentIndices(component.getSubscriptIndices());
-          *this << ", indices_equals ";
-          component.getSubscriptIndexEquals()->printName(PrintState.OS);
-          *this << " : "
-                << component.getSubscriptIndexEquals()->getLoweredType();
-          *this << ", indices_hash ";
-          component.getSubscriptIndexHash()->printName(PrintState.OS);
-          *this << " : "
-                << component.getSubscriptIndexHash()->getLoweredType();
-        }
-        break;
-      }
-      case KeyPathPatternComponent::Kind::OptionalWrap:
-      case KeyPathPatternComponent::Kind::OptionalChain:
-      case KeyPathPatternComponent::Kind::OptionalForce: {
-        switch (kind) {
-        case KeyPathPatternComponent::Kind::OptionalWrap:
-          *this << "optional_wrap : $";
-          break;
-        case KeyPathPatternComponent::Kind::OptionalChain:
-          *this << "optional_chain : $";
-          break;
-        case KeyPathPatternComponent::Kind::OptionalForce:
-          *this << "optional_force : $";
-          break;
-        default:
-          llvm_unreachable("out of sync");
-        }
-        *this << component.getComponentType();
-        break;
-      }
-      case KeyPathPatternComponent::Kind::External: {
-        *this << "external #";
-        printValueDecl(component.getExternalDecl(), PrintState.OS);
-        if (!component.getExternalSubstitutions().empty()) {
-          printSubstitutions(component.getExternalSubstitutions());
-        }
-        
-        if (!component.getSubscriptIndices().empty()) {
-          printComponentIndices(component.getSubscriptIndices());
-        }
-        
-        *this << " : $" << component.getComponentType();
-      }
-      }
+
+      printKeyPathPatternComponent(component);
     }
     
     *this << ')';
@@ -2143,6 +2041,115 @@ public:
         });
       
       *this << ")";
+    }
+  }
+  
+  void
+  printKeyPathPatternComponent(const KeyPathPatternComponent &component) {
+    auto printComponentIndices =
+      [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
+        *this << '[';
+        interleave(indices,
+          [&](const KeyPathPatternComponent::Index &i) {
+            *this << "%$" << i.Operand << " : $"
+                  << i.FormalType << " : "
+                  << i.LoweredType;
+          }, [&]{
+            *this << ", ";
+          });
+        *this << ']';
+      };
+
+    switch (auto kind = component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto prop = component.getStoredPropertyDecl();
+      *this << "stored_property #";
+      printValueDecl(prop, PrintState.OS);
+      *this << " : $" << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty: {
+      *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
+                  ? "gettable_property $" : "settable_property $")
+            << component.getComponentType() << ", "
+            << " id ";
+      auto id = component.getComputedPropertyId();
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
+        *this << declRef << " : "
+              << declRef.getDecl()->getInterfaceType();
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Function: {
+        id.getFunction()->printName(PrintState.OS);
+        *this << " : " << id.getFunction()->getLoweredType();
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property: {
+        *this << "##";
+        printValueDecl(id.getProperty(), PrintState.OS);
+        break;
+      }
+      }
+      *this << ", getter ";
+      component.getComputedPropertyGetter()->printName(PrintState.OS);
+      *this << " : "
+            << component.getComputedPropertyGetter()->getLoweredType();
+      if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+        *this << ", setter ";
+        component.getComputedPropertySetter()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertySetter()->getLoweredType();
+      }
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices ";
+        printComponentIndices(component.getSubscriptIndices());
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce: {
+      switch (kind) {
+      case KeyPathPatternComponent::Kind::OptionalWrap:
+        *this << "optional_wrap : $";
+        break;
+      case KeyPathPatternComponent::Kind::OptionalChain:
+        *this << "optional_chain : $";
+        break;
+      case KeyPathPatternComponent::Kind::OptionalForce:
+        *this << "optional_force : $";
+        break;
+      default:
+        llvm_unreachable("out of sync");
+      }
+      *this << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::External: {
+      *this << "external #";
+      printValueDecl(component.getExternalDecl(), PrintState.OS);
+      if (!component.getExternalSubstitutions().empty()) {
+        printSubstitutions(component.getExternalSubstitutions());
+      }
+      
+      if (!component.getSubscriptIndices().empty()) {
+        printComponentIndices(component.getSubscriptIndices());
+      }
+      
+      *this << " : $" << component.getComponentType();
+    }
     }
   }
 };
@@ -2316,6 +2323,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     printValueDecl(getClangNodeOwner(), OS);
     OS << "] ";
   }
+
+  // Handle functions that are deserialized from canonical SIL. Normally, we
+  // should emit SIL with the correct SIL stage, so preserving this attribute
+  // won't be necessary. But consider serializing raw SIL (either textual SIL or
+  // SIB) after importing canonical SIL from another module. If the imported
+  // functions are reserialized (e.g. shared linkage), then we must preserve
+  // this attribute.
+  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+    OS << "[canonical] ";
 
   printName(OS);
   OS << " : $";
@@ -2573,6 +2589,33 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
+void SILProperty::print(SILPrintContext &Ctx) const {
+  PrintOptions Options = PrintOptions::printSIL();
+  
+  auto &OS = Ctx.OS();
+  OS << "sil_property ";
+  if (isSerialized())
+    OS << "[serialized] ";
+  
+  OS << '#';
+  printValueDecl(getDecl(), OS);
+  if (auto sig = getDecl()->getInnermostDeclContext()
+                          ->getGenericSignatureOfContext()) {
+    sig->getCanonicalSignature()->print(OS, Options);
+    OS << ' ';
+  }
+  OS << '(';
+  SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
+  OS << ")\n";
+}
+
+static void printSILProperties(SILPrintContext &Ctx,
+                               const SILModule::PropertyListType &Properties) {
+  for (const SILProperty &P : Properties) {
+    P.print(Ctx);
+  }
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
@@ -2629,6 +2672,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMapList());
+  printSILProperties(PrintCtx, getPropertyList());
   
   OS << "\n\n";
 }

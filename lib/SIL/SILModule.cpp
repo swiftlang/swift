@@ -813,3 +813,13 @@ void SILModule::setOptRecordStream(
   OptRecordStream = std::move(Stream);
   OptRecordRawStream = std::move(RawStream);
 }
+
+SILProperty *SILProperty::create(SILModule &M,
+                                 bool Serialized,
+                                 AbstractStorageDecl *Decl,
+                                 KeyPathPatternComponent Component) {
+  auto prop = new (M) SILProperty(Serialized, Decl, Component);
+  M.properties.push_back(prop);
+  return prop;
+}
+

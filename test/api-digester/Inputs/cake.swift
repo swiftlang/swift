@@ -22,3 +22,6 @@ public extension C0 where T1 == S1, T2 == S1, T3 == S1 {
 public extension C0 {
   func unconditionalFooExt() {}
 }
+
+public func foo1(_ a: Int = 1, b: S1) {}
+public func foo2(_ a: Int = #line, b: S1) {}

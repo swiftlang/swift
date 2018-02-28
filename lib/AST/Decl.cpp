@@ -804,7 +804,10 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
-    return getBestImportKind(type->getAnyNominal());
+    auto *nominal = type->getAnyNominal();
+    if (!nominal)
+      return ImportKind::Type;
+    return getBestImportKind(nominal);
   }
 
   case DeclKind::Accessor:

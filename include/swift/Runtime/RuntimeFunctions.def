@@ -791,27 +791,33 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
+// Metadata *swift_getGenericMetadata(TypeContextDescriptor *type,
 //                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+// Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
+//                                              const void *template,
+//                                              size_t templateSize,
+//                                              size_t templateAddressPoint,
 //                                              const void * const *arguments,
 //                                              objc_class *superclass,
 //                                              size_t numImmediateMembers);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+// Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
+//                                              const void *template,
+//                                              size_t templateSize,
 //                                              const void * const *arguments);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
 // const ProtocolWitnessTable *

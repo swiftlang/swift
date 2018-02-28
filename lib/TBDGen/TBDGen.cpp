@@ -147,8 +147,7 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   // Generic types do not get metadata directly, only through the function.
   if (!NTD->isGenericContext()) {
     addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                          TypeMetadataAddress::AddressPoint,
-                                          /*isPattern=*/false));
+                                          TypeMetadataAddress::AddressPoint));
   }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 

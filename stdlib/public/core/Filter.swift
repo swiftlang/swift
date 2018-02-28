@@ -385,6 +385,7 @@ extension LazyCollectionProtocol {
 }
 
 extension LazyFilterSequence {
+  @available(swift, introduced: 5)
   public func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
@@ -395,6 +396,7 @@ extension LazyFilterSequence {
 }
 
 extension LazyFilterCollection {
+  @available(swift, introduced: 5)
   public func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterCollection<Base> {

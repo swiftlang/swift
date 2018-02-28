@@ -146,7 +146,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   // SIL_DEFAULT_WITNESS_TABLE_NAMES. But each one can be
   // omitted if no entries exist in the module file.
   unsigned kind = 0;
-  while (kind != sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) {
+  while (kind != sil_index_block::SIL_PROPERTY_OFFSETS) {
     auto next = cursor.advance();
     if (next.Kind == llvm::BitstreamEntry::EndBlock)
       return;
@@ -161,7 +161,8 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
              kind == sil_index_block::SIL_VTABLE_NAMES ||
              kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
              kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
-             kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES)) &&
+             kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+             kind == sil_index_block::SIL_PROPERTY_OFFSETS)) &&
          "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
           SIL_WITNESS_TABLE_NAMES, or SIL_DEFAULT_WITNESS_TABLE_NAMES.");
     (void)prevKind;
@@ -176,6 +177,11 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
       WitnessTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES)
       DefaultWitnessTableList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
+      // No matching 'names' block for property descriptors needed yet.
+      Properties.assign(scratch.begin(), scratch.end());
+      return;
+    }
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
     next = cursor.advance();
@@ -742,6 +748,112 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
     DRef = DRef.asCurried();
   NextIdx += 4;
   return DRef;
+}
+
+KeyPathPatternComponent
+SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
+                                      unsigned &nextValue) {
+  auto kind =
+    (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
+  auto type = MF->getType(ListOfValues[nextValue++])
+    ->getCanonicalType();
+
+  auto handleComputedId =
+  [&]() -> KeyPathPatternComponent::ComputedPropertyId {
+    auto kind =
+      (KeyPathComputedComponentIdKindEncoding)ListOfValues[nextValue++];
+    switch (kind) {
+    case KeyPathComputedComponentIdKindEncoding::Property:
+      return cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+    case KeyPathComputedComponentIdKindEncoding::Function: {
+      auto name = MF->getIdentifier(ListOfValues[nextValue++]);
+      return getFuncForReference(name.str());
+    }
+    case KeyPathComputedComponentIdKindEncoding::DeclRef: {
+      // read SILDeclRef
+      return getSILDeclRef(MF, ListOfValues, nextValue);
+    }
+    }
+  };
+
+  ArrayRef<KeyPathPatternComponent::Index> indices;
+  SILFunction *indicesEquals = nullptr;
+  SILFunction *indicesHash = nullptr;
+
+  auto handleComputedIndices = [&] {
+    SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
+    auto numIndexes = ListOfValues[nextValue++];
+    indicesBuf.reserve(numIndexes);
+    while (numIndexes-- > 0) {
+      unsigned operand = ListOfValues[nextValue++];
+      auto formalType = MF->getType(ListOfValues[nextValue++]);
+      auto loweredType = MF->getType(ListOfValues[nextValue++]);
+      auto loweredCategory = (SILValueCategory)ListOfValues[nextValue++];
+      auto conformance = MF->readConformance(SILCursor);
+      indicesBuf.push_back({
+        operand, formalType->getCanonicalType(),
+        SILType::getPrimitiveType(loweredType->getCanonicalType(),
+                                  loweredCategory),
+        conformance});
+    }
+    
+    indices = MF->getContext().AllocateCopy(indicesBuf);
+    if (!indices.empty() &&
+        kind != KeyPathComponentKindEncoding::External) {
+      auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
+      auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
+      indicesEquals = getFuncForReference(indicesEqualsName.str());
+      indicesHash = getFuncForReference(indicesHashName.str());
+    }
+  };
+
+  switch (kind) {
+  case KeyPathComponentKindEncoding::StoredProperty: {
+    auto decl = cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+    return KeyPathPatternComponent::forStoredProperty(decl, type);
+  }
+  case KeyPathComponentKindEncoding::GettableProperty: {
+    auto id = handleComputedId();
+    auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+    auto getter = getFuncForReference(getterName.str());
+    handleComputedIndices();
+    return KeyPathPatternComponent::forComputedGettableProperty(
+        id, getter, indices, indicesEquals, indicesHash, type);
+  }
+  case KeyPathComponentKindEncoding::SettableProperty: {
+    auto id = handleComputedId();
+    auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+    auto getter = getFuncForReference(getterName.str());
+    auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
+    auto setter = getFuncForReference(setterName.str());
+    handleComputedIndices();
+    return KeyPathPatternComponent::forComputedSettableProperty(
+        id, getter, setter, indices, indicesEquals, indicesHash, type);
+    break;
+  }
+  case KeyPathComponentKindEncoding::OptionalChain:
+    return KeyPathPatternComponent::forOptional(
+        KeyPathPatternComponent::Kind::OptionalChain, type);
+  case KeyPathComponentKindEncoding::OptionalForce:
+    return KeyPathPatternComponent::forOptional(
+        KeyPathPatternComponent::Kind::OptionalForce, type);
+  case KeyPathComponentKindEncoding::OptionalWrap:
+    return KeyPathPatternComponent::forOptional(
+        KeyPathPatternComponent::Kind::OptionalWrap, type);
+  case KeyPathComponentKindEncoding::External: {
+    auto declID = ListOfValues[nextValue++];
+    auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
+    auto numComponentSubstitutions = ListOfValues[nextValue++];
+    SmallVector<Substitution, 4> subs;
+    while (numComponentSubstitutions-- > 0) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      subs.push_back(*sub);
+    }
+    handleComputedIndices();
+    return KeyPathPatternComponent::forExternal(decl,
+        MF->getContext().AllocateCopy(subs), indices, type);
+  }
+  }
 }
 
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
@@ -2202,101 +2314,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SmallVector<KeyPathPatternComponent, 4> components;
     components.reserve(numComponents);
     while (numComponents-- > 0) {
-      auto kind =
-        (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
-      auto type = MF->getType(ListOfValues[nextValue++])
-        ->getCanonicalType();
-      
-      auto handleComputedId =
-      [&]() -> KeyPathPatternComponent::ComputedPropertyId {
-        auto kind =
-          (KeyPathComputedComponentIdKindEncoding)ListOfValues[nextValue++];
-        switch (kind) {
-        case KeyPathComputedComponentIdKindEncoding::Property:
-          return cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
-        case KeyPathComputedComponentIdKindEncoding::Function: {
-          auto name = MF->getIdentifier(ListOfValues[nextValue++]);
-          return getFuncForReference(name.str());
-        }
-        case KeyPathComputedComponentIdKindEncoding::DeclRef: {
-          // read SILDeclRef
-          return getSILDeclRef(MF, ListOfValues, nextValue);
-        }
-        }
-      };
-      
-      ArrayRef<KeyPathPatternComponent::Index> indices;
-      SILFunction *indicesEquals = nullptr;
-      SILFunction *indicesHash = nullptr;
-      
-      auto handleComputedIndices = [&] {
-        SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
-        auto numIndexes = ListOfValues[nextValue++];
-        indicesBuf.reserve(numIndexes);
-        while (numIndexes-- > 0) {
-          unsigned operand = ListOfValues[nextValue++];
-          auto formalType = MF->getType(ListOfValues[nextValue++]);
-          auto loweredType = MF->getType(ListOfValues[nextValue++]);
-          auto loweredCategory = (SILValueCategory)ListOfValues[nextValue++];
-          auto conformance = MF->readConformance(SILCursor);
-          indicesBuf.push_back({
-            operand, formalType->getCanonicalType(),
-            SILType::getPrimitiveType(loweredType->getCanonicalType(),
-                                      loweredCategory),
-            conformance});
-        }
-        
-        indices = MF->getContext().AllocateCopy(indicesBuf);
-        if (!indices.empty()) {
-          auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
-          auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
-          indicesEquals = getFuncForReference(indicesEqualsName.str());
-          indicesHash = getFuncForReference(indicesHashName.str());
-        }
-      };
-      
-      switch (kind) {
-      case KeyPathComponentKindEncoding::StoredProperty: {
-        auto decl = cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
-        components.push_back(
-          KeyPathPatternComponent::forStoredProperty(decl, type));
-        break;
-      }
-      case KeyPathComponentKindEncoding::GettableProperty: {
-        auto id = handleComputedId();
-        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
-        auto getter = getFuncForReference(getterName.str());
-        handleComputedIndices();
-        components.push_back(
-          KeyPathPatternComponent::forComputedGettableProperty(
-            id, getter, indices, indicesEquals, indicesHash, type));
-        break;
-      }
-      case KeyPathComponentKindEncoding::SettableProperty: {
-        auto id = handleComputedId();
-        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
-        auto getter = getFuncForReference(getterName.str());
-        auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
-        auto setter = getFuncForReference(setterName.str());
-        handleComputedIndices();
-        components.push_back(
-          KeyPathPatternComponent::forComputedSettableProperty(
-            id, getter, setter, indices, indicesEquals, indicesHash, type));
-        break;
-      }
-      case KeyPathComponentKindEncoding::OptionalChain:
-        components.push_back(KeyPathPatternComponent::forOptional(
-            KeyPathPatternComponent::Kind::OptionalChain, type));
-        break;
-      case KeyPathComponentKindEncoding::OptionalForce:
-        components.push_back(KeyPathPatternComponent::forOptional(
-            KeyPathPatternComponent::Kind::OptionalForce, type));
-        break;
-      case KeyPathComponentKindEncoding::OptionalWrap:
-        components.push_back(KeyPathPatternComponent::forOptional(
-            KeyPathPatternComponent::Kind::OptionalWrap, type));
-        break;
-      }
+      components.push_back(readKeyPathComponent(ListOfValues, nextValue));
     }
     
     SmallVector<Requirement, 4> requirements;
@@ -2658,6 +2676,46 @@ void SILDeserializer::getAllVTables() {
 
   for (unsigned I = 0, E = VTables.size(); I < E; I++)
     readVTable(I+1);
+}
+
+SILProperty *SILDeserializer::readProperty(DeclID PId) {
+  auto &propOrOffset = Properties[PId-1];
+  
+  if (propOrOffset.isFullyDeserialized())
+    return propOrOffset.get();
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(propOrOffset.getOffset());
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in readProperty.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_PROPERTY && "expect a sil_property");
+  (void)kind;
+
+  unsigned Serialized;
+  DeclID StorageID;
+  ArrayRef<uint64_t> ComponentValues;
+  PropertyLayout::readRecord(scratch, StorageID, Serialized, ComponentValues);
+  
+  auto decl = cast<AbstractStorageDecl>(MF->getDecl(StorageID));
+  unsigned ComponentValueIndex = 0;
+  auto component = readKeyPathComponent(ComponentValues, ComponentValueIndex);
+  
+  auto prop = SILProperty::create(SILMod, Serialized, decl, component);
+  propOrOffset.set(prop, /*fully deserialized*/ true);
+  return prop;
+}
+
+void SILDeserializer::getAllProperties() {
+  for (unsigned I = 0, E = Properties.size(); I < E; ++I) {
+    readProperty(I+1);
+  }
 }
 
 SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,

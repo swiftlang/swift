@@ -2381,6 +2381,15 @@ extension ${Self} {
 %end
 
 #if _runtime(_ObjC)
+// We isolate the bridging of the Cocoa Array -> Swift Array here so that
+// in the future, we can eagerly bridge the Cocoa array. We need this function
+// to do the bridging in an ABI safe way. Even though this looks useless,
+// DO NOT DELETE!
+@_versioned internal
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+  return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
+}
+
 extension Array {
   @_inlineable
   public // @SPI(Foundation)
@@ -2414,7 +2423,7 @@ extension Array {
   ///   is a reference type).
   @_inlineable
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }
 #endif

@@ -88,17 +88,29 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::TypeMetadataLazyCacheVariable:
       return mangler.mangleTypeMetadataLazyCacheVariable(getType());
 
+    case Kind::TypeMetadataInstantiationCache:
+      return mangler.mangleTypeMetadataInstantiationCache(
+                                              cast<NominalTypeDecl>(getDecl()));
+
+    case Kind::TypeMetadataInstantiationFunction:
+      return mangler.mangleTypeMetadataInstantiationFunction(
+                                              cast<NominalTypeDecl>(getDecl()));
+
     case Kind::TypeMetadata:
       switch (getMetadataAddress()) {
         case TypeMetadataAddress::FullMetadata:
           return mangler.mangleTypeFullMetadataFull(getType());
         case TypeMetadataAddress::AddressPoint:
-          return mangler.mangleTypeMetadataFull(getType(), isMetadataPattern());
+          return mangler.mangleTypeMetadataFull(getType());
       }
       llvm_unreachable("invalid metadata address");
 
+    case Kind::TypeMetadataPattern:
+      return mangler.mangleTypeMetadataPattern(
+                                          cast<NominalTypeDecl>(getDecl()));
+
     case Kind::ForeignTypeMetadataCandidate:
-      return mangler.mangleTypeMetadataFull(getType(), /*isPattern=*/false);
+      return mangler.mangleTypeMetadataFull(getType());
 
     case Kind::SwiftMetaclassStub:
       return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
@@ -109,7 +121,11 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::NominalTypeDescriptor:
       return mangler.mangleNominalTypeDescriptor(
                                           cast<NominalTypeDecl>(getDecl()));
-      
+
+    case Kind::PropertyDescriptor:
+      return mangler.manglePropertyDescriptor(
+                                          cast<AbstractStorageDecl>(getDecl()));
+
     case Kind::ModuleDescriptor:
       return mangler.mangleModuleDescriptor(cast<ModuleDecl>(getDecl()));
   

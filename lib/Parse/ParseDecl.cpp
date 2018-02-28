@@ -227,6 +227,10 @@ bool Parser::parseTopLevel() {
     assert(isInSILMode() &&
            "'sil_coverage_map' should only be a keyword in SIL mode");
     SIL->parseSILCoverageMap(*this);
+  } else if (Tok.is(tok::kw_sil_property)) {
+    assert(isInSILMode() &&
+           "'sil_property' should only be a keyword in SIL mode");
+    SIL->parseSILProperty(*this);
   } else if (Tok.is(tok::kw_sil_scope)) {
     assert(isInSILMode() && "'sil_scope' should only be a keyword in SIL mode");
     SIL->parseSILScope(*this);

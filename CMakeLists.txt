@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.4.3)
 
+# TODO: Fix RPATH usage to be CMP0068 compliant
+# Disable Policy CMP0068 for CMake 3.9
+# rdar://37725888
+if(POLICY CMP0068)
+  cmake_policy(SET CMP0068 OLD)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")

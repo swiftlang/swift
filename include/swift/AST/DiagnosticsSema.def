@@ -688,9 +688,13 @@ ERROR(decl_does_not_exist_in_module,none,
       "%1 does not exist in module %2",
       (/*ImportKind*/ unsigned, Identifier, Identifier))
 ERROR(imported_decl_is_wrong_kind,none,
-      "%0 was imported as '%1', but is a "
-      "%select{%error|type|struct|class|enum|protocol|variable|function}2",
+      "%0 was imported as '%1', but is "
+      "%select{%error|a type|a struct|a class|an enum|a protocol|a variable|"
+      "a function}2",
       (Identifier, StringRef, /*ImportKind*/ unsigned))
+ERROR(imported_decl_is_wrong_kind_typealias,none,
+      "%0 %1 cannot be imported as '%2'",
+      (DescriptiveDeclKind, Type, StringRef))
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
@@ -3176,7 +3180,9 @@ NOTE(required_initializer_here,none,
       "'required' initializer is declared in superclass here", ())
 
 ERROR(required_initializer_not_accessible,none,
-      "'required' initializer must be as accessible as its enclosing type", ())
+      "'required' initializer must be accessible wherever class %0 can be "
+      "subclassed",
+      (DeclName))
 ERROR(required_initializer_missing_keyword,none,
       "'required' modifier must be present on all overrides of a required "
       "initializer", ())

@@ -463,4 +463,7 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
 
+def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
+  HelpText<"Enable key path resilience.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

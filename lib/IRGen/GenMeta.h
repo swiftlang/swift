@@ -48,6 +48,7 @@ namespace irgen {
   class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
+  enum RequireMetadata_t : bool;
   class Size;
   class StructLayout;
   enum class SymbolReferenceKind : unsigned char;
@@ -130,7 +131,12 @@ namespace irgen {
   /// Emit a type context descriptor that was demanded by a reference from
   /// other generated definitions.
   void emitLazyTypeContextDescriptor(IRGenModule &IGM,
-                                     NominalTypeDecl *theStruct);
+                                     NominalTypeDecl *type,
+                                     RequireMetadata_t requireMetadata);
+
+  /// Emit type metadata that was demanded by a reference from other
+  /// generated definitions.
+  void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type);
 
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);

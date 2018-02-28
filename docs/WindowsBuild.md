@@ -83,11 +83,11 @@ set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
-mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
-pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
+mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/cmark"
 popd
-cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
+cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64/"
 ```
 
 ### 6. Build LLVM/Clang/Compiler-RT
@@ -129,8 +129,8 @@ pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DSWIFT_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
- -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
- -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/src"^
+ -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
+ -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64/src"^
  -DSWIFT_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
  -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="%swift_source_dir%/llvm/tools/clang"^
