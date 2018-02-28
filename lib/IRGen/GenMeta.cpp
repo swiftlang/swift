@@ -2058,7 +2058,13 @@ namespace {
         return emitFromValueWitnessTable(IGF.IGM.Context.TheEmptyTupleType);
       }
       case MetatypeRepresentation::Thick:
-        return emitFromTypeMetadata(type);
+        if (isa<ExistentialMetatypeType>(type)) {
+            return emitFromTypeMetadata(type);
+        } else {
+          // Thick metatypes look like pointers with spare bits.
+          return emitFromValueWitnessTable(
+                     CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
+        }
       case MetatypeRepresentation::ObjC:
         // Thick metatypes look like pointers with spare bits.
         return emitFromValueWitnessTable(
