@@ -176,6 +176,21 @@ struct ${Self} {
   }
 
   @inline(__always)
+  public mutating func finalize(
+    tailBytes: UInt64,
+    tailByteCount: Int
+  ) -> UInt64 {
+    _sanityCheck(tailByteCount >= 0 && tailByteCount < 8)
+    _sanityCheck(tailByteCount + (byteCount & 7) <= 7)
+    _sanityCheck(tailBytes >> (tailByteCount << 3) == 0)
+    let count = UInt64(_truncatingBits: tailByteCount._lowWord)
+    let currentByteCount = byteCount & 7
+    tailAndByteCount |= (tailBytes &<< (currentByteCount &<< 3))
+    tailAndByteCount = tailAndByteCount &+ (count &<< 56)
+    return finalize()
+  }
+
+  @inline(__always)
   public mutating func finalize() -> UInt64 {
     _compress(tailAndByteCount)
 

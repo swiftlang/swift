@@ -1,8 +1,5 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
-//
-// Temporarily disabled; needs updating to streamlined SipHash interface.
-// XFAIL: *
 
 import StdlibUnittest
 
@@ -246,11 +243,60 @@ func loadUnalignedUIntLE(
 #endif
 }
 
+func loadPartialUnalignedUInt64LE(
+  from p: UnsafeRawPointer,
+  byteCount: Int
+) -> UInt64 {
+  _sanityCheck((0..<8).contains(byteCount))
+  var result: UInt64 = 0
+  if byteCount >= 1 { result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) }
+  if byteCount >= 2 { result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< (8 as UInt64) }
+  if byteCount >= 3 { result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< (16 as UInt64) }
+  if byteCount >= 4 { result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< (24 as UInt64) }
+  if byteCount >= 5 { result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< (32 as UInt64) }
+  if byteCount >= 6 { result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< (40 as UInt64) }
+  if byteCount >= 7 { result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< (48 as UInt64) }
+  return result
+}
+
+func loadPartialUnalignedUInt32LE(
+  from p: UnsafeRawPointer,
+  byteCount: Int
+) -> UInt32 {
+  _sanityCheck((0..<4).contains(byteCount))
+  var result: UInt32 = 0
+  if byteCount >= 1 { result |= UInt32(p.load(fromByteOffset: 0, as: UInt8.self)) }
+  if byteCount >= 2 { result |= UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) &<< (8 as UInt32) }
+  if byteCount >= 3 { result |= UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) &<< (16 as UInt32) }
+  return result
+}
+
+func loadPartialUnalignedUIntLE(
+  from p: UnsafeRawPointer,
+  byteCount: Int
+) -> UInt {
+#if arch(i386) || arch(arm)
+  return UInt(loadPartialUnalignedUInt32LE(from: p, byteCount: byteCount))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  return UInt(loadPartialUnalignedUInt64LE(from: p, byteCount: byteCount))
+#endif
+}
+
 % for data_type in ['Int', 'Int64', 'Int32']:
 func loadUnaligned${data_type}LE(
   from p: UnsafeRawPointer
 ) -> ${data_type} {
   return ${data_type}(bitPattern: loadUnalignedU${data_type}LE(from: p))
+}
+
+func loadPartialUnaligned${data_type}LE(
+  from p: UnsafeRawPointer,
+  byteCount: Int
+) -> ${data_type} {
+  return ${data_type}(
+    bitPattern: loadPartialUnalignedU${data_type}LE(
+      from: p,
+      byteCount: byteCount))
 }
 % end
 
@@ -260,85 +306,45 @@ func loadUnaligned${data_type}(
 ) -> ${data_type} {
   return ${data_type}(littleEndian: loadUnaligned${data_type}LE(from: p))
 }
+func loadPartialUnaligned${data_type}(
+  from p: UnsafeRawPointer,
+  byteCount: Int
+) -> ${data_type} {
+  return ${data_type}(littleEndian:
+    loadPartialUnaligned${data_type}LE(from: p, byteCount: byteCount))
+}
 % end
 
 % for (Self, tests) in [
-%   ('_SipHash13Context', 'sipHash13Tests'),
-%   ('_SipHash24Context', 'sipHash24Tests')
+%   ('_SipHash13', 'sipHash13Tests'),
+%   ('_SipHash24', 'sipHash24Tests')
 % ]:
-SipHashTests.test("${Self}/Oneshot").forEach(in: ${tests}) {
-  test in
-
-  expectEqual(
-    test.output,
-    ${Self}.hash(
-      data: test.input,
-      dataByteCount: test.input.count,
-      key: test.key))
-}
-
-SipHashTests.test("${Self}.append(UnsafeRawPointer)")
-  .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) {
-  test_ in
-  let (test, pattern) = test_
-
-  var context = ${Self}(key: test.key)
-  var startIndex = 0
-  var chunkSizeIndex = 0
-  while startIndex != test.input.endIndex {
-    let chunkSize = min(
-      pattern[chunkSizeIndex],
-      test.input.endIndex - startIndex)
-    context.append(
-      Array(test.input[startIndex..<(startIndex+chunkSize)]),
-      byteCount: chunkSize)
-    startIndex += chunkSize
-    chunkSizeIndex += 1
-    chunkSizeIndex %= pattern.count
-  }
-  expectEqual(
-    test.output,
-    context.finalizeAndReturnHash())
-
-  // Check that we can query the hash value more than once.
-  expectEqual(
-    test.output,
-    context.finalizeAndReturnHash())
-}
-
 % for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
 SipHashTests.test("${Self}.append(${data_type})").forEach(in: ${tests}) {
   test in
 
-  var context = ${Self}(key: test.key)
+  var hasher = ${Self}(key: test.key)
 
   let chunkSize = MemoryLayout<${data_type}>.size
 
   var startIndex = 0
   let endIndex = test.input.count - (test.input.count % chunkSize)
   while startIndex != endIndex {
-    context.append(
+    hasher.append(
       loadUnaligned${data_type}(
         from: Array(
           test.input[startIndex..<(startIndex+chunkSize)])))
     startIndex += chunkSize
   }
-  context.append(
-    Array(test.input.suffix(from: endIndex)),
-    byteCount: test.input.count - endIndex)
-
-  expectEqual(
-    test.output,
-    context.finalizeAndReturnHash())
+  let tailCount = test.input.count - endIndex
+  let hash = hasher.finalize(
+    tailBytes: loadPartialUnalignedUInt64(
+      from: Array(test.input.suffix(from: endIndex)),
+      byteCount: tailCount),
+    tailByteCount: tailCount)
+  expectEqual(test.output, hash)
 }
 % end
-
-SipHashTests.test("${Self}/AppendAfterFinalizing") {
-  var context = ${Self}(key: (0, 0))
-  _ = context.finalizeAndReturnHash()
-  expectCrashLater()
-  context.append([], byteCount: 0)
-}
 % end
 
 runAllTests()
