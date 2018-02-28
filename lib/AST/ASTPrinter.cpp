@@ -1762,7 +1762,13 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   assert(Nominal && "extension of non-nominal type");
   if (auto nt = ExtendedType->getAs<NominalType>()) {
     if (auto ParentType = nt->getParent()) {
-      ParentType.print(Printer, Options);
+      if (auto *ParentNT = ParentType->getAs<NominalOrBoundGenericNominalType>()) {
+        // Avoid using the parent type directly because it can be bound
+        // generic type and sugared.
+        ParentNT->getDecl()->getDeclaredType().print(Printer, Options);
+      } else {
+        ParentType.print(Printer, Options);
+      }
       Printer << ".";
     }
   }
