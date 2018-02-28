@@ -843,6 +843,9 @@ public:
     auto AddIndentFunc = [&] () {
       auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
                                       : FmtOptions.IndentWidth;
+      // We don't need to add additional indentation if Width is zero.
+      if (!Width)
+        return;
       // Increment indent.
       ExpandedIndent += Width;
       // Normalize indent to align on proper column indent width.
