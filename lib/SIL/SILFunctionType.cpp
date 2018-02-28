@@ -1250,6 +1250,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   case SILFunctionType::Representation::WitnessMethod: {
     switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DefaultInitializerConventions(), ForeignInfo(),
                                 constant, witnessMethodConformance);
@@ -1272,7 +1273,6 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 getNormalArgumentConvention(M), ForeignInfo(),
                                 constant, witnessMethodConformance);
