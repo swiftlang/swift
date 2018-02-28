@@ -484,6 +484,7 @@ internal struct ComputedArgumentWitnesses {
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
+  // FIXME(hashing) Pass in, append to and return _UnsafeHasher instead
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
@@ -595,46 +596,45 @@ internal enum KeyPathComponent: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var hashValue: Int {
-    var hash: Int = 0
-    func mixHashFromArgument(_ argument: KeyPathComponent.ArgumentRef?) {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    var hasher = hasher
+    func appendHashFromArgument(
+      _ argument: KeyPathComponent.ArgumentRef?
+    ) {
       if let argument = argument {
-        let addedHash = argument.witnesses.pointee.hash(
-          argument.data.baseAddress.unsafelyUnwrapped,
-          argument.data.count)
-        // Returning 0 indicates that the arguments should not impact the
-        // hash value of the overall key path.
-        if addedHash != 0 {
-          hash ^= _mixInt(addedHash)
-        }
+        hasher = hasher.appending(
+          argument.witnesses.pointee.hash(
+            argument.data.baseAddress.unsafelyUnwrapped,
+            argument.data.count))
       }
     }
     switch self {
     case .struct(offset: let a):
-      hash ^= _mixInt(0)
-      hash ^= _mixInt(a)
+      hasher = hasher.appending(0).appending(a)
     case .class(offset: let b):
-      hash ^= _mixInt(1)
-      hash ^= _mixInt(b)
+      hasher = hasher.appending(1).appending(b)
     case .optionalChain:
-      hash ^= _mixInt(2)
+      hasher = hasher.appending(2)
     case .optionalForce:
-      hash ^= _mixInt(3)
+      hasher = hasher.appending(3)
     case .optionalWrap:
-      hash ^= _mixInt(4)
+      hasher = hasher.appending(4)
     case .get(id: let id, get: _, argument: let argument):
-      hash ^= _mixInt(5)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher = hasher.appending(5).appending(id)
+      appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(6)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.appending(6).appending(id)
+      appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(7)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.appending(7).appending(id)
+      appendHashFromArgument(argument)
     }
-    return hash
+    return hasher
   }
 }
 

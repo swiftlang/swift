@@ -118,7 +118,8 @@ struct ComputedArgumentWitnesses {
      _ size: Int) -> Bool
   typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
-     _ size: Int) -> Int
+     _ size: Int,
+     _ hasher: _UnsafeHasher) -> _UnsafeHasher
 
   let destroy: Destroy?
   let copy: Copy
@@ -965,10 +966,14 @@ func testEquals(_ a: UnsafeRawPointer,
 }
 
 var numberOfHashOperations = 0
-func testHash(_ a: UnsafeRawPointer, _ count: Int) -> Int {
+func testHash(
+  _ a: UnsafeRawPointer,
+  _ count: Int,
+  _ hasher: _UnsafeHasher
+) -> _UnsafeHasher {
   numberOfHashOperations += 1
-  // Don't use this hash function at home
-  return count
+  // Don't use this hash at home
+  return hasher.appending(count)
 }
 
 var testWitnesses = ComputedArgumentWitnesses(

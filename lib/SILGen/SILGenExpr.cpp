@@ -3584,8 +3584,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes. There isn't a great hash combining
-    // interface in the standard library to do this yet.
+    // TODO: Combine hashes of the indexes using an _UnsafeHasher passed in as
+    // an extra parameter.
     {
       auto &index = indexes[0];
       
