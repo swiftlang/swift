@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
 
@@ -110,6 +111,53 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
+};
+
+/// \brief DiagnosticConsumer that funnels diagnostics in certain source ranges
+/// to particular sub-consumers.
+///
+/// Diagnostics that are not in one of the special ranges are emitted into every
+/// sub-consumer.
+class RangeSpecificDiagnosticConsumer : public DiagnosticConsumer {
+public:
+  using ConsumerPair =
+      std::pair<CharSourceRange, std::unique_ptr<DiagnosticConsumer>>;
+
+private:
+  SmallVector<std::unique_ptr<DiagnosticConsumer>, 4> SubConsumers;
+
+  /// A "map" sorted by the end locations of the ranges, so that a lookup by
+  /// position can be done using binary search.
+  ///
+  /// \see #consumerForLocation
+  SmallVector<std::pair<CharSourceRange, unsigned>, 4> LocationToConsumerMap;
+
+  /// Indicates which consumer to send Note diagnostics too.
+  ///
+  /// Notes are always considered attached to the error, warning, or remark
+  /// that was most recently emitted.
+  ///
+  /// If null, Note diagnostics are sent to every consumer.
+  DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
+
+public:
+  /// Takes ownership of the DiagnosticConsumers specified in \p consumers and
+  /// records their association with the CharSourceRanges.
+  ///
+  /// The ranges must not be overlapping.
+  explicit RangeSpecificDiagnosticConsumer(
+      MutableArrayRef<ConsumerPair> consumers);
+
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
+                        const DiagnosticInfo &Info) override;
+
+   bool finishProcessing() override;
+
+private:
+  DiagnosticConsumer *consumerForLocation(SourceLoc loc) const;
 };
   
 } // end namespace swift
