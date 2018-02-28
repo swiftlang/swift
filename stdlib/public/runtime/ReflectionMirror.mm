@@ -39,6 +39,44 @@
 #include <objc/runtime.h>
 #endif
 
+#if defined(_WIN32)
+#include <stdarg.h>
+
+namespace {
+int asprintf(char **strp, const char *fmt, ...) {
+  va_list argp0, argp1;
+
+  va_start(argp0, fmt);
+  va_copy(argp1, argp0);
+
+  int length = _vscprintf(fmt, argp0);
+
+  *strp = reinterpret_cast<char *>(malloc(length + 1));
+  if (*strp == nullptr)
+    return -1;
+
+  length = _vsnprintf(*strp, length, fmt, argp1);
+
+  va_end(argp0);
+  va_end(argp1);
+
+  return length;
+}
+
+char *strndup(const char *s, size_t n) {
+  size_t length = std::min(strlen(s), n);
+
+  char *buffer = reinterpret_cast<char *>(malloc(length + 1));
+  if (buffer == nullptr)
+    return buffer;
+
+  strncpy(buffer, s, length);
+  buffer[length] = '\0';
+  return buffer;
+}
+}
+#endif
+
 using namespace swift;
 
 #if SWIFT_OBJC_INTEROP
