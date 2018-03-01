@@ -3610,21 +3610,22 @@ extension ${Self} : Hashable {
   public var hashValue: Int {
     @inline(__always)
     get {
-% if bits <= word_bits and signed:
-      // Sign extend the value.
-      return Int(self)
-% elif bits <= word_bits and not signed:
-      // Sign extend the value.
-      return Int(${OtherSelf}(bitPattern: self))
-% elif bits == word_bits * 2:
-      // We have twice as many bits as we need to return.
-      return
-        Int(truncatingIfNeeded: self) ^
-        Int(truncatingIfNeeded: self &>> 32)
-% else:
-      _Unimplemented()
-% end
+      return _hashValue(for: self)
     }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    % if bits == word_bits:
+    return hasher.appending(bits: _lowWord)
+    % elif bits <= 32:
+    return hasher.appending(
+      bits: UInt32(Builtin.${z}extOrBitCast_Int${bits}_Int32(_value)))
+    % elif bits == 2 * word_bits:
+    return hasher.appending(bits: UInt64(_value))
+    % else:
+    fatalError("Unsupported integer width")
+    % end
   }
 }
 

@@ -108,6 +108,22 @@ public protocol Hashable : Equatable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
+
+  /// Feed bits to be hashed into the hash function represented by `hasher`.
+  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
+}
+
+extension Hashable {
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    return hasher.appending(self.hashValue)
+  }
+}
+
+// Called by synthesized `hashValue` implementations.
+@inline(__always)
+public func _hashValue<H: Hashable>(for value: H) -> Int {
+  var value = value
+  return withUnsafePointer(to: &value) { _UnsafeHasher.hashValue(for: $0) }
 }
 
 // Called by the SwiftValue implementation.
@@ -126,4 +142,3 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
 ) -> Int {
   return value.pointee.hashValue
 }
-

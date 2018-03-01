@@ -171,6 +171,15 @@ extension LazyPrefixWhileIndex : Hashable where Base.Index : Hashable {
       return .max
     }
   }
+
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    switch _value {
+    case .index(let value):
+      return hasher.appending(value)
+    case .pastEnd:
+      return hasher.appending(Int.max)
+    }
+  }
 }
 
 % for Traversal in ['Forward', 'Bidirectional']:

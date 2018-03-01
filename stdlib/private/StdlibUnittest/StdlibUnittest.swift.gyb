@@ -1089,6 +1089,15 @@ struct PersistentState {
   static var runNoTestsWasCalled: Bool = false
   static var ranSomething: Bool = false
   static var complaintInstalled = false
+  static var hashingKeyOverridden = false
+
+  static func overrideHashingKey() {
+    if !hashingKeyOverridden {
+      // FIXME: This has to run before creating the first Set/Dictionary
+      _Hashing.secretKey = (0, 0)
+      hashingKeyOverridden = true
+    }
+  }
 
   static func complainIfNothingRuns() {
     if !complaintInstalled {
@@ -1200,6 +1209,7 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 
 public final class TestSuite {
   public init(_ name: String) {
+    PersistentState.overrideHashingKey()
     self.name = name
     _precondition(
       _testNameToIndex[name] == nil,

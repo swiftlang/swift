@@ -15,15 +15,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef KNOWN_STDLIB_TYPE_DECL
-/// KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS)
+#ifndef KNOWN_STDLIB_TYPE_DECL_WITH_NAME
+/// KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS)
 ///
 /// The macro is expanded for each known standard library type. NAME is
 /// bound to the unqualified name of the type. DECL_CLASS is bound to the
 /// Decl subclass it is expected to be an instance of. NUM_GENERIC_PARAMS is
 /// bound to the number of generic parameters the type is expected to have.
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS)
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS)
 #endif
+
+#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, #NAME, DECL_CLASS, NUM_GENERIC_PARAMS)
 
 KNOWN_STDLIB_TYPE_DECL(Bool, NominalTypeDecl, 0)
 
@@ -50,6 +53,7 @@ KNOWN_STDLIB_TYPE_DECL(Sequence, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Dictionary, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(AnyHashable, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(MutableCollection, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL_WITH_NAME(UnsafeHasher, "_UnsafeHasher", NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(AnyKeyPath, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(PartialKeyPath, NominalTypeDecl, 1)
@@ -79,3 +83,4 @@ KNOWN_STDLIB_TYPE_DECL(KeyedDecodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(RangeReplaceableCollection, ProtocolDecl, 1)
 
 #undef KNOWN_STDLIB_TYPE_DECL
+#undef KNOWN_STDLIB_TYPE_DECL_WITH_NAME

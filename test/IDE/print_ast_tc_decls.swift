@@ -587,6 +587,7 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{.*}}static func __derived_enum_equals(_ a: d0200_EscapedIdentifiers.`enum`, _ b: d0200_EscapedIdentifiers.`enum`) -> Bool
 // PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}    func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   class `class` {}
@@ -1015,6 +1016,7 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  {{.*}}static func __derived_enum_equals(_ a: d2000_EnumDecl1, _ b: d2000_EnumDecl1) -> Bool
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 enum d2100_EnumDecl2 {
@@ -1072,6 +1074,7 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher{{$}}
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1085,6 +1088,7 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher{{$}}
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}

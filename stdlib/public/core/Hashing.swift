@@ -25,7 +25,7 @@ import SwiftShims
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _Hashing {
+enum _Hashing {
   // FIXME(ABI)#41 : make this an actual public API.
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI
@@ -48,7 +48,7 @@ struct _Hashing {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _HashingDetail {
+enum _HashingDetail {
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
@@ -159,35 +159,6 @@ func _mixInt(_ value: Int) -> Int {
 #endif
 }
 
-/// Given a hash value, returns an integer value in the range of
-/// 0..<`upperBound` that corresponds to a hash value.
-///
-/// The `upperBound` must be positive and a power of 2.
-///
-/// This function is superior to computing the remainder of `hashValue` by
-/// the range length.  Some types have bad hash functions; sometimes simple
-/// patterns in data sets create patterns in hash values and applying the
-/// remainder operation just throws away even more information and invites
-/// even more hash collisions.  This effect is especially bad because the
-/// range is a power of two, which means to throws away high bits of the hash
-/// (which would not be a problem if the hash was known to be good). This
-/// function mixes the bits in the hash value to compensate for such cases.
-///
-/// Of course, this function is a compressing function, and applying it to a
-/// hash value does not change anything fundamentally: collisions are still
-/// possible, and it does not prevent malicious users from constructing data
-/// sets that will exhibit pathological collisions.
-@_inlineable // FIXME(sil-serialize-all)
-public // @testable
-func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
-  _sanityCheck(_isPowerOf2(upperBound))
-  let mixedHashValue = _mixInt(hashValue)
-
-  // As `upperBound` is a power of two we can do a bitwise-and to calculate
-  // mixedHashValue % upperBound.
-  return mixedHashValue & (upperBound &- 1)
-}
-
 /// Returns a new value that combines the two given hash values.
 ///
 /// Combining is performed using [a hash function][ref] described by T.C. Hoad
@@ -214,3 +185,121 @@ func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   x ^= UInt(bitPattern: secondValue) &+ magic &+ (x &<< 6) &+ (x &>> 2)
   return Int(bitPattern: x)
 }
+
+/// An unsafe wrapper around a stateful hash function, presenting a faux purely
+/// functional interface to eliminate ARC overhead.
+///
+/// This is not a true value type; calling `appending` or `finalized` actually
+/// mutates `self`'s state.
+@_fixed_layout
+public struct _UnsafeHasher {
+  @_versioned
+  internal let _rawState: UnsafeMutableRawPointer
+
+  internal var _state: UnsafeMutablePointer<_Hasher> {
+    @inline(__always)
+    get { return _rawState.assumingMemoryBound(to: _Hasher.self) }
+  }
+
+  @inline(__always)
+  @_versioned
+  internal init(_ state: UnsafeMutablePointer<_Hasher>) {
+    self._rawState = UnsafeMutableRawPointer(state)
+  }
+
+  @_versioned
+  // not @_inlineable
+  @effects(readonly) // FIXME: Unjustified
+  static func hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
+    var hasher = _Hasher()
+    return withUnsafeMutablePointer(to: &hasher) { p in
+      return pointer.pointee._hash(into: _UnsafeHasher(p))._finalized()
+    }
+  }
+
+  @_versioned
+  // not @_inlineable
+  @effects(readonly)
+  internal func appending(bits value: UInt) -> _UnsafeHasher {
+    // The effects attribute is a lie; however, it enables the compiler to
+    // eliminate unnecessary retain/releases protecting Hashable state around
+    // calls to `_Hasher.append(_:)`.
+    //
+    // We don't have a way to describe the side-effects of an opaque function --
+    // if it doesn't have an @effects attribute, the compiler has no choice but
+    // to assume it may mutate the hashable we're visiting. We know that won't
+    // be the case (the stdlib owns the hash function), but the only way to tell
+    // this to the compiler is to pretend the state update is pure.
+    _state.pointee.append(value)
+    return self
+  }
+
+  @_versioned
+  // not @_inlineable
+  @effects(readonly) // See comment in appending(_: UInt)
+  internal func appending(bits value: UInt32) -> _UnsafeHasher {
+    _state.pointee.append(value)
+    return self
+  }
+
+  @_versioned
+  // not @_inlineable
+  @effects(readonly) // See comment in appending(_: UInt)
+  internal func appending(bits value: UInt64) -> _UnsafeHasher {
+    _state.pointee.append(value)
+    return self
+  }
+
+  @_inlineable
+  @inline(__always)
+  public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
+    return value._hash(into: self)
+  }
+
+  @inline(__always)
+  internal func _finalized() -> Int {
+    return Int(_truncatingBits: _state.pointee.finalize()._lowWord)
+  }
+}
+
+// FIXME(hashing): This is purely for benchmarking; to be removed.
+internal struct _LegacyHasher {
+  internal var _hash: Int
+
+  @inline(__always)
+  internal init() {
+    _hash = 0
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: Int) {
+    _hash = (_hash == 0 ? value : _combineHashValues(_hash, value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt) {
+    append(Int(bitPattern: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt32) {
+    append(Int(truncatingIfNeeded: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt64) {
+    if UInt64.bitWidth > Int.bitWidth {
+      append(Int(truncatingIfNeeded: value ^ (value &>> 32)))
+    } else {
+      append(Int(truncatingIfNeeded: value))
+    }
+  }
+
+  @inline(__always)
+  internal mutating func finalize() -> UInt64 {
+    return UInt64(
+      _truncatingBits: UInt(bitPattern: _mixInt(_hash))._lowWord)
+  }
+}
+
+internal typealias _Hasher = _SipHash13
