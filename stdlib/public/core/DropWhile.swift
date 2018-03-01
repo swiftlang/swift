@@ -14,11 +14,13 @@
 /// consecutive elements of some base sequence that satisfy a given predicate.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyDropWhileSequence<Base: Sequence> {
+  public typealias Element = Base.Element
+  
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
@@ -26,7 +28,7 @@ public struct LazyDropWhileSequence<Base: Sequence> {
   @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
   @_versioned // FIXME(sil-serialize-all)
-  internal let _predicate: (Base.Element) -> Bool
+  internal let _predicate: (Element) -> Bool
 }
 
 extension LazyDropWhileSequence {
@@ -38,9 +40,11 @@ extension LazyDropWhileSequence {
   /// types.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
+    public typealias Element = Base.Element
+    
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_base: Base.Iterator, predicate: @escaping (Base.Element) -> Bool) {
+    internal init(_base: Base.Iterator, predicate: @escaping (Element) -> Bool) {
       self._base = _base
       self._predicate = predicate
     }
@@ -50,13 +54,11 @@ extension LazyDropWhileSequence {
     @_versioned // FIXME(sil-serialize-all)
     internal var _base: Base.Iterator
     @_versioned // FIXME(sil-serialize-all)
-    internal let _predicate: (Base.Element) -> Bool
+    internal let _predicate: (Element) -> Bool
   }
 }
 
 extension LazyDropWhileSequence.Iterator: IteratorProtocol {
-  public typealias Element = Base.Element
-  
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
     // Once the predicate has failed for the first time, the base iterator
@@ -78,6 +80,8 @@ extension LazyDropWhileSequence.Iterator: IteratorProtocol {
 }
 
 extension LazyDropWhileSequence: Sequence {
+  public typealias SubSequence = AnySequence<Element> // >:(
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -119,9 +123,11 @@ extension LazySequenceProtocol {
 ///   documented complexity.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyDropWhileCollection<Base: Collection> {
+  public typealias Element = Base.Element
+  
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
@@ -129,7 +135,7 @@ public struct LazyDropWhileCollection<Base: Collection> {
   @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
   @_versioned // FIXME(sil-serialize-all)
-  internal let _predicate: (Base.Element) -> Bool
+  internal let _predicate: (Element) -> Bool
 }
 
 extension LazyDropWhileCollection: Sequence {
@@ -145,6 +151,8 @@ extension LazyDropWhileCollection: Sequence {
 }
 
 extension LazyDropWhileCollection {
+  public typealias SubSequence = Slice<LazyDropWhileCollection<Base>>
+
   /// A position in a `LazyDropWhileCollection` or
   /// `LazyDropWhileBidirectionalCollection` instance.
   @_fixed_layout // FIXME(sil-serialize-all)
@@ -207,7 +215,7 @@ extension LazyDropWhileCollection: Collection {
 
 
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(position: Index) -> Base.Element {
+  public subscript(position: Index) -> Element {
     return _base[position.base]
   }
 }
