@@ -48,6 +48,7 @@ void PrettyStackTraceDriverCommandOutputAddition::print(
   out << "While adding " << Description
       << " output named " << NewOutputName
       << " of type " << types::getTypeName(NewOutputType)
+      << " for input " << PrimaryInput
       << " to driver CommandOutput\n";
   TheCommandOutput->print(out);
   out << '\n';
