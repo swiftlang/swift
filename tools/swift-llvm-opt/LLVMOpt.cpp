@@ -212,7 +212,8 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
 //===----------------------------------------------------------------------===//
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   // Initialize passes
   PassRegistry &Registry = *PassRegistry::getPassRegistry();

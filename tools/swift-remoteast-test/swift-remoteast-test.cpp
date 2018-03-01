@@ -19,6 +19,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
@@ -143,6 +144,8 @@ struct Observer : public FrontendObserver {
 } // end anonymous namespace
 
 int main(int argc, const char *argv[]) {
+  PROGRAM_START(argc, argv);
+
   unsigned numForwardedArgs = argc
       - 1  // we drop argv[0]
       + 1; // -interpret
