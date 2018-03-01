@@ -789,8 +789,8 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &SGF,
   bool isDirect = (TheAccessSemantics != AccessSemantics::Ordinary);
 
   // Call the mutable addressor.
-  auto addressor = SGF.getAddressorDeclRef(WitnessStorage,
-                                           AccessKind::ReadWrite);
+  auto addressor = SGF.SGM.getAddressorDeclRef(WitnessStorage,
+                                               AccessKind::ReadWrite);
   std::pair<ManagedValue, ManagedValue> result;
   {
     FormalEvaluationScope Scope(SGF);

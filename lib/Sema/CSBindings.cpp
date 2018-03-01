@@ -134,19 +134,17 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
       !binding.BindingType->hasTypeVariable() && !binding.DefaultedProtocol &&
       !binding.isDefaultableBinding() && allowJoinMeet) {
     if (lastSupertypeIndex) {
-      // Can we compute a join?
       auto &lastBinding = Bindings[*lastSupertypeIndex];
       auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
       auto bindingType = binding.BindingType->getWithoutSpecifierType();
+
       auto join = Type::join(lastType, bindingType);
-      if (join) {
-        auto anyType = join->getASTContext().TheAnyType;
-        if (!join->isEqual(anyType) || lastType->isEqual(anyType) ||
-            bindingType->isEqual(anyType)) {
-          // Replace the last supertype binding with the join. We're done.
-          lastBinding.BindingType = join;
-          return;
-        }
+      if (join && !(*join)->isAny() &&
+          (!(*join)->getOptionalObjectType()
+           || !(*join)->getOptionalObjectType()->isAny())) {
+        // Replace the last supertype binding with the join. We're done.
+        lastBinding.BindingType = *join;
+        return;
       }
     }
 

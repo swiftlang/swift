@@ -679,11 +679,18 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   // Try to convert indirect incoming parameters to direct parameters.
   unsigned IdxForParam = NumFormalIndirectResults;
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
-    if (substConv.getSILType(PI).isLoadable(M) &&
-        PI.getConvention() == ParameterConvention::Indirect_In) {
-      Conversions.set(IdxForParam);
-    }
+    auto IdxToInsert = IdxForParam;
     ++IdxForParam;
+    if (!substConv.getSILType(PI).isLoadable(M)) {
+      continue;
+    }
+    if (PI.getConvention() == ParameterConvention::Indirect_In) {
+      Conversions.set(IdxToInsert);
+    }
+    if ((PI.getConvention() == ParameterConvention::Indirect_In_Guaranteed) &&
+        substConv.getSILType(PI).isTrivial(M)) {
+      Conversions.set(IdxToInsert);
+    }
   }
 
   // Produce a specialized type, which is the substituted type with
@@ -763,18 +770,26 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
-    if (isParamConverted(ParamIdx++)) {
-      // Convert the indirect parameter to a direct parameter.
-      SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
-      // Indirect parameters are passed as owned, so we also need to pass the
-      // direct parameter as owned (except it's a trivial type).
-      auto C = (SILParamTy.isTrivial(M) ? ParameterConvention::Direct_Unowned :
-                ParameterConvention::Direct_Owned);
-      SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
-    } else {
+    if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
+      continue;
     }
+
+    // Convert the indirect parameter to a direct parameter.
+    SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
+    // Indirect parameters are passed as owned/guaranteed, so we also
+    // need to pass the direct/guaranteed parameter as
+    // owned/guaranteed (except it's a trivial type).
+    auto C = ParameterConvention::Direct_Unowned;
+    if (!SILParamTy.isTrivial(M)) {
+      if (PI.isGuaranteed()) {
+        C = ParameterConvention::Direct_Guaranteed;
+      } else {
+        C = ParameterConvention::Direct_Owned;
+      }
+    }
+    SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
     // For now, always just use the original, substituted parameter info.

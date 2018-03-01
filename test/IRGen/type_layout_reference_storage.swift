@@ -91,3 +91,20 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN]]SgXwWV", i32 9)
   weak            var uwi: Unknown!
 }
+
+
+public class Base {
+   var a: UInt32 = 0
+}
+// CHECK-LABEL: %swift.type* @{{.*}}7DerivedCMi"(%swift.type_descriptor*, i8**)
+// CHECK-NOT: store {{.*}}getelementptr{{.*}}SBomWV
+// CHECK: call %swift.type* @"$S29type_layout_reference_storage1P_pXmTMa"()
+// CHECK: store {{.*}}getelementptr{{.*}}SBoWV
+// CHECK: ret
+public class Derived<T> : Base {
+  var type : P.Type
+  var k = C()
+  init(_ t: P.Type) {
+    type = t
+  }
+}
