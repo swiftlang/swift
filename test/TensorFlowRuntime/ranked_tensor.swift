@@ -4,35 +4,20 @@
 // Tensor API tests.
 
 import TensorFlow
+#if TPU
+import TestUtilsTPU
+#else
 import TestUtils
+#endif
 import StdlibUnittest
 
 var RankedTensorTests = TestSuite("RankedTensor")
 
-/// Determines if two floating point numbers are very nearly equal.
-func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
-  _ lhs: T, _ rhs: T, byError error: T = 0.000001
-) {
-  expectLT(abs(lhs - rhs), error)
-}
-
-/// Determines if two collections of floating point numbers are very nearly
-/// equal.
-func expectPointwiseNearlyEqual<T, C1, C2>(
-  _ lhs: C1, _ rhs: C2, byError error: T = 0.000001
-) where T : FloatingPoint & ExpressibleByFloatLiteral,
-  C1 : Collection, C2 : Collection, C1.Element == T, C1.Element == C2.Element {
-  precondition(lhs.count == rhs.count, "Scalar count mismatch.")
-  for (l, r) in zip(lhs, rhs) {
-    expectNearlyEqual(l, r, byError: error)
-  }
-}
-
-RankedTensorTests.testCPUAndGPU("Initializers") {
-  let vector = Tensor1D([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-  let matrix = Tensor2D([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+RankedTensorTests.testAllBackends("Initializers") {
+  let vector = Tensor1D<Float>([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+  let matrix = Tensor2D<Float>([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
   let tensor = Tensor3D(identicallyRanked: Tensor<Float>(ones: [2, 3, 4]))
-  let broadcasted4DScalar = Tensor4D(broadcasting: 4)
+  let broadcasted4DScalar = Tensor4D<Float>(broadcasting: 4)
   expectEqual([1, 2, 3, 4, 5, 6], vector.array)
   expectEqual(Array2D(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]), matrix.array)
   expectEqual(Array3D(shape: [2, 3, 4], repeating: 1), tensor.array)
@@ -40,33 +25,36 @@ RankedTensorTests.testCPUAndGPU("Initializers") {
               broadcasted4DScalar.array)
 }
 
-RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
+RankedTensorTests.testAllBackends("FactoryInitializers") {
   let x = Tensor2D<Float>(ones: [1, 10])
   expectEqual([1, 10], x.shape)
   expectEqual(Array(repeating: 1, count: 10), x.scalars)
 }
 
-RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion1") {
-  let matrix = -1.makeTensor2D()
+RankedTensorTests.testAllBackends("ScalarToTensorConversion1") {
+  let matrix = Tensor2D<Float>(broadcasting: -1)
   expectEqual([1, 1], matrix.shape)
   expectEqual([-1], matrix.scalars)
 }
 
 // TODO: Merge into the previous example when we support code motion to avoid
 // sends.
-RankedTensorTests.testCPUAndGPU("ScalarToTensorConversion2") {
-  let tensor = 42.makeTensor4D()
+RankedTensorTests.testAllBackends("ScalarToTensorConversion2") {
+  let tensor = Tensor4D<Float>(broadcasting: 42)
   expectEqual([1, 1, 1, 1], tensor.shape)
   expectEqual([42], tensor.scalars)
 }
 
-RankedTensorTests.testCPUAndGPU("ArrayXDConversion") {
+RankedTensorTests.testAllBackends("ArrayXDConversion") {
   let array3D = Array3D(shape: [2, 3, 4], repeating: 1.0)
   let tensor3D = Tensor3D(array3D)
   expectEqual(array3D, tensor3D.array)
 }
 
-RankedTensorTests.testCPUAndGPU("DataTypeCast") {
+RankedTensorTests.testAllBackends("DataTypeCast") {
+  // TPU does not support DT_INT8 or 16 for cast
+  guard _RuntimeConfig.executionMode != .tpu else { return }
+
   let x = Tensor2D<Int32>(ones: [5, 5])
   let ints = Tensor2D<Int64>(x)
   let floats = Tensor2D<Float>(x)
@@ -76,7 +64,9 @@ RankedTensorTests.testCPUAndGPU("DataTypeCast") {
   expectEqual(Array2D(shape: [5, 5], repeating: 1), i8s.array)
 }
 
-RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
+RankedTensorTests.testAllBackends("BoolToNumericCast") {
+  guard _RuntimeConfig.executionMode != .tpu else { return }
+
   let bools = Tensor2D<Bool>([[true, false], [true, false]])
   let ints = Tensor2D<Int64>(bools)
   let floats = Tensor2D<Float>(bools)
@@ -87,6 +77,9 @@ RankedTensorTests.testCPUAndGPU("BoolToNumericCast") {
 }
 
 RankedTensorTests.test("ElementIndexing") {
+  // XLA compilation error under TPU.
+  guard _RuntimeConfig.executionMode != .tpu else { return }
+
   // NOTE: This tests the `subscript(index:)` method, which is distinct from
   // the `subscript(indices:)` method.
   // NOTE: cannot test multiple `Tensor.shape` or `Tensor.scalars` directly
@@ -114,6 +107,9 @@ RankedTensorTests.test("ElementIndexing") {
 }
 
 RankedTensorTests.test("SliceIndexing") {
+  // XLA compilation error under TPU.
+  guard _RuntimeConfig.executionMode != .tpu else { return }
+
   // NOTE: cannot test `TensorXD.shape` or `TensorXD.scalars` directly until
   // send and receive are implemented (without writing a bunch of mini tests).
   // Instead, `TensorXD.array` is called to make an ArrayXD host copy and the
@@ -140,14 +136,14 @@ RankedTensorTests.test("SliceIndexing") {
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D)
 }
 
-RankedTensorTests.testCPUAndGPU("Reduction") {
+RankedTensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxis: 0)
   expectEqual([2, 4, 6, 8, 10], sum.array)
 }
 
-RankedTensorTests.testCPUAndGPU("Concatenation") {
+RankedTensorTests.testAllBackends("Concatenation") {
   // 2 x 3
   let t1 = Tensor2D<Int32>([[0, 1, 2], [3, 4, 5]])
   // 2 x 3
@@ -164,7 +160,7 @@ RankedTensorTests.testCPUAndGPU("Concatenation") {
               concatenated1.array)
 }
 
-RankedTensorTests.testCPUAndGPU("ArgMax") {
+RankedTensorTests.testAllBackends("ArgMax") {
   // 2 x 3
   let x = Tensor2D<Float>([[0, 1, 2], [3, 4, 5]])
   let argmax0 = x.argmax(alongAxis: 0)
@@ -175,7 +171,7 @@ RankedTensorTests.testCPUAndGPU("ArgMax") {
   expectEqual(5, scalarsArgmax)
 }
 
-RankedTensorTests.testCPUAndGPU("SimpleMath") {
+RankedTensorTests.testAllBackends("SimpleMath") {
   let x = Tensor1D<Float>([1.2, 1.2])
   let y = tanh(x)
   expectPointwiseNearlyEqual([0.833655, 0.833655], y.array, byError: 0.0001)
@@ -187,7 +183,7 @@ RankedTensorTests.testCPUAndGPU("SimpleMath") {
 // defined on TensorProtocol.
 // TODO: A more comprehensive way to eliminate redundant tests is to define
 // generic functions on TensorProtocol and call those.
-RankedTensorTests.testCPUAndGPU("ScalarTensorOps1") {
+RankedTensorTests.testAllBackends("ScalarTensorOps1") {
   let scalar: Float = 2.0
   let tensor = Tensor2D<Float>(ones: [2, 3])
   let sum = tensor + scalar
@@ -201,7 +197,7 @@ RankedTensorTests.testCPUAndGPU("ScalarTensorOps1") {
               diffArray)
 }
 
-RankedTensorTests.testCPUAndGPU("ScalarTensorOps2") {
+RankedTensorTests.testAllBackends("ScalarTensorOps2") {
   let scalar: Float = 2.0
   var tensor = Tensor2D<Float>(shape: [2, 3], repeating: 5)
   tensor += scalar
@@ -213,7 +209,7 @@ RankedTensorTests.testCPUAndGPU("ScalarTensorOps2") {
               tensor.array)
 }
 
-RankedTensorTests.testCPUAndGPU("Convolution") {
+RankedTensorTests.testAllBackends("Convolution") {
   // TODO: the code for initializing Tensor4D instances here is quite verbose.
   // Consider adding `init(shape:repeating)` and/or `init(shape:scalars)`
   // initializers to TensorXD?
@@ -229,16 +225,16 @@ RankedTensorTests.testCPUAndGPU("Convolution") {
               y.array)
 }
 
-RankedTensorTests.testCPUAndGPU("3Adds") {
-  let a = Tensor1D([1])
-  let b = Tensor1D([2])
-  let c = Tensor1D([3])
+RankedTensorTests.testAllBackends("3Adds") {
+  let a = Tensor1D<Float>([1])
+  let b = Tensor1D<Float>([2])
+  let c = Tensor1D<Float>([3])
   let o = a + b + c
 
   expectEqual([6], o.array)
 }
 
-RankedTensorTests.testCPUAndGPU("testMultiOpMath") {
+RankedTensorTests.testAllBackends("testMultiOpMath") {
   let x = Tensor1D<Float>([1.2, 1.2])
   let y = Tensor1D<Float>([2.4, 2.4])
   let t1 = x + y
@@ -250,28 +246,28 @@ RankedTensorTests.testCPUAndGPU("testMultiOpMath") {
   expectPointwiseNearlyEqual([3.6, 3.6], t3.array)
 }
 
-RankedTensorTests.testCPUAndGPU("testXWPlusB") {
+RankedTensorTests.testAllBackends("testXWPlusB") {
   // Shape: 1 x 4
-  let x = Tensor2D([[1.0, 2.0, 2.0, 1.0]])
+  let x = Tensor2D<Float>([[1.0, 2.0, 2.0, 1.0]])
   // Shape: 4 x 2
-  let w = Tensor2D([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
+  let w = Tensor2D<Float>([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
   // Shape: 2
-  let b = Tensor1D([0.5, 0.5])
+  let b = Tensor1D<Float>([0.5, 0.5])
   // Do xW+b!
   let result = x ⊗ w + b.rankLifted()
   expectEqual([1, 2], result.shape)
   expectPointwiseNearlyEqual([12.5, 6.5], result.scalars)
 }
 
-RankedTensorTests.testCPUAndGPU("Transpose") {
+RankedTensorTests.testAllBackends("Transpose") {
   // Shape: 3 x 2
-  let xT = Tensor2D([[1, 2], [3, 4], [5, 6]]).transposed()
+  let xT = Tensor2D<Float>([[1, 2], [3, 4], [5, 6]]).transposed()
   expectEqual(2, xT.rank)
   expectEqual([2, 3], xT.shape)
   expectEqual([1, 3, 5, 2, 4, 6], xT.scalars)
 }
 
-RankedTensorTests.testCPUAndGPU("Flatten") {
+RankedTensorTests.testAllBackends("Flatten") {
   // 2 x 3
   let matrix = Tensor2D<Int32>([[0, 1, 2], [3, 4, 5]])
   let flattened = matrix.flattened()
@@ -300,22 +296,22 @@ RankedTensorTests.testGPU("simpleCounterLoop") {
 
 @inline(never)
 func testXORInference() {
-  func xor(_ x: Double, _ y: Double) -> Double {
-    let x = Tensor2D([[x, y]])
+  func xor(_ x: Float, _ y: Float) -> Float {
+    let x = Tensor2D<Float>([[x, y]])
 
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4
-    let w1 = Tensor2D(
+    let w1 = Tensor2D<Float>(
       [[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
        [-1.83523219, -0.51167348, 0.15490439, 1.91018065]])
     // 1 x 4
-    let b1 = Tensor2D(
+    let b1 = Tensor2D<Float>(
       [[2.54353216, 0.25132703, -0.16503136, -0.85754058]])
     // 4 x 1
-    let w2 = Tensor2D(
+    let w2 = Tensor2D<Float>(
       [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]])
     // 1 x 1
-    let b2 = Tensor2D([[-0.74635993]])
+    let b2 = Tensor2D<Float>([[-0.74635993]])
 
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
@@ -326,6 +322,6 @@ func testXORInference() {
   expectNearlyEqual(1.0, xor(1.0, 0.0), byError: 0.1)
   expectNearlyEqual(0.0, xor(1.0, 1.0), byError: 0.1)
 }
-RankedTensorTests.testCPUAndGPU("XORInference", testXORInference)
+RankedTensorTests.testAllBackends("XORInference", testXORInference)
 
 runAllTests()

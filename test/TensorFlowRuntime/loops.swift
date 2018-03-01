@@ -4,12 +4,16 @@
 // Tensor API tests.
 
 import TensorFlow
+#if TPU
+import TestUtilsTPU
+#else
 import TestUtils
+#endif
 import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
 
-LoopsTests.testCPUAndGPU("simpleCounterLoop") {
+LoopsTests.testAllBackends("simpleCounterLoop") {
   guard shouldDoLoopTest() else { return }
 
   let maxCount = 100
@@ -27,7 +31,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop") {
 }
 
 // Explicitly use Int64 everywhere.
-LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
+LoopsTests.testAllBackends("simpleCounterLoop_Int64") {
   guard shouldDoLoopTest() else { return }
 
   let maxCount = 100
@@ -45,7 +49,7 @@ LoopsTests.testCPUAndGPU("simpleCounterLoop_Int64") {
 }
 
 // Explicitly use Int32 everywhere.
-LoopsTests.testCPUAndGPU("simpleCounterLoop_Int32") {
+LoopsTests.testAllBackends("simpleCounterLoop_Int32") {
   guard shouldDoLoopTest() else { return }
 
   let maxCount: Int32 = 100
