@@ -21,7 +21,9 @@ cd `dirname $0`
 "$swiftc5" -sdk "$SDK" -emit-library test5.swift -o /tmp/libtest5.dylib
 
 clang -framework Foundation -I ../../../include/swift/SwiftRemoteMirror \
-      -o /tmp/test -g test.m
+      -o /tmp/test -g test.m 
+
+
 echo "Testing 4 with both mirror libs"
 /tmp/test /tmp/libtest4.dylib "$mirrorlib4" "$mirrorlib5"
 echo ""
@@ -46,6 +48,7 @@ echo "Testing 5 with only mirror lib 5"
 /tmp/test /tmp/libtest5.dylib "-" "$mirrorlib5"
 echo ""
 
+# Not supported (yet?)
 #echo "Testing 5 with only mirror lib 4"
 #/tmp/test /tmp/libtest5.dylib "$mirrorlib4" "-"
 #echo ""

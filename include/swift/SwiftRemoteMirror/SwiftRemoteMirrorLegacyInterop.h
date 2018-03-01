@@ -552,6 +552,7 @@ swift_reflection_interop_addImageLegacy(
     return 0;
   }
   
+  // Read the commands.
   uint32_t Length = Header->sizeofcmds;
   if (ContextRef->FreeBytes != NULL)
     ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
@@ -560,8 +561,30 @@ swift_reflection_interop_addImageLegacy(
                               ImageStart,
                               Length,
                               &FreeContext);
+  if (Buf == NULL)
+    return 0;
   Header = (MachHeader *)Buf;
   
+  // Find the TEXT segment and figure out where the end is.
+  unsigned long TextSize;
+  uint8_t *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
+  if (ContextRef->FreeBytes != NULL)
+    ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
+  
+  if (TextSegment == NULL) {
+    return 0;
+  }
+  unsigned long TextEnd = TextSegment - (uint8_t *)Buf + TextSize;
+
+  // Read everything including the TEXT segment.
+  Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
+                              ImageStart,
+                              TextEnd,
+                              &FreeContext);
+  if (Buf == NULL)
+    return 0;
+  Header = (MachHeader *)Buf;
+
   // Find all the sections and fill out the reflection info.
   swift_reflection_legacy_info_t info = {};
   

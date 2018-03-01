@@ -1,5 +1,6 @@
 #import <dlfcn.h>
 #import <Foundation/Foundation.h>
+#import <mach/mach.h>
 #import <mach-o/dyld.h>
 
 #import "SwiftRemoteMirrorLegacyInterop.h"
@@ -14,16 +15,23 @@ void *Load(char *path) {
   return Handle;
 }
 
-void NopFree(void *reader_context, const void *bytes, void *context) {
+void Free(void *reader_context, const void *bytes, void *context) {
   assert(reader_context == (void *)0xdeadbeef);
   assert(context == (void *)0xfeedface);
+  free((void *)bytes);
 }
 
 const void *ReadBytes(void *context, swift_addr_t address, uint64_t size,
                       void **outFreeContext) {
   assert(context == (void *)0xdeadbeef);
   *outFreeContext = (void *)0xfeedface;
-  return (void *)address;
+
+  void *Buffer = malloc(size);
+  vm_size_t InOutSize = size;
+  kern_return_t result = vm_read_overwrite(mach_task_self(), address, size, (vm_address_t)Buffer, &InOutSize);
+  if (result != KERN_SUCCESS) abort();
+  if (InOutSize != size) abort();
+  return Buffer;
 }
 
 uint64_t GetStringLength(void *context, swift_addr_t address) {
@@ -61,7 +69,7 @@ int main(int argc, char **argv) {
       Mirror5Handle,
       Mirror4Handle,
       sizeof(void *),
-      NopFree,
+      Free,
       ReadBytes,
       GetStringLength,
       GetSymbolAddress);
