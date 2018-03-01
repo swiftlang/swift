@@ -248,6 +248,13 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
+
+    # msvcprt's std::function requires RTTI, but we do not want RTTI data.
+    # Emulate /GR-
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result -frtti)
+      list(APPEND result -Xclang;-fno-rtti-data)
+    endif()
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
