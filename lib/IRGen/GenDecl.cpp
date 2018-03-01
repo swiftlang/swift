@@ -2256,6 +2256,17 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                                  llvm::Constant *global,
                                                  StringRef globalName) {
+  if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
+    if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
+      llvm::GlobalVariable *GV =
+          new llvm::GlobalVariable(IGM.Module, global->getType(),
+                                   /*Constant=*/true,
+                                   llvm::GlobalValue::ExternalLinkage,
+                                   nullptr, llvm::Twine("__imp_") + globalName);
+      GV->setExternallyInitialized(true);
+      return GV;
+    }
+  }
 
   auto gotEquivalent = new llvm::GlobalVariable(IGM.Module,
                                       global->getType(),
