@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import os
 import re
+import sys
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -571,7 +572,15 @@ class ExecutionContext(object):
             if (file, line) != self.last_file_line:
                 # We can only insert the line directive at a line break
                 if len(self.result_text) == 0 \
-                   or self.result_text[-1].endswith('\n'):
+                    or self.result_text[-1].endswith('\n'):
+                    if sys.platform == 'win32':
+                        # CMake gives us backslashes, clang doesn't like
+                        # backslashes. Forward slashes work on Windows
+                        file = file.replace('\\', '/')
+                        # The file also needs to be quotes, so clang-cl can
+                        # correctly parse the `C:/ ...` part of the path
+                        file = "\"{}\"".format(file)
+
                     substitutions = {'file': file, 'line': line + 1}
                     format_str = self.line_directive + '\n'
                     self.result_text.append(format_str % substitutions)
