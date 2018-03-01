@@ -47,6 +47,25 @@ Swift 5.0
 Swift 4.1
 ---------
 
+* [SE-0075][]
+
+  Compile-time testing for the existence and importability of modules is now
+  implemented as a build configuration test.  The `canImport` test allows
+  the development of features that require a possibly-failing import 
+  declaration across multiple platforms.  
+
+  ```swift
+  #if canImport(UIKit)
+    import UIKit
+    class MyView : UIView {}
+  #elseif canImport(AppKit)
+    import AppKit
+    class MyView : NSView {}
+  #else
+    class MyView : CustomView {}
+  #endif
+  ```
+
 * [SE-0189][]
 
   If an initializer is declared in a different module from a struct, it must
