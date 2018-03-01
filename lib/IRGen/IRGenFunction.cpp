@@ -432,7 +432,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   return Address(slotPtr, objectAlignment);
 }
 
-void IRGenFunction::emitTrap(bool EmitUnreachable) {
+llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM) {
   if (IGM.IRGen.Opts.shouldOptimize()) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
@@ -445,14 +445,20 @@ void IRGenFunction::emitTrap(bool EmitUnreachable) {
         llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
     llvm::InlineAsm *inlineAsm =
         llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    Builder.CreateAsmCall(inlineAsm,
-                          llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
+    CreateAsmCall(inlineAsm,
+                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
   }
 
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
       llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
-  Builder.CreateCall(trapIntrinsic, {});
+  auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
+  setCallingConvUsingCallee(Call);
+  return Call;
+}
+
+void IRGenFunction::emitTrap(bool EmitUnreachable) {
+  Builder.CreateNonMergeableTrap(IGM);
   if (EmitUnreachable)
     Builder.CreateUnreachable();
 }

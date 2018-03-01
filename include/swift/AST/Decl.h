@@ -1712,7 +1712,9 @@ public:
     return D->getKind() == DeclKind::Extension;
   }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::ExtensionDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     return C->getIterableContextKind() 
@@ -2003,7 +2005,9 @@ public:
     return D->getKind() == DeclKind::TopLevelCode;
   }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::TopLevelCodeDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   
   using DeclContext::operator new;
@@ -2465,7 +2469,9 @@ public:
   using TypeDecl::getDeclaredInterfaceType;
 
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::GenericTypeDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_GenericTypeDecl &&
@@ -2533,8 +2539,9 @@ public:
     return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(GTD);
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 };
 
@@ -3038,8 +3045,9 @@ public:
   }
 
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(GTD);
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     return C->getIterableContextKind()
@@ -3183,8 +3191,9 @@ public:
     return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3252,8 +3261,9 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3509,8 +3519,9 @@ public:
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3827,8 +3838,9 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -4333,13 +4345,13 @@ public:
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
-  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
-                                Identifier preferredName = Identifier()) const;
+  ObjCSelector
+  getObjCGetterSelector(Identifier preferredName = Identifier()) const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its setter selector.
-  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr,
-                                Identifier preferredName = Identifier()) const;
+  ObjCSelector
+  getObjCSetterSelector(Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -4835,7 +4847,7 @@ public:
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
-  ObjCSubscriptKind getObjCSubscriptKind(LazyResolver *resolver) const;
+  ObjCSubscriptKind getObjCSubscriptKind() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -4847,7 +4859,9 @@ public:
   }
   
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SubscriptDecl;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 
   using DeclContext::operator new;
@@ -5121,8 +5135,7 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr,
-                               DeclName preferredName = DeclName()) const;
+  ObjCSelector getObjCSelector(DeclName preferredName = DeclName()) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
@@ -5230,7 +5243,9 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::AbstractFunctionDecl;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   
   /// True if the declaration is forced to be statically dispatched.
@@ -5496,8 +5511,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 
@@ -5617,8 +5632,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -6036,8 +6051,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -6080,8 +6095,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -6582,6 +6597,12 @@ inline const GenericContext *Decl::getAsGenericContext() const {
     return static_cast<const Id##Decl*>(this);
 #include "swift/AST/DeclNodes.def"
   }
+}
+
+inline bool DeclContext::isExtensionContext() const {
+  if (auto D = getAsDeclOrDeclExtensionContext())
+    return ExtensionDecl::classof(D);
+  return false;
 }
 
 inline bool DeclContext::classof(const Decl *D) {

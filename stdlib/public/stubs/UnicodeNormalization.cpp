@@ -63,6 +63,7 @@ UBool u_isdefined(UChar32);
 #include <unicode/uiter.h>
 #include <unicode/ubrk.h>
 #include <unicode/uchar.h>
+#include <unicode/uvernum.h>
 
 #pragma clang diagnostic pop
 
@@ -288,11 +289,19 @@ swift::__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *err) {
 }
 
 int32_t swift::__swift_stdlib_unorm2_normalize(
-    const __swift_stdlib_UNormalizer2 *norm, const __swift_uint16_t *src,
-    __swift_int32_t len, __swift_uint16_t *dst, __swift_int32_t capacity,
+    const __swift_stdlib_UNormalizer2 *norm, const __swift_stdlib_UChar *src,
+    __swift_int32_t len, __swift_stdlib_UChar *dst, __swift_int32_t capacity,
     __swift_stdlib_UErrorCode *err) {
+  // TODO remove this compatibility when we require ICU >= 60 on Linux
+#if defined(__APPLE__) || U_ICU_VERSION_MAJOR_NUM >= 60
   return unorm2_normalize(ptr_cast<UNormalizer2>(norm), src, len, dst, capacity,
                           ptr_cast<UErrorCode>(err));
+#else
+  return unorm2_normalize(ptr_cast<UNormalizer2>(norm),
+                          reinterpret_cast<const UChar *>(src), len,
+                          reinterpret_cast<UChar *>(dst), capacity,
+                          ptr_cast<UErrorCode>(err));
+#endif
 }
 
 __swift_int32_t swift::__swift_stdlib_unorm2_spanQuickCheckYes(

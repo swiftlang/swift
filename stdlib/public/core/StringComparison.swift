@@ -803,7 +803,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
       if idx+1 == other.count {
         return _lexicographicalCompare(selfASCIIChar, otherCU)
       }
-      if _fastPath(other.hasNormalizationBoundary(after: idx, count: other.count)) {
+      if _fastPath(other.hasNormalizationBoundary(after: idx)) {
         return _lexicographicalCompare(selfASCIIChar, otherCU)
       }
     }
@@ -843,9 +843,9 @@ extension _UnmanagedOpaqueString {
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
-  func hasNormalizationBoundary(after index: Int, count: Int) -> Bool {
+  func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
-    if nextIndex >= count {
+    if nextIndex >= self.count {
       return true
     }
     
@@ -1115,8 +1115,8 @@ extension _UnmanagedString where CodeUnit == UInt16 {
       &selfOutputBuffer, selfLength,
       &otherOutputBuffer, otherLength) 
     {
-      let selfSlice = self[selfSegmentEndIdx...]
-      let otherSlice = other[otherSegmentEndIdx...]
+      let selfSlice = self[selfSegmentStartIdx...]
+      let otherSlice = other[otherSegmentStartIdx...]
       return selfSlice._compareStringsPathological(other: otherSlice)
     }
 

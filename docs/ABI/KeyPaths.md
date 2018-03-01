@@ -25,7 +25,7 @@ by previous ABI-stable versions of the Swift compiler.
 ### Buffer Header
 
 Key path objects begin with the standard Swift heap object header, followed by a
-key path object header. Relative to the start of the heap object header:
+key path object header. Relative to the end of the heap object header:
 
 Offset  | Description
 ------- | ----------------------------------------------
@@ -40,7 +40,7 @@ following bit fields:
 Bits (LSB zero) | Description
 --------------- | -----------
 0...23          | **Buffer size** in bytes
-24...29         | Reserved. Must be zero in Swift 4 runtime
+24...29         | Reserved. Must be zero in Swift 4...5 runtime
 30              | 1 = Has **reference prefix**, 0 = No reference prefix
 31              | 1 = Is **trivial**, 0 = Has destructor
 
@@ -63,8 +63,8 @@ describing the following component.
 
 Bits (LSB zero) | Description
 --------------- | -----------
-0...28          | **Payload** (meaning is dependent on component kind)
-29...30         | **Component kind**
+0...23          | **Payload** (meaning is dependent on component kind)
+24...30         | **Component kind**
 31              | 1 = **End of reference prefix**, 0 = Not end of reference prefix
 
 If the key path has a *reference prefix*, then exactly one component must have
@@ -73,12 +73,12 @@ that the component after the end of the reference prefix will initiate mutation.
 
 The following *component kinds* are recognized:
 
-Value in bit 30&29 | Description
------------------- | -----------
-0                  | Struct/tuple/self stored property
-1                  | Computed
-2                  | Class stored property
-3                  | Optional chaining/forcing/wrapping
+Value in bits 24...30 | Description
+--------------------- | -----------
+0                     | Struct/tuple/self stored property
+1                     | Computed
+2                     | Class stored property
+3                     | Optional chaining/forcing/wrapping
 
 - A **struct stored property** component, when given
   a value of the base type in memory, can project the component value in-place
@@ -86,14 +86,14 @@ Value in bit 30&29 | Description
   properties, tuple fields, and the `.self` identity component (which trivially
   projects at offset zero). The
   *payload* contains the offset in bytes of the projected field in the
-  aggregate, or the special value `0x1FFF_FFFF`, which indicates that the
+  aggregate, or the special value `0xFF_FFFF`, which indicates that the
   offset is too large to pack into the payload and is stored in the next 32 bits
   after the header.
 - A **class stored property** component, when given a reference to a class
   instance, can project the component value inside the class instance at
   a fixed offset. The *payload*
   *payload* contains the offset in bytes of the projected field from the
-  address point of the object, or the special value `0x1FFF_FFFF`, which
+  address point of the object, or the special value `0xFF_FFFF`, which
   indicates that the offset is too large to pack into the payload and is stored
   in the next 32 bits after the header.
 - An **optional** component performs an operation involving `Optional` values.

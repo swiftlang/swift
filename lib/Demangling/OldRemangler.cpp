@@ -702,6 +702,16 @@ void Remangler::mangleTypeMetadataAccessFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
+  Out << "MI";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
+  Out << "Mi";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Out << "ML";
   mangleSingleChildNode(node); // type
@@ -720,6 +730,10 @@ void Remangler::mangleClassMetadataBaseOffset(Node *node) {
 void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Out << "Mn";
   mangleSingleChildNode(node); // type
+}
+
+void Remangler::manglePropertyDescriptor(Node *node) {
+  unreachable("not supported");
 }
 
 void Remangler::mangleTypeMetadata(Node *node) {

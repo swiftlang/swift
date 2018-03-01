@@ -194,6 +194,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
 
+  // Emit non-mergeable traps only.
+  if (IGF.Builder.isTrapIntrinsic(IID)) {
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    return;
+  }
+
   // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.
   // At that stage, the function name GV used by the profiling pass is hidden.
   // Fix the intrinsic call here by pointing it to the correct GV.

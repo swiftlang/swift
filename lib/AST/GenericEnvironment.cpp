@@ -132,8 +132,7 @@ Type TypeBase::mapTypeOutOfContext() {
     SubstFlags::AllowLoweredTypes);
 }
 
-Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
-                                                SubstitutableType *type) const {
+Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
   if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
@@ -148,7 +147,7 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      assert(self->Builder && "Missing generic signature builder for lazy query");
+      assert(self->Builder &&"Missing generic signature builder for lazy query");
       auto equivClass =
         self->Builder->resolveEquivalenceClass(
                                   type,

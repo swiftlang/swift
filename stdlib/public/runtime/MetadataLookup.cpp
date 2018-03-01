@@ -187,7 +187,6 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        auto flags = type->Flags.getKindSpecificFlags();
         switch (node->getKind()) {
         // If the mangled name doesn't indicate a type kind, accept anything.
         // Otherwise, try to match them up.
@@ -195,7 +194,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
           break;
         case Demangle::Node::Kind::Structure:
           if (type->getKind() != ContextDescriptorKind::Struct
-              && !(flags & (uint16_t)TypeContextDescriptorFlags::IsCTag))
+              && !type->getTypeContextDescriptorFlags().isCTag())
             return false;
           break;
         case Demangle::Node::Kind::Class:
@@ -207,7 +206,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
             return false;
           break;
         case Demangle::Node::Kind::TypeAlias:
-          if (!(flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef))
+          if (!type->getTypeContextDescriptorFlags().isCTypedef())
             return false;
           break;
 

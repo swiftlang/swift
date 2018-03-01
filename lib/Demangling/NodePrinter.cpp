@@ -393,6 +393,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
@@ -418,6 +419,8 @@ private:
     case Node::Kind::TypeMangling:
     case Node::Kind::TypeMetadata:
     case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::TypeMetadataInstantiationCache:
+    case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::Unmanaged:
@@ -1445,6 +1448,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata accessor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::TypeMetadataInstantiationCache:
+    Printer << "type metadata instantiation cache for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::TypeMetadataInstantiationFunction:
+    Printer << "type metadata instantiation function for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
@@ -1465,6 +1476,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ClassMetadataBaseOffset:
     Printer << "class metadata base offset for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::PropertyDescriptor:
+    Printer << "property descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:

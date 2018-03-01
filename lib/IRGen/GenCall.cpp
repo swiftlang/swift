@@ -1601,6 +1601,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
+  assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
   llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());

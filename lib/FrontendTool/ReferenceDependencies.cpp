@@ -123,20 +123,11 @@ swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
   return tmp;
 }
 
-bool swift::emitReferenceDependenciesIfNeeded(DiagnosticEngine &diags,
-                                              SourceFile *SF,
-                                              DependencyTracker &depTracker,
-                                              StringRef outputPath) {
+bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
+                                      DependencyTracker &depTracker,
+                                      StringRef outputPath) {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
-
-  const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
-  if (!tracker) {
-    assert(outputPath.empty());
-    return false;
-  }
-
-  assert(!outputPath.empty());
-
+  
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
@@ -341,6 +332,9 @@ bool swift::emitReferenceDependenciesIfNeeded(DiagnosticEngine &diags,
     });
     return pairs;
   };
+
+  const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
+  assert(tracker && "Cannot emit reference dependencies without a tracker");
 
   out << "depends-top-level:\n";
   for (auto &entry : sortedByName(tracker->getTopLevelNames())) {

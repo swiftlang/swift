@@ -38,7 +38,7 @@ typedef           int __swift_ssize_t;
 #elif defined(_WIN32)
 #if defined(_M_ARM) || defined(_M_IX86)
 typedef           int __swift_ssize_t;
-#elif defined(_M_X64)
+#elif defined(_M_X64) || defined(_M_ARM64)
 typedef long long int __swift_ssize_t;
 #else
 #error unsupported machine type

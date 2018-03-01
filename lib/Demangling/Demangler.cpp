@@ -1438,6 +1438,10 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'a':
       return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'I':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
+    case 'i':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1464,6 +1468,9 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
     }
+    case 'V':
+      return createWithChild(Node::Kind::PropertyDescriptor,
+                             popNode(isEntity));
     case 'X':
       return demanglePrivateContextDescriptor();
     default:

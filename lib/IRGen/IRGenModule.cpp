@@ -236,15 +236,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
-  // A metadata pattern is a structure from which generic type
-  // metadata are allocated.  We leave this struct type intentionally
-  // opaque, because the compiler basically never needs to access
-  // anything from one.
-  TypeMetadataPatternStructTy =
-    llvm::StructType::create(getLLVMContext(), "swift.type_pattern");
-  TypeMetadataPatternPtrTy =
-    TypeMetadataPatternStructTy->getPointerTo(DefaultAS);
-
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
 

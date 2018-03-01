@@ -2011,10 +2011,10 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm"
-                        -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
-                        -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
-                        -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
-                        -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                        -DSWIFT_ANDROID_${HOST}_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                        -DSWIFT_ANDROID_${HOST}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                        -DSWIFT_ANDROID_${HOST}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                        -DSWIFT_ANDROID_${HOST}_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                     )
                 fi
@@ -2369,6 +2369,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                SWIFT_BUILD_DIR=$(build_directory ${host} swift)
 
                 # Staging: require opt-in for building with dispatch
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
@@ -2387,6 +2388,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     --swiftc="${SWIFTC_BIN}" \
                     --build-dir="${XCTEST_BUILD_DIR}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                    --swift-build-dir="${SWIFT_BUILD_DIR}" \
                     $LIBDISPATCH_BUILD_ARGS \
                     $XCTEST_BUILD_ARGS
 
@@ -2555,9 +2557,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig"
                 swift_cmake_options=(
                     "${swift_cmake_options[@]}"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_STATICLIB:BOOL=TRUE
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
                 )
                 # libicu builds itself and doesn't use cmake
                 continue

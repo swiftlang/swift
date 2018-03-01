@@ -196,19 +196,40 @@ void ManagedValue::dump(raw_ostream &os, unsigned indent) const {
 
 ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
                                          SILLocation loc) const {
-  if (!hasCleanup()) {
+  // Undef can pair with any type of ownership, so it is effectively a +1 value.
+  if (isa<SILUndef>(getValue()))
+    return *this;
+
+  if (!isPlusOne(SGF)) {
     return copy(SGF, loc);
   }
   return *this;
 }
 
 bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
-  // Ignore trivial values and objects with trivial value ownership kind.
-  if (getType().isTrivial(SGF.F.getModule()) ||
-      (getType().isObject() &&
-       getOwnershipKind() == ValueOwnershipKind::Trivial))
+  // If this value is SILUndef, return true. SILUndef can always be passed to +1
+  // APIs.
+  if (isa<SILUndef>(getValue()))
     return true;
+
+  // Ignore trivial values since for our purposes they are always at +1 since
+  // they can always be passed to +1 APIs.
+  if (getType().isTrivial(SGF.F.getModule()))
+    return true;
+
+  // If we have an object and the object has trivial ownership, the same
+  // property applies.
+  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return true;
+
   return hasCleanup();
 }
 
-bool ManagedValue::isPlusZero() const { return hasCleanup(); }
+bool ManagedValue::isPlusZero() const {
+  // SILUndef can always be passed to +0 APIs.
+  if (isa<SILUndef>(getValue()))
+    return true;
+
+  // Otherwise, just check if we have a cleanup.
+  return !hasCleanup();
+}

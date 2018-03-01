@@ -110,7 +110,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type* }, { %swift.type* }* [[BUFFER]], i32 0, i32 0
 // CHECK:   store %swift.type* %0, %swift.type** [[BUFFER_ELT]]
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes6OneArgVMP" {{.*}}, i8* [[BUFFER_PTR]])
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_descriptor* {{.*}} @"$S17generic_metatypes6OneArgVMn" {{.*}}, i8* [[BUFFER_PTR]])
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.end
 // CHECK:   ret %swift.type* [[METADATA]]
@@ -128,7 +128,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type* }, { %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 1
 // CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes7TwoArgsVMP" {{.*}}, i8* [[BUFFER_PTR]])
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_descriptor* {{.*}} @"$S17generic_metatypes7TwoArgsVMn" {{.*}}, i8* [[BUFFER_PTR]])
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.end
 // CHECK:   ret %swift.type* [[METADATA]]
@@ -148,7 +148,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 2
 // CHECK:   store %swift.type* %2, %swift.type** [[BUFFER_ELT]]
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes9ThreeArgsVMP" {{.*}}, i8* [[BUFFER_PTR]])
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata(%swift.type_descriptor* {{.*}} @"$S17generic_metatypes9ThreeArgsVMn" {{.*}}, i8* [[BUFFER_PTR]])
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.end
 // CHECK:   ret %swift.type* [[METADATA]]
@@ -170,7 +170,7 @@ func makeGenericMetatypes() {
 
 // CHECK: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**) [[NOUNWIND_OPT:#[0-9]+]]
 // CHECK-NOT: alloc
-// CHECK:   call %swift.type* @swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FiveArgsVMP" {{.*}}, i8*
+// CHECK:   call %swift.type* @swift_getGenericMetadata(%swift.type_descriptor* {{.*}} @"$S17generic_metatypes8FiveArgsVMn" {{.*}}, i8*
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.type*
 

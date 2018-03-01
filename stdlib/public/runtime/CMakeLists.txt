@@ -48,6 +48,7 @@ set(swift_runtime_sources
     Errors.cpp
     ErrorDefaultImpls.cpp
     Exclusivity.cpp
+    ExistentialContainer.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp
@@ -100,6 +101,10 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionShared PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+
+  swift_install_in_component(stdlib
+    TARGETS swiftImageInspectionShared
+    DESTINATION "lib/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")

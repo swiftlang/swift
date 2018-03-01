@@ -329,9 +329,48 @@ public:
       delete Dominance;
   }
 
+  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // stages. However, the optimizer currently breaks the invariant in three
+  // places:
+  // 1. Normal Simplify CFG during conditional branch simplification
+  //    (sneaky jump threading).
+  // 2. Simplify CFG via Jump Threading.
+  // 3. Loop Rotation.
+  //
+  //
+  bool prohibitAddressBlockArgs() {
+    // If this function was deserialized from canonical SIL, this invariant may
+    // already have been violated regardless of this module's SIL stage or
+    // exclusivity enforcement level. Presumably, access markers were already
+    // removed prior to serialization.
+    if (F.wasDeserializedCanonical())
+      return false;
+
+    SILModule &M = F.getModule();
+    return M.getStage() == SILStage::Raw;
+  }
+
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
+
+    if (isa<SILPHIArgument>(arg) && prohibitAddressBlockArgs()) {
+      // As a structural SIL property, we disallow address-type block
+      // arguments. Supporting them would prevent reliably reasoning about the
+      // underlying storage of memory access. This reasoning is important for
+      // diagnosing violations of memory access rules and supporting future
+      // optimizations such as bitfield packing. Address-type block arguments
+      // also create unnecessary complexity for SIL optimization passes that
+      // need to reason about memory aliasing.
+      //
+      // Note: We could allow non-phi block arguments to be addresses, because
+      // the address source would still be uniquely recoverable. But then
+      // we would need to separately ensure that something like begin_access is
+      // never passed as a block argument before being used by end_access. For
+      // now, it simpler to have a strict prohibition.
+      require(!arg->getType().isAddress(),
+              "Block arguments cannot be addresses");
+    }
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -505,17 +544,6 @@ public:
     // Regular locations are allowed on all instructions.
     if (LocKind == SILLocation::RegularKind)
       return;
-
-#if 0
-    // FIXME: This check was tautological before the removal of
-    // AutoreleaseReturnInst, and it turns out that we're violating it.
-    // Fix incoming.
-    if (LocKind == SILLocation::CleanupKind ||
-        LocKind == SILLocation::InlinedKind)
-      require(InstKind != SILInstructionKind::ReturnInst ||
-              InstKind != SILInstructionKind::AutoreleaseReturnInst,
-        "cleanup and inlined locations are not allowed on return instructions");
-#endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
@@ -3999,7 +4027,7 @@ public:
           auto substType = component.getExternalDecl()->getStorageInterfaceType()
             .subst(subs);
           require(substType->isEqual(component.getComponentType()),
-                  "component type should make storage type of referenced "
+                  "component type should match storage type of referenced "
                   "declaration");
 
           // Index types should match the lowered index types expected by the

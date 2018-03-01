@@ -110,7 +110,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
-  INITIALIZE_LLVM(argc_, argv_);
+  PROGRAM_START(argc_, argv_);
 
   SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;

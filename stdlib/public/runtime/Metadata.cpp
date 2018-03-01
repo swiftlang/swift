@@ -21,6 +21,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
@@ -71,6 +72,8 @@ static int compareIntegers(T left, T right) {
   return (left == right ? 0 : left < right ? -1 : 1);
 }
 
+static const size_t ValueTypeMetadataAddressPoint = sizeof(TypeMetadataHeader);
+
 namespace {
   struct GenericCacheEntry;
 
@@ -91,14 +94,15 @@ namespace {
 
     size_t getNumArguments() const { return NumArguments; }
 
-    static GenericCacheEntry *getFromMetadata(GenericMetadata *pattern,
+    static GenericCacheEntry *getFromMetadata(
+                            const TypeGenericContextDescriptorHeader &generics,
                                               Metadata *metadata) {
       char *bytes = (char*) metadata;
       if (auto classType = dyn_cast<ClassMetadata>(metadata)) {
         assert(classType->isTypeMetadata());
         bytes -= classType->getClassAddressPoint();
       } else {
-        bytes -= pattern->AddressPoint;
+        bytes -= ValueTypeMetadataAddressPoint;
       }
       bytes -= sizeof(GenericCacheEntry);
       return reinterpret_cast<GenericCacheEntry*>(bytes);
@@ -110,71 +114,78 @@ using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
-static GenericMetadataCache &getCache(GenericMetadata *metadata) {
+static GenericMetadataCache &getCache(
+    const TypeGenericContextDescriptorHeader &generics) {
   // Keep this assert even if you change the representation above.
   static_assert(sizeof(LazyGenericMetadataCache) <=
-                sizeof(GenericMetadata::PrivateData),
+                sizeof(GenericMetadataInstantiationCache::PrivateData),
                 "metadata cache is larger than the allowed space");
 
   auto lazyCache =
-    reinterpret_cast<LazyGenericMetadataCache*>(metadata->PrivateData);
+    reinterpret_cast<LazyGenericMetadataCache*>(
+      generics.getInstantiationCache()->PrivateData);
   return lazyCache->get();
 }
 
 /// Fetch the metadata cache for a generic metadata structure,
 /// in a context where it must have already been initialized.
-static GenericMetadataCache &unsafeGetInitializedCache(GenericMetadata *metadata) {
+static GenericMetadataCache &unsafeGetInitializedCache(
+    const TypeGenericContextDescriptorHeader &generics) {
   // Keep this assert even if you change the representation above.
   static_assert(sizeof(LazyGenericMetadataCache) <=
-                sizeof(GenericMetadata::PrivateData),
+                sizeof(GenericMetadataInstantiationCache::PrivateData),
                 "metadata cache is larger than the allowed space");
 
   auto lazyCache =
-    reinterpret_cast<LazyGenericMetadataCache*>(metadata->PrivateData);
+    reinterpret_cast<LazyGenericMetadataCache*>(
+      generics.getInstantiationCache()->PrivateData);
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
 ClassMetadata *
-swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
+                                          const void *metadataTemplate,
+                                          size_t templateSize,
+                                          size_t templateAddressPoint,
                                           const void *arguments,
                                           ClassMetadata *superclass,
                                           size_t numImmediateMembers) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
-  size_t numGenericArguments = pattern->NumKeyArguments;
+  auto &generics = description->getFullGenericContextHeader();
+  size_t numGenericArguments = generics.Base.NumKeyArguments;
 
   size_t metadataSize;
   if (superclass && superclass->isTypeMetadata()) {
-    assert(superclass->getClassAddressPoint() <= pattern->AddressPoint);
+    assert(superclass->getClassAddressPoint() <= templateAddressPoint);
 
     metadataSize = (superclass->getClassSize() -
                     superclass->getClassAddressPoint() +
-                    pattern->AddressPoint +
+                    templateAddressPoint +
                     numImmediateMembers * sizeof(void *));
-    assert(pattern->TemplateSize <= metadataSize);
+    assert(templateSize <= metadataSize);
   } else {
-    metadataSize = (pattern->TemplateSize +
+    metadataSize = (templateSize +
                     numImmediateMembers * sizeof(void *));
   }
 
-  char *bytes = GenericCacheEntry::allocate(
-                              unsafeGetInitializedCache(pattern).getAllocator(),
-                              argumentsAsArray,
-                              numGenericArguments,
-                              metadataSize)->getData<char>();
+  auto &cache = unsafeGetInitializedCache(generics);
+  char *bytes = GenericCacheEntry::allocate(cache.getAllocator(),
+                                            argumentsAsArray,
+                                            numGenericArguments,
+                                            metadataSize)->getData<char>();
 
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
+  memcpy(bytes, metadataTemplate, templateSize);
 
   // Zero out the rest of the metadata.
-  memset(bytes + pattern->TemplateSize, 0,
-         metadataSize - pattern->TemplateSize);
+  memset(bytes + templateSize, 0, metadataSize - templateSize);
 
   // Okay, move to the address point.
   ClassMetadata *metadata =
-      reinterpret_cast<ClassMetadata *>(bytes + pattern->AddressPoint);
+    reinterpret_cast<ClassMetadata *>(bytes + templateAddressPoint);
   auto patternBytes =
-    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
-    pattern->AddressPoint;
+    reinterpret_cast<const char*>(metadataTemplate) +
+    templateAddressPoint;
   auto patternMetadata = reinterpret_cast<const ClassMetadata*>(patternBytes);
   assert(metadata->isTypeMetadata());
 
@@ -187,53 +198,50 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 
   // The pattern might have private prefix matter prior to the start
   // of metadata.
-  assert(metadata->getClassAddressPoint() <= pattern->AddressPoint);
+  assert(metadata->getClassAddressPoint() <= templateAddressPoint);
   metadata->setClassSize(metadataSize);
 
   return metadata;
 }
 
 ValueMetadata *
-swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
+                                          const void *metadataTemplate,
+                                          size_t templateSize,
                                           const void *arguments) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
-  size_t numGenericArguments = pattern->NumKeyArguments;
+  auto &generics = description->getFullGenericContextHeader();
+  size_t numGenericArguments = generics.Base.NumKeyArguments;
 
+  auto &cache = unsafeGetInitializedCache(generics);
   char *bytes =
-    GenericCacheEntry::allocate(
-                              unsafeGetInitializedCache(pattern).getAllocator(),
-                              argumentsAsArray, numGenericArguments,
-                              pattern->TemplateSize)->getData<char>();
+    GenericCacheEntry::allocate(cache.getAllocator(),
+                                argumentsAsArray, numGenericArguments,
+                                templateSize)->getData<char>();
 
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
+  memcpy(bytes, metadataTemplate, templateSize);
 
   // Okay, move to the address point.
-  bytes += pattern->AddressPoint;
+  bytes += ValueTypeMetadataAddressPoint;
   auto *metadata = reinterpret_cast<ValueMetadata*>(bytes);
   
-  // Adjust the relative references to the nominal type descriptor and
-  // parent type.
-  auto patternBytes =
-    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
-    pattern->AddressPoint;
-  auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
-  metadata->Description = patternMetadata->Description;
-
   return metadata;
 }
 
 /// The primary entrypoint.
-const Metadata *swift::swift_getGenericMetadata(GenericMetadata *pattern,
-                                                const void *arguments) {
+const Metadata *
+swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
+                                const void *arguments) {
   auto genericArgs = (const void * const *) arguments;
-  size_t numGenericArgs = pattern->NumKeyArguments;
+  auto &generics = description->getFullGenericContextHeader();
+  size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs,
+  auto entry = getCache(generics).findOrAdd(genericArgs, numGenericArgs,
     [&]() -> GenericCacheEntry* {
       // Create new metadata to cache.
-      auto metadata = pattern->CreateFunction(pattern, arguments);
-      auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
+      auto metadata = generics.InstantiationFunction(description, arguments);
+      auto entry = GenericCacheEntry::getFromMetadata(generics, metadata);
       entry->Value = metadata;
       return entry;
     });
@@ -2240,15 +2248,12 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   case ExistentialTypeRepresentation::Class:
     return true;
   // Opaque existential containers uniquely own their contained value.
-  case ExistentialTypeRepresentation::Opaque:
-  {
+  case ExistentialTypeRepresentation::Opaque: {
     // We can't take from a shared existential box without checking uniqueness.
     auto *opaque =
         reinterpret_cast<const OpaqueExistentialContainer *>(container);
-    auto *vwt = opaque->Type->getValueWitnesses();
-    return vwt->isValueInline();
+    return opaque->isValueInline();
   }
-    
   // References to boxed existential containers may be shared.
   case ExistentialTypeRepresentation::Error: {
     // We can only take the value if the box is a bridged NSError, in which case
@@ -2275,13 +2280,7 @@ const {
   
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
-    auto *vwt = opaque->Type->getValueWitnesses();
-    if (!vwt->isValueInline()) {
-      unsigned alignMask = vwt->getAlignmentMask();
-      unsigned size = vwt->size;
-      swift_deallocObject(*reinterpret_cast<HeapObject **>(&opaque->Buffer),
-                          size, alignMask);
-    }
+    opaque->deinit();
     break;
   }
   
@@ -2303,18 +2302,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
-    auto *type = opaqueContainer->Type;
-    auto *vwt = type->getValueWitnesses();
-
-    if (vwt->isValueInline())
-      return reinterpret_cast<const OpaqueValue *>(&opaqueContainer->Buffer);
-
-    unsigned alignMask = vwt->getAlignmentMask();
-    // Compute the byte offset of the object in the box.
-    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-    auto *bytePtr = reinterpret_cast<const char *>(
-        *reinterpret_cast<HeapObject *const *const>(&opaqueContainer->Buffer));
-    return reinterpret_cast<const OpaqueValue *>(bytePtr + byteOffset);
+    return opaqueContainer->projectValue();
   }
   case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox

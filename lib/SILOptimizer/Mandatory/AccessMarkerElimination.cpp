@@ -36,7 +36,7 @@ using namespace swift;
 // This is currently unsupported because tail duplication results in
 // address-type block arguments.
 llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
-    "sil-optimized-access-markers", llvm::cl::init(true),
+    "sil-optimized-access-markers", llvm::cl::init(false),
     llvm::cl::desc("Enable memory access markers during optimization passes."));
 
 namespace {

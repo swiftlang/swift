@@ -706,7 +706,7 @@ RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
 }
 
 RValue RValue::ensurePlusOne(SILGenFunction &SGF, SILLocation loc) && {
-  if (SGF.getOptions().EnableGuaranteedNormalArguments && isPlusZero(SGF))
+  if (!isPlusOne(SGF))
     return copy(SGF, loc);
   return std::move(*this);
 }

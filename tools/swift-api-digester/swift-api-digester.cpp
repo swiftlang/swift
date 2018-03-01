@@ -67,7 +67,9 @@ namespace  {
     DumpSwiftModules,
     CompareSDKs,
     DiagnoseSDKs,
+    // The following two are for testing purposes
     DeserializeDiffItems,
+    DeserializeSDK,
   };
 } // end anonymous namespace
 
@@ -135,7 +137,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Diagnose SDK content in JSON file"),
           clEnumValN(ActionType::DeserializeDiffItems,
                      "deserialize-diff",
-                     "Deserialize diff items in a JSON file")));
+                     "Deserialize diff items in a JSON file"),
+          clEnumValN(ActionType::DeserializeSDK,
+                     "deserialize-sdk",
+                     "Deserialize sdk digester in a JSON file")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -287,6 +292,30 @@ static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
+/// We don't dump individual extension declaration in the digester. However,
+/// we still want to detect whether an extension's applicability changes. Therefore,
+/// by using ParentExtensionInfo, we keep track of extension's information in
+/// each member of the extension.
+class ParentExtensionInfo {
+  friend struct SDKNodeInitInfo;
+  friend class SDKNode;
+  std::vector<StringRef> Requirements;
+
+  void *operator new(size_t Bytes, SDKContext &C) {
+    return C.allocator().Allocate<ParentExtensionInfo>();
+  }
+public:
+  ArrayRef<StringRef> getGenericRequirements() const { return Requirements; }
+};
+
+/// The additional information we need to create a type node.
+struct TypeInitInfo {
+  bool IsImplicitlyUnwrappedOptional = false;
+  /// When this type node represents a function parameter, this boolean value
+  /// indicates whether the parameter has default argument.
+  bool hasDefaultArgument = false;
+};
+
 struct SDKNodeInitInfo {
   SDKContext &Ctx;
   StringRef Name;
@@ -303,10 +332,12 @@ struct SDKNodeInitInfo {
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   StringRef SuperclassUsr;
+  ParentExtensionInfo *ExtInfo = nullptr;
+  TypeInitInfo TypeInfo;
+
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                  bool IsImplicitlyUnwrappedOptional =false);
+  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
@@ -372,12 +403,15 @@ class SDKNodeDecl : public SDKNode {
   bool IsStatic;
   uint8_t Ownership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
+  // Non-null ExtInfo implies this decl is defined in an type extension.
+  ParentExtensionInfo *ExtInfo;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
     DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
     ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)) {}
+    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)),
+    ExtInfo(Info.ExtInfo) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -395,6 +429,11 @@ public:
   bool isSDKPrivate() const;
   bool isDeprecated() const;
   bool isStatic() const { return IsStatic; };
+  bool isFromExtension() const { return ExtInfo; }
+  const ParentExtensionInfo& getExtensionInfo() const {
+    assert(isFromExtension());
+    return *ExtInfo;
+  }
 };
 
 StringRef SDKNodeDecl::getHeaderName() const {
@@ -434,17 +473,23 @@ NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
 
 class SDKNodeType : public SDKNode {
   std::vector<TypeAttrKind> TypeAttributes;
+  bool HasDefaultArg;
 
 protected:
   bool hasTypeAttribute(TypeAttrKind DAKind) const;
   SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-    TypeAttributes(Info.TypeAttrs) {}
+    TypeAttributes(Info.TypeAttrs),
+    HasDefaultArg(Info.TypeInfo.hasDefaultArgument) {}
 
 public:
   KnownTypeKind getTypeKind() const;
   void addTypeAttribute(TypeAttrKind AttrKind);
   ArrayRef<TypeAttrKind> getTypeAttributes() const;
   SDKNodeDecl *getClosestParentDecl() const;
+
+  // When the type node represents a function parameter, this function returns
+  // whether the parameter has a default value.
+  bool hasDefaultArgument() const { return HasDefaultArg; }
   static bool classof(const SDKNode *N);
 };
 
@@ -893,6 +938,14 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                                       cast<llvm::yaml::MappingNode>(&Mapping)));
       }
       break;
+    case KeyKind::KK_parentExtensionReqs: {
+      assert(!Info.ExtInfo);
+      Info.ExtInfo = new (Ctx) ParentExtensionInfo();
+      for (auto &Req : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+        Info.ExtInfo->Requirements.push_back(GetScalarString(&Req));
+      }
+      break;
+    }
     case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
       break;
@@ -907,6 +960,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       break;
     case KeyKind::KK_mutating:
       Info.IsMutating = true;
+      break;
+    case KeyKind::KK_hasDefaultArg:
+      Info.TypeInfo.hasDefaultArgument = true;
       break;
     case KeyKind::KK_static:
       Info.IsStatic = true;
@@ -1180,9 +1236,10 @@ static Ownership getOwnership(ValueDecl *VD) {
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                                 bool IsImplicitlyUnwrappedOptional) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)) {
+                                 TypeInitInfo TypeInfo) :
+    Ctx(Ctx), Name(getTypeName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
+    PrintedName(getPrintedName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
+    TypeInfo(TypeInfo) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
 }
@@ -1194,7 +1251,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
     ModuleName(VD->getModuleContext()->getName().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
     IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
-    Ownership(getOwnership(VD)) {
+    Ownership(getOwnership(VD)), ExtInfo(nullptr) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1203,6 +1260,18 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
   }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
+
+  // If the decl is declared in an extension, calculate the extension info.
+  if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
+    ExtInfo = new (Ctx) ParentExtensionInfo();
+    // Print each generic requirement to the extension info.
+    for (auto Req: Ext->getGenericRequirements()) {
+      llvm::SmallString<32> Result;
+      llvm::raw_svector_ostream OS(Result);
+      Req.print(OS, PrintOptions::printInterface());
+      ExtInfo->Requirements.emplace_back(Ctx.buffer(OS.str()));
+    }
+  }
 }
 
 SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
@@ -1219,8 +1288,8 @@ case SDKNodeKind::X:                                                           \
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
 static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
-                                  bool IsImplicitlyUnwrappedOptional =false) {
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional)
+                                  TypeInitInfo InitInfo = TypeInitInfo()) {
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, InitInfo)
     .createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
@@ -1262,6 +1331,25 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
   return Root;
 }
 
+static std::vector<SDKNode*>
+createParameterNodes(SDKContext &Ctx, ArrayRef<ParameterList*> AllParamLists) {
+  std::vector<SDKNode*> Result;
+  for (auto PL: AllParamLists) {
+    for (auto param: *PL) {
+      if (param->isSelfParameter())
+        continue;
+      TypeInitInfo TypeInfo;
+      TypeInfo.IsImplicitlyUnwrappedOptional = param->getAttrs().
+        hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      TypeInfo.hasDefaultArgument = param->getDefaultArgumentKind() !=
+        DefaultArgumentKind::None;
+      Result.push_back(constructTypeNode(Ctx, param->getInterfaceType(),
+                                         TypeInfo));
+    }
+  }
+  return Result;
+}
+
 // Construct a node for a function decl. The first child of the function decl
 // is guaranteed to be the return value type of this function.
 // We sometimes skip the first parameter because it can be metatype of dynamic
@@ -1269,35 +1357,20 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
 static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
                                       SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  bool resultIsImplicitlyUnwrappedOptional = false;
-  if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    resultIsImplicitlyUnwrappedOptional = true;
-  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(),
-                                   resultIsImplicitlyUnwrappedOptional));
-  for (auto *paramList : FD->getParameterLists()) {
-    for (auto param : *paramList) {
-      bool paramIsImplicitlyUnwrappedOptional = false;
-      if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        paramIsImplicitlyUnwrappedOptional = true;
-
-      if (!param->isSelfParameter())
-        Func->addChild(constructTypeNode(Ctx, param->getInterfaceType(),
-                                         paramIsImplicitlyUnwrappedOptional));
-    }
-  }
+  TypeInitInfo TypeInfo;
+  TypeInfo.IsImplicitlyUnwrappedOptional = FD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(), TypeInfo));
+  for (auto *Node : createParameterNodes(Ctx, FD->getParameterLists()))
+    Func->addChild(Node);
   return Func;
 }
 
 static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   auto Func = SDKNodeInitInfo(Ctx, CD).createSDKNode(SDKNodeKind::Constructor);
   Func->addChild(constructTypeNode(Ctx, CD->getResultInterfaceType()));
-  for (auto *paramList : CD->getParameterLists()) {
-    for (auto param : *paramList)
-      Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
-  }
-
-  // Always remove the first parameter in init.
-  Func->removeChild(Func->getChildBegin() + 1);
+  for (auto *Node : createParameterNodes(Ctx, CD->getParameterLists()))
+    Func->addChild(Node);
   return Func;
 }
 
@@ -1354,11 +1427,10 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD) {
 
 static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
   auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::Var);
-  auto isImplicitlyUnwrappedOptional = false;
-  if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    isImplicitlyUnwrappedOptional = true;
-  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType(),
-                                  isImplicitlyUnwrappedOptional));
+  TypeInitInfo TypeInfo;
+  TypeInfo.IsImplicitlyUnwrappedOptional = VD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType(), TypeInfo));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::Getter));
@@ -1576,6 +1648,15 @@ namespace swift {
                               Super);
             }
           }
+          if (D->isFromExtension()) {
+            // Even if we don't have any requirements on this parent extension,
+            // we still want to have this key present to indicate the member
+            // is from an extension.
+            auto Reqs = D->getExtensionInfo().getGenericRequirements();
+            out.mapRequired(getKeyContent(Ctx,
+                                          KeyKind::KK_parentExtensionReqs).data(),
+                            Reqs);
+          }
           auto Attributes = D->getDeclAttributes();
           if (!Attributes.empty())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
@@ -1590,6 +1671,10 @@ namespace swift {
           if (!Attributes.empty())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(),
                             Attributes);
+          if (bool HasDefault = T->hasDefaultArgument()) {
+            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasDefaultArg).data(),
+                            HasDefault);
+          }
         }
         if (!value->isLeaf()) {
           ArrayRef<SDKNode *> Children = value->getChildren();
@@ -1628,6 +1713,16 @@ namespace swift {
       static SDKDeclAttrKind& element(Output &, ArrayRef<SDKDeclAttrKind> &seq,
                                    size_t index) {
         return const_cast<SDKDeclAttrKind&>(seq[index]);
+      }
+    };
+    template<>
+    struct ArrayTraits<ArrayRef<StringRef>> {
+      static size_t size(Output &out, ArrayRef<StringRef> &seq) {
+        return seq.size();
+      }
+      static StringRef& element(Output &, ArrayRef<StringRef> &seq,
+                                   size_t index) {
+        return const_cast<StringRef&>(seq[index]);
       }
     };
   } // namespace json
@@ -3497,8 +3592,26 @@ static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
   return 0;
 }
 
+/// Mostly for testing purposes, this function de-serializes the SDK dump in
+/// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
+/// the contents in dumpPath and OutputPath should be identical.
+static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  if (!fs::exists(dumpPath)) {
+    llvm::errs() << dumpPath << " does not exist\n";
+    return 1;
+  }
+  SDKContext Ctx;
+  SwiftDeclCollector Collector(Ctx);
+  Collector.deSerialize(dumpPath);
+  Collector.serialize(OutputPath);
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SDK Digester\n");
   CompilerInvocation InitInvok;
@@ -3532,12 +3645,16 @@ int main(int argc, char *argv[]) {
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1]);
+  case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
     if (options::SDKJsonPaths.size() != 1) {
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+    if (options::Action == ActionType::DeserializeDiffItems)
+      return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+    else
+      return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile);
   }
   case ActionType::None:
     llvm::errs() << "Action required\n";

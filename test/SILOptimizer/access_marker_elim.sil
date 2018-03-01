@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -enforce-exclusivity=unchecked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=UNCHECKED
-// RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=CHECKED
+// FIXME: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=CHECKED
 
 sil_stage raw
 
