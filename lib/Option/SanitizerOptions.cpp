@@ -139,15 +139,15 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     if (!kind) {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
           A->getOption().getPrefixedName(), A->getValue(i));
-    } else if (sanitizerRuntimeLibExists(toFileName(*kind), isShared)
-        && (*kind != SanitizerKind::Thread || Triple.isArch64Bit())) {
-      sanitizerSet |= *kind;
-    } else {
+    } else if (!sanitizerRuntimeLibExists(toFileName(*kind), isShared)
+        || (*kind == SanitizerKind::Thread && !Triple.isArch64Bit())) {
       SmallString<128> b;
       Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
                      (A->getOption().getPrefixedName() + toStringRef(*kind))
                          .toStringRef(b),
                      Triple.getTriple());
+    } else {
+      sanitizerSet |= *kind;
     }
   }
 
