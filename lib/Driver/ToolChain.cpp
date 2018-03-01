@@ -317,7 +317,8 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
 
 bool
 ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
-                                     StringRef sanitizerName) const {
+                                     StringRef sanitizerName,
+                                     bool shared) const {
   // Assume no sanitizers are supported by default.
   // This method should be overriden by a platform-specific subclass.
   return false;
