@@ -86,11 +86,13 @@ enum FooEnum {
 // FOO_ENUM_NO_DOT: Begin completions
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: FooEnum#})[#(into: _UnsafeHasher) -> _UnsafeHasher#]; name=_hash(FooEnum)
 // FOO_ENUM_NO_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT: Begin completions
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: _hash({#self: FooEnum#})[#(into: _UnsafeHasher) -> _UnsafeHasher#]; name=_hash(FooEnum)
 // FOO_ENUM_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT_ELEMENTS: Begin completions, 2 items
@@ -231,17 +233,19 @@ enum QuxEnum : Int {
 // QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
-// QUX_ENUM_NO_DOT: Begin completions, 4 items
+// QUX_ENUM_NO_DOT: Begin completions, 5 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: QuxEnum#})[#(into: _UnsafeHasher) -> _UnsafeHasher#]; name=_hash(QuxEnum)
 // QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
-// QUX_ENUM_DOT: Begin completions, 4 items
+// QUX_ENUM_DOT: Begin completions, 5 items
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: _hash({#self: QuxEnum#})[#(into: _UnsafeHasher) -> _UnsafeHasher#]; name=_hash(QuxEnum)
 // QUX_ENUM_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: End completions
 
