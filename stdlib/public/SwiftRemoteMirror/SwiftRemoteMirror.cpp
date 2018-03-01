@@ -58,6 +58,9 @@ swift_reflection_createReflectionContext(void *ReaderContext,
                                          GetStringLengthFunction GetStringLength,
                                          GetSymbolAddressFunction GetSymbolAddress) {
   assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
+  assert(PointerSize == sizeof(uintptr_t) &&
+         "We currently only support the pointer size this file was compiled with.");
+  
   auto GetSize = PointerSize == 4
     ? [](void *){ return (uint8_t)4; }
     : [](void *){ return (uint8_t)8; };

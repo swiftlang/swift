@@ -84,9 +84,13 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata);
 
 /// Returns whether the given object appears to have metadata understood
-/// by this library. A negative result is always correct, but a positive
-/// result may be a false positive if the address in question is not
-/// really a Swift or Objective-C object.
+/// by this library. Images must be added using
+/// swift_reflection_addImage, not swift_reflection_addReflectionInfo,
+/// for this function to work properly. If addImage is used, a negative
+/// result is always correct, but a positive result may be a false
+/// positive if the address in question is not really a Swift or
+/// Objective-C object. If addReflectionInfo is used, the return value
+/// will always be false.
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
 

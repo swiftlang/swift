@@ -341,10 +341,6 @@ static inline int swift_reflection_interop_libraryOwnsObject(
 
 static inline void swift_reflection_interop_loadFunctions(
   struct SwiftReflectionInteropContext *Context, void *Handle, int IsLegacy) {
-#ifndef __cplusplus
-#define decltype(x) void *
-#endif
-
   if (Handle == NULL)
     return;
 
@@ -352,6 +348,9 @@ static inline void swift_reflection_interop_loadFunctions(
     ->Libraries[Context->LibraryCount];
   struct SwiftReflectionFunctions *Functions = &Library->Functions;
 
+#ifndef __cplusplus
+#define decltype(x) void *
+#endif
 #define LOAD_NAMED(field, symbol) do { \
     Functions->field = (decltype(Functions->field))dlsym(Handle, symbol); \
     if (Functions->field == NULL) return; \

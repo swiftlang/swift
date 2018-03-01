@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Exercise the SwiftRemoteMirrorLegacyInterop API. This requires a build
+# of an old (circa 4.0.3) version of Swift as well as the current one.
+# It then builds Swift code using the old and new compilers, and
+# exercises the Interop API using the old and new remote mirrors
+# libraries.
+
 set -euo pipefail
 
 if [[ $# -ne 4 ]]; then
