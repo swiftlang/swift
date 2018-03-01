@@ -1751,15 +1751,15 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
                                   PrintOptions Options) {
   auto Nominal = ExtendedType->getAnyNominal();
   assert(Nominal && "extension of non-nominal type");
-  if (auto ct = ExtendedType->getAs<ClassType>()) {
-    if (auto ParentType = ct->getParent()) {
-      ParentType.print(Printer, Options);
-      Printer << ".";
-    }
-  }
-  if (auto st = ExtendedType->getAs<StructType>()) {
-    if (auto ParentType = st->getParent()) {
-      ParentType.print(Printer, Options);
+  if (auto nt = ExtendedType->getAs<NominalType>()) {
+    if (auto ParentType = nt->getParent()) {
+      if (auto *PD = ParentType->getNominalOrBoundGenericNominal()) {
+        // Avoid using the parent type directly because it can be bound
+        // generic type and sugared.
+        PD->getDeclaredType().print(Printer, Options);
+      } else {
+        ParentType.print(Printer, Options);
+      }
       Printer << ".";
     }
   }
