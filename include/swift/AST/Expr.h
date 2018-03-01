@@ -4909,7 +4909,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no index expr for this kind");
+        return nullptr;
       }
     }
 
@@ -4942,7 +4942,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no hashable conformances for this kind");
+        return {};
       }
     }
     

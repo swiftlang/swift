@@ -1158,6 +1158,53 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     if (auto setter = vd->getSetter())
       emitFunction(setter);
   }
+  
+  tryEmitPropertyDescriptor(vd);
+}
+
+static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
+  // The storage needs a descriptor if it sits at a module's ABI boundary,
+  // meaning it has public linkage.
+  
+  // Any property that's potentially resilient should have accessors
+  // synthesized.
+  if (!decl->getGetter())
+    return false;
+
+  // TODO: If previous versions of an ABI-stable binary needed the descriptor,
+  // then we still do.
+
+  auto getter = SILDeclRef(decl->getGetter());
+  auto getterLinkage = getter.getLinkage(ForDefinition);
+  
+  switch (getterLinkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+    // We may need a descriptor.
+    break;
+    
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::Hidden:
+    // Don't need a public descriptor.
+    return false;
+    
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::SharedExternal:
+    llvm_unreachable("should be definition linkage?");
+  }
+  
+  // TODO: We might be able to avoid a descriptor if the property is committed
+  // to being implemented a certain way, such as if it's promised to remain
+  // stored, or is computed with inlinable accessors, and can't change its
+  // mutability (because it's already promised to be mutable or fully immutable).
+  return true;
+}
+
+void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
+  // TODO
 }
 
 void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
