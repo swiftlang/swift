@@ -91,6 +91,10 @@ public:
   std::string loadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
+  std::string serializedDiagnosticsPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs
+        .SerializedDiagnosticsPath;
+  }
 };
 } // namespace swift
 

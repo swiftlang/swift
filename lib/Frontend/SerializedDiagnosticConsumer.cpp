@@ -222,9 +222,10 @@ private:
 };
 } // end anonymous namespace
 
-namespace swift { namespace serialized_diagnostics {
-  DiagnosticConsumer *createConsumer(StringRef serializedDiagnosticsPath) {
-    return new SerializedDiagnosticConsumer(serializedDiagnosticsPath);
+namespace swift {
+namespace serialized_diagnostics {
+  std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
+    return llvm::make_unique<SerializedDiagnosticConsumer>(outputPath);
   }
 } // namespace serialized_diagnostics
 } // namespace swift
