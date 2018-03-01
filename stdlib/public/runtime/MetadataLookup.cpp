@@ -639,12 +639,12 @@ public:
   /// Callback used to handle the substitution of a generic parameter for
   /// its metadata.
   using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
+    llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
   /// Callback used to handle the lookup of dependent member types.
-  using LookupDependentMemberFn =
-    std::function<const Metadata *(const Metadata *base, StringRef assocType,
-                                   const ProtocolDescriptor *protocol)>;
+  using LookupDependentMemberFn = llvm::function_ref<const Metadata *(
+      const Metadata *base, StringRef assocType,
+      const ProtocolDescriptor *protocol)>;
 
 private:
   /// The demangler we'll use when building new nodes.
