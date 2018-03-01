@@ -42,6 +42,8 @@ Swift 5.0
 	conditionally conforms to `P`, will succeed when the conditional
 	requirements are met.
 
+**Add new entries to the top of this file, not here!**
+
 Swift 4.1
 ---------
 
@@ -166,8 +168,6 @@ Swift 4.1
   ```
 
   If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
-
-  **Add new entries to the top of this file, not here!**
 
 Swift 4.0
 ---------
@@ -6875,3 +6875,9 @@ Swift 1.0
 [SE-0191]: <https://github.com/apple/swift-evolution/blob/master/proposals/0191-eliminate-indexdistance.md>
 [SE-0192]: <https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md>
 [SE-0193]: <https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md>
+[SE-0194]: <https://github.com/apple/swift-evolution/blob/master/proposals/0194-derived-collection-of-enum-cases.md>
+[SE-0195]: <https://github.com/apple/swift-evolution/blob/master/proposals/0195-dynamic-member-lookup.md>
+[SE-0196]: <https://github.com/apple/swift-evolution/blob/master/proposals/0196-diagnostic-directives.md>
+[SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
+[SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
+[SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
