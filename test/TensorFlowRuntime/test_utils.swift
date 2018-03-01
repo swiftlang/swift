@@ -1,56 +1,104 @@
 import TensorFlow
 import StdlibUnittest
 
-extension TestSuite {
-  public func testCPUAndGPU(_ name: String, _ body: @escaping () -> Void) {
-    testCPU(name, body)
-    testGPU(name, body)
-  }
-  // For now, each test will run in both eager and non-eager modes.  We expect
-  // to remove eager mode support due to challenges in full XLA support there.
-  public func testCPU(_ name: String, _ body: @escaping () -> Void) {
-    test(name + "_CPU_eager") {
-      _RuntimeConfig.usesTFEagerAPI = true
-      _RuntimeConfig.runsOnGPU = false
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-    test(name + "_CPU") {
-      _RuntimeConfig.usesTFEagerAPI = false
-      _RuntimeConfig.runsOnGPU = false
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-  }
-  public func testGPU(_ name: String, _ body: @escaping () -> Void) {
-#if CUDA
-    // Run eager tests before non-eager ones, so that _ExecutionContext.init()
-    // will call TFE_ContextOptionsSetDevicePlacementPolicy() properly.
-    test(name + "_GPU_eager") {
-      _RuntimeConfig.usesTFEagerAPI = true
-      _RuntimeConfig.runsOnGPU = true
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-    test(name + "_GPU") {
-      _RuntimeConfig.usesTFEagerAPI = false
-      _RuntimeConfig.runsOnGPU = true
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-#endif
+/// Determines if two floating point numbers are very nearly equal.
+public func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
+  _ lhs: T, _ rhs: T, byError error: T = 0.000001
+) {
+  expectLT(abs(lhs - rhs), error)
+}
+
+/// Determines if two collections of floating point numbers are very nearly
+/// equal.
+public func expectPointwiseNearlyEqual<T, C1, C2>(
+  _ lhs: C1, _ rhs: C2, byError error: T = 0.000001
+) where T : FloatingPoint & ExpressibleByFloatLiteral,
+  C1 : Collection, C2 : Collection, C1.Element == T, C1.Element == C2.Element {
+  precondition(lhs.count == rhs.count, "Scalar count mismatch.")
+  for (l, r) in zip(lhs, rhs) {
+    expectNearlyEqual(l, r, byError: error)
   }
 }
 
-/// Loop testing on GPU is only supported via XLA, which in turn only
-/// supports TF C API. So for TF eager C API + GPU execution, the test is
-/// skipped.
+extension TestSuite {
+  // Use the three macros CPU, CUDA and TPU to differentiate the 3 associated
+  // backends.
+  // Notes:
+  // 1. When Cuda is enabled, we still run testCPU(). This might change in the
+  // future, as the runtime based on TF C API will place nodes on GPU when GPU
+  // is available.
+  // 2. TPU is mutually exclusive with {CPU, CUDA} (requiring different
+  // hardware).
+  public func testAllBackends(_ name: String, _ body: @escaping () -> Void) {
+#if CPU
+    testCPU(name, body)
+#endif
+#if CUDA && !TPU
+    testGPU(name, body)
+#endif // CUDA && !TPU
+#if TPU && !CUDA
+    // If CUDA is also defined, don't run the TPU tests.
+    testTPU(name, body)
+#endif // TPU && !CUDA
+  }
+  // For now, each CPU test will run in both eager and non-eager modes.  We
+  // expect to remove eager mode support due to challenges in full XLA support
+  // there.
+  public func testCPU(_ name: String, _ body: @escaping () -> Void) {
+#if CPU
+#if !CUDA
+    // Do not run eager tests under GPU, to save resource and run-time.
+    test(name + "_CPU_eager") {
+      _RuntimeConfig.usesTFEagerAPI = true
+      _RuntimeConfig.executionMode = .cpu
+      _RuntimeConfig.printsDebugLog = false
+      body()
+    }
+#endif // CUDA
+    test(name + "_CPU") {
+      _RuntimeConfig.usesTFEagerAPI = false
+      _RuntimeConfig.executionMode = .cpu
+      _RuntimeConfig.printsDebugLog = false
+      body()
+    }
+#endif // CPU
+  }
+  public func testGPU(_ name: String, _ body: @escaping () -> Void) {
+#if CUDA && !TPU
+    test(name + "_GPU") {
+      // To save resources and runtime, do not run GPU tests under eager.
+      _RuntimeConfig.usesTFEagerAPI = false
+      _RuntimeConfig.executionMode = .gpu
+      _RuntimeConfig.printsDebugLog = false
+      body()
+    }
+#endif // CUDA && !TPU
+  }
+  public func testTPU(_ name: String, _ body: @escaping () -> Void) {
+#if TPU && !CUDA
+    test(name + "_TPU") {
+      _RuntimeConfig.usesTFEagerAPI = false
+      _RuntimeConfig.executionMode = .tpu
+      _RuntimeConfig.printsDebugLog = false
+      body()
+    }
+#endif // TPU && !CUDA
+  }
+}
+
+/// Loops can run on these backends:
+/// 1. TF interpreter with CPU (not covered in the testing here, for
+/// simplicity)
+/// 2. XLA (CPU or GPU)
+/// 3. TPU
 public func shouldDoLoopTest() -> Bool {
   if _RuntimeConfig.usesTFEagerAPI &&
      _ExecutionContext.global.gpuDeviceName != nil {
     print("Loop tests are skipped in Eager + GPU mode.")
     return false
   }
-  _RuntimeConfig.usesXLA = true
+  if _RuntimeConfig.executionMode != .tpu {
+    _RuntimeConfig.executionMode = .xla
+  }
   return true
 }
