@@ -36,6 +36,18 @@ import Glibc
 #endif
 import CTensorFlow
 
+public enum _ExecutionMode {
+  /// Classical TF interpreter backend, on CPU.
+  case cpu
+  /// Classical TF interpreter backend, on GPU.
+  case gpu
+  /// TPU backend.
+  case tpu
+  /// XLA jit-compilation backend (will use GPU when available, and otherwise
+  /// CPU).
+  case xla
+}
+
 /// The configuration for the compiler runtime.
 /// TODO(hongm): Revisit the longer-term design.
 public enum _RuntimeConfig {
@@ -44,12 +56,27 @@ public enum _RuntimeConfig {
   /// - Note: Set to true only for debugging purposes.
   static public var usesSynchronousExecution = false
 
-  /// When true, uses the TF eager C API. Otherwise uses the TF C API.
+  /// When true, uses the TF eager C API, and TF interpreter backend.
+  /// Otherwise uses the TF C API, with execution mode set below.
   static public var usesTFEagerAPI = false
 
-  /// When true, enables XLA jit compilation for TF graphs. Only defined when
-  /// usesTFEagerAPI == false.
-  static public var usesXLA = false
+  /// Only defined when usesTFEagerAPI == false.
+  ///
+  /// Setting the value to gpu requires that the Swift compiler and model code
+  /// be built with `--config=cuda`. If there are multiple GPUs, an arbitrary
+  /// one is chosen.
+  static public var executionMode: _ExecutionMode = .cpu {
+    willSet {
+      debugLog("About to set executionMode to \(newValue)")
+      guard newValue == .gpu else { return }
+      guard _ExecutionContext.global.gpuDeviceName != nil else {
+        fatalError("""
+          GPU must be available when _RuntimeConfig.executionMode is set to \
+          .gpu -- did you compile with --config=cuda and have a qualified GPU?
+          """)
+      }
+    }
+  }
 
   /// When true, prints various debug messages on the runtime state.
   ///
@@ -65,28 +92,6 @@ public enum _RuntimeConfig {
       debugLog("About to set tensorflowVerboseLogLevel to \(newValue)")
       guard newValue >= 0 && newValue <= 4 else {
         fatalError("Invalid tensorflowVerboseLogLevel value \(newValue)")
-      }
-    }
-  }
-
-  /// When true, forces the model code to be run on a GPU. If there is no usable
-  /// GPU, your program will crash. This option requires that the Swift compiler
-  /// and model code are built with `--config=cuda`. If there are multiple GPUs,
-  /// an arbitrary one is chosen.
-  ///
-  /// TODO: replace with an enum such as:
-  /// enum_ComputeDeviceKind {
-  ///   case cpu, gpu, tpu
-  /// }
-  static public var runsOnGPU = false {
-    willSet {
-      debugLog("About to set runsOnGPU to \(newValue)")
-      guard newValue else { return }
-      guard _ExecutionContext.global.gpuDeviceName != nil else {
-        fatalError("""
-          GPU must be available when _RuntimeConfig.runsOnGPU is set to true \
-          -- did you compile with --config=cuda and have a TF-qualified GPU?
-          """)
       }
     }
   }
@@ -157,9 +162,9 @@ public final class _ExecutionContext {
     checkOk(status)
 
     // Initialize GPU device.
-    // While the code here is only needed when _RuntimeConfig.runsOnGPU is true,
-    // running it in all code paths helps keep things simple (e.g. so that the
-    // cpuDeviceName property is always set.)
+    // While the code here is only needed when _RuntimeConfig.executionMode is
+    // set to .gpu, running it in all code paths helps keep things simple
+    // (e.g. so that the cpuDeviceName property is always set.)
     let devices = TFE_ContextListDevices(cContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
@@ -183,7 +188,7 @@ public final class _ExecutionContext {
       fatalError("CPU should always be an available device.")
     }
     self.cpuDeviceName = cpuDeviceName
-    // This must be non-nil when _RuntimeConfig.runsOnGPU is set to true, as
+    // This must be non-nil when _RuntimeConfig.executionMode is set to .gpu, as
     // being enforced in the willSet check for that property.
     self.gpuDeviceName = deviceNames["GPU"]
 
@@ -346,7 +351,11 @@ fileprivate extension _ExecutionContext {
 
     // Memorize the loaded program by address.
     sync {
-      loadedTFPrograms[address] = graph
+      // In TPU mode, the graph will be rewritten before each execution, so do
+      // not use the cache in that case.
+      if _RuntimeConfig.executionMode != .tpu {
+        loadedTFPrograms[address] = graph
+      }
     }
     debugLog("Done loading a new program.")
     return graph!
@@ -413,7 +422,7 @@ private class TFState {
     graph = _ExecutionContext.global.loadGraphInBytes(programByteAddress,
                                                       count: programByteCount)
     let opts = TF_NewSessionOptions()
-    if _RuntimeConfig.usesXLA {
+    if _RuntimeConfig.executionMode == .xla {
       debugLog("Enable XLA execution.")
       TF_EnableXLACompilation(opts, 1)
     }
@@ -459,7 +468,7 @@ extension TFState {
     }
 
     // Prepare output related parameters for TF_SessionRun().
-    let outputNodeSpecs = (0..<Int32(returnValues.count)).map { i in
+    var outputNodeSpecs = (0..<Int32(returnValues.count)).map { i in
       TF_Output(oper: funcNode, index: i)
     }
     var outputTensors: [CTensor?] = Array(repeating: nil,
@@ -467,6 +476,18 @@ extension TFState {
 
     if returnValues.count > 0 {
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
+      if _RuntimeConfig.executionMode == .tpu {
+        debugLog("Enable TPU execution.")
+        var tpuRewrittenSpecs: [TF_Output] = Array(
+          repeating: TF_Output(oper: nil, index: -1),
+          count: returnValues.count)
+        TF_SetupTPUExecution(cSession,
+                              Int32(inputNodeSpecs.count), inputNodeSpecs,
+                              Int32(outputNodeSpecs.count), outputNodeSpecs,
+                              &tpuRewrittenSpecs, status)
+        checkOk(status)
+        outputNodeSpecs = tpuRewrittenSpecs
+      }
       TF_SessionRun(
         cSession, nil,
         // input related parameters
@@ -596,7 +617,7 @@ public final class _TensorComputation {
       debugLog("Done initializing TF-specific state.")
     }
 
-    if _RuntimeConfig.runsOnGPU {
+    if _RuntimeConfig.executionMode == .gpu {
       guard let gpuDeviceName = context.gpuDeviceName else {
         fatalError("""
           The availability of a GPU device should have been confirmed \

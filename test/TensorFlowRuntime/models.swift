@@ -8,12 +8,16 @@
 // too much.
 
 import TensorFlow
+#if TPU
+import TestUtilsTPU
+#else
 import TestUtils
+#endif
 import StdlibUnittest
 
 var ModelTests = TestSuite("Model")
 
-ModelTests.testCPUAndGPU("StraightLineXORTraining") {
+ModelTests.testAllBackends("StraightLineXORTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
   // FIXME: GPU training won't converge.
@@ -74,7 +78,7 @@ ModelTests.testCPUAndGPU("StraightLineXORTraining") {
   expectLT(loss, 0.01)
 }
 
-ModelTests.testCPUAndGPU("XORClassifierTraining") {
+ModelTests.testAllBackends("XORClassifierTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
   // FIXME: GPU training won't converge.
