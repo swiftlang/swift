@@ -1341,7 +1341,7 @@ tests.test("LazyPrefixWhileSequence/AssociatedTypes") {
   typealias Subject = LazyPrefixWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self,
     subSequenceType: AnySequence<OpaqueValue<Int>>.self)
 }
 
@@ -1350,21 +1350,21 @@ tests.test("LazyPrefixWhileCollection/AssociatedTypes") {
   typealias Subject = LazyPrefixWhileCollection<Base>
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self,
     subSequenceType: Slice<Subject>.self,
-    indexType: LazyPrefixWhileIndex<Base>.self,
+    indexType: LazyPrefixWhileCollection<Base>.Index.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
 tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyPrefixWhileBidirectionalCollection<Base>
+  typealias Subject = LazyPrefixWhileCollection<Base>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyPrefixWhileCollection<Base>.Iterator.self,
     // FIXME(ABI)#82 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
-    indexType: LazyPrefixWhileIndex<Base>.self,
+    indexType: LazyPrefixWhileCollection<Base>.Index.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
