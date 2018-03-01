@@ -2629,7 +2629,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
       // Handle methods first.
       if (auto overriddenFunc = dyn_cast<AbstractFunctionDecl>(overridden)) {
         // Determine the selector of the overridden method.
-        ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector(&tc);
+        ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector();
 
         // Dig out the @objc attribute on the method, if it exists.
         auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
@@ -2869,7 +2869,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
             return None;
           }
         };
-        auto sel = method->getObjCSelector(&TC);
+        auto sel = method->getObjCSelector();
         if (auto diagID = isForbiddenSelector(sel)) {
           auto diagInfo = getObjCMethodDiagInfo(method);
           TC.diagnose(method, *diagID,
@@ -6068,14 +6068,13 @@ public:
         bool objCMatch = false;
         if (parentDecl->isObjC() && decl->isObjC()) {
           if (method) {
-            if (method->getObjCSelector(&TC)
-                  == parentMethod->getObjCSelector(&TC))
+            if (method->getObjCSelector() == parentMethod->getObjCSelector())
               objCMatch = true;
           } else if (auto *parentSubscript =
                        dyn_cast<SubscriptDecl>(parentStorage)) {
             // If the subscript kinds don't match, it's not an override.
-            if (subscript->getObjCSubscriptKind(&TC)
-                  == parentSubscript->getObjCSubscriptKind(&TC))
+            if (subscript->getObjCSubscriptKind()
+                  == parentSubscript->getObjCSubscriptKind())
               objCMatch = true;
           }
 
@@ -6172,11 +6171,11 @@ public:
         if (objCMatch) {
           if (method) {
             TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                        method->getObjCSelector(&TC), declTy);
+                        method->getObjCSelector(), declTy);
           } else {
             TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
                         static_cast<unsigned>(
-                          subscript->getObjCSubscriptKind(&TC)),
+                          subscript->getObjCSubscriptKind()),
                         declTy);
           }
           TC.diagnose(parentDecl, diag::overridden_here_with_type,
