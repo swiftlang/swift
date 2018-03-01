@@ -810,17 +810,17 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // If there are primary source files, build a separate SILModule for
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
   // once for each such input.
-  if (auto *PrimaryFile = Instance.getPrimarySourceFile()) {
+  std::deque<PostSILGenInputs> PSGIs;
+  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
     auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
-    std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
-    return PSGIs;
   }
+  if (!PSGIs.empty())
+    return PSGIs;
   // If there are primary inputs but no primary _source files_, there might be
   // a primary serialized input.
-  std::deque<PostSILGenInputs> PSGIs;
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
