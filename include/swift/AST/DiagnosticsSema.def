@@ -1371,6 +1371,8 @@ ERROR(objc_generic_extension_using_type_parameter,none,
       "generic parameters at runtime", ())
 NOTE(objc_generic_extension_using_type_parameter_here,none,
      "generic parameter used here", ())
+NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
+     "add '@objc' to allow uses of 'self' within the function body", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
