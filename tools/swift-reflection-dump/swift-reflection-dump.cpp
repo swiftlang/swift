@@ -293,6 +293,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
 }
 
 int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
                                   options::Architecture,
