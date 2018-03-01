@@ -568,6 +568,27 @@
           ]
         },
         {
+          "kind": "Function",
+          "name": "_hash",
+          "printedName": "_hash(into:)",
+          "declKind": "Func",
+          "usr": "s:4cake6NumberO5_hash4intoys7_HasherVz_tF",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "InOut",
+              "printedName": "inout _Hasher"
+            }
+          ]
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",
