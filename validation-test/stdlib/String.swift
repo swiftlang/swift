@@ -2011,6 +2011,7 @@ let comparisonTestCases = [
     "a\u{fa1}\u{fb7}\u{fa1}\u{fb7}a\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
     ], .equal),
 
+  ComparisonTestCase(["a\u{301}\u{0301}", "\u{e1}"], .greater),
   ComparisonTestCase(["😀", "😀"], .equal),
   ComparisonTestCase(["\u{2f9df}", "\u{8f38}"], .equal),
   ComparisonTestCase([
