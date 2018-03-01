@@ -242,7 +242,7 @@ extension LazyCollectionProtocol {
 
 @available(*, deprecated, renamed: "LazyDropWhileSequence.Iterator")
 public typealias LazyDropWhileIterator<T> = LazyDropWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated, renamed: "LazyDropWhileCollection.Iterator")
+@available(*, deprecated, renamed: "LazyDropWhileCollection.Index")
 public typealias LazyDropWhileIndex<T> = LazyDropWhileCollection<T>.Index where T: Collection
 @available(*, deprecated, renamed: "LazyDropWhileCollection")
 public typealias LazyDropWhileBidirectionalCollection<T> = LazyDropWhileCollection<T> where T: BidirectionalCollection
