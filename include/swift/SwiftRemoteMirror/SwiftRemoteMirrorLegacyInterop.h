@@ -47,6 +47,8 @@ typedef struct swift_typeref_interop {
 /// as the corresponding swift_reflection_* functions, except for taking
 /// or returning _interop data types in some circumstances.
 
+typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
+
 static inline SwiftReflectionInteropContextRef
 swift_reflection_interop_createReflectionContext(
     void *ReaderContext,
@@ -295,8 +297,6 @@ struct SwiftReflectionInteropContext {
   struct SwiftReflectionInteropContextFreeList *FreeList;
   struct SwiftReflectionInteropContextLegacyDataSegmentList *LegacyDataSegmentList;
 };
-
-typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
 #define FOREACH_LIBRARY \
   for (struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[0]; \
