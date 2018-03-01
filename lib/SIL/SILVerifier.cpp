@@ -329,11 +329,6 @@ public:
       delete Dominance;
   }
 
-  // Address-type block args must be prohibited whenever access markers are
-  // present. Access markers are always present in raw SIL to diagnose exclusive
-  // memory access. In canonical SIL, access markers are only present with
-  // EnforceExclusivityDynamic.
-  //
   // FIXME: For sanity, address-type block args should be prohibited at all SIL
   // stages. However, the optimizer currently breaks the invariant in three
   // places:
@@ -341,8 +336,8 @@ public:
   //    (sneaky jump threading).
   // 2. Simplify CFG via Jump Threading.
   // 3. Loop Rotation.
-  // Once EnforceExclusivityDynamic is performant enough to be enabled by
-  // default at -O, address-type blocks args can be prohibited unconditionally.
+  //
+  //
   bool prohibitAddressBlockArgs() {
     // If this function was deserialized from canonical SIL, this invariant may
     // already have been violated regardless of this module's SIL stage or
@@ -352,12 +347,7 @@ public:
       return false;
 
     SILModule &M = F.getModule();
-    if (M.getStage() == SILStage::Raw)
-      return true;
-
-    // If dynamic enforcement is enabled, markers are present at -O so we
-    // prohibit address block args.
-    return M.getOptions().EnforceExclusivityDynamic;
+    return M.getStage() == SILStage::Raw;
   }
 
   void visitSILArgument(SILArgument *arg) {
