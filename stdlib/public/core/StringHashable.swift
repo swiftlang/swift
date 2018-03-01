@@ -12,141 +12,95 @@
 
 import SwiftShims
 
-#if _runtime(_ObjC)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHashValue")
-internal func _stdlib_NSStringHashValue(
-  _ str: AnyObject, isASCII: Bool) -> Int
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHashValuePointer")
-internal func _stdlib_NSStringHashValuePointer(
-  _ str: OpaquePointer, isASCII: Bool) -> Int
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_CFStringHashCString")
-internal func _stdlib_CFStringHashCString(
-  _ str: OpaquePointer, _ len: Int) -> Int
-#endif
-
-extension Unicode {
+extension _UnmanagedString where CodeUnit == UInt8 {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
-  internal static func hashASCII(
-    _ string: UnsafeBufferPointer<UInt8>,
-    into hasher: inout _Hasher
-  ) {
-    let collationTable = _swift_stdlib_unicode_getASCIICollationTable()
-    for c in string {
+  internal func hashASCII() -> Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for c in self {
       _precondition(c <= 127)
-      let element = collationTable[Int(c)]
-      // Ignore zero valued collation elements. They don't participate in the
-      // ordering relation.
-      if element != 0 {
-        hasher.append(Int(truncatingIfNeeded: element))
+      let element = UInt(c)
+      hasher.append(element)
+    }
+    return hasher._finalizeAndReturnIntHash()
+    // return Int(_SipHash13Context.hash(data: buffer.baseAddress._unsafelyUnwrappedUnchecked, dataByteCount: buffer.count, key: _Hashing.secretKey))
+  }
+}
+
+extension _UnmanagedString where CodeUnit == UInt16 {
+  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
+  // @_inlineable // FIXME(sil-serialize-all)
+  // @_versioned // FIXME(sil-serialize-all)
+  internal static func hashUTF16(
+    _ string: UnsafeBufferPointer<UInt8>,
+
+    for (i, cu) in self.enumerated() {
+      let cuIsASCII = cu <= 0x7F
+  ) {
+      let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
+      guard cuIsASCII && isSingleSegmentScalar else {
+        let codeUnitSequence = IteratorSequence(
+          _NormalizedCodeUnitIterator(self[i...])
+        )
+        for element in codeUnitSequence {
+          hasher.append(UInt(element))
+        }
+        break
       }
+
+      hasher.append(UInt(cu))
     }
   }
+}
 
+extension _UnmanagedOpaqueString {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt16>,
+
     into hasher: inout _Hasher
   ) {
-    let collationIterator = _swift_stdlib_unicodeCollationIterator_create(
-      string.baseAddress!,
-      UInt32(string.count))
-    defer { _swift_stdlib_unicodeCollationIterator_delete(collationIterator) }
+    for (i, cu) in self.enumerated() {
 
-    while true {
-      var hitEnd = false
-      let element =
-        _swift_stdlib_unicodeCollationIterator_next(collationIterator, &hitEnd)
-      if hitEnd {
+      let cuIsASCII = cu <= 0x7F
+      let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
+
+      guard cuIsASCII && isSingleSegmentScalar else {
+        let codeUnitSequence = IteratorSequence(
+          _NormalizedCodeUnitIterator(self[i...])
+        )
+        for element in codeUnitSequence {
+          hasher.append(Int(element))
+        }
         break
       }
-      // Ignore zero valued collation elements. They don't participate in the
-      // ordering relation.
-      if element != 0 {
-        hasher.append(Int(truncatingIfNeeded: element))
-      }
+
+      hasher.append(Int(truncatingIfNeeded: cu))
     }
   }
 }
-
-#if _runtime(_ObjC)
-#if arch(i386) || arch(arm)
-    private let stringHashOffset = Int(bitPattern: 0x88dd_cc21)
-#else
-    private let stringHashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
-#endif // arch(i386) || arch(arm)
-#endif // _runtime(_ObjC)
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   @_versioned
-  @inline(never) // Hide the CF dependency
   internal func computeHashValue() -> Int {
-#if _runtime(_ObjC)
-    let hash = _stdlib_CFStringHashCString(OpaquePointer(start), count)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-    return stringHashOffset ^ hash
-#else
-    var hasher = _Hasher()
-    Unicode.hashASCII(self.buffer, into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
-#endif // _runtime(_ObjC)
+    return self.hashASCII()
   }
 }
 
-extension _UnmanagedString where CodeUnit == UTF16.CodeUnit {
+extension _UnmanagedString where CodeUnit == UInt16 {
   @_versioned
-  @inline(never) // Hide the CF dependency
   internal func computeHashValue() -> Int {
-#if _runtime(_ObjC)
-    let temp = _NSContiguousString(_StringGuts(_large: self))
-    let hash = temp._unsafeWithNotEscapedSelfPointer {
-      return _stdlib_NSStringHashValuePointer($0, isASCII: false)
-    }
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-    return stringHashOffset ^ hash
-#else
-    var hasher = _Hasher()
-    Unicode.hashUTF16(self.buffer, into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
-#endif // _runtime(_ObjC)
+    return self.hashUTF16()
   }
 }
 
 extension _UnmanagedOpaqueString {
   @_versioned
-  @inline(never) // Hide the CF dependency
   internal func computeHashValue() -> Int {
-#if _runtime(_ObjC)
-    // TODO: ranged hash?
-    let hash = _stdlib_NSStringHashValue(cocoaSlice(), isASCII: false)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-    return stringHashOffset ^ hash
-#else
-    // FIXME: Streaming hash
-    let p = UnsafeMutablePointer<UTF16.CodeUnit>.allocate(capacity: count)
-    defer { p.deallocate(capacity: count) }
-    let buffer = UnsafeMutableBufferPointer(start: p, count: count)
-    _copy(into: buffer)
-    var hasher = _Hasher()
-    Unicode.hashUTF16(
-      UnsafeBufferPointer(start: p, count: count),
-      into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
-#endif
+    return self.hashUTF16()
   }
 }
 

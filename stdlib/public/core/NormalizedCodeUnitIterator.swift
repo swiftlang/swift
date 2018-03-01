@@ -127,8 +127,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
         buffer[bufferIndex] = cu
         index += 1
         bufferIndex += 1
-      } while unmanagedString.hasNormalizationBoundary(
-          after: index - 1) == false
+      } while !unmanagedString.hasNormalizationBoundary(after: index - 1)
       
       return bufferIndex
     }
