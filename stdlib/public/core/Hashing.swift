@@ -25,7 +25,7 @@ import SwiftShims
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _Hashing {
+enum _Hashing {
   // FIXME(ABI)#41 : make this an actual public API.
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI
@@ -48,7 +48,7 @@ struct _Hashing {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
-struct _HashingDetail {
+enum _HashingDetail {
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
