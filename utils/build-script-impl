@@ -2824,16 +2824,17 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
-                           call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                           "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                           --executable "${lldb_executable}" \
-                           ${LLDB_TEST_DEBUG_SERVER} \
-                           ${LLDB_TEST_SUBDIR_CLAUSE} \
-                           ${LLDB_TEST_CATEGORIES} \
-                           ${LLDB_DOTEST_CC_OPTS} \
-                           ${LLDB_FORMATTER_OPTS} \
-                           -E "${DOTEST_EXTRA}"
+                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                    SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                    "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                    --executable "${lldb_executable}" \
+                    ${LLDB_TEST_DEBUG_SERVER} \
+                    ${LLDB_TEST_SUBDIR_CLAUSE} \
+                    ${LLDB_TEST_CATEGORIES} \
+                    ${LLDB_DOTEST_CC_OPTS} \
+                    ${LLDB_FORMATTER_OPTS} \
+                    --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                    -E "${DOTEST_EXTRA}"
                 continue
                 ;;
             llbuild)
