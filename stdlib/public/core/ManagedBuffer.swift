@@ -118,9 +118,8 @@ open class ManagedBuffer<Header, Element> {
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    let r = try body(headerAddress, firstElementAddress)
-    _fixLifetime(self)
-    return r
+    defer { _fixLifetime(self) }
+    return try body(headerAddress, firstElementAddress)
   }
 
   /// The stored `Header` instance.
@@ -304,9 +303,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   public func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    let r = try body(_headerPointer, _elementPointer)
-    _fixLifetime(_nativeBuffer)
-    return r
+    defer { _fixLifetime(_nativeBuffer) }
+    return try body(_headerPointer, _elementPointer)
   }
 
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
