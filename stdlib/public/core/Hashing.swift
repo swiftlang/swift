@@ -311,4 +311,4 @@ internal struct _LegacyHasher {
   }
 }
 
-internal typealias _Hasher = _LegacyHasher
+internal typealias _Hasher = _SipHash13
