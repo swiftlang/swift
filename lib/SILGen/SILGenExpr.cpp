@@ -5327,6 +5327,8 @@ public:
                                AccessKind kind) const override {
     return kind;
   }
+
+  virtual bool isLoadingPure() const override { return true; }
   
   void set(SILGenFunction &SGF, SILLocation loc,
            ArgumentSource &&value, ManagedValue base) && override {
@@ -5663,9 +5665,10 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     FormalEvaluationScope scope(*this);
     PostponedCleanup postpone(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
-    // If the lvalue is purely physical, then it won't have any side effects,
-    // and we don't need to drill into it.
-    if (lv.isPhysical())
+
+    // If loading from the lvalue is guaranteed to have no side effects, we
+    // don't need to drill into it.
+    if (lv.isLoadingPure())
       return;
 
     // If the last component is physical, then we just need to drill through
@@ -5678,6 +5681,39 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     // Otherwise, we must call the ultimate getter to get its potential side
     // effect.
     emitLoadOfLValue(E, std::move(lv), SGFContext::AllowImmediatePlusZero);
+    return;
+  }
+
+  auto findLoadThroughForceValueExprs = [](Expr *E,
+                                           SmallVectorImpl<ForceValueExpr *>
+                                             &forceValueExprs) -> LoadExpr * {
+    while (auto FVE = dyn_cast<ForceValueExpr>(E)) {
+      forceValueExprs.push_back(FVE);
+      E = FVE->getSubExpr();
+    }
+    return dyn_cast<LoadExpr>(E);
+  };
+
+  // Look through force unwrap(s) of an lvalue. If possible, we want to just to
+  // emit the precondition(s) without having to load the value.
+  SmallVector<ForceValueExpr *, 4> forceValueExprs;
+  if (auto *LE = findLoadThroughForceValueExprs(E, forceValueExprs)) {
+    FormalEvaluationScope scope(*this);
+    LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
+
+    ManagedValue value;
+    if (lv.isLastComponentPhysical()) {
+      value = emitAddressOfLValue(LE, std::move(lv), AccessKind::Read);
+    } else {
+      value = emitLoadOfLValue(LE, std::move(lv),
+          SGFContext::AllowImmediatePlusZero).getAsSingleValue(*this, LE);
+    }
+
+    for (auto &FVE : reversed(forceValueExprs)) {
+      const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
+      value = emitCheckedGetOptionalValueFrom(
+          FVE, value, optTL, SGFContext::AllowImmediatePlusZero);
+    }
     return;
   }
 
