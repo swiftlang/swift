@@ -2307,8 +2307,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsKind() == EffectsKind::ReadWrite)
+  else if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
+  else if (getEffectsKind() == EffectsKind::ReleaseNone)
+    OS << "[releasenone] ";
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
