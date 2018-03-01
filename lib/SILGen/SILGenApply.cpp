@@ -5011,6 +5011,9 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
                                                       CanType baseFormalType,
                                                       SILDeclRef accessor) {
+  if (!base)
+    return ArgumentSource();
+
   AccessorBaseArgPreparer Preparer(*this, loc, base, baseFormalType, accessor);
   return Preparer.prepare();
 }

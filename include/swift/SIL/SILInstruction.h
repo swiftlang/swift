@@ -2353,9 +2353,6 @@ private:
       Indices(indices),
       IndexEquality{indicesEqual, indicesHash},
       ComponentType(ComponentType) {
-    assert(indices.empty() == !indicesEqual
-           && indices.empty() == !indicesHash
-           && "must have equals/hash functions iff there are indices");
   }
   
   KeyPathPatternComponent(AbstractStorageDecl *externalStorage,

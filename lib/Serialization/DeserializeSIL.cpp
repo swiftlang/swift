@@ -2607,7 +2607,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_FUNCTION) {
+         kind != SIL_FUNCTION &&
+         kind != SIL_PROPERTY) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;

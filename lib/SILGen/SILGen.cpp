@@ -15,6 +15,7 @@
 #include "Scope.h"
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1204,7 +1205,69 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  // TODO
+  // TODO: Key path code emission doesn't handle opaque values properly yet.
+  if (!SILModuleConventions(M).useLoweredAddresses())
+    return;
+  
+  if (!doesPropertyNeedDescriptor(decl))
+    return;
+  
+  auto genericEnv = decl->getInnermostDeclContext()
+                        ->getGenericEnvironmentOfContext();
+  unsigned baseOperand = 0;
+  bool needsGenericContext = true;
+  
+  Type baseTy;
+  if (decl->getDeclContext()->isTypeContext()) {
+    baseTy = decl->getDeclContext()->getSelfInterfaceType();
+    if (decl->isStatic()) {
+      // TODO: Static properties should eventually be referenceable as
+      // keypaths from T.Type -> Element
+      //baseTy = MetatypeType::get(baseTy);
+      return;
+    }
+  } else {
+    // TODO: Global variables should eventually be referenceable as
+    // key paths from ()
+    //baseTy = TupleType::getEmpty(getASTContext());
+    return;
+  }
+  
+  SubstitutionList subs = {};
+  if (genericEnv)
+    subs = genericEnv->getForwardingSubstitutions();
+  
+  // TODO: The hashable conformances for the indices need to be provided by the
+  // client, since they may be post-hoc conformances, or a generic subscript
+  // may be invoked with hashable substitutions. We may eventually allow for
+  // non-hashable keypaths as well.
+  SmallVector<ProtocolConformanceRef, 4> indexHashables;
+  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+    auto hashable = getASTContext().getProtocol(KnownProtocolKind::Hashable);
+    for (auto *index : *sub->getIndices()) {
+      if (index->isInOut())
+        return;
+      auto indexTy = index->getInterfaceType();
+      if (genericEnv)
+        indexTy = genericEnv->mapTypeIntoContext(indexTy);
+      
+      auto conformance = sub->getModuleContext()
+                            ->lookupConformance(indexTy, hashable);
+      if (!conformance)
+        return;
+      if (!conformance->getConditionalRequirements().empty())
+        return;
+      indexHashables.push_back(*conformance);
+    }
+  }
+  
+  auto component = emitKeyPathComponentForDecl(SILLocation(decl),
+                                               genericEnv,
+                                               baseOperand, needsGenericContext,
+                                               subs, decl, indexHashables,
+                                               baseTy->getCanonicalType());
+  
+  (void)SILProperty::create(M, /*serialized*/ false, decl, component);
 }
 
 void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
