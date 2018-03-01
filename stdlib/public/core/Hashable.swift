@@ -122,14 +122,6 @@ public protocol Hashable : Equatable {
   func hash(into hasher: inout Hasher)
 }
 
-extension Hashable {
-  @inlinable
-  @inline(__always)
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(self.hashValue)
-  }
-}
-
 // Called by synthesized `hashValue` implementations.
 @inlinable
 @inline(__always)
