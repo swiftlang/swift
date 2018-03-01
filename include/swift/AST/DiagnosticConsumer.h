@@ -113,24 +113,44 @@ public:
                         const DiagnosticInfo &Info) override;
 };
 
-/// \brief DiagnosticConsumer that funnels diagnostics in certain source ranges
-/// to particular sub-consumers.
+/// \brief DiagnosticConsumer that funnels diagnostics in certain files to
+/// particular sub-consumers.
 ///
-/// Diagnostics that are not in one of the special ranges are emitted into every
-/// sub-consumer.
-class RangeSpecificDiagnosticConsumer : public DiagnosticConsumer {
+/// The intended use case for such a consumer is "batch mode" compilations,
+/// where we want to record diagnostics for each file as if they were compiled
+/// separately. This is important for incremental builds, so that if a file has
+/// warnings but doesn't get recompiled in the next build, the warnings persist.
+///
+/// Diagnostics that are not in one of the special files are emitted into every
+/// sub-consumer. This is necessary to deal with, for example, diagnostics in a
+/// bridging header imported from Objective-C, which isn't really about the
+/// current file.
+class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
 public:
+  /// A diagnostic consumer, along with the name of the buffer that it should
+  /// be associated with. An empty string means that a consumer is not
+  /// associated with any particular buffer, and should only receive diagnostics
+  /// that are not in any of the other consumers' files.
   using ConsumerPair =
-      std::pair<CharSourceRange, std::unique_ptr<DiagnosticConsumer>>;
+      std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
 
 private:
-  SmallVector<std::unique_ptr<DiagnosticConsumer>, 4> SubConsumers;
+  /// All consumers owned by this FileSpecificDiagnosticConsumer.
+  const SmallVector<ConsumerPair, 4> SubConsumers;
 
-  /// A "map" sorted by the end locations of the ranges, so that a lookup by
-  /// position can be done using binary search.
+  using ConsumersOrderedByRangeEntry =
+    std::pair<CharSourceRange, DiagnosticConsumer *>;
+
+  /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
+  /// the end locations of each file so that a lookup by position can be done
+  /// using binary search.
+  ///
+  /// Generated and cached when the first diagnostic with a location is emitted.
+  /// This allows diagnostics to be emitted before files are actually opened,
+  /// as long as they don't have source locations.
   ///
   /// \see #consumerForLocation
-  SmallVector<std::pair<CharSourceRange, unsigned>, 4> LocationToConsumerMap;
+  SmallVector<ConsumersOrderedByRangeEntry, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
   ///
@@ -141,12 +161,12 @@ private:
   DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
 
 public:
-  /// Takes ownership of the DiagnosticConsumers specified in \p consumers and
-  /// records their association with the CharSourceRanges.
+  /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
   ///
-  /// The ranges must not be overlapping.
-  explicit RangeSpecificDiagnosticConsumer(
-      MutableArrayRef<ConsumerPair> consumers);
+  /// There must not be two consumers for the same file (i.e., having the same
+  /// buffer name).
+  explicit FileSpecificDiagnosticConsumer(
+      SmallVectorImpl<ConsumerPair> &consumers);
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
@@ -157,7 +177,9 @@ public:
    bool finishProcessing() override;
 
 private:
-  DiagnosticConsumer *consumerForLocation(SourceLoc loc) const;
+  void computeConsumersOrderedByRange(SourceManager &SM);
+  DiagnosticConsumer *consumerForLocation(SourceManager &SM,
+                                          SourceLoc loc) const;
 };
   
 } // end namespace swift

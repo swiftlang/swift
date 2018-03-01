@@ -53,48 +53,97 @@ namespace {
   };
 } // end anonymous namespace
 
-TEST(RangeSpecificDiagnosticConsumer, SubConsumersFinishInOrder) {
+TEST(FileSpecificDiagnosticConsumer, SubConsumersFinishInOrder) {
   SourceManager sourceMgr;
-  unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
-  unsigned bufferB = sourceMgr.addMemBufferCopy("vwxyz", "B");
-  (void)bufferB;
+  (void)sourceMgr.addMemBufferCopy("abcde", "A");
+  (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, None);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), None);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
+TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   SourceManager sourceMgr;
-  unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
-  unsigned bufferB = sourceMgr.addMemBufferCopy("vwxyz", "B");
-  (void)bufferB;
+  (void)sourceMgr.addMemBufferCopy("abcde", "A");
+  (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
   ExpectedDiagnostic expected[] = { {SourceLoc(), "dummy"} };
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(nullptr,
-      expected);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      nullptr, expected);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expected);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Error,
                                "dummy", {}, DiagnosticInfo());
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers){
+TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
+  SourceManager sourceMgr;
+  //                                             01234
+  unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
+  unsigned bufferB = sourceMgr.addMemBufferCopy("vwxyz", "B");
+
+  SourceLoc frontOfA = sourceMgr.getLocForOffset(bufferA, 0);
+  SourceLoc middleOfA = sourceMgr.getLocForOffset(bufferA, 2);
+  SourceLoc backOfA = sourceMgr.getLocForOffset(bufferA, 4);
+
+  SourceLoc frontOfB = sourceMgr.getLocForOffset(bufferB, 0);
+  SourceLoc middleOfB = sourceMgr.getLocForOffset(bufferB, 2);
+  SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
+
+  ExpectedDiagnostic expectedA[] = {
+    {frontOfA, "front"},
+    {middleOfA, "middle"},
+    {backOfA, "back"},
+  };
+  ExpectedDiagnostic expectedB[] = {
+    {frontOfB, "front"},
+    {middleOfB, "middle"},
+    {backOfB, "back"}
+  };
+
+  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      nullptr, expectedA);
+  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedB);
+
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("B", std::move(consumerB));
+
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
+  topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
+                               "front", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
+                               "front", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Error,
+                               "middle", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Error,
+                               "middle", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Error,
+                               "back", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Error,
+                               "back", {}, DiagnosticInfo());
+  topConsumer.finishProcessing();
+}
+
+TEST(FileSpecificDiagnosticConsumer,
+     ErrorsInUnaffiliatedFilesGoToEveryConsumer) {
   SourceManager sourceMgr;
   //                                             01234
   unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
@@ -116,7 +165,7 @@ TEST(RangeSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers){
     {backOfA, "back"},
     {backOfB, "back"}
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "front"},
     {middleOfB, "middle"},
     {backOfB, "back"}
@@ -124,14 +173,14 @@ TEST(RangeSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers){
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
                                "front", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
@@ -147,7 +196,7 @@ TEST(RangeSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers){
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
+TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
   SourceManager sourceMgr;
   //                                             01234
   unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
@@ -162,21 +211,21 @@ TEST(RangeSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
     {frontOfA, "remark"},
     {frontOfB, "remark"},
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "warning"},
     {frontOfB, "remark"},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Warning,
                                "warning", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Warning,
@@ -188,7 +237,7 @@ TEST(RangeSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
+TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
   SourceManager sourceMgr;
   //                                             01234
   unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
@@ -213,7 +262,7 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
     {middleOfA, "note"},
     {backOfA, "note"},
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "error"},
     {middleOfB, "note"},
     {backOfB, "note"},
@@ -221,14 +270,14 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
                                "error", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
@@ -250,7 +299,7 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
+TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
   SourceManager sourceMgr;
   //                                             01234
   unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
@@ -275,7 +324,7 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
     {middleOfA, "note"},
     {backOfA, "note"},
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "warning"},
     {middleOfB, "note"},
     {backOfB, "note"},
@@ -283,14 +332,14 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Warning,
                                "warning", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
@@ -312,7 +361,67 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
   topConsumer.finishProcessing();
 }
 
-TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
+TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
+  SourceManager sourceMgr;
+  //                                             01234
+  unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
+  unsigned bufferB = sourceMgr.addMemBufferCopy("vwxyz", "B");
+
+  SourceLoc frontOfA = sourceMgr.getLocForOffset(bufferA, 0);
+  SourceLoc middleOfA = sourceMgr.getLocForOffset(bufferA, 2);
+  SourceLoc backOfA = sourceMgr.getLocForOffset(bufferA, 4);
+
+  SourceLoc frontOfB = sourceMgr.getLocForOffset(bufferB, 0);
+  SourceLoc middleOfB = sourceMgr.getLocForOffset(bufferB, 2);
+  SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
+
+  ExpectedDiagnostic expectedA[] = {
+    {frontOfA, "error"},
+    {middleOfB, "note"},
+    {backOfA, "note"},
+    {frontOfA, "error"},
+    {middleOfB, "note"},
+    {backOfA, "note"},
+  };
+  ExpectedDiagnostic expectedB[] = {
+    {frontOfB, "error"},
+    {middleOfA, "note"},
+    {backOfB, "note"},
+  };
+
+  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      nullptr, expectedA);
+  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedB);
+
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("B", std::move(consumerB));
+
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
+  topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
+                               "error", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
+                               "error", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
+                               "error", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
+                               "note", {}, DiagnosticInfo());
+  topConsumer.finishProcessing();
+}
+
+TEST(FileSpecificDiagnosticConsumer,
+     NotesAreAttachedToErrorsEvenAcrossFilesWithUnaffiliatedConsumer) {
   SourceManager sourceMgr;
   //                                             01234
   unsigned bufferA = sourceMgr.addMemBufferCopy("abcde", "A");
@@ -337,7 +446,7 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
     {middleOfB, "note"},
     {backOfA, "note"},
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "error"},
     {middleOfA, "note"},
     {backOfB, "note"},
@@ -345,14 +454,14 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
                                "error", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
@@ -375,7 +484,7 @@ TEST(RangeSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
 }
 
 
-TEST(RangeSpecificDiagnosticConsumer,
+TEST(FileSpecificDiagnosticConsumer,
      NotesWithInvalidLocsAreStillAttachedToErrors) {
   SourceManager sourceMgr;
   //                                             01234
@@ -393,21 +502,21 @@ TEST(RangeSpecificDiagnosticConsumer,
     {frontOfA, "error"},
     {SourceLoc(), "note"},
   };
-  ExpectedDiagnostic expectedB[] = {
+  ExpectedDiagnostic expectedUnaffiliated[] = {
     {frontOfB, "error"},
     {SourceLoc(), "note"},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), expectedB);
+  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+      consumerA.get(), expectedUnaffiliated);
 
-  RangeSpecificDiagnosticConsumer::ConsumerPair consumers[] = {
-    {sourceMgr.getRangeForBuffer(bufferA), std::move(consumerA)},
-    {CharSourceRange(), std::move(consumerB)}};
+  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
-  RangeSpecificDiagnosticConsumer topConsumer(consumers);
+  FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
                                "error", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Note,
