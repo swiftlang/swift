@@ -2059,12 +2059,9 @@ namespace {
       }
       case MetatypeRepresentation::Thick:
         if (isa<ExistentialMetatypeType>(type)) {
-            return emitFromTypeMetadata(type);
-        } else {
-          // Thick metatypes look like pointers with spare bits.
-          return emitFromValueWitnessTable(
-                     CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
+          return emitFromTypeMetadata(type);
         }
+        // Otherwise, this is a metatype that looks like a pointer.
       case MetatypeRepresentation::ObjC:
         // Thick metatypes look like pointers with spare bits.
         return emitFromValueWitnessTable(
