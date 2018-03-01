@@ -190,6 +190,10 @@ extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
   public var hashValue: Int {
     return base.hashValue
   }
+
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    return hasher.appending(base)
+  }
 }
 
 extension LazyDropWhileCollection: Collection {

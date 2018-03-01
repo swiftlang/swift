@@ -792,11 +792,16 @@ extension Set : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    var result: Int = _mixInt(0)
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+    var hash = 0
     for member in self {
-       result ^= _mixInt(member.hashValue)
+      hash ^= _hashValue(for: member)
     }
-    return result
+    return hasher.appending(hash)
   }
 }
 
