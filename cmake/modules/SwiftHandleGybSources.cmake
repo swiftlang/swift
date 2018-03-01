@@ -37,10 +37,6 @@ function(handle_gyb_source_single dependency_out_var_name)
       GYB_SINGLE # prefix
       "${options}" "${single_value_args}" "${multi_value_args}" ${ARGN})
 
-  set(gyb_flags
-      ${SWIFT_GYB_FLAGS}
-      ${GYB_SINGLE_FLAGS})
-
   set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
   set(gyb_tool_source "${gyb_tool}" "${gyb_tool}.py")
 
@@ -62,11 +58,9 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${PYTHON_EXECUTABLE}" "${gyb_tool}" "${gyb_flags}"
-          -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "${PYTHON_EXECUTABLE}" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
-          "${CMAKE_COMMAND}" -E copy_if_different
-          "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
+          "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
           "${CMAKE_COMMAND}" -E remove "${GYB_SINGLE_OUTPUT}.tmp"
       OUTPUT "${GYB_SINGLE_OUTPUT}"

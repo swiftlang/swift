@@ -91,6 +91,7 @@ KEY(ownership)
 KEY(superclassUsr)
 KEY(parentExtensionReqs)
 KEY(hasDefaultArg)
+KEY(conformingProtocols)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
