@@ -1685,6 +1685,7 @@ function cmake_config_opt() {
 
 function set_swiftpm_bootstrap_command() {
     SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+    SWIFT_BUILD_DIR="$(build_directory ${LOCAL_HOST} swift)"
     LLBUILD_BIN="$(build_directory_bin ${LOCAL_HOST} llbuild)/swift-build-tool"
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
@@ -1717,7 +1718,8 @@ function set_swiftpm_bootstrap_command() {
     swiftpm_bootstrap_command+=(
         --swiftc="${SWIFTC_BIN}"
         --sbt="${LLBUILD_BIN}"
-        --build="${build_dir}")
+        --build="${build_dir}"
+        --swift-build-dir="${SWIFT_BUILD_DIR}")
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         swiftpm_bootstrap_command+=(
             --foundation="${FOUNDATION_BUILD_DIR}/Foundation")
