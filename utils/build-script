@@ -1028,7 +1028,10 @@ def main_preset():
     if not args.preset:
         diagnostics.fatal("missing --preset option")
 
-    args.preset_substitutions = {}
+    args.preset_substitutions = {
+      'home': os.path.expanduser("~")
+    }
+
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
