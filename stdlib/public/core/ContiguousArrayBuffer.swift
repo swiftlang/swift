@@ -696,9 +696,11 @@ internal func _copyCollectionToContiguousArray<
   var p = result.firstElementAddress
   var i = source.startIndex
   var buffer = UnsafeMutableBufferPointer(start: p, count: count)
-  source._copyContents(initializing: buffer)
-
+  var (iterator, index) = source._copyContents(initializing: buffer)
+  
   _expectEnd(of: source, is: source.index(i, offsetBy: count))
+  _expectEnd(of: buffer, is: index)
+  _sanityCheck(iterator.next() == nil)
 
   return ContiguousArray(_buffer: result)
 }
