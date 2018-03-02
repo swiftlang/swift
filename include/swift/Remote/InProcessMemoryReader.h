@@ -42,9 +42,8 @@ class InProcessMemoryReader final : public MemoryReader {
     return true;
   }
 
-  std::tuple<const void *, std::function<void()>>
-    readBytes(RemoteAddress address, uint64_t size) override {
-    return std::make_tuple(address.getLocalPointer<void>(), []{});
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
+    return ReadBytesResult(address.getLocalPointer<void>(), [](const void *) {});
   }
 };
  

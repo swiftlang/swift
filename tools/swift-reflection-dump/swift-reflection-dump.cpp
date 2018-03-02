@@ -196,14 +196,12 @@ public:
     return false;
   }
   
-  std::tuple<const void *, std::function<void()>>
-    readBytes(RemoteAddress address, uint64_t size) override {
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
     if (!isAddressValid(address, size))
-      return std::make_tuple(nullptr, []{});
+      return ReadBytesResult(nullptr, [](const void *){});
 
     // TODO: Account for offset in ELF binaries
-    auto ptr = (const void *)address.getAddressData();
-    return std::make_tuple(ptr, []{});
+    return ReadBytesResult((const void *)address.getAddressData(), [](const void *) {});
   }
   
   bool readString(RemoteAddress address, std::string &dest) override {

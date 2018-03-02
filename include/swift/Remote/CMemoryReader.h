@@ -62,31 +62,26 @@ public:
     if (!length)
       return false;
 
-    const void *ptr;
-    std::function<void()> freeFunc;
-    std::tie(ptr, freeFunc) = readBytes(address, length);
-    if (ptr != nullptr) {
-      dest = std::string(reinterpret_cast<const char *>(ptr), length);
-      freeFunc();
-      return true;
-    } else {
+    auto Buf = readBytes(address, length);
+    if (!Buf)
       return false;
-    }
+    
+    dest = std::string(reinterpret_cast<const char *>(Buf.get()), length);
+    return true;
   }
 
-  std::tuple<const void *, std::function<void()>>
-    readBytes(RemoteAddress address, uint64_t size) override {
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
       void *FreeContext;
       auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
                                 &FreeContext);
 
       auto Free = Impl.free;
       if (Free == nullptr)
-        return std::make_tuple(Ptr, []{});
+        return ReadBytesResult(Ptr, [](const void *) {});
       
       auto ReaderContext = Impl.reader_context;
-      auto freeLambda = [=]{ Free(ReaderContext, Ptr, FreeContext); };
-      return std::make_tuple(Ptr, freeLambda);
+      auto freeLambda = [=](const void *Ptr) { Free(ReaderContext, Ptr, FreeContext); };
+      return ReadBytesResult(Ptr, freeLambda);
   }
 };
 

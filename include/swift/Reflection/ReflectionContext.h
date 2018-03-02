@@ -34,6 +34,7 @@
 #include <set>
 #include <vector>
 #include <unordered_map>
+#include <utility>
 
 #if defined(__APPLE__) && defined(__MACH__)
 #ifndef __LP64__
@@ -75,7 +76,9 @@ class ReflectionContext
 
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
-  std::vector<std::function<void()>> freeFuncs;
+  /// All buffers we need to keep around long term. This will automatically free them
+  /// when this object is destroyed.
+  std::vector<MemoryReader::ReadBytesResult> savedBuffers;
   std::vector<std::tuple<RemoteAddress, RemoteAddress>> dataSegments;
 
 public:
@@ -95,11 +98,6 @@ public:
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
   
-  ~ReflectionContext() {
-    for (auto f : freeFuncs)
-      f();
-  }
-
   MemoryReader &getReader() {
     return *this->Reader;
   }
@@ -115,50 +113,38 @@ public:
 
 #if defined(__APPLE__) && defined(__MACH__)
   bool addImage(RemoteAddress ImageStart) {
-    const void *Buf;
-    std::function<void()> FreeFunc;
-
-    std::tie(Buf, FreeFunc) =
-        this->getReader().readBytes(ImageStart, sizeof(MachHeader));
-    if (Buf == nullptr)
+    auto Buf = this->getReader().readBytes(ImageStart, sizeof(MachHeader));
+    if (!Buf)
       return false;
 
-    auto Header = reinterpret_cast<MachHeader *>(Buf);
-
+    auto Header = reinterpret_cast<MachHeader *>(Buf.get());
     if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
-      FreeFunc();
       return false;
     }
-
     auto Length = Header->sizeofcmds;
-    FreeFunc();
 
     // Read the commands.
-    std::tie(Buf, FreeFunc) = this->getReader().readBytes(ImageStart, Length);
-
-    if (Buf == nullptr)
+    Buf = this->getReader().readBytes(ImageStart, Length);
+    if (!Buf)
       return false;
 
     // Find the TEXT segment and figure out where the end is.
-    Header = reinterpret_cast<MachHeader *>(Buf);
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
     unsigned long TextSize;
     auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
-    if (TextSegment == nullptr) {
-      FreeFunc();
+    if (TextSegment == nullptr)
       return false;
-    }
+    
     auto TextEnd =
-        TextSegment - reinterpret_cast<const uint8_t *>(Buf) + TextSize;
-    FreeFunc();
+        TextSegment - reinterpret_cast<const uint8_t *>(Buf.get()) + TextSize;
 
     // Read everything including the TEXT segment.
-    std::tie(Buf, FreeFunc) = this->getReader().readBytes(ImageStart, TextEnd);
-
-    if (Buf == nullptr)
+    Buf = this->getReader().readBytes(ImageStart, TextEnd);
+    if (!Buf)
       return false;
 
     // Read all the metadata parts.
-    Header = reinterpret_cast<MachHeader *>(Buf);
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
 
     // The docs say "not all sections may be present." We'll succeed if ANY of
     // them are present. Not sure if that's the right thing to do.
@@ -173,12 +159,10 @@ public:
 
     bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
                    CaptureMd.second || TyperefMd.second || ReflStrMd.second;
-    if (!success) {
-      FreeFunc();
-      return 0;
-    }
+    if (!success)
+      return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf);
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
     auto RemoteStartAddress =
         reinterpret_cast<uint64_t>(ImageStart.getAddressData());
 
@@ -194,17 +178,18 @@ public:
 
     this->addReflectionInfo(info);
 
-    freeFuncs.push_back(FreeFunc);
-
     unsigned long DataSize;
     auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
     if (DataSegment != nullptr) {
-      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf)
+      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf.get())
                             + ImageStart.getAddressData();
       auto DataSegmentEnd = DataSegmentStart + DataSize;
       dataSegments.push_back(std::make_tuple(RemoteAddress(DataSegmentStart),
                                              RemoteAddress(DataSegmentEnd)));
     }
+    
+    savedBuffers.push_back(std::move(Buf));
+
     return true;
   }
 #endif // defined(__APPLE__) && defined(__MACH__)

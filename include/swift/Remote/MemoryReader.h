@@ -21,6 +21,7 @@
 #include "swift/Remote/RemoteAddress.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <tuple>
 
@@ -33,6 +34,9 @@ namespace remote {
 /// representation of the address space of a remote process.
 class MemoryReader {
 public:
+  /// A convenient name for the return type from readBytes.
+  using ReadBytesResult = std::unique_ptr<const void, std::function<void(const void *)>>;
+
   /// Return the size of an ordinary pointer in the remote process, in bytes.
   virtual uint8_t getPointerSize() = 0;
 
@@ -47,7 +51,7 @@ public:
   ///
   /// Returns false if the operation failed.
   virtual bool readString(RemoteAddress address, std::string &dest) = 0;
-
+  
   /// Attempts to read an integer from the given address in the remote
   /// process.
   ///
@@ -65,15 +69,17 @@ public:
   ///
   /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
   /// implementation calls through to the other one.
-  virtual std::tuple<const void *, std::function<void()>>
+  virtual ReadBytesResult
     readBytes(RemoteAddress address, uint64_t size) {
-    void *buffer = malloc(size);
-    bool success = readBytes(address, reinterpret_cast<uint8_t *>(buffer), size);
+    auto *Buf = malloc(size);
+    ReadBytesResult Result(Buf, [](const void *ptr) {
+      free(const_cast<void *>(ptr));
+    });
+    bool success = readBytes(address, reinterpret_cast<uint8_t *>(Buf), size);
     if (!success) {
-      free(buffer);
-      return std::make_tuple(nullptr, []{});
+      Result.reset();
     }
-    return std::make_tuple(buffer, [=]{ free(buffer); });
+    return Result;
   }
 
   /// Attempts to read 'size' bytes from the given address in the
@@ -84,16 +90,12 @@ public:
   /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
   /// implementation calls through to the other one.
   virtual bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) {
-    const void *ptr;
-    std::function<void()> freeFunc;
-    std::tie(ptr, freeFunc) = readBytes(address, size);
-    if (ptr != nullptr) {
-      memcpy(dest, ptr, size);
-      freeFunc();
-      return true;
-    } else {
+    auto Ptr = readBytes(address, size);
+    if (!Ptr)
       return false;
-    }
+    
+    memcpy(dest, Ptr.get(), size);
+    return true;
   }
           
   virtual ~MemoryReader() = default;
