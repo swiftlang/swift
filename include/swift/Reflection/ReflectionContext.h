@@ -163,8 +163,7 @@ public:
       return false;
 
     auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
-    auto RemoteStartAddress =
-        reinterpret_cast<uint64_t>(ImageStart.getAddressData());
+    auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
         {{FieldMd.first.startAddress(), FieldMd.first.endAddress()}, 0},
