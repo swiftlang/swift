@@ -6,7 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
-| [Swift 5.0](#swift-50) |
+| [Swift 4.2](#swift-42) |
 | [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
@@ -20,7 +20,7 @@ CHANGELOG
 
 </details>
 
-Swift 5.0
+Swift 4.2
 ---------
 
 * Public classes may now have internal `required` initializers. The rule for
