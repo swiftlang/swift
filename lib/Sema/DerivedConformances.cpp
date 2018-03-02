@@ -31,6 +31,13 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
   if (!knownProtocol)
     return false;
 
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    // We can always complete a partial Hashable implementation, and we can
+    // synthesize a full Hashable implementation for structs and enums with
+    // Hashable components.
+    return canDeriveHashable(tc, nominal, protocol);
+  }
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -38,12 +45,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
       case KnownProtocolKind::RawRepresentable:
         return enumDecl->hasRawType();
 
-        // Enums without associated values can implicitly derive Equatable and
-        // Hashable conformance.
+        // Enums without associated values can implicitly derive Equatable
+        // conformance.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(tc, enumDecl, protocol);
-      case KnownProtocolKind::Hashable:
-        return canDeriveHashable(tc, enumDecl, protocol);
 
         // @objc enums can explicitly derive their _BridgedNSError conformance.
       case KnownProtocolKind::BridgedNSError:
@@ -87,13 +92,11 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
       return true;
     }
 
-    // Structs can explicitly derive Equatable and Hashable conformance.
+    // Structs can explicitly derive Equatable conformance.
     if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
           return canDeriveEquatable(tc, structDecl, protocol);
-        case KnownProtocolKind::Hashable:
-          return canDeriveHashable(tc, structDecl, protocol);
         default:
           return false;
       }
@@ -160,6 +163,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_to)
         return getRequirement(KnownProtocolKind::Encodable);
+    }
+
+    // Hashable._hash(into: _UnsafeHasher) -> _UnsafeHasher
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_hash) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
+        return getRequirement(KnownProtocolKind::Hashable);
     }
 
     return nullptr;
