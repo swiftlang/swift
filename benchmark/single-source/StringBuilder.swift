@@ -39,7 +39,7 @@ func buildString(_ i: String) -> String {
 @inline(never)
 public func run_StringBuilder(_ N: Int) {
   for _ in 1...5000*N {
-    blackHole(buildString(getString("a")))
+    _ = buildString(getString("a"))
   }
 }
 
@@ -52,7 +52,7 @@ func addString(_ i: String) -> String {
 @inline(never)
 public func run_StringAdder(_ N: Int) {
   for _ in 1...5000*N {
-    blackHole(addString(getString("a")))
+    _ = addString(getString("a"))
   }
 }
 
@@ -68,9 +68,10 @@ func buildStringUTF16(_ i: String) -> String {
 @inline(never)
 public func run_StringUTF16Builder(_ N: Int) {
   for _ in 1...5000*N {
-    blackHole(buildStringUTF16(getString("a")))
+    _ = buildStringUTF16("a")
   }
 }
+
 
 @inline(never)
 func buildStringLong(_ i: String) -> String {
@@ -80,10 +81,12 @@ func buildStringLong(_ i: String) -> String {
   return sb
 }
 
+
+
 @inline(never)
 public func run_StringBuilderLong(_ N: Int) {
   for _ in 1...5000*N {
-    blackHole(buildStringLong(getString("👻")))
+    _ = buildStringLong("👻")
   }
 }
 
@@ -105,16 +108,10 @@ func buildString(
 
 @inline(never)
 public func run_StringWordBuilder(_ N: Int) {
-  blackHole(buildString(
-    word: getString("bumfuzzle"),
-    count: 50_000 * N,
-    reservingCapacity: false))
+  _ = buildString(word: "bumfuzzle", count: 50_000 * N, reservingCapacity: false)
 }
 
 @inline(never)
 public func run_StringWordBuilderReservingCapacity(_ N: Int) {
-  blackHole(buildString(
-    word: getString("bumfuzzle"),
-    count: 50_000 * N,
-    reservingCapacity: true))
+  _ = buildString(word: "bumfuzzle", count: 50_000 * N, reservingCapacity: true)
 }
