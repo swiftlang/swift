@@ -6227,13 +6227,15 @@ public:
 
     // If we have an explicit ownership modifier and our parent doesn't,
     // complain.
-    auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
-    if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
-      Ownership parentOwnership;
+    auto parentAttr =
+        matchDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+    if (auto ownershipAttr =
+            decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      ReferenceOwnership parentOwnership;
       if (parentAttr)
         parentOwnership = parentAttr->get();
       else
-        parentOwnership = Ownership::Strong;
+        parentOwnership = ReferenceOwnership::Strong;
       if (parentOwnership != ownershipAttr->get()) {
         TC.diagnose(decl, diag::override_ownership_mismatch,
                     (unsigned)parentOwnership,
@@ -6507,7 +6509,7 @@ public:
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
-    UNINTERESTING_ATTR(Ownership)
+    UNINTERESTING_ATTR(ReferenceOwnership)
 
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)

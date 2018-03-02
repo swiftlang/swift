@@ -2175,7 +2175,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   switch (DA->getKind()) {
   case DAK_RawDocComment:
-  case DAK_Ownership: // Serialized as part of the type.
+  case DAK_ReferenceOwnership: // Serialized as part of the type.
   case DAK_AccessControl:
   case DAK_SetterAccess:
   case DAK_ObjCBridged:
@@ -3484,12 +3484,23 @@ static uint8_t getRawStableSILCoroutineKind(
 
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
-static uint8_t getRawStableOwnership(swift::Ownership ownership) {
+static uint8_t
+getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   switch (ownership) {
-  SIMPLE_CASE(Ownership, Strong)
-  SIMPLE_CASE(Ownership, Weak)
-  SIMPLE_CASE(Ownership, Unowned)
-  SIMPLE_CASE(Ownership, Unmanaged)
+  SIMPLE_CASE(ReferenceOwnership, Strong)
+  SIMPLE_CASE(ReferenceOwnership, Weak)
+  SIMPLE_CASE(ReferenceOwnership, Unowned)
+  SIMPLE_CASE(ReferenceOwnership, Unmanaged)
+  }
+  llvm_unreachable("bad ownership kind");
+}
+/// Translate from the AST ownership enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableValueOwnership(swift::ValueOwnership ownership) {
+  switch (ownership) {
+  SIMPLE_CASE(ValueOwnership, Default)
+  SIMPLE_CASE(ValueOwnership, InOut)
+  SIMPLE_CASE(ValueOwnership, Shared)
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -3595,12 +3606,14 @@ void Serializer::writeType(Type ty) {
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
     auto paramFlags = parenTy->getParameterFlags();
+    auto rawOwnership =
+        getRawStableValueOwnership(paramFlags.getValueOwnership());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
         paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), paramFlags.isInOut(), paramFlags.isShared());
+        paramFlags.isEscaping(), rawOwnership);
     break;
   }
 
@@ -3613,11 +3626,12 @@ void Serializer::writeType(Type ty) {
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
       auto paramFlags = elt.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
       TupleTypeEltLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
           addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(),
-          paramFlags.isInOut(), paramFlags.isShared());
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
     }
 
     break;
@@ -3896,7 +3910,8 @@ void Serializer::writeType(Type ty) {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
-    auto stableOwnership = getRawStableOwnership(refTy->getOwnership());
+    auto stableOwnership =
+        getRawStableReferenceOwnership(refTy->getOwnership());
     ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            stableOwnership,
                                   addTypeRef(refTy->getReferentType()));

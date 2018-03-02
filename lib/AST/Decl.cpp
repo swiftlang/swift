@@ -1177,7 +1177,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
   // Look through most attributes.
   if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     // Weak ownership implies optionality.
-    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
+    if (attributed->getAttrs().getOwnership() == ReferenceOwnership::Weak)
       return true;
 
     return isDefaultInitializable(attributed->getTypeRepr());
@@ -4416,8 +4416,8 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
 }
 
 ParameterTypeFlags ParamDecl::getParameterFlags() const {
-  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(), isShared())
-            .withInOut(isInOut());
+  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(),
+                                               getValueOwnership());
 }
 
 /// Return the full source range of this parameter.

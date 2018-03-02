@@ -2498,20 +2498,21 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
-      Ownership ownershipKind = Ownership::Strong;
+      auto ownershipKind = ReferenceOwnership::Strong;
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Weak;
+        ownershipKind = ReferenceOwnership::Weak;
       } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Unowned;
+        ownershipKind = ReferenceOwnership::Unowned;
 
         // Skip over "safe" and "unsafe" if present.
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
-            ownershipKind = Ownership::Unowned; // FIXME: No "safe" variant.
+            ownershipKind =
+                ReferenceOwnership::Unowned; // FIXME: No "safe" variant.
           else if (Tok.getText() == "unsafe")
-            ownershipKind = Ownership::Unmanaged;
+            ownershipKind = ReferenceOwnership::Unmanaged;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
           consumeIf(tok::identifier);
@@ -2570,17 +2571,17 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Create the VarDecl and the PatternBindingDecl for the captured
       // expression.  This uses the parent declcontext (not the closure) since
       // the initializer expression is evaluated before the closure is formed.
-      auto specifierKind = (ownershipKind != Ownership::Weak)
-                         ? VarDecl::Specifier::Let
-                         : VarDecl::Specifier::Var;
+      auto specifierKind = (ownershipKind != ReferenceOwnership::Weak)
+                               ? VarDecl::Specifier::Let
+                               : VarDecl::Specifier::Var;
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        specifierKind,
                                        /*isCaptureList*/true,
                                        nameLoc, name, Type(), CurDeclContext);
 
       // Attributes.
-      if (ownershipKind != Ownership::Strong)
-        VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));
+      if (ownershipKind != ReferenceOwnership::Strong)
+        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(ownershipKind));
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
