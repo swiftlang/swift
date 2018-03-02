@@ -680,19 +680,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Ownership: {
+  case DAK_ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
-    Ownership Kind = AttrName == "weak" ? Ownership::Weak : Ownership::Unowned;
+    auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
+                                   : ReferenceOwnership::Unowned;
     SourceLoc EndLoc = Loc;
 
-    if (Kind == Ownership::Unowned && Tok.is(tok::l_paren)) {
+    if (Kind == ReferenceOwnership::Unowned && Tok.is(tok::l_paren)) {
       // Parse an optional specifier after unowned.
       SourceLoc lp = consumeToken(tok::l_paren);
       if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
         consumeToken();
       } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
         consumeToken();
-        Kind = Ownership::Unmanaged;
+        Kind = ReferenceOwnership::Unmanaged;
       } else {
         diagnose(Tok, diag::attr_unowned_invalid_specifier);
         consumeIf(tok::identifier);
@@ -705,8 +706,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) OwnershipAttr(SourceRange(Loc, EndLoc),
-                                                 Kind));
+      Attributes.add(
+          new (Context) ReferenceOwnershipAttr(SourceRange(Loc, EndLoc), Kind));
     break;
   }
 
@@ -2350,7 +2351,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         Kind = DAK_AccessControl;
       } else if (Tok.isContextualKeyword("weak") ||
                  Tok.isContextualKeyword("unowned")) {
-        Kind = DAK_Ownership;
+        Kind = DAK_ReferenceOwnership;
       } else if (Tok.isContextualKeyword("optional")) {
         Kind = DAK_Optional;
       } else if (Tok.isContextualKeyword("required")) {

@@ -2854,10 +2854,20 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     ParameterTypeFlags paramFlags;
     if (isImmediateFunctionInput) {
-      bool isShared = (tyR->getKind() == TypeReprKind::Shared);
-      bool isInOut = (tyR->getKind() == TypeReprKind::InOut);
-      paramFlags = ParameterTypeFlags::fromParameterType(ty, variadic, isShared)
-                     .withInOut(isInOut);
+      ValueOwnership ownership;
+      switch (tyR->getKind()) {
+      case TypeReprKind::Shared:
+        ownership = ValueOwnership::Shared;
+        break;
+      case TypeReprKind::InOut:
+        ownership = ValueOwnership::InOut;
+        break;
+      default:
+        ownership = ValueOwnership::Default;
+        break;
+      }
+      paramFlags =
+          ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
     }
     elements.emplace_back(ty->getInOutObjectType(), name, paramFlags);
   }

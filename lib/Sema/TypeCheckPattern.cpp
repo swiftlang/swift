@@ -1099,7 +1099,7 @@ recur:
       var->setInterfaceType(type->mapTypeOutOfContext());
 
     checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<OwnershipAttr>())
+    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
       type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
       type = var->getType();

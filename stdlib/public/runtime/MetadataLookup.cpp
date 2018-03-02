@@ -657,7 +657,7 @@ private:
   LookupDependentMemberFn lookupDependentMember;
 
   /// Ownership information related to the metadata we are trying to lookup.
-  TypeOwnership Ownership;
+  TypeReferenceOwnership ReferenceOwnership;
 
 public:
   DecodedMetadataBuilder(Demangler &demangler,
@@ -940,17 +940,17 @@ public:
   }
 
   BuiltType createUnownedStorageType(BuiltType base) {
-    Ownership.setUnowned();
+    ReferenceOwnership.setUnowned();
     return base;
   }
 
   BuiltType createUnmanagedStorageType(BuiltType base) {
-    Ownership.setUnmanaged();
+    ReferenceOwnership.setUnmanaged();
     return base;
   }
 
   BuiltType createWeakStorageType(BuiltType base) {
-    Ownership.setWeak();
+    ReferenceOwnership.setWeak();
     return base;
   }
 
@@ -959,7 +959,9 @@ public:
     return BuiltType();
   }
 
-  TypeOwnership getOwnership() const { return Ownership; }
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 }
@@ -1020,7 +1022,7 @@ swift::_getTypeByMangledName(StringRef typeName,
     });
 
   auto type = Demangle::decodeMangledType(builder, node);
-  return {type, builder.getOwnership()};
+  return {type, builder.getReferenceOwnership()};
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

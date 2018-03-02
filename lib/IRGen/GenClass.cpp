@@ -1947,7 +1947,7 @@ namespace {
       if (!prop->isSettable(prop->getDeclContext()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
-      else if (prop->getAttrs().hasAttribute<OwnershipAttr>())
+      else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
         outs << ",W";
       // If the property is @NSCopying, or is bridged to a value class, the
       // property is (copy).

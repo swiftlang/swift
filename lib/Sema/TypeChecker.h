@@ -1318,7 +1318,7 @@ public:
   void checkDeclAttributes(Decl *D);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
 
-  void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
+  void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
 
   void computeAccessLevel(ValueDecl *D);
   void computeDefaultAccessLevel(ExtensionDecl *D);
