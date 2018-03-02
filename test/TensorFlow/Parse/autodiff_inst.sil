@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -sil-print-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+sil @foo : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float):
+  return undef : $Float
+}
+
+// CHECK-LABEL: sil @foo : $@convention(thin) (Float, Float) -> Float {
+// CHECK-NEXT: bb0(%0 : $Float, %1 : $Float):
+// CHECK-NEXT:   return undef : $Float
+// CHECK-NEXT: }
+
+sil @dfoo : $@convention(thin) (Float, Float) -> (Float, Float) {
+bb0(%0 : $Float, %1 : $Float):
+  autodiff_reverse [wrt 0, 1] @foo : $@convention(thin) (Float, Float) -> Float
+}
+
+// CHECK-LABEL: sil @dfoo : $@convention(thin) (Float, Float) -> (Float, Float) {
+// CHECK-NEXT: bb0(%0 : $Float, %1 : $Float):
+// CHECK-NEXT:   autodiff_reverse [wrt 0, 1] @foo : $@convention(thin) (Float, Float) -> Float
+// CHECK-NEXT: }

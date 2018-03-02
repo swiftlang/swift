@@ -17,6 +17,8 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -3927,6 +3929,10 @@ public:
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
   CanType getSelfInstanceType() const;
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  CanSILFunctionType getGradientType(SILAutoDiffConfiguration config,
+                                     SILModule &M);
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for

@@ -2948,8 +2948,93 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 /// SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
-  // FIXME: Handle this.
-  llvm_unreachable("Unhandled GradientExpr");
+  SILFunction &F = SGF.F;
+  FuncDecl *primalDecl = E->getResolvePrimal();
+  assert(primalDecl && "Primal decl not resolved?");
+  SILFunction &primalFn =
+    *SGF.SGM.getFunction(SILDeclRef(primalDecl), ForDefinition);
+
+  std::string gradName = primalFn.getName().str() + "__grad";
+  // Compute SIL gradient type.
+  auto primalTy = primalFn.getLoweredFunctionType();
+
+  // If differentiation arguments are specified, lower them to SIL argument
+  // indices.
+  SmallVector<unsigned, 8> loweredArgIndices;
+  gradName += '_';
+  if (!E->getArguments().empty()) {
+    interleave(E->getArguments(), [&](AutoDiffArgument arg) {
+      unsigned index;
+      switch (arg.getKind()) {
+      case swift::AutoDiffArgument::Kind::Index:
+        // The original index gets carried over.
+        index = arg.getIndex();
+      case swift::AutoDiffArgument::Kind::Self:
+        // The last argument of the SIL function is self.
+        index = primalFn.getArguments().size() - 1;
+      }
+      loweredArgIndices.push_back(index);
+      gradName += std::to_string(index);
+    }, [&] {
+      gradName += '_';
+    });
+  } else {
+    gradName += "all";
+  }
+  // TODO: Currently #gradient doesn't support `seed:` or `preservingResult:`.
+  // When those are added to the syntax, they need to be encoded in the function
+  // name of the gradient.
+
+  // Find the gradient function. If the gradient has been emitted, just use
+  // that. Otherwise, create a new function containing an `autodiff_reverse`.
+  SILAutoDiffConfiguration config {
+    loweredArgIndices,
+    /*seedable*/false,
+    /*preservingResult*/false
+  };
+  SILFunction *gradFn;
+  std::pair<SILFunction *, SILAutoDiffConfiguration> gradKey = { &primalFn,
+                                                                 config };
+  if (auto *emittedGrad = SGF.SGM.emittedGradients.lookup(gradKey))
+    gradFn = emittedGrad;
+  else {
+    auto gradTy = primalTy->getGradientType(config, SGF.SGM.M);
+    SmallVector<unsigned, 8> gradResults;
+    SILLocation loc(E);
+    gradFn = SGF.SGM.M.createFunction(primalFn.getLinkage(), gradName, gradTy,
+                                      primalFn.getGenericEnvironment(),
+                                      loc, primalFn.isBare(),
+                                      primalFn.isTransparent(),
+                                      primalFn.isSerialized(),
+                                      ProfileCounter(), IsNotThunk,
+                                      SubclassScope::NotApplicable,
+                                      InlineDefault,
+                                      primalFn.getEffectsKind(),
+                                      /*InsertBefore*/nullptr,
+                                      /*DebugScope*/nullptr);
+    gradFn->setDebugScope(new (SGF.SGM.M) SILDebugScope(loc, gradFn));
+    SILGenFunction gradSGF(SGF.SGM, *gradFn);
+    // FIXME: SIL BB args do not directly correspond to function type params.
+    // Currently we are doing something super basic - emit an argument for each
+    // param, but this will fail verification when there's a tuple argument, for
+    // example. SILGenProlog would do this, but it's tied to ParamDecl and
+    // generates instructions. (We don't want any instructions but
+    // `autodiff_reverse`!)
+    for (auto &arg : gradTy->getParameters())
+      gradSGF.B.createFunctionArgument(arg.getSILStorageType(), nullptr);
+    gradSGF.B.createAutoDiffReverse(SILLocation(E), &primalFn,
+                                    loweredArgIndices, config.seedable,
+                                    config.preservingResult);
+    gradSGF.B.clearInsertionPoint();
+    // Cache this gradient for this primal function and this autodiff
+    // configuration.
+    SGF.SGM.emittedGradients.insert({ gradKey, gradFn });
+  }
+
+  // Create a function_ref to the gradient function.
+  auto gradFnRef = SGF.B.createFunctionRef(primalFn.getLocation(), gradFn);
+  ManagedValue v = SGF.emitManagedRValueWithCleanup(gradFnRef);
+  return RValue(SGF, E, v);
 }
 
 RValue RValueEmitter::

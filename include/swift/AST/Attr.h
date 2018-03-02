@@ -33,7 +33,8 @@
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/Differentiation.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
