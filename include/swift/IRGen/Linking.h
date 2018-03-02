@@ -756,9 +756,6 @@ public:
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
   }
-  bool isObjCClassRef() const {
-    return getKind() == Kind::ObjCClassRef;
-  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const {

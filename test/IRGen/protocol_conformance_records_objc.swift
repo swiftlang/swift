@@ -30,7 +30,7 @@ extension NSRect: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- class object reference
-// CHECK-SAME:           @"OBJC_CLASS_REF_$_Gizmo"
+// CHECK-SAME:           @"got.OBJC_CLASS_$_Gizmo"
 // -- witness table
 // CHECK-SAME:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
 // -- flags
