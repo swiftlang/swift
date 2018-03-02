@@ -17,14 +17,11 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
   internal func hashASCII() -> Int {
-    var hasher = _SipHash13Context(key: _Hashing.secretKey)
-    for c in self {
-      _precondition(c <= 127)
-      let element = UInt(c)
-      hasher.append(element)
-    }
-    return hasher._finalizeAndReturnIntHash()
-    // return Int(_SipHash13Context.hash(data: buffer.baseAddress._unsafelyUnwrappedUnchecked, dataByteCount: buffer.count, key: _Hashing.secretKey))
+    return Int(Int64(bitPattern:
+      _SipHash13Context.hash(
+        data: start, dataByteCount: count, key: _Hashing.secretKey
+      )
+    ))
   }
 }
 
