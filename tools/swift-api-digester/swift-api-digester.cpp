@@ -331,6 +331,7 @@ struct SDKNodeInitInfo {
   Ownership Ownership = Ownership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
+  std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
   ParentExtensionInfo *ExtInfo = nullptr;
   TypeInitInfo TypeInfo;
@@ -774,12 +775,14 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 
 class SDKNodeTypeDecl : public SDKNodeDecl {
   StringRef SuperclassUsr;
+  std::vector<StringRef> ConformingProtocols;
 public:
   SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
-                                          SuperclassUsr(Info.SuperclassUsr) {}
+                                          SuperclassUsr(Info.SuperclassUsr),
+                                ConformingProtocols(Info.ConformingProtocols){}
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
-
+  ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
@@ -943,6 +946,13 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       Info.ExtInfo = new (Ctx) ParentExtensionInfo();
       for (auto &Req : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
         Info.ExtInfo->Requirements.push_back(GetScalarString(&Req));
+      }
+      break;
+    }
+    case KeyKind::KK_conformingProtocols: {
+      assert(Info.ConformingProtocols.empty());
+      for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+        Info.ConformingProtocols.push_back(GetScalarString(&Name));
       }
       break;
     }
@@ -1270,6 +1280,13 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
       llvm::raw_svector_ostream OS(Result);
       Req.print(OS, PrintOptions::printInterface());
       ExtInfo->Requirements.emplace_back(Ctx.buffer(OS.str()));
+    }
+  }
+
+  // Get all protocol names this type decl conforms to.
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
+    for (auto *P: NTD->getAllProtocols()) {
+      ConformingProtocols.push_back(P->getName().str());
     }
   }
 }
@@ -1646,6 +1663,12 @@ namespace swift {
             if (!Super.empty()) {
               out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
                               Super);
+            }
+            auto Pros = TD->getAllProtocols();
+            if (!Pros.empty()) {
+              out.mapRequired(getKeyContent(Ctx,
+                                        KeyKind::KK_conformingProtocols).data(),
+                              Pros);
             }
           }
           if (D->isFromExtension()) {
