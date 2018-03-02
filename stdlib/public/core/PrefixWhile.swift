@@ -74,6 +74,8 @@ extension LazyPrefixWhileSequence.Iterator: IteratorProtocol, Sequence {
 }
 
 extension LazyPrefixWhileSequence: Sequence {
+  public typealias SubSequence = AnySequence<Element> // >:(
+  
   @_inlineable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
@@ -112,6 +114,7 @@ extension LazySequenceProtocol {
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyPrefixWhileCollection<Base: Collection> {
   public typealias Element = Base.Element
+  public typealias SubSequence = Slice<LazyPrefixWhileCollection<Base>>
   
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
