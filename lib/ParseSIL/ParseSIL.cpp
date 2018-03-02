@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+/// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-/// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/Differentiation.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"

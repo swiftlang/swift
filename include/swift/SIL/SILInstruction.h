@@ -17,6 +17,8 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -7907,8 +7909,8 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// AutoDiffReverseInst - Represents the derivative of another SIL function.
-class AutoDiffReverseInst
+/// AutoDiffReverseInst - Represents the gradient of another SIL function.
+class AutoDiffReverseInst final
   : public InstructionBase<SILInstructionKind::AutoDiffReverseInst,
                            TermInst> {
 private:
@@ -7942,14 +7944,10 @@ public:
 
   SILFunction *getPrimalFunction() const { return Primal; }
 
-  void dropPrimalFunction();
+  void dropReferencedPrimalFunction();
 
   unsigned *getArgumentIndicesData() {
     return reinterpret_cast<unsigned *>(this+1);
-  }
-
-  MutableArrayRef<unsigned> getArgumentIndices() {
-    return { getArgumentIndicesData(), NumArgIndices };
   }
 
   ArrayRef<unsigned> getArgumentIndices() const;
@@ -7958,9 +7956,17 @@ public:
 
   bool isPreservingResult() const { return PreservingResult; }
 
+  SILAutoDiffConfiguration getConfiguration() const {
+    return { getArgumentIndices(), Seedable, PreservingResult };
+  }
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
 
   MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  ArrayRef<SILSuccessor> getSuccessors() const { return {}; }
+
+  MutableArrayRef<SILSuccessor> getSuccessors() { return {}; }
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::AutoDiffReverseInst;

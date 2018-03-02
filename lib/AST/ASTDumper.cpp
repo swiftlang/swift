@@ -1850,7 +1850,7 @@ public:
           OS << '.' << arg.getIndex();
           break;
         case AutoDiffArgument::Kind::Self:
-          OS << 'self';
+          OS << "self";
           break;
         }
       }, [&]{

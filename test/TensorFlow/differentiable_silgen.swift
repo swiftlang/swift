@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -verify %s | %FileCheck %s
 
 @_silgen_name("foo")
 @differentiable(gradient: dfoo(_:partial:seed:))
