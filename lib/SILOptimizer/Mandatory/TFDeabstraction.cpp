@@ -63,10 +63,20 @@ namespace {
 
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
+    void propagateTensorOperands();
     void canonicalizeOps();
   };
 }  // end anonymous namespace
 
+
+/// Return true if this is a "array.uninitialized" call, which creates an array
+/// and returns it with uninitialized elements for the caller to fill in.
+static bool isArrayUninitialized(SILInstruction *call) {
+  auto *apply = dyn_cast<ApplyInst>(call);
+  if (!apply) return false;
+  auto semantics = ArraySemanticsCall(apply, "array.uninitialized");
+  return semantics.getKind() == ArrayCallKind::kArrayUninitialized;
+}
 
 /// Scan the function looking for call sites that should be inlined to expose
 /// tensor operations, and inline them to expose those ops.  Also keep track of
@@ -78,22 +88,20 @@ void TFDeabstraction::inlineCalls() {
   // TensorHandle values as their argument or result lists.
   inlineForTFDeabstraction(fn,
      [&](FullApplySite site, const SILFunction &callee) -> bool {
+       // Check for array internals which we could be inlined, but prefer to
+       // leave in abstracted form for easier analysis.  For things like
+       // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
+       // construction calls beacuse we end up removing them anyway.
+       if (isArrayUninitialized(site.getInstruction()))
+         return false;
+
        // Get the type of the function being called after applying substitutions
        // at the call site.
        auto type = site.getSubstCalleeType();
 
        // If the call we found is to something that processes TensorHandles,
        // then we want it inlined.
-       bool result = tfc.containsTensorHandle(type);
-
-       // TODO: What about Array<Tensor>'s that appear in Tensor ops?  It would
-       // be nice to avoid inlining them so we can apply the higher level array
-       // semantic hooks to them, and to improve compile time / avoid code
-       // bloat.
-       // Specifically, do not inline Array._adoptStorage since it is marked
-       // as @_semantics("array.uninitialized").  This affects things like
-       // Tensor<Float>([[1,2],[3,4]]).
-       return result;
+       return tfc.containsTensorHandle(type);
      }
   );
 }
@@ -411,6 +419,240 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
     dead->eraseFromParent();
 }
 
+/// The specified argument has tuple type that deabstraction needs to scalarize.
+/// Explode it into its deabstracted elements, rebuilding it and the branch
+/// instructions that feed it.  This returns a value of the original type that
+/// can be used for further analysis.
+static SILValue explodeSILTupleArgument(SILPHIArgument *arg) {
+  SmallVector<SILValue, 4> newArgs;
+
+  auto *argBB = arg->getParent();
+
+  // Collect all the fields and add new BB arguments to the block for each of
+  // them.
+  auto tuple = arg->getType();
+  unsigned numElements = tuple.castTo<TupleType>()->getNumElements();
+  for (unsigned i = 0; i != numElements; ++i) {
+    auto newArg = argBB->createPHIArgument(tuple.getTupleElementType(i),
+                                           arg->getOwnershipKind());
+    newArgs.push_back(newArg);
+  }
+
+  // Now that we have created all of the BB arguments, we can create a new
+  // tuple inst, replace the old argument, and remove it.
+  SILBuilder B(&argBB->front());
+  auto replacement = B.createTuple(argBB->front().getLoc(),
+                                   arg->getType(), newArgs);
+  arg->replaceAllUsesWith(replacement);
+  unsigned argNo = arg->getIndex();
+  argBB->eraseArgument(argNo);
+
+  // Ok, now that we've exploded the BB argument itself, we need to explode the
+  // values passed in the predecessor blocks.
+  for (auto pi : argBB->getPredecessorBlocks()) {
+    auto *br = cast<BranchInst>(pi->getTerminator());
+    SmallVector<SILValue, 8> operands;
+    for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
+      if (i != argNo)
+        operands.push_back(br->getOperand(i));
+
+    auto origValue = br->getOperand(argNo);
+
+    B.setInsertionPoint(br);
+
+    // Add all of the extracted versions of the elements.
+    for (unsigned i = 0; i != numElements; ++i)
+      operands.push_back(B.createTupleExtract(br->getLoc(), origValue, i));
+
+    // Replace the branch itself.
+    SILBuilder(br).createBranch(br->getLoc(), br->getDestBB(), operands);
+    br->eraseFromParent();
+  }
+
+  // Ok, we're done.  Return the generated StructInst that aggregates the
+  // arguments back to the caller.
+  return replacement;
+}
+
+/// The specified argument has struct type that deabstraction needs to
+/// scalarize. Explode it into its deabstracted elements, rebuilding it and the
+/// branch instructions that feed it.  This returns a value of the original type
+/// that can be used for further analysis.
+static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
+  SmallVector<VarDecl*, 4> elementDecls;
+  SmallVector<SILValue, 4> newArgs;
+
+  auto &M = arg->getFunction()->getModule();
+  auto *argBB = arg->getParent();
+
+  // Collect all the fields and add new BB arguments to the block for each of
+  // them.
+  auto structType = arg->getType();
+  auto decl = structType.getStructOrBoundGenericStruct();
+  for (auto fieldDecl : decl->getStoredProperties()) {
+    elementDecls.push_back(fieldDecl);
+    auto fieldTy = structType.getFieldType(fieldDecl, M);
+
+    auto newArg = argBB->createPHIArgument(fieldTy, arg->getOwnershipKind());
+    newArgs.push_back(newArg);
+  }
+
+  // Now that we have created all of the BB arguments, we can create a new
+  // struct inst, replace the old argument, and remove it.
+  SILBuilder B(&argBB->front());
+  auto replacement = B.createStruct(argBB->front().getLoc(),
+                                    arg->getType(), newArgs);
+  arg->replaceAllUsesWith(replacement);
+  unsigned argNo = arg->getIndex();
+  argBB->eraseArgument(argNo);
+
+  // Ok, now that we've exploded the BB argument itself, we need to explode the
+  // values passed in the predecessor blocks.
+  for (auto pi : argBB->getPredecessorBlocks()) {
+    auto *br = cast<BranchInst>(pi->getTerminator());
+    SmallVector<SILValue, 8> operands;
+    for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
+      if (i != argNo)
+        operands.push_back(br->getOperand(i));
+
+    auto origValue = br->getOperand(argNo);
+
+    B.setInsertionPoint(br);
+
+    // Add all of the extracted versions of the elements.
+    for (auto fieldDecl : elementDecls)
+      operands.push_back(B.createStructExtract(br->getLoc(), origValue,
+                                               fieldDecl));
+
+    // Replace the branch itself.
+    SILBuilder(br).createBranch(br->getLoc(), br->getDestBB(), operands);
+    br->eraseFromParent();
+  }
+
+  // Ok, we're done.  Return the generated StructInst that aggregates the
+  // arguments back to the caller.
+  return replacement;
+}
+
+/// We've promoted any stack allocations that are in the way of tensor operands
+/// so we now have proper SSA.  Look through struct and tuple injection and
+/// projection instructions to find the underlying value that feeds the tensor
+/// operation.  This is typically another tensor operation or a constant (for
+/// attributes) but may be variables or other things that cause a send.
+///
+static SILValue
+propagateTensorOperand(SILValue v,
+                       SmallPtrSet<SILPHIArgument*, 8> &checkedPhis) {
+  // This is the series of struct/tuple extract indices that the value is
+  // currently being projected through.  Consider an access like this:
+  //     B = struct { #1, #2 }
+  //     C = tuple { #3, B }
+  //     Y = tuple_extract C, 1
+  //     Z = struct_extract Y, 0
+  // We start analysis at Z, and add the access indices of Z and Y.  When we get
+  // to C, we know that we're accessing element 1 from the tuple because that is
+  // the top of our access path.  When we get to B, we know we're accessing
+  // element 0 from the access path, so we return the #1 value.
+  SmallVector<unsigned, 4> accessPath;
+
+  SILValue lastRootValue;
+  while (1) {
+    // If our access path is empty, this is a candidate that we could return.
+    if (accessPath.empty())
+      lastRootValue = v;
+
+    if (auto *arg = dyn_cast<SILPHIArgument>(v)) {
+      // Don't reprocess a PHI argument if we've already seen it.
+      if (!checkedPhis.insert(arg).second)
+        break;
+
+      // If this is an aggregate basic block argument, explode it into its
+      // component values.
+      if (!accessPath.empty()) {
+        // We're going to erase 'arg', so don't leave dangling pointers in the
+        // set.
+        checkedPhis.erase(arg);
+        if (arg->getType().is<TupleType>())
+          v = explodeSILTupleArgument(arg);
+        else if (arg->getType().is<StructType>() ||
+                 arg->getType().is<BoundGenericStructType>())
+          v = explodeSILStructArgument(arg);
+        else
+          break; // Cannot handle this.
+        continue;
+      }
+
+      // Otherwise simplify inputs in predecessor blocks.
+      for (auto pi : arg->getParent()->getPredecessorBlocks()) {
+        auto *br = cast<BranchInst>(pi->getTerminator());
+        // We intentionally recalculate arg->getIndex() because its index can
+        // shift.  We know that recursive processing won't delete the bb arg
+        // though, as it is in checkedPhis.
+        auto incomingVal = br->getOperand(arg->getIndex());
+        incomingVal = propagateTensorOperand(incomingVal, checkedPhis);
+        br->setOperand(arg->getIndex(), incomingVal);
+      }
+
+      continue;
+    }
+
+    // Otherwise, peer through instructions.
+    auto inst = v->getDefiningInstruction();
+    if (!inst)
+      break;
+
+    // Extractions add to the access path.
+    if (auto extract = dyn_cast<TupleExtractInst>(inst)) {
+      accessPath.push_back(extract->getFieldNo());
+      v = extract->getOperand();
+      continue;
+    }
+    if (auto extract = dyn_cast<StructExtractInst>(inst)) {
+      accessPath.push_back(extract->getFieldNo());
+      v = extract->getOperand();
+      continue;
+    }
+
+    // Constructions provide values to extract from if we have an access inside
+    // of it.
+    if (!accessPath.empty()) {
+      if (auto str = dyn_cast<StructInst>(inst)) {
+        v = str->getOperand(accessPath.pop_back_val());
+        continue;
+      }
+      if (auto tuple = dyn_cast<TupleInst>(inst)) {
+        v = tuple->getOperand(accessPath.pop_back_val());
+        continue;
+      }
+    }
+
+    // Otherwise, this is an unhandled instruction - we're done.
+    break;
+  }
+
+  return lastRootValue;
+}
+
+/// Propagate the operand values for all tensors.
+void TFDeabstraction::propagateTensorOperands() {
+  SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
+  for (auto *op : tensorOps) {
+    for (auto &operand : op->getAllOperands()) {
+
+      // Get the propagated value.  This call can change the tensor operand.
+      auto newVal = propagateTensorOperand(operand.get(), checkedPhis);
+      // Get the (possibly-changed) instruction that used to be feeding the
+      // tensor operation and set the new value.
+      auto opInst = operand.get()->getDefiningInstruction();
+      operand.set(newVal);
+
+      // If the old instruction is unused, try to clean up the code.
+      if (opInst && !opInst->hasUsesOfAnyResult())
+        recursivelyDeleteTriviallyDeadInstructions(opInst);
+    }
+  }
+}
+
 /// Canonicalize tensor ops, validating their attribute arguments have
 /// constants, and flattening array parameters.
 void TFDeabstraction::canonicalizeOps() {
@@ -499,12 +741,12 @@ void TFDeabstraction::doIt() {
   // and eliminates mutation from tensor values.
   promoteToSSA(stackAllocs);
 
-#if 0 // Not ready for this yet.
   // Now that we've promoted all the allocations in the way of our dataflow,
-  // go through and scalarize any tuple/struct values that are in the way of
+  // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
-  // TODO: scalarizeTensorOperands();
+  propagateTensorOperands();
 
+#if 0 // Not ready yet.
   // Canonicalize tensor ops, validating their attribute arguments have
   // constants, and flattening array parameters.
   canonicalizeOps();
