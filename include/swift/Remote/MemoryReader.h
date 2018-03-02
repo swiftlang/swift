@@ -20,6 +20,7 @@
 
 #include "swift/Remote/RemoteAddress.h"
 
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <string>
