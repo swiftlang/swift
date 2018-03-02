@@ -1907,19 +1907,38 @@ endfunction()
 #
 #   [LINK_FAT_LIBRARIES lipo_target1 ...]
 #     Fat libraries to link with.
+#
+#   [SWIFT_ENABLE_EXPORTS]
+#     Effectively, it enables -rdynamic on *nix platforms for the executable
+#
 function(_add_swift_executable_single name)
-  # Parse the arguments we were given.
+  set(options
+        EXCLUDE_FROM_ALL
+        DONT_STRIP_NON_MAIN_SYMBOLS
+        DISABLE_ASLR
+        SWIFT_ENABLE_EXPORTS)
+  set(single_value_args SDK ARCHITECTURE)
+  set(multi_value_args
+	DEPENDS
+	LLVM_COMPONENT_DEPENDS
+	LINK_LIBRARIES
+	LINK_FAT_LIBRARIES)
+
   cmake_parse_arguments(SWIFTEXE_SINGLE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
-    "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES"
-    ${ARGN})
+        "${options}"
+	"${single_value_args}"
+	"${multi_value_args}"
+${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
 
   translate_flag(${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL}
       "EXCLUDE_FROM_ALL"
       SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
+
+  translate_flag(${SWIFTEXE_SINGLE_SWIFT_ENABLE_EXPORTS}
+      "SWIFT_ENABLE_EXPORTS"
+      SWIFTEXE_SINGLE_SWIFT_ENABLE_EXPORTS_FLAG)
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2024,6 +2043,10 @@ function(_add_swift_executable_single name)
 
   set_target_properties(${name}
       PROPERTIES FOLDER "Swift executables")
+
+  if(SWIFTEXE_SINGLE_SWIFT_ENABLE_EXPORTS_FLAG)
+    set_target_properties(${name} PROPERTIES ENABLE_EXPORTS 1)
+  endif()
 endfunction()
 
 # Add an executable for each target variant. Executables are given suffixes
@@ -2139,6 +2162,9 @@ endfunction()
 #   DISABLE_ASLR
 #     Should we compile with -Wl,-no_pie so that ASLR is disabled?
 #
+#   SWIFT_ENABLE_EXPORTS
+#     Effectively, it enables -rdynamic on *nix platforms for the executable
+#
 #   source1 ...
 #     Sources to add into this executable.
 #
@@ -2146,12 +2172,18 @@ endfunction()
 #   Host executables are not given a variant suffix. To build an executable for
 #   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_executable name)
-  # Parse the arguments we were given.
+  set(options 
+	  EXCLUDE_FROM_ALL 
+	  DONT_STRIP_NON_MAIN_SYMBOLS 
+	  DISABLE_ASLR
+	  SWIFT_ENABLE_EXPORTS)
+  set(single_value_args)
+  set(multi_value_args DEPENDS LLVM_COMPONENT_DEPENDS LINK_LIBRARIES)
   cmake_parse_arguments(SWIFTEXE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
-    ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES"
-    ${ARGN})
+      "${options}"
+      "${single_value_args}"
+      "${multi_value_args}"
+      ${ARGN})
 
   translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
       "EXCLUDE_FROM_ALL"
@@ -2162,6 +2194,9 @@ function(add_swift_executable name)
   translate_flag(${SWIFTEXE_DISABLE_ASLR}
       "DISABLE_ASLR"
       SWIFTEXE_DISABLE_ASLR_FLAG)
+  translate_flag("${SWIFTEXE_ENABLE_EXPORTS}"
+      "ENABLE_EXPORTS"
+      SWIFTEXE_ENABLE_EXPORTS_FLAG)
 
   set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
 
@@ -2175,7 +2210,8 @@ function(add_swift_executable name)
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-      ${SWIFTEXE_DISABLE_ASLR_FLAG})
+      ${SWIFTEXE_DISABLE_ASLR_FLAG}
+      ${SWIFTEXE_ENABLE_EXPORTS_FLAG})
 endfunction()
 
 macro(add_swift_tool_subdirectory name)
@@ -2186,16 +2222,53 @@ macro(add_swift_lib_subdirectory name)
   add_llvm_subdirectory(SWIFT LIB ${name})
 endmacro()
 
+# Add a tool to all SDKs
+#
+# Usage:
+#   add_swift_host_tool(executable
+#      [SWIFT_ENABLE_EXPORTS]
+#      [SWIFT_COMPONENT component1 [component2 ...]]
+#      source1 [source2 source3 ...])
+#
+#   executable
+#     Name of the executable (e.g., swift-remoteast-test)
+#
+#   SWIFT_ENABLE_EXPORTS
+#     Effectively, it enables -rdynamic on *nix platforms for the executable
+#
+#   SWIFT_COMPONENT
+#     The component that the executable belongs to.
+#
+#   source1 ...
+#     Sources to add into this executable.
+#
+# Note:
+#   Host executables are not given a variant suffix. To build an executable for
+#   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_host_tool executable)
+  set(options SWIFT_ENABLE_EXPORTS)
+  set(single_value_args)
+  set(multi_value_args SWIFT_COMPONENT)
+
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "SWIFT_COMPONENT" # multi-value args
+      "${options}"
+      "${single_value_args}"
+      "${multi_value_args}"
       ${ARGN})
 
+  translate_flag("${ADDSWIFTHOSTTOOL_ENABLE_EXPORTS}"
+	         "ENABLE_EXPORTS"
+		 ASE_ENABLE_EXPORTS_FLAG)
+
+  if(ADDSWIFTHOSTTOOL_SWIFT_ENABLE_EXPORTS)
+    set(ASE_ENABLE_EXPORTS_FLAG SWIFT_ENABLE_EXPORTS)
+  endif()
+
   # Create the executable rule.
-  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
+  add_swift_executable(${executable}
+	  ${ASE_ENABLE_EXPORTS_FLAG}
+	  ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
 
   # And then create the install rule if we are asked to.
   if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)

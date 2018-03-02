@@ -1,12 +1,12 @@
 add_swift_host_tool(swift-remoteast-test
   swift-remoteast-test.cpp
+  SWIFT_ENABLE_EXPORTS
   LINK_LIBRARIES
     swiftFrontendTool
     swiftRemoteAST
   SWIFT_COMPONENT tools
 )
 
-set_target_properties(swift-remoteast-test PROPERTIES ENABLE_EXPORTS 1)
 if(HAVE_UNICODE_LIBEDIT)
   target_link_libraries(swift-remoteast-test PRIVATE edit)
 endif()
