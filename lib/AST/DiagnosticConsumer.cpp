@@ -101,12 +101,12 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
 DiagnosticConsumer *
 FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
                                                     SourceLoc loc) const {
-  // If there's only one consumer, we'll use it no matter what, because...
-  // - ...all diagnostics within the file will go to that consumer.
-  // - ...all diagnostics not within the file will not be claimed by any
-  //   consumer, and so will go to all (one) consumers.
-  if (SubConsumers.size() == 1)
-    return SubConsumers.front().second.get();
+  // // If there's only one consumer, we'll use it no matter what, because...
+  // // - ...all diagnostics within the file will go to that consumer.
+  // // - ...all diagnostics not within the file will not be claimed by any
+  // //   consumer, and so will go to all (one) consumers.
+  // if (SubConsumers.size() == 1)
+  //   return SubConsumers.front().second.get();
 
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
