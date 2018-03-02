@@ -83,7 +83,6 @@ static T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
-#if !(defined(__APPLE__) && defined(__MACH__))
 static SectionRef getSectionRef(const ObjectFile *objectFile,
                                 ArrayRef<StringRef> anySectionNames) {
   for (auto section : objectFile->sections()) {
@@ -150,7 +149,6 @@ static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
       /*RemoteStartAddress*/ startAddress,
   };
 }
-#endif // defined(__APPLE__) && defined(__MACH__)
 
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
@@ -253,11 +251,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
 
-#if defined(__APPLE__) && defined(__MACH__)
-    context.addImage(RemoteAddress((uint64_t)(objectFile->getData().begin())));
-#else
     context.addReflectionInfo(findReflectionInfo(objectFile));
-#endif
   }
 
   switch (action) {
