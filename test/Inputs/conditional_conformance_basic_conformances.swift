@@ -323,3 +323,11 @@ public func double_concrete_concrete() {
 func dynamicCastToP1(_ value: Any) -> P1? {
   return value as? P1
 }
+
+protocol P4 {}
+typealias P4Typealias = P4
+protocol P5 {}
+
+struct SR7101<T> {}
+extension SR7101 : P5 where T == P4Typealias {}
+
