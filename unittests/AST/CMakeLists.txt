@@ -1,4 +1,5 @@
 add_swift_unittest(SwiftASTTests
+  DiagnosticConsumerTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
