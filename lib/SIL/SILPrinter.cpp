@@ -1149,20 +1149,20 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
-    ADRI->getPrimalFunction()->printName(PrintState.OS);
     if (!ADRI->getArgumentIndices().empty()) {
-      *this << " [wrt ";
+      *this << "[wrt ";
       interleave(ADRI->getArgumentIndices(), [&](unsigned idx) {
           *this << idx;
         }, [&]{
           *this << ", ";
         });
-      *this << "]";
+      *this << "] ";
     }
     if (ADRI->isSeedable())
-      *this << " [seedable]";
+      *this << "[seedable] ";
     if (ADRI->isPreservingResult())
-      *this << " [preserving_result]";
+      *this << "[preserving_result] ";
+    ADRI->getPrimalFunction()->printName(PrintState.OS);
     *this << " : " << ADRI->getPrimalFunction()->getLoweredType();
   }
 

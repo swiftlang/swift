@@ -600,17 +600,19 @@ AutoDiffReverseInst::create(SILModule &M, SILDebugLocation debugLoc,
                             bool seedable, bool preservingResult) {
   unsigned size =
     sizeof(AutoDiffReverseInst) + argIndices.size() * sizeof(unsigned);
-  void *buffer = M.allocate(size, alignof(AutoDiffReverseInst));
+  void *buffer = M.allocateInst(size, alignof(AutoDiffReverseInst));
   return ::new (buffer) AutoDiffReverseInst(debugLoc, primal, argIndices,
                                             seedable, preservingResult);
 }
 
-ArrayRef<unsigned>
-AutoDiffReverseInst::getArgumentIndices() const {
-  return const_cast<AutoDiffReverseInst *>(this)->getArgumentIndices();
+ArrayRef<unsigned> AutoDiffReverseInst::getArgumentIndices() const {
+  return {
+    const_cast<AutoDiffReverseInst *>(this)->getArgumentIndicesData(),
+    NumArgIndices
+  };
 }
 
-void AutoDiffReverseInst::dropPrimalFunction() {
+void AutoDiffReverseInst::dropReferencedPrimalFunction() {
   if (Primal)
     Primal->decrementRefCount();
   Primal = nullptr;
