@@ -40,7 +40,7 @@ LazyTestSuite.test("Repeated/AssociatedTypes") {
     iteratorType: IndexingIterator<Subject>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
-    indicesType: CountableRange<Int>.self)
+    indicesType: Range<Int>.self)
 }
 
 LazyTestSuite.test("repeatedValue()/TypeInference") {
@@ -122,7 +122,7 @@ LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
     iteratorType: IteratorOverOne<OpaqueValue<Int>>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
-    indicesType: CountableRange<Int>.self)
+    indicesType: Range<Int>.self)
 }
 
 % for (name, operation, indices) in [
@@ -245,7 +245,7 @@ LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
     iteratorType: EmptyIterator<OpaqueValue<Int>>.self,
     subSequenceType: Subject.self,
     indexType: Int.self,
-    indicesType: CountableRange<Int>.self)
+    indicesType: Range<Int>.self)
 }
 
 % for (name, operation) in [
@@ -1207,8 +1207,8 @@ tests.test("lazy.filter/TypeInference") {
 
 do {
   struct Sample {
-    var expected: CountableRange<Int>
-    var data: [CountableRange<Int>]
+    var expected: Range<Int>
+    var data: [Range<Int>]
   }
 
   let flattenSamples: [Sample] = [
@@ -1399,7 +1399,7 @@ tests.test("LazyDropWhileSequence/AssociatedTypes") {
   typealias Subject = LazyDropWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyDropWhileSequence<Base>.Iterator.self,
     subSequenceType: AnySequence<OpaqueValue<Int>>.self)
 }
 
@@ -1408,21 +1408,21 @@ tests.test("LazyDropWhileCollection/AssociatedTypes") {
   typealias Subject = LazyDropWhileCollection<Base>
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyDropWhileSequence<Base>.Iterator.self,
     subSequenceType: Slice<Subject>.self,
-    indexType: LazyDropWhileIndex<Base>.self,
+    indexType: LazyDropWhileCollection<Base>.Index.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
 tests.test("LazyDropWhileBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyDropWhileBidirectionalCollection<Base>
+  typealias Subject = LazyDropWhileCollection<Base>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    iteratorType: LazyDropWhileSequence<Base>.Iterator.self,
     // FIXME(ABI)#83 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
-    indexType: LazyDropWhileIndex<Base>.self,
+    indexType: LazyDropWhileCollection<Base>.Index.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
