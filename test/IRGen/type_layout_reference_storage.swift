@@ -96,7 +96,7 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
 public class Base {
    var a: UInt32 = 0
 }
-// CHECK-LABEL: %swift.type* @{{.*}}7DerivedCM{{.*}}(%swift.type_descriptor*, i8**)
+// CHECK-LABEL: %swift.type* @create_generic_metadata_Derived(%swift.type_pattern*, i8**)
 // CHECK-NOT: store {{.*}}getelementptr{{.*}}SBomWV
 // CHECK: call %swift.type* @{{.*}}S29type_layout_reference_storage{{.*}}()
 // CHECK: store {{.*}}getelementptr{{.*}}SBoWV
