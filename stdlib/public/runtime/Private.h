@@ -29,7 +29,7 @@
 
 namespace swift {
 
-class TypeOwnership {
+class TypeReferenceOwnership {
   enum : uint8_t {
     Weak = 1 << 0,
     Unowned = 1 << 1,
@@ -38,10 +38,10 @@ class TypeOwnership {
 
   uint8_t Data;
 
-  constexpr TypeOwnership(uint8_t Data) : Data(Data) {}
+  constexpr TypeReferenceOwnership(uint8_t Data) : Data(Data) {}
 
 public:
-  constexpr TypeOwnership() : Data(0) {}
+  constexpr TypeReferenceOwnership() : Data(0) {}
 
   bool isWeak() const { return Data & Weak; }
   bool isUnowned() const { return Data & Unowned; }
@@ -60,19 +60,19 @@ public:
 /// itself related info has to be bundled with it.
 class TypeInfo {
   const Metadata *Type;
-  const TypeOwnership Ownership;
+  const TypeReferenceOwnership ReferenceOwnership;
 
 public:
-  TypeInfo() : Type(nullptr), Ownership() {}
+  TypeInfo() : Type(nullptr), ReferenceOwnership() {}
 
-  TypeInfo(const Metadata *type, TypeOwnership ownership)
-      : Type(type), Ownership(ownership) {}
+  TypeInfo(const Metadata *type, TypeReferenceOwnership ownership)
+      : Type(type), ReferenceOwnership(ownership) {}
 
   operator const Metadata *() { return Type; }
 
-  bool isWeak() const { return Ownership.isWeak(); }
-  bool isUnowned() const { return Ownership.isUnowned(); }
-  bool isUnmanaged() const { return Ownership.isUnmanaged(); }
+  bool isWeak() const { return ReferenceOwnership.isWeak(); }
+  bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
+  bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
 };
 
 #if SWIFT_HAS_ISA_MASKING

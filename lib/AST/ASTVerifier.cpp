@@ -2249,9 +2249,9 @@ public:
 
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
-      if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
+      if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() !=
           isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
-        if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
+        if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
         } else {
