@@ -228,3 +228,36 @@ bb0(%0 : @trivial $*Builtin.Int64, %1 : @trivial $Builtin.Int64):
   %closure = partial_apply %f(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
   unreachable
 }
+
+sil [canonical] @serializedClosureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : @trivial $*Builtin.Int64):
+  %2 = begin_access [read] [unknown] %0 : $*Builtin.Int64
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  end_access %2 : $*Builtin.Int64
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// A begin_access may not be used by a partial_apply or a nested
+// begin_access prior to mandatory inlining. Nonetheless, this does
+// occur in deserialzied SIL. This SIL is only well-formed because the
+// function is marked [canonical].
+sil [canonical] @accessAroundClosure : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %2 = copy_value %1 : ${ var Builtin.Int64 }
+  %3 = project_box %1 : ${ var Builtin.Int64 }, 0
+  // outer access (presumably its uses were mandatory inlined)
+  %4 = begin_access [modify] [static] %3 : $*Builtin.Int64
+  %5 = function_ref @serializedClosureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %6 = partial_apply %5(%4) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %7 = begin_access [modify] [static] %4 : $*Builtin.Int64
+  %8 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  %9 = apply %8(%7, %6) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  end_access %7 : $*Builtin.Int64
+  end_access %4 : $*Builtin.Int64
+  destroy_value %2 : ${ var Builtin.Int64 }
+  destroy_value %1 : ${ var Builtin.Int64 }
+  %10 = tuple ()
+  return %10 : $()
+}
