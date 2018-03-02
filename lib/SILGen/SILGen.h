@@ -60,6 +60,10 @@ public:
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
+  /// Mapping from reverse-mode AD configuration to gradient functions.
+  llvm::DenseMap<std::pair<SILFunction*,
+                           SILAutoDiffConfiguration>, SILFunction*>
+    emittedGradients;
 
   struct DelayedFunction {
     /// Insert the entity after the given function when it's emitted.

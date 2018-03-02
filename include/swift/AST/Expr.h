@@ -25,9 +25,9 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/AST/Availability.h"
 // SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/Differentiation.h"
+#include "swift/AST/AutoDiff.h"
+#include "swift/AST/Availability.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
@@ -3854,6 +3854,10 @@ public:
 
   MutableArrayRef<AutoDiffArgument> getArguments() {
     return { getArgumentsData(), NumArguments };
+  }
+
+  AutoDiffConfiguration getConfiguration() const {
+    return { getArguments(), /*seedable*/false };
   }
 
   SourceRange getSourceRange() const {

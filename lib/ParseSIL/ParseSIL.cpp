@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+/// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-/// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/Differentiation.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
@@ -2673,12 +2673,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           return true;
       }
       // SWIFT_ENABLE_TENSORFLOW: TODO: We can clean this up once Swift has a
-      // better understanding of the tensorflow operations.
+      // better understanding of the TensorFlow operations.
     } else if (Id.str().startswith("__tfop") ||
       // TODO: tf_tensor_to_i1 can become a named builtin in Builtins.def when
-      // TensorCore become a builtin type.
+      // TensorHandle become a builtin type.
                Id.str() == "tf_tensor_to_i1") {
-      // Tensorflow builtins don't have a decl associated with them, and don't
+      // TensorFlow builtins don't have a decl associated with them, and don't
       // have substitutions.
     } else {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "builtin name");
