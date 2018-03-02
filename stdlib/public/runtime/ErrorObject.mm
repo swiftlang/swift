@@ -521,7 +521,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 
   // If so, attempt the bridge.
   NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
-  objc_retain(srcInstance);
+  SWIFT_CC_PLUSONE_GUARD(objc_retain(srcInstance));
   if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       objc_release(srcInstance);
