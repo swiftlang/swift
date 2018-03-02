@@ -1,5 +1,6 @@
 -static
 -lswiftCore
+-lswiftImageInspectionShared
 -Xlinker
 --defsym=__import_pthread_self=pthread_self
 -Xlinker
