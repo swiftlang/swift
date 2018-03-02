@@ -836,7 +836,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
     // fileprivate. (The access level of synthesized members doesn't normally
     // matter; they don't go through an access level check after being returned
     // from the synthesizer.)
-    hashDecl->setAccess(std::max(typeDecl->getFormalAccess(), AccessLevel::FilePrivate));
+    hashDecl->setAccess(AccessLevel::FilePrivate);
     if (typeDecl->getAttrs().hasAttribute<VersionedAttr>()) {
       hashDecl->getAttrs().add(new (C) VersionedAttr(/*implicit=*/true));
     }
