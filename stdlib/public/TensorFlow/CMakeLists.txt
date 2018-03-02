@@ -26,6 +26,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
   list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
   list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
   list(APPEND swift_stdlib_compile_flags "-Onone")
+  list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}")
 
   add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
       ADRuntime.swift
@@ -43,7 +44,8 @@ if(SWIFT_ENABLE_TENSORFLOW)
       TensorShape.swift
       Utilities.swift
       INCORPORATE_OBJECT_LIBRARIES swiftTensorFlowInit
-      PRIVATE_LINK_LIBRARIES "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so"
+      TARGET_SDKS OSX
+      PRIVATE_LINK_LIBRARIES "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so" "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow_framework.so"
       SWIFT_MODULE_DEPENDS SwiftOnoneSupport
       SWIFT_MODULE_DEPENDS_IOS Darwin
       SWIFT_MODULE_DEPENDS_OSX Darwin

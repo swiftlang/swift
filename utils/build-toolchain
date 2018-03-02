@@ -108,6 +108,18 @@ SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain
 SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
 
+if [[ -z ${SWIFT_PACKAGE} ]]; then
+  if [[ "$(uname -s)" == "Darwin" ]] ; then
+      SWIFT_PACKAGE=buildbot_osx_package
+  else
+      if [[ "$2" == "-t" || "$2" == "--test" ]] ; then
+          SWIFT_PACKAGE=buildbot_linux
+      else
+          SWIFT_PACKAGE=buildbot_linux,no_test
+      fi
+  fi
+fi
+
 ./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \

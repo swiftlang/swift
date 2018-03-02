@@ -4,7 +4,8 @@ if(SWIFT_ENABLE_TENSORFLOW)
     "${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
   )
   set(swiftSILOptimizerPrivateLibraries
-    "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/libtensorflow.so")
+    "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/libtensorflow.so"
+    "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/libtensorflow_framework.so")
 endif()
 add_subdirectory(ARC)
 add_subdirectory(Analysis)
@@ -28,4 +29,4 @@ add_swift_library(swiftSILOptimizer STATIC
   ${TRANSFORMS_SOURCES}
   ${IPO_SOURCES}
   LINK_LIBRARIES swiftSIL
-  PRIVATE_LINK_LIBRARIES "${swiftSILOptimizerPrivateLibraries}")
+  INTERFACE_LINK_LIBRARIES "${swiftSILOptimizerPrivateLibraries}")
