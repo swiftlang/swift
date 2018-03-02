@@ -1424,17 +1424,17 @@ extension Sequence {
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-      var it = self.makeIterator()
-      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
-      for idx in buffer.startIndex..<buffer.count {
-        guard let x = it.next() else {
-          return (it, idx)
-        }
-        ptr.initialize(to: x)
-        ptr += 1
+    var it = self.makeIterator()
+    guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+    for idx in buffer.startIndex..<buffer.count {
+      guard let x = it.next() else {
+        return (it, idx)
       }
-      return (it,buffer.endIndex)
+      ptr.initialize(to: x)
+      ptr += 1
     }
+    return (it, buffer.endIndex)
+  }
 }
 
 // FIXME(ABI)#182
