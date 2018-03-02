@@ -24,6 +24,7 @@ import Darwin
 let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
+let RequestImages = "m"
 let RequestReadBytes = "b"
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
@@ -45,11 +46,97 @@ public enum InstanceKind : UInt8 {
   case Closure
 }
 
+/// Represents a section in a loaded image in this process.
+internal struct Section {
+  /// The absolute start address of the section's data in this address space.
+  let startAddress: UnsafeRawPointer
+
+  /// The size of the section in bytes.
+  let size: UInt
+}
+
+/// Holds the addresses and sizes of sections related to reflection
+internal struct ReflectionInfo : Sequence {
+  /// The name of the loaded image
+  internal let imageName: String
+
+  /// Reflection metadata sections
+  internal let fieldmd: Section?
+  internal let assocty: Section?
+  internal let builtin: Section?
+  internal let capture: Section?
+  internal let typeref: Section?
+  internal let reflstr: Section?
+
+  internal func makeIterator() -> AnyIterator<Section?> {
+    return AnyIterator([
+      fieldmd,
+      assocty,
+      builtin,
+      capture,
+      typeref,
+      reflstr
+    ].makeIterator())
+  }
+}
+
 #if arch(x86_64) || arch(arm64)
 typealias MachHeader = mach_header_64
 #else
 typealias MachHeader = mach_header
 #endif
+
+/// Get the location and size of a section in a binary.
+///
+/// - Parameter name: The name of the section
+/// - Parameter imageHeader: A pointer to the Mach header describing the
+///   image.
+/// - Returns: A `Section` containing the address and size, or `nil` if there
+///   is no section by the given name.
+internal func getSectionInfo(_ name: String,
+  _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  var size: UInt = 0
+  let address = getsectiondata(imageHeader, "__TEXT", name, &size)
+  guard let nonNullAddress = address else { return nil }
+  guard size != 0 else { return nil }
+  return Section(startAddress: nonNullAddress, size: size)
+}
+
+/// Get the Swift Reflection section locations for a loaded image.
+///
+/// An image of interest must have the following sections in the __DATA
+/// segment:
+/// - __swift5_fieldmd
+/// - __swift5_assocty
+/// - __swift5_builtin
+/// - __swift5_capture
+/// - __swift5_typeref
+/// - __swift5_reflstr (optional, may have been stripped out)
+///
+/// - Parameter i: The index of the loaded image as reported by Dyld.
+/// - Returns: A `ReflectionInfo` containing the locations of all of the
+///   needed sections, or `nil` if the image doesn't contain all of them.
+internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let header = unsafeBitCast(_dyld_get_image_header(i),
+    to: UnsafePointer<MachHeader>.self)
+
+  let imageName = _dyld_get_image_name(i)!
+  let fieldmd = getSectionInfo("__swift5_fieldmd", header)
+  let assocty = getSectionInfo("__swift5_assocty", header)
+  let builtin = getSectionInfo("__swift5_builtin", header)
+  let capture = getSectionInfo("__swift5_capture", header)
+  let typeref = getSectionInfo("__swift5_typeref", header)
+  let reflstr = getSectionInfo("__swift5_reflstr", header)
+  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
+                        fieldmd: fieldmd,
+                        assocty: assocty,
+                        builtin: builtin,
+                        capture: capture,
+                        typeref: typeref,
+                        reflstr: reflstr)
+}
 
 /// Get the TEXT segment location and size for a loaded image.
 ///
@@ -107,6 +194,24 @@ internal func readUInt() -> UInt {
 /// Send all known `ReflectionInfo`s for all images loaded in the current
 /// process.
 internal func sendReflectionInfos() {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let infos = (0..<_dyld_image_count()).compactMap(getReflectionInfoForImage)
+
+  var numInfos = infos.count
+  debugLog("\(numInfos) reflection info bundles.")
+  precondition(numInfos >= 1)
+  sendBytes(from: &numInfos, count: MemoryLayout<UInt>.size)
+  for info in infos {
+    debugLog("Sending info for \(info.imageName)")
+    for section in info {
+      sendValue(section?.startAddress)
+      sendValue(section?.size ?? 0)
+    }
+  }
+}
+
+/// Send all loadedimages loaded in the current process.
+internal func sendImages() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let infos = (0..<_dyld_image_count()).map(getAddressInfoForImage)
 
@@ -200,6 +305,8 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
       sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
+    case String(validatingUTF8: RequestImages)!:
+      sendImages()
     case String(validatingUTF8: RequestReadBytes)!:
       sendBytes()
     case String(validatingUTF8: RequestSymbolAddress)!:
