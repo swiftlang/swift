@@ -117,9 +117,9 @@ struct ${Self} {
   @_versioned
   internal mutating func _compress(_ m: UInt64) {
     v3 ^= m
-    % for _ in range(0, c_rounds):
-    _SipHashDetail._sipRound(v0: &v0, v1: &v1, v2: &v2, v3: &v3)
-    % end
+    for _ in 0..<${c_rounds} {
+      _SipHashDetail._sipRound(v0: &v0, v1: &v1, v2: &v2, v3: &v3)
+    }
     v0 ^= m
   }
 
