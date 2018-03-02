@@ -59,7 +59,7 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 int

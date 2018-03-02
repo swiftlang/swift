@@ -20,7 +20,7 @@
 #ifndef SWIFT_REMOTE_MIRROR_LEGACY_INTEROP_H
 #define SWIFT_REMOTE_MIRROR_LEGACY_INTEROP_H
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 
 #include "SwiftRemoteMirror.h"
 
@@ -880,7 +880,7 @@ size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef Contex
 
 /// @}
 
-#endif // __APPLE__
+#endif // defined(__APPLE__) && defined(__MACH__)
 
 #endif // SWIFT_REMOTE_MIRROR_LEGACY_INTEROP_H
 

@@ -18,7 +18,7 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 #include <mach-o/getsect.h>
 #endif
 
@@ -35,7 +35,7 @@
 #include <vector>
 #include <unordered_map>
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 #ifndef __LP64__
 typedef const struct mach_header MachHeader;
 #else
@@ -43,7 +43,7 @@ typedef const struct mach_header_64 MachHeader;
 #endif
 #endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 template <typename Section>
 static std::pair<Section, bool> findSection(MachHeader *Header,
                                             const char *Name) {
@@ -58,7 +58,7 @@ static std::pair<Section, bool> findSection(MachHeader *Header,
            reinterpret_cast<const void *>(End)},
           true};
 }
-#endif // __APPLE__
+#endif
 
 namespace swift {
 namespace reflection {
@@ -113,7 +113,7 @@ public:
     getBuilder().dumpAllSections();
   }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
   bool addImage(RemoteAddress ImageStart) {
     const void *Buf;
     std::function<void()> FreeFunc;
@@ -207,7 +207,7 @@ public:
     }
     return true;
   }
-#endif // __APPLE__
+#endif // defined(__APPLE__) && defined(__MACH__)
   
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);

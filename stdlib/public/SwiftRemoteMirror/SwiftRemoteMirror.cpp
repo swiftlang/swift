@@ -16,7 +16,7 @@
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 #include <mach-o/getsect.h>
 #endif
 
@@ -89,7 +89,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
 }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(__MACH__)
 #ifndef __LP64__
 typedef const struct mach_header MachHeader;
 #else
