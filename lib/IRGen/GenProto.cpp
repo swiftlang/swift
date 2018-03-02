@@ -1210,7 +1210,8 @@ public:
           ConcreteType(SILWT->getConformance()->getDeclContext()
                          ->mapTypeIntoContext(
                            SILWT->getConformance()->getType()
-                             ->getCanonicalType())),
+                             ->getCanonicalType())
+                         ->getCanonicalType()),
           Conformance(*SILWT->getConformance()),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
