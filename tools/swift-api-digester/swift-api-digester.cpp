@@ -333,6 +333,7 @@ struct SDKNodeInitInfo {
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
+  StringRef EnumRawTypeName;
   ParentExtensionInfo *ExtInfo = nullptr;
   TypeInitInfo TypeInfo;
 
@@ -779,13 +780,26 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 class SDKNodeTypeDecl : public SDKNodeDecl {
   StringRef SuperclassUsr;
   std::vector<StringRef> ConformingProtocols;
+  StringRef EnumRawTypeName;
 public:
   SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
                                           SuperclassUsr(Info.SuperclassUsr),
-                                ConformingProtocols(Info.ConformingProtocols){}
+                                ConformingProtocols(Info.ConformingProtocols),
+                                        EnumRawTypeName(Info.EnumRawTypeName) {}
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
+
+#define NOMINAL_TYPE_DECL(ID, PARENT) \
+  bool is##ID() const { return getDeclKind() == DeclKind::ID; }
+#define DECL(ID, PARENT)
+#include "swift/AST/DeclNodes.def"
+
+  StringRef getEnumRawTypeName() const {
+    assert(isEnum());
+    return EnumRawTypeName;
+  }
+
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
@@ -957,6 +971,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
         Info.ConformingProtocols.push_back(GetScalarString(&Name));
       }
+      break;
+    }
+    case KeyKind::KK_enumRawTypeName: {
+      assert(Info.DKind == DeclKind::Enum);
+      Info.EnumRawTypeName = GetScalarString(Pair.getValue());
       break;
     }
     case KeyKind::KK_printedName:
@@ -1292,6 +1311,15 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (auto *P: NTD->getAllProtocols()) {
       ConformingProtocols.push_back(P->getName().str());
+    }
+  }
+
+  // Get enum raw type name if this is an enum.
+  if (auto *ED = dyn_cast<EnumDecl>(VD)) {
+    if (auto RT = ED->getRawType()) {
+      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+        EnumRawTypeName = D->getName().str();
+      }
     }
   }
 }
@@ -1675,6 +1703,14 @@ namespace swift {
                                         KeyKind::KK_conformingProtocols).data(),
                               Pros);
             }
+
+            auto RawTypeName = TD->isEnum() ? TD->getEnumRawTypeName() : StringRef();
+            if (!RawTypeName.empty()) {
+              out.mapRequired(getKeyContent(Ctx,
+                                            KeyKind::KK_enumRawTypeName).data(),
+                              RawTypeName);
+            }
+
           }
           if (D->isFromExtension()) {
             // Even if we don't have any requirements on this parent extension,
