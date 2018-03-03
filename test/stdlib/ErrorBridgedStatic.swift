@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-clang -fmodules -c -o %t/ErrorBridgedStaticImpl.o %S/Inputs/ErrorBridgedStaticImpl.m 
 // RUN: %target-build-swift -static-stdlib -o %t/ErrorBridgedStatic %t/ErrorBridgedStaticImpl.o %s -import-objc-header %S/Inputs/ErrorBridgedStaticImpl.h

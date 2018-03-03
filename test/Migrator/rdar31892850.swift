@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -typecheck -primary-file %s -module-cache-path %t/mcp -emit-remap-file-path %t/edits.remap
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t && %target-swift-frontend -typecheck -primary-file %s -module-cache-path %t/mcp -emit-remap-file-path %t/edits.remap
 // RUN: %FileCheck %s -input-file=%t/edits.remap
 
 enum SomeStringEnum : String {

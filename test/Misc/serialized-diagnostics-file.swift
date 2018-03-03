@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 
 // RUN: not %target-swift-frontend -typecheck -serialize-diagnostics-path %t/nonexistent/some.dia %s 2>%t.err.txt

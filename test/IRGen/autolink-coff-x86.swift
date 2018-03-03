@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 
 // RUN: %swift -target x86_64--windows-gnu -parse-as-library -parse-stdlib -emit-module-path %t/module.swiftmodule -module-name module -module-link-name module %s

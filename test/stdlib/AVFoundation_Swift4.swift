@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir %t
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: objc_interop

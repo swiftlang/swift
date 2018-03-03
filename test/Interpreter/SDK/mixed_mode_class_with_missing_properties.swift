@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -whole-module-optimization -emit-module-path %t/UsingObjCStuff.swiftmodule -c -o %t/UsingObjCStuff.o -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 -parse-as-library %S/Inputs/mixed_mode/UsingObjCStuff.swift

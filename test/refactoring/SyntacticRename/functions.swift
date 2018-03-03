@@ -124,7 +124,8 @@ _ = memberwise . /*memberwise-x:ref*/x
 // RUN: diff -u %S/Outputs/functions/sub.swift.expected %t.result/functions_sub.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="memberwise-x" -old-name "x" -new-name "new_x" >> %t.result/functions_memberwise-x.swift
 // RUN: diff -u %S/Outputs/functions/memberwise-x.swift.expected %t.result/functions_memberwise-x.swift
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
+// RUN: mkdir -p %t.ranges
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="bar" -is-function-like -old-name "bar(_:)" >> %t.ranges/functions_bar.swift
 // RUN: diff -u %S/FindRangeOutputs/functions/bar.swift.expected %t.ranges/functions_bar.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc" >> %t.ranges/functions_no-args.swift

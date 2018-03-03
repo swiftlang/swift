@@ -74,7 +74,7 @@
 // well as interfaces.
 //
 
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/Headers/Simple
 // RUN: ln -s %S/Inputs/frameworks/Simple.framework/Headers/Simple.h %t/Headers/Simple/Simple.h
 // RUN: %target-build-swift -emit-module -module-name test -Xfrontend -disable-deserialization-recovery -v -F %S/Inputs/frameworks -Xcc "-I%t/Headers" -module-cache-path %t/clang-module-cache -import-objc-header %S/Inputs/pch-bridging-header-with-non-modular-import.h %S/Inputs/other.swift %s

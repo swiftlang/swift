@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %gyb %s > %t/collection-combinatorics.swift
 // RUN: %target-swift-frontend -typecheck -verify %t/collection-combinatorics.swift

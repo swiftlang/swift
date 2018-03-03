@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // RUN: %utils/chex.py < %s > %t/cf.sil
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil
 

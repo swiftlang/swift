@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %swift -emit-module -o %t/test_module.swiftmodule %S/Inputs/test_module.swift
 

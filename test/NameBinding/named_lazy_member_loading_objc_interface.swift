@@ -1,6 +1,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-// RUN: rm -rf %t && mkdir -p %t/stats-pre && mkdir -p %t/stats-post
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t/stats-pre && mkdir -p %t/stats-post
 //
 // Prime module cache
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers -typecheck -primary-file %s %S/Inputs/NamedLazyMembers/NamedLazyMembersExt.swift

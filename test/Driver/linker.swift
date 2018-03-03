@@ -313,7 +313,7 @@
 // Test ld detection. We use hard links to make sure
 // the Swift driver really thinks it's been moved.
 
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin)
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
