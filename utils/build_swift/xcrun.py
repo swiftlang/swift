@@ -12,6 +12,8 @@ Xcrun wrapper module.
 """
 
 
+from __future__ import absolute_import, unicode_literals
+
 from . import shell
 
 
@@ -30,26 +32,34 @@ class Xcrun(object):
         self._sdk = sdk
         self._toolchain = toolchain
 
-    def _build_command(self, args):
+    def _build_command(self, args, sdk=None, toolchain=None):
         command = ['xcrun']
-        if self._sdk is not None:
-            command += ['--sdk', self._sdk]
-        if self._toolchain is not None:
-            command += ['--toolchain', self._toolchain]
+
+        sdk = sdk or self._sdk
+        if sdk is not None:
+            command += ['--sdk', sdk]
+
+        toolchain = toolchain or self._toolchain
+        if toolchain is not None:
+            command += ['--toolchain', toolchain]
 
         return command + args
 
-    def popen(self, args, **kwargs):
-        return self._sh.popen(self._build_command(args), **kwargs)
+    def popen(self, args, sdk=None, toolchain=None, **kwargs):
+        command = self._build_command(args, sdk=sdk, toolchain=toolchain)
+        return self._sh.popen(command, **kwargs)
 
-    def call(self, args):
-        return self._sh.call(self._build_command(args))
+    def call(self, args, sdk=None, toolchain=None, **kwargs):
+        command = self._build_command(args, sdk=sdk, toolchain=toolchain)
+        return self._sh.call(command, **kwargs)
 
-    def check_call(self, args):
-        return self._sh.check_call(self._build_command(args))
+    def check_call(self, args, sdk=None, toolchain=None, **kwargs):
+        command = self._build_command(args, sdk=sdk, toolchain=toolchain)
+        return self._sh.check_call(command, **kwargs)
 
-    def check_output(self, args):
-        return self._sh.check_output(self._build_command(args))
+    def check_output(self, args, sdk=None, toolchain=None, **kwargs):
+        command = self._build_command(args, sdk=sdk, toolchain=toolchain)
+        return self._sh.check_output(command, **kwargs)
 
     # -------------------------------------------------------------------------
 
