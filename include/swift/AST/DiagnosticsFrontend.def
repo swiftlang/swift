@@ -210,7 +210,7 @@ ERROR(symbol_in_ir_not_in_tbd,none,
       (StringRef, StringRef))
 
 ERROR(redundant_prefix_compilation_flag,none,
-      "did you provide a redundant '-D' in your build settings? (got '-D%0')", 
+      "invalid argument '-D%0'; did you provide a redundant '-D' in your build settings?", 
       (StringRef))    
 
 ERROR(invalid_conditional_compilation_flag,none,
