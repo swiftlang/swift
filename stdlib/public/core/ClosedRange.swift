@@ -127,7 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_fixed_layout // FIXME(resilience)
+  @_frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   /// The result of attempting to parse a `T` from some input.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
   case valid(T)

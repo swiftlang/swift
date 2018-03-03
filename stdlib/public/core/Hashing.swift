@@ -23,7 +23,7 @@
 
 import SwiftShims
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public // @testable
 enum _HashingDetail {
 

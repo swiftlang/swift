@@ -157,6 +157,7 @@ extension _FixedArray16 where T == UInt16 {
   }
 }
 
+@_frozen
 @_versioned internal
 enum _Ordering: Int, Equatable {
   case less = -1

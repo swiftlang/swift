@@ -45,7 +45,7 @@ public struct Mirror {
   /// Note that the effect of this setting goes no deeper than the
   /// nearest descendant class that overrides `customMirror`, which
   /// in turn can determine representation of *its* descendants.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal enum _DefaultDescendantRepresentation {
     /// Generate a default mirror for descendant classes that don't
@@ -69,7 +69,7 @@ public struct Mirror {
   /// its mirror represents ancestor classes by initializing the mirror
   /// with an `AncestorRepresentation`. This setting has no effect on mirrors
   /// reflecting value type instances.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   public enum AncestorRepresentation {
 
     /// Generates a default mirror for all ancestor classes.
@@ -152,7 +152,7 @@ public struct Mirror {
   /// Playgrounds and the debugger will show a representation similar
   /// to the one used for instances of the kind indicated by the
   /// `DisplayStyle` case name when the mirror is used for display.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   public enum DisplayStyle {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
@@ -503,7 +503,7 @@ extension Mirror {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public enum PlaygroundQuickLook {
   /// Plain text.

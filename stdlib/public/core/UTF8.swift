@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_fixed_layout
+  @_frozen
   public enum UTF8 {
   case _swift3Buffer(Unicode.UTF8.ForwardParser)
   }

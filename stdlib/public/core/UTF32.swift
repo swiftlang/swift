@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   public enum UTF32 {
   case _swift3Codec
   }
