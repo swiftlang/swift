@@ -124,15 +124,15 @@ extension Collection {
   ) -> Range<Index> {
     let r = offset.relativeOffsetRange()
 
-    let startBase = r.lowerBound < 0
-      ? endIndex
-      : startIndex
-    let endBase = r.upperBound == nil || r.upperBound! < 0
-      ? endIndex
-      : startIndex
+    let startOffset = r.lowerBound < 0
+      ? count + r.lowerBound
+      : r.lowerBound
+    let endOffset = r.upperBound == nil || r.upperBound! < 0
+      ? count + (r.upperBound ?? 0)
+      : r.upperBound!
 
-    let start = index(startBase, offsetBy: r.lowerBound)
-    let end = index(endBase, offsetBy: r.upperBound ?? 0)
+    let start = index(startIndex, offsetBy: startOffset)
+    let end = index(start, offsetBy: endOffset - startOffset)
 
     return start..<end
   }
