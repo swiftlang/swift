@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  SWIFT_ENABLE_TENSORFLOW
-//  This file defines AST support for reverse-mode automatic differentiation.
+//  This file defines AST support for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,16 +19,8 @@
 #define SWIFT_AST_AUTODIFF_H
 
 #include "ASTContext.h"
-#include "DeclNameLoc.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/DenseMap.h"
-#include <utility>
 
 namespace swift {
-
-struct AutoDiffConfiguration;
-struct SILAutoDiffConfiguration;
 
 class AutoDiffArgument {
 public:
@@ -76,93 +68,31 @@ public:
   }
 };
 
-/// Swift-level automatic differentiation configuration.
-struct AutoDiffConfiguration {
-  ArrayRef<AutoDiffArgument> arguments;
-  bool seedable;
-  bool preservingResult;
-
-  SILAutoDiffConfiguration getLoweredConfiguration() const;
-};
-
 /// SIL-level automatic differentiation configuration.
 struct SILAutoDiffConfiguration {
   ArrayRef<unsigned> argumentIndices;
   bool seedable;
   bool preservingResult;
-
-  std::string getEncoding() const;
 };
 
 } // end namespace swift
 
 namespace llvm {
 
-template<> struct DenseMapInfo<swift::AutoDiffArgument> {
-  static swift::AutoDiffArgument getEmptyKey() {
-    return swift::AutoDiffArgument::getIndexArgument(swift::SourceLoc(), 0);
-  }
+using swift::SILAutoDiffConfiguration;
 
-  static swift::AutoDiffArgument getTombstoneKey() {
-    return swift::AutoDiffArgument::getIndexArgument(swift::SourceLoc(), ~1U);
-  }
+template<typename T> struct DenseMapInfo;
 
-  static unsigned getHashValue(swift::AutoDiffArgument Val) {
-    switch (Val.getKind()) {
-    case swift::AutoDiffArgument::Kind::Self:
-      return DenseMapInfo<unsigned>::getHashValue(UINT_MAX);
-    case swift::AutoDiffArgument::Kind::Index:
-      return DenseMapInfo<unsigned>::getHashValue(Val.getIndex());
-    }
-  }
-
-  static bool isEqual(swift::AutoDiffArgument LHS,
-                      swift::AutoDiffArgument RHS) {
-    return LHS.isEqual(RHS);
-  }
-};
-
-template<> struct DenseMapInfo<swift::AutoDiffConfiguration> {
-  static swift::AutoDiffConfiguration getEmptyKey() {
-    return { {}, false };
-  }
-
-  static swift::AutoDiffConfiguration getTombstoneKey() {
-    return { {}, true };
-  }
-
-  static unsigned getHashValue(swift::AutoDiffConfiguration Val) {
-    unsigned argHash = ~1U;
-    for (auto arg : Val.arguments)
-      argHash = hash_combine(
-        argHash, DenseMapInfo<swift::AutoDiffArgument>::getHashValue(arg));
-    return hash_combine(
-      argHash,
-      DenseMapInfo<unsigned>::getHashValue(Val.seedable)
-    );
-  }
-
-  static bool isEqual(swift::AutoDiffConfiguration LHS,
-                      swift::AutoDiffConfiguration RHS) {
-    if (LHS.arguments.size() != RHS.arguments.size())
-      return false;
-    for (unsigned i = 0; i < LHS.arguments.size(); i++)
-      if (!LHS.arguments[i].isEqual(RHS.arguments[i]))
-        return false;
-    return LHS.seedable == RHS.seedable;
-  }
-};
-
-template<> struct DenseMapInfo<swift::SILAutoDiffConfiguration> {
-  static swift::SILAutoDiffConfiguration getEmptyKey() {
+template<> struct DenseMapInfo<SILAutoDiffConfiguration> {
+  static SILAutoDiffConfiguration getEmptyKey() {
     return { {}, false, false };
   }
 
-  static swift::SILAutoDiffConfiguration getTombstoneKey() {
+  static SILAutoDiffConfiguration getTombstoneKey() {
     return { {}, true, true };
   }
 
-  static unsigned getHashValue(swift::SILAutoDiffConfiguration Val) {
+  static unsigned getHashValue(SILAutoDiffConfiguration Val) {
     unsigned argHash = ~1U;
     for (auto i : Val.argumentIndices)
       argHash = hash_combine(argHash, DenseMapInfo<unsigned>::getHashValue(i));
@@ -173,11 +103,12 @@ template<> struct DenseMapInfo<swift::SILAutoDiffConfiguration> {
     );
   }
 
-  static bool isEqual(swift::SILAutoDiffConfiguration LHS,
-                      swift::SILAutoDiffConfiguration RHS) {
-    if (LHS.argumentIndices.size() != RHS.argumentIndices.size())
+  static bool isEqual(SILAutoDiffConfiguration LHS,
+                      SILAutoDiffConfiguration RHS) {
+    auto numArgs = LHS.argumentIndices.size();
+    if (numArgs != RHS.argumentIndices.size())
       return false;
-    for (unsigned i = 0; i < LHS.argumentIndices.size(); i++)
+    for (unsigned i = 0; i < numArgs; i++)
       if (LHS.argumentIndices[i] != RHS.argumentIndices[i])
         return false;
     return LHS.seedable == RHS.seedable &&
