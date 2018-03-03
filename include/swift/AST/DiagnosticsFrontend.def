@@ -209,6 +209,10 @@ ERROR(symbol_in_ir_not_in_tbd,none,
       "symbol '%0' (%1) is in generated IR file, but not in TBD file",
       (StringRef, StringRef))
 
+ERROR(redundant_prefix_compilation_flag,none,
+      "did you provide a redundant '-D' in your build settings? (got '-D%0')", 
+      (StringRef))    
+
 ERROR(invalid_conditional_compilation_flag,none,
       "conditional compilation flags must be valid Swift identifiers (rather than '%0')",
       (StringRef))
