@@ -25,7 +25,6 @@ if(SWIFT_ENABLE_TENSORFLOW)
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
   list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
   list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
-  list(APPEND swift_stdlib_compile_flags "-Onone")
   list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}")
 
   add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
