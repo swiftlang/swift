@@ -138,13 +138,11 @@ void swift::runSILTFPartitionPass(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
 
-  SILPassManager PM(&Module, "Onone");
+  SILPassManager PM(&Module, "TensorFlow", /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(SILPassPipelinePlan::getTFParitionPassPipeline());
 
   // Verify the module, if required.
-#if 0// TODO: For development, always verify.
   if (Module.getOptions().VerifyAll)
-#endif
     Module.verify();
 
 }

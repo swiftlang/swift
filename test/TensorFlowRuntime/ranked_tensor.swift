@@ -87,8 +87,10 @@ RankedTensorTests.test("ElementIndexing") {
   // tests). Instead, `Tensor.array` is called to make a ShapedArray host copy
   // and the ShapedArray is tested.
   let tensor3D = Tensor3D<Float>(
+    // TODO: We should add tensor initializers for common things like this so
+    // they don't have to be copied to the device.
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1))
-  )
+  ).toDevice()
   let element2D = tensor3D[2]
   let element1D = tensor3D[1][3]
   let element0D = tensor3D[2][0][3]
@@ -116,7 +118,8 @@ RankedTensorTests.test("SliceIndexing") {
   // ArrayXD is tested instead.
   let tensor3D = Tensor3D<Float>(
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1))
-  )
+  ).toDevice()
+
   let slice3D = tensor3D[1..<2]
   let slice2D = tensor3D[1][0..<2]
   let slice1D = tensor3D[0][0][3..<5]
