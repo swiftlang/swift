@@ -1132,18 +1132,21 @@ getSanitizerRuntimeLibNameForLinux(StringRef Sanitizer, const llvm::Triple &Trip
 }
 
 bool toolchains::Darwin::sanitizerRuntimeLibExists(
-    const ArgList &args, StringRef sanitizer) const {
+    const ArgList &args, StringRef sanitizer, bool shared) const {
   SmallString<128> sanitizerLibPath;
   getClangLibraryPath(*this, args, sanitizerLibPath);
   llvm::sys::path::append(sanitizerLibPath,
-      getSanitizerRuntimeLibNameForDarwin(sanitizer, this->getTriple()));
+                          getSanitizerRuntimeLibNameForDarwin(
+                              sanitizer, this->getTriple(), shared));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
 }
 
 bool toolchains::GenericUnix::sanitizerRuntimeLibExists(
-    const ArgList &args, StringRef sanitizer) const {
+    const ArgList &args, StringRef sanitizer, bool shared) const {
   SmallString<128> sanitizerLibPath;
   getClangLibraryPath(*this, args, sanitizerLibPath);
+
+  // All libraries are static for linux.
   llvm::sys::path::append(sanitizerLibPath,
       getSanitizerRuntimeLibNameForLinux(sanitizer, this->getTriple()));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
@@ -1784,4 +1787,3 @@ std::string toolchains::Cygwin::getDefaultLinker() const {
 std::string toolchains::Cygwin::getTargetForLinker() const {
   return "";
 }
-
