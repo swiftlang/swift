@@ -425,6 +425,7 @@
         "Hashable",
         "RawRepresentable"
       ],
+      "enumRawTypeName": "Int",
       "children": [
         {
           "kind": "Var",

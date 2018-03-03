@@ -133,9 +133,9 @@ public:
       }
     }
     types::forAllTypes([&](types::ID Ty) {
-      auto Output = Cmd.getOutput().getAdditionalOutputForType(Ty);
-      if (!Output.empty())
-        Outputs.push_back(OutputPair(Ty, Output));
+        for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
+          Outputs.push_back(OutputPair(Ty, Output));
+        }
     });
   }
 

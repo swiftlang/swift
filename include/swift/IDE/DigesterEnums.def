@@ -92,6 +92,7 @@ KEY(superclassUsr)
 KEY(parentExtensionReqs)
 KEY(hasDefaultArg)
 KEY(conformingProtocols)
+KEY(enumRawTypeName)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
