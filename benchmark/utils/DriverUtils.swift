@@ -208,9 +208,6 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--sleep"] {
-      if x.isEmpty {
-        return .fail("--sleep requires a non-empty integer value")
-      }
       let v: Int? = Int(x)
       if v == nil {
         return .fail("--sleep requires a non-empty integer value")
