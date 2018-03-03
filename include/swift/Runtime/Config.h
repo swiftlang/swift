@@ -119,17 +119,6 @@
 #define SWIFT_INDIRECT_RESULT
 #endif
 
-// SWIFT_CC(PreserveMost) is used in the runtime implementation to prevent
-// register spills on the hot path.
-// It is not safe to use for external calls; the loader's lazy function
-// binding may not save all of the registers required for this convention.
-#if __has_attribute(preserve_most) &&                                          \
-    (defined(__aarch64__) || defined(__x86_64__))
-#define SWIFT_CC_PreserveMost __attribute__((preserve_most))
-#else
-#define SWIFT_CC_PreserveMost
-#endif
-
 // This is the DefaultCC value used by the compiler.
 // FIXME: the runtime's code does not honor DefaultCC
 // so changing this value is not sufficient.
