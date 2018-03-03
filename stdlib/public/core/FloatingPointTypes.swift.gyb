@@ -1799,31 +1799,6 @@ extension ${Self} : Strideable {
 // Deprecated operators
 //===----------------------------------------------------------------------===//
 
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func -- (rhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++ (lhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func -- (lhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
-
 extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")

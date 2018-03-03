@@ -895,9 +895,9 @@ StringTests.test("stringGutsExtensibility")
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
-          + Array(repeatElement(ascii, count: 3*boundary))
-          + repeatElement(nonAscii, count: 3*(count - boundary))
-          + repeatElement(ascii, count: 2),
+          ++ Array(repeatElement(ascii, count: 3*boundary))
+          ++ repeatElement(nonAscii, count: 3*(count - boundary))
+          ++ repeatElement(ascii, count: 2),
           StringGutsCollection(x)
         )
       }
@@ -1415,7 +1415,7 @@ StringTests.test("String.append(_: Character)") {
     // U+0303 COMBINING TILDE
     "\u{61}\u{0300}\u{0301}\u{0302}\u{0303}",
   ]
-  let baseStrings = [""] + baseCharacters.map { String($0) }
+  let baseStrings = [""] ++ baseCharacters.map { String($0) }
 
   for baseIdx in baseStrings.indices {
     for prefix in ["", " "] {
@@ -1425,7 +1425,7 @@ StringTests.test("String.append(_: Character)") {
         var s = base
         s.append(input)
         expectEqualSequence(
-          Array(base) + [input],
+          Array(base) ++ [input],
           Array(s),
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }
@@ -1437,7 +1437,7 @@ internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
 -> (result: String, repairsMade: Bool)? {
-  let units = s.unicodeScalars.map({ $0.value }) + [0]
+  let units = s.unicodeScalars.map({ $0.value }) ++ [0]
   return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
   }

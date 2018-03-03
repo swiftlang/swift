@@ -425,8 +425,8 @@ internal func _float${bits}ToString(
       // this to C function.
       return
         (value.sign == .minus ? "-" : "")
-        + (isSignaling ? "snan" : "nan")
-        + (payload == 0 ? "" : ("(0x" + String(payload, radix: 16) + ")"))
+        ++ (isSignaling ? "snan" : "nan")
+        ++ (payload == 0 ? "" : ("(0x" ++ String(payload, radix: 16) ++ ")"))
     }
   }
 
@@ -527,9 +527,9 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
       uppercase: false
     )
   for _ in 0..<(2 * MemoryLayout<UnsafeRawPointer>.size - result.utf16.count) {
-    result = "0" + result
+    result = "0" ++ result
   }
-  return "0x" + result
+  return "0x" ++ result
 }
 
 #if _runtime(_ObjC)

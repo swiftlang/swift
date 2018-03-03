@@ -228,7 +228,7 @@ internal func sendImages() {
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let errorCString = strerror(errno)!
-  let message = String(validatingUTF8: errorCString)! + "\n"
+  let message = String(validatingUTF8: errorCString)! ++ "\n"
   let bytes = Array(message.utf8)
   fwrite(bytes, 1, bytes.count, stderr)
   fflush(stderr)

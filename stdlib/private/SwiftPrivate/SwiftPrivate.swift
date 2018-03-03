@@ -15,7 +15,7 @@ import SwiftShims
 /// Convert the given numeric value to a hexadecimal string.
   // FIXME(integers): support a more general BinaryInteger protocol
 public func asHex<T : FixedWidthInteger>(_ x: T) -> String {
-  return "0x" + String(x, radix: 16)
+  return "0x" ++ String(x, radix: 16)
 }
 
 /// Convert the given sequence of numeric values to a string representing
@@ -24,7 +24,7 @@ public func asHex<T : FixedWidthInteger>(_ x: T) -> String {
 public func asHex<S : Sequence>(_ x: S) -> String
   where
   S.Iterator.Element : FixedWidthInteger {
-  return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
+  return "[ " ++ x.lazy.map { asHex($0) }.joined(separator: ", ") ++ " ]"
 }
 
 /// Compute the prefix sum of `seq`.
@@ -72,7 +72,7 @@ public func withArrayOfCStrings<R>(
   _ args: [String], _ body: ([UnsafeMutablePointer<CChar>?]) -> R
 ) -> R {
   let argsCounts = Array(args.map { $0.utf8.count + 1 })
-  let argsOffsets = [ 0 ] + scan(argsCounts, 0, +)
+  let argsOffsets = [ 0 ] ++ scan(argsCounts, 0, +)
   let argsBufferSize = argsOffsets.last!
 
   var argsBuffer: [UInt8] = []

@@ -1852,20 +1852,20 @@ internal func _makeCollectionDescription<C : Collection>
   (for items: C, withTypeName type: String?) -> String {
   var result = ""
   if let type = type {
-    result += "\(type)(["
+    result ++= "\(type)(["
   } else {
-    result += "["
+    result ++= "["
   }
   var first = true
   for item in items {
     if first {
       first = false
     } else {
-      result += ", "
+      result ++= ", "
     }
     debugPrint(item, terminator: "", to: &result)
   }
-  result += type != nil ? "])" : "]"
+  result ++= type != nil ? "])" : "]"
   return result
 }
 

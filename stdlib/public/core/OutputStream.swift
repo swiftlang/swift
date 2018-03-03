@@ -581,7 +581,7 @@ extension String : TextOutputStream {
   /// - Parameter other: A string to append.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
-    self += other
+    self ++= other
   }
 }
 

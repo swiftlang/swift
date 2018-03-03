@@ -30,7 +30,7 @@ extension String : _ExpressibleByStringInterpolation {
   public init(stringInterpolation strings: String...) {
     self.init()
     for str in strings {
-      self += str
+      self ++= str
     }
   }
 

@@ -381,7 +381,7 @@ extension String {
     }
     var nullTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
     nullTerminatedUTF8.reserveCapacity(utf8.count + 1)
-    nullTerminatedUTF8 += utf8
+    nullTerminatedUTF8.append(contentsOf: utf8)
     nullTerminatedUTF8.append(0)
     return try nullTerminatedUTF8.withUnsafeBufferPointer(body)
   }

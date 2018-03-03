@@ -319,7 +319,7 @@ extension AnyHashable : CustomStringConvertible {
 extension AnyHashable : CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
-    return "AnyHashable(" + String(reflecting: base) + ")"
+    return "AnyHashable(" ++ String(reflecting: base) ++ ")"
   }
 }
 

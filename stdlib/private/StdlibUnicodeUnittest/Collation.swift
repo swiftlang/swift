@@ -235,7 +235,7 @@ extension String {
       let scalars: HashableArray<Unicode.Scalar> = [us]
       let collationElements = ducetExtract[scalars]!.collationElements
       if collationElements[0] != 0 {
-        result += collationElements
+        result.append(contentsOf: collationElements)
       }
     }
     return result
@@ -332,7 +332,7 @@ public struct StringComparisonTest {
 
   public static let allTests: [StringComparisonTest] = {
     () in
-    return testsFromDUCET + hardcodedTests
+    return testsFromDUCET ++ hardcodedTests
   }()
 }
 

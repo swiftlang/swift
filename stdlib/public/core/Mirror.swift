@@ -461,7 +461,7 @@ extension Mirror {
     _ first: MirrorPath, _ rest: MirrorPath...
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
-    for e in [first] + rest {
+    for e in [first] ++ rest {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
       if case let label as String = e {

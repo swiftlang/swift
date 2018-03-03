@@ -288,7 +288,7 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
     @inline(never)
     get {
       if (index >= _RuntimeFunctionCounters.numRuntimeFunctionCounters) {
-        fatalError("Counter index should be in the range " +
+        fatalError("Counter index should be in the range " ++
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
       var tmpCounters = counters
@@ -303,7 +303,7 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
     @inline(never)
     set {
       if (index >= _RuntimeFunctionCounters.numRuntimeFunctionCounters) {
-        fatalError("Counter index should be in the range " +
+        fatalError("Counter index should be in the range " ++
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
       withUnsafeMutablePointer(to: &counters) {
@@ -380,10 +380,10 @@ extension _RuntimeFunctionCountersStats {
       if skipUnchanged && self[i] == 0 {
         continue
       }
-      print("counter \(i) : " +
-        "\(Counters.runtimeFunctionNames[i])" +
-        " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]):" +
+      print("counter \(i) : " ++
+        "\(Counters.runtimeFunctionNames[i])" ++
+        " at offset: " ++
+        "\(Counters.runtimeFunctionCountersOffsets[i]):" ++
         "  \(self[i])", to: &to)
     }
   }
@@ -400,12 +400,12 @@ extension _RuntimeFunctionCountersStats {
       if skipUnchanged && self[i] == after[i] {
         continue
       }
-      print("counter \(i) : " +
-        "\(Counters.runtimeFunctionNames[i])" +
-        " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]): " +
-        "before \(self[i]) " +
-        "after \(after[i])" + " diff=\(after[i]-self[i])", to: &to)
+      print("counter \(i) : " ++
+        "\(Counters.runtimeFunctionNames[i])" ++
+        " at offset: " ++
+        "\(Counters.runtimeFunctionCountersOffsets[i]): " ++
+        "before \(self[i]) " ++
+        "after \(after[i])" ++ " diff=\(after[i]-self[i])", to: &to)
     }
   }
 

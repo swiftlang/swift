@@ -617,7 +617,7 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+      ++ "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 %end

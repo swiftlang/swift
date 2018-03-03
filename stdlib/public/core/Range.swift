@@ -361,7 +361,7 @@ extension Range : CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
-    + "..<\(String(reflecting: upperBound)))"
+    ++ "..<\(String(reflecting: upperBound)))"
   }
 }
 

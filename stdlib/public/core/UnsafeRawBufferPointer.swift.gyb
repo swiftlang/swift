@@ -670,7 +670,7 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "${Self}"
-      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+      ++ "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 

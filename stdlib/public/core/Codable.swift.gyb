@@ -1345,7 +1345,7 @@ public extension DecodingError {
     forKey key: C.Key, in container: C, debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(
-      codingPath: container.codingPath + [key],
+      codingPath: container.codingPath ++ [key],
       debugDescription: debugDescription)
     return .dataCorrupted(context)
   }
@@ -1367,7 +1367,7 @@ public extension DecodingError {
     debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(
-      codingPath: container.codingPath +
+      codingPath: container.codingPath ++
         [_GenericIndexKey(intValue: container.currentIndex)!],
       debugDescription: debugDescription)
     return .dataCorrupted(context)

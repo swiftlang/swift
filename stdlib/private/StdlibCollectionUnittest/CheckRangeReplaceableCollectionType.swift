@@ -601,7 +601,7 @@ self.test("\(testNamePrefix).OperatorPlusEquals") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalCollection(elements: test.newElements.map(wrapValue))
-    c += newElements
+    c ++= newElements
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },
@@ -1041,7 +1041,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalSequence(elements: test.rhs.map(wrapValue))
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },
@@ -1058,7 +1058,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     let lhs = MinimalSequence(elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },
@@ -1075,7 +1075,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalCollection(elements: test.rhs.map(wrapValue))
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },
@@ -1096,7 +1096,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = makeWrappedCollection(test.rhs)
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },
@@ -1118,7 +1118,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     let rhs = MinimalRangeReplaceableCollection(
       elements: test.rhs.map(wrapValue))
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },
@@ -1140,7 +1140,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)
 
-    let result = lhs + rhs
+    let result = lhs ++ rhs
     expectEqualSequence(
       test.expected,
       result.map { extractValue($0).value },

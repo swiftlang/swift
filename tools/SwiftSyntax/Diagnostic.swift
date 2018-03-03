@@ -227,7 +227,7 @@ public struct Diagnostic: Codable {
 
     /// Adds the provided source ranges as highlights of this diagnostic.
     public mutating func highlight(_ ranges: SourceRange...) {
-      self.highlights += ranges
+      self.highlights.append(contentsOf: ranges)
     }
 
     /// Adds a FixIt to remove the contents of the provided SourceRange.

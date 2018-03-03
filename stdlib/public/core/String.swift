@@ -489,7 +489,7 @@ extension String {
 /// the original unaffected.
 ///
 ///     var otherGreeting = greeting
-///     otherGreeting += " Have a nice time!"
+///     otherGreeting ++= " Have a nice time!"
 ///     // otherGreeting == "Welcome! Have a nice time!"
 ///
 ///     print(greeting)
@@ -924,9 +924,9 @@ extension String : CustomDebugStringConvertible {
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
-      result += us.escaped(asASCII: false)
+      result ++= us.escaped(asASCII: false)
     }
-    result += "\""
+    result ++= "\""
     return result
   }
 }
@@ -1037,7 +1037,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_semantics("string.concat")
-  public static func + (lhs: String, rhs: String) -> String {
+  public static func ++ (lhs: String, rhs: String) -> String {
     var lhs = lhs
     lhs.append(rhs)
     return lhs
@@ -1045,7 +1045,7 @@ extension String {
 
   // String append
   @_inlineable // FIXME(sil-serialize-all)
-  public static func += (lhs: inout String, rhs: String) {
+  public static func ++= (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
 }

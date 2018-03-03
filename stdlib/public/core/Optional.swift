@@ -275,7 +275,7 @@ extension Optional : CustomDebugStringConvertible {
     case .some(let value):
       var result = "Optional("
       debugPrint(value, terminator: "", to: &result)
-      result += ")"
+      result ++= ")"
       return result
     case .none:
       return "nil"

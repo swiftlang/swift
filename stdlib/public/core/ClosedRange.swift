@@ -393,7 +393,7 @@ extension ClosedRange : CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
-    + "...\(String(reflecting: upperBound)))"
+    ++ "...\(String(reflecting: upperBound)))"
   }
 }
 

@@ -956,7 +956,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A range-replaceable collection.
   ///   - rhs: A collection or finite sequence.
   @_inlineable
-  public static func + <
+  public static func ++ <
     Other : Sequence
   >(lhs: Self, rhs: Other) -> Self
   where Element == Other.Element {
@@ -985,7 +985,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A collection or finite sequence.
   ///   - rhs: A range-replaceable collection.
   @_inlineable
-  public static func + <
+  public static func ++ <
     Other : Sequence
   >(lhs: Other, rhs: Self) -> Self
   where Element == Other.Element {
@@ -1013,7 +1013,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @_inlineable
-  public static func += <
+  public static func ++= <
     Other : Sequence
   >(lhs: inout Self, rhs: Other)
   where Element == Other.Element {
@@ -1039,7 +1039,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A range-replaceable collection.
   ///   - rhs: Another range-replaceable collection.
   @_inlineable
-  public static func + <
+  public static func ++ <
     Other : RangeReplaceableCollection
   >(lhs: Self, rhs: Other) -> Self
   where Element == Other.Element {

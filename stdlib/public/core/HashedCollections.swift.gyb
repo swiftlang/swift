@@ -2806,13 +2806,13 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
       if first {
         first = false
       } else {
-        result += ", "
+        result ++= ", "
       }
       debugPrint(k, terminator: "", to: &result)
-      result += ": "
+      result ++= ": "
       debugPrint(v, terminator: "", to: &result)
     }
-    result += "]"
+    result ++= "]"
     return result
   }
 
@@ -3969,9 +3969,9 @@ extension _Native${Self}Buffer
     for i in 0..<bucketCount {
       if isInitializedEntry(at: i) {
         let key = self.key(at: i)
-        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
+        result ++= "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
       } else {
-        result += "bucket \(i), empty\n"
+        result ++= "bucket \(i), empty\n"
       }
     }
 #endif

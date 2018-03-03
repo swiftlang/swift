@@ -223,31 +223,31 @@ extension Unicode.Scalar :
       return "\\t"
     } else if UInt32(self) < 128 {
       return "\\u{"
-        + lowNibbleAsHex(UInt32(self) >> 4)
-        + lowNibbleAsHex(UInt32(self)) + "}"
+        ++ lowNibbleAsHex(UInt32(self) >> 4)
+        ++ lowNibbleAsHex(UInt32(self)) ++ "}"
     } else if !forceASCII {
       return String(self)
     } else if UInt32(self) <= 0xFFFF {
       var result = "\\u{"
-      result += lowNibbleAsHex(UInt32(self) >> 12)
-      result += lowNibbleAsHex(UInt32(self) >> 8)
-      result += lowNibbleAsHex(UInt32(self) >> 4)
-      result += lowNibbleAsHex(UInt32(self))
-      result += "}"
+      result ++= lowNibbleAsHex(UInt32(self) >> 12)
+      result ++= lowNibbleAsHex(UInt32(self) >> 8)
+      result ++= lowNibbleAsHex(UInt32(self) >> 4)
+      result ++= lowNibbleAsHex(UInt32(self))
+      result ++= "}"
       return result
     } else {
       // FIXME: Type checker performance prohibits this from being a
       // single chained "+".
       var result = "\\u{"
-      result += lowNibbleAsHex(UInt32(self) >> 28)
-      result += lowNibbleAsHex(UInt32(self) >> 24)
-      result += lowNibbleAsHex(UInt32(self) >> 20)
-      result += lowNibbleAsHex(UInt32(self) >> 16)
-      result += lowNibbleAsHex(UInt32(self) >> 12)
-      result += lowNibbleAsHex(UInt32(self) >> 8)
-      result += lowNibbleAsHex(UInt32(self) >> 4)
-      result += lowNibbleAsHex(UInt32(self))
-      result += "}"
+      result ++= lowNibbleAsHex(UInt32(self) >> 28)
+      result ++= lowNibbleAsHex(UInt32(self) >> 24)
+      result ++= lowNibbleAsHex(UInt32(self) >> 20)
+      result ++= lowNibbleAsHex(UInt32(self) >> 16)
+      result ++= lowNibbleAsHex(UInt32(self) >> 12)
+      result ++= lowNibbleAsHex(UInt32(self) >> 8)
+      result ++= lowNibbleAsHex(UInt32(self) >> 4)
+      result ++= lowNibbleAsHex(UInt32(self))
+      result ++= "}"
       return result
     }
   }

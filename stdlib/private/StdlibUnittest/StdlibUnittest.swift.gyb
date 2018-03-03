@@ -697,7 +697,7 @@ struct _ParentProcess {
   }
 
   mutating func _spawnChild() {
-    let params = ["--stdlib-unittest-run-child"] + _args
+    let params = ["--stdlib-unittest-run-child"] ++ _args
     let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
@@ -974,7 +974,7 @@ struct _ParentProcess {
     if testPassed && t.crashOutputMatches.count > 0 {
       // If we still think that the test passed, check if the crash
       // output matches our expectations.
-      let crashOutput = crashStdout + crashStderr
+      let crashOutput = crashStdout ++ crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
         if crashOutput.isEmpty && expectedSubstring.isEmpty {

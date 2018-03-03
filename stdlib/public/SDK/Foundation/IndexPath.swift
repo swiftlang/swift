@@ -82,7 +82,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 self = .array([first, second, other])
                 break
             case .array(let indexes):
-                self = .array(indexes + [other])
+                self = .array(indexes ++ [other])
                 break
             }
         }
@@ -117,7 +117,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     self = .array([lhsIndex, rhsFirst, rhsSecond])
                     break
                 case .array(let rhsIndexes):
-                    self = .array([lhsIndex] + rhsIndexes)
+                    self = .array([lhsIndex] ++ rhsIndexes)
                     break
                 }
                 break
@@ -133,7 +133,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     self = .array([lhsFirst, lhsSecond, rhsFirst, rhsSecond])
                     break
                 case .array(let rhsIndexes):
-                    self = .array([lhsFirst, lhsSecond] + rhsIndexes)
+                    self = .array([lhsFirst, lhsSecond] ++ rhsIndexes)
                     break
                 }
                 break
@@ -143,13 +143,13 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     // DO NOTHING
                     break
                 case .single(let rhsIndex):
-                    self = .array(lhsIndexes + [rhsIndex])
+                    self = .array(lhsIndexes ++ [rhsIndex])
                     break
                 case .pair(let rhsFirst, let rhsSecond):
-                    self = .array(lhsIndexes + [rhsFirst, rhsSecond])
+                    self = .array(lhsIndexes ++ [rhsFirst, rhsSecond])
                     break
                 case .array(let rhsIndexes):
-                    self = .array(lhsIndexes + rhsIndexes)
+                    self = .array(lhsIndexes ++ rhsIndexes)
                     break
                 }
                 break
@@ -183,7 +183,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     self = .pair(first, other[0])
                     break
                 default:
-                    self = .array([first] + other)
+                    self = .array([first] ++ other)
                     break
                 }
                 break
@@ -193,12 +193,12 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     // DO NOTHING
                     break
                 default:
-                    self = .array([first, second] + other)
+                    self = .array([first, second] ++ other)
                     break
                 }
                 break
             case .array(let indexes):
-                self = .array(indexes + other)
+                self = .array(indexes ++ other)
                 break
             }
         }
@@ -317,7 +317,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                         self = .array([first, second, index])
                         break
                     case (0, 0, .array(let other)):
-                        self = .array(other + [index])
+                        self = .array(other ++ [index])
                         break
                     case (0, 1, .empty):
                         fallthrough
@@ -334,7 +334,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                         self = .array([index, first, second])
                         break
                     case (1, 1, .array(let other)):
-                        self = .array([index] + other)
+                        self = .array([index] ++ other)
                         break
                     default:
                         fatalError("Range \(range) is out of bounds of count 1")
@@ -352,7 +352,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                             self = .array([otherFirst, otherSecond, first, second])
                             break
                         case .array(let other):
-                            self = .array(other + [first, second])
+                            self = .array(other ++ [first, second])
                             break
                         }
                         break
@@ -368,7 +368,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                             self = .array([otherFirst, otherSecond, second])
                             break
                         case .array(let other):
-                            self = .array(other + [second])
+                            self = .array(other ++ [second])
                             break
                         }
                         break
@@ -387,7 +387,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                             self = .array([first, otherFirst, otherSecond])
                             break
                         case .array(let other):
-                            self = .array([first] + other)
+                            self = .array([first] ++ other)
                         }
                         break
                     case (2, 2):
@@ -401,7 +401,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                             self = .array([first, second, otherFirst, otherSecond])
                             break
                         case .array(let other):
-                            self = .array([first, second] + other)
+                            self = .array([first, second] ++ other)
                         }
                         break
                     default:
