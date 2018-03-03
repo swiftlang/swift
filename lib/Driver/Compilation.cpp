@@ -419,7 +419,7 @@ namespace driver {
     /// TaskFinishedResponse::ContinueExecution from any of the constituent
     /// calls.
     TaskFinishedResponse
-    unpackAndFinishBatch(ProcessId Pid, int ReturnCode, StringRef Output,
+    unpackAndFinishBatch(int ReturnCode, StringRef Output,
                          StringRef Errors, const BatchJob *B) {
       if (Comp.ShowJobLifecycle)
         llvm::outs() << "Batch job finished: " << LogJob(B) << "\n";
@@ -428,7 +428,8 @@ namespace driver {
         if (Comp.ShowJobLifecycle)
           llvm::outs() << "  ==> Unpacked batch constituent finished: "
                        << LogJob(J) << "\n";
-        auto r = taskFinished(Pid, ReturnCode, Output, Errors, (void *)J);
+        auto r = taskFinished(llvm::sys::ProcessInfo::InvalidPid, ReturnCode, Output,
+                              Errors, (void *)J);
         if (r != TaskFinishedResponse::ContinueExecution)
           res = r;
       }
@@ -443,24 +444,27 @@ namespace driver {
                  StringRef Errors, void *Context) {
       const Job *FinishedCmd = (const Job *)Context;
 
-      if (Comp.ShowDriverTimeCompilation) {
-        DriverTimers[FinishedCmd]->stopTimer();
+      if (Pid != llvm::sys::ProcessInfo::InvalidPid) {
+
+        if (Comp.ShowDriverTimeCompilation) {
+          DriverTimers[FinishedCmd]->stopTimer();
+        }
+
+        if (Comp.Level == OutputLevel::Parseable) {
+          // Parseable output was requested.
+          parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
+                                                ReturnCode, Output);
+        } else {
+          // Otherwise, send the buffered output to stderr, though only if we
+          // support getting buffered output.
+          if (TaskQueue::supportsBufferingOutput())
+            llvm::errs() << Output;
+        }
       }
 
       if (BatchJobs.count(FinishedCmd) != 0) {
-        return unpackAndFinishBatch(Pid, ReturnCode, Output, Errors,
+        return unpackAndFinishBatch(ReturnCode, Output, Errors,
                                     static_cast<const BatchJob *>(FinishedCmd));
-      }
-
-      if (Comp.Level == OutputLevel::Parseable) {
-        // Parseable output was requested.
-        parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                              ReturnCode, Output);
-      } else {
-        // Otherwise, send the buffered output to stderr, though only if we
-        // support getting buffered output.
-        if (TaskQueue::supportsBufferingOutput())
-          llvm::errs() << Output;
       }
 
       // In order to handle both old dependencies that have disappeared and new
@@ -505,30 +509,6 @@ namespace driver {
       return TaskFinishedResponse::ContinueExecution;
     }
 
-    /// Unpack a \c BatchJob that has finished into its constituent \c Job
-    /// members, and call \c taskSignalled on each, propagating any \c
-    /// TaskFinishedResponse other than \c
-    /// TaskFinishedResponse::ContinueExecution from any of the constituent
-    /// calls.
-    TaskFinishedResponse
-    unpackAndSignalBatch(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                         StringRef Errors, const BatchJob *B,
-                         Optional<int> Signal) {
-      if (Comp.ShowJobLifecycle)
-        llvm::outs() << "Batch job signalled: " << LogJob(B) << "\n";
-      auto res = TaskFinishedResponse::ContinueExecution;
-      for (const Job *J : B->getCombinedJobs()) {
-        if (Comp.ShowJobLifecycle)
-          llvm::outs() << "  ==> Unpacked batch constituent signalled: "
-                       << LogJob(J) << "\n";
-        auto r = taskSignalled(Pid, ErrorMsg, Output, Errors,
-                               (void *)J, Signal);
-        if (r != TaskFinishedResponse::ContinueExecution)
-          res = r;
-      }
-      return res;
-    }
-
     TaskFinishedResponse
     taskSignalled(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
                   StringRef Errors, void *Context, Optional<int> Signal) {
@@ -536,12 +516,6 @@ namespace driver {
 
       if (Comp.ShowDriverTimeCompilation) {
         DriverTimers[SignalledCmd]->stopTimer();
-      }
-
-      if (BatchJobs.count(SignalledCmd) != 0) {
-        return unpackAndSignalBatch(Pid, ErrorMsg, Output, Errors,
-                                    static_cast<const BatchJob *>(SignalledCmd),
-                                    Signal);
       }
 
       if (Comp.Level == OutputLevel::Parseable) {
@@ -554,7 +528,6 @@ namespace driver {
         if (TaskQueue::supportsBufferingOutput())
           llvm::errs() << Output;
       }
-
       if (!ErrorMsg.empty())
         Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
                             ErrorMsg);
