@@ -63,10 +63,6 @@ namespace {
   };
 } // end anonymous namespace
 
-llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
-  return loc.Value;
-}
-
 void PrintingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
