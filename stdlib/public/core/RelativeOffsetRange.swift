@@ -36,8 +36,8 @@ public protocol RelativeOffsetRangeExpression {
 /// how a partial range from works:
 ///
 ///     let greeting = "Hello, Swift!"
-///     let greeting = numbers[offset: (-6)...]
-///     // greeting == "Swift!"
+///     let name = greeting[offset: (-6)...]
+///     // name == "Swift!"
 ///
 /// Use this method only if you need a range that will be used to slice a 
 /// `collection` with offsets relative to the start and/or end indices. To
@@ -45,8 +45,9 @@ public protocol RelativeOffsetRangeExpression {
 /// offset expression, use the collection's generic subscript that uses a 
 /// relative offset range expression as its parameter.
 ///
-///     let numbersPrefix = numbers[offset: upToFour]
-///     // numbersPrefix == [10, 20, 30, 40]
+///     let numbers = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+///     let numbersPrefix = numbers[offset: exceptLastFour]
+///     // numbersPrefix == [10, 20, 30, 40, 50, 60]
 ///
 /// - Returns: An offset range suitable for slicing `collection` as an offset. 
 ///   The returned range is *not* guaranteed to be inside the bounds of 
