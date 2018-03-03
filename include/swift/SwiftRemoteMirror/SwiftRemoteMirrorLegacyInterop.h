@@ -22,32 +22,15 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+#include "SwiftRemoteMirrorLegacyInteropTypes.h"
 #include "SwiftRemoteMirror.h"
 
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
 
-#define SWIFT_LEGACY_METADATA_MIN_VERSION 3
-
-/// The remote representation of a Swift metada pointer as returned by
-/// interop wrappers.
-typedef struct swift_metadata_interop {
-  uintptr_t Metadata;
-  int Library;
-} swift_metadata_interop_t;
-
-/// The remote representation of a Swift typeref as returned by interop
-/// wrappers.
-typedef struct swift_typeref_interop {
-  swift_typeref_t Typeref;
-  int Library;
-} swift_typeref_interop_t;
-
 /// The "public" interface follows. All of these functions are the same
 /// as the corresponding swift_reflection_* functions, except for taking
 /// or returning _interop data types in some circumstances.
-
-typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 
 static inline SwiftReflectionInteropContextRef
 swift_reflection_interop_createReflectionContext(
@@ -152,6 +135,9 @@ size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef Contex
 
 /// \name Internal implementation details, clients don't need to use these.
 /// @{
+
+/// The minimum supported metadata version for the legacy library.
+#define SWIFT_LEGACY_METADATA_MIN_VERSION 3
 
 /// The legacy reflection info struct.
 typedef struct swift_reflection_legacy_info {
