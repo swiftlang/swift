@@ -44,4 +44,4 @@ extension Wrapper: P3 where T: P3 { }
 // CHECK-LABEL: define internal i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1A_AaEPWT"
 // CHECK: [[CONDITIONAL_REQ_BUFFER:%.*]] = alloca [1 x i8**]
 // CHECK: [[FIRST_REQ:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[CONDITIONAL_REQ_BUFFER]]
-// CHECK: call i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"(%swift.type* [[WRAPPER_TO_A:%.*]], i8*** [[FIRST_REQ]], i64 1)
+// CHECK: call i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"(%swift.type* [[WRAPPER_TO_A:%.*]], i8*** [[FIRST_REQ]])

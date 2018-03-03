@@ -544,7 +544,6 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
-  llvm::StructType *WitnessTableSliceTy;     /// { witness_table**, i64 }
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
