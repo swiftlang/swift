@@ -2581,17 +2581,20 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
-struct GenericContextDescriptorHeader {
-  unsigned NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+template<typename Runtime>
+struct TargetGenericContextDescriptorHeader {
+  uint32_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
   
-  unsigned getNumArguments() const {
+  uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;
   }
-  
+
   bool hasArguments() const {
     return getNumArguments() > 0;
   }
 };
+using GenericContextDescriptorHeader =
+  TargetGenericContextDescriptorHeader<InProcess>;
 
 /// A reference to a generic parameter that is the subject of a requirement.
 /// This can refer either directly to a generic parameter or to a path to an
@@ -2812,32 +2815,36 @@ using GenericRequirementDescriptor =
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
-template<typename Self,
-         typename HeaderType = GenericContextDescriptorHeader,
-         typename...FollowingTrailingObjects>
+template<class Self,
+         template <typename> class TargetGenericContextHeaderType =
+           TargetGenericContextDescriptorHeader,
+         typename... FollowingTrailingObjects>
 class TrailingGenericContextObjects;
 
-template<template<typename> class TargetSelf,
-         typename Runtime,
-         typename HeaderType,
-         typename...FollowingTrailingObjects>
-class TrailingGenericContextObjects<
-  TargetSelf<Runtime>,
-  HeaderType,
-  FollowingTrailingObjects...
-> : protected swift::ABI::TrailingObjects<TargetSelf<Runtime>,
-      HeaderType,
+// This oddity with partial specialization is necessary to get
+// reasonable-looking code while also working around various kinds of
+// compiler bad behavior with injected class names.
+template<class Runtime,
+         template <typename> class TargetSelf,
+         template <typename> class TargetGenericContextHeaderType,
+         typename... FollowingTrailingObjects>
+class TrailingGenericContextObjects<TargetSelf<Runtime>,
+                                    TargetGenericContextHeaderType,
+                                    FollowingTrailingObjects...> :
+  protected swift::ABI::TrailingObjects<TargetSelf<Runtime>,
+      TargetGenericContextHeaderType<Runtime>,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>,
       FollowingTrailingObjects...>
 {
 protected:
   using Self = TargetSelf<Runtime>;
+  using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
 
   using TrailingObjects = swift::ABI::TrailingObjects<Self,
-    HeaderType,
+    GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
     FollowingTrailingObjects...>;
@@ -2850,12 +2857,16 @@ protected:
     return static_cast<const Self *>(this);
   }
 public:
-  const HeaderType &getFullGenericContextHeader() const {
+  using StoredSize = typename Runtime::StoredSize;
+  using StoredPointer = typename Runtime::StoredPointer;
+
+  const GenericContextHeaderType &getFullGenericContextHeader() const {
     assert(asSelf()->isGeneric());
-    return *this->template getTrailingObjects<HeaderType>();
+    return *this->template getTrailingObjects<GenericContextHeaderType>();
   }
 
-  const GenericContextDescriptorHeader &getGenericContextHeader() const {
+  const TargetGenericContextDescriptorHeader<Runtime> &
+  getGenericContextHeader() const {
     /// HeaderType ought to be convertible to GenericContextDescriptorHeader.
     return getFullGenericContextHeader();
   }
@@ -2885,8 +2896,13 @@ public:
             getGenericContextHeader().NumRequirements};
   }
 
+  StoredSize getGenericArgumentsStorageSize() const {
+    return StoredSize(getGenericContextHeader().getNumArguments())
+             * sizeof(StoredPointer);
+  }
+
 protected:
-  size_t numTrailingObjects(OverloadToken<HeaderType>) const {
+  size_t numTrailingObjects(OverloadToken<GenericContextHeaderType>) const {
     return asSelf()->isGeneric() ? 1 : 0;
   }
   
@@ -2902,7 +2918,8 @@ protected:
 /// Reference to a generic context.
 template<typename Runtime>
 struct TargetGenericContext final
-  : TrailingGenericContextObjects<TargetGenericContext<Runtime>>
+  : TrailingGenericContextObjects<TargetGenericContext<Runtime>,
+                                  TargetGenericContextDescriptorHeader>
 {
   // This struct is supposed to be empty, but TrailingObjects respects the
   // unique-address-per-object C++ rule, so even if this type is empty, the
@@ -2921,7 +2938,7 @@ struct TargetExtensionContextDescriptor final
 {
 private:
   using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetExtensionContextDescriptor>;
+    = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
   /// A mangling of the `Self` type context that the extension extends.
   /// The mangled name represents the type in the generic context encoded by
@@ -2991,9 +3008,9 @@ struct TargetTypeGenericContextDescriptorHeader {
   }
 
   /// The base header.  Must always be the final member.
-  GenericContextDescriptorHeader Base;
+  TargetGenericContextDescriptorHeader<Runtime> Base;
   
-  operator const GenericContextDescriptorHeader &() const {
+  operator const TargetGenericContextDescriptorHeader<Runtime> &() const {
     return Base;
   }
 };
@@ -3124,7 +3141,8 @@ public:
   const TargetTypeGenericContextDescriptorHeader<Runtime> &
     getFullGenericContextHeader() const;
 
-  const GenericContextDescriptorHeader &getGenericContextHeader() const {
+  const TargetGenericContextDescriptorHeader<Runtime> &
+  getGenericContextHeader() const {
     return getFullGenericContextHeader();
   }
 
@@ -3155,14 +3173,14 @@ template <typename Runtime>
 class TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                              TargetTypeGenericContextDescriptorHeader<Runtime>,
+                              TargetTypeGenericContextDescriptorHeader,
                               /*additional trailing objects:*/
                               TargetVTableDescriptorHeader<Runtime>,
                               TargetMethodDescriptor<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader<Runtime>,
+                                  TargetTypeGenericContextDescriptorHeader,
                                   TargetVTableDescriptorHeader<Runtime>,
                                   TargetMethodDescriptor<Runtime>>;
 
@@ -3334,11 +3352,11 @@ template <typename Runtime>
 class TargetStructDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader<Runtime>> {
+                            TargetTypeGenericContextDescriptorHeader> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                             TargetTypeGenericContextDescriptorHeader<Runtime>>;
+                                  TargetTypeGenericContextDescriptorHeader>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3376,11 +3394,11 @@ template <typename Runtime>
 class TargetEnumDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader<Runtime>> {
+                                     TargetTypeGenericContextDescriptorHeader> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                             TargetTypeGenericContextDescriptorHeader<Runtime>>;
+                                  TargetTypeGenericContextDescriptorHeader>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
