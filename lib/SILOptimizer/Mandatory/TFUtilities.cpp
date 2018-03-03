@@ -511,6 +511,9 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
     }
   }
 
+  // Simplify scalar operands in general.
+  if (!v) return nullptr;
+
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
     return fli;
@@ -1343,23 +1346,27 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   auto hasInlinableAttrs = [&](Decl *decl) -> bool {
     if (decl->getAttrs().hasAttribute<InlineableAttr>())
       return true;
-    if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
-      if (attr->getKind() == InlineKind::Always)
-        return true;
     return false;
   };
 
   // Don't transform functions that are marked @_inlineable or inline(always)
-  if (auto dc = fn->getDeclContext()) {
-    if (auto fnDecl = dc->getInnermostDeclarationDeclContext()) {
-      if (hasInlinableAttrs(fnDecl))
-        return false;
+  // unless they are a thunk.  Thunks are only generated for inherently
+  // interesting declarations.
+  if (!fn->isThunk()) {
+    if (fn->getInlineStrategy() == AlwaysInline)
+      return false;
 
-      // If this is an accessor for a computed property, check the property for
-      // @_inlineable as well.
-      if (auto *fd = dyn_cast<AccessorDecl>(fnDecl))
-        if (hasInlinableAttrs(fd->getStorage()))
+    if (auto dc = fn->getDeclContext()) {
+      if (auto fnDecl = dc->getInnermostDeclarationDeclContext()) {
+        if (hasInlinableAttrs(fnDecl))
           return false;
+
+        // If this is an accessor for a computed property, check the property
+        // for @_inlineable as well.
+        if (auto *fd = dyn_cast<AccessorDecl>(fnDecl))
+          if (hasInlinableAttrs(fd->getStorage()))
+            return false;
+      }
     }
   }
 
@@ -1381,12 +1388,6 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
       if (auto *fd = dyn_cast<FuncDecl>(dc))
         if (fd->getFormalAccess() >= AccessLevel::Public)
           return true;
-#if 0
-  // Can we us this to simplify the above code?
-  if (fn->isThunk())
-#endif
-
-
 
   // Otherwise, the function is either public and inlininable or it is internal
   // to the current module.  In both cases, we check to see if the function
@@ -1394,12 +1395,6 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   // that it will be inlined away by deabstraction, and we don't need to touch
   // it.
   if (containsTensorHandle(fn->getLoweredFunctionType()))
-    return false;
-
-  // If this function has no source location information, then it came from
-  // a deserialized module.  Don't transform it.
-  // TODO: Why is this necessary?
-  if (fn->getLocation().isNull())
     return false;
 
   // If it contains no tensor inputs or results, then we are willing to
