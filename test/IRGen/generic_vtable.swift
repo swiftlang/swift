@@ -63,8 +63,6 @@ public class Concrete : Derived<Int> {
 //// instantiation time.
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal constant <{{.*}}> <{
-// -- nominal type descriptor
-// CHECK-SAME: @"$S14generic_vtable7DerivedCMn",
 // -- ivar destroyer
 // CHECK-SAME: i8* null
 // --
@@ -105,7 +103,7 @@ public class Concrete : Derived<Int> {
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}} @"$S14generic_vtable7DerivedCMP" to i8**), i64 {{[0-9]+}}, i64 {{[0-9]+}}, i8** %1, {{.*}}, i64 2)
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}} @"$S14generic_vtable7DerivedCMP" to i8**))
 
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 

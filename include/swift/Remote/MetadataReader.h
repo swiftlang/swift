@@ -233,7 +233,7 @@ public:
       return StoredPointer();
 
     auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    return classMeta->SuperClass;
+    return classMeta->Superclass;
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
@@ -548,10 +548,10 @@ public:
       if (!classMetadata)
         return llvm::None;
 
-      if (!classMetadata->SuperClass)
+      if (!classMetadata->Superclass)
         return type->getGenericArgumentOffset(nullptr, nullptr);
 
-      auto superMetadata = readMetadata(classMetadata->SuperClass);
+      auto superMetadata = readMetadata(classMetadata->Superclass);
       if (!superMetadata)
         return llvm::None;
 
@@ -921,7 +921,7 @@ private:
         if (descriptorAddress || !skipArtificialSubclasses)
           return static_cast<StoredPointer>(descriptorAddress);
 
-        auto superclassMetadataAddress = classMeta->SuperClass;
+        auto superclassMetadataAddress = classMeta->Superclass;
         if (!superclassMetadataAddress)
           return 0;
 

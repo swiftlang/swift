@@ -1113,8 +1113,7 @@ static Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
   unsigned index = 1;
 
   Address addr(metadata, IGF.IGM.getPointerAlignment());
-  addr = IGF.Builder.CreateBitCast(addr,
-                                   IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
   return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
 }
 
@@ -2913,44 +2912,30 @@ namespace {
       return cast<ClassDecl>(Type);
     }
 
+    // Non-null unless the type is foreign.
+    ClassMetadataLayout *MetadataLayout = nullptr;
+
     Optional<TypeEntityReference> SuperClassRef;
 
-    // Offsets of key fields in the metadata records.
-    Size FieldVectorOffset, GenericParamsOffset;
-
-    SILVTable *VTable;
-
-    Size VTableOffset;
-    unsigned VTableSize;
+    SILVTable *VTable = nullptr;
+    unsigned VTableSize = 0;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
                                   RequireMetadata_t requireMetadata)
       : super(IGM, Type, requireMetadata)
     {
-      if (getType()->isForeign()) {
-        VTable = nullptr;
-        VTableSize = 0;
-        return;
-      }
+      if (getType()->isForeign()) return;
+
+      MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
       if (auto superclassDecl = getType()->getSuperclassDecl()) {
         SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
       }
 
-      auto &layout = IGM.getClassMetadataLayout(getType());
-
-      VTable = IGM.getSILModule().lookUpVTable(getType());
-      VTableSize = layout.getVTableSize();
-
-      if (layout.hasResilientSuperclass()) {
-        FieldVectorOffset = layout.getRelativeFieldOffsetVectorOffset();
-        GenericParamsOffset = layout.getRelativeGenericRequirementsOffset();
-        VTableOffset = layout.getRelativeVTableOffset();
-      } else {
-        FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
-        GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
-        VTableOffset = layout.getStaticVTableOffset();
+      VTableSize = MetadataLayout->getVTableSize();
+      if (VTableSize) {
+        VTable = IGM.getSILModule().lookUpVTable(getType());
       }
     }
     
@@ -2966,14 +2951,17 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      flags.setIsReflectable(true); // class is always reflectable
+      // Classes are always reflectable.
+      flags.setIsReflectable(true);
 
       if (!getType()->isForeign()) {
+        if (MetadataLayout->areImmediateMembersNegative())
+          flags.class_setAreImmediateMembersNegative(true);
+
         if (VTableSize != 0)
           flags.class_setHasVTable(true);
 
-        auto &layout = IGM.getClassMetadataLayout(getType());
-        if (layout.hasResilientSuperclass())
+        if (MetadataLayout->hasResilientSuperclass())
           flags.class_setHasResilientSuperclass(true);
       }
 
@@ -2987,14 +2975,27 @@ namespace {
     }
     
     Size getGenericParamsOffset() {
-      return GenericParamsOffset;
+      if (!MetadataLayout) return Size(0);
+      return (MetadataLayout->hasResilientSuperclass()
+                ? MetadataLayout->getRelativeGenericRequirementsOffset()
+                : MetadataLayout->getStaticGenericRequirementsOffset());
+    }
+
+    Size getFieldVectorOffset() {
+      if (!MetadataLayout) return Size(0);
+      return (MetadataLayout->hasResilientSuperclass()
+                ? MetadataLayout->getRelativeFieldOffsetVectorOffset()
+                : MetadataLayout->getStaticFieldOffsetVectorOffset());
     }
     
     void addVTable() {
       if (VTableSize == 0)
         return;
-      
-      B.addInt32(VTableOffset / IGM.getPointerSize());
+
+      auto offset = MetadataLayout->hasResilientSuperclass()
+                      ? MetadataLayout->getRelativeVTableOffset()
+                      : MetadataLayout->getStaticVTableOffset();
+      B.addInt32(offset / IGM.getPointerSize());
       B.addInt32(VTableSize);
       
       addVTableEntries(getType());
@@ -3052,11 +3053,16 @@ namespace {
         B.addInt32(0);
       }
 
+      // uint32_t NumImmediateMembers;
+      auto numImmediateMembers =
+        (MetadataLayout ? MetadataLayout->getNumImmediateMembers() : 0);
+      B.addInt32(numImmediateMembers);
+
       // uint32_t NumFields;
       B.addInt32(std::distance(properties.begin(), properties.end()));
 
       // uint32_t FieldOffsetVectorOffset;
-      B.addInt32(FieldVectorOffset / IGM.getPointerSize());
+      B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
 
       addFieldTypes(IGM, getType(), properties);
     }
@@ -3193,7 +3199,11 @@ void IRGenModule::addFieldTypes(ArrayRef<CanType> fieldTypes) {
 namespace {
   /// An adapter class which turns a metadata layout class into a
   /// generic metadata layout class.
-  template <class Impl, class Base>
+  ///
+  /// If AddGenericArguments is false, fill ops will be added for the
+  /// arguments, but space for them won't actually be built into the
+  /// pattern.
+  template <class Impl, class Base, bool AddGenericArguments = true>
   class GenericMetadataBuilderBase : public Base {
     typedef Base super;
 
@@ -3210,7 +3220,7 @@ namespace {
 
     /// The total size of the template (following any header).
     Size TemplateSize = Size::invalid();
-    
+
     IRGenModule &IGM = super::IGM;
     using super::asImpl;
     using super::Target;
@@ -3319,6 +3329,10 @@ namespace {
 
       TemplateSize = getNextOffsetFromTemplateHeader();
 
+      asImpl().emitInstantiationDefinitions();
+    }
+
+    void emitInstantiationDefinitions() {
       asImpl().emitCreateFunction();
       asImpl().emitInstantiationCache();
     }
@@ -3337,14 +3351,16 @@ namespace {
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
       FillOps.push_back({type, None});
-      super::addGenericArgument(type, std::forward<T>(args)...);
+      if (AddGenericArguments)
+        super::addGenericArgument(type, std::forward<T>(args)...);
     }
 
     template <class... T>
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
       FillOps.push_back({type, conf});
-      super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
+      if (AddGenericArguments)
+        super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
     
     // Can be overridden by subclassers to emit other dependent metadata.
@@ -3544,11 +3560,10 @@ namespace {
     using super::Target;
     using super::asImpl;
 
-    bool HasResilientSuperclass = false;
-
     ConstantStructBuilder &B;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
+    ClassMetadataLayout &MetadataLayout;
 
     MemberBuilder Members;
 
@@ -3558,47 +3573,50 @@ namespace {
                              const ClassLayout &fieldLayout)
       : super(IGM, theClass), B(builder),
         Layout(layout), FieldLayout(fieldLayout),
+        MetadataLayout(IGM.getClassMetadataLayout(theClass)),
         Members(IGM, theClass, builder, layout, fieldLayout) {}
 
   public:
-    void noteResilientSuperclass() {
-      HasResilientSuperclass = true;
-    }
+    void noteResilientSuperclass() {}
 
     void noteStartOfImmediateMembers(ClassDecl *theClass) {
+      if (theClass == Target) {
+        emitClassMetadataBaseOffset();
+      }
+    }
+
+    /// Emit the base-offset variable for the class.
+    void emitClassMetadataBaseOffset() {
       // Only classes defined in resilient modules, or those that have
       // a resilient superclass need this.
-      if (!HasResilientSuperclass &&
-          !IGM.isResilient(theClass, ResilienceExpansion::Minimal)) {
+      if (!MetadataLayout.hasResilientSuperclass() &&
+          !IGM.isResilient(Target, ResilienceExpansion::Minimal)) {
         return;
       }
 
-      if (theClass == Target) {
-        auto *offsetAddr =
-          IGM.getAddrOfClassMetadataBaseOffset(theClass,
-                                               ForDefinition);
-        auto *offsetVar = cast<llvm::GlobalVariable>(offsetAddr);
+      auto *offsetAddr =
+        IGM.getAddrOfClassMetadataBaseOffset(Target, ForDefinition);
+      auto *offsetVar = cast<llvm::GlobalVariable>(offsetAddr);
 
-        if (HasResilientSuperclass) {
-          // If the superclass is resilient to us, we have to compute and
-          // initialize the global when we initialize the metadata.
-          auto *init = llvm::ConstantInt::get(IGM.SizeTy, 0);
-
-          offsetVar->setInitializer(init);
-          offsetVar->setConstant(false);
-          return;
-        }
-
-        // Otherwise, we know the offset at compile time, even if our
-        // clients do not, so just emit a constant.
-        auto &layout = IGM.getClassMetadataLayout(theClass);
-
-        auto value = layout.getStartOfImmediateMembers();
-        auto *init = llvm::ConstantInt::get(IGM.SizeTy, value.getValue());
+      if (MetadataLayout.hasResilientSuperclass()) {
+        // If the superclass is resilient to us, we have to compute and
+        // initialize the global when we initialize the metadata.
+        auto *init = llvm::ConstantInt::get(IGM.SizeTy, 0);
 
         offsetVar->setInitializer(init);
-        offsetVar->setConstant(true);
+        offsetVar->setConstant(false);
+        return;
       }
+
+      // Otherwise, we know the offset at compile time, even if our
+      // clients do not, so just emit a constant.
+      auto &layout = IGM.getClassMetadataLayout(Target);
+
+      auto value = layout.getStartOfImmediateMembers();
+      auto *init = llvm::ConstantInt::get(IGM.SizeTy, value.getValue());
+
+      offsetVar->setInitializer(init);
+      offsetVar->setConstant(true);
     }
 
     /// The 'metadata flags' field in a class is actually a pointer to
@@ -3744,16 +3762,16 @@ namespace {
     }
 
     void addClassSize() {
-      auto size = IGM.getMetadataLayout(Target).getSize();
+      auto size = MetadataLayout.getSize();
       B.addInt32(size.FullSize.getValue());
     }
 
     void addClassAddressPoint() {
       // FIXME: Wrong
-      auto size = IGM.getMetadataLayout(Target).getSize();
+      auto size = MetadataLayout.getSize();
       B.addInt32(size.AddressPoint.getValue());
     }
-    
+
     void addClassCacheData() {
       // We initially fill in these fields with addresses taken from
       // the ObjC runtime.
@@ -3865,44 +3883,102 @@ namespace {
     // metadata size does not change between generic instantiations, so
     // all stores after the first should be idempotent.
     void emitInitializeClassMetadataBaseOffset(IRGenFunction &IGF,
-                                               llvm::Value *superMetadata) {
-      if (!HasResilientSuperclass)
+                                               llvm::Value *metadata,
+                                               bool metadataIsSuperclass) {
+      if (!MetadataLayout.hasResilientSuperclass())
         return;
 
-      auto &layout = IGM.getClassMetadataLayout(Target);
+      // TODO: can we move all this into the runtime?
 
       // Load the size of the superclass metadata.
       Address metadataAsBytes(
-          IGF.Builder.CreateBitCast(superMetadata, IGF.IGM.Int8PtrTy),
+          IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
           IGM.getPointerAlignment());
-
-      Address sizeSlot = IGF.Builder.CreateConstByteArrayGEP(
-          metadataAsBytes,
-          layout.getMetadataSizeOffset());
-      sizeSlot = IGF.Builder.CreateBitCast(sizeSlot,
-                                           IGM.Int32Ty->getPointerTo());
-      llvm::Value *size = IGF.Builder.CreateLoad(sizeSlot);
 
       Address addressPointSlot = IGF.Builder.CreateConstByteArrayGEP(
           metadataAsBytes,
-          layout.getMetadataAddressPointOffset());
+          MetadataLayout.getMetadataAddressPointOffset());
       addressPointSlot = IGF.Builder.CreateBitCast(addressPointSlot,
                                                    IGM.Int32Ty->getPointerTo());
       llvm::Value *addressPoint = IGF.Builder.CreateLoad(addressPointSlot);
 
-      size = IGF.Builder.CreateSub(size, addressPoint);
+      auto getImmediateMembersSize = [&] {
+        auto size =
+          IGM.getPointerSize() * MetadataLayout.getNumImmediateMembers();
+        return llvm::ConstantInt::get(IGM.Int32Ty, size.getValue());
+      };
 
-      if (IGM.SizeTy != IGM.Int32Ty)
-        size = IGF.Builder.CreateZExt(size, IGM.SizeTy);
+      llvm::Value *offset;
+
+      // If the immediate members are negatively allocated, then the start
+      // of the immediate members section is the negative of the address
+      // point of the subclass metadata.
+      if (MetadataLayout.areImmediateMembersNegative()) {
+        offset = addressPoint;
+
+        // If the metadata is superclass metadata, then we need to compute
+        // the subclass's address point by substracting the size of the
+        // of the immediate members section (or adding it before we negate).
+        if (metadataIsSuperclass) {
+          offset = IGF.Builder.CreateAdd(offset, getImmediateMembersSize());
+        }
+
+        offset = IGF.Builder.CreateNeg(offset);
+        offset = IGF.Builder.CreateSExt(offset, IGM.SizeTy);
+
+      // If the immediate members are positively allocated, then the start
+      // of the immediate members section is the size of the subclass, minus
+      // the address point of the subclass, minus the size of the immediate
+      // members section.  This is equivalent to the size of the superclass
+      // minus the address point of the superclass.
+      } else {
+        Address sizeSlot = IGF.Builder.CreateConstByteArrayGEP(
+            metadataAsBytes,
+            MetadataLayout.getMetadataSizeOffset());
+        sizeSlot = IGF.Builder.CreateBitCast(sizeSlot,
+                                             IGM.Int32Ty->getPointerTo());
+        llvm::Value *size = IGF.Builder.CreateLoad(sizeSlot);
+        offset = IGF.Builder.CreateSub(size, addressPoint);
+
+        if (!metadataIsSuperclass) {
+          offset = IGF.Builder.CreateSub(offset, getImmediateMembersSize());
+        }
+        offset = IGF.Builder.CreateZExt(offset, IGM.SizeTy);
+      }
 
       Address offsetAddr(
-          IGM.getAddrOfClassMetadataBaseOffset(Target,
-                                               NotForDefinition),
+          IGM.getAddrOfClassMetadataBaseOffset(Target, NotForDefinition),
           IGM.getPointerAlignment());
 
-      // FIXME: Do we need to worry about memory barriers here, and when we
-      // load from the global?
-      IGF.Builder.CreateStore(size, offsetAddr);
+      // We don't need to worry about memory barriers here because the
+      // runtime should ensure that there is full synchronization (not just
+      // dependency-ordered synchronization) between all these initializations
+      // and every thread that tries to access the metadata.
+      //
+      // Note that this store might be redundant.
+      IGF.Builder.CreateStore(offset, offsetAddr);
+    }
+
+    /// Materialize type metadata for the given type and store it into the
+    /// superclass field of the given metadata.
+    void emitStoreOfSuperclass(IRGenFunction &IGF, CanType superclassType,
+                               llvm::Value *metadata,
+                               bool initializeBaseOffset) {
+      llvm::Value *superMetadata =
+        emitClassHeapMetadataRef(IGF, superclassType,
+                                 MetadataValueType::TypeMetadata,
+                                 /*allowUninit*/ false);
+
+      if (initializeBaseOffset) {
+        emitInitializeClassMetadataBaseOffset(IGF, superMetadata,
+                                              /*super*/ true);
+      }
+
+      Address superField =
+        emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+      superField = IGF.Builder.CreateElementBitCast(superField,
+                                                    IGM.TypeMetadataPtrTy);
+      IGF.Builder.CreateStore(superMetadata, superField);
     }
 
     // Update vtable entries for method overrides. The runtime copies in
@@ -4080,18 +4156,8 @@ namespace {
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
         auto superclass = type->getSuperclass()->getCanonicalType();
-        llvm::Value *superMetadata =
-          emitClassHeapMetadataRef(IGF, superclass,
-                                   MetadataValueType::TypeMetadata,
-                                   /*allowUninit*/ false);
-
-        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
-
-        Address superField =
-          emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-        superField = IGF.Builder.CreateElementBitCast(superField,
-                                                     IGM.TypeMetadataPtrTy);
-        IGF.Builder.CreateStore(superMetadata, superField);
+        this->emitStoreOfSuperclass(IGF, superclass, metadata,
+                                    /*initialize metadata offset*/ true);
       }
 
       // Relocate the metadata if it has a superclass that is resilient
@@ -4139,20 +4205,18 @@ namespace {
       : super(IGM, theClass, builder, layout, fieldLayout) {}
   };
 
-  /// A builder for generic class metadata.
+  /// A builder for GenericClassMetadataPattern objects.
   class GenericClassMetadataBuilder :
     public GenericMetadataBuilderBase<GenericClassMetadataBuilder,
                       ClassMetadataBuilderBase<GenericClassMetadataBuilder,
-                                               ResilientClassMemberBuilder>>
+                                               ResilientClassMemberBuilder>,
+                                      /*add generic arguments*/ false>
   {
     typedef GenericMetadataBuilderBase super;
 
-    Size MetaclassPtrOffset = Size::invalid();
-    Size ClassRODataPtrOffset = Size::invalid();
-    Size MetaclassRODataPtrOffset = Size::invalid();
-    Size DependentMetaclassPoint = Size::invalid();
-    Size DependentClassRODataPoint = Size::invalid();
-    Size DependentMetaclassRODataPoint = Size::invalid();
+    Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+      NumExtraDataWords, ClassRODataOffset, MetaclassObjectOffset,
+      MetaclassRODataOffset;
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &B,
@@ -4165,70 +4229,107 @@ namespace {
       HasDependentMetadata = true;
     }
 
-    void addSuperClass() {
-      // Filled in by the runtime.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    void layout() {
+      // HeapObjectDestroyer *Destroy;
+      addDestructorFunction();
+
+      // ClassIVarDestroyer *IVarDestroyer;
+      addIVarDestroyer();
+
+      // ClassFlags Flags;
+      addClassFlags();
+
+      // TODO: consider using this to initialize the field offsets (and then
+      // suppress dynamic layout for them).
+      // uint16_t ImmediateMembersPattern_Size;
+      // uint16_t ImmediateMembersPattern_TargetOffset;
+      B.addInt16(0);
+      B.addInt16(0);
+
+      // uint16_t NumExtraDataWords;
+      NumExtraDataWords = B.addPlaceholderWithSize(IGM.Int16Ty);
+
+      // uint16_t ClassRODataOffset;
+      ClassRODataOffset = B.addPlaceholderWithSize(IGM.Int16Ty);
+
+      // uint16_t MetaclassObjectOffset;
+      MetaclassObjectOffset = B.addPlaceholderWithSize(IGM.Int16Ty);
+
+      // uint16_t MetadataRODataOffset;
+      MetaclassRODataOffset = B.addPlaceholderWithSize(IGM.Int16Ty);
+
+      // Immediate members pattern:
+      //   (currently we don't take advantage of this)
+
+      // Extra data pattern:
+      addExtraDataPattern();
+
+      // We're done with the pattern now.
+#ifndef NDEBUG
+      auto finalOffset = getNextOffsetFromTemplateHeader();
+#endif
+
+      // Emit the base-offset variable.
+      emitClassMetadataBaseOffset();
+
+      // Emit the nominal type descriptor.
+      (void) ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+
+      // Register fill ops for all the immediate type arguments.
+      addGenericFields(Target, Target->getDeclaredTypeInContext(), Target);
+
+      // Emit instantiation information.
+      emitInstantiationDefinitions();
+
+      assert(finalOffset == getNextOffsetFromTemplateHeader() &&
+             "shouldn't have added anything to the pattern");
     }
 
-    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
-                                      llvm::Value *descriptor,
-                                      llvm::Value *arguments) {
-      llvm::Value *superMetadata;
-      if (Target->hasSuperclass()) {
-        Type superclass = Target->getSuperclass();
-        superclass = Target->mapTypeIntoContext(superclass);
-        superMetadata =
-          emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
-                                   MetadataValueType::ObjCClass);
+    uint16_t getOffsetInWords(Size begin, Size offset) {
+      // Subtract the offset from the initial offset and divide by the
+      // pointer size, rounding up.
+      auto result =
+        (offset - begin + IGM.getPointerSize() - Size(1))
+          / IGM.getPointerSize();
+      assert(result < (1 << 16));
+      return uint16_t(result);
+    };
 
-        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
-      } else if (IGM.ObjCInterop) {
-        superMetadata = emitObjCHeapMetadataRef(IGF,
-                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target));
-      } else {
-        superMetadata = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+    void addExtraDataPattern() {
+      Size extraDataBegin = getNextOffsetFromTemplateHeader();
+
+      uint16_t classRODataOffsetWords = 0;
+      uint16_t metaclassObjectOffsetWords = 0;
+      uint16_t metaclassRODataOffsetWords = 0;
+      if (IGM.ObjCInterop) {
+        // Add the metaclass object.
+        metaclassObjectOffsetWords =
+          getOffsetInWords(extraDataBegin, getNextOffsetFromTemplateHeader());
+        addMetaclassObject();
+
+        // Add the RO-data objects.
+        auto roDataPoints =
+          emitClassPrivateDataFields(IGM, B, Target);
+        classRODataOffsetWords =
+          getOffsetInWords(extraDataBegin, roDataPoints.first);
+        metaclassRODataOffsetWords =
+          getOffsetInWords(extraDataBegin, roDataPoints.second);
       }
 
-      auto templatePointer = IGM.getAddrOfTypeMetadataPattern(Target);
-      auto templateSize = IGM.getSize(TemplateSize);
-      auto templateAddressPoint = IGM.getSize(AddressPoint);
+      auto extraDataEnd = getNextOffsetFromTemplateHeader();
+      auto numExtraDataWords = getOffsetInWords(extraDataBegin, extraDataEnd);
 
-      auto numImmediateMembers =
-        IGM.getSize(Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
+      B.fillPlaceholderWithInt(*NumExtraDataWords, IGM.Int16Ty,
+                               numExtraDataWords);
+      B.fillPlaceholderWithInt(*ClassRODataOffset, IGM.Int16Ty,
+                               classRODataOffsetWords);
+      B.fillPlaceholderWithInt(*MetaclassObjectOffset, IGM.Int16Ty,
+                               metaclassObjectOffsetWords);
+      B.fillPlaceholderWithInt(*MetaclassRODataOffset, IGM.Int16Ty,
+                               metaclassRODataOffsetWords);
+    }
 
-      return IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
-                                    {descriptor, templatePointer, templateSize,
-                                     templateAddressPoint, arguments,
-                                     superMetadata, numImmediateMembers});
-    }
-    
-    void addMetadataFlags() {
-      // The metaclass pointer will be instantiated here.
-      MetaclassPtrOffset = getNextOffsetFromTemplateHeader();
-      B.addInt(IGM.MetadataKindTy, 0);
-    }
-    
-    void addClassDataPointer() {
-      // The rodata pointer will be instantiated here.
-      // Make sure we at least set the 'is Swift class' bit, though.
-      ClassRODataPtrOffset = getNextOffsetFromTemplateHeader();
-      if (!IGM.ObjCInterop) {
-        // FIXME: Remove null data altogether rdar://problem/18801263
-        B.addInt(IGM.MetadataKindTy, 1);
-      } else {
-        B.addInt(IGM.MetadataKindTy, IGM.UseDarwinPreStableABIBit ? 1 : 2);
-      }
-    }
-    
-    void addDependentData() {
-      if (!IGM.ObjCInterop) {
-        // Every piece of data in the dependent data appears to be related to
-        // Objective-C information. If we're not doing Objective-C interop, we
-        // can just skip adding it to the class.
-        return;
-      }
-      // Emit space for the dependent metaclass.
-      DependentMetaclassPoint = getNextOffsetFromTemplateHeader();
+    void addMetaclassObject() {
       // isa
       ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
@@ -4240,17 +4341,9 @@ namespace {
       // vtable
       B.add(IGM.getObjCEmptyVTablePtr());
       // rodata, which is always dependent
-      MetaclassRODataPtrOffset = getNextOffsetFromTemplateHeader();
       B.addInt(IGM.IntPtrTy, 0);
-
-      std::tie(DependentClassRODataPoint, DependentMetaclassRODataPoint)
-        = emitClassPrivateDataFields(IGM, B, Target);
     }
                             
-    void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
-    
-    void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
-    
     // Suppress GenericMetadataBuilderBase's default behavior of introducing
     // fill ops for generic arguments unless they belong directly to the target
     // class and not its ancestors.
@@ -4278,91 +4371,33 @@ namespace {
       }
     }
 
+    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                      llvm::Value *descriptor,
+                                      llvm::Value *arguments) {
+      auto templatePointer = IGM.getAddrOfTypeMetadataPattern(Target);
+      auto metadata =
+        IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
+                               {descriptor, arguments, templatePointer});
+
+      // Initialize the metadata base offset.
+      emitInitializeClassMetadataBaseOffset(IGF, metadata, /*super*/ false);
+
+      return metadata;
+    }
+
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 bool isVWTMutable) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
 
-      // Fill in the metaclass pointer.
-      Address metadataPtr(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrPtrTy),
-                          IGF.IGM.getPointerAlignment());
-      
-      llvm::Value *metaclass;
-      if (IGF.IGM.ObjCInterop) {
-        assert(!DependentMetaclassPoint.isInvalid());
-        assert(!MetaclassPtrOffset.isInvalid());
-
-        Address metaclassPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                            MetaclassPtrOffset - AddressPoint);
-        metaclassPtrSlot = IGF.Builder.CreateBitCast(metaclassPtrSlot,
-                                        IGF.IGM.ObjCClassPtrTy->getPointerTo());
-        Address metaclassRawPtr = createPointerSizedGEP(IGF, metadataPtr,
-                                        DependentMetaclassPoint - AddressPoint);
-        metaclass = IGF.Builder.CreateBitCast(metaclassRawPtr,
-                                              IGF.IGM.ObjCClassPtrTy)
-          .getAddress();
-        IGF.Builder.CreateStore(metaclass, metaclassPtrSlot);
-      } else {
-        // FIXME: Remove altogether rather than injecting a NULL value.
-        // rdar://problem/18801263
-        assert(!MetaclassPtrOffset.isInvalid());
-        Address metaclassPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                            MetaclassPtrOffset - AddressPoint);
-        metaclassPtrSlot = IGF.Builder.CreateBitCast(metaclassPtrSlot,
-                                        IGF.IGM.ObjCClassPtrTy->getPointerTo());
-        IGF.Builder.CreateStore(
-          llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy), 
-          metaclassPtrSlot);
-      }
-      
-      // Fill in the rodata reference in the class.
-      Address classRODataPtr;
-      if (IGF.IGM.ObjCInterop) {
-        assert(!DependentClassRODataPoint.isInvalid());
-        assert(!ClassRODataPtrOffset.isInvalid());
-        Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                           ClassRODataPtrOffset - AddressPoint);
-        rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
-                                              IGF.IGM.IntPtrTy->getPointerTo());
-        
-        classRODataPtr = createPointerSizedGEP(IGF, metadataPtr,
-                                      DependentClassRODataPoint - AddressPoint);
-        // Set the low bit of the value to indicate "compiled by Swift".
-        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(
-                                classRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
-        rodata = IGF.Builder.CreateOr(rodata, 1);
-        IGF.Builder.CreateStore(rodata, rodataPtrSlot);
-      } else {
-        // NOTE: Unlike other bits of the metadata that should later be removed,
-        // this one is important because things check this value's flags to
-        // determine what kind of object it is. That said, if those checks
-        // are determined to be removable, we can remove this as well per
-        // rdar://problem/18801263
-        assert(!ClassRODataPtrOffset.isInvalid());
-        Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                           ClassRODataPtrOffset - AddressPoint);
-        rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
-                                              IGF.IGM.IntPtrTy->getPointerTo());
-        
-        IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1), 
-                                                                rodataPtrSlot);
-      }
-
-      // Fill in the rodata reference in the metaclass.
-      Address metaclassRODataPtr;
-      if (IGF.IGM.ObjCInterop) {
-        assert(!DependentMetaclassRODataPoint.isInvalid());
-        assert(!MetaclassRODataPtrOffset.isInvalid());
-        Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                      MetaclassRODataPtrOffset - AddressPoint);
-        rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
-                                              IGF.IGM.IntPtrTy->getPointerTo());
-        
-        metaclassRODataPtr = createPointerSizedGEP(IGF, metadataPtr,
-                                 DependentMetaclassRODataPoint - AddressPoint);
-        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(
-                            metaclassRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
-        IGF.Builder.CreateStore(rodata, rodataPtrSlot);
+      // Install the superclass.  The runtime takes care of installing
+      // SwiftObject if we're building with ObjC interop and don't have
+      // a formal superclass.
+      if (Target->hasSuperclass()) {
+        CanType superclass = Target->mapTypeIntoContext(Target->getSuperclass())
+                                   ->getCanonicalType();
+        emitStoreOfSuperclass(IGF, superclass, metadata,
+                              /*initialize metadata base offset*/ false);
       }
 
       // We can assume that this never relocates the metadata because

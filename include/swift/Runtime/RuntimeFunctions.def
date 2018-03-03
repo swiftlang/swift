@@ -799,16 +799,11 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
-//                                              const void *template,
-//                                              size_t templateSize,
-//                                              size_t templateAddressPoint,
 //                                              const void * const *arguments,
-//                                              objc_class *superclass,
-//                                              size_t numImmediateMembers);
+//                                              const void *template);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, SizeTy,
-              Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,

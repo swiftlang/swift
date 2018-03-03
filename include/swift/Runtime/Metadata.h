@@ -740,6 +740,7 @@ namespace {
 }
 
 template <typename Runtime> struct TargetGenericMetadataInstantiationCache;
+template <typename Runtime> struct TargetAnyClassMetadata;
 template <typename Runtime> struct TargetClassMetadata;
 template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
@@ -760,13 +761,19 @@ template <typename Runtime>
 struct TargetMetadata {
   using StoredPointer = typename Runtime::StoredPointer;
 
+  /// The basic header type.
+  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+
   constexpr TargetMetadata()
     : Kind(static_cast<StoredPointer>(MetadataKind::Class)) {}
   constexpr TargetMetadata(MetadataKind Kind)
     : Kind(static_cast<StoredPointer>(Kind)) {}
-  
-  /// The basic header type.
-  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+
+#if SWIFT_OBJC_INTEROP
+protected:
+  constexpr TargetMetadata(TargetAnyClassMetadata<Runtime> *isa)
+    : Kind(reinterpret_cast<StoredPointer>(isa)) {}
+#endif
 
 private:
   /// The kind. Only valid for non-class metadata; getKind() must be used to get
@@ -783,6 +790,17 @@ public:
     Kind = static_cast<StoredPointer>(kind);
   }
 
+#if SWIFT_OBJC_INTEROP
+protected:
+  const TargetAnyClassMetadata<Runtime> *getClassISA() const {
+    return reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(Kind);
+  }
+  void setClassISA(const TargetAnyClassMetadata<Runtime> *isa) {
+    Kind = reinterpret_cast<StoredPointer>(isa);
+  }
+#endif
+
+public:
   /// Is this a class object--the metadata record for a Swift class (which also
   /// serves as the class object), or the class object for an ObjC class (which
   /// is not metadata)?
@@ -1008,19 +1026,32 @@ using FullOpaqueMetadata = FullMetadata<OpaqueMetadata>;
     const FullOpaqueMetadata METADATA_SYM(Symbol);
 #include "swift/Runtime/BuiltinTypes.def"
 
+using HeapObjectDestroyer =
+  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
+
 /// The prefix on a heap metadata.
-struct HeapMetadataHeaderPrefix {
+template <typename Runtime>
+struct TargetHeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
-  SWIFT_CC(swift) void (*destroy)(SWIFT_CONTEXT HeapObject *);
+  TargetPointer<Runtime, HeapObjectDestroyer> destroy;
 };
+using HeapMetadataHeaderPrefix =
+  TargetHeapMetadataHeaderPrefix<InProcess>;
 
 /// The header present on all heap metadata.
-struct HeapMetadataHeader : HeapMetadataHeaderPrefix, TypeMetadataHeader {
-  constexpr HeapMetadataHeader(const HeapMetadataHeaderPrefix &heapPrefix,
-                               const TypeMetadataHeader &typePrefix)
-    : HeapMetadataHeaderPrefix(heapPrefix), TypeMetadataHeader(typePrefix) {}
+template <typename Runtime>
+struct TargetHeapMetadataHeader
+    : TargetHeapMetadataHeaderPrefix<Runtime>,
+      TargetTypeMetadataHeader<Runtime> {
+  constexpr TargetHeapMetadataHeader(
+      const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
+      const TargetTypeMetadataHeader<Runtime> &typePrefix)
+    : TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+      TargetTypeMetadataHeader<Runtime>(typePrefix) {}
 };
+using HeapMetadataHeader =
+  TargetHeapMetadataHeader<InProcess>;
 
 /// The common structure of all metadata for heap-allocated types.  A
 /// pointer to one of these can be retrieved by loading the 'isa'
@@ -1030,11 +1061,15 @@ struct HeapMetadataHeader : HeapMetadataHeaderPrefix, TypeMetadataHeader {
 /// not be the Swift type metadata for the object's dynamic type.
 template <typename Runtime>
 struct TargetHeapMetadata : TargetMetadata<Runtime> {
-  typedef HeapMetadataHeader HeaderType;
+  using HeaderType = TargetHeapMetadataHeader<Runtime>;
 
   TargetHeapMetadata() = default;
-  constexpr TargetHeapMetadata(const TargetMetadata<Runtime> &base)
-    : TargetMetadata<Runtime>(base) {}
+  constexpr TargetHeapMetadata(MetadataKind kind)
+    : TargetMetadata<Runtime>(kind) {}
+#if SWIFT_OBJC_INTEROP
+  constexpr TargetHeapMetadata(TargetAnyClassMetadata<Runtime> *isa)
+    : TargetMetadata<Runtime>(isa) {}
+#endif
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
@@ -1075,12 +1110,76 @@ public:
   uint32_t getVTableOffset(const TargetClassMetadata<Runtime> *metadata) const {
     const auto *description = metadata->getDescription();
     if (description->hasResilientSuperclass())
-      return metadata->SuperClass->getSizeInWords() + VTableOffset;
+      return metadata->Superclass->getSizeInWords() + VTableOffset;
     return VTableOffset;
   }
 };
 
-typedef SWIFT_CC(swift) void (*ClassIVarDestroyer)(SWIFT_CONTEXT HeapObject *);
+/// The portion of a class metadata object that is compatible with
+/// all classes, even non-Swift ones.
+template <typename Runtime>
+struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
+
+#if SWIFT_OBJC_INTEROP
+  constexpr TargetAnyClassMetadata(TargetAnyClassMetadata<Runtime> *isa,
+                                   TargetClassMetadata<Runtime> *superclass)
+    : TargetHeapMetadata<Runtime>(isa),
+      Superclass(superclass),
+      CacheData{nullptr, nullptr},
+      Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+#endif
+
+  constexpr TargetAnyClassMetadata(TargetClassMetadata<Runtime> *superclass)
+    : TargetHeapMetadata<Runtime>(MetadataKind::Class),
+      Superclass(superclass),
+      CacheData{nullptr, nullptr},
+      Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+
+#if SWIFT_OBJC_INTEROP
+  // Allow setting the metadata kind to a class ISA on class metadata.
+  using TargetMetadata<Runtime>::getClassISA;
+  using TargetMetadata<Runtime>::setClassISA;
+#endif
+
+  // Note that ObjC classes does not have a metadata header.
+
+  /// The metadata for the superclass.  This is null for the root class.
+  ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
+
+  // TODO: remove the CacheData and Data fields in non-ObjC-interop builds.
+
+  /// The cache data is used for certain dynamic lookups; it is owned
+  /// by the runtime and generally needs to interoperate with
+  /// Objective-C's use.
+  TargetPointer<Runtime, void> CacheData[2];
+
+  /// The data pointer is used for out-of-line metadata and is
+  /// generally opaque, except that the compiler sets the low bit in
+  /// order to indicate that this is a Swift metatype and therefore
+  /// that the type metadata header is present.
+  StoredSize Data;
+  
+  static constexpr StoredPointer offsetToData() {
+    return offsetof(TargetAnyClassMetadata, Data);
+  }
+
+  /// Is this object a valid swift type metadata?  That is, can it be
+  /// safely downcast to ClassMetadata?
+  bool isTypeMetadata() const {
+    return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
+  }
+  /// A different perspective on the same bit
+  bool isPureObjC() const {
+    return !isTypeMetadata();
+  }
+};
+using AnyClassMetadata =
+  TargetAnyClassMetadata<InProcess>;
+
+using ClassIVarDestroyer =
+  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
 
 /// The structure of all class metadata.  This structure is embedded
 /// directly within the class's heap metadata structure and therefore
@@ -1089,69 +1188,28 @@ typedef SWIFT_CC(swift) void (*ClassIVarDestroyer)(SWIFT_CONTEXT HeapObject *);
 /// Note that the layout of this type is compatible with the layout of
 /// an Objective-C class.
 template <typename Runtime>
-struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
+struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
+
   friend class ReflectionContext;
+
   TargetClassMetadata() = default;
-  constexpr TargetClassMetadata(const TargetHeapMetadata<Runtime> &base,
-             ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> superClass,
-             StoredPointer data,
+  constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
              ClassFlags flags,
-             StoredPointer ivarDestroyer,
+             ClassIVarDestroyer *ivarDestroyer,
              StoredPointer size, StoredPointer addressPoint,
              StoredPointer alignMask,
              StoredPointer classSize, StoredPointer classAddressPoint)
-    : TargetHeapMetadata<Runtime>(base), SuperClass(superClass),
-      CacheData {0, 0}, Data(data),
+    : TargetAnyClassMetadata<Runtime>(base),
       Flags(flags), InstanceAddressPoint(addressPoint),
       InstanceSize(size), InstanceAlignMask(alignMask),
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
-  // Description's copy ctor is deleted so we have to do this the hard way.
-  TargetClassMetadata(const TargetClassMetadata &other)
-      : TargetHeapMetadata<Runtime>(other),
-        SuperClass(other.SuperClass),
-        CacheData{other.CacheData[0], other.CacheData[1]},
-        Data(other.Data), Flags(other.Flags),
-        InstanceAddressPoint(other.InstanceAddressPoint),
-        InstanceSize(other.InstanceSize),
-        InstanceAlignMask(other.InstanceAlignMask), Reserved(other.Reserved),
-        ClassSize(other.ClassSize), ClassAddressPoint(other.ClassAddressPoint),
-        Description(other.Description), IVarDestroyer(other.IVarDestroyer) {}
-
-  /// The metadata for the superclass.  This is null for the root class.
-  ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
-
-  /// The cache data is used for certain dynamic lookups; it is owned
-  /// by the runtime and generally needs to interoperate with
-  /// Objective-C's use.
-  StoredPointer CacheData[2];
-
-  /// The data pointer is used for out-of-line metadata and is
-  /// generally opaque, except that the compiler sets the low bit in
-  /// order to indicate that this is a Swift metatype and therefore
-  /// that the type metadata header is present.
-  StoredPointer Data;
-  
-  static constexpr StoredPointer offsetToData() {
-    return offsetof(TargetClassMetadata, Data);
-  }
-
-  /// Is this object a valid swift type metadata?
-  bool isTypeMetadata() const {
-    return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
-  }
-  /// A different perspective on the same bit
-  bool isPureObjC() const {
-    return !isTypeMetadata();
-  }
-
-private:
   // The remaining fields are valid only when isTypeMetadata().
   // The Objective-C runtime knows the offsets to some of these fields.
-  // Be careful when changing them.
+  // Be careful when accessing them.
 
   /// Swift-specific class flags.
   ClassFlags Flags;
@@ -1177,15 +1235,19 @@ private:
   /// The offset of the address point within the class object.
   uint32_t ClassAddressPoint;
 
+  // Description is by far the most likely field for a client to try
+  // to access directly, so we force access to go through accessors.
+private:
   /// An out-of-line Swift-specific description of the type, or null
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
 
+public:
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
-  StoredPointer IVarDestroyer;
+  TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
 
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
@@ -1194,7 +1256,8 @@ private:
   //   - class variables (if we choose to support these)
   //   - "tabulated" virtual methods
 
-public:
+  using TargetAnyClassMetadata<Runtime>::isTypeMetadata;
+
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor>
   getDescription() const {
     assert(isTypeMetadata());
@@ -1203,12 +1266,6 @@ public:
 
   void setDescription(const TargetClassDescriptor<Runtime> *description) {
     Description = description;
-  }
-
-  /// Only valid if the target is in-process.
-  ClassIVarDestroyer getIVarDestroyer() const {
-    assert(isTypeMetadata());
-    return reinterpret_cast<ClassIVarDestroyer>(IVarDestroyer);
   }
 
   /// Is this class an artificial subclass, such as one dynamically
@@ -1437,7 +1494,7 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     mutable std::atomic<CacheValue> Cache;
   };
 
-  struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
+  struct HeaderType : HeaderPrefix, TargetTypeMetadataHeader<Runtime> {};
 
   TargetPointer<Runtime, const char> getName() const {
     return reinterpret_cast<TargetPointer<Runtime, const char>>(
@@ -1514,7 +1571,7 @@ struct TargetForeignClassMetadata
 
   /// The superclass of the foreign class, if any.
   ConstTargetMetadataPointer<Runtime, swift::TargetForeignClassMetadata>
-    SuperClass;
+    Superclass;
 
   /// Reserved space.  For now, these should be zero-initialized.
   StoredPointer Reserved[3];
@@ -2055,6 +2112,62 @@ struct TargetGenericMetadataInstantiationCache {
 };
 using GenericMetadataInstantiationCache =
   TargetGenericMetadataInstantiationCache<InProcess>;
+
+/// The pattern for class metadata.
+template <typename Runtime>
+struct TargetGenericClassMetadataPattern {
+  using StoredPointer = typename Runtime::StoredPointer;
+
+  /// The heap-destructor function.
+  TargetPointer<Runtime, HeapObjectDestroyer> Destroy;
+
+  /// The ivar-destructor function.
+  TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+
+  /// The class flags.
+  ClassFlags Flags;
+
+  /// The size of the immedate-members pattern, in words.
+  ///
+  /// This pattern will be copied into the immediate-members section of
+  /// the allocated class metadata.  The pattern data is at the start of
+  /// the pattern buffer.
+  ///
+  /// The rest of the immediate-members section will be zeroed.
+  uint16_t ImmediateMembersPattern_Size;
+
+  /// The offset into the immediate-members section of the metadata, in
+  /// words, into which to copy the immediate-members pattern.
+  uint16_t ImmediateMembersPattern_TargetOffset;
+
+  /// The total amount of extra space to allocate in the metadata, in words.
+  /// This space will always be allocated after the metadata.
+  uint16_t NumExtraDataWords;
+
+  // TODO: only in ObjC interop
+
+  /// The offset of the class RO-data within the extra data pattern,
+  /// in words.
+  uint16_t ClassRODataOffset;
+
+  /// The offset of the metaclass object within the extra data pattern,
+  /// in words.
+  uint16_t MetaclassObjectOffset;
+
+  /// The offset of the metaclass RO-data within the extra data pattern,
+  /// in words.
+  uint16_t MetaclassRODataOffset;
+
+  const StoredPointer *getImmediateMembersPattern() const {
+    return reinterpret_cast<const StoredPointer *>(this + 1);
+  }
+
+  const StoredPointer *getExtraDataPattern() const {
+    return getImmediateMembersPattern() + ImmediateMembersPattern_Size;
+  }
+};
+using GenericClassMetadataPattern =
+  TargetGenericClassMetadataPattern<InProcess>;
 
 /// Heap metadata for a box, which may have been generated statically by the
 /// compiler or by the runtime.
@@ -3064,6 +3177,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TargetTypeContextDescriptor<Runtime>::getTypeContextDescriptorFlags;
 
   /// The superclass of this class.  This pointer can be interpreted
   /// using the superclass reference kind stored in the type context
@@ -3071,7 +3185,35 @@ public:
   ///
   /// Note that SwiftObject, the implicit superclass of all Swift root
   /// classes when building with ObjC compatibility, does not appear here.
-  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> SuperClass;
+  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
+
+  /// Does this class have a formal superclass?
+  bool hasSuperclass() const {
+    return !Superclass.isNull();
+  }
+
+  TypeMetadataRecordKind getSuperclassReferenceKind() const {
+    return getTypeContextDescriptorFlags().class_getSuperclassReferenceKind();
+  }
+
+  /// The number of additional members added by this class to the class
+  /// metadata.  This data is opaque by default to the runtime, other than
+  /// as exposed in other members; it's really just
+  /// NumImmediateMembers * sizeof(void*) bytes of data.
+  ///
+  /// Whether those bytes are added before or after the address point
+  /// depends on areImmediateMembersNegative().
+  uint32_t NumImmediateMembers; // ABI: could be uint16_t?
+
+  typename Runtime::StoredSize getImmediateMembersSize() const {
+    return NumImmediateMembers * sizeof(typename Runtime::StoredPointer);
+  }
+
+  /// Are the immediate members of the class metadata allocated at negative
+  /// offsets instead of positive?
+  bool areImmediateMembersNegative() const {
+    return getTypeContextDescriptorFlags().class_areImmediateMembersNegative();
+  }
 
   /// The number of stored properties in the class, not including its
   /// superclasses. If there is a field offset vector, this is its length.
@@ -3113,7 +3255,7 @@ public:
     const auto *description = metadata->getDescription();
 
     if (description->hasResilientSuperclass())
-      return metadata->SuperClass->getSizeInWords() + FieldOffsetVectorOffset;
+      return metadata->Superclass->getSizeInWords() + FieldOffsetVectorOffset;
 
     return FieldOffsetVectorOffset;
   }
@@ -3140,7 +3282,7 @@ public:
   }
 
   /// This is factored in a silly way because remote mirrors cannot directly
-  /// dereference the SuperClass field of class metadata.
+  /// dereference the Superclass field of class metadata.
   uint32_t getGenericArgumentOffset(
                       const TargetClassMetadata<Runtime> *classMetadata,
                       const TargetClassMetadata<Runtime> *superMetadata) const {
@@ -3157,7 +3299,7 @@ public:
   getGenericArgumentOffset(const TargetMetadata<Runtime> *metadata) const {
     if (hasResilientSuperclass()) {
       auto *classMetadata = llvm::cast<ClassMetadata>(metadata);
-      auto *superMetadata = llvm::cast<ClassMetadata>(classMetadata->SuperClass);
+      auto *superMetadata = llvm::cast<ClassMetadata>(classMetadata->Superclass);
       return getGenericArgumentOffset(classMetadata, superMetadata);
     }
 
@@ -3376,16 +3518,32 @@ const Metadata *
 swift_getGenericMetadata(const TypeContextDescriptor *description,
                          const void *arguments);
 
-// Callback to allocate a generic class metadata object.
+/// Allocate a generic class metadata object.  This is intended to be
+/// called by the metadata instantiation function of a generic class.
+///
+/// This function:
+///   - computes the required size of the metadata object based on the
+///     class hierarchy;
+///   - allocates memory for the metadata object based on the computed
+///     size and the additional requirements imposed by the pattern;
+///   - copies information from the pattern into the allocated metadata; and
+///   - fully initializes the ClassMetadata header, except that the
+///     superclass pointer will be null (or SwiftObject under ObjC interop
+///     if there is no formal superclass).
+///
+/// The instantiation function is responsible for completing the
+/// initialization, including:
+///   - setting the superclass pointer;
+///   - copying class data from the superclass;
+///   - installing the generic arguments;
+///   - installing new v-table entries and overrides; and
+///   - registering the class with the runtime under ObjC interop.
+/// Most of this work can be achieved by calling swift_initClassMetadata.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_allocateGenericClassMetadata(const ClassDescriptor *description,
-                                   const void *metadataTemplate,
-                                   size_t metadataTemplateSize,
-                                   size_t metadataTemplateAddressPoint,
                                    const void *arguments,
-                                   ClassMetadata *superclass,
-                                   size_t numImmediateMembers);
+                                   const GenericClassMetadataPattern *pattern);
 
 // Callback to allocate a generic struct/enum metadata object.
 SWIFT_RUNTIME_EXPORT

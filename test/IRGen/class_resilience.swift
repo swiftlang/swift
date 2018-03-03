@@ -356,12 +356,12 @@ extension ResilientGenericOutsideParent {
 
 // CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
 // CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
 // CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
 // CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
 // CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
 
 // CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
 
@@ -441,12 +441,12 @@ extension ResilientGenericOutsideParent {
 
 // CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
 // CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
 // CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
 // CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
 // CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
 
 // CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
 
@@ -471,17 +471,18 @@ extension ResilientGenericOutsideParent {
 
 // Get the superclass size and address point...
 
-// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentCMa"(%swift.type* %T)
-// CHECK:              [[SUPER_TMP:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
-// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %objc_class* [[SUPER_TMP]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
-// CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}} @"$S16class_resilience21ResilientGenericChildCMP" to i8**))
+
+// CHECK:              [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
+// CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ADDR]], i32 {{40|60}}
 // CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
 // CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
 
-// CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
+// CHECK:              [[T0:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
+// CHECK:              [[OFFSET:%.*]] = sub i32 [[T0]], {{40|20}}
 
 // Initialize class metadata base offset...
 // CHECK-32:           store [[INT]] [[OFFSET]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
@@ -489,5 +490,12 @@ extension ResilientGenericOutsideParent {
 // CHECK-64:           [[OFFSET_ZEXT:%.*]] = zext i32 [[OFFSET]] to i64
 // CHECK-64:           store [[INT]] [[OFFSET_ZEXT]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
 
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}} @"$S16class_resilience21ResilientGenericChildCMP" to i8**), [[INT]] {{[0-9]+}}, [[INT]] {{[0-9]+}}, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 5)
+// Initialize the superclass pointer...
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentCMa"(%swift.type* %T)
+// CHECK:              [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:              [[SUPER_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_ADDR]],
+
+// CHECK:              call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]],
+
 // CHECK:              ret %swift.type* [[METADATA]]

@@ -75,6 +75,118 @@ static int compareIntegers(T left, T right) {
 static const size_t ValueTypeMetadataAddressPoint = sizeof(TypeMetadataHeader);
 
 namespace {
+  struct MetadataBounds {
+    uint32_t NegativeSize;
+    uint32_t PositiveSize;
+
+    uint32_t getTotalSize() const {
+      return PositiveSize + NegativeSize;
+    }
+    uint32_t getAddressPoint() const {
+      return NegativeSize;
+    }
+
+    /// Compute the bounds of a class, given that these bounds currently
+    /// store the bounds of its superclass.
+    void adjustForSubclass(const ClassDescriptor *description) & {
+      auto immediateSize = description->getImmediateMembersSize();
+      if (description->areImmediateMembersNegative()) {
+        NegativeSize += immediateSize;
+      } else {
+        PositiveSize += immediateSize;
+      }
+    }
+
+    static MetadataBounds forAddressPointAndSize(uint32_t addressPoint,
+                                                 uint32_t size) {
+      auto negativeSize = addressPoint;;
+      auto positiveSize = size - negativeSize;
+      return { negativeSize, positiveSize };
+    }
+
+    static MetadataBounds forSwiftRootClass();
+    static MetadataBounds forClass(const ClassDescriptor *description);
+    static MetadataBounds forSuperclass(const void *ref,
+                                        TypeMetadataRecordKind refKind);
+
+    bool operator==(const MetadataBounds &other) const {
+      return NegativeSize == other.NegativeSize &&
+             PositiveSize == other.PositiveSize;
+    }
+  };
+}
+
+MetadataBounds MetadataBounds::forSwiftRootClass() {
+  using Metadata = FullMetadata<ClassMetadata>;
+  return forAddressPointAndSize(sizeof(Metadata::HeaderType), sizeof(Metadata));
+}
+
+MetadataBounds MetadataBounds::forClass(const ClassDescriptor *description) {
+  MetadataBounds bounds;
+  if (const void *superRef = description->Superclass.get()) {
+    bounds = forSuperclass(superRef, description->getSuperclassReferenceKind());
+  } else {
+    bounds = forSwiftRootClass();
+  }
+  bounds.adjustForSubclass(description);
+  return bounds;
+}
+
+MetadataBounds MetadataBounds::forSuperclass(const void *ref,
+                                             TypeMetadataRecordKind refKind) {
+  switch (refKind) {
+  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+    auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
+    if (!description) {
+      swift::fatalError(0, "instantiating class metadata for class with "
+                           "missing weak-linked ancestor");
+    }
+    return forClass(description);
+  }
+
+  case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+    auto description = reinterpret_cast<const ClassDescriptor *>(ref);
+    return forClass(description);
+  }
+
+  case TypeMetadataRecordKind::IndirectObjCClass:
+#if SWIFT_OBJC_INTEROP
+    {
+      auto rootBounds = forSwiftRootClass();
+
+      auto cls = *reinterpret_cast<const Class *>(ref);
+      cls = swift_getInitializedObjCClass(cls);
+      auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
+
+      // If the class is not type metadata, just use the root-class bounds.
+      if (!metadata->isTypeMetadata())
+        return rootBounds;
+
+      // Otherwise, pull out the bounds from the metadata.
+      auto bounds = forAddressPointAndSize(metadata->getClassAddressPoint(),
+                                           metadata->getClassSize());
+
+      assert(bounds.PositiveSize >= rootBounds.PositiveSize);
+
+      // The stored bounds might not include enough space for the root negative
+      // metadata.
+      if (bounds.NegativeSize < rootBounds.NegativeSize) {
+        bounds.NegativeSize = rootBounds.NegativeSize;
+      }
+
+      return bounds;
+    }
+#else
+    // fallthrough
+#endif
+
+  case TypeMetadataRecordKind::Reserved:
+    break;
+  }
+  swift_runtime_unreachable("unsupported superclass reference kind");
+}
+
+namespace {
   struct GenericCacheEntry;
 
   // The cache entries in a generic cache are laid out like this:
@@ -94,9 +206,7 @@ namespace {
 
     size_t getNumArguments() const { return NumArguments; }
 
-    static GenericCacheEntry *getFromMetadata(
-                            const TypeGenericContextDescriptorHeader &generics,
-                                              Metadata *metadata) {
+    static GenericCacheEntry *getFromMetadata(Metadata *metadata) {
       char *bytes = (char*) metadata;
       if (auto classType = dyn_cast<ClassMetadata>(metadata)) {
         assert(classType->isTypeMetadata());
@@ -108,9 +218,12 @@ namespace {
       return reinterpret_cast<GenericCacheEntry*>(bytes);
     }
   };
+
+  struct GenericMetadataCache : MetadataCache<GenericCacheEntry> {
+    std::atomic<MetadataBounds> CachedClassBounds;
+  };
 } // end anonymous namespace
 
-using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
@@ -142,65 +255,158 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
+#ifndef NDEBUG
+extern "C" void *_objc_empty_cache;
+#endif
+
+static void
+initializeClassMetadataFromPattern(ClassMetadata *metadata,
+                                   MetadataBounds bounds,
+                                   const ClassDescriptor *description,
+                                   const GenericClassMetadataPattern *pattern) {
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
+
+  // Install the extra-data pattern.
+  void **metadataExtraData =
+    reinterpret_cast<void**>(rawMetadata + bounds.PositiveSize);
+  memcpy(metadataExtraData, pattern->getExtraDataPattern(),
+         pattern->NumExtraDataWords * sizeof(void*));
+
+  // Install the immediate members pattern:
+  auto numImmediateMembers = description->NumImmediateMembers;
+  void **immediateMembers =
+    (description->areImmediateMembersNegative()
+      ? metadataExtraData - numImmediateMembers
+      : reinterpret_cast<void**>(rawMetadata - bounds.NegativeSize));
+
+  // Zero out the entire immediate-members section.
+  // TODO: only memset the parts that aren't covered by the pattern.
+  memset(immediateMembers, 0, numImmediateMembers * sizeof(void*));
+
+  // Copy the immediate-members pattern.
+  if (auto immediateSize = pattern->ImmediateMembersPattern_Size) {
+    memcpy(immediateMembers + pattern->ImmediateMembersPattern_TargetOffset,
+           pattern->getImmediateMembersPattern(),
+           immediateSize * sizeof(void*));
+  }
+
+  // Initialize the header:
+
+  // Heap destructor.
+  fullMetadata->destroy = pattern->Destroy;
+
+  // Value witness table.
+#if SWIFT_OBJC_INTEROP
+  fullMetadata->ValueWitnesses =
+    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
+       ? &VALUE_WITNESS_SYM(Bo)
+       : &VALUE_WITNESS_SYM(BO);
+#else
+  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+
+#if SWIFT_OBJC_INTEROP
+  // Install the metaclass's RO-data pointer.
+  auto metaclass = reinterpret_cast<AnyClassMetadata *>(
+      metadataExtraData + pattern->MetaclassObjectOffset);
+  auto metaclassRO = metadataExtraData + pattern->MetaclassRODataOffset;
+  metaclass->Data = reinterpret_cast<uintptr_t>(metaclassRO);
+#endif
+
+  // MetadataKind / isa.
+#if SWIFT_OBJC_INTEROP
+  metadata->setClassISA(metaclass);
+#else
+  metadata->setKind(MetadataKind::Class);
+#endif
+
+  // Superclass.
+  metadata->Superclass = nullptr;
+#if SWIFT_OBJC_INTEROP
+  // If the class doesn't have a formal superclass, automatically set
+  // it to SwiftObject.
+  if (!description->hasSuperclass()) {
+    metadata->Superclass = getRootSuperclass();
+  }
+#endif
+
+#if SWIFT_OBJC_INTEROP
+  // Cache data.  Install the same initializer that the compiler is
+  // required to use.  We don't need to do this in non-ObjC-interop modes.
+  metadata->CacheData[0] = &_objc_empty_cache;
+  metadata->CacheData[1] = nullptr;
+#endif
+
+  // RO-data pointer.
+#if SWIFT_OBJC_INTEROP
+  auto classRO = metadataExtraData + pattern->ClassRODataOffset;
+  metadata->Data =
+    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
+#else
+  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
+#endif
+
+  // Class flags.
+  metadata->Flags = pattern->Flags;
+
+  // Instance layout.
+  metadata->InstanceAddressPoint = 0;
+  metadata->InstanceSize = 0;
+  metadata->InstanceAlignMask = 0;
+
+  // Reserved.
+  metadata->Reserved = 0;
+
+  // Class metadata layout.
+  metadata->ClassSize = bounds.getTotalSize();
+  metadata->ClassAddressPoint = bounds.getAddressPoint();
+
+  // Class descriptor.
+  metadata->setDescription(description);
+
+  // I-var destroyer.
+  metadata->IVarDestroyer = pattern->IVarDestroyer;
+}
+
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
-                                          const void *metadataTemplate,
-                                          size_t templateSize,
-                                          size_t templateAddressPoint,
                                           const void *arguments,
-                                          ClassMetadata *superclass,
-                                          size_t numImmediateMembers) {
+                                    const GenericClassMetadataPattern *pattern){
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   auto &generics = description->getFullGenericContextHeader();
+  auto &cache = unsafeGetInitializedCache(generics);
+
   size_t numGenericArguments = generics.Base.NumKeyArguments;
 
-  size_t metadataSize;
-  if (superclass && superclass->isTypeMetadata()) {
-    assert(superclass->getClassAddressPoint() <= templateAddressPoint);
+  // Try to load the metadata bounds from cache.
+  auto bounds = cache.CachedClassBounds.load(std::memory_order_relaxed);
 
-    metadataSize = (superclass->getClassSize() -
-                    superclass->getClassAddressPoint() +
-                    templateAddressPoint +
-                    numImmediateMembers * sizeof(void *));
-    assert(templateSize <= metadataSize);
-  } else {
-    metadataSize = (templateSize +
-                    numImmediateMembers * sizeof(void *));
+  // A zero size means the bounds haven't been computed yet.
+  if (bounds.PositiveSize == 0) {
+    bounds = MetadataBounds::forClass(description);
+
+    // Write back to the cache.  We don't mind if we raced with someone
+    // else to do this because the computation is idempotent.
+    cache.CachedClassBounds.store(bounds, std::memory_order_relaxed);
   }
 
-  auto &cache = unsafeGetInitializedCache(generics);
-  char *bytes = GenericCacheEntry::allocate(cache.getAllocator(),
-                                            argumentsAsArray,
-                                            numGenericArguments,
-                                            metadataSize)->getData<char>();
+  auto allocationBounds = bounds;
+  allocationBounds.PositiveSize += pattern->NumExtraDataWords * sizeof(void*);
 
-  // Copy in the metadata template.
-  memcpy(bytes, metadataTemplate, templateSize);
+  auto entry = GenericCacheEntry::allocate(cache.getAllocator(),
+                                           argumentsAsArray,
+                                           numGenericArguments,
+                                           allocationBounds.getTotalSize());
 
-  // Zero out the rest of the metadata.
-  memset(bytes + templateSize, 0, metadataSize - templateSize);
+  auto bytes = entry->getData<char>();
+  auto addressPoint = bytes + allocationBounds.NegativeSize;
+  auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
 
-  // Okay, move to the address point.
-  ClassMetadata *metadata =
-    reinterpret_cast<ClassMetadata *>(bytes + templateAddressPoint);
-  auto patternBytes =
-    reinterpret_cast<const char*>(metadataTemplate) +
-    templateAddressPoint;
-  auto patternMetadata = reinterpret_cast<const ClassMetadata*>(patternBytes);
+  initializeClassMetadataFromPattern(metadata, bounds, description, pattern);
+
+  assert(GenericCacheEntry::getFromMetadata(metadata) == entry);
   assert(metadata->isTypeMetadata());
-
-  // Overwrite the superclass field.
-  metadata->SuperClass = superclass;
-  // Adjust the relative reference to the nominal type descriptor.
-  if (!metadata->isArtificialSubclass()) {
-    metadata->setDescription(patternMetadata->getDescription());
-  }
-
-  // The pattern might have private prefix matter prior to the start
-  // of metadata.
-  assert(metadata->getClassAddressPoint() <= templateAddressPoint);
-  metadata->setClassSize(metadataSize);
-
   return metadata;
 }
 
@@ -241,7 +447,7 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
     [&]() -> GenericCacheEntry* {
       // Create new metadata to cache.
       auto metadata = generics.InstantiationFunction(description, arguments);
-      auto entry = GenericCacheEntry::getFromMetadata(generics, metadata);
+      auto entry = GenericCacheEntry::getFromMetadata(metadata);
       entry->Value = metadata;
       return entry;
     });
@@ -1475,7 +1681,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     _swift_initGenericClassObjCName(theClass);
 #endif
 
-  const ClassMetadata *theSuperclass = theClass->SuperClass;
+  const ClassMetadata *theSuperclass = theClass->Superclass;
 
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
@@ -1531,7 +1737,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
              superWords + fieldOffsetVector,
              description->NumFields * sizeof(uintptr_t));
     }
-    ancestor = ancestor->SuperClass;
+    ancestor = ancestor->Superclass;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -1540,7 +1746,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
   auto theSuperMetaclass
     = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
-  theMetaclass->SuperClass = theSuperMetaclass;
+  theMetaclass->Superclass = theSuperMetaclass;
 #endif
 }
 
@@ -1556,7 +1762,7 @@ ClassMetadata *
 swift::swift_relocateClassMetadata(ClassMetadata *self,
                                    size_t templateSize,
                                    size_t numImmediateMembers) {
-  const ClassMetadata *superclass = self->SuperClass;
+  const ClassMetadata *superclass = self->Superclass;
 
   size_t metadataSize;
   if (superclass && superclass->isTypeMetadata()) {
@@ -1608,7 +1814,7 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // If we have a superclass, start from its size and alignment instead.
   if (classHasSuperclass(self)) {
-    const ClassMetadata *super = self->SuperClass;
+    const ClassMetadata *super = self->Superclass;
 
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
