@@ -138,11 +138,11 @@ extension Collection {
   }
 
   public func _relativeAsOffset(_ offset: Int) -> Index {
-    let base = offset < 0
-      ? endIndex
-      : startIndex
+    let baseOffset = offset < 0
+      ? count + offset
+      : offset
 
-    return index(base, offsetBy: offset)
+    return index(startIndex, offsetBy: baseOffset)
   }
 
   /// Accesses a contiguous subrange of the collection's elements with a range
