@@ -686,7 +686,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
         Args, A, Triple, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName) {
+        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
