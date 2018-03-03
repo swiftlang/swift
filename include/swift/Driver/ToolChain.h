@@ -199,8 +199,10 @@ public:
   ///
   /// \param args Invocation arguments.
   /// \param sanitizer Sanitizer name.
+  /// \param shared Whether the library is shared
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                         StringRef sanitizer) const;
+                                         StringRef sanitizer,
+                                         bool shared=true) const;
 
 };
 } // end namespace driver
