@@ -172,7 +172,7 @@ void SILInstruction::dropAllReferences() {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // If we have a AutoDiffReverseInst, drop it's primal function reference so
+  // If we have a AutoDiffReverseInst, drop its primal function reference so
   // that we can decrement refcounts on referenced functions.
   if (auto *ADRI = dyn_cast<AutoDiffReverseInst>(this)) {
     ADRI->dropReferencedPrimalFunction();
