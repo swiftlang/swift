@@ -3872,10 +3872,6 @@ public:
     return { getArgumentsData(), NumArguments };
   }
 
-  AutoDiffConfiguration getConfiguration() const {
-    return { getArguments(), /*seedable*/false };
-  }
-
   SourceRange getSourceRange() const {
     return SourceRange(Loc, RParenLoc);
   }

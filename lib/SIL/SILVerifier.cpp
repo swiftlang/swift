@@ -1258,13 +1258,13 @@ public:
     // are bring differentiated with respect to. For simplicity, we add all
     // argument indices to a temporary.
     if (config.argumentIndices.empty()) {
-      for (unsigned i = 0; i < primalTy->getNumParameters(); i++)
+      for (unsigned i = 0, n = primalTy->getNumParameters(); i != n; ++i)
         allArgIndices.push_back(i);
       argIndices = allArgIndices;
     }
     // Verify differentiation arguments.
     int lastIndex = -1;
-    for (unsigned i = 0; i < argIndices.size(); i++) {
+    for (unsigned i = 0, n = argIndices.size(); i != n; ++i) {
       auto index = argIndices[i];
       require((int)index > lastIndex, "Argument indices must be ascending");
       auto paramTy = primalTy->getParameters()[index].getType();

@@ -2999,7 +2999,6 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
     gradFn = emittedGrad;
   else {
     auto gradTy = primalTy->getGradientType(config, SGF.SGM.M);
-    SmallVector<unsigned, 8> gradResults;
     SILLocation loc(E);
     gradFn = SGF.SGM.M.createFunction(primalFn.getLinkage(), gradName, gradTy,
                                       primalFn.getGenericEnvironment(),
