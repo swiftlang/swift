@@ -3,7 +3,7 @@
 // RUN: echo 'public func b() { }' >%t/b.swift
 // RUN: echo 'public func c() { }' >%t/c.swift
 // RUN: echo 'public func main() {a(); b(); c()}' >%t/main.swift
-// RUN: %target-swift-frontend -c -enable-batch-mode -bypass-batch-mode-checks -module-name foo -primary-file %t/a.swift -primary-file %t/b.swift -primary-file %t/c.swift -primary-file %t/main.swift -o %t/a.o -o %t/b.o -o %t/c.o -o %t/main.o
+// RUN: %target-swift-frontend -c -enable-batch-mode -module-name foo -primary-file %t/a.swift -primary-file %t/b.swift -primary-file %t/c.swift -primary-file %t/main.swift -o %t/a.o -o %t/b.o -o %t/c.o -o %t/main.o
 //
 // RUN: llvm-objdump -t %t/a.o | swift-demangle | %FileCheck -check-prefix=CHECK-A %s
 // RUN: llvm-objdump -t %t/b.o | swift-demangle | %FileCheck -check-prefix=CHECK-B %s
