@@ -1444,7 +1444,8 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,
                    unsigned BufferID,
                    unsigned Offset = 0,
-                   unsigned EndOffset = 0);
+                   unsigned EndOffset = 0,
+                   DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

@@ -112,11 +112,13 @@ namespace {
 int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
-                      DiagnosticEngine &Diags,
+                      swift::DiagnosticEngine &Diags,
                       std::vector<std::pair<RC<syntax::RawSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
-  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID,
+                              /*Offset=*/0, /*EndOffset=*/0,
+                              &Diags);
+  return EXIT_SUCCESS;
 }
 
 
@@ -191,7 +193,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
     TokAndPos.first->print(llvm::outs(), {});
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doDumpRawTokenSyntax(const StringRef InputFilename) {
@@ -215,7 +217,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
     llvm::outs() << "\n";
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doFullParseRoundTrip(const char *MainExecutablePath,

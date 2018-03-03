@@ -35,7 +35,7 @@ public:
     if (KeepEOF)
       Toks = tokenizeAndKeepEOF(BufID);
     else
-      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, KeepComments);
+      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, /*Diags=*/nullptr, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
       EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind()) << "i = " << i;
@@ -685,7 +685,7 @@ TEST_F(LexerTest, TokenizePlaceholder) {
 TEST_F(LexerTest, NoPlaceholder) {
   auto checkTok = [&](StringRef Source) {
     unsigned BufID = SourceMgr.addMemBufferCopy(Source);
-    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, false);
+    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, /*Diags=*/nullptr, false);
     ASSERT_FALSE(Toks.empty());
     EXPECT_NE(tok::identifier, Toks[0].getKind());
   };
