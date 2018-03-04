@@ -154,13 +154,11 @@ extension Bool : Equatable, Hashable {
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
   public var hashValue: Int {
-    return self ? 1 : 0
+    return _hashValue(for: self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
   public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
     return hasher.appending((self ? 1 : 0) as UInt8)
   }
