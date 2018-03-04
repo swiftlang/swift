@@ -3848,7 +3848,7 @@ public:
     return SourceRange(Loc, RParenLoc);
   }
 
-  FuncDecl *getResolvePrimal() const {
+  FuncDecl *getResolvedPrimal() const {
     return ResolvedPrimal;
   }
 

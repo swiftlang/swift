@@ -1238,18 +1238,10 @@ namespace {
       auto *primalExpr = GE->getPrimalExpr();
       auto *primalTy = CS.getType(primalExpr)->getAs<AnyFunctionType>();
       auto locator = CS.getConstraintLocator(GE);
+      // Primal type must be a function.
       if (!primalTy) {
         TC.diagnose(primalExpr->getLoc(),
                     diag::gradient_expr_not_a_function, CS.getType(primalExpr));
-        return nullptr;
-      }
-      // The primal expression must be a declaration reference.
-      if (!(isa<UnresolvedDeclRefExpr>(primalExpr) ||
-            isa<DeclRefExpr>(primalExpr) ||
-            isa<UnresolvedMemberExpr>(primalExpr) ||
-            isa<UnresolvedDotExpr>(primalExpr) ||
-            isa<MemberRefExpr>(primalExpr))) {
-        TC.diagnose(primalExpr->getLoc(), diag::gradient_expr_not_a_decl_ref);
         return nullptr;
       }
       // Compute the gradient type.
@@ -1349,10 +1341,10 @@ namespace {
           CS.addConstraint(ConstraintKind::ConformsTo, diffArgTy, fpProtoTy,
                            locator);
         else if (!CS.TC.isConvertibleTo(diffArgTy, fpProtoTy, CurDC)) {
-            TC.diagnose(GE->getLoc(),
-                        diag::gradient_expr_argument_not_differentiable,
-                        diffArgTy);
-            return nullptr;
+          TC.diagnose(GE->getLoc(),
+                      diag::gradient_expr_argument_not_differentiable,
+                      diffArgTy);
+          return nullptr;
         }
       }
 
@@ -1477,8 +1469,8 @@ namespace {
         auto opname = dyn_cast<StringLiteralExpr>(arg);
         if (!opname) {
           tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                      "#tfop() takes a string literal and a list of inputs "
-                      "and attributes");
+                      "#tfop() takes a string literal and a list of inputs and "
+                      "attributes");
           return nullptr;
         }
         return CS.createTypeVariable(locator, 0);
@@ -1486,8 +1478,8 @@ namespace {
 
       if (tt->getNumElements() == 0) {
         tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes a string literal and a list of inputs and"
-                    " attributes");
+                    "#tfop() takes a string literal and a list of inputs and "
+                    "attributes");
         return nullptr;
       }
 
@@ -1495,8 +1487,8 @@ namespace {
       auto opname = dyn_cast<StringLiteralExpr>(tt->getElement(0));
       if (!opname) {
         tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes a string literal and a list of inputs "
-                    "and attributes");
+                    "#tfop() takes a string literal and a list of inputs and "
+                    "attributes");
         return nullptr;
       }
 

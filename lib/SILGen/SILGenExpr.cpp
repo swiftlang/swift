@@ -2953,7 +2953,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
   SILFunction &F = SGF.F;
-  FuncDecl *primalDecl = E->getResolvePrimal();
+  FuncDecl *primalDecl = E->getResolvedPrimal();
   assert(primalDecl && "Primal decl not resolved?");
   SILFunction &primalFn =
     *SGF.SGM.getFunction(SILDeclRef(primalDecl), ForDefinition);
