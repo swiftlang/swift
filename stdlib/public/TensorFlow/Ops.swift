@@ -1101,7 +1101,7 @@ public extension Tensor4D where Scalar : FloatingPoint {
     padding: Padding
   ) -> Tensor4D {
     return Tensor4D(
-      identicallyRanked: base.convolved2D(
+      base: base.convolved2D(
         withFilter: filter.base,
         strides: strides,
         padding: padding

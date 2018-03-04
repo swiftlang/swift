@@ -5,9 +5,17 @@ func foo(x: Float, y: Float) -> Float {}
 let someVar: Int = 100
 
 #gradient(of: someVar) // expected-error {{only functions can be differentiated}}
+#valueAndGradient(of: someVar) // expected-error {{only functions can be differentiated}}
 
-let foo_grad: (Float, Float) -> (Float, Float) = #gradient(of: foo) // ok
+let _ = #gradient(of: foo) // ok
+let _ = #valueAndGradient(of: foo) // ok
+let _: (Float, Float) -> (Float, Float) = #gradient(of: foo) // ok
+let _: (Float, Float) -> (value: Float, gradient: (Float, Float)) = #valueAndGradient(of: foo) // ok
+
 let _: (Float, Float) -> Float = #gradient(of: foo, withRespectTo: .0) // ok
+let _: (Float, Float) -> (value: Float, gradient: Float)
+  = #valueAndGradient(of: foo, withRespectTo: .0) // ok
+let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' argument can only be used in an instance declaration}}
 let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' argument can only be used in an instance declaration}}
 let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: .0, self) // expected-error {{the 'self' argument must be the first}}
 let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: .0, .1) // ok
@@ -17,7 +25,10 @@ let _: (Float, Float) -> (Float, Float, Float) = #gradient(of: foo, withRespectT
 struct S {
   func a(_ x: Float) -> Float {}
 
-  lazy var da: (Float) -> Float = #gradient(of: self.a) // ok
+  lazy var da = #gradient(of: self.a) // ok
+  lazy var daWithValue = #valueAndGradient(of: self.a) // ok
+  lazy var da2: (Float) -> Float = #gradient(of: self.a) // ok
+  lazy var daWithValue2: (Float) -> (value: Float, gradient: Float) = #valueAndGradient(of: self.a) // ok
 
   func b() {
     let _: (Float) -> Float = #gradient(of: a) // ok
@@ -33,14 +44,22 @@ struct S {
 
 let s = S()
 let _: (Float) -> Float = #gradient(of: s.a)
-let _: (Double) -> Double = #gradient(of: s.a) // expected-error {{cannot convert value of type '(Float) -> Float' to specified type '(Double) -> Double'}}
+let _: (Float) -> (Float, Float) = #valueAndGradient(of: s.a)
+let _: (Double) -> Double = #gradient(of: s.a)
+// expected-error @-1 {{cannot convert value of type '(Float) -> Float' to specified type}}
+let _: (Double) -> (Double, Double) = #valueAndGradient(of: s.a)
+// expected-error @-1 {{cannot convert value of type '(Float) -> (value: Float, gradient: Float)' to specified type}}
 
 // Gradient expressions with generic primal.
-func e<T>(_ x: T) -> T {} // expected-note {{in call to function 'e'}}
+func e<T>(_ x: T) -> T {} // expected-note 2 {{in call to function 'e'}}
 
 let _ = #gradient(of: e) // expected-error {{generic parameter 'T' could not be inferred}}
+let _ = #valueAndGradient(of: e) // expected-error {{generic parameter 'T' could not be inferred}}
 let _: (Float) -> Float = #gradient(of: e)
 let _: (Double) -> Double = #gradient(of: e)
+let _: (Float) -> (Float, Float) = #valueAndGradient(of: e)
+let _: (Double) -> (Double, Double) = #valueAndGradient(of: e)
+
 let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
 let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
 let _: (Float) -> Double = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
@@ -68,4 +87,8 @@ func daddNumeric<T : Numeric>(_ x: T, _ y: T) -> (T, T) {
 // Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
 func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
   return #gradient(of: addNumeric)(x, y) // ok
+}
+// Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
+func daddFloatingPointWithValue<T : FloatingPoint>(_ x: T, _ y: T) -> (value: T, gradient: (T, T)) {
+  return #valueAndGradient(of: addNumeric)(x, y) // ok
 }
