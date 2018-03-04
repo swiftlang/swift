@@ -3835,21 +3835,9 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-///
-/// Gradient expression - An expression that produces the automatically
-/// differentiated adjoint function that computes the gradient or
-/// vector-Jacobian product with respect to specified arguments.
-/// Example:
-///   #gradient(of: baz)
-///   #gradient(of: bar, withRespectTo: (.0, .1))
-///   #gradient(of: foo(_:_:), withRespectTo: (.0))
-class GradientExpr : public Expr {
+/// Base class for #gradient and #valueAndGradient expressions.
+class ReverseAutoDiffExpr : public Expr {
 public:
-  static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
-                              SourceLoc lParenLoc,
-                              Expr *primalExpr, ArrayRef<AutoDiffArgument>,
-                              SourceLoc rParenLoc);
-
   Expr *getPrimalExpr() const {
     return PrimalExpr;
   }
@@ -3881,7 +3869,8 @@ public:
   }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Gradient;
+    return E->getKind() == ExprKind::Gradient ||
+           E->getKind() == ExprKind::ValueAndGradient;
   }
 
 private:
@@ -3898,9 +3887,67 @@ private:
   /// Primal declaration, to be resolved by Sema.
   FuncDecl *ResolvedPrimal = nullptr;
 
-  GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *primalExpr,
-               ArrayRef<AutoDiffArgument> arguments, SourceLoc rParenLoc);
+protected:
+  explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
+                               SourceLoc lParenLoc,
+                               Expr *primalExpr,
+                               ArrayRef<AutoDiffArgument> arguments,
+                               SourceLoc rParenLoc);
+};
 
+/// Gradient expression - An expression that produces the automatically
+/// differentiated function that computes the gradient (or vector-Jacobian
+/// products) with respect to specified arguments.
+/// Examples:
+///   #gradient(of: baz)
+///   #gradient(of: bar, withRespectTo: .0, .1)
+///   #gradient(of: foo(_:_:), withRespectTo: .0)
+///
+class GradientExpr : public ReverseAutoDiffExpr {
+public:
+  static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
+                              SourceLoc lParenLoc, Expr *primalExpr,
+                              ArrayRef<AutoDiffArgument> arguments,
+                              SourceLoc rParenLoc);
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Gradient;
+  }
+
+private:
+  explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *primalExpr,
+                        ArrayRef<AutoDiffArgument> args, SourceLoc rParenLoc)
+    : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, primalExpr, args,
+                          rParenLoc) {}
+};
+
+/// ValueAndGradient expression - An expression that produces an automatically
+/// differentiated function that returns the result of the original function and
+/// the gradient (or vector-Jacobian products) with respect to specified
+/// arguments.
+/// Examples:
+///   #valueAndGradient(of: baz)
+///   #valueAndGradient(of: bar, withRespectTo: .0, .1)
+///   #valueAndGradient(of: foo(_:_:), withRespectTo: .0)
+///
+class ValueAndGradientExpr : public ReverseAutoDiffExpr {
+public:
+  static ValueAndGradientExpr *create(ASTContext &ctx, SourceLoc loc,
+                                      SourceLoc lParenLoc, Expr *primalExpr,
+                                      ArrayRef<AutoDiffArgument> arguments,
+                                      SourceLoc rParenLoc);
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ValueAndGradient;
+  }
+
+private:
+  explicit ValueAndGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
+                                Expr *primalExpr,
+                                ArrayRef<AutoDiffArgument> args,
+                                SourceLoc rParenLoc)
+    : ReverseAutoDiffExpr(ExprKind::ValueAndGradient, loc, lParenLoc,
+                          primalExpr, args, rParenLoc) {}
 };
 
 /// An expression referring to an opaque object of a fixed type.
