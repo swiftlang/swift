@@ -1797,8 +1797,7 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGradientExpr(GradientExpr *E) {
-    printCommon(E, "gradient_expr");
+  void printReverseAutoDiffExpr(ReverseAutoDiffExpr *E) {
     OS << " primal=";
     E->getPrimalExpr()->dump(OS);
     auto arguments = E->getArguments();
@@ -1819,6 +1818,16 @@ public:
       OS << ")";
     }
     OS << ")";
+  }
+
+  void visitGradientExpr(GradientExpr *E) {
+    printCommon(E, "gradient_expr");
+    printReverseAutoDiffExpr(E);
+  }
+
+  void visitValueAndGradientExpr(ValueAndGradientExpr *E) {
+    printCommon(E, "value_and_gradient_expr");
+    printReverseAutoDiffExpr(E);
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {

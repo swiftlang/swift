@@ -1237,7 +1237,8 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Type visitGradientExpr(GradientExpr *GE) {
+    Type handleReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
+                                   bool preservingPrimalResult) {
       auto &TC = CS.getTypeChecker();
       auto *primalExpr = GE->getPrimalExpr();
       auto *primalTy = CS.getType(primalExpr)->getAs<AnyFunctionType>();
@@ -1378,6 +1379,14 @@ namespace {
       }
 
       return gradTy;
+    }
+
+    Type visitGradientExpr(GradientExpr *GE) {
+      return handleReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/false);
+    }
+
+    Type visitValueAndGradientExpr(ValueAndGradientExpr *VGE) {
+      return handleReverseAutoDiffExpr(VGE, /*preservingPrimalResult=*/true);
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {

@@ -478,6 +478,7 @@ namespace {
                                               SGFContext C);
     // SWIFT_ENABLE_TENSORFLOW
     RValue visitGradientExpr(GradientExpr *E, SGFContext C);
+    RValue visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -3034,6 +3035,11 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
   auto gradFnRef = SGF.B.createFunctionRef(primalFn.getLocation(), gradFn);
   ManagedValue v = SGF.emitManagedRValueWithCleanup(gradFnRef);
   return RValue(SGF, E, v);
+}
+
+RValue RValueEmitter::
+visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
+  llvm_unreachable("Unhandled #valueAndGradient");
 }
 
 RValue RValueEmitter::
