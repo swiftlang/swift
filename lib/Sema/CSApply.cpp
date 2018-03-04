@@ -2461,18 +2461,35 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
                                     bool preservingPrimalResult) {
+      auto &TC = cs.getTypeChecker();
       auto gradType = simplifyType(cs.getType(expr));
       assert(gradType && "Gradient expression should've been assigned a type");
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
 
-      // FIXME(danielzheng): Currently, type checking a type member decl doesn't
-      // directly give us a FuncDecl. We are skipping decl assignment to make
-      // type checking tests pass.
-      if (!isa<DeclRefExpr>(expr->getPrimalExpr())) return expr;
-      auto *primalDecl = expr->getPrimalExpr()->getReferencedDecl().getDecl();
-      auto *primalFD = cast<FuncDecl>(primalDecl);
-      expr->setResolvedPrimal(primalFD);
+      // Resolve primal expression to a func decl.
+      // NOTE: Only primal expression cases in the test have been handled. More
+      // cases should be handled as they arise.
+      auto *primalExpr = expr->getPrimalExpr();
+      FuncDecl *primalDecl = nullptr;
+      // If primal expression already has a referenced decl, check if it's a
+      // func decl and set resolved primal to it.
+      if (auto referencedDecl = primalExpr->getReferencedDecl()) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(referencedDecl.getDecl()))
+          primalDecl = funcDecl;
+      }
+      // If primal expression is an dot syntax call expr, it must be a class
+      // method or instance method.
+      else if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(primalExpr))
+        if (auto funcDecl = dyn_cast<FuncDecl>(dotExpr->getCalledValue()))
+          primalDecl = funcDecl;
+      // Emit error if primal func decl could not be resolved.
+      if (!primalDecl) {
+        TC.diagnose(primalExpr->getLoc(),
+                    diag::gradient_expr_primal_func_decl_unresolved);
+        return nullptr;
+      }
+      expr->setResolvedPrimal(primalDecl);
       return expr;
     }
 
