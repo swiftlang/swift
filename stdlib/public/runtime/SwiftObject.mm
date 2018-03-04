@@ -112,7 +112,7 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
     if (!classAsMetadata->isArtificialSubclass())
       return classAsMetadata;
-    classAsMetadata = classAsMetadata->SuperClass;
+    classAsMetadata = classAsMetadata->Superclass;
   }
 
   id objcObject = reinterpret_cast<id>(object);
@@ -195,10 +195,10 @@ static NSString *_getClassDescription(Class cls) {
   return _swift_getObjCClassOfAllocated(self);
 }
 + (Class)superclass {
-  return (Class)((const ClassMetadata*) self)->SuperClass;
+  return (Class)((const ClassMetadata*) self)->Superclass;
 }
 - (Class)superclass {
-  return (Class)_swift_getClassOfAllocated(self)->SuperClass;
+  return (Class)_swift_getClassOfAllocated(self)->Superclass;
 }
 
 + (BOOL)isMemberOfClass:(Class)cls {
@@ -289,7 +289,7 @@ static NSString *_getClassDescription(Class cls) {
 
 - (BOOL)isKindOfClass:(Class)someClass {
   for (auto cls = _swift_getClassOfAllocated(self); cls != nullptr;
-       cls = cls->SuperClass)
+       cls = cls->Superclass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 
@@ -298,7 +298,7 @@ static NSString *_getClassDescription(Class cls) {
 
 + (BOOL)isSubclassOfClass:(Class)someClass {
   for (auto cls = (const ClassMetadata*) self; cls != nullptr;
-       cls = cls->SuperClass)
+       cls = cls->Superclass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 

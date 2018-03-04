@@ -48,10 +48,10 @@ public:
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
-
     // Instantiation-specific.
+
+    // Generic arguments.
+    // This must always be the first piece of trailing data.
     asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
 
     // Struct field offsets.

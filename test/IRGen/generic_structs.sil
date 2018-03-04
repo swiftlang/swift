@@ -29,8 +29,6 @@ import Builtin
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
-// --       generic parameter vector offset
-// CHECK-SAME:   i32 2,
 // --       generic instantiation info
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**)* @"$S15generic_structs13SingleDynamicVMi"
 // CHECK-SAME:   [{{[0-9]+}} x i8*]* @"$S15generic_structs13SingleDynamicVMI"
@@ -59,8 +57,6 @@ import Builtin
 // CHECK-SAME: i32 2,
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
-// --       generic parameter vector offset
-// CHECK-SAME: i32 2,
 // --       generic params, requirements, key args, extra args
 // CHECK-SAME: i32 2, i32 2, i32 2, i32 2,
 // --       generic parameters

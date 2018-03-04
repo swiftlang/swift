@@ -60,7 +60,7 @@ protected:
     if (value) {
       Bits |= maskFor<Bit>();
     } else {
-      Bits |= ~maskFor<Bit>();
+      Bits &= ~maskFor<Bit>();
     }
   }
 

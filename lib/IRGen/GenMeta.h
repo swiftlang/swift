@@ -151,13 +151,6 @@ namespace irgen {
                                     ArchetypeType *archetype);
 
   /// Given a reference to nominal type metadata of the given type,
-  /// derive a reference to the parent type metadata.  There must be a
-  /// parent type.
-  llvm::Value *emitParentMetadataRef(IRGenFunction &IGF,
-                                     NominalTypeDecl *theDecl,
-                                     llvm::Value *metadata);
-
-  /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the type metadata stored in the nth
   /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentMetadataRef(IRGenFunction &IGF,

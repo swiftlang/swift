@@ -54,7 +54,7 @@ bb0(%0 : $ChildToResilientParent):
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC6methodyyF"(%T5super22ChildToResilientParentC* swiftself)
 // CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
-// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS:{.*}]], {{.*}}* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{20|40}}
 // CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
 // CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
@@ -76,7 +76,7 @@ bb0(%0 : $@thick ChildToResilientParent.Type):
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC11classMethodyyFZ"(%swift.type* swiftself)
 // CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
-// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{24|48}}
 // CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
 // CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
@@ -151,7 +151,7 @@ bb0(%0 : $ResilientOutsideChild):
 // CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%.*]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{20|40}}
 // CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
 // CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
@@ -177,7 +177,7 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 // CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%.*]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{24|48}}
 // CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
 // CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]

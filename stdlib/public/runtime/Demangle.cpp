@@ -263,7 +263,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 #endif
     description = classType->getDescription();
     break;
