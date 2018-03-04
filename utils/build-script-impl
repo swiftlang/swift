@@ -2876,6 +2876,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 call "${XCTEST_SOURCE_DIR}"/build_script.py test \
                     --swiftc="${SWIFTC_BIN}" \
+                    --lit="${LLVM_SOURCE_DIR}/utils/lit/lit.py" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
                     ${LIBDISPATCH_BUILD_ARGS} \
                     $XCTEST_BUILD_ARGS \
