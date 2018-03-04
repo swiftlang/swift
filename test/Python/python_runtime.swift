@@ -10,16 +10,16 @@ var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 
 PythonRuntimeTestSuite.test("check-version") {
   let sysModule = try! Python.import("sys")
-  let version = String(sysModule.get(member: "version"))!
+  let version = String(sysModule[member: "version"])!
   expectEqual("2.7.", version.prefix(4))
 }
 
 PythonRuntimeTestSuite.test("pylist") {
   let list = PyVal([0, 1, 2])
   expectEqual("[0, 1, 2]", list.description)
-  expectEqual(3, Python.len.call(list))
-  expectEqual("[0, 1, 2]", Python.str.call(list))
-  expectEqual("<type 'list'>", Python.str.call(Python.type.call(list)))
+  expectEqual(3, Python.len.call(with: list))
+  expectEqual("[0, 1, 2]", Python.str.call(with: list))
+  expectEqual("<type 'list'>", Python.str.call(with: Python.type.call(with: list)))
 
   let polymorphicList = PyVal(["a", 2, true, 1.5])
   expectEqual("a", polymorphicList[0])
@@ -34,7 +34,7 @@ PythonRuntimeTestSuite.test("pylist") {
 
 PythonRuntimeTestSuite.test("pydict") {
   let dict = ["a": 1, 1: 0.5] as PyVal
-  expectEqual(2, Python.len.call(dict))
+  expectEqual(2, Python.len.call(with: dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
 
@@ -73,7 +73,7 @@ PythonRuntimeTestSuite.test("comparable") {
 }
 
 PythonRuntimeTestSuite.test("range-iter") {
-  for (index, val) in Python.range.call(5).enumerated() {
+  for (index, val) in Python.range.call(with: 5).enumerated() {
     expectEqual(PyVal(index), val)
   }
 }
