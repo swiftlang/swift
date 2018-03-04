@@ -155,8 +155,9 @@ extension DoubleWidth : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher.appending(low).appending(high)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(low)
+    hasher.append(high)
   }
 }
 

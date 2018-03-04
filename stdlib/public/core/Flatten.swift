@@ -236,10 +236,11 @@ extension FlattenCollection.Index : Hashable
     return _hashValue(for: self)
   }
 
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    let h = hasher.appending(_outer)
-    guard let inner = _inner else { return h }
-    return h.appending(inner)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(_outer)
+    if let inner = _inner {
+      hasher.append(inner)
+    }
   }
 }
 

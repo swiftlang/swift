@@ -38,8 +38,9 @@ using namespace DerivedConformance;
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all associated values of all elements of the enum conform.
-bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
-                                          ProtocolDecl *protocol) {
+static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
+                                                 EnumDecl *theEnum,
+                                                 ProtocolDecl *protocol) {
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
@@ -76,9 +77,9 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
 /// \p theStruct The struct whose stored properties should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all stored properties of the struct conform.
-bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
-                                          StructDecl *theStruct,
-                                          ProtocolDecl *protocol) {
+static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
+                                                 StructDecl *theStruct,
+                                                 ProtocolDecl *protocol) {
   auto declContext = theStruct->getDeclContext();
 
   auto storedProperties =
@@ -747,71 +748,83 @@ static Expr *integerLiteralExpr(ASTContext &C, int64_t value) {
 
 /// Returns a new \c CallExpr representing
 ///
-///   hasher.appending(hashable)
+///   hasher.append(hashable)
 ///
 /// \param C The AST context to create the expression in.
 ///
-/// \param hasher The base expression to make the call on.
+/// \param hasher The parameter decl to make the call on.
 ///
 /// \param hashable The parameter to the call.
-static CallExpr *createHasherAppendingCall(ASTContext &C,
-                                           Expr *hasher,
-                                           Expr *hashable) {
-  // hasher.appending(_:)
-  DeclName name(C, C.Id_appending, {Identifier()});
-  auto *appendingCall = new (C) UnresolvedDotExpr(hasher, SourceLoc(),
-                                                  name, DeclNameLoc(),
-                                                  /*implicit*/ true);
+static CallExpr *createHasherAppendCall(ASTContext &C,
+                                        ParamDecl *hasher,
+                                        Expr *hashable) {
+  Expr *hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasher),
+                                         DeclNameLoc(), /*implicit*/ true);
+  DeclName name(C, C.Id_append, {Identifier()});
+  // hasher.append(_:)
+  auto *appendCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
+                                               name, DeclNameLoc(),
+                                               /*implicit*/ true);
   
-  // hasher.appending(hashable)
-  return CallExpr::createImplicit(C, appendingCall, {hashable}, {Identifier()});
+  // hasher.append(hashable)
+  return CallExpr::createImplicit(C, appendCall, {hashable}, {Identifier()});
 }
 
 static FuncDecl *
 deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                         NominalTypeDecl *typeDecl,
                         void (*bodySynthesizer)(AbstractFunctionDecl *)) {
-  // @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
+  // @derived func _hash(into hasher: inout _Hasher)
 
   ASTContext &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
-  // Expected type: (Self) -> (into: _UnsafeHasher) -> _UnsafeHasher
+  // Expected type: (Self) -> (into: inout _Hasher) -> ()
   // Constructed as:
   //   func type(input: Self,
-  //             output: func type(input: _UnsafeHasher,
-  //                               output: _UnsafeHasher))
+  //             output: func type(input: inout _UnsafeHasher,
+  //                               output: ()))
   // Created from the inside out:
 
-  Type hasherType = C.getUnsafeHasherDecl()->getDeclaredType();
+  auto hasherDecl = C.getHasherDecl();
+  if (!hasherDecl) {
+    auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
+    tc.diagnose(hashableProto->getLoc(), diag::broken_hashable_no_hasher);
+    return nullptr;
+  }
+  Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
-  auto *hasherParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                        SourceLoc(), C.Id_into, SourceLoc(),
-                                        C.Id_hasher, hasherType, parentDC);
-  hasherParam->setInterfaceType(hasherType);
+  auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
+                                            SourceLoc(),
+                                            SourceLoc(), C.Id_into, SourceLoc(),
+                                            C.Id_hasher, hasherType, parentDC);
+  hasherParamDecl->setInterfaceType(hasherType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
-                             ParameterList::createWithoutLoc(hasherParam)};
+                             ParameterList::createWithoutLoc(hasherParamDecl)};
 
-  // Func name: _hash(into: _UnsafeHasher)
+  // Return type: ()
+  auto returnType = TupleType::getEmpty(C);
+
+  // Func name: _hash(into: inout _Hasher) -> ()
   DeclName name(C, C.Id_hash, params[1]);
   auto *hashDecl = FuncDecl::create(C,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
                                     nullptr, params,
-                                    TypeLoc::withoutLoc(hasherType),
+                                    TypeLoc::withoutLoc(returnType),
                                     parentDC);
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Evaluate type of Self in (Self) -> (into: _UnsafeHasher) -> _UnsafeHasher
+  // Evaluate type of Self in (Self) -> (into: inout _Hasher) -> ()
   auto selfParam = computeSelfParam(hashDecl);
-  auto inputTypeElt = TupleTypeElt(hasherType, C.Id_into);
-  auto inputType = TupleType::get({inputTypeElt}, C);
-  auto innerType = FunctionType::get(inputType, hasherType,
+  auto inoutFlag = ParameterTypeFlags().withInOut(true);
+  auto hasherParam = AnyFunctionType::Param(hasherType, C.Id_into, inoutFlag);
+  auto innerType = FunctionType::get({hasherParam}, returnType,
                                      FunctionType::ExtInfo());
 
   Type interfaceType;
@@ -820,7 +833,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
     interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
                                              FunctionType::ExtInfo());
   } else {
-    // (Self) -> innerType == (_UnsafeHasher) -> _UnsafeHasher
+    // (Self) -> innerType == (inout _Hasher) -> ()
     interfaceType = FunctionType::get({selfParam}, innerType,
                                       FunctionType::ExtInfo());
   }
@@ -865,28 +878,31 @@ static void
 deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   // enum SomeEnum {
   //   case A, B, C
-  //   @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  //   @derived func _hash(into hasher: inout _Hasher) {
   //     switch self {
   //     case A:
-  //       return hasher.appending(0)
+  //       hasher.append(0)
   //     case B:
-  //       return hasher.appending(1)
+  //       hasher.append(1)
   //     case C:
-  //       return hasher.appending(2)
+  //       hasher.append(2)
   //     }
   //   }
   // }
   //
   // enum SomeEnumWithAssociatedValues {
   //   case A, B(Int), C(String, Int)
-  //   @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  //   @derived func _hash(into hasher: inout _Hasher) {
   //     switch self {
   //     case A:
-  //       return hasher.appending(0)
+  //       hasher.append(0)
   //     case B(let a0):
-  //       return hasher.appending(1).appending(a0)
+  //       hasher.append(1)
+  //       hasher.append(a0)
   //     case C(let a0, let a1):
-  //       return hasher.appending(2).appending(a0).appending(a1)
+  //       hasher.append(2)
+  //       hasher.append(a0)
+  //       hasher.append(a1)
   //     }
   //   }
   // }
@@ -904,20 +920,12 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   unsigned index = 0;
   SmallVector<ASTNode, 4> cases;
 
-  auto hasNoAssociatedValues = enumDecl->hasOnlyCasesWithoutAssociatedValues();
-
   // For each enum element, generate a case statement that binds the associated
   // values so that they can be fed to the hasher.
   for (auto elt : enumDecl->getAllElements()) {
     // case .<elt>(let a0, let a1, ...):
     SmallVector<VarDecl*, 3> payloadVars;
-
-    // hasherExpr will hold the returned expression. It starts by the hasher
-    // parameter, but we will add one or more chained method calls to it below.
-    //
-    // <hasherExpr> := hasher
-    Expr* hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasherParam),
-                                           DeclNameLoc(), /*implicit*/ true);
+    SmallVector<ASTNode, 3> statements;
 
     auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
@@ -929,32 +937,29 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
     auto labelItem = CaseLabelItem(/*IsDefault*/ false, pat, SourceLoc(),
                                    nullptr);
 
-    // If the enum has no associated values, we use the ordinal alone as the
-    // hash value, because that is sufficient for a good distribution. If any
-    // case does have associated values, then the ordinal is used as the first
-    // term fed into the hasher.
+    // If the enum has no associated values, we use the ordinal as the single
+    // hash component, because that is sufficient for a good distribution. If
+    // any case does have associated values, then the ordinal is used as the
+    // first term fed into the hasher.
 
-    // <hasherExpr> := <hasherExpr>.appending(<ordinal>)
     {
+      // Generate: hasher.append(<ordinal>)
       auto ordinalExpr = integerLiteralExpr(C, index++);
-      hasherExpr = createHasherAppendingCall(C, hasherExpr, ordinalExpr);
+      auto appendExpr = createHasherAppendCall(C, hasherParam, ordinalExpr);
+      statements.emplace_back(ASTNode(appendExpr));
     }
 
-    if (!hasNoAssociatedValues) {
-      // Generate a sequence of expressions that combine the payload's hash
-      // values into result.
-      for (auto payloadVar : payloadVars) {
-        auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
-                                                 /*implicit*/ true);
-        // <hasherExpr> := <hasherExpr>.appending(<payloadVar>)
-        hasherExpr = createHasherAppendingCall(C, hasherExpr, payloadVarRef);
-      }
+    // Generate a sequence of statements that feed the payloads into hasher.
+    for (auto payloadVar : payloadVars) {
+      auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
+                                               /*implicit*/ true);
+      // Generate: hasher.append(<payloadVar>)
+      auto appendExpr = createHasherAppendCall(C, hasherParam, payloadVarRef);
+      statements.emplace_back(ASTNode(appendExpr));
     }
 
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), hasherExpr);
     auto hasBoundDecls = !payloadVars.empty();
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  {ASTNode(returnStmt)}, SourceLoc());
+    auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
                                      SourceLoc(), body));
   }
@@ -965,7 +970,8 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
 
-  auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)}, SourceLoc());
+  auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
+                                SourceLoc());
   hashIntoDecl->setBody(body);
 }
 
@@ -975,25 +981,20 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   // struct SomeStruct {
   //   var x: Int
   //   var y: String
-  //   @derived func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-  //     return hasher.appending(x).appending(y)
+  //   @derived func _hash(into hasher: inout _Hasher) {
+  //     hasher.append(x)
+  //     hasher.append(y)
   //   }
   // }
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
   auto structDecl = parentDC->getAsStructOrStructExtensionContext();
+  SmallVector<ASTNode, 6> statements;
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
-
-  // hasherExpr will hold the returned expression. It starts by the hasher
-  // parameter, but we will add one or more chained method calls to it below.
-  //
-  // <hasherExpr> := hasher
-  Expr* hasherExpr = new (C) DeclRefExpr(hasherParam, DeclNameLoc(),
-                                         /*implicit*/ true);
 
   auto storedProperties =
     structDecl->getStoredProperties(/*skipInaccessible=*/true);
@@ -1006,12 +1007,12 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
                                        /*implicit*/ true);
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
-    // <hasherExpr> := <hasherExpr>.appending(self.<property>)
-    hasherExpr = createHasherAppendingCall(C, hasherExpr, selfPropertyExpr);
+    // Generate: hasher.append(self.<property>)
+    auto appendExpr = createHasherAppendCall(C, hasherParam, selfPropertyExpr);
+    statements.emplace_back(ASTNode(appendExpr));
   }
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), hasherExpr);
-  auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(returnStmt)},
+  auto body = BraceStmt::create(C, SourceLoc(), statements,
                                 SourceLoc(), /*implicit*/ true);
   hashIntoDecl->setBody(body);
 }
@@ -1223,7 +1224,6 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
     return hashValueDecl;
   }
 
-  tc.diagnose(requirement->getLoc(),
-              diag::broken_hashable_requirement);
+  tc.diagnose(requirement->getLoc(), diag::broken_hashable_requirement);
   return nullptr;
 }

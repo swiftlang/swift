@@ -211,12 +211,12 @@ extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
     return _hashValue(for: self)
   }
 
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  public func _hash(into hasher: inout _Hasher) {
     switch _value {
     case .index(let value):
-      return hasher.appending(value)
+      hasher.append(value)
     case .pastEnd:
-      return hasher.appending(Int.max)
+      hasher.append(Int.max)
     }
   }
 }

@@ -3583,8 +3583,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes using an _UnsafeHasher passed in as
-    // an extra parameter.
+    // TODO: Combine hashes of the indexes using an inout _Hasher
     {
       auto &index = indexes[0];
       

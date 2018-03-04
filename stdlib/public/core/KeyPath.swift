@@ -53,20 +53,18 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  public func _hash(into hasher: inout _Hasher) {
     return withBuffer {
-      var hasher = hasher
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        hasher = hasher.appending(component.value)
+        hasher.append(component.value)
         if let type = type {
-          hasher = hasher.appending(unsafeBitCast(type, to: Int.self))
+          hasher.append(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
       }
-      return hasher
     }
   }
   
@@ -462,11 +460,10 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher
-      .appending(value)
-      .appending(isStoredProperty)
-      .appending(isTableOffset)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(value)
+    hasher.append(isStoredProperty)
+    hasher.append(isTableOffset)
   }
 }
 
@@ -483,7 +480,7 @@ internal struct ComputedArgumentWitnesses {
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
-  // FIXME(hashing) Pass in, append to and return _UnsafeHasher instead
+  // FIXME(hasher) Append to an inout _Hasher instead
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
@@ -600,7 +597,7 @@ internal enum KeyPathComponent: Hashable {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  internal func _hash(into hasher: inout _Hasher) {
     var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
@@ -611,34 +608,38 @@ internal enum KeyPathComponent: Hashable {
           argument.data.count)
         // Returning 0 indicates that the arguments should not impact the
         // hash value of the overall key path.
-        // FIXME(hasher): hash witness should just return hasher directly
+        // FIXME(hasher): hash witness should just mutate hasher directly
         if hash != 0 {
-          hasher = hasher.appending(hash)
+          hasher.append(hash)
         }
       }
     }
     switch self {
     case .struct(offset: let a):
-      hasher = hasher.appending(0).appending(a)
+      hasher.append(0)
+      hasher.append(a)
     case .class(offset: let b):
-      hasher = hasher.appending(1).appending(b)
+      hasher.append(1)
+      hasher.append(b)
     case .optionalChain:
-      hasher = hasher.appending(2)
+      hasher.append(2)
     case .optionalForce:
-      hasher = hasher.appending(3)
+      hasher.append(3)
     case .optionalWrap:
-      hasher = hasher.appending(4)
+      hasher.append(4)
     case .get(id: let id, get: _, argument: let argument):
-      hasher = hasher.appending(5).appending(id)
+      hasher.append(5)
+      hasher.append(id)
       appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher = hasher.appending(6).appending(id)
+      hasher.append(6)
+      hasher.append(id)
       appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher = hasher.appending(7).appending(id)
+      hasher.append(7)
+      hasher.append(id)
       appendHashFromArgument(argument)
     }
-    return hasher
   }
 }
 

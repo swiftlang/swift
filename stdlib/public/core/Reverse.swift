@@ -198,8 +198,8 @@ extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
     return base.hashValue
   }
 
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher.appending(base)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(base)
   }
 }
 

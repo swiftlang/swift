@@ -3615,19 +3615,20 @@ extension ${Self} : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  public func _hash(into hasher: inout _Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
     // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
     // this, we should introduce a custom AnyHashable box for integer values
     // that sign-extends values to 64 bits.
     % if bits <= word_bits:
-    return hasher.appending(bits: _lowWord)
+    hasher.append(bits: _lowWord)
     % elif bits == 2 * word_bits:
     if let word = ${"" if signed else "U"}Int(exactly: self) {
-      return hasher.appending(bits: word._lowWord)
+      hasher.append(bits: word._lowWord)
+    } else {
+      hasher.append(bits: UInt64(_value))
     }
-    return hasher.appending(bits: UInt64(_value))
     % else:
     fatalError("Unsupported integer width")
     % end

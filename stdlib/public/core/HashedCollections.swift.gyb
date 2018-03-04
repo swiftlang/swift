@@ -796,12 +796,12 @@ extension Set : Hashable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
+  public func _hash(into hasher: inout _Hasher) {
     var hash = 0
     for member in self {
       hash ^= _hashValue(for: member)
     }
-    return hasher.appending(hash)
+    hasher.append(hash)
   }
 }
 

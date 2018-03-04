@@ -29,13 +29,13 @@ enum E {
 // CHECK: ret i{{.*}}
 
 // Check if the _hash(into:) method can be compiled to a simple zext instruction
-// followed by a call to _UnsafeHasher(appending:).
+// followed by a call to _Hasher.append(bits:).
 
-// CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$S12enum_derived1EO5_hash4intos13_UnsafeHasherVAG_tF"
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO5_hash4intos13_UnsafeHasherVAG_tF"
+// CHECK-NORMAL-LABEL:define hidden swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
 // CHECK: [[V:%.*]] = zext i8 %1 to i{{.*}}
-// CHECK: [[R:%.*]] = tail call swiftcc i{{.*}} @"$Ss13_UnsafeHasherV9appending4bitsABSu_tF"(i{{.*}} [[V]],
-// CHECK: ret i{{.*}} [[R]]
+// CHECK: tail call swiftcc i{{.*}} @"$Ss7_HasherV6append4bitsySu_tF"(i{{.*}} [[V]],
+// CHECK: ret void
 
 // Derived conformances from extensions
 // The actual enums are in Inputs/def_enum.swift

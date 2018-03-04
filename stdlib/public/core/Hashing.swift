@@ -195,82 +195,6 @@ func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   return Int(bitPattern: x)
 }
 
-/// An unsafe wrapper around a stateful hash function, presenting a faux purely
-/// functional interface to eliminate ARC overhead.
-///
-/// This is not a true value type; calling `appending` or `finalized` actually
-/// mutates `self`'s state.
-@_fixed_layout
-public struct _UnsafeHasher {
-  @_versioned
-  internal let _rawState: UnsafeMutableRawPointer
-
-  internal var _state: UnsafeMutablePointer<_Hasher> {
-    @inline(__always)
-    get { return _rawState.assumingMemoryBound(to: _Hasher.self) }
-  }
-
-  @inline(__always)
-  @_versioned
-  internal init(_ state: UnsafeMutablePointer<_Hasher>) {
-    self._rawState = UnsafeMutableRawPointer(state)
-  }
-
-  @_versioned
-  // not @_inlineable
-  @effects(readonly) // FIXME(hasher): Unjustified
-  static func hashValue<H: Hashable>(for pointer: UnsafePointer<H>) -> Int {
-    var hasher = _Hasher()
-    return withUnsafeMutablePointer(to: &hasher) { p in
-      return pointer.pointee._hash(into: _UnsafeHasher(p))._finalized()
-    }
-  }
-
-  @_versioned
-  // not @_inlineable
-  @effects(readonly)
-  internal func appending(bits value: UInt) -> _UnsafeHasher {
-    // The effects attribute is a lie; however, it enables the compiler to
-    // eliminate unnecessary retain/releases protecting Hashable state around
-    // calls to `_Hasher.append(_:)`.
-    //
-    // We don't have a way to describe the side-effects of an opaque function --
-    // if it doesn't have an @effects attribute, the compiler has no choice but
-    // to assume it may mutate the hashable we're visiting. We know that won't
-    // be the case (the stdlib owns the hash function), but the only way to tell
-    // this to the compiler is to pretend the state update is pure.
-    _state.pointee.append(value)
-    return self
-  }
-
-  @_versioned
-  // not @_inlineable
-  @effects(readonly) // See comment in appending(_: UInt)
-  internal func appending(bits value: UInt32) -> _UnsafeHasher {
-    _state.pointee.append(value)
-    return self
-  }
-
-  @_versioned
-  // not @_inlineable
-  @effects(readonly) // See comment in appending(_: UInt)
-  internal func appending(bits value: UInt64) -> _UnsafeHasher {
-    _state.pointee.append(value)
-    return self
-  }
-
-  @_inlineable
-  @inline(__always)
-  public func appending<H: Hashable>(_ value: H) -> _UnsafeHasher {
-    return value._hash(into: self)
-  }
-
-  @inline(__always)
-  internal func _finalized() -> Int {
-    return Int(_truncatingBits: _state.pointee.finalize()._lowWord)
-  }
-}
-
 // FIXME(hasher): This is purely for benchmarking; to be removed.
 internal struct _LegacyHasher {
   internal var _hash: Int
@@ -311,4 +235,52 @@ internal struct _LegacyHasher {
   }
 }
 
-internal typealias _Hasher = _SipHash13
+
+// NOT @_fixed_layout
+public struct _Hasher {
+  internal typealias Core = _SipHash13
+
+  // NOT @_versioned
+  internal var _core: Core
+
+  // NOT @_inlineable
+  public init() {
+    self._core = Core()
+  }
+
+  @inline(__always)
+  public mutating func append<H: Hashable>(_ value: H) {
+    value._hash(into: &self)
+  }
+
+  // NOT @_inlineable
+  public mutating func append(bits: UInt) {
+    _core.append(bits)
+  }
+  // NOT @_inlineable
+  public mutating func append(bits: UInt32) {
+    _core.append(bits)
+  }
+  // NOT @_inlineable
+  public mutating func append(bits: UInt64) {
+    _core.append(bits)
+  }
+
+  // NOT @_inlineable
+  public mutating func append(bits: Int) {
+    _core.append(UInt(bitPattern: bits))
+  }
+  // NOT @_inlineable
+  public mutating func append(bits: Int32) {
+    _core.append(UInt32(bitPattern: bits))
+  }
+  // NOT @_inlineable
+  public mutating func append(bits: Int64) {
+    _core.append(UInt64(bitPattern: bits))
+  }
+
+  // NOT @_inlineable
+  public mutating func finalize() -> Int {
+    return Int(truncatingIfNeeded: _core.finalize())
+  }
+}

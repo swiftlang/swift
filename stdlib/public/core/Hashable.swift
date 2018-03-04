@@ -110,21 +110,22 @@ public protocol Hashable : Equatable {
   var hashValue: Int { get }
 
   /// Feed bits to be hashed into the hash function represented by `hasher`.
-  func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher
+  func _hash(into hasher: inout _Hasher)
 }
 
 extension Hashable {
   @inline(__always)
-  public func _hash(into hasher: _UnsafeHasher) -> _UnsafeHasher {
-    return hasher.appending(self.hashValue)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(self.hashValue)
   }
 }
 
 // Called by synthesized `hashValue` implementations.
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var value = value
-  return withUnsafePointer(to: &value) { _UnsafeHasher.hashValue(for: $0) }
+  var hasher = _Hasher()
+  hasher.append(value)
+  return hasher.finalize()
 }
 
 // Called by the SwiftValue implementation.
@@ -143,4 +144,3 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
 ) -> Int {
   return value.pointee.hashValue
 }
-
