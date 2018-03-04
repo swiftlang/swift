@@ -532,6 +532,9 @@ private:
   bool tryLexConflictMarker(bool EatNewline);
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
+
+  /// Lex invalid characters and return which it should be tokenized.
+  bool lexInvalidCharacters(const char *&Ptr);
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first

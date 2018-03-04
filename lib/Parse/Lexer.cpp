@@ -1875,6 +1875,79 @@ Lexer::NulCharacterKind Lexer::getNulCharacterKind(const char *Ptr) const {
   return NulCharacterKind::Embedded;
 }
 
+bool Lexer::lexInvalidCharacters(const char *&Ptr) {
+  assert(Ptr != nullptr);
+
+  const char *const StartPtr = Ptr;
+
+  if (advanceIfValidContinuationOfIdentifier(Ptr, BufferEnd)) {
+    // If this is a valid identifier continuation, but not a valid identifier
+    // start, attempt to recover by eating more continuation characters.
+    diagnose(StartPtr, diag::lex_invalid_identifier_start_character);
+    while (advanceIfValidContinuationOfIdentifier(Ptr, BufferEnd))
+      ;
+    return true;
+  }
+
+  // This character isn't allowed in Swift source.
+  uint32_t codepoint = validateUTF8CharacterAndAdvance(Ptr, BufferEnd);
+  if (codepoint == ~0U) {
+    diagnose(StartPtr, diag::lex_invalid_utf8)
+        .fixItReplaceChars(getSourceLoc(StartPtr), getSourceLoc(Ptr), " ");
+    // Skip presumed whitespace.
+    return false;
+  }
+
+  if (codepoint == 0x0000201D) {
+    // If this is an end curly quote, just diagnose it with a fixit hint.
+    diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
+        .fixItReplaceChars(getSourceLoc(StartPtr), getSourceLoc(Ptr), "\"");
+    return true;
+  }
+
+  if (codepoint == 0x0000201C) {
+    const char *const LeftQuoteEndPtr = Ptr;
+
+    // If this is a start curly quote, do a fuzzy match of a string literal
+    // to improve recovery.
+    if (const char *const RightQuoteEndPtr =
+            findEndOfCurlyQuoteStringLiteral(Ptr)) {
+      Ptr = RightQuoteEndPtr;
+    }
+
+    // Note, we intentionally diagnose the end quote before the start quote,
+    // so that the IDE suggests fixing the end quote before the start quote.
+    // This, in turn, works better with our error recovery because we won't
+    // diagnose an end curly quote in the middle of a straight quoted
+    // literal.
+    diagnose(StartPtr, diag::lex_invalid_curly_quote)
+        .fixItReplaceChars(getSourceLoc(StartPtr),
+                           getSourceLoc(LeftQuoteEndPtr), "\"");
+
+    return true;
+  }
+
+  diagnose(StartPtr, diag::lex_invalid_character)
+      .fixItReplaceChars(getSourceLoc(StartPtr), getSourceLoc(Ptr), " ");
+
+  char expectedCodepoint;
+  if ((expectedCodepoint =
+           confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
+
+    llvm::SmallString<4> confusedChar;
+    EncodeToUTF8(codepoint, confusedChar);
+    llvm::SmallString<1> expectedChar;
+    expectedChar += expectedCodepoint;
+    diagnose(StartPtr, diag::lex_confusable_character, confusedChar,
+             expectedChar)
+        .fixItReplaceChars(getSourceLoc(StartPtr), getSourceLoc(Ptr),
+                           expectedChar);
+  }
+
+  // Skip presumed whitespace.
+  return false;
+}
+
 void Lexer::tryLexEditorPlaceholder() {
   assert(CurPtr[-1] == '<' && CurPtr[0] == '#');
   const char *TokStart = CurPtr-1;
@@ -2100,65 +2173,15 @@ Restart:
     
     if (advanceIfValidStartOfOperator(tmp, BufferEnd))
       return lexOperatorIdentifier();
-    
-    if (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd)) {
-      // If this is a valid identifier continuation, but not a valid identifier
-      // start, attempt to recover by eating more continuation characters.
-      diagnose(CurPtr-1, diag::lex_invalid_identifier_start_character);
-      while (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd));
-    } else {
-      // This character isn't allowed in Swift source.
-      uint32_t codepoint = validateUTF8CharacterAndAdvance(tmp, BufferEnd);
-      if (codepoint == ~0U) {
-        diagnose(CurPtr-1, diag::lex_invalid_utf8)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
-        CurPtr = tmp;
-        goto Restart;  // Skip presumed whitespace.
-      } else if (codepoint == 0x0000201D) {
-        // If this is an end curly quote, just diagnose it with a fixit hint.
-        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
-      } else if (codepoint == 0x0000201C) {
-        auto endPtr = tmp;
-        // If this is a start curly quote, do a fuzzy match of a string literal
-        // to improve recovery.
-        if (auto tmp2 = findEndOfCurlyQuoteStringLiteral(tmp))
-          tmp = tmp2;
 
-        // Note, we intentionally diagnose the end quote before the start quote,
-        // so that the IDE suggests fixing the end quote before the start quote.
-        // This, in turn, works better with our error recovery because we won't
-        // diagnose an end curly quote in the middle of a straight quoted
-        // literal.
-        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(endPtr),"\"");
+    bool ShouldTokenize = lexInvalidCharacters(tmp);
+    CurPtr = tmp;
 
-      } else {
-        diagnose(CurPtr-1, diag::lex_invalid_character)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
-
-        char expectedCodepoint;
-        if ((expectedCodepoint =
-            confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
-
-          llvm::SmallString<4> confusedChar;
-          EncodeToUTF8(codepoint, confusedChar);
-          llvm::SmallString<1> expectedChar;
-          expectedChar += expectedCodepoint;
-          diagnose(CurPtr-1, diag::lex_confusable_character,
-                   confusedChar, expectedChar)
-            .fixItReplaceChars(getSourceLoc(CurPtr-1),
-                               getSourceLoc(tmp),
-                               expectedChar);
-        }
-
-        CurPtr = tmp;
-        goto Restart;  // Skip presumed whitespace.
-      }
+    if (ShouldTokenize) {
+      return formToken(tok::unknown, TokStart);
     }
 
-    CurPtr = tmp;
-    return formToken(tok::unknown, TokStart);
+    goto Restart;
   }
 
   case '\n':
