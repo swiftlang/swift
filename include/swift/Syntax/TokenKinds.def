@@ -285,6 +285,7 @@ POUND_OBJECT_LITERAL(tfop, "tfop",  ExpressibleByTensorFlowOp)
 
 // SWIFT_ENABLE_TENSORFLOW
 POUND_KEYWORD(gradient)
+POUND_KEYWORD(valueAndGradient)
 
 // Single-token literals
 LITERAL(integer_literal)
