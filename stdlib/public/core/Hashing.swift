@@ -244,6 +244,7 @@ public struct _Hasher {
   internal var _core: Core
 
   // NOT @_inlineable
+  @effects(releasenone)
   public init() {
     self._core = Core()
   }
@@ -254,32 +255,39 @@ public struct _Hasher {
   }
 
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: UInt) {
     _core.append(bits)
   }
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: UInt32) {
     _core.append(bits)
   }
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: UInt64) {
     _core.append(bits)
   }
 
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: Int) {
     _core.append(UInt(bitPattern: bits))
   }
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: Int32) {
     _core.append(UInt32(bitPattern: bits))
   }
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func append(bits: Int64) {
     _core.append(UInt64(bitPattern: bits))
   }
 
   // NOT @_inlineable
+  @effects(releasenone)
   public mutating func finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
   }
