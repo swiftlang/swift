@@ -19,12 +19,16 @@ import Swift
 // CHECK-SAME:   <i32 0x8004_00D0>
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
+// --       negative size in words
+// CHECK-SAME:   i32 2,
+// --       positive size in words
+// CHECK-SAME:   i32 18,
+// --       num immediate members
+// CHECK-SAME:   i32 8,
 // --       num fields
 // CHECK-SAME:   i32 3,
 // --       field offset vector offset
 // CHECK-SAME:   i32 15,
-// --       generic parameter vector offset
-// CHECK-SAME:   i32 10,
 // --       template instantiation function
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**)* @"$S15generic_classes11RootGenericCMi"
 // --       template instantiation cache
@@ -38,10 +42,29 @@ import Swift
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S15generic_classes11RootGenericCMP" = internal constant
-// --       nominal type descriptor
-// CHECK-SAME:   @"$S15generic_classes11RootGenericCMn"
+// CHECK-SAME: <{
+// --       heap destructor
+// CHECK-SAME:   @"$S15generic_classes11RootGenericCfD"
 // --       ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* null,
+// --       flags
+// CHECK_SAME:   i32 3,
+// --       immediate pattern size
+// CHECK-SAME:   i16 0,
+// --       immediate pattern target offset
+// CHECK-SAME:   i16 0,
+// --       extra data size
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 23,
+// --       class ro-data offset
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 5,
+// --       metaclass object offset
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 0,
+// --       class ro-data offset
+// CHECK-SAME-native:   i16 0
+// CHECK-SAME-objc:     i16 14,
 // CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
@@ -87,10 +110,28 @@ import Swift
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**)* @"$S15generic_classes015GenericInheritsC0CMi"
 
 // CHECK: @"$S15generic_classes015GenericInheritsC0CMP" = internal constant
-// --       nominal type descriptor
-// CHECK-SAME:   @"$S15generic_classes015GenericInheritsC0CMn",
+// --       heap destructor
+// CHECK-SAME:   @"$S15generic_classes015GenericInheritsC0CfD"
 // --       ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* null,
+// --       flags
+// CHECK_SAME:   i32 3,
+// --       immediate pattern size
+// CHECK-SAME:   i16 0,
+// --       immediate pattern target offset
+// CHECK-SAME:   i16 0,
+// --       extra data size
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 23,
+// --       class ro-data offset
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 5,
+// --       metaclass object offset
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 0,
+// --       class ro-data offset
+// CHECK-SAME-native:   i16 0
+// CHECK-SAME-objc:     i16 14,
 // CHECK-SAME: }
 
 // CHECK: @"$S15generic_classes018GenericInheritsNonC0CMP"
@@ -292,13 +333,13 @@ entry(%c : $RootGeneric<Int32>):
  */
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes11RootGenericCMi"(%swift.type_descriptor*, i8**) {{.*}} {
-// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, {{.*}}, i64 8)
+// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, {{.*}} @"$S15generic_classes11RootGenericCMP"{{.*}})
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor*, i8**) {{.*}} {
-// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, {{.*}}, i64 5)
+// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, {{.*}} @"$S15generic_classes22RootGenericFixedLayoutCMP"{{.*}})
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
@@ -309,10 +350,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the superclass.
-// CHECK:   [[SUPER:%.*]] = call %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type* %A)
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
-// CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** {{.*}}, i64 96, i64 16, i8** %1, %objc_class* [[T0]], i64 6)
-// CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** {{.*}}, i64 280, i64 200, i8** %1, %objc_class* [[T0]], i64 6)
+// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, {{.*}} @"$S15generic_classes015GenericInheritsC0CMP"{{.*}})
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Put the generic arguments in their correct positions.
 // CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 18
@@ -321,26 +359,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 19
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8*
 // CHECK:   store i8* [[T0]], i8** [[B_ADDR]], align 8
-//   Set up the isa.
-// CHECK-objc:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 0
-// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to %objc_class**
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -25
-// CHECK-objc:   [[METACLASS:%.*]] = bitcast i8** [[T0]] to %objc_class*
-// CHECK-objc:   store %objc_class* [[METACLASS]], %objc_class** [[T1]], align 8
-//   Set up the instance rodata pointer.
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
-// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK-objc:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -20
-// CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[RODATA]] to i64
-// CHECK-objc:   [[T3:%.*]] = or i64 [[T2]], 1
-// CHECK-objc:   store i64 [[T3]], i64* [[T1]], align 8
-//   Set up the class rodata pointer.
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -21
-// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK-objc:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -11
-// CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
-// CHECK-objc:   store i64 [[T2]], i64* [[T1]], align 8
+// CHECK:   [[SUPER:%.*]] ={{( tail)?}} call %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type* %A)
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:   store %swift.type* [[SUPER]], %swift.type** [[T1]],
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 // CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 23

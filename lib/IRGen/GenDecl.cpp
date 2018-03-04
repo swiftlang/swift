@@ -3346,11 +3346,18 @@ IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
 
 /// Returns the address of a class metadata base offset.
 llvm::Constant *
-IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
-                                              ForDefinition_t forDefinition) {
+IRGenModule::getAddrOfClassMetadataBounds(ClassDecl *D,
+                                          ForDefinition_t forDefinition) {
+  // StoredClassMetadataBounds
+  auto layoutTy = llvm::StructType::get(getLLVMContext(), {
+    SizeTy,  // Immediate members offset
+    Int32Ty, // Negative size in words
+    Int32Ty  // Positive size in words
+  });
+
   LinkEntity entity = LinkEntity::forClassMetadataBaseOffset(D);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
-                               SizeTy, DebugTypeInfo());
+                               layoutTy, DebugTypeInfo());
 }
 
 /// Return the address of a generic type's metadata instantiation cache.

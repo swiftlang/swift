@@ -63,14 +63,18 @@ class C<T> : B {}
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMa"
 //   Superclass.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1BCMn"
+//   Negative size in words.
+// CHECK-SAME: i32 2,
+//   Positive size in words.
+// CHECK-32-SAME: i32 15,
+// CHECK-64-SAME: i32 12,
+//   Num immediate members.
+// CHECK-32-SAME: i32 1,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
 // CHECK-32-SAME: i32 15,
 // CHECK-64-SAME: i32 12,
-//   Argument offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
 //   Instantiation function.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMi"
 //   Instantiation cache.

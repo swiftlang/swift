@@ -658,10 +658,10 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
     }
 #endif
 
-    if (auto fn = classMetadata->getIVarDestroyer())
-      fn(object);
+    if (classMetadata->IVarDestroyer)
+      classMetadata->IVarDestroyer(object);
 
-    classMetadata = classMetadata->SuperClass->getClassObject();
+    classMetadata = classMetadata->Superclass->getClassObject();
     assert(classMetadata && "Given metatype not a superclass of object type?");
   }
 
@@ -671,7 +671,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   if (!usesNativeSwiftReferenceCounting(classMetadata)) {
     // Find the pure Objective-C superclass.
     while (!classMetadata->isPureObjC())
-      classMetadata = classMetadata->SuperClass->getClassObject();
+      classMetadata = classMetadata->Superclass->getClassObject();
 
     // Set the class to the pure Objective-C superclass, so that when dealloc
     // runs, it starts at that superclass.
