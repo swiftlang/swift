@@ -226,7 +226,7 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
-#ifndef NDEBUG
+#if SWIFT_OBJC_INTEROP
 extern "C" void *_objc_empty_cache;
 #endif
 
