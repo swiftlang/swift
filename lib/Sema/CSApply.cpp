@@ -2391,15 +2391,16 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Expr *visitGradientExpr(GradientExpr *expr) {
+    Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
+                                    bool preservingPrimalResult) {
       auto gradType = simplifyType(cs.getType(expr));
       assert(gradType && "Gradient expression should've been assigned a type");
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
+
       // FIXME(danielzheng): Currently, type checking a type member decl doesn't
       // directly give us a FuncDecl. We are skipping decl assignment to make
       // type checking tests pass.
-
       if (!isa<DeclRefExpr>(expr->getPrimalExpr())) return expr;
       auto *primalDecl = expr->getPrimalExpr()->getReferencedDecl().getDecl();
       auto *primalFD = cast<FuncDecl>(primalDecl);
@@ -2407,16 +2408,12 @@ namespace {
       return expr;
     }
 
+    Expr *visitGradientExpr(GradientExpr *expr) {
+      return handleReverseAutoDiffExpr(expr, /*preservingPrimalResult=*/false);
+    }
+
     Expr *visitValueAndGradientExpr(ValueAndGradientExpr *expr) {
-      assert(cs.getType(expr) && "should've been assigned a type");
-      // FIXME(danielzheng): Currently, type checking a type member decl doesn't
-      // directly give us a FuncDecl. We are skipping decl assignment to make
-      // type checking tests pass.
-      if (!isa<DeclRefExpr>(expr->getPrimalExpr())) return expr;
-      auto *primalDecl = expr->getPrimalExpr()->getReferencedDecl().getDecl();
-      auto *primalFD = cast<FuncDecl>(primalDecl);
-      expr->setResolvedPrimal(primalFD);
-      return expr;
+      return handleReverseAutoDiffExpr(expr, /*preservingPrimalResult=*/true);
     }
 
     // SWIFT_ENABLE_TENSORFLOW
