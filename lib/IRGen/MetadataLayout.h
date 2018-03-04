@@ -227,6 +227,10 @@ public:
     return HasResilientSuperclass;
   }
 
+  constexpr static bool areImmediateMembersNegative() {
+    return false;
+  }
+
   Size getMetadataSizeOffset() const;
 
   Size getMetadataAddressPointOffset() const;

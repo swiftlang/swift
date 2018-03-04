@@ -11,30 +11,43 @@
 // CHECK-LABEL: @"$S13generic_types1ACMI" = internal global [16 x i8*] zeroinitializer, align 8
 
 // CHECK-LABEL: @"$S13generic_types1ACMn" = hidden constant
+// CHECK-SAME:   i32 -2147221296,
+// CHECK-SAME:   @"$S13generic_typesMXM"
+//               <name>
 // CHECK-SAME:   @"$S13generic_types1ACMa"
+// -- superclass
+// CHECK-SAME:   i32 0,
+// -- negative size in words
+// CHECK-SAME:   i32 2,
+// -- positive size in words
+// CHECK-SAME:   i32 17,
+// -- num immediate members
+// CHECK-SAME:   i32 7,
+// -- num fields
+// CHECK-SAME:   i32 1,
+// -- field offset vector offset
+// CHECK-SAME:   i32 16,
+// -- instantiation function
 // CHECK-SAME:   @"$S13generic_types1ACMi"
+// -- instantiation cache
 // CHECK-SAME:   @"$S13generic_types1ACMI"
+// -- num generic params
+// CHECK-SAME:   i32 1,
+// -- num generic requirement
+// CHECK-SAME:   i32 0,
+// -- num key arguments
+// CHECK-SAME:   i32 1,
+// -- num extra arguments
+// CHECK-SAME:   i32 0,
+// -- parameter descriptor 1
+// CHECK-SAME:   i8 -128,
 
 // CHECK-LABEL: @"$S13generic_types1ACMP" = internal constant
 // CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD",
-// CHECK-SAME:   i8** @"$SBoWV",
-// CHECK-SAME:   i64 0,
-// CHECK-SAME:   %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 {{1|2}},
-// CHECK-SAME:   i32 {{3|2}},
-// CHECK-SAME:   i32 0,
-// CHECK-SAME:   i32 24,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   i32 152,
-// CHECK-SAME:   i32 16,
-// -- nominal type descriptor
-// CHECK-SAME:   @"$S13generic_types1ACMn",
 // -- ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* null,
+// -- flags
+// CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S13generic_types1BCMI" = internal global [16 x i8*] zeroinitializer, align 8
@@ -46,77 +59,29 @@
 
 // CHECK-LABEL: @"$S13generic_types1BCMP" = internal constant
 // CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD",
-// CHECK-SAME:   i8** @"$SBoWV",
-// CHECK-SAME:   i64 0,
-// CHECK-SAME:   %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 {{1|2}},
-// CHECK-SAME:   i32 {{3|2}},
-// CHECK-SAME:   i32 0,
-// CHECK-SAME:   i32 24,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   i32 144,
-// CHECK-SAME:   i32 16,
-// -- nominal type descriptor
-// CHECK-SAME:   @"$S13generic_types1BCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S13generic_types1CCMP" = internal constant
 // CHECK-SAME:   void ([[C]]*)* @"$S13generic_types1CCfD",
-// CHECK-SAME:   i8** @"$SBoWV",
-// CHECK-SAME:   i64 0,
-// CHECK-SAME:   %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 {{1|2}},
-// CHECK-SAME:   i32 {{3|2}},
-// CHECK-SAME:   i32 0,
-// CHECK-SAME:   i32 24,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   i32 160,
-// CHECK-SAME:   i32 16,
-// -- nominal type descriptor
-// CHECK-SAME:   @"$S13generic_types1CCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S13generic_types1DCMP" = internal constant
 // CHECK-SAME:   void ([[D]]*)* @"$S13generic_types1DCfD",
-// CHECK-SAME:   i8** @"$SBoWV",
-// CHECK-SAME:   i64 0,
-// CHECK-SAME:   %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 {{1|2}},
-// CHECK-SAME:   i32 {{3|2}},
-// CHECK-SAME:   i32 0,
-// CHECK-SAME:   i32 24,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   i32 160,
-// CHECK-SAME:   i32 16,
-// -- nominal type descriptor
-// CHECK-SAME:   @"$S13generic_types1DCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}}* @"$S13generic_types1ACMP" to i8**), i64 96, i64 16, i8** %1, %objc_class* null, i64 7)
-// CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$__TtCs12_SwiftObject"
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
-// CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}}* @"$S13generic_types1ACMP" to i8**), i64 280, i64 200, i8** %1, %objc_class* [[SUPER]], i64 7)
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}}* @"$S13generic_types1ACMP" to i8**))
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
@@ -127,10 +92,7 @@
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}}* @"$S13generic_types1BCMP" to i8**), i64 96, i64 16, i8** %1, %objc_class* null, i64 6)
-// CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$__TtCs12_SwiftObject"
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
-// CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}}* @"$S13generic_types1BCMP" to i8**), i64 280, i64 200, i8** %1, %objc_class* [[SUPER]], i64 6)
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}}* @"$S13generic_types1BCMP" to i8**))
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*

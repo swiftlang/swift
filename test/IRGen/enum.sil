@@ -116,8 +116,6 @@ import Swift
 // CHECK-SAME:   i32 1,
 // --       No empty cases
 // CHECK-SAME:   i32 0,
-// --       Case type accessor
-// CHECK-SAME:   i32 2,
 // --       generic instantiation function
 // CHECK-SAME:   @"$S4enum16DynamicSingletonOMi"
 // --       generic parameters, requirements, key, extra

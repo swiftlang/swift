@@ -563,7 +563,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
       // Look through artificial subclasses.
       while (isa->isTypeMetadata() && isa->isArtificialSubclass()) {
-        isa = isa->SuperClass;
+        isa = isa->Superclass;
       }
       passedType = isa;
     }
