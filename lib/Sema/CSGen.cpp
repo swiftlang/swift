@@ -1241,6 +1241,7 @@ namespace {
       auto &TC = CS.getTypeChecker();
       auto *primalExpr = GE->getPrimalExpr();
       auto *primalTy = CS.getType(primalExpr)->getAs<AnyFunctionType>();
+      auto locator = CS.getConstraintLocator(GE);
       if (!primalTy) {
         TC.diagnose(primalExpr->getLoc(),
                     diag::gradient_expr_not_a_function, CS.getType(primalExpr));
@@ -1255,18 +1256,17 @@ namespace {
         TC.diagnose(primalExpr->getLoc(), diag::gradient_expr_not_a_decl_ref);
         return nullptr;
       }
-      auto primalParams = primalTy->getParams();
       // Compute the gradient type.
+      auto primalParams = primalTy->getParams();
       auto *genSig = primalTy->getOptGenericSignature();
       // We are going to collect differention arguments' types into this array.
-      SmallVector<TupleTypeElt, 8> gradResultTypes;
+      SmallVector<TupleTypeElt, 8> diffArgTypes;
       // If no arguments are given, then it is differentiating with respect to
       // all arguments (except self). The gradient's result type is all of the
       // primal's parameters' types.
-      if (GE->getArguments().empty()) {
+      if (GE->getArguments().empty())
         for (auto &primalParam : primalParams)
-          gradResultTypes.push_back(primalParam.getType());
-      }
+          diffArgTypes.push_back(primalParam.getType());
       // If arguments are specified, collect and type-check those arguments.
       else {
         int lastIndex = -1;
@@ -1280,7 +1280,7 @@ namespace {
                           diag::gradient_expr_argument_indices_not_ascending);
               return nullptr;
             }
-            // Indices cannot exdeed the number of arguments in the primal
+            // Indices cannot exceed the number of arguments in the primal
             // function.
             if (index >= primalParams.size()) {
               TC.diagnose(arg.getLoc(),
@@ -1299,7 +1299,7 @@ namespace {
               return nullptr;
             }
             lastIndex = index;
-            gradResultTypes.push_back(paramTy);
+            diffArgTypes.push_back(paramTy);
             break;
           }
           case AutoDiffArgument::Kind::Self: {
@@ -1328,25 +1328,55 @@ namespace {
               return nullptr;
             }
             // Collect the type.
-            gradResultTypes.push_back(selfTy);
+            diffArgTypes.push_back(selfTy);
             break;
           }
           }
         }
       }
+
+      // Gradient result types must conform to FloatingPoint.
+      // TODO: generalize to DifferentiationArgument, when implemented.
+      auto &ctx = CS.getASTContext();
+      ProtocolDecl *fpProto = ctx.getProtocol(KnownProtocolKind::FloatingPoint);
+      assert(fpProto && "FloatingPoint protocol could not be found.");
+
+      for (auto &diffArg : diffArgTypes)
+        CS.addConstraint(ConstraintKind::ConformsTo, diffArg.getType(),
+                         fpProto->getDeclaredInterfaceType(), locator);
+
       // Create a type for the gradient. The gradient has the same generic
       // signature as the primal function. The gradient's result types are
-      // what we collected in `gradResultTypes`.
-      Type gradResult = gradResultTypes.size() == 1
-        ? gradResultTypes.front().getType()
-        : TupleType::get(gradResultTypes, TC.Context);
-      Type gradTy;
+      // what we collected in `diffArgTypes`.
+      Type gradResult = diffArgTypes.size() == 1
+        ? diffArgTypes.front().getType()
+        : TupleType::get(diffArgTypes, TC.Context);
+      AnyFunctionType *gradTy;
       if (genSig)
         gradTy = GenericFunctionType::get(genSig, primalParams,
                                           gradResult, primalTy->getExtInfo());
       else
         gradTy = FunctionType::get(primalParams, gradResult,
                                    primalTy->getExtInfo());
+
+      // Gradient expressions with generic primals must have an explicit
+      // contextual type.
+      if (primalTy->hasTypeVariable()) {
+        auto contextualTy = CS.getContextualType(GE);
+        if (!contextualTy) {
+          TC.diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
+          return nullptr;
+        }
+        auto contextualGradTy = contextualTy->getAs<AnyFunctionType>();
+        if (!contextualGradTy) {
+          TC.diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
+          return nullptr;
+        }
+        // Contextual type must be convertible to expected gradient type.
+        CS.addConstraint(ConstraintKind::Conversion, contextualGradTy, gradTy,
+                         locator);
+      }
+
       return gradTy;
     }
 

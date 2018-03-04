@@ -837,7 +837,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(getIdentifier("TensorFlow"));
-    assert(M && "TensorFlow module does not exist.");
     break;
   default:
     M = getStdlibModule();

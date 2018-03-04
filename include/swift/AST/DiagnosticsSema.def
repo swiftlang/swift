@@ -711,7 +711,14 @@ ERROR(gradient_expr_argument_indices_not_ascending,none,
 ERROR(gradient_expr_argument_index_out_of_bounds,none,
       "the argument index is out of bounds for type %0, which has %1 arguments", (Type, unsigned))
 ERROR(gradient_expr_argument_not_value_type,none,
-      "the argument referred to has non-value type %0, and thus cannot be differentiated with respect to.", (Type))
+      "the argument referred to has non-value type %0 and thus cannot be an argument for differentiation", (Type))
+ERROR(gradient_expr_argument_not_differentiable,none,
+      "gradient argument has non-differentiable type %0", (Type))
+ERROR(gradient_expr_generic_unresolved,none,
+      "cannot infer type for generic gradient expression without a contextual type", ())
+// TODO: improve gradient expr diagnostics.
+ERROR(gradient_expr_unresolved,none,
+      "type of gradient expression could not be resolved", ())
 
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
