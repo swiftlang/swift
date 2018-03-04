@@ -3333,7 +3333,9 @@ namespace {
 
               auto &tc = cs.getTypeChecker();
               tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
-                          destValueType);
+                          destValueType)
+                .highlight(cast->getSourceRange())
+                .fixItReplace(cast->getLoc(), "as");
             }
           }
         }
