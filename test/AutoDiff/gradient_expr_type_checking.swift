@@ -21,7 +21,7 @@ struct S {
 
   func b() {
     let _: (Float) -> Float = #gradient(of: a) // ok
-    let _: (Float) -> S = #gradient(of: a, withRespectTo: self) // expected-error {{type of gradient expression could not be resolved}}
+    let _: (Float) -> S = #gradient(of: a, withRespectTo: self) // expected-error {{gradient argument has non-differentiable type 'S'}}
   }
 
   static func c(_ x: Float) -> Float {}
@@ -33,14 +33,39 @@ struct S {
 
 let s = S()
 let _: (Float) -> Float = #gradient(of: s.a)
-let _: (Double) -> Double = #gradient(of: s.a) // expected-error {{type of gradient expression could not be resolved}}
+let _: (Double) -> Double = #gradient(of: s.a) // expected-error {{cannot convert value of type '(Float) -> Float' to specified type '(Double) -> Double'}}
 
 // Gradient expressions with generic primal.
-func e<T>(_ x: T) -> T {}
+func e<T>(_ x: T) -> T {} // expected-note {{in call to function 'e'}}
 
+let _ = #gradient(of: e) // expected-error {{generic parameter 'T' could not be inferred}}
 let _: (Float) -> Float = #gradient(of: e)
 let _: (Double) -> Double = #gradient(of: e)
-let _ = #gradient(of: e) // expected-error {{cannot infer type for generic gradient expression without a contextual type}}
-let _: ((Float, Float)) -> ((Float, Float)) = #gradient(of: e) // expected-error {{type of gradient expression could not be resolved}}
-let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{type of gradient expression could not be resolved}}
-let _: (Float) -> Double = #gradient(of: e) // expected-error {{type of gradient expression could not be resolved}}
+let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
+let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
+let _: (Float) -> Double = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
+
+// Complex type inference.
+func add<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x + y
+}
+func dadd<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
+  return #gradient(of: add)(x, y) // ok
+}
+func daddWithValue<T : FloatingPoint>(
+  _ x: T, _ y: T
+) -> (value: T, gradient: (T, T)) {
+  return #valueAndGradient(of: add)(x, y) // ok
+}
+
+func addNumeric<T : Numeric>(_ x: T, _ y: T) -> T { // expected-note {{in call to function 'addNumeric'}}
+  return x + y
+}
+func daddNumeric<T : Numeric>(_ x: T, _ y: T) -> (T, T) {
+  // TODO: improve diagnostic for this case.
+  return #gradient(of: addNumeric)(x, y) // expected-error {{generic parameter 'T' could not be inferred}}
+}
+// Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
+func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
+  return #gradient(of: addNumeric)(x, y) // ok
+}
