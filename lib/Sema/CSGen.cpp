@@ -1373,15 +1373,30 @@ namespace {
         }
       }
 
-      // Gradient result types must conform to FloatingPoint.
-      // TODO: generalize to DifferentiationArgument, when implemented.
+      // Differentiation argument types must conform to FloatingPoint.
+      // TODO: generalize conformance to DifferentiationArgument, when
+      // implemented. Also generalize to aggregate types of FloatingPoint or
+      // DifferentiationArgument.
       auto &ctx = CS.getASTContext();
       ProtocolDecl *fpProto = ctx.getProtocol(KnownProtocolKind::FloatingPoint);
       assert(fpProto && "FloatingPoint protocol could not be found.");
+      Type fpProtoTy = fpProto->getDeclaredInterfaceType();
 
-      for (auto &diffArg : diffArgTypes)
-        CS.addConstraint(ConstraintKind::ConformsTo, diffArg.getType(),
-                         fpProto->getDeclaredInterfaceType(), locator);
+      for (auto &diffArg : diffArgTypes) {
+        auto diffArgTy = diffArg.getType();
+        // If diff argument has type variables, add conformance to
+        // FloatingPoint. Otherwise, diff argument must directly conform to
+        // FloatingPoint.
+        if (diffArgTy->hasTypeVariable())
+          CS.addConstraint(ConstraintKind::ConformsTo, diffArgTy, fpProtoTy,
+                           locator);
+        else if (!CS.TC.isConvertibleTo(diffArgTy, fpProtoTy, CurDC)) {
+            TC.diagnose(GE->getLoc(),
+                        diag::gradient_expr_argument_not_differentiable,
+                        diffArgTy);
+            return nullptr;
+        }
+      }
 
       // Create a type for the gradient. The gradient has the same generic
       // signature as the primal function. The gradient's result types are
@@ -1389,6 +1404,16 @@ namespace {
       Type gradResult = diffArgTypes.size() == 1
         ? diffArgTypes.front().getType()
         : TupleType::get(diffArgTypes, TC.Context);
+      // If preserving primal result, then the gradient's result type is a tuple
+      // of the primal result type with label "value" and `diffArgTypes` with
+      // label "gradient".
+      if (preservingPrimalResult) {
+        gradResult = TupleType::get({
+          TupleTypeElt(primalTy->getResult(),
+                       TC.Context.getIdentifier("value")),
+          TupleTypeElt(gradResult, TC.Context.getIdentifier("gradient"))
+        }, TC.Context);
+      }
       AnyFunctionType *gradTy;
       if (genSig)
         gradTy = GenericFunctionType::get(genSig, primalParams,
@@ -1397,23 +1422,13 @@ namespace {
         gradTy = FunctionType::get(primalParams, gradResult,
                                    primalTy->getExtInfo());
 
-      // Gradient expressions with generic primals must have an explicit
-      // contextual type.
-      if (primalTy->hasTypeVariable()) {
-        auto contextualTy = CS.getContextualType(GE);
-        if (!contextualTy) {
-          TC.diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
-          return nullptr;
-        }
-        auto contextualGradTy = contextualTy->getAs<AnyFunctionType>();
-        if (!contextualGradTy) {
-          TC.diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
-          return nullptr;
-        }
-        // Contextual type must be convertible to expected gradient type.
-        CS.addConstraint(ConstraintKind::Conversion, contextualGradTy, gradTy,
-                         locator);
-      }
+      // Gradient expressions with generic primals must have a type that is
+      // convertible to the contextual type.
+      if (primalTy->hasTypeVariable())
+        if (auto contextualTy = CS.getContextualType(GE))
+          if (auto contextualGradTy = contextualTy->getAs<AnyFunctionType>())
+            CS.addConstraint(ConstraintKind::Conversion, contextualGradTy,
+                             gradTy, locator);
 
       return gradTy;
     }

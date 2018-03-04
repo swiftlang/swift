@@ -1031,7 +1031,9 @@ private:
   bool visitCaptureListExpr(CaptureListExpr *CLE);
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
+  // SWIFT_ENABLE_TENSORFLOW
   bool visitGradientExpr(GradientExpr *GE);
+  bool visitValueAndGradientExpr(ValueAndGradientExpr *GE);
 };
 } // end anonymous namespace
 
@@ -7281,24 +7283,36 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
-  // TODO(danielzheng): Sema diagnostics for gradient expressions can be vastly
-  // improved. There should be a natural way to produce better diagnostics
-  // leveraging the constraint system but it's not straightforward.
-  // Currently, there is only a vague catch-all error.
+bool FailureDiagnosis::
+diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
+                            bool preservingPrimalResult) {
+  // TODO: Sema diagnostics for gradient expressions could be improved by
+  // diagnosing non-differentiable arguments/non-differentiable constraints.
   auto gradType = CS.getType(GE);
-  auto contextualType = CS.getContextualType();
+  auto gradFnType = gradType->getAs<AnyFunctionType>();
+  assert(gradFnType && "Gradient expression should have function type.");
 
-  // Gradient expressions with generic primal must have an explicit contextual
-  // type.
-  if (gradType->hasTypeVariable() && !contextualType) {
-    diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
+  // If there is no contextual type, there is no way to diagnose further.
+  auto contextualType = CS.getContextualType();
+  if (!contextualType) return false;
+
+  // If gradient expression has a generic primal, then conversion to the
+  // contextual type was not possible.
+  if (gradType->hasTypeVariable()) {
+    diagnose(GE->getLoc(), diag::gradient_expr_incompatible_contextual_type,
+             contextualType);
     return true;
   }
 
-  // Emit catch-all error.
-  diagnose(GE->getLoc(), diag::gradient_expr_unresolved);
-  return true;
+  return false;
+}
+
+bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
+  return diagnoseReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/false);
+}
+
+bool FailureDiagnosis::visitValueAndGradientExpr(ValueAndGradientExpr *GE) {
+  return diagnoseReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/true);
 }
 
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,
