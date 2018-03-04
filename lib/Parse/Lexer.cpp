@@ -2341,7 +2341,6 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  // TODO: Handle random nul('\0') character in the middle of a buffer.
   // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
@@ -2419,6 +2418,19 @@ Restart:
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
       goto Restart;
+    }
+    break;
+  case 0:
+    switch (getNulCharacterKind(CurPtr - 1)) {
+    case NulCharacterKind::Embedded: {
+      diagnoseEmbeddedNul(Diags, CurPtr - 1);
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    }
+    case NulCharacterKind::CodeCompletion:
+    case NulCharacterKind::BufferEnd:
+      break;
     }
     break;
   default:
