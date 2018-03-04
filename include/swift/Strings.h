@@ -35,6 +35,8 @@ namespace swift {
   static const char SWIFT_ONONE_SUPPORT[] = "SwiftOnoneSupport";
   /// The name of the SwiftShims module, which contains private stdlib decls.
   static const char SWIFT_SHIMS_NAME[] = "SwiftShims";
+  /// The name of the Builtin module, which contains Builtin functions.
+  static const char BUILTIN_NAME[] = "Builtin";
   /// The prefix of module names used by LLDB to capture Swift expressions
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
 
