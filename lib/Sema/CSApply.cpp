@@ -2392,10 +2392,14 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *visitGradientExpr(GradientExpr *expr) {
-      assert(cs.getType(expr) && "should've been assigned a type");
+      auto gradType = simplifyType(cs.getType(expr));
+      assert(gradType && "Gradient expression should've been assigned a type");
+      cs.setType(expr, gradType);
+      cs.cacheExprTypes(expr);
       // FIXME(danielzheng): Currently, type checking a type member decl doesn't
       // directly give us a FuncDecl. We are skipping decl assignment to make
       // type checking tests pass.
+
       if (!isa<DeclRefExpr>(expr->getPrimalExpr())) return expr;
       auto *primalDecl = expr->getPrimalExpr()->getReferencedDecl().getDecl();
       auto *primalFD = cast<FuncDecl>(primalDecl);
