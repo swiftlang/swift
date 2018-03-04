@@ -311,11 +311,21 @@ namespace driver {
         DriverTimers[BeganCmd]->startTimer();
       }
 
-      // For verbose output, print out each command as it begins execution.
-      if (Comp.Level == OutputLevel::Verbose)
+      switch (Comp.Level) {
+      case OutputLevel::Normal:
+        break;
+        // For command line or verbose output, print out each command as it
+        // begins execution.
+      case OutputLevel::PrintJobs:
+        BeganCmd->printCommandLineAndEnvironment(llvm::outs());
+        break;
+      case OutputLevel::Verbose:
         BeganCmd->printCommandLine(llvm::errs());
-      else if (Comp.Level == OutputLevel::Parseable)
+        break;
+      case OutputLevel::Parseable:
         parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
+        break;
+      }
     }
 
     /// Note that a .swiftdeps file failed to load and take corrective actions:
@@ -450,15 +460,22 @@ namespace driver {
           DriverTimers[FinishedCmd]->stopTimer();
         }
 
-        if (Comp.Level == OutputLevel::Parseable) {
-          // Parseable output was requested.
-          parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                                ReturnCode, Output);
-        } else {
-          // Otherwise, send the buffered output to stderr, though only if we
+        switch (Comp.Level) {
+        case OutputLevel::PrintJobs:
+          // Only print the jobs, not the outputs
+          break;
+        case OutputLevel::Normal:
+        case OutputLevel::Verbose:
+          // Send the buffered output to stderr, though only if we
           // support getting buffered output.
           if (TaskQueue::supportsBufferingOutput())
             llvm::errs() << Output;
+          break;
+        case OutputLevel::Parseable:
+          // Parseable output was requested.
+          parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
+                                                ReturnCode, Output);
+          break;
         }
       }
 
@@ -1109,8 +1126,17 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   if (!writeFilelistIfNecessary(Cmd, Diags))
     return 1;
 
-  if (Level == OutputLevel::Verbose)
+  switch (Level) {
+  case OutputLevel::Normal:
+  case OutputLevel::Parseable:
+    break;
+  case OutputLevel::PrintJobs:
+    Cmd->printCommandLineAndEnvironment(llvm::outs());
+    return 0;
+  case OutputLevel::Verbose:
     Cmd->printCommandLine(llvm::errs());
+    break;
+  }
 
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
