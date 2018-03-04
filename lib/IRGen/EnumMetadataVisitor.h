@@ -50,12 +50,10 @@ public:
     // EnumMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
-
     // Instantiation-specific.
 
-    // Add fields for generic cases.
+    // Generic arguments.
+    // This must always be the first piece of trailing data.
     asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
 
     // Reserve a word to cache the payload size if the type has dynamic layout.

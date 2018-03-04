@@ -17,14 +17,16 @@
 // CHECK-SAME:   @"$S13generic_types1ACMa"
 // -- superclass
 // CHECK-SAME:   i32 0,
+// -- negative size in words
+// CHECK-SAME:   i32 2,
+// -- positive size in words
+// CHECK-SAME:   i32 17,
 // -- num immediate members
 // CHECK-SAME:   i32 7,
 // -- num fields
 // CHECK-SAME:   i32 1,
 // -- field offset vector offset
 // CHECK-SAME:   i32 16,
-// -- argument offset
-// CHECK-SAME:   i32 10,
 // -- instantiation function
 // CHECK-SAME:   @"$S13generic_types1ACMi"
 // -- instantiation cache

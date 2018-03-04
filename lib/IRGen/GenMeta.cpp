@@ -2643,17 +2643,10 @@ namespace {
     
     /// Fill in the fields of a TypeGenericContextDescriptorHeader.
     void addGenericParametersHeader() {
-      asImpl().addGenericParamsOffset();
       asImpl().addMetadataInstantiationFunction();
       asImpl().addMetadataInstantiationCache();
 
       super::addGenericParametersHeader();
-    }
-
-    void addGenericParamsOffset() {
-      // Include the offset to the generic argument vector inside a metadata
-      // record for this type.
-      B.addInt32(asImpl().getGenericParamsOffset() / IGM.getPointerSize());
     }
 
     void addMetadataInstantiationFunction() {
@@ -2715,7 +2708,6 @@ namespace {
     }
 
     // Subclasses should provide:
-    // Size getGenericParamsOffset();
     // ContextDescriptorKind getContextKind();
     // void addLayoutInfo(); // ABI TODO: should be superseded
   };
@@ -2796,7 +2788,7 @@ namespace {
       return cast<StructDecl>(Type);
     }
 
-    Size FieldVectorOffset, GenericParamsOffset;
+    Size FieldVectorOffset;
 
   public:
     StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type,
@@ -2804,12 +2796,7 @@ namespace {
       : super(IGM, Type, requireMetadata)
     {
       auto &layout = IGM.getMetadataLayout(getType());
-      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
-    }
-
-    Size getGenericParamsOffset() {
-      return GenericParamsOffset;
     }
 
     ContextDescriptorKind getContextKind() {
@@ -2847,7 +2834,6 @@ namespace {
       return cast<EnumDecl>(Type);
     }
     
-    Size GenericParamsOffset;
     Size PayloadSizeOffset;
     const EnumImplStrategy &Strategy;
     
@@ -2859,15 +2845,10 @@ namespace {
                      getType()->getDeclaredTypeInContext()->getCanonicalType()))
     {
       auto &layout = IGM.getMetadataLayout(getType());
-      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
       if (layout.hasPayloadSizeOffset())
         PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
     }
     
-    Size getGenericParamsOffset() {
-      return GenericParamsOffset;
-    }
-
     ContextDescriptorKind getContextKind() {
       return ContextDescriptorKind::Enum;
     }
@@ -2974,13 +2955,6 @@ namespace {
       return flags.getOpaqueValue();
     }
     
-    Size getGenericParamsOffset() {
-      if (!MetadataLayout) return Size(0);
-      return (MetadataLayout->hasResilientSuperclass()
-                ? MetadataLayout->getRelativeGenericRequirementsOffset()
-                : MetadataLayout->getStaticGenericRequirementsOffset());
-    }
-
     Size getFieldVectorOffset() {
       if (!MetadataLayout) return Size(0);
       return (MetadataLayout->hasResilientSuperclass()
@@ -3051,6 +3025,35 @@ namespace {
         B.addRelativeAddress(SuperClassRef->getValue());
       } else {
         B.addInt32(0);
+      }
+
+      // union {
+      //   uint32_t MetadataNegativeSizeInWords;
+      //   RelativeDirectPointer<StoredClassMetadataBounds>
+      //     ResilientMetadataBounds;
+      // };
+      if (!MetadataLayout) {
+        // FIXME: do something meaningful for foreign classes?
+        B.addInt32(0);
+      } else if (!MetadataLayout->hasResilientSuperclass()) {
+        B.addInt32(MetadataLayout->getSize().AddressPoint
+                     / IGM.getPointerSize());
+      } else {
+        B.addRelativeAddress(
+          IGM.getAddrOfClassMetadataBounds(getType(), NotForDefinition));
+      }
+
+      // union {
+      //   uint32_t MetadataPositiveSizeInWords;
+      // };
+      if (!MetadataLayout) {
+        // FIXME: do something meaningful for foreign classes?
+        B.addInt32(0);
+      } else if (!MetadataLayout->hasResilientSuperclass()) {
+        B.addInt32(MetadataLayout->getSize().getOffsetToEnd()
+                     / IGM.getPointerSize());
+      } else {
+        B.addInt32(0); // currently unused
       }
 
       // uint32_t NumImmediateMembers;
@@ -3595,13 +3598,13 @@ namespace {
       }
 
       auto *offsetAddr =
-        IGM.getAddrOfClassMetadataBaseOffset(Target, ForDefinition);
+        IGM.getAddrOfClassMetadataBounds(Target, ForDefinition);
       auto *offsetVar = cast<llvm::GlobalVariable>(offsetAddr);
 
       if (MetadataLayout.hasResilientSuperclass()) {
         // If the superclass is resilient to us, we have to compute and
         // initialize the global when we initialize the metadata.
-        auto *init = llvm::ConstantInt::get(IGM.SizeTy, 0);
+        auto init = llvm::ConstantAggregateZero::get(offsetVar->getValueType());
 
         offsetVar->setInitializer(init);
         offsetVar->setConstant(false);
@@ -3612,8 +3615,17 @@ namespace {
       // clients do not, so just emit a constant.
       auto &layout = IGM.getClassMetadataLayout(Target);
 
-      auto value = layout.getStartOfImmediateMembers();
-      auto *init = llvm::ConstantInt::get(IGM.SizeTy, value.getValue());
+      auto immediateMembersOffset = layout.getStartOfImmediateMembers();
+      auto size = layout.getSize();
+      auto negativeSizeInWords = size.AddressPoint / IGM.getPointerSize();
+      auto positiveSizeInWords = size.getOffsetToEnd() / IGM.getPointerSize();
+
+      auto initTy = cast<llvm::StructType>(offsetVar->getValueType());
+      auto *init = llvm::ConstantStruct::get(initTy, {
+        llvm::ConstantInt::get(IGM.SizeTy, immediateMembersOffset.getValue()),
+        llvm::ConstantInt::get(IGM.Int32Ty, negativeSizeInWords),
+        llvm::ConstantInt::get(IGM.Int32Ty, positiveSizeInWords)
+      });
 
       offsetVar->setInitializer(init);
       offsetVar->setConstant(true);
@@ -3875,104 +3887,14 @@ namespace {
       return metadata;
     }
 
-    // Store the runtime-computed metadata size of our superclass into the
-    // target class's metadata base offset global variable.
-    //
-    // Note that this code will run for each generic instantiation of the
-    // class, if the class is generic. This should be OK because the
-    // metadata size does not change between generic instantiations, so
-    // all stores after the first should be idempotent.
-    void emitInitializeClassMetadataBaseOffset(IRGenFunction &IGF,
-                                               llvm::Value *metadata,
-                                               bool metadataIsSuperclass) {
-      if (!MetadataLayout.hasResilientSuperclass())
-        return;
-
-      // TODO: can we move all this into the runtime?
-
-      // Load the size of the superclass metadata.
-      Address metadataAsBytes(
-          IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
-          IGM.getPointerAlignment());
-
-      Address addressPointSlot = IGF.Builder.CreateConstByteArrayGEP(
-          metadataAsBytes,
-          MetadataLayout.getMetadataAddressPointOffset());
-      addressPointSlot = IGF.Builder.CreateBitCast(addressPointSlot,
-                                                   IGM.Int32Ty->getPointerTo());
-      llvm::Value *addressPoint = IGF.Builder.CreateLoad(addressPointSlot);
-
-      auto getImmediateMembersSize = [&] {
-        auto size =
-          IGM.getPointerSize() * MetadataLayout.getNumImmediateMembers();
-        return llvm::ConstantInt::get(IGM.Int32Ty, size.getValue());
-      };
-
-      llvm::Value *offset;
-
-      // If the immediate members are negatively allocated, then the start
-      // of the immediate members section is the negative of the address
-      // point of the subclass metadata.
-      if (MetadataLayout.areImmediateMembersNegative()) {
-        offset = addressPoint;
-
-        // If the metadata is superclass metadata, then we need to compute
-        // the subclass's address point by substracting the size of the
-        // of the immediate members section (or adding it before we negate).
-        if (metadataIsSuperclass) {
-          offset = IGF.Builder.CreateAdd(offset, getImmediateMembersSize());
-        }
-
-        offset = IGF.Builder.CreateNeg(offset);
-        offset = IGF.Builder.CreateSExt(offset, IGM.SizeTy);
-
-      // If the immediate members are positively allocated, then the start
-      // of the immediate members section is the size of the subclass, minus
-      // the address point of the subclass, minus the size of the immediate
-      // members section.  This is equivalent to the size of the superclass
-      // minus the address point of the superclass.
-      } else {
-        Address sizeSlot = IGF.Builder.CreateConstByteArrayGEP(
-            metadataAsBytes,
-            MetadataLayout.getMetadataSizeOffset());
-        sizeSlot = IGF.Builder.CreateBitCast(sizeSlot,
-                                             IGM.Int32Ty->getPointerTo());
-        llvm::Value *size = IGF.Builder.CreateLoad(sizeSlot);
-        offset = IGF.Builder.CreateSub(size, addressPoint);
-
-        if (!metadataIsSuperclass) {
-          offset = IGF.Builder.CreateSub(offset, getImmediateMembersSize());
-        }
-        offset = IGF.Builder.CreateZExt(offset, IGM.SizeTy);
-      }
-
-      Address offsetAddr(
-          IGM.getAddrOfClassMetadataBaseOffset(Target, NotForDefinition),
-          IGM.getPointerAlignment());
-
-      // We don't need to worry about memory barriers here because the
-      // runtime should ensure that there is full synchronization (not just
-      // dependency-ordered synchronization) between all these initializations
-      // and every thread that tries to access the metadata.
-      //
-      // Note that this store might be redundant.
-      IGF.Builder.CreateStore(offset, offsetAddr);
-    }
-
     /// Materialize type metadata for the given type and store it into the
     /// superclass field of the given metadata.
     void emitStoreOfSuperclass(IRGenFunction &IGF, CanType superclassType,
-                               llvm::Value *metadata,
-                               bool initializeBaseOffset) {
+                               llvm::Value *metadata) {
       llvm::Value *superMetadata =
         emitClassHeapMetadataRef(IGF, superclassType,
                                  MetadataValueType::TypeMetadata,
                                  /*allowUninit*/ false);
-
-      if (initializeBaseOffset) {
-        emitInitializeClassMetadataBaseOffset(IGF, superMetadata,
-                                              /*super*/ true);
-      }
 
       Address superField =
         emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
@@ -4065,7 +3987,6 @@ namespace {
     using super::Target;
     using super::B;
     using super::addReferenceToHeapMetadata;
-    using super::emitInitializeClassMetadataBaseOffset;
     using super::emitFinishInitializationOfClassMetadata;
     using super::emitFinishIdempotentInitialization;
     using super::emitFieldOffsetGlobals;
@@ -4156,8 +4077,7 @@ namespace {
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
         auto superclass = type->getSuperclass()->getCanonicalType();
-        this->emitStoreOfSuperclass(IGF, superclass, metadata,
-                                    /*initialize metadata offset*/ true);
+        this->emitStoreOfSuperclass(IGF, superclass, metadata);
       }
 
       // Relocate the metadata if it has a superclass that is resilient
@@ -4379,9 +4299,6 @@ namespace {
         IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
                                {descriptor, arguments, templatePointer});
 
-      // Initialize the metadata base offset.
-      emitInitializeClassMetadataBaseOffset(IGF, metadata, /*super*/ false);
-
       return metadata;
     }
 
@@ -4396,8 +4313,7 @@ namespace {
       if (Target->hasSuperclass()) {
         CanType superclass = Target->mapTypeIntoContext(Target->getSuperclass())
                                    ->getCanonicalType();
-        emitStoreOfSuperclass(IGF, superclass, metadata,
-                              /*initialize metadata base offset*/ false);
+        emitStoreOfSuperclass(IGF, superclass, metadata);
       }
 
       // We can assume that this never relocates the metadata because

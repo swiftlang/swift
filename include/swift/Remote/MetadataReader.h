@@ -537,32 +537,24 @@ public:
   ///
   /// The offset is in units of words, from the start of the class's
   /// metadata.
-  llvm::Optional<uint32_t>
+  llvm::Optional<int32_t>
   readGenericArgsOffset(MetadataRef metadata,
                         ContextDescriptorRef descriptor) {
     switch (descriptor->getKind()) {
     case ContextDescriptorKind::Class: {
       auto type = cast<TargetClassDescriptor<Runtime>>(descriptor);
 
-      auto *classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
-      if (!classMetadata)
+      if (!type->hasResilientSuperclass())
+        return type->getNonResilientGenericArgumentOffset();
+
+      auto bounds = readMetadataBoundsOfSuperclass(descriptor);
+      if (!bounds)
         return llvm::None;
 
-      if (!classMetadata->Superclass)
-        return type->getGenericArgumentOffset(nullptr, nullptr);
+      bounds->adjustForSubclass(type->areImmediateMembersNegative(),
+                                type->NumImmediateMembers);
 
-      auto superMetadata = readMetadata(classMetadata->Superclass);
-      if (!superMetadata)
-        return llvm::None;
-
-      auto superClassMetadata =
-        dyn_cast<TargetClassMetadata<Runtime>>(superMetadata);
-      if (!superClassMetadata)
-        return llvm::None;
-
-      auto result =
-        type->getGenericArgumentOffset(classMetadata, superClassMetadata);
-      return result;
+      return bounds->ImmediateMembersOffset / sizeof(StoredPointer);
     }
 
     case ContextDescriptorKind::Enum: {
@@ -573,6 +565,76 @@ public:
     case ContextDescriptorKind::Struct: {
       auto type = cast<TargetStructDescriptor<Runtime>>(descriptor);
       return type->getGenericArgumentOffset();
+    }
+
+    default:
+      return llvm::None;
+    }
+  }
+
+  using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
+
+  // This follows computeMetadataBoundsForSuperclass.
+  llvm::Optional<ClassMetadataBounds>
+  readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
+    auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
+
+    auto rawSuperclass =
+      resolveNullableRelativeField(subclassRef, subclass->Superclass);
+    if (!rawSuperclass) {
+      return ClassMetadataBounds::forSwiftRootClass();
+    }
+
+    return forTypeReference<ClassMetadataBounds>(
+      subclass->getSuperclassReferenceKind(), *rawSuperclass,
+      [&](ContextDescriptorRef superclass)
+            -> llvm::Optional<ClassMetadataBounds> {
+        if (!isa<TargetClassDescriptor<Runtime>>(superclass))
+          return llvm::None;
+        return readMetadataBoundsOfSuperclass(superclass);
+      },
+      [&](MetadataRef metadata) -> llvm::Optional<ClassMetadataBounds> {
+        auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
+        if (!cls)
+          return llvm::None;
+
+        return cls->getClassBoundsAsSwiftSuperclass();
+      });
+  }
+
+  template <class Result, class DescriptorFn, class MetadataFn>
+  llvm::Optional<Result>
+  forTypeReference(TypeMetadataRecordKind refKind, StoredPointer ref,
+                   const DescriptorFn &descriptorFn,
+                   const MetadataFn &metadataFn) {
+    switch (refKind) {
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+      StoredPointer descriptorAddress = 0;
+      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
+        return llvm::None;
+
+      ref = descriptorAddress;
+      LLVM_FALLTHROUGH;
+    }
+
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+      auto descriptor = readContextDescriptor(ref);
+      if (!descriptor)
+        return llvm::None;
+
+      return descriptorFn(descriptor);
+    }
+
+    case TypeMetadataRecordKind::IndirectObjCClass: {
+      StoredPointer classRef = 0;
+      if (!Reader->readInteger(RemoteAddress(ref), &classRef))
+        return llvm::None;
+
+      auto metadata = readMetadata(classRef);
+      if (!metadata)
+        return llvm::None;
+
+      return metadataFn(metadata);
     }
 
     default:

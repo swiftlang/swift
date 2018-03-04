@@ -1150,8 +1150,8 @@ public:
   /// Determine whether the given type requires foreign type metadata.
   bool requiresForeignTypeMetadata(CanType type);
 
-  llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
-                                                 ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
+                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                       RequireMetadata_t requireMetadata,
                                       ConstantInit definition = ConstantInit());

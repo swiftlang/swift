@@ -19,12 +19,16 @@ import Swift
 // CHECK-SAME:   <i32 0x8004_00D0>
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
+// --       negative size in words
+// CHECK-SAME:   i32 2,
+// --       positive size in words
+// CHECK-SAME:   i32 18,
+// --       num immediate members
+// CHECK-SAME:   i32 8,
 // --       num fields
 // CHECK-SAME:   i32 3,
 // --       field offset vector offset
 // CHECK-SAME:   i32 15,
-// --       generic parameter vector offset
-// CHECK-SAME:   i32 10,
 // --       template instantiation function
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**)* @"$S15generic_classes11RootGenericCMi"
 // --       template instantiation cache

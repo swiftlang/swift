@@ -86,6 +86,7 @@ template <>
 struct RuntimeTarget<4> {
   using StoredPointer = uint32_t;
   using StoredSize = uint32_t;
+  using StoredPointerDifference = int32_t;
   static constexpr size_t PointerSize = 4;
 };
 
@@ -93,6 +94,7 @@ template <>
 struct RuntimeTarget<8> {
   using StoredPointer = uint64_t;
   using StoredSize = uint64_t;
+  using StoredPointerDifference = int64_t;
   static constexpr size_t PointerSize = 8;
 };
 
@@ -104,6 +106,10 @@ struct InProcess {
   static constexpr size_t PointerSize = sizeof(uintptr_t);
   using StoredPointer = uintptr_t;
   using StoredSize = size_t;
+  using StoredPointerDifference = ptrdiff_t;
+
+  static_assert(sizeof(StoredSize) == sizeof(StoredPointerDifference),
+                "target uses differently-sized size_t and ptrdiff_t");
   
   template <typename T>
   using Pointer = T*;
@@ -134,6 +140,7 @@ template <typename Runtime>
 struct External {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
   static constexpr size_t PointerSize = Runtime::PointerSize;
   const StoredPointer PointerValue;
   
@@ -756,6 +763,32 @@ template <typename Runtime> class TargetStructDescriptor;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 
+/// Bounds for metadata objects.
+template <typename Runtime>
+struct TargetMetadataBounds {
+  using StoredSize = typename Runtime::StoredSize;
+
+  /// The negative extent of the metadata, in words.
+  uint32_t NegativeSizeInWords;
+
+  /// The positive extent of the metadata, in words.
+  uint32_t PositiveSizeInWords;
+
+  /// Return the total size of the metadata in bytes, including both
+  /// negatively- and positively-offset members.
+  StoredSize getTotalSizeInBytes() const {
+    return (StoredSize(NegativeSizeInWords) + StoredSize(PositiveSizeInWords))
+              * sizeof(void*);
+  }
+
+  /// Return the offset of the address point of the metadata from its
+  /// start, in bytes.
+  StoredSize getAddressPointInBytes() const {
+    return StoredSize(NegativeSizeInWords) * sizeof(void*);
+  }
+};
+using MetadataBounds = TargetMetadataBounds<InProcess>;
+
 /// The common structure of all type metadata.
 template <typename Runtime>
 struct TargetMetadata {
@@ -974,7 +1007,7 @@ public:
 
     auto asWords = reinterpret_cast<
       ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return asWords + description->getGenericArgumentOffset(this);
+    return asWords + description->getGenericArgumentOffset();
   }
 
   bool satisfiesClassConstraint() const;
@@ -1114,6 +1147,71 @@ public:
     return VTableOffset;
   }
 };
+
+/// The bounds of a class metadata object.
+///
+/// This type is a currency type and is not part of the ABI.
+/// See TargetStoredClassMetadataBounds for the type of the class
+/// metadata bounds variable.
+template <typename Runtime>
+struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+
+  using TargetMetadataBounds<Runtime>::NegativeSizeInWords;
+  using TargetMetadataBounds<Runtime>::PositiveSizeInWords;
+
+  /// The offset from the address point of the metadata to the immediate
+  /// members.
+  StoredPointerDifference ImmediateMembersOffset;
+
+  constexpr TargetClassMetadataBounds() = default;
+  constexpr TargetClassMetadataBounds(
+              StoredPointerDifference immediateMembersOffset,
+              uint32_t negativeSizeInWords, uint32_t positiveSizeInWords)
+    : TargetMetadataBounds<Runtime>{negativeSizeInWords, positiveSizeInWords},
+      ImmediateMembersOffset(immediateMembersOffset) {}
+
+  /// Return the basic bounds of all Swift class metadata.
+  /// The immediate members offset will not be meaningful.
+  static constexpr TargetClassMetadataBounds<Runtime> forSwiftRootClass() {
+    using Metadata = FullMetadata<TargetClassMetadata<Runtime>>;
+    return forAddressPointAndSize(sizeof(typename Metadata::HeaderType),
+                                  sizeof(Metadata));
+  }
+
+  /// Return the bounds of a Swift class metadata with the given address
+  /// point and size (both in bytes).
+  /// The immediate members offset will not be meaningful.
+  static constexpr TargetClassMetadataBounds<Runtime>
+  forAddressPointAndSize(StoredSize addressPoint, StoredSize totalSize) {
+    return {
+      // Immediate offset in bytes.
+      StoredPointerDifference(totalSize - addressPoint),
+      // Negative size in words.
+      uint32_t(addressPoint / sizeof(StoredPointer)),
+      // Positive size in words.
+      uint32_t((totalSize - addressPoint) / sizeof(StoredPointer))
+    };
+  }
+
+  /// Adjust these bounds for a subclass with the given immediate-members
+  /// section.
+  void adjustForSubclass(bool areImmediateMembersNegative,
+                         uint32_t numImmediateMembers) {
+    if (areImmediateMembersNegative) {
+      NegativeSizeInWords += numImmediateMembers;
+      ImmediateMembersOffset =
+        -StoredPointerDifference(NegativeSizeInWords) * sizeof(StoredPointer);
+    } else {
+      ImmediateMembersOffset = PositiveSizeInWords * sizeof(StoredPointer);
+      PositiveSizeInWords += numImmediateMembers;
+    }
+  }
+};
+using ClassMetadataBounds =
+  TargetClassMetadataBounds<InProcess>;
 
 /// The portion of a class metadata object that is compatible with
 /// all classes, even non-Swift ones.
@@ -1357,6 +1455,33 @@ public:
     uint32_t size = getClassSize() - getClassAddressPoint();
     assert(size % sizeof(StoredPointer) == 0);
     return size / sizeof(StoredPointer);
+  }
+
+  /// Given that this class is serving as the superclass of a Swift class,
+  /// return its bounds as metadata.
+  ///
+  /// Note that the ImmediateMembersOffset member will not be meaningful.
+  TargetClassMetadataBounds<Runtime>
+  getClassBoundsAsSwiftSuperclass() const {
+    using Bounds = TargetClassMetadataBounds<Runtime>;
+
+    auto rootBounds = Bounds::forSwiftRootClass();
+
+    // If the class is not type metadata, just use the root-class bounds.
+    if (!isTypeMetadata())
+      return rootBounds;
+
+    // Otherwise, pull out the bounds from the metadata.
+    auto bounds = Bounds::forAddressPointAndSize(getClassAddressPoint(),
+                                                 getClassSize());
+
+    // Round the bounds up to the required dimensions.
+    if (bounds.NegativeSizeInWords < rootBounds.NegativeSizeInWords)
+      bounds.NegativeSizeInWords = rootBounds.NegativeSizeInWords;
+    if (bounds.PositiveSizeInWords < rootBounds.PositiveSizeInWords)
+      bounds.PositiveSizeInWords = rootBounds.PositiveSizeInWords;
+
+    return bounds;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1612,10 +1737,13 @@ template <typename Runtime>
 struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using TargetValueMetadata<Runtime>::TargetValueMetadata;
-  
+
   const TargetStructDescriptor<Runtime> *getDescription() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this->Description);
   }
+
+  // The first trailing field of struct metadata is always the generic
+  // argument array.
 
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
@@ -1624,6 +1752,10 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const StoredPointer *>(asWords + offset);
+  }
+
+  static constexpr int32_t getGenericArgumentOffset() {
+    return sizeof(TargetStructMetadata<Runtime>) / sizeof(void*);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1642,6 +1774,9 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   const TargetEnumDescriptor<Runtime> *getDescription() const {
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this->Description);
   }
+
+  // The first trailing field of enum metadata is always the generic
+  // argument array.
 
   /// True if the metadata records the size of the payload area.
   bool hasPayloadSize() const {
@@ -1665,6 +1800,10 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     StoredSize *asWords = reinterpret_cast<StoredSize *>(this);
     asWords += offset;
     return *asWords;
+  }
+
+  static constexpr int32_t getGenericArgumentOffset() {
+    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(void*);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -2896,6 +3035,8 @@ public:
             getGenericContextHeader().NumRequirements};
   }
 
+  /// Return the amount of space that the generic arguments take up in
+  /// metadata of this type.
   StoredSize getGenericArgumentsStorageSize() const {
     return StoredSize(getGenericContextHeader().getNumArguments())
              * sizeof(StoredPointer);
@@ -2983,13 +3124,6 @@ public:
 
 template <typename Runtime>
 struct TargetTypeGenericContextDescriptorHeader {
-  /// Indicates the offset of the instantiation arguments for a type's generic
-  /// contexts in instances of its type metadata. For a value type or class
-  /// without resilient superclasses, this the the offset from the address
-  /// point of the metadata. For a class with a resilient superclass, this
-  /// offset is relative to the end of the superclass metadata.
-  uint32_t ArgumentOffset;
-
   using InstantiationFunction_t =
     TargetMetadata<Runtime> *(const TargetTypeContextDescriptor<Runtime> *type,
                               const void *arguments);
@@ -3148,14 +3282,13 @@ public:
 
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(void*).
-  uint32_t getGenericArgumentOffset(
-                               const TargetMetadata<Runtime> *metadata) const;
+  int32_t getGenericArgumentOffset() const;
 
   /// Return the start of the generic arguments array in the nominal
   /// type's metadata. The returned value is measured in sizeof(void*).
   const TargetMetadata<Runtime> * const *getGenericArguments(
                                const TargetMetadata<Runtime> *metadata) const {
-    auto offset = getGenericArgumentOffset(metadata);
+    auto offset = getGenericArgumentOffset();
     auto words =
       reinterpret_cast<const TargetMetadata<Runtime> * const *>(metadata);
     return words + offset;
@@ -3168,6 +3301,91 @@ public:
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
+
+/// Storage for class metadata bounds.  This is the variable returned
+/// by getAddrOfClassMetadataBounds in the compiler.
+///
+/// This storage is initialized before the allocation of any metadata
+/// for the class to which it belongs.  In classes without resilient
+/// superclasses, it is initialized statically with values derived
+/// during compilation.  In classes with resilient superclasses, it
+/// is initialized dynamically, generally during the allocation of
+/// the first metadata of this class's type.  If metadata for this
+/// class is available to you to use, you must have somehow synchronized
+/// with the thread which allocated the metadata, and therefore the
+/// complete initialization of this variable is also ordered before
+/// your access.  That is why you can safely access this variable,
+/// and moreover access it without further atomic accesses.  However,
+/// since this variable may be accessed in a way that is not dependency-
+/// ordered on the metadata pointer, it is important that you do a full
+/// synchronization and not just a dependency-ordered (consume)
+/// synchronization when sharing class metadata pointers between
+/// threads.  (There are other reasons why this is true; for example,
+/// field offset variables are also accessed without dependency-ordering.)
+///
+/// If you are accessing this storage without such a guarantee, you
+/// should be aware that it may be lazily initialized, and moreover
+/// it may be getting lazily initialized from another thread.  To ensure
+/// correctness, the fields must be read in the correct order: the
+/// immediate-members offset is initialized last with a store-release,
+/// so it must be read first with a load-acquire, and if the result
+/// is non-zero then the rest of the variable is known to be valid.
+/// (No locking is required because racing initializations should always
+/// assign the same values to the storage.)
+template <typename Runtime>
+struct TargetStoredClassMetadataBounds {
+  using StoredPointerDifference =
+    typename Runtime::StoredPointerDifference;
+
+  /// The offset to the immediate members.  This value is in bytes so that
+  /// clients don't have to sign-extend it.
+
+
+  /// It is not necessary to use atomic-ordered loads when accessing this
+  /// variable just to read the immediate-members offset when drilling to
+  /// the immediate members of an already-allocated metadata object.
+  /// The proper initialization of this variable is always ordered before
+  /// any allocation of metadata for this class.
+  std::atomic<StoredPointerDifference> ImmediateMembersOffset;
+
+  /// The positive and negative bounds of the class metadata.
+  TargetMetadataBounds<Runtime> Bounds;
+
+  /// Attempt to read the cached immediate-members offset.
+  ///
+  /// \return true if the read was successful, or false if the cache hasn't
+  ///   been filled yet
+  bool tryGetImmediateMembersOffset(StoredPointerDifference &output) {
+    output = ImmediateMembersOffset.load(std::memory_order_relaxed);
+    return output != 0;
+  }
+
+  /// Attempt to read the full cached bounds.
+  ///
+  /// \return true if the read was successful, or false if the cache hasn't
+  ///   been filled yet
+  bool tryGet(TargetClassMetadataBounds<Runtime> &output) {
+    auto offset = ImmediateMembersOffset.load(std::memory_order_acquire);
+    if (offset == 0) return false;
+
+    output.ImmediateMembersOffset = offset;
+    output.NegativeSizeInWords = Bounds.NegativeSizeInWords;
+    output.PositiveSizeInWords = Bounds.PositiveSizeInWords;
+    return true;
+  }
+
+  void initialize(TargetClassMetadataBounds<Runtime> value) {
+    assert(value.ImmediateMembersOffset != 0 &&
+           "attempting to initialize metadata bounds cache to a zero state!");
+
+    Bounds.NegativeSizeInWords = value.NegativeSizeInWords;
+    Bounds.PositiveSizeInWords = value.PositiveSizeInWords;
+    ImmediateMembersOffset.store(value.ImmediateMembersOffset,
+                                 std::memory_order_release);
+  }
+};
+using StoredClassMetadataBounds =
+  TargetStoredClassMetadataBounds<InProcess>;
 
 template <typename Runtime>
 class TargetClassDescriptor final
@@ -3192,6 +3410,10 @@ public:
   using MethodDescriptor = TargetMethodDescriptor<Runtime>;
   using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
 
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  using StoredSize = typename Runtime::StoredSize;
+
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
@@ -3214,6 +3436,26 @@ public:
     return getTypeContextDescriptorFlags().class_getSuperclassReferenceKind();
   }
 
+  union {
+    /// If this descriptor does not have a resilient superclass, this is the
+    /// negative size of metadata objects of this class (in words).
+    uint32_t MetadataNegativeSizeInWords;
+
+    /// If this descriptor has a resilient superclass, this is a reference
+    /// to a cache holding the metadata's extents.
+    TargetRelativeDirectPointer<Runtime,
+                                TargetStoredClassMetadataBounds<Runtime>>
+      ResilientMetadataBounds;
+  };
+
+  union {
+    /// If this descriptor does not have a resilient superclass, this is the
+    /// positive size of metadata objects of this class (in words).
+    uint32_t MetadataPositiveSizeInWords;
+
+    // Maybe add something here that's useful only for resilient types?
+  };
+
   /// The number of additional members added by this class to the class
   /// metadata.  This data is opaque by default to the runtime, other than
   /// as exposed in other members; it's really just
@@ -3223,8 +3465,8 @@ public:
   /// depends on areImmediateMembersNegative().
   uint32_t NumImmediateMembers; // ABI: could be uint16_t?
 
-  typename Runtime::StoredSize getImmediateMembersSize() const {
-    return NumImmediateMembers * sizeof(typename Runtime::StoredPointer);
+  StoredSize getImmediateMembersSize() const {
+    return StoredSize(NumImmediateMembers) * sizeof(StoredPointer);
   }
 
   /// Are the immediate members of the class metadata allocated at negative
@@ -3299,29 +3541,49 @@ public:
             numTrailingObjects(OverloadToken<MethodDescriptor>{})};
   }
 
-  /// This is factored in a silly way because remote mirrors cannot directly
-  /// dereference the Superclass field of class metadata.
-  uint32_t getGenericArgumentOffset(
-                      const TargetClassMetadata<Runtime> *classMetadata,
-                      const TargetClassMetadata<Runtime> *superMetadata) const {
-    auto Offset = getFullGenericContextHeader().ArgumentOffset;
-    if (hasResilientSuperclass())
-      return superMetadata->getSizeInWords() + Offset;
+  /// Return the bounds of this class's metadata.
+  TargetClassMetadataBounds<Runtime> getMetadataBounds() const {
+    if (!hasResilientSuperclass())
+      return getNonResilientMetadataBounds();
 
-    return Offset;
+    // This lookup works by ADL and will intentionally fail for
+    // non-InProcess instantiations.
+    return getResilientMetadataBounds(this);
+  }
+
+  /// Given that this class is known to not have a resilient superclass
+  /// return its metadata bounds.
+  TargetClassMetadataBounds<Runtime> getNonResilientMetadataBounds() const {
+    return { getNonResilientImmediateMembersOffset()
+               * StoredPointerDifference(sizeof(void*)),
+             MetadataNegativeSizeInWords,
+             MetadataPositiveSizeInWords };
   }
 
   /// Return the offset of the start of generic arguments in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
-  uint32_t
-  getGenericArgumentOffset(const TargetMetadata<Runtime> *metadata) const {
-    if (hasResilientSuperclass()) {
-      auto *classMetadata = llvm::cast<ClassMetadata>(metadata);
-      auto *superMetadata = llvm::cast<ClassMetadata>(classMetadata->Superclass);
-      return getGenericArgumentOffset(classMetadata, superMetadata);
-    }
+  /// type's metadata. The returned value is measured in words.
+  int32_t getGenericArgumentOffset() const {
+    if (!hasResilientSuperclass())
+      return getNonResilientGenericArgumentOffset();
 
-    return getFullGenericContextHeader().ArgumentOffset;
+    // This lookup works by ADL and will intentionally fail for
+    // non-InProcess instantiations.
+    return getResilientImmediateMembersOffset(this);
+  }
+
+  /// Given that this class is known to not have a resilient superclass,
+  /// return the offset of its generic arguments in words.
+  int32_t getNonResilientGenericArgumentOffset() const {
+    return getNonResilientImmediateMembersOffset();
+  }
+
+  /// Given that this class is known to not have a resilient superclass,
+  /// return the offset of its immediate members in words.
+  int32_t getNonResilientImmediateMembersOffset() const {
+    assert(!hasResilientSuperclass());
+    return areImmediateMembersNegative()
+             ? -int32_t(MetadataNegativeSizeInWords)
+             : int32_t(MetadataPositiveSizeInWords - NumImmediateMembers);
   }
 
   void *getMethod(unsigned i) const {
@@ -3336,6 +3598,11 @@ public:
 };
 
 using ClassDescriptor = TargetClassDescriptor<InProcess>;
+
+/// Compute the bounds of class metadata with a resilient superclass.
+ClassMetadataBounds getResilientMetadataBounds(
+                                           const ClassDescriptor *descriptor);
+int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
 template <typename Runtime>
 class TargetValueTypeDescriptor
@@ -3379,8 +3646,8 @@ public:
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
 
-  uint32_t getGenericArgumentOffset() const {
-    return getFullGenericContextHeader().ArgumentOffset;
+  static constexpr int32_t getGenericArgumentOffset() {
+    return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3435,8 +3702,8 @@ public:
     return getPayloadSizeOffset() != 0;
   }
 
-  uint32_t getGenericArgumentOffset() const {
-    return getFullGenericContextHeader().ArgumentOffset;
+  static constexpr int32_t getGenericArgumentOffset() {
+    return TargetEnumMetadata<Runtime>::getGenericArgumentOffset();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3478,12 +3745,11 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
 }
 
 template <typename Runtime>
-uint32_t TargetTypeContextDescriptor<Runtime>::getGenericArgumentOffset(
-                                const TargetMetadata<Runtime> *metadata) const {
+int32_t TargetTypeContextDescriptor<Runtime>::getGenericArgumentOffset() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getGenericArgumentOffset(metadata);
+        ->getGenericArgumentOffset();
   case ContextDescriptorKind::Enum:
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getGenericArgumentOffset();
