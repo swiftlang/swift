@@ -7282,7 +7282,23 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 
 // SWIFT_ENABLE_TENSORFLOW
 bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
-  return false;
+  // TODO(danielzheng): Sema diagnostics for gradient expressions can be vastly
+  // improved. There should be a natural way to produce better diagnostics
+  // leveraging the constraint system but it's not straightforward.
+  // Currently, there is only a vague catch-all error.
+  auto gradType = CS.getType(GE);
+  auto contextualType = CS.getContextualType();
+
+  // Gradient expressions with generic primal must have an explicit contextual
+  // type.
+  if (gradType->hasTypeVariable() && !contextualType) {
+    diagnose(GE->getLoc(), diag::gradient_expr_generic_unresolved);
+    return true;
+  }
+
+  // Emit catch-all error.
+  diagnose(GE->getLoc(), diag::gradient_expr_unresolved);
+  return true;
 }
 
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,
