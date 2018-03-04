@@ -1792,7 +1792,11 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case tok::pound_gradient:
-    Result = parseExprGradient();
+    Result = parseExprGradientBody(/*isValueAndGradient=*/false);
+    break;
+
+  case tok::pound_valueAndGradient:
+    Result = parseExprGradientBody(/*isValueAndGradient=*/true);
     break;
 
   case tok::pound_available: {
@@ -3648,20 +3652,24 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// parseExprGradient
-///
+/// parseExprGradientBody
 ///   expr-gradient:
-///     'gradient' '('
+///     '#gradient' expr-gradient-body
+///   expr-value-and-gradient:
+///     '#valueAndGradient' expr-gradient-body
+///   expr-gradient-body:
+///     '('
 ///       'of' ':' expr
 ///       (',' 'withRespectTo' ':' expr-gradient-arg-list)?
 ///     ')'
-///   expr-gradient-arg-list:
+///   expr-gradient-args:
 ///     expr-gradient-arg-index (',' expr-gradient-arg-index)*
 ///   expr-gradient-arg-index:
 ///     'self' | '.' [0-9]+
 ///
-ParserResult<Expr> Parser::parseExprGradient() {
-  auto poundGradLoc = consumeToken(tok::pound_gradient);
+ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
+  assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
+  auto poundGradLoc = consumeToken();
   SourceLoc lParenLoc;
   SourceLoc rParenLoc;
 
@@ -3732,7 +3740,11 @@ ParserResult<Expr> Parser::parseExprGradient() {
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
 
   // Successfully parsed a #gradient expression.
-  return makeParserResult<Expr>(
-    GradientExpr::create(Context, poundGradLoc, lParenLoc,
-                         primalParseResult.get(), args, rParenLoc));
+  Expr *result = isValueAndGradient
+    ? (Expr *)ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                           primalParseResult.get(), args,
+                                           rParenLoc)
+    : (Expr *)GradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                   primalParseResult.get(), args, rParenLoc);
+  return makeParserResult<Expr>(result);
 }

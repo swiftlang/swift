@@ -302,6 +302,7 @@ POUND_OLD_OBJECT_LITERAL(Color, colorLiteral, colorLiteralRed, red)
 
 // SWIFT_ENABLE_TENSORFLOW
 POUND_KEYWORD(gradient)
+POUND_KEYWORD(valueAndGradient)
 
 // Single-token literals
 LITERAL(integer_literal)

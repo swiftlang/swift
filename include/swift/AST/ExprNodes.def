@@ -185,8 +185,10 @@ EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
 // SWIFT_ENABLE_TENSORFLOW
-EXPR(Gradient, Expr)
-LAST_EXPR(KeyPathDot)
+ABSTRACT_EXPR(ReverseAutoDiff, Expr)
+  EXPR(Gradient, ReverseAutoDiffExpr)
+  EXPR(ValueAndGradient, ReverseAutoDiffExpr)
+LAST_EXPR(ValueAndGradient)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR
