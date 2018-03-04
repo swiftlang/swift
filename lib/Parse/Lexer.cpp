@@ -557,6 +557,43 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
   return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
+static bool isStartOfInvalidCharacters(const char *Ptr, const char *EndPtr) {
+  // This logic must equals to switch-case in lexImpl.
+  switch ((signed char)*Ptr) {
+  case '\n': case '\r':
+  case ' ': case '\t': case '\f': case '\v':
+  case -1: case -2:
+  case 0:
+  case '@': case '{': case '[': case '(': case '}': case ']': case ')':
+  case ',': case ';': case ':': case '\\': case '#': case '/': case '%':
+  case '!': case '?': case '<': case '>': case '=':
+  case '-': case '+': case '*': case '&': case '|': case '^': case '~': case '.':
+  case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
+  case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
+  case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
+  case 'V': case 'W': case 'X': case 'Y': case 'Z':
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'v': case 'w': case 'x': case 'y': case 'z':
+  case '_': case '$':
+  case '0': case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
+  case '"': case '\'': case '`':
+    return false;
+  default: {
+    if (advanceIfValidStartOfIdentifier(Ptr, EndPtr)) {
+      return false;
+    }
+    if (advanceIfValidStartOfOperator(Ptr, EndPtr)) {
+      return false;
+    }
+
+    return true;
+  }
+  }
+}
+
 bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
@@ -2376,7 +2413,6 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
     if (IsForTrailingTrivia)
@@ -2468,8 +2504,22 @@ Restart:
       break;
     }
     break;
-  default:
-    break;
+  default: {
+    const char *Ptr = CurPtr - 1;
+    if (!isStartOfInvalidCharacters(Ptr, BufferEnd)) {
+      break;
+    }
+
+    bool ShouldTokenize = lexInvalidCharacters(Ptr, /*InLexTrivia=*/true);
+    if (ShouldTokenize) {
+      break;
+    }
+
+    CurPtr = Ptr;
+    size_t Length = CurPtr - TriviaStart;
+    Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+    goto Restart;
+  }
   }
   // Reset the cursor.
   --CurPtr;
