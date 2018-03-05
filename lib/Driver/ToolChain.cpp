@@ -242,15 +242,19 @@ makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
   return output;
 }
 
-/// Set-union the \c Inputs and \c Actions from each \c Job in \p jobs into the
-/// provided \p inputJobs and \p inputActions vectors, further adding all \c
-/// Actions from the resulting merger to \p batchCJA. Do set-union rather than
-/// concatenation here to avoid mentioning the same input multiple times.
+/// Set-union the \c Inputs and \c InputActions from each \c Job in \p jobs into
+/// the provided \p inputJobs and \p inputActions vectors, further adding all \c
+/// Actions in the \p jobs -- InputActions or otherwise -- to \p batchCJA. Do
+/// set-union rather than concatenation here to avoid mentioning the same input
+/// multiple times.
 static bool
 mergeBatchInputs(ArrayRef<const Job *> jobs,
                  llvm::SmallSetVector<const Job *, 16> &inputJobs,
                  llvm::SmallSetVector<const Action *, 16> &inputActions,
                  CompileJobAction *batchCJA) {
+
+  llvm::SmallSetVector<const Action *, 16> allActions;
+
   for (auto const *J : jobs) {
     for (auto const *I : J->getInputs()) {
       inputJobs.insert(I);
@@ -259,11 +263,18 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
     if (!CJA)
       return true;
     for (auto const *I : CJA->getInputs()) {
-      inputActions.insert(I);
+      // Capture _all_ input actions -- whether or not they are InputActions --
+      // in allActions, to set as the inputs for batchCJA below.
+      allActions.insert(I);
+      // Only collect input actions that _are InputActions_ in the inputActions
+      // array, to load into the JobContext in our caller.
+      if (auto const *IA = dyn_cast<InputAction>(I)) {
+        inputActions.insert(IA);
+      }
     }
   }
 
-  for (auto const *I : inputActions) {
+  for (auto const *I : allActions) {
     batchCJA->addInput(I);
   }
   return false;
