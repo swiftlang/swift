@@ -115,6 +115,9 @@
         "P1",
         "P2"
       ],
+      "declAttributes": [
+        "fixedLayout"
+      ],
       "children": [
         {
           "kind": "Function",
