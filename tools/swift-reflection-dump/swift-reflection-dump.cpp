@@ -13,6 +13,10 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
+// FIXME davidino: this needs to be included first to avoid textual
+// replacement. It's silly and needs to be fixed.
+#include "llvm/Object/MachO.h"
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -20,7 +24,6 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "llvm/Object/Archive.h"
-#include "llvm/Object/MachO.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
@@ -191,15 +194,12 @@ public:
     return false;
   }
   
-  bool readBytes(RemoteAddress address, uint8_t *dest,
-                 uint64_t size) override {
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
     if (!isAddressValid(address, size))
-      return false;
+      return ReadBytesResult(nullptr, [](const void *){});
 
     // TODO: Account for offset in ELF binaries
-    auto src = (const void *)address.getAddressData();
-    memcpy(dest, (const void*)src, size);
-    return true;
+    return ReadBytesResult((const void *)address.getAddressData(), [](const void *) {});
   }
   
   bool readString(RemoteAddress address, std::string &dest) override {
@@ -246,12 +246,12 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
       objectFile = objectOwner.get();
     }
 
-    context.addReflectionInfo(findReflectionInfo(objectFile));
-
     // Retain the objects that own section memory
     binaryOwners.push_back(std::move(binaryOwner));
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
+
+    context.addReflectionInfo(findReflectionInfo(objectFile));
   }
 
   switch (action) {

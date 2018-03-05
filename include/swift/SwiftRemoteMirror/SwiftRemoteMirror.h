@@ -17,8 +17,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_REFLECTION_SWIFT_REFLECTION_H
-#define SWIFT_REFLECTION_SWIFT_REFLECTION_H
+#ifndef SWIFT_REMOTE_MIRROR_H
+#define SWIFT_REMOTE_MIRROR_H
 
 #include "Platform.h"
 #include "MemoryReaderInterface.h"
@@ -45,11 +45,11 @@ uint16_t swift_reflection_getSupportedMetadataVersion();
 SWIFT_REMOTE_MIRROR_LINKAGE
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
-                                         PointerSizeFunction getPointerSize,
-                                         SizeSizeFunction getSizeSize,
-                                         ReadBytesFunction readBytes,
-                                         GetStringLengthFunction getStringLength,
-                                         GetSymbolAddressFunction getSymbolAddress);
+                                         uint8_t PointerSize,
+                                         FreeBytesFunction Free,
+                                         ReadBytesFunction ReadBytes,
+                                         GetStringLengthFunction GetStringLength,
+                                         GetSymbolAddressFunction GetSymbolAddress);
 
 /// Destroys an opaque reflection context.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -58,8 +58,18 @@ swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
 /// Add reflection sections for a loaded Swift image.
 SWIFT_REMOTE_MIRROR_LINKAGE
-void swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
-                                        swift_reflection_info_t Info);
+void
+swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
+                                   swift_reflection_info_t Info);
+
+#if defined(__APPLE__) && defined(__MACH__)
+/// Add reflection information from a loaded Swift image.
+/// Returns true on success, false if the image's memory couldn't be read.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int
+swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
+                          swift_addr_t imageStart);
+#endif
 
 /// Returns a boolean indicating if the isa mask was successfully
 /// read, in which case it is stored in the isaMask out parameter.
@@ -77,6 +87,24 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata);
+
+/// Returns whether the given object appears to have metadata understood
+/// by this library. Images must be added using
+/// swift_reflection_addImage, not swift_reflection_addReflectionInfo,
+/// for this function to work properly. If addImage is used, a negative
+/// result is always correct, but a positive result may be a false
+/// positive if the address in question is not really a Swift or
+/// Objective-C object. If addReflectionInfo is used, the return value
+/// will always be false.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int
+swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
+
+/// Returns the metadata pointer for a given object.
+SWIFT_REMOTE_MIRROR_LINKAGE
+uintptr_t
+swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
+                                   uintptr_t Object);
 
 /// Returns an opaque type reference for a class or closure context
 /// instance pointer, or NULL if one can't be constructed.
