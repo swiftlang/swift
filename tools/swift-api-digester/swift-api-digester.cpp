@@ -433,6 +433,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const;
+  bool hasFixedLayout() const;
   bool isStatic() const { return IsStatic; };
   bool isFromExtension() const { return ExtInfo; }
   const ParentExtensionInfo& getExtensionInfo() const {
@@ -712,6 +713,10 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
 
 bool SDKNodeDecl::isDeprecated() const {
   return hasDeclAttribute(SDKDeclAttrKind::DAK_deprecated);
+}
+
+bool SDKNodeDecl::hasFixedLayout() const {
+  return hasDeclAttribute(SDKDeclAttrKind::DAK_fixedLayout);
 }
 
 bool SDKNodeDecl::isSDKPrivate() const {
@@ -1294,6 +1299,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
+
+  // If this is fixed_layout struct.
+  if (VD->getAttrs().hasAttribute<FixedLayoutAttr>()) {
+    DeclAttrs.push_back(SDKDeclAttrKind::DAK_fixedLayout);
+  }
 
   // If the decl is declared in an extension, calculate the extension info.
   if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
