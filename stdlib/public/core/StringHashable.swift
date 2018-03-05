@@ -201,11 +201,21 @@ extension String : Hashable {
     let gutsBits = _guts.rawBits
     return _StringGuts._computeHashValue(_unsafeBitPattern: gutsBits)
   }
+
+  @_inlineable
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(self.hashValue)
+  }
 }
 
 extension StringProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue : Int {
     return _wholeString._guts._computeHashValue(_encodedOffsetRange)
+  }
+
+  @_inlineable
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(self.hashValue)
   }
 }
