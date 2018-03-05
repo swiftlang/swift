@@ -565,6 +565,28 @@ public extension AccelerableByTensorFlow {
 }
 
 //===----------------------------------------------------------------------===//
+// Automatic differentiation
+//===----------------------------------------------------------------------===//
+
+extension Tensor : DifferentiationArgument where Scalar : FloatingPoint {
+  /// The currency type in the mathematical model of differentiation.
+  public typealias DifferentiationCurrency = Scalar
+
+  /// Creates an instance from the specified currency value and another,
+  /// structurally isomorphic instance.
+  ///
+  /// - Parameters:
+  ///   - value: The differentiation currency value for initializing the
+  ///     instance.
+  ///   - other: The other, structurally isomorphic instance.
+  ///
+  @_inlineable @inline(__always)
+  public init(_ value: Scalar, isomorphicTo other: Tensor) {
+    self.init(handle: #tfop("Fill", other.shapeTensor, value))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
