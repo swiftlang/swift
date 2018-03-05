@@ -264,7 +264,7 @@ public extension ${TensorXD} {
 
 /// Factories
 public extension ${TensorXD} where Scalar : Numeric {
-  /// Creates a ${TensorXD} with all elements set to zero.
+  /// Creates a ${TensorXD} with all scalars set to zero.
   ///
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
@@ -281,7 +281,7 @@ public extension ${TensorXD} where Scalar : Numeric {
     self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
-  /// Creates a ${TensorXD} with all elements set to one.
+  /// Creates a ${TensorXD} with all scalars set to one.
   ///
   /// - Parameter shape: The dimensions of the ${TensorXD}.
   @_inlineable @inline(__always)
@@ -360,6 +360,24 @@ public extension ${TensorXD} where Scalar == Double {
     precondition(shape.count == ${rank},
                  "The given shape doesn't match rank ${rank}")
     self.init(base: Tensor(randomUniform: shape))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Automatic differentiation
+//===----------------------------------------------------------------------===//
+
+extension ${TensorXD} : DifferentiationArgument where Scalar : FloatingPoint {
+  // Returns a ${TensorXD} of the same shape with all scalars set to zero.
+  @_inlineable @inline(__always)
+  public func makeZero() -> ${TensorXD} {
+    return #tfop("Fill", shapeTensor, 0)
+  }
+
+  // Returns a ${TensorXD} of the same shape with all scalars set to one.
+  @_inlineable @inline(__always)
+  public func makeOne() -> ${TensorXD} {
+    return #tfop("Fill", shapeTensor, 1)
   }
 }
 
