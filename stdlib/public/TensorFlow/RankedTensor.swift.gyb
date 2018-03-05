@@ -368,16 +368,20 @@ public extension ${TensorXD} where Scalar == Double {
 //===----------------------------------------------------------------------===//
 
 extension ${TensorXD} : DifferentiationArgument where Scalar : FloatingPoint {
-  // Returns a ${TensorXD} of the same shape with all scalars set to zero.
-  @_inlineable @inline(__always)
-  public func makeZero() -> ${TensorXD} {
-    return #tfop("Fill", shapeTensor, 0)
-  }
+  /// The currency type in the mathematical model of differentiation.
+  public typealias DifferentiationCurrency = Scalar
 
-  // Returns a ${TensorXD} of the same shape with all scalars set to one.
+  /// Creates an instance from the specified currency value and another,
+  /// structurally isomorphic instance.
+  ///
+  /// - Parameters:
+  ///   - value: The differentiation currency value for initializing the
+  ///     instance.
+  ///   - other: The other, structurally isomorphic instance.
+  ///
   @_inlineable @inline(__always)
-  public func makeOne() -> ${TensorXD} {
-    return #tfop("Fill", shapeTensor, 1)
+  public init(_ value: Scalar, isomorphicTo other: ${TensorXD}) {
+    self.init(handle: #tfop("Fill", other.shapeTensor, value))
   }
 }
 
