@@ -2346,6 +2346,15 @@ for host in "${ALL_HOSTS[@]}"; do
                         fi
                         ;;
                 esac
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS=NO
+                        )
+                else
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS=YES
+                    )
+                fi
                 ;;
             llbuild)
                 cmake_options=(
