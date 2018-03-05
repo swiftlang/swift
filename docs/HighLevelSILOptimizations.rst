@@ -348,42 +348,41 @@ releasenone
   visible release has happened (i.e it is allowed for a ``releasenone``
   function to allocate and destruct an object in its implementation as long as
   this is does not cause an release of an object visible outside of the
-  implementation).
+  implementation). Here are some examples::
 
-  Examples
-  ::
-  class SomeObject {
-    final var x: Int = 3
-  }
-  var global = SomeObject()
-
-  class SomeOtherObject {
-    var x: Int = 2
-    deinit {
-      global = SomeObject()
+    class SomeObject {
+      final var x: Int = 3
     }
-  }
 
-  @effects(releasenone)
-  func validReleaseNoneFunction(x: Int) -> Int {
-    global.x = 5
-    return x + 2
-  }
+    var global = SomeObject()
 
-  @effects(releasenone)
-  func validReleaseNoneFunction(x: Int) -> Int {
-    var notExternallyVisibleObject = SomeObject()
-    return x +  notExternallyVisibleObject.x
-  }
+    class SomeOtherObject {
+      var x: Int = 2
+      deinit {
+        global = SomeObject()
+      }
+    }
 
-  func notAReleaseNoneFunction(x: Int, y: SomeObject) -> Int {
-    return x + y.x
-  }
+    @effects(releasenone)
+    func validReleaseNoneFunction(x: Int) -> Int {
+      global.x = 5
+      return x + 2
+    }
 
-  func notAReleaseNoneFunction(x: Int) -> Int {
-    var releaseExternallyVisible = SomeOtherObject()
-    return x + releaseExternallyVisible.x
-  }
+    @effects(releasenone)
+    func validReleaseNoneFunction(x: Int) -> Int {
+      var notExternallyVisibleObject = SomeObject()
+      return x +  notExternallyVisibleObject.x
+    }
+
+    func notAReleaseNoneFunction(x: Int, y: SomeObject) -> Int {
+      return x + y.x
+    }
+
+    func notAReleaseNoneFunction(x: Int) -> Int {
+      var releaseExternallyVisible = SomeOtherObject()
+      return x + releaseExternallyVisible.x
+    }
 
 readwrite
 
