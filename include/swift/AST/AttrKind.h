@@ -73,6 +73,7 @@ enum class InlineKind : uint8_t {
 enum class EffectsKind : uint8_t {
   ReadNone,
   ReadOnly,
+  ReleaseNone,
   ReadWrite,
   Unspecified
 };

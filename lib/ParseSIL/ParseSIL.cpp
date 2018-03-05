@@ -936,6 +936,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *MRK = EffectsKind::ReadOnly;
     else if (MRK && SP.P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
+    else if (MRK && SP.P.Tok.getText() == "releasenone")
+      *MRK = EffectsKind::ReleaseNone;
     else if (Semantics && SP.P.Tok.getText() == "_semantics") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {

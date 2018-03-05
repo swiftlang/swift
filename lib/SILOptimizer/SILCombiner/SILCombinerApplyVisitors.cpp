@@ -1317,7 +1317,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunction();
-  if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       if (eraseApply(AI, Users))
@@ -1327,7 +1327,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->getEffectsKind() < EffectsKind::ReadWrite) {
+    if (SF->getEffectsKind() < EffectsKind::ReleaseNone) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
         return I;
@@ -1450,7 +1450,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunction();
-  if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (Fn && Fn->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
       SILBasicBlock *BB = AI->getParent();
