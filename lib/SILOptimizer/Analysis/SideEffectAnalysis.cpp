@@ -159,6 +159,11 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
     return true;
   }
   switch (F->getEffectsKind()) {
+    case EffectsKind::ReleaseNone:
+      Effects.GlobalEffects.Reads = true;
+      Effects.GlobalEffects.Writes = true;
+      Effects.GlobalEffects.Releases = false;
+      return true;
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:

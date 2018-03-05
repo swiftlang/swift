@@ -693,8 +693,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto *FRILeftFun = FRILeft->getReferencedFunction();
   auto *FRIRightFun = FRIRight->getReferencedFunction();
 
-  if (FRILeftFun->getEffectsKind() >= EffectsKind::ReadWrite ||
-      FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
+  if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
+      FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)
     return false;
 
   if (!FRILeftFun->hasSemanticsAttrs() || !FRIRightFun->hasSemanticsAttrs())
