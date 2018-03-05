@@ -63,44 +63,44 @@ static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef ContextRef,
                                             uintptr_t Object);
 
-swift_typeref_interop_t
+static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForMangledTypeName(
   SwiftReflectionInteropContextRef ContextRef,
   const char *MangledName,
   uint64_t Length);
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef);
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index);
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata);
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index);
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object);
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index);
 
-unsigned
+static inline unsigned
 swift_reflection_interop_genericArgumentCountOfTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef);
 
-swift_typeref_interop_t
+static inline swift_typeref_interop_t
 swift_reflection_interop_genericArgumentOfTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef,
   unsigned Index);
@@ -116,20 +116,24 @@ static inline void
 swift_reflection_interop_dumpTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                      swift_typeref_interop_t OpaqueTypeRef);
 
-void swift_reflection_interop_dumpInfoForTypeRef(
-  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef);
+static inline void
+swift_reflection_interop_dumpInfoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_typeref_interop_t OpaqueTypeRef);
 
-void swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
-                                                  swift_metadata_interop_t Metadata);
+static inline void
+swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                             swift_metadata_interop_t Metadata);
 
-void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
-                                                  uintptr_t Object);
+static inline void
+swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                             uintptr_t Object);
 
-size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
-                                         const char *MangledName,
-                                         size_t Length,
-                                         char *OutDemangledName,
-                                         size_t MaxLength);
+static inline size_t
+swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
+                                  const char *MangledName,
+                                  size_t Length,
+                                  char *OutDemangledName,
+                                  size_t MaxLength);
 
 
 
@@ -292,7 +296,8 @@ struct SwiftReflectionInteropContext {
 #define DECLARE_LIBRARY(index) \
   struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[index]
 
-static inline int swift_reflection_interop_libraryOwnsObject(
+static inline int
+swift_reflection_interop_libraryOwnsObject(
   struct SwiftReflectionInteropContext *ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
   uintptr_t Object) {
@@ -325,8 +330,10 @@ static inline int swift_reflection_interop_libraryOwnsObject(
   return 0;
 }
 
-static inline void swift_reflection_interop_loadFunctions(
-  struct SwiftReflectionInteropContext *Context, void *Handle, int IsLegacy) {
+static inline void
+swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Context,
+                                       void *Handle,
+                                       int IsLegacy) {
   if (Handle == NULL)
     return;
 
@@ -388,10 +395,11 @@ static inline void swift_reflection_interop_loadFunctions(
 #endif
 }
 
-static int swift_reflection_interop_readBytesAdapter(void *reader_context,
-                                                     swift_addr_t address,
-                                                     void *dest,
-                                                     uint64_t size) {
+static inline int
+swift_reflection_interop_readBytesAdapter(void *reader_context,
+                                          swift_addr_t address,
+                                          void *dest,
+                                          uint64_t size) {
   SwiftReflectionInteropContextRef Context =
     (SwiftReflectionInteropContextRef)reader_context;
 
@@ -407,19 +415,22 @@ static int swift_reflection_interop_readBytesAdapter(void *reader_context,
   return 1;
 }
 
-static uint8_t swift_reflection_interop_getSizeAdapter(void *reader_context) {
+static inline uint8_t
+swift_reflection_interop_getSizeAdapter(void *reader_context) {
   // Legacy library doesn't pay attention to these anyway.
   return sizeof(void *);
 }
 
-static uint64_t swift_reflection_interop_GetStringLengthAdapter(
+static inline uint64_t
+swift_reflection_interop_GetStringLengthAdapter(
   void *reader_context, swift_addr_t address) {
   SwiftReflectionInteropContextRef Context =
     (SwiftReflectionInteropContextRef)reader_context;
   return Context->GetStringLength(Context->ReaderContext, address);
 }
 
-static swift_addr_t swift_reflection_interop_GetSymbolAddressAdapter(
+static inline swift_addr_t
+swift_reflection_interop_GetSymbolAddressAdapter(
   void *reader_context, const char *name, uint64_t name_length) {
   SwiftReflectionInteropContextRef Context =
     (SwiftReflectionInteropContextRef)reader_context;
@@ -692,7 +703,7 @@ swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef Con
   return Result;
 }
 
-swift_typeref_interop_t
+static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForMangledTypeName(
   SwiftReflectionInteropContextRef ContextRef,
   const char *MangledName,
@@ -714,14 +725,14 @@ swift_reflection_interop_typeRefForMangledTypeName(
   return Result;
 }
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   return Library->Functions.infoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
 }
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index) {
@@ -731,14 +742,14 @@ swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef Context
                                            Index);
 }
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   return Library->Functions.infoForMetadata(Library->Context, Metadata.Metadata);
 }
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index) {
@@ -746,7 +757,7 @@ swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef Contex
   return Library->Functions.childOfMetadata(Library->Context, Metadata.Metadata, Index);
 }
 
-swift_typeinfo_t
+static inline swift_typeinfo_t
 swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object) {
   swift_typeinfo_t Result = {};
@@ -765,7 +776,7 @@ swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef Contex
   return Result;
 }
 
-swift_childinfo_t
+static inline swift_childinfo_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index) {
@@ -781,14 +792,14 @@ swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef Contex
   return Result;
 }
 
-unsigned
+static inline unsigned
 swift_reflection_interop_genericArgumentCountOfTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   return Library->Functions.genericArgumentCountOfTypeRef(OpaqueTypeRef.Typeref);
 }
 
-swift_typeref_interop_t
+static inline swift_typeref_interop_t
 swift_reflection_interop_genericArgumentOfTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef,
   unsigned Index) {
@@ -826,19 +837,22 @@ swift_reflection_interop_dumpTypeRef(SwiftReflectionInteropContextRef ContextRef
   Library->Functions.dumpTypeRef(OpaqueTypeRef.Typeref);
 }
 
-void swift_reflection_interop_dumpInfoForTypeRef(
+static inline void
+swift_reflection_interop_dumpInfoForTypeRef(
   SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   Library->Functions.dumpInfoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
 }
 
-void swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
+static inline void
+swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                                   swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   Library->Functions.dumpInfoForMetadata(Library->Context, Metadata.Metadata);
 }
 
-void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
+static inline void
+swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                                   uintptr_t Object) {
   FOREACH_LIBRARY {
     if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
@@ -849,11 +863,12 @@ void swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextR
   }
 }
 
-size_t swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
-                                         const char *MangledName,
-                                         size_t Length,
-                                         char *OutDemangledName,
-                                         size_t MaxLength) {
+static inline size_t
+swift_reflection_interop_demangle(SwiftReflectionInteropContextRef ContextRef,
+                                  const char *MangledName,
+                                  size_t Length,
+                                  char *OutDemangledName,
+                                  size_t MaxLength) {
   FOREACH_LIBRARY {
     return Library->Functions.demangle(MangledName, Length, OutDemangledName, MaxLength);
   }
