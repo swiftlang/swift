@@ -42,6 +42,24 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Automatic differentiation
+//===----------------------------------------------------------------------===//
+
+extension Tensor : DifferentiationArgument where Scalar : FloatingPoint {
+  // Returns a Tensor of the same shape with all scalars set to zero.
+  @_inlineable @inline(__always)
+  public func makeZero() -> Tensor {
+    return #tfop("Fill", shapeTensor, 0)
+  }
+
+  // Returns a Tensor of the same shape with all scalars set to one.
+  @_inlineable @inline(__always)
+  public func makeOne() -> Tensor {
+    return #tfop("Fill", shapeTensor, 1)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 

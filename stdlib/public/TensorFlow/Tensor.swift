@@ -275,7 +275,7 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
-  /// Creates a tensor with all elements set to zero.
+  /// Creates a tensor with all scalars set to zero.
   ///
   /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)
@@ -283,7 +283,7 @@ public extension Tensor where Scalar : Numeric {
     self.init(shape: shape, repeating: 0)
   }
 
-  /// Creates a tensor with all elements set to one.
+  /// Creates a tensor with all scalars set to one.
   ///
   /// - Parameter shape: The dimensions of the tensor.
   @_inlineable @inline(__always)

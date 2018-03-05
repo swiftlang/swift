@@ -30,6 +30,8 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
+  # SWIFT_ENABLE_TENSORFLOW
+  AutoDiff.swift
   BidirectionalCollection.swift
   Bool.swift
   BridgeObjectiveC.swift

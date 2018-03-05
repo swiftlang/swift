@@ -68,6 +68,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(TensorProtocol)
+PROTOCOL(DifferentiationArgument)
 PROTOCOL(FloatingPoint)
 
 PROTOCOL_(ObjectiveCBridgeable)
