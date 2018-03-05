@@ -2097,7 +2097,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
       && Info.Kind != RangeKind::MultiStatement)
     return notFound;
 
-  if (Info.ContainedNodes.size() == 0)
+  if (Info.ContainedNodes.empty())
     return notFound;
 
   struct AssignExprFinder: public SourceEntityWalker {
@@ -2529,7 +2529,7 @@ static CharSourceRange
   ContextFinder Finder(*TheFile, Node, NodeChecker);
   Finder.resolve();
   auto Contexts = Finder.getContexts();
-  if (Contexts.size() == 0)
+  if (Contexts.empty())
     return CharSourceRange();
   auto TargetNode = Contexts.back();
   BraceStmt *BStmt = dyn_cast<BraceStmt>(TargetNode.dyn_cast<Stmt*>());

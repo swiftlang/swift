@@ -284,7 +284,7 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
     }
   }
 #endif
-  if (jobs.size() == 0)
+  if (jobs.empty())
     return nullptr;
 
   // Synthetic OutputInfo is a slightly-modified version of the initial

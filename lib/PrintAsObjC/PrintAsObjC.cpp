@@ -620,7 +620,7 @@ private:
       }
 
       // Zero-parameter methods.
-      if (params.size() == 0) {
+      if (params.empty()) {
         assert(paramIndex == 0);
         os << piece;
         paramIndex = 1;
