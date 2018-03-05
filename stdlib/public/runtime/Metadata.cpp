@@ -2872,9 +2872,10 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   return entry;
 }
 
-const WitnessTable *swift::swift_getGenericWitnessTable(
-    GenericWitnessTable *genericTable, const Metadata *type,
-    void *const *instantiationArgs) {
+const WitnessTable *
+swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
+                                    const Metadata *type,
+                                    void **const *instantiationArgs) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }

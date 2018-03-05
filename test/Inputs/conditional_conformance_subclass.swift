@@ -63,8 +63,7 @@ public func subclassgeneric_generic<T: P2>(_: T.Type) {
 
 // CHECK-LABEL: define{{( protected)?}} i8** @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type*, i8***)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast i8*** %1 to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8*** %1)
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 

@@ -296,7 +296,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // CHECK-LABEL: define{{( protected)?}} i8** @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG", %swift.type* null, i8** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG", %swift.type* null, i8*** null)
 // CHECK-NEXT:    ret i8** [[WTABLE]]
 
 

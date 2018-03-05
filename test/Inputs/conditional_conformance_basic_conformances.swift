@@ -63,8 +63,7 @@ public func single_generic<T: P2>(_: T.Type) {
 
 // CHECK-LABEL: define{{( protected)?}} i8** @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type*, i8***)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast i8*** %1 to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8*** %1)
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 
@@ -186,8 +185,7 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 
 // CHECK-LABEL: define{{( protected)?}} i8** @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type*, i8***)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast i8*** %1 to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWG", %swift.type* %0, i8*** %1)
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 

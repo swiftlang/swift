@@ -136,8 +136,7 @@ struct Computed<T, U> : Assocked {
 //   Witness table accessor function for Computed : Assocked.
 // CHECK-LABEL: define hidden i8** @"$S23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWa"(%swift.type*, i8***)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:     [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast i8*** %1 to i8**
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", %swift.type* %0, i8*** %1)
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
@@ -180,8 +179,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 //   Witness table accessor function for GenericComputed : HasSimpleAssoc..
 // CHECK-LABEL: define hidden i8** @"$S23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa"(%swift.type*, i8***)
 // CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast i8*** %1 to i8**
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG", %swift.type* %0, i8*** %1)
 // CHECK-NEXT:    ret i8** [[WTABLE]]
 
 

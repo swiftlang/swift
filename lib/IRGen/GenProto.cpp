@@ -1760,12 +1760,11 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   if (Conformance.witnessTableAccessorRequiresArguments()) {
     metadata = params.claimNext();
-    auto conditionalReqtWtables = params.claimNext();
-    instantiationArgs =
-        IGF.Builder.CreateBitCast(conditionalReqtWtables, IGF.IGM.Int8PtrPtrTy);
+    instantiationArgs = params.claimNext();
   } else {
     metadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-    instantiationArgs = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrPtrTy);
+    instantiationArgs =
+        llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrPtrTy);
   }
 
   // Okay, we need a cache.  Build the cache structure.

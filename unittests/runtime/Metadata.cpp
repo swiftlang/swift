@@ -774,7 +774,7 @@ static void initializeRelativePointer(int32_t *ptr, T value) {
 
 static void witnessTableInstantiator(WitnessTable *instantiatedTable,
                                      const Metadata *type,
-                                     void * const *instantiationArgs) {
+                                     void **const *instantiationArgs) {
   EXPECT_EQ(type, nullptr);
 
   EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 123);
@@ -903,7 +903,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void **)conditionalTablesBuffer);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -942,7 +942,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void **)conditionalTablesBuffer);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -982,7 +982,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void **)conditionalTablesBuffer);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
