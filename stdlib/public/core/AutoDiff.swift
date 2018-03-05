@@ -12,9 +12,12 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// This file defines the DifferentiationArgument type, used by gradient
-// expressions and the differentiable attribute.
+// This file defines support for automatic differentiation.
 //
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Compiler Protocols
 //===----------------------------------------------------------------------===//
 
 /// A type that represents a valid argument for automatic differentiation.
@@ -23,7 +26,8 @@
 /// differentiated with-respect-to in #gradient and #valueAndGradient
 /// expressions.
 ///
-/// TODO: improve description and add examples.
+/// - TODO: Improve description and add examples.
+///
 public protocol DifferentiationArgument {
   /// Returns an instance initialized to zero.
   func makeZero() -> Self
