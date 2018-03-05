@@ -583,6 +583,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       kind = EffectsKind::ReadNone;
     else if (Tok.getText() == "readwrite")
       kind = EffectsKind::ReadWrite;
+    else if (Tok.getText() == "releasenone")
+      kind = EffectsKind::ReleaseNone;
     else {
       diagnose(Loc, diag::effects_attribute_unknown_option,
                Tok.getText(), AttrName);
