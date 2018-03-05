@@ -351,16 +351,19 @@ void Lexer::skipToEndOfLine(bool EatNewline) {
       }
       break;   // Otherwise, eat other characters.
     case 0:
-      // If this is a random nul character in the middle of a buffer, skip it as
-      // whitespace.
-      if (CurPtr-1 != BufferEnd) {
+      switch (getNulCharacterKind(CurPtr - 1)) {
+      case NulCharacterKind::Embedded:
+        // If this is a random nul character in the middle of a buffer, skip it
+        // as whitespace.
         diagnoseEmbeddedNul(Diags, CurPtr-1);
-        break;
+        LLVM_FALLTHROUGH;
+      case NulCharacterKind::CodeCompletion:
+        continue;
+      case NulCharacterKind::BufferEnd:
+        // Otherwise, the last line of the file does not have a newline.
+        --CurPtr;
+        return;
       }
-
-      // Otherwise, the last line of the file does not have a newline.
-      --CurPtr;
-      return;
     }
   }
 }
@@ -422,26 +425,30 @@ void Lexer::skipSlashStarComment() {
 
       break;   // Otherwise, eat other characters.
     case 0:
-      // If this is a random nul character in the middle of a buffer, skip it as
-      // whitespace.
-      if (CurPtr-1 != BufferEnd) {
-        diagnoseEmbeddedNul(Diags, CurPtr-1);
-        break;
+      switch (getNulCharacterKind(CurPtr - 1)) {
+      case NulCharacterKind::Embedded:
+        // If this is a random nul character in the middle of a buffer, skip it
+        // as whitespace.
+        diagnoseEmbeddedNul(Diags, CurPtr - 1);
+        LLVM_FALLTHROUGH;
+      case NulCharacterKind::CodeCompletion:
+        continue;
+      case NulCharacterKind::BufferEnd: {
+        // Otherwise, we have an unterminated /* comment.
+        --CurPtr;
+
+        // Count how many levels deep we are.
+        llvm::SmallString<8> Terminator("*/");
+        while (--Depth != 0)
+          Terminator += "*/";
+
+        const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
+        diagnose(EOL, diag::lex_unterminated_block_comment)
+            .fixItInsert(getSourceLoc(EOL), Terminator);
+        diagnose(StartPtr, diag::lex_comment_start);
+        return;
       }
-      
-      // Otherwise, we have an unterminated /* comment.
-      --CurPtr;
-
-      // Count how many levels deep we are.
-      llvm::SmallString<8> Terminator("*/");
-      while (--Depth != 0)
-        Terminator += "*/";
-
-      const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
-      diagnose(EOL, diag::lex_unterminated_block_comment)
-        .fixItInsert(getSourceLoc(EOL), Terminator);
-      diagnose(StartPtr, diag::lex_comment_start);
-      return;
+      }
     }
   }
 }
@@ -1857,6 +1864,16 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   return false;
 }
 
+Lexer::NulCharacterKind Lexer::getNulCharacterKind(const char *Ptr) const {
+  assert(Ptr != nullptr && *Ptr == 0);
+  if (Ptr == CodeCompletionPtr) {
+    return NulCharacterKind::CodeCompletion;
+  }
+  if (Ptr == BufferEnd) {
+    return NulCharacterKind::BufferEnd;
+  }
+  return NulCharacterKind::Embedded;
+}
 
 void Lexer::tryLexEditorPlaceholder() {
   assert(CurPtr[-1] == '<' && CurPtr[0] == '#');
@@ -2164,21 +2181,22 @@ Restart:
     return formToken(tok::unknown, TokStart);
 
   case 0:
-    if (CurPtr-1 == CodeCompletionPtr)
+    switch (getNulCharacterKind(CurPtr - 1)) {
+    case NulCharacterKind::CodeCompletion:
       return formToken(tok::code_complete, TokStart);
 
-    // If this is a random nul character in the middle of a buffer, skip it as
-    // whitespace.
-    if (CurPtr-1 != BufferEnd) {
+    case NulCharacterKind::Embedded:
+      // If this is a random nul character in the middle of a buffer, skip it as
+      // whitespace.
       diagnoseEmbeddedNul(Diags, CurPtr-1);
       goto Restart;
+    case NulCharacterKind::BufferEnd:
+      // Otherwise, this is the real end of the buffer.  Put CurPtr back into
+      // buffer bounds.
+      --CurPtr;
+      // Return EOF.
+      return formToken(tok::eof, TokStart);
     }
-
-    // Otherwise, this is the real end of the buffer.  Put CurPtr back into
-    // buffer bounds.
-    --CurPtr;
-    // Return EOF.
-    return formToken(tok::eof, TokStart);
 
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
@@ -2323,7 +2341,6 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  // TODO: Handle random nul('\0') character in the middle of a buffer.
   // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
@@ -2401,6 +2418,19 @@ Restart:
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
       goto Restart;
+    }
+    break;
+  case 0:
+    switch (getNulCharacterKind(CurPtr - 1)) {
+    case NulCharacterKind::Embedded: {
+      diagnoseEmbeddedNul(Diags, CurPtr - 1);
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    }
+    case NulCharacterKind::CodeCompletion:
+    case NulCharacterKind::BufferEnd:
+      break;
     }
     break;
   default:

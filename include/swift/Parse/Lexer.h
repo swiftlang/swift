@@ -461,6 +461,16 @@ public:
   };
 
 private:
+  /// Nul character meaning kind.
+  enum class NulCharacterKind {
+    /// String buffer terminator.
+    BufferEnd,
+    /// Embedded nul character.
+    Embedded,
+    /// Code completion marker.
+    CodeCompletion
+  };
+
   /// For a source location in the current buffer, returns the corresponding
   /// pointer.
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
@@ -520,6 +530,8 @@ private:
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker(bool EatNewline);
+
+  NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first
