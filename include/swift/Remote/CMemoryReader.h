@@ -62,17 +62,26 @@ public:
     if (!length)
       return false;
 
-    auto buffer = std::unique_ptr<uint8_t>(new uint8_t[length + 1]);
-    if (!readBytes(address, buffer.get(), length + 1))
+    auto Buf = readBytes(address, length);
+    if (!Buf)
       return false;
-
-    dest = std::string(reinterpret_cast<const char *>(buffer.get()));
+    
+    dest = std::string(reinterpret_cast<const char *>(Buf.get()), length);
     return true;
   }
 
-  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
-    return Impl.readBytes(Impl.reader_context,
-                          address.getAddressData(), dest, size) != 0;
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
+      void *FreeContext;
+      auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
+                                &FreeContext);
+
+      auto Free = Impl.free;
+      if (Free == nullptr)
+        return ReadBytesResult(Ptr, [](const void *) {});
+      
+      auto ReaderContext = Impl.reader_context;
+      auto freeLambda = [=](const void *Ptr) { Free(ReaderContext, Ptr, FreeContext); };
+      return ReadBytesResult(Ptr, freeLambda);
   }
 };
 
