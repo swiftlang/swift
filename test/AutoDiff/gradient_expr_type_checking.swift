@@ -60,8 +60,9 @@ let _: (Double) -> Double = #gradient(of: e)
 let _: (Float) -> (Float, Float) = #valueAndGradient(of: e)
 let _: (Double) -> (Double, Double) = #valueAndGradient(of: e)
 
-let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
-let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
+let _: (Float) -> (Float, Float, Float) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
+let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{gradient argument has non-differentiable type '(Float, Float)'}}
+let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{gradient argument has non-differentiable type 'Int'}}
 let _: (Float) -> Double = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
 
 // Complex type inference.
@@ -77,12 +78,11 @@ func daddWithValue<T : FloatingPoint>(
   return #valueAndGradient(of: add)(x, y) // ok
 }
 
-func addNumeric<T : Numeric>(_ x: T, _ y: T) -> T { // expected-note {{in call to function 'addNumeric'}}
+func addNumeric<T : Numeric>(_ x: T, _ y: T) -> T {
   return x + y
 }
 func daddNumeric<T : Numeric>(_ x: T, _ y: T) -> (T, T) {
-  // TODO: improve diagnostic for this case.
-  return #gradient(of: addNumeric)(x, y) // expected-error {{generic parameter 'T' could not be inferred}}
+  return #gradient(of: addNumeric)(x, y) // expected-error {{gradient argument has non-differentiable type 'T'}}
 }
 // Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
 func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
