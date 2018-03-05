@@ -525,13 +525,17 @@ private:
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
-  const char *findEndOfCurlyQuoteStringLiteral(const char*);
+  const char *findEndOfCurlyQuoteStringLiteral(const char *,
+                                               bool EmitDiagnostics);
 
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker(bool EatNewline);
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
+
+  /// Lex invalid characters and return which it should be tokenized.
+  bool lexInvalidCharacters(const char *&Ptr, bool InLexTrivia);
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first
