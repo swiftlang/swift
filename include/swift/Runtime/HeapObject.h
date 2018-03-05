@@ -280,6 +280,23 @@ SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferencedOrPinned_nonNull_native(
   const struct HeapObject *);
 
+/// Is this native Swift pointer non-null and has a reference count greater than
+/// one.
+/// This runtime call will print an error message if the closure is escaping but
+/// it will not abort.
+SWIFT_RUNTIME_EXPORT
+bool swift_isEscapingClosure(const struct HeapObject *object);
+
+/// Is this native Swift pointer non-null and has a reference count greater than
+/// one.
+/// This runtime call will print an error message with file name and location if
+/// the closure is escaping but it will not abort.
+SWIFT_RUNTIME_EXPORT
+bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
+                                           const unsigned char *filename,
+                                           int32_t filenameLength,
+                                           int32_t line);
+
 /// Deallocate the given memory.
 ///
 /// It must have been returned by swift_allocObject and the strong reference

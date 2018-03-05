@@ -1795,6 +1795,9 @@ public:
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+    *this << getIDAndType(CUI->getOperand());
+  }
   void visitDeallocStackInst(DeallocStackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }

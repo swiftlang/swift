@@ -2848,6 +2848,19 @@ memory object or a reference to a pinned object. Returns 1 if the
 strong reference count is 1 or the object has been marked pinned by
 strong_pin.
 
+is_escaping_closure
+```````````````````
+
+::
+  sil-instruction ::= 'is_escaping_closure' sil-operand
+
+  %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  // %0 must be an escaping swift closure.
+  // %1 will be of type Builtin.Int1
+
+Checks whether the context reference is not nil and bigger than one and returns
+true if it is.
+
 copy_block
 ``````````
 ::

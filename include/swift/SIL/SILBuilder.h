@@ -1538,6 +1538,12 @@ public:
     return insert(new (getModule()) IsUniqueOrPinnedInst(
         getSILDebugLocation(Loc), value, Int1Ty));
   }
+  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+                                                 SILValue operand) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (getModule()) IsEscapingClosureInst(
+        getSILDebugLocation(Loc), operand, Int1Ty));
+  }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
     return insert(new (getModule())

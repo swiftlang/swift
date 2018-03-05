@@ -753,6 +753,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::OpenExistentialBoxInst:
