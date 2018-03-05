@@ -106,10 +106,10 @@ internal final class __DataStorage {
     @usableFromInline var _bytes: UnsafeMutableRawPointer?
     @usableFromInline var _length: Int
     @usableFromInline var _capacity: Int
-    @usableFromInline var _needToZero: Bool
-    @usableFromInline var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
     @usableFromInline var _offset: Int
-    
+    @usableFromInline var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
+    @usableFromInline var _needToZero: Bool
+
     @inlinable // This is @inlinable as trivially computable.
     var bytes: UnsafeRawPointer? {
         return UnsafeRawPointer(_bytes)?.advanced(by: -_offset)
