@@ -96,10 +96,10 @@ public final class _DataStorage {
     public var _bytes: UnsafeMutableRawPointer?
     public var _length: Int
     public var _capacity: Int
-    public var _needToZero: Bool
+    public var _offset: Int
     public var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
     public var _backing: Backing = .swift
-    public var _offset: Int
+    public var _needToZero: Bool
     
     public var bytes: UnsafeRawPointer? {
         @inline(__always)
