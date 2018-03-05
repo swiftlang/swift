@@ -195,11 +195,26 @@ public enum PythonError : Error {
   /// A callMember(x, ...) operation failed to look up the 'x' member.
   case invalidMember(String)
 
-  /// An access to an invalid tuple member was performed.
-  case invalidTupleMember(base: PyVal)
-
   /// Importing the module with the returned name failed.
   case invalidModule(String)
+}
+
+extension PythonError : Equatable {
+  public static func == (lhs: PythonError, rhs: PythonError) -> Bool {
+    switch (lhs, rhs) {
+    case let (.invalidCall(leftVal), .invalidCall(rightVal)),
+         let (.exception(leftVal), .exception(rightVal)):
+      return leftVal == rightVal
+    case let (.invalidModule(leftString), .invalidModule(rightString)),
+         let (.invalidMember(leftString), .invalidMember(rightString)):
+      return leftString == rightString
+    case (.exception(_), _),
+         (.invalidCall(_), _),
+         (.invalidMember(_), _),
+         (.invalidModule(_), _):
+      return false
+    }
+  }
 }
 
 extension PythonError : CustomStringConvertible {
@@ -208,7 +223,6 @@ extension PythonError : CustomStringConvertible {
     case .exception(let p): return "exception: \(p)"
     case .invalidCall(let p): return "invalidCall: \(p)"
     case .invalidMember(let m): return "invalidMember: \(m)"
-    case .invalidTupleMember(let p): return "invalidTupleMember: \(p)"
     case .invalidModule(let m): return "invalidModule: \(m)"
     }
   }
@@ -252,8 +266,7 @@ public struct ThrowingPyVal {
     if PyErr_Occurred() != nil {
       // FIXME: This should be an assert, but the failure mode in playgrounds
       // is just awful.
-      print("Python error state must be clear")
-      fatalError()
+      fatalError("Python error state must be clear")
     }
 
     // Produce a dictionary for keyword arguments if any are present.
@@ -272,12 +285,7 @@ public struct ThrowingPyVal {
     defer { Py_DecRef(kwdictObject) }  // Py_DecRef is nil safe.
 
     // Non-keyword arguments are passed as a tuple of values.
-    let argTuple = PyTuple_New(args.count)!
-    for (index, element) in args.enumerated() {
-      // This 'steals' the element stored into the tuple.
-      PyTuple_SetItem(argTuple, index, element.ownedPyObject)
-    }
-    // PyObject_Call doesn't take ownership of the arg tuple.
+    let argTuple = pyTuple(args)
     defer { Py_DecRef(argTuple) }
 
     // Python calls always return a non-null value when successful.  If the
@@ -436,7 +444,6 @@ public struct CheckingPyVal {
     }
   }
 
-
   public var tuple2: (PyVal, PyVal)? {
     guard let elt0 = self[0], let elt1 = self[1] else {
       return nil
@@ -478,23 +485,16 @@ public extension PyVal {
     return checking[member: member]!
   }
 
-  // This returns true on error and false on success, gross.
-  private func failablyUpdateMember(_ member: String, _ value: PyVal) -> Bool {
+  func updateMember(_ member: String, to value: PyVal) {
     let selfObject = self.ownedPyObject
     defer { Py_DecRef(selfObject) }
     let valueObject = value.ownedPyObject
     defer { Py_DecRef(valueObject) }
 
     if PyObject_SetAttrString(selfObject, member, valueObject) == -1 {
-      PyErr_Clear()
-      return true
+      try! throwPythonErrorIfPresent()
+      fatalError("setting an invalid Python member \(member)")
     }
-    return false
-  }
-
-  func updateMember(_ member: String, _ value: PyVal) {
-    let failed = failablyUpdateMember(member, value)
-    assert(!failed, "setting an invalid Python member \(member)")
   }
 
   // Dictionary lookups return optionals because they can always fail if the
@@ -523,30 +523,15 @@ public extension PyVal {
 
   // Helpers for destructuring tuples
   var tuple2: (PyVal, PyVal) {
-    get {
-      return (self[0], self[1])
-    }
-    set {
-      (self[0], self[1]) = newValue
-    }
+    return (self[0], self[1])
   }
 
   var tuple3: (PyVal, PyVal, PyVal) {
-    get {
-      return (self[0], self[1], self[2])
-    }
-    set {
-      (self[0], self[1], self[2]) = newValue
-    }
+    return (self[0], self[1], self[2])
   }
 
   var tuple4: (PyVal, PyVal, PyVal, PyVal) {
-    get {
-      return (self[0], self[1], self[2], self[3])
-    }
-    set {
-      (self[0], self[1], self[2], self[3]) = newValue
-    }
+    return (self[0], self[1], self[2], self[3])
   }
 
   /// Call self, which must be a Python Callable.
@@ -769,23 +754,34 @@ extension String : PythonConvertible {
   }
 }
 
-extension Int : PythonConvertible {
-  public init?(_ pyValue: PyVal) {
-    let pyObject = pyValue.ownedPyObject
+fileprivate extension PyVal {
+  // This converts a PyVal to some given type by applying the appropriate
+  // converter and checking against the error value.
+  func converted<T : Equatable>(withError errorValue: T,
+                                by converter: (OwnedPyObject) -> T) -> T? {
+    let pyObject = ownedPyObject
     defer { Py_DecRef(pyObject) }
 
     assert(PyErr_Occurred() == nil,
            "Python error occurred somewhere but wasn't handled")
 
-    let value = PyInt_AsLong(pyObject)
-
-    // PyInt_AsLong return -1 and sets an error if the Python value isn't
-    // integer compatible.
-    if value == -1 && PyErr_Occurred() != nil {
+    let value = converter(pyObject)
+    guard value != errorValue || PyErr_Occurred() == nil else {
       PyErr_Clear()
       return nil
     }
+    return value
 
+  }
+}
+
+extension Int : PythonConvertible {
+  public init?(_ pyValue: PyVal) {
+    // PyInt_AsLong return -1 and sets an error if the Python value isn't
+    // integer compatible.
+    guard let value = pyValue.converted(withError: -1, by: PyInt_AsLong) else {
+      return nil
+    }
     self = value
   }
 
@@ -797,22 +793,13 @@ extension Int : PythonConvertible {
 
 extension UInt : PythonConvertible {
   public init?(_ pyValue: PyVal) {
-    let pyObject = pyValue.ownedPyObject
-    defer { Py_DecRef(pyObject) }
-
-    assert(PyErr_Occurred() == nil,
-           "Python error occurred somewhere but wasn't handled")
-
-    let value = PyInt_AsUnsignedLongMask(pyObject)
-
     // PyInt_AsUnsignedLongMask isn't documented as such, but in fact it does
     // return -1 and sets an error if the Python value isn't
     // integer compatible.
-    if value == ~0 && PyErr_Occurred() != nil {
-      PyErr_Clear()
+    guard let value = pyValue.converted(withError: ~0,
+                                        by: PyInt_AsUnsignedLongMask) else {
       return nil
     }
-
     self = value
   }
 
@@ -824,21 +811,12 @@ extension UInt : PythonConvertible {
 
 extension Double : PythonConvertible {
   public init?(_ pyValue: PyVal) {
-    let pyObject = pyValue.ownedPyObject
-    defer { Py_DecRef(pyObject) }
-
-    assert(PyErr_Occurred() == nil,
-           "Python error occurred somewhere but wasn't handled")
-
-    let value = PyFloat_AsDouble(pyObject)
-
     // PyFloat_AsDouble return -1 and sets an error
     // if the Python value isn't float compatible.
-    if value == -1 && PyErr_Occurred() != nil {
-      PyErr_Clear()
+    guard let value = pyValue.converted(withError: -1,
+                                        by: PyFloat_AsDouble) else {
       return nil
     }
-
     self = value
   }
 

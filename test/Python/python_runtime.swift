@@ -61,6 +61,8 @@ PythonRuntimeTestSuite.test("binary-ops") {
   expectEqual(7, x)
   x /= 2
   expectEqual(3.5, x)
+  x += -1
+  expectEqual(2.5, x)
 }
 
 PythonRuntimeTestSuite.test("comparable") {
@@ -76,6 +78,66 @@ PythonRuntimeTestSuite.test("range-iter") {
   for (index, val) in Python.range.call(with: 5).enumerated() {
     expectEqual(PyVal(index), val)
   }
+}
+
+PythonRuntimeTestSuite.test("errors") {
+  expectThrows(PythonError.exception("division by zero") as PythonError?, {
+    try PyVal(1).throwing.callMember("__truediv__", with: 0)
+    // expectThrows does not fail if no error is thrown.
+    fatalError("No error was thrown.")
+  })
+  expectThrows(PythonError.invalidMember("undefinedMember") as PythonError?, {
+    try PyVal(1).throwing.callMember("undefinedMember", with: 0)
+    fatalError("No error was thrown.")
+  })
+}
+
+PythonRuntimeTestSuite.test("tuple") {
+  let element1: PyVal = 0
+  let element2: PyVal = "abc"
+  let element3: PyVal = [0, 0]
+  let element4: PyVal = ["a": 0, "b": "c"]
+  let pair = PyVal(tuple: element1, element2)
+  let (pair1, pair2) = pair.tuple2
+  expectEqual(element1, pair1)
+  expectEqual(element2, pair2)
+
+  let triple = PyVal(tuple: element1, element2, element3)
+  let (triple1, triple2, triple3) = triple.tuple3
+  expectEqual(element1, triple1)
+  expectEqual(element2, triple2)
+  expectEqual(element3, triple3)
+
+  let quadruple = PyVal(tuple: element1, element2, element3, element4)
+  let (quadruple1, quadruple2, quadruple3, quadruple4) = quadruple.tuple4
+  expectEqual(element1, quadruple1)
+  expectEqual(element2, quadruple2)
+  expectEqual(element3, quadruple3)
+  expectEqual(element4, quadruple4)
+
+  expectEqual(element2, quadruple[1])
+}
+
+PythonRuntimeTestSuite.test("python-convertible") {
+  // Ensure that we cover the -1 case as this is used by Python
+  // to signal conversion errors.
+  let minusOne: PyVal = -1
+  let zero: PyVal = 0
+  let half: PyVal = 0.5
+  let string: PyVal = "abc"
+
+  expectEqual(-1, Int(minusOne))
+  expectEqual(0, Int(zero))
+  expectEqual("abc", String(string))
+  expectEqual(-1.0, Double(minusOne))
+  expectEqual(0.0, Double(zero))
+  expectEqual(0.5, Double(half))
+  // Python rounds down the value in this case.
+  expectEqual(0, Int(half))
+
+  expectNil(String(zero))
+  expectNil(Int(string))
+  expectNil(Double(string))
 }
 
 runAllTests()
