@@ -838,22 +838,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                                       FunctionType::ExtInfo());
   }
   hashDecl->setInterfaceType(interfaceType);
-
-  if (typeDecl->getFormalAccess() != AccessLevel::Private) {
-    hashDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
-  } else {
-    // FIXME: We want to call copyFormalAccessAndVersionedAttrFrom here, but we
-    // can't copy the access level of a private type, because of the backhanded
-    // way we synthesize _hash(into:) in deriveHashable -- we need to make sure
-    // the resolver will find the new function, so it needs to be at least
-    // fileprivate. (The access level of synthesized members doesn't normally
-    // matter; they don't go through an access level check after being returned
-    // from the synthesizer.)
-    hashDecl->setAccess(AccessLevel::FilePrivate);
-    if (typeDecl->getAttrs().hasAttribute<VersionedAttr>()) {
-      hashDecl->getAttrs().add(new (C) VersionedAttr(/*implicit=*/true));
-    }
-  }
+  hashDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If we aren't synthesizing into an imported/derived type, the derived conformance is
   // either from the type itself or an extension, in which case we will emit the
@@ -871,6 +856,30 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
  
   cast<IterableDeclContext>(parentDecl)->addMember(hashDecl);
   return hashDecl;
+}
+
+/// Derive the body for the _hash(into:) method when hashValue has a
+/// user-supplied implementation.
+static void
+deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+  // func _hash(into hasher: inout _Hasher) {
+  //   hasher.append(self.hashValue)
+  // }
+  auto parentDC = hashIntoDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/ true);
+  auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
+                                                 C.Id_hashValue, DeclNameLoc(),
+                                                 /*implicit*/ true);
+  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherExpr = createHasherAppendCall(C, hasherParam, hashValueExpr);
+
+  auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
+                                SourceLoc(), /*implicit*/ true);
+  hashIntoDecl->setBody(body);
 }
 
 /// Derive the body for the '_hash(into:)' method for an enum.
@@ -1139,19 +1148,12 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   return hashValueDecl;
 }
 
-bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
-                                           NominalTypeDecl *type,
-                                           ValueDecl *requirement) {
-  auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
-  return canDeriveConformance(tc, type, hashableProto);
-}
-
 static ValueDecl *
-getHashIntoRequirement(ASTContext &C) {
+getHashValueRequirement(ASTContext &C) {
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
   for (auto member: hashableProto->getMembers()) {
-    if (auto fd = dyn_cast<FuncDecl>(member)) {
-      if (fd->getBaseName() == C.Id_hash)
+    if (auto fd = dyn_cast<VarDecl>(member)) {
+      if (fd->getBaseName() == C.Id_hashValue)
         return fd;
     }
   }
@@ -1171,57 +1173,76 @@ getHashableConformance(Decl *parentDecl) {
   return nullptr;
 }
 
+bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
+                                           NominalTypeDecl *type,
+                                           ValueDecl *requirement) {
+  if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
+    return false;
+  // FIXME: This is not actually correct. We cannot promise to always
+  // provide a witness here in all cases. Unfortunately, figuring out
+  // whether this is actually possible requires a parent decl context.
+  // When the answer is no, DerivedConformance::deriveHashable will output
+  // its own diagnostics.
+  return true;
+}
+
 ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
                                               Decl *parentDecl,
                                               NominalTypeDecl *type,
                                               ValueDecl *requirement) {
   ASTContext &C = parentDecl->getASTContext();
-  auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-
-  // Conformance can't be synthesized in an extension; we allow it as a special
-  // case for enums with no associated values to preserve source compatibility.
-  auto theEnum = dyn_cast<EnumDecl>(type);
-  if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
-      type != parentDecl) {
-    auto hashableType = hashableProto->getDeclaredType();
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                hashableType);
-    return nullptr;
-  }
 
   // var hashValue: Int
   if (requirement->getBaseName() == C.Id_hashValue) {
-    auto hashValueDecl = deriveHashable_hashValue(tc, parentDecl, type);
+    // We always allow hashValue to be synthesized; invalid cases are diagnosed
+    // during _hash(into:) synthesis.
+    return deriveHashable_hashValue(tc, parentDecl, type);
+  }
 
-    // Also derive _hash(into:) -- it has a default implementation, so we
-    // wouldn't otherwise consider it as a candidate for synthesizing.
-    //
-    // FIXME: This assumes that _hash(into:) hasn't already been resolved. It
-    // would be nicer to remove the default implementation and independently
-    // synthesize either/both of the two Hashable requirements as needed;
-    // however, synthesizing methods (as opposed to properties) into imported
-    // types is not yet fully supported.
-    if (auto hashIntoReq = getHashIntoRequirement(C)) {
-      AbstractFunctionDecl::BodySynthesizer hashIntoSynthesizer;
+  // Hashable._hash(into:)
+  if (requirement->getBaseName() == C.Id_hash) {
+    // Start by resolving hashValue conformance.
+    auto hashValueReq = getHashValueRequirement(C);
+    auto conformance = getHashableConformance(parentDecl);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &tc);
+
+    if (hashValueDecl->isImplicit()) {
+      // Neither hashValue nor _hash(into:) is explicitly defined; we need to do
+      // a full Hashable derivation.
+      
+      // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
+      // has non-Hashable stored properties/associated values.
+      auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
+      if (!canDeriveConformance(tc, type, hashableProto)) {
+        tc.diagnose(parentDecl->getLoc(), diag::type_does_not_conform,
+                    type->getDeclaredType(), hashableProto->getDeclaredType());
+        return nullptr;
+      }
+      // Hashable can't be fully synthesized in an extension; we allow it as a
+      // special case for enums with no associated values to preserve source
+      // compatibility.
+      auto theEnum = dyn_cast<EnumDecl>(type);
+      if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
+          type != parentDecl) {
+        tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+                    hashableProto->getDeclaredType());
+        return nullptr;
+      }
       if (theEnum)
-        hashIntoSynthesizer = &deriveBodyHashable_enum_hashInto;
+        return deriveHashable_hashInto(tc, parentDecl, theEnum,
+                                       &deriveBodyHashable_enum_hashInto);
       else if (auto theStruct = dyn_cast<StructDecl>(type))
-        hashIntoSynthesizer = &deriveBodyHashable_struct_hashInto;
+        return deriveHashable_hashInto(tc, parentDecl, theStruct,
+                                       &deriveBodyHashable_struct_hashInto);
       else
         llvm_unreachable("Attempt to derive Hashable for a type other "
-                         "than a struct or enum");
-      auto hashIntoDecl = deriveHashable_hashInto(tc, parentDecl, type,
-                                                  hashIntoSynthesizer);
-      if (hashIntoDecl) {
-        auto conformance = getHashableConformance(parentDecl);
-        auto witnessDecl = conformance->getWitnessDecl(hashIntoReq, &tc);
-        if (witnessDecl != hashIntoDecl) {
-          tc.diagnose(requirement->getLoc(),
-                      diag::broken_hashable_requirement);
-        }
-      }
+                         "than a struct or enum");      
+    } else {
+      // We can always derive _hash(into:) if hashValue has an explicit
+      // implementation.
+      return deriveHashable_hashInto(tc, parentDecl, type,
+                                     &deriveBodyHashable_compat_hashInto);
     }
-    return hashValueDecl;
   }
 
   tc.diagnose(requirement->getLoc(), diag::broken_hashable_requirement);
