@@ -31,12 +31,51 @@
 #include "swift/AST/DiagnosticsSIL.h"
 using namespace swift;
 using namespace tf;
+using llvm::DenseMap;
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
+
+
+/// If the specified instruction is an high-level aggregate operation like
+/// copy_addr or destroy_addr, break it down into its more primitive operations
+/// and return true.  Otherwise, return false.  This leaves the instruction in
+/// place and inserts the additional instructions immediately after any
+/// instruction that is exploded.
+static bool explodeAggregateInst(SILInstruction *inst) {
+
+  // Lower a copy_addr into a load and store + retain/release instructions.
+  if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+    SILBuilder B(copyAddr);
+    auto &TL = B.getTypeLowering(copyAddr->getSrc()->getType());
+    if (!TL.isLoadable())
+      return false;
+
+    // Note, we don't use TL.emitCopyInto because that will produce a copy_addr.
+    auto loc = copyAddr->getLoc();
+    SILValue value =
+      TL.emitLoadOfCopy(B, loc, copyAddr->getSrc(), copyAddr->isTakeOfSrc());
+    TL.emitStoreOfCopy(B, loc, value, copyAddr->getDest(),
+                       copyAddr->isInitializationOfDest());
+    return true;
+  }
+
+  /// Turn a destroy_addr into a load+release_value pair.
+  if (auto *destroy = dyn_cast<DestroyAddrInst>(inst)) {
+    SILBuilder B(destroy);
+    auto &TL = B.getTypeLowering(destroy->getOperand()->getType());
+    if (!TL.isLoadable())
+      return false;
+    TL.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
+    return true;
+  }
+
+  return false;
+}
+
 
 namespace {
   /// This class wraps the state and logic necessary to deabstract code into one
@@ -46,6 +85,17 @@ namespace {
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
     SILPassManager *passManager;
+
+    /// This is set to true by the early inlining phase if the function was
+    /// forcibly flattened to make all references to global variables visible
+    /// within the current function.  This is done for top level code in
+    /// Playgrounds and the REPL.
+    bool forciblyFlattened = false;
+
+    /// This keeps track of whether we've ever changed this function through the
+    /// 'aboutToChangeFunction' method.  This enables it to print debug log info
+    /// only for interesting functions.
+    bool changedFunction = false;
 
     /// This is the list of tensor operations in the current function, filled in
     /// by promoteIndirectTensorOperands.
@@ -57,10 +107,27 @@ namespace {
 
     /// Deabstract the specified top level function as a deabstraction context.
     void doIt();
+
+    /// This function is called on key entrypoints that mutate the SIL function.
+    /// This just exists to reduce the amount of debug spew to focus on the
+    /// functions that matter.
+    void aboutToChangeFunction() {
+      // If we already changed the function then no need to print again.
+      if (changedFunction) return;
+      changedFunction = true;
+
+      if (shouldDumpIntermediates()) {
+        llvm::outs() << "--- TFDeabstraction Input: " << fn.getName() << "\n";
+        fn.print(llvm::outs());
+        llvm::outs() << "----\n";
+      }
+    }
   private:
     void inlineCalls();
     void simplifyTensorOperands();
 
+    void promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
+                               SmallVectorImpl<AllocStackInst*> &stackAllocs);
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateTensorOperands();
@@ -79,29 +146,71 @@ static bool isArrayUninitialized(SILInstruction *call) {
 }
 
 /// Scan the function looking for call sites that should be inlined to expose
-/// tensor operations, and inline them to expose those ops.  Also keep track of
-/// whether we see any tensor ops - if not, there is no reason to further
-/// process this function, so we can stop and exit early from other
-/// canonicalizations.
+/// tensor operations, and inline them to expose those ops.
 void TFDeabstraction::inlineCalls() {
+  // We generally want to carefully and deliberately choose which functions to
+  // inline into our 'fn' function, but if this is a main function with top
+  // level code (e.g. in a playground) then we want to aggressively inline
+  // when/if we see any global_addr's with a TensorHandle in them.  This allows
+  // us to promote these global_addrs to registers safely.
+  //
+  // TODO: This should be enough for now, but isn't really the right long term
+  // approach.  Long term we should build a full callgraph and look for call
+  // paths that can touch tensor flavored global variables.  If a function
+  // doesn't do so, then there is no reason to inline it.  This can start to
+  // matter for larger examples.
+  //
+  // TODO: This should handle playgrounds and #! scripts, but probably isn't
+  // enough to handle REPL generated code.  How do we identify the functions it
+  // produces for each entered statement?  Matching on __repl or whatever prefix
+  // LLDB and the integrated REPL use is probably enough.
+  //
+  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
+    forciblyFlattened = [&]() -> bool {
+      for (auto &bb : fn)
+        for (auto &i : bb)
+          if (auto *inst = dyn_cast<GlobalAddrInst>(&i)) {
+            if (tfc.containsTensorHandle(inst->getType().getSwiftRValueType()))
+              return true;
+          }
+      return false;
+    }();
+  }
+
+  /// This predicate decides whether we should mandatory inline the specified
+  /// call site.
+  auto shouldInline = [&](FullApplySite site) -> bool {
+    // Check for array internals which we could be inlined, but prefer to
+    // leave in abstracted form for easier analysis.  For things like
+    // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
+    // construction calls beacuse we end up removing them anyway.
+    if (isArrayUninitialized(site.getInstruction()))
+      return false;
+
+    // If we're trying to flatten the code into the top level function, then
+    // yes, we should inline this.
+    if (forciblyFlattened)
+      return true;
+
+    // Get the type of the function being called after applying substitutions
+    // at the call site.
+    auto type = site.getSubstCalleeType();
+
+    // If the call we found is to something that processes TensorHandles,
+    // then we want it inlined.
+    return tfc.containsTensorHandle(type);
+  };
+
   // Use the mandatory inlining algorithm to expose call sites that contain
   // TensorHandle values as their argument or result lists.
   inlineForTFDeabstraction(fn,
      [&](FullApplySite site, const SILFunction &callee) -> bool {
-       // Check for array internals which we could be inlined, but prefer to
-       // leave in abstracted form for easier analysis.  For things like
-       // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
-       // construction calls beacuse we end up removing them anyway.
-       if (isArrayUninitialized(site.getInstruction()))
+       if (!shouldInline(site))
          return false;
 
-       // Get the type of the function being called after applying substitutions
-       // at the call site.
-       auto type = site.getSubstCalleeType();
-
-       // If the call we found is to something that processes TensorHandles,
-       // then we want it inlined.
-       return tfc.containsTensorHandle(type);
+       // Recognize that we're about to change this function.
+       aboutToChangeFunction();
+       return true;
      }
   );
 }
@@ -113,7 +222,7 @@ void TFDeabstraction::inlineCalls() {
 /// Similarly, if a primitive integer or floating point value is passed as a
 /// struct value, extract out the underlying integer or float value.
 ///
-static BuiltinInst *simplifyOperands(BuiltinInst *inst) {
+static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   /// Return a VarDecl if this is a struct wrapping a single field which is a
   /// primitive integer or floating point value.  We accept multiple layers of
   /// struct wrappers as well, but return the decl for the top level field
@@ -166,6 +275,9 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst) {
   }
 
   if (!mustChangeBuiltin) return inst;
+
+  // Mark the function as being mutated.
+  TFDA.aboutToChangeFunction();
 
   // Okay, we do have to simplify something.  Scan through and rewrite operands.
   SILBuilder B(inst);
@@ -232,7 +344,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // Try to decode this instruction as an op.  If it isn't one, ignore it.
       if (auto opInfo = SILTensorOpInfo::decode(inst)) {
         // Simplify operands if possible.
-        opInfo->inst = simplifyOperands(opInfo->inst);
+        opInfo->inst = simplifyOperands(opInfo->inst, *this);
 
         // Remember this for later passes.
         tensorOps.push_back(opInfo->inst);
@@ -242,35 +354,144 @@ void TFDeabstraction::simplifyTensorOperands() {
 }
 
 namespace {
-  /// This helper is used to find stack allocations in the operand chains of
+  /// This helper is used to find promotable memory in the operand chains of
   /// tensor operations.  This operates on the pre-deabstraction code, so it has
   /// to be able to look through the various cases that will be eliminated
   /// later.
-  class StackAllocFinder {
+  class PromotableMemoryFinder {
+    SmallVectorImpl<SILGlobalVariable*> &globals;
     SmallVectorImpl<AllocStackInst*> &stackAllocs;
     SmallPtrSet<SILInstruction*, 32> visited;
+    SmallVector<GlobalAddrInst*, 8> globalAddrs;
   public:
 
-    StackAllocFinder(SmallVectorImpl<AllocStackInst*> &stackAllocs)
-      : stackAllocs(stackAllocs) {}
+    PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
+                           SmallVectorImpl<AllocStackInst*> &stackAllocs)
+      : globals(globals), stackAllocs(stackAllocs) {}
 
-    void run(ArrayRef<BuiltinInst*> tensorOps) {
-      for (auto *op : tensorOps) {
-        for (auto &operand : op->getAllOperands())
-          findStackAllocsFromValue(operand.get());
+    void run(ArrayRef<BuiltinInst*> tensorOps);
+  private:
+    void findPromotableMemoryFromValue(SILValue value);
+    void findPromotableMemoryFromLoadedAddress(SILValue pointer);
+  };
+} // end anonymous namespace
+
+
+
+/// Analyze the dataflow values feeding into the specified tensor operations in
+/// order to find promotable stack and global references.
+void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
+  for (auto *op : tensorOps) {
+    for (auto &operand : op->getAllOperands())
+      findPromotableMemoryFromValue(operand.get());
+  }
+
+  // If we found any global variables, scan the function once to collect all of
+  // global_addr instructions.  If we found no globals, we're done.
+  if (globalAddrs.empty())
+    return;
+
+  // Find all global addrs in the function, whether or not they involve tensor
+  // operations: they could involve tensor values but not be directly used in
+  // the ops.
+  DenseMap<SILGlobalVariable*, SmallVector<SILValue, 4>> allGlobalAddrs;
+  for (auto &bb : *tensorOps.front()->getFunction())
+    for (auto &inst : bb)
+      if (auto ga = dyn_cast<GlobalAddrInst>(&inst))
+        allGlobalAddrs[ga->getReferencedGlobal()].push_back(ga);
+
+  SmallPtrSet<SILGlobalVariable*, 4> checkedGlobals;
+
+  // If we've found references to global variables, we need to make sure to
+  // analyze the computation that feeds into the globals as well.  This is an
+  // iterative process since new references can be discovered as new globals are
+  // found.
+  for (unsigned nextAddrToCheck = 0; nextAddrToCheck != globalAddrs.size();
+       ++nextAddrToCheck) {
+    auto addr = globalAddrs[nextAddrToCheck];
+    auto global = addr->getReferencedGlobal();
+
+    // If we've already checked this global we're done.
+    if (!checkedGlobals.insert(global).second)
+      continue;
+
+    bool canPromoteGlobal = true;
+
+    // Process *all* of the global_addrs that are referencing this global, not
+    // just the ones that fed into tensor ops.  Iterate through a copy of the
+    // array so we can discover new things to inspect.
+    auto addrs = allGlobalAddrs[global];
+
+    for (unsigned i = 0; i != addrs.size(); ++i) {
+      auto addr = addrs[i];
+      // Walk the use chains of the addr, looking for stores to it.  Any store
+      // to it produces a value that feeds it, which we can contain global
+      // variable references and stack allocation references.
+    restart:
+      for (auto *use : addr->getUses()) {
+        auto user = use->getUser();
+
+        // Take an extremely conservative approach to handling accesses of the
+        // global, whitelisting specific sorts of uses.  If we find anything
+        // we can't handle, we abort promotion of this global.
+        if (isa<LoadInst>(user) || // Loads don't provide a value.
+            isa<EndAccessInst>(user)) // Just a marker.
+          continue;
+
+        // If this is a store to the global, analyze the input value.
+        if (auto *si = dyn_cast<StoreInst>(user)) {
+          if (use->getOperandNumber() == 1) {
+            findPromotableMemoryFromValue(si->getOperand(0));
+            continue;
+          }
+        }
+
+        // If this is a begin_access instruction, then it is a projection/copy
+        // of the address.  Analyze it too.
+        if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
+          addrs.push_back(begin);
+          continue;
+        }
+
+        // See if this is an aggregate operation that needs to be exploded.
+        if (explodeAggregateInst(user)) {
+          user->eraseFromParent();
+          // We just invalidated the use-def chain that we're walking, start our
+          // check over.
+          goto restart;
+        }
+
+
+        // Some other unexpected user of the address is left around.  We should
+        // handle this some day, but for now just leave the global access
+        // unchanged, to avoid miscompiling code.
+        canPromoteGlobal = false;
+
+        // Make this a hard error in the testsuite.
+        if (shouldDumpIntermediates()) {
+          llvm::errs() << "unexpected global_addr user in top level code"
+                       << " promotion: " << *user << "\n\n";
+          llvm::errs() << *user->getFunction();
+          llvm::errs() << "unexpected global_addr user in top level code"
+                       << " promotion: " << *user << "\n\n";
+          abort();
+        }
+        break;
       }
     }
 
-  private:
-    void findStackAllocsFromValue(SILValue value);
-    void findStackAllocsFromLoadedAddress(SILValue pointer);
-  };
-} // end anonymous namespace
+    // Tell the caller that this global is promotable.
+    if (canPromoteGlobal)
+      globals.push_back(global);
+  }
+}
+
+
 
 /// Scan the def-use chains of the specified operand value, looking through
 /// operations that we can deabstract.  If we find stack allocations along the
 /// way, add them to our set.
-void StackAllocFinder::findStackAllocsFromValue(SILValue value) {
+void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // If we found a non-instruction operand, or an instruction we've already
   // visited, then we're done scanning it.
   auto *inst = value->getDefiningInstruction();
@@ -282,24 +503,33 @@ void StackAllocFinder::findStackAllocsFromValue(SILValue value) {
   if (isa<TupleInst>(inst) || isa<StructInst>(inst) ||
       isa<StructExtractInst>(inst) || isa<TupleExtractInst>(inst)) {
     for (auto &operand : inst->getAllOperands())
-      findStackAllocsFromValue(operand.get());
+      findPromotableMemoryFromValue(operand.get());
     return;
   }
 
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
   if (auto *load = dyn_cast<LoadInst>(inst))
-    findStackAllocsFromLoadedAddress(load->getOperand());
+    findPromotableMemoryFromLoadedAddress(load->getOperand());
 }
 
 /// The specific pointer is being loaded by a tensor operation.  Recursively
 /// process the pointer - if it is to a stack allocation that we can deabstract,
 /// then recursively process any stores into it as values that feed the tensor
 /// operation.
-void StackAllocFinder::findStackAllocsFromLoadedAddress(SILValue pointer) {
+void PromotableMemoryFinder::
+findPromotableMemoryFromLoadedAddress(SILValue pointer) {
   while (isa<TupleElementAddrInst>(pointer) ||
-         isa<StructElementAddrInst>(pointer)) {
+         isa<StructElementAddrInst>(pointer) ||
+         isa<BeginAccessInst>(pointer)) {
     pointer = cast<SingleValueInstruction>(pointer)->getOperand(0);
+  }
+
+  // If the base of the pointer is a global variable, save it for possible
+  // consideration.
+  if (auto *ga = dyn_cast<GlobalAddrInst>(pointer)) {
+    globalAddrs.push_back(ga);
+    return;
   }
 
   // If the base of the pointer is something other than a stack allocation or if
@@ -328,7 +558,7 @@ void StackAllocFinder::findStackAllocsFromLoadedAddress(SILValue pointer) {
           // If this is a store *to* the address, then process the stored value
           // as an input.
           if (use->getOperandNumber() == 1)
-            findStackAllocsFromValue(store->getSrc());
+            findPromotableMemoryFromValue(store->getSrc());
           continue;
         }
 
@@ -336,7 +566,7 @@ void StackAllocFinder::findStackAllocsFromLoadedAddress(SILValue pointer) {
         // a load of the other operand.
         if (auto *copyaddr = dyn_cast<CopyAddrInst>(user)) {
           if (use->getOperandNumber() == 1)
-            findStackAllocsFromLoadedAddress(copyaddr->getSrc());
+            findPromotableMemoryFromLoadedAddress(copyaddr->getSrc());
         }
 
         // If this is the original allocation or an SRoA'able projection of its
@@ -349,6 +579,108 @@ void StackAllocFinder::findStackAllocsFromLoadedAddress(SILValue pointer) {
 
         // Otherwise we don't know what kind of user this is, ignore it.
       }
+  }
+}
+
+
+/// Our dataflow analysis of tensor operations has decided that some number of
+/// global variables need to be promoted to SSA in order to perform
+/// deabstraction.  We know that all calls within this function have been
+/// forcibly inlined, so we can switch them to stack allocations and then allow
+/// SSA promotion to take care of converting them to registers.
+void TFDeabstraction::
+promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
+                      SmallVectorImpl<AllocStackInst*> &stackAllocs) {
+  DenseMap<SILGlobalVariable*, AllocStackInst*> stackAllocForGlobal;
+
+  // Promote each global by making a stack allocation that corresponds to them,
+  // inserting loads and stores to the real global, and replacing the uses of
+  // the global_addr instructions with the stack allocation.
+  for (auto *global : globals) {
+    // Create a stack allocation in the entry block for the function.
+    SILBuilder B(&fn.getEntryBlock()->front());
+    auto stackAlloc = B.createAllocStack(fn.getLocation(),
+                                         global->getLoweredType());
+    stackAllocForGlobal[global] = stackAlloc;
+
+    // Make sure to convert the generated alloc_stack to SSA.
+    stackAllocs.push_back(stackAlloc);
+  }
+
+  // Scan the function to find any alloc_global instructions, and replace any
+  // global_addr instructions with our stack allocation.
+  DenseMap<SILGlobalVariable*, AllocGlobalInst*> allocGlobals;
+  SmallVector<SILBasicBlock*, 4> exitBlocks;
+
+  for (auto &bb : fn) {
+    // Find all exit blocks from the function.
+    if (isa<ReturnInst>(bb.getTerminator()) ||
+        isa<ThrowInst>(bb.getTerminator()) ||
+        isa<UnwindInst>(bb.getTerminator()))
+      exitBlocks.push_back(&bb);
+
+    for (auto i = bb.begin(), e = bb.end(); i != e;) {
+      auto inst = &*i++;
+
+      if (auto *alloc = dyn_cast<AllocGlobalInst>(inst)) {
+        assert(allocGlobals[alloc->getReferencedGlobal()] == 0 &&
+               "more than one alloc_global instruction in the function?");
+        allocGlobals[alloc->getReferencedGlobal()] = alloc;
+      }
+
+      // If this is a global_addr for a global we're referencing, replace it
+      // with a use of the stack allocation.
+      if (auto *addr = dyn_cast<GlobalAddrInst>(inst)) {
+        auto stack = stackAllocForGlobal[addr->getReferencedGlobal()];
+        if (!stack) continue;
+
+        addr->replaceAllUsesWith(stack);
+        addr->eraseFromParent();
+      }
+    }
+  }
+
+
+  // Insert a stack deallocation plus cleanup in all of the exit blocks.
+  for (auto *global : globals) {
+    auto stackAlloc = stackAllocForGlobal[global];
+    assert(stackAlloc && "where'd our alloc_stack go?");
+
+    // If there was an alloc_global for the global, then this is the code that
+    // initializes the global, otherwise it is just something that uses it
+    // (REPL case).  In the later case, we start the stack allocation off with
+    // a load.
+    if (!allocGlobals.count(global)) {
+      // Insert after the stack alloc.
+      SILBuilder B(++SILBasicBlock::iterator(stackAlloc));
+      auto loc = fn.getLocation();
+
+      auto *addr = B.createGlobalAddr(loc, global);
+      auto &TL = B.getTypeLowering(stackAlloc->getType());
+      TL.emitCopyInto(B, loc, addr, stackAlloc, IsTake_t::IsNotTake,
+                      IsInitialization_t::IsInitialization);
+    }
+
+
+    // Process each exit block, inserting epilog code.
+    for (auto *exit : exitBlocks) {
+      SILBuilder B(exit->getTerminator());
+      auto loc = fn.getLocation();
+
+      // Load from the stack allocation and store to the global, leaving it
+      // initialized with our final state.
+      auto addr = B.createGlobalAddr(loc, global);
+
+      // If this function defines the global, then this is an initialization
+      // of it, otherwise this is a reassignment of it.
+      bool isInit = allocGlobals.count(global);
+
+      auto &TL = B.getTypeLowering(stackAlloc->getType());
+      TL.emitCopyInto(B, loc, addr, stackAlloc, IsTake_t::IsTake,
+                      IsInitialization_t(isInit));
+
+      B.createDeallocStack(loc, stackAlloc);
+    }
   }
 }
 
@@ -377,46 +709,44 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   // TODO: We will eventually need to do real SRoA to handle the case when
   // we have tensor values mixed in with other random values that shouldn't
   // (or can't) be loaded.  For now, we can just fail to deabstract these
-  // cases.  When we handle the general case, we should investigate whether
-  // it makes sense to use TypeLowering as
-  // AvailableValueDataflowContext::explodeCopyAddr does.
-  auto &module = alloc->getModule();
-  if (!alloc->getType().isLoadable(module))
-    return;
+  // cases.
+  SmallVector<SILInstruction*, 4> users;
 
-  SmallVector<SILInstruction*, 4> usersToRemove;
+  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+    auto inst = (*UI++)->getUser();
 
-  for (auto UI = alloc->use_begin(); UI != alloc->use_end(); ) {
-    // See if this is an instruction we need to explode.
-    auto *inst = (*UI++)->getUser();
-
-    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-      // Lower the copy into a load and store + retain/release instructions.
-      SILBuilder B(copyAddr);
-      auto loc = copyAddr->getLoc();
-      auto &TL = B.getTypeLowering(copyAddr->getSrc()->getType());
-
-      SILValue value =
-        TL.emitLoadOfCopy(B, loc, copyAddr->getSrc(), copyAddr->isTakeOfSrc());
-      TL.emitStoreOfCopy(B, loc, value, copyAddr->getDest(),
-                         copyAddr->isInitializationOfDest());
-
-      usersToRemove.push_back(copyAddr);
+    // If we have an instruction other than begin_access, remember it.
+    auto *begin = dyn_cast<BeginAccessInst>(inst);
+    if (!begin) {
+      users.push_back(inst);
       continue;
     }
 
-    /// Turn a destroy_addr into a load+release_value pair.
-    if (auto *destroy = dyn_cast<DestroyAddrInst>(inst)) {
-      SILBuilder B(destroy);
-      auto &lowering = B.getTypeLowering(destroy->getOperand()->getType());
-      lowering.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
-      usersToRemove.push_back(destroy);
-      continue;
+    // If we have a begin_access instruction, look through it.  Add all of the
+    // users to the users list, and replace uses of begin_access with uses of
+    // the original value.  Finally, ignore and remove the end_access.
+    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
+      auto *use = *UI++;
+      auto inst = use->getUser();
+      if (isa<EndAccessInst>(inst)) {
+        inst->eraseFromParent();
+      } else {
+        use->set(begin->getOperand());
+        users.push_back(inst);
+      }
     }
+
+    begin->eraseFromParent();
   }
 
-  for (auto dead : usersToRemove)
-    dead->eraseFromParent();
+  for (auto user : users) {
+    if (explodeAggregateInst(user))
+      user->eraseFromParent();
+    if (isa<EndAccessInst>(user))
+      user->eraseFromParent();
+
+
+  }
 }
 
 /// The specified argument has tuple type that deabstraction needs to scalarize.
@@ -703,22 +1033,17 @@ void TFDeabstraction::canonicalizeOps() {
 /// We currently make use of the following techniques to do this:
 ///   1) Inlining.  We look for direct calls to functions that take and return
 ///      values of TensorHandle type, possibly wrapped by structs and tuples.
-///   2) SSA Promotion of TensorHandle's.
+///   2) Promotion of globals to stack allocations for Playgrounds, REPL, and
+///      top level code in scripts.
+///   3) SSA Promotion of stack values to registers.
+///   4) Scalarization of struct/tuple values.
 ///
 /// TODO:
-///   0) Move tensor op canonicalization up from tf-partition.
-///   1) Generics specialization.
-///   2) Struct and tuple scalarization.
-///   3) Enums.  What can we reliably do with them?  Should they be out of
+///   *) Move tensor op canonicalization up from tf-partition.
+///   *) Enums.  What can we reliably do with them?  Should they be out of
 ///      model?  We can definitely do ones without payload values.
 ///
 void TFDeabstraction::doIt() {
-  if (shouldDumpIntermediates()) {
-    llvm::outs() << "--- TFDeabstraction Input: " << fn.getName() << "\n";
-    fn.print(llvm::outs());
-    llvm::outs() << "----\n";
-  }
-
   // Start by inlining functions that take and return Tensor values.
   inlineCalls();
 
@@ -731,11 +1056,18 @@ void TFDeabstraction::doIt() {
   if (tensorOps.empty())
     return;
 
-  // Scan over all of the operands to the tensor ops, performing deabstraction
-  // on each of them as necessary, finding stack allocations, struct and
-  // tuple abstractions, function calls, etc.
+  // Scan over all of the operands of the tensor ops, finding stack allocations
+  // and global variables that must be promoted to SSA.
+  SmallVector<SILGlobalVariable*, 8> globals;
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  StackAllocFinder(stackAllocs).run(tensorOps);
+  PromotableMemoryFinder(globals, stackAllocs).run(tensorOps);
+
+  // If any global variable references were found in the operation chain, try
+  // to predictably promote their references to unblock analysis.  This is only
+  // valid in cases that we have forcibly flattened the function (e.g.
+  // Playgrounds, REPL, and other top-level-code situations).
+  if (forciblyFlattened && !globals.empty())
+    promoteGlobalsToStack(globals, stackAllocs);
 
   // Promote stack allocations to SSA, this allows us to do dataflow analysis,
   // and eliminates mutation from tensor values.
