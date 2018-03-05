@@ -368,6 +368,14 @@ extension String {
   }
 }
 
+// Called by the SwiftObject implementation to get the description of a value
+// as an NSString.
+@_silgen_name("swift_stdlib_getDescription")
+public func _getDescription<T>(_ x: T) -> AnyObject {
+  return String(reflecting: x)._bridgeToObjectiveCImpl()
+}
+
+
 #else // !_runtime(_ObjC)
 
 @_fixed_layout // FIXME(sil-serialize-all)

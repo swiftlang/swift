@@ -147,20 +147,14 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
-  typedef SWIFT_CC(swift) NSString *GetDescriptionFn(OpaqueValue*, const Metadata*);
-  auto getDescription = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<GetDescriptionFn*>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation15_getDescriptionySo8NSStringCxlF)))));
-  
-  // If Foundation hasn't loaded yet, fall back to returning the static string
-  // "Swift._SwiftObject". The likelihood of someone invoking -description without
-  // ObjC interop is low.
-  if (!getDescription) {
-    return @"Swift._SwiftObject";
-  }
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+NSString *swift_stdlib_getDescription(OpaqueValue *value,
+                                      const Metadata *type);
 
-  return [getDescription(value, type) autorelease];
+NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
+  auto result = swift_stdlib_getDescription(value, type);
+  SWIFT_CC_PLUSZERO_GUARD(type->vw_destroy(value));
+  return [result autorelease];
 }
 
 static NSString *_getObjectDescription(SwiftObject *obj) {
