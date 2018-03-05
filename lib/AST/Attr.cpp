@@ -603,7 +603,7 @@ StringRef DeclAttribute::getAttrName() const {
         return "effects(readonly)";
       case EffectsKind::ReleaseNone:
         return "effects(releasenone)";
-     case EffectsKind::ReadWrite:
+      case EffectsKind::ReadWrite:
         return "effects(readwrite)";
       case EffectsKind::Unspecified:
         return "effects(unspecified)";
