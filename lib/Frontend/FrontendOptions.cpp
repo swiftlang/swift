@@ -116,19 +116,15 @@ void FrontendOptions::forAllOutputPaths(
     else
       fn(input.outputFilename());
   }
-  (void)InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &inp) -> bool {
-        const SupplementaryOutputPaths &outs =
-            inp.getPrimarySpecificPaths().SupplementaryOutputs;
-        const std::string *outputs[] = {&outs.ModuleOutputPath,
-                                        &outs.ModuleDocOutputPath,
-                                        &outs.ObjCHeaderOutputPath};
-        for (const std::string *next : outputs) {
-          if (!next->empty())
-            fn(*next);
-        }
-        return false;
-      });
+  const SupplementaryOutputPaths &outs =
+      input.getPrimarySpecificPaths().SupplementaryOutputs;
+  const std::string *outputs[] = {&outs.ModuleOutputPath,
+                                  &outs.ModuleDocOutputPath,
+                                  &outs.ObjCHeaderOutputPath};
+  for (const std::string *next : outputs) {
+    if (!next->empty())
+      fn(*next);
+  }
 }
 
 const char *

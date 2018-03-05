@@ -1021,6 +1021,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Only meaningful for class descriptors.
     Class_SuperclassReferenceKind = 12,
     Class_SuperclassReferenceKind_width = 2,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 11,
   };
 
 public:
@@ -1037,6 +1041,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
                                 class_hasResilientSuperclass,
                                 class_setHasResilientSuperclass)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
+                                class_areImmediateMembersNegative,
+                                class_setAreImmediateMembersNegative)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
                                  Class_SuperclassReferenceKind_width,

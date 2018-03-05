@@ -328,11 +328,12 @@ struct SDKNodeInitInfo {
   bool IsMutating = false;
   bool IsStatic = false;
   Optional<uint8_t> SelfIndex;
-  Ownership Ownership = Ownership::Strong;
+  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
+  StringRef EnumRawTypeName;
   ParentExtensionInfo *ExtInfo = nullptr;
   TypeInitInfo TypeInfo;
 
@@ -402,17 +403,18 @@ class SDKNodeDecl : public SDKNode {
   StringRef ModuleName;
   std::vector<SDKDeclAttrKind> DeclAttributes;
   bool IsStatic;
-  uint8_t Ownership;
+  uint8_t ReferenceOwnership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
   // Non-null ExtInfo implies this decl is defined in an type extension.
   ParentExtensionInfo *ExtInfo;
 
 protected:
-  SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-    DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
-    ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)),
-    ExtInfo(Info.ExtInfo) {}
+  SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
+      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
+        Location(Info.Location), ModuleName(Info.ModuleName),
+        DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
+        ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
+        ExtInfo(Info.ExtInfo) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -421,7 +423,9 @@ public:
   StringRef getHeaderName() const;
   void addDeclAttribute(SDKDeclAttrKind DAKind);
   ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
-  swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
+  swift::ReferenceOwnership getReferenceOwnership() const {
+    return swift::ReferenceOwnership(ReferenceOwnership);
+  }
   bool isObjc() const { return Usr.startswith("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
@@ -776,13 +780,26 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 class SDKNodeTypeDecl : public SDKNodeDecl {
   StringRef SuperclassUsr;
   std::vector<StringRef> ConformingProtocols;
+  StringRef EnumRawTypeName;
 public:
   SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
                                           SuperclassUsr(Info.SuperclassUsr),
-                                ConformingProtocols(Info.ConformingProtocols){}
+                                ConformingProtocols(Info.ConformingProtocols),
+                                        EnumRawTypeName(Info.EnumRawTypeName) {}
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
+
+#define NOMINAL_TYPE_DECL(ID, PARENT) \
+  bool is##ID() const { return getDeclKind() == DeclKind::ID; }
+#define DECL(ID, PARENT)
+#include "swift/AST/DeclNodes.def"
+
+  StringRef getEnumRawTypeName() const {
+    assert(isEnum());
+    return EnumRawTypeName;
+  }
+
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
@@ -956,6 +973,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       }
       break;
     }
+    case KeyKind::KK_enumRawTypeName: {
+      assert(Info.DKind == DeclKind::Enum);
+      Info.EnumRawTypeName = GetScalarString(Pair.getValue());
+      break;
+    }
     case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
       break;
@@ -978,8 +1000,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       Info.IsStatic = true;
       break;
     case KeyKind::KK_ownership:
-      Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
-      assert(Info.Ownership != swift::Ownership::Strong &&
+      Info.ReferenceOwnership =
+          swift::ReferenceOwnership(getAsInt(Pair.getValue()));
+      assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
              "Strong is implied.");
       break;
 
@@ -1077,7 +1100,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Right = (&Other)->getAs<SDKNodeDecl>();
       if (Left->isStatic() ^ Right->isStatic())
         return false;
-      if (Left->getOwnership() != Right->getOwnership())
+      if (Left->getReferenceOwnership() != Right->getReferenceOwnership())
         return false;
       LLVM_FALLTHROUGH;
     }
@@ -1238,11 +1261,11 @@ static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   return None;
 }
 
-static Ownership getOwnership(ValueDecl *VD) {
-  if (auto OA = VD->getAttrs().getAttribute<OwnershipAttr>()) {
+static ReferenceOwnership getReferenceOwnership(ValueDecl *VD) {
+  if (auto OA = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
     return OA->get();
   }
-  return Ownership::Strong;
+  return ReferenceOwnership::Strong;
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
@@ -1254,14 +1277,15 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
-    PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
-    USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
-    ModuleName(VD->getModuleContext()->getName().str()),
-    IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
-    Ownership(getOwnership(VD)), ExtInfo(nullptr) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
+    : Ctx(Ctx),
+      Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
+      PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
+      USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
+      ModuleName(VD->getModuleContext()->getName().str()),
+      IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
+      IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
+      ReferenceOwnership(getReferenceOwnership(VD)), ExtInfo(nullptr) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1287,6 +1311,15 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (auto *P: NTD->getAllProtocols()) {
       ConformingProtocols.push_back(P->getName().str());
+    }
+  }
+
+  // Get enum raw type name if this is an enum.
+  if (auto *ED = dyn_cast<EnumDecl>(VD)) {
+    if (auto RT = ED->getRawType()) {
+      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+        EnumRawTypeName = D->getName().str();
+      }
     }
   }
 }
@@ -1670,6 +1703,14 @@ namespace swift {
                                         KeyKind::KK_conformingProtocols).data(),
                               Pros);
             }
+
+            auto RawTypeName = TD->isEnum() ? TD->getEnumRawTypeName() : StringRef();
+            if (!RawTypeName.empty()) {
+              out.mapRequired(getKeyContent(Ctx,
+                                            KeyKind::KK_enumRawTypeName).data(),
+                              RawTypeName);
+            }
+
           }
           if (D->isFromExtension()) {
             // Even if we don't have any requirements on this parent extension,
@@ -1685,8 +1726,8 @@ namespace swift {
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
                             Attributes);
           // Strong reference is implied, no need for serialization.
-          if (D->getOwnership() != Ownership::Strong) {
-            uint8_t Raw = uint8_t(D->getOwnership());
+          if (D->getReferenceOwnership() != ReferenceOwnership::Strong) {
+            uint8_t Raw = uint8_t(D->getReferenceOwnership());
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
           }
         } else if (auto T = dyn_cast<SDKNodeType>(value)) {
@@ -2250,7 +2291,7 @@ static void detectDeclChange(NodePtr L, NodePtr R) {
     auto *RD = R->getAs<SDKNodeDecl>();
     if (LD->isStatic() ^ RD->isStatic())
       L->annotate(NodeAnnotation::StaticChange);
-    if (LD->getOwnership() != RD->getOwnership())
+    if (LD->getReferenceOwnership() != RD->getReferenceOwnership())
       L->annotate(NodeAnnotation::OwnershipChange);
     detectRename(L, R);
   }
@@ -3093,22 +3134,25 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::OwnershipChange: {
-    auto getOwnershipDescription = [&](swift::Ownership O) {
+    auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
       switch (O) {
-      case Ownership::Strong:    return Ctx.buffer("strong");
-      case Ownership::Weak:      return Ctx.buffer("weak");
-      case Ownership::Unowned:   return Ctx.buffer("unowned");
-      case Ownership::Unmanaged: return Ctx.buffer("unowned(unsafe)");
+      case ReferenceOwnership::Strong:
+        return Ctx.buffer("strong");
+      case ReferenceOwnership::Weak:
+        return Ctx.buffer("weak");
+      case ReferenceOwnership::Unowned:
+        return Ctx.buffer("unowned");
+      case ReferenceOwnership::Unmanaged:
+        return Ctx.buffer("unowned(unsafe)");
       }
 
       llvm_unreachable("Unhandled Ownership in switch.");
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                                  getOwnershipDescription(Node->getOwnership()),
-                                getOwnershipDescription(Count->getOwnership()));
+    AttrChangedDecls.Diags.emplace_back(
+        ScreenInfo, Node->getDeclKind(), Node->getFullyQualifiedName(),
+        getOwnershipDescription(Node->getReferenceOwnership()),
+        getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
   default:

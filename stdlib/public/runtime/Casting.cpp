@@ -75,7 +75,7 @@ static void _buildNameForMetadata(const Metadata *type,
     auto classType = static_cast<const ClassMetadata *>(type);
     // Look through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 
     // Ask the Objective-C runtime to name ObjC classes.
     if (!classType->isTypeMetadata()) {
@@ -262,7 +262,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
     if (sourceType == targetType) {
       return sourceType;
     }
-    sourceType = sourceType->SuperClass;
+    sourceType = sourceType->Superclass;
   } while (sourceType);
   
   return nullptr;
@@ -3228,7 +3228,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))
-      return getMetadataForClass(classType->SuperClass);
+      return getMetadataForClass(classType->Superclass);
   return nullptr;
 }
 

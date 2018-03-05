@@ -884,8 +884,8 @@ def overflowOperationComment(operator):
 # operator:
 #     +   unsafeAdding(_:)
 #     -   unsafeSubtracting(_:)
-#     *   unsafeMultiplying(_:)
-#     /   unsafeDividing(by:)
+#     *   unsafeMultiplied(by:)
+#     /   unsafeDivided(by:)
 def unsafeOperationComment(operator):
     comments = {
         '+': """\

@@ -252,8 +252,7 @@ TEST(Concurrent, ConcurrentMap) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
-    ClassFlags(), 0, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {

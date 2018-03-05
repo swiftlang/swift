@@ -2634,7 +2634,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+     << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
   // current file).

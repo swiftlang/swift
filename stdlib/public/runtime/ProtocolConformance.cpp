@@ -470,7 +470,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = getMetadataForClass(classType->SuperClass);
+      type = getMetadataForClass(classType->Superclass);
       goto recur;
     }
   }
@@ -513,7 +513,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = getMetadataForClass(classType->SuperClass);
+        type = getMetadataForClass(classType->Superclass);
         continue;
       }
     }
