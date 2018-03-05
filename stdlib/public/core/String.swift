@@ -1337,7 +1337,7 @@ extension String {
       var guts = _guts
       guts.withMutableASCIIStorage(unusedCapacity: 0) { storage in
         for i in 0..<storage._value.count {
-          // See the comment above in lowercaseString.
+          // See the comment above in lowercased.
           let value = storage._value.start[i]
           let isLower =
             _asciiLowerCaseTable &>>
