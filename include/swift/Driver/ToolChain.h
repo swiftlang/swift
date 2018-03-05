@@ -29,9 +29,6 @@ namespace driver {
   class Job;
   class OutputInfo;
 
-/// The limit for passing a list of files on the command line.
-const size_t TOO_MANY_FILES = 128;
-
 /// A ToolChain is responsible for turning abstract Actions into concrete,
 /// runnable Jobs.
 ///

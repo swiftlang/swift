@@ -688,7 +688,6 @@ namespace driver {
           NonBatchable.insert(Cmd);
         }
       }
-      PendingExecution.clear();
     }
 
     /// If \p Batch is nonempty, construct a new \c BatchJob from its
@@ -770,6 +769,30 @@ namespace driver {
       }
     }
 
+    // FIXME: at the moment we're not passing OutputFileMaps to frontends, so
+    // due to the multiplication of the number of additional files and the
+    // number of files in a batch, it's pretty easy to construct too-long
+    // command lines here, which will then fail to exec. We address this crudely
+    // by re-forming batches with a finer partition when we overflow.
+    bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
+                                       size_t &NumPartitions) {
+
+      // Stop rebatching if we can't subdivide batches any further.
+      if (NumPartitions > PendingExecution.size())
+        return false;
+
+      for (auto const *B : Batches) {
+        if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
+                                                          B->getArguments())) {
+          // To avoid redoing the batch loop too many times, repartition pretty
+          // aggressively by doubling partition count / halving size.
+          NumPartitions *= 2;
+          return true;
+        }
+      }
+      return false;
+    }
+
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
     /// them together into \p BatchJob instances (also inserted into \p
     /// BatchJobs), and enqueue all \c PendingExecution jobs (whether batched or
@@ -783,23 +806,29 @@ namespace driver {
         return;
       }
 
-      // Split the batchable from non-batchable pending jobs.
+      size_t NumPartitions = Comp.NumberOfParallelCommands;
       CommandSetVector Batchable, NonBatchable;
-      getPendingBatchableJobs(Batchable, NonBatchable);
-
-      // Partition the batchable jobs into sets.
-      // FIXME: at present we set a maximum batch size of TOO_MANY_FILES
-      // so that we don't overflow command-line lengths. This can go away
-      // when we're passing OFMs to the frontend processes.
-      BatchPartition Partition(std::max(size_t(Comp.NumberOfParallelCommands),
-                                        Batchable.size() / TOO_MANY_FILES));
-      partitionIntoBatches(Batchable.takeVector(), Partition);
-
-      // Construct a BatchJob from each batch in the partition.
       std::vector<const Job *> Batches;
-      for (auto const &Batch : Partition) {
-        formBatchJobFromPartitionBatch(Batches, Batch);
-      }
+      do {
+        // We might be restarting loop; clear these before proceeding.
+        Batchable.clear();
+        NonBatchable.clear();
+        Batches.clear();
+
+        // Split the batchable from non-batchable pending jobs.
+        getPendingBatchableJobs(Batchable, NonBatchable);
+
+        // Partition the batchable jobs into sets.
+        BatchPartition Partition(NumPartitions);
+        partitionIntoBatches(Batchable.takeVector(), Partition);
+
+        // Construct a BatchJob from each batch in the partition.
+        for (auto const &Batch : Partition) {
+          formBatchJobFromPartitionBatch(Batches, Batch);
+        }
+
+      } while (shouldRetryWithMorePartitions(Batches, NumPartitions));
+      PendingExecution.clear();
 
       // Save batches so we can locate and decompose them on task-exit.
       for (const Job *Cmd : Batches)

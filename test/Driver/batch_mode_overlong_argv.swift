@@ -1,3 +1,4 @@
+// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: touch  %t/f_1_1.swift %t/f_1_2.swift %t/f_1_3.swift %t/f_1_4.swift %t/f_1_5.swift %t/f_1_6.swift %t/f_1_7.swift %t/f_1_8.swift %t/f_1_9.swift %t/f_1_10.swift
 // RUN: touch  %t/f_2_1.swift %t/f_2_2.swift %t/f_2_3.swift %t/f_2_4.swift %t/f_2_5.swift %t/f_2_6.swift %t/f_2_7.swift %t/f_2_8.swift %t/f_2_9.swift %t/f_2_10.swift
@@ -99,11 +100,15 @@
 // RUN: touch  %t/f_98_1.swift %t/f_98_2.swift %t/f_98_3.swift %t/f_98_4.swift %t/f_98_5.swift %t/f_98_6.swift %t/f_98_7.swift %t/f_98_8.swift %t/f_98_9.swift %t/f_98_10.swift
 // RUN: touch  %t/f_99_1.swift %t/f_99_2.swift %t/f_99_3.swift %t/f_99_4.swift %t/f_99_5.swift %t/f_99_6.swift %t/f_99_7.swift %t/f_99_8.swift %t/f_99_9.swift %t/f_99_10.swift
 // RUN: touch  %t/f_100_1.swift %t/f_100_2.swift %t/f_100_3.swift %t/f_100_4.swift %t/f_100_5.swift %t/f_100_6.swift %t/f_100_7.swift %t/f_100_8.swift %t/f_100_9.swift %t/f_100_10.swift
-// RUN: %swiftc_driver -driver-show-job-lifecycle -c -module-name foo -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
+// RUN: mkdir -p %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/
+// RUN: %swiftc_driver -driver-show-job-lifecycle -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
 // RUN: %FileCheck %s <%t/out.txt
 // CHECK-NOT: unable to execute command
-// CHECK: Found 1000 batchable jobs
-// CHECK: Forming into 7 batches
+// CHECK: Forming into 1 batches
+// CHECK: Forming batch job from 1000 constituents
+// CHECK: Forming into 2 batches
+// CHECK: Forming batch job from 500 constituents
+// CHECK: Forming batch job from 500 constituents
 func thing() {
     print(1)
 }
