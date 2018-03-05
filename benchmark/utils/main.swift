@@ -28,6 +28,7 @@ import ArrayOfRef
 import ArraySetElement
 import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
+import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
@@ -169,6 +170,9 @@ registerBenchmark(ArrayOfRef)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
 registerBenchmark(BinaryFloatingPointConversionFromBinaryInteger)
+registerBenchmark(BinaryFloatingPointPropertiesBinade)
+registerBenchmark(BinaryFloatingPointPropertiesNextUp)
+registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
