@@ -1249,14 +1249,31 @@ namespace {
                     diag::gradient_expr_not_a_function, CS.getType(primalExpr));
         return nullptr;
       }
+
+      // Get FloatingPoint and DifferentiationArgument protocol types.
+      auto &ctx = CS.getASTContext();
+      ProtocolDecl *fpProto =
+        ctx.getProtocol(KnownProtocolKind::FloatingPoint);
+      ProtocolDecl *diffArgProto =
+        ctx.getProtocol(KnownProtocolKind::DifferentiationArgument);
+      assert(fpProto && "FloatingPoint protocol could not be found.");
+      assert(diffArgProto &&
+             "DifferentiationArgument protocol could not be found.");
+      Type fpProtoTy = fpProto->getDeclaredInterfaceType();
+      Type diffArgProtoTy = diffArgProto->getDeclaredInterfaceType();
+      auto isValidDiffArgType = [&](Type argTy) {
+        return CS.TC.isConvertibleTo(argTy, fpProtoTy, CurDC) ||
+          CS.TC.isConvertibleTo(argTy, diffArgProtoTy, CurDC);
+      };
+
       // Compute the gradient type.
       auto primalParams = primalTy->getParams();
       auto *genSig = primalTy->getOptGenericSignature();
-      // We are going to collect differention arguments' types into this array.
+      // Collect differentiation argument types.
       SmallVector<TupleTypeElt, 8> diffArgTypes;
-      // If no arguments are given, then it is differentiating with respect to
+      // If no arguments are given, then differentiation is done with respect to
       // all arguments (except self). The gradient's result type is all of the
-      // primal's parameters' types.
+      // primal parameters' types.
       if (GE->getArguments().empty())
         for (auto &primalParam : primalParams)
           diffArgTypes.push_back(primalParam.getType());
@@ -1320,6 +1337,14 @@ namespace {
                         diag::gradient_expr_argument_not_value_type, selfTy);
               return nullptr;
             }
+            // 'self' type must conform to either FloatingPoint or
+            // DifferentiationArgument.
+            if (!isValidDiffArgType(selfTy)) {
+              TC.diagnose(arg.getLoc(),
+                          diag::gradient_expr_argument_not_differentiable,
+                          selfTy);
+              return nullptr;
+            }
             // Collect the type.
             diffArgTypes.push_back(selfTy);
             break;
@@ -1328,27 +1353,17 @@ namespace {
         }
       }
 
-      // Differentiation argument types must conform to FloatingPoint.
-      // TODO: generalize conformance to DifferentiationArgument, when
-      // implemented. Also generalize to aggregate types of FloatingPoint or
+      // Differentiation argument types must conform to either FloatingPoint or
       // DifferentiationArgument.
-      auto &ctx = CS.getASTContext();
-      ProtocolDecl *fpProto = ctx.getProtocol(KnownProtocolKind::FloatingPoint);
-      assert(fpProto && "FloatingPoint protocol could not be found.");
-      Type fpProtoTy = fpProto->getDeclaredInterfaceType();
-
-      for (auto &diffArg : diffArgTypes) {
-        auto diffArgTy = diffArg.getType();
-        // If diff argument has type variables, add conformance to
-        // FloatingPoint. Otherwise, diff argument must directly conform to
-        // FloatingPoint.
-        if (diffArgTy->hasTypeVariable())
-          CS.addConstraint(ConstraintKind::ConformsTo, diffArgTy, fpProtoTy,
-                           locator);
-        else if (!CS.TC.isConvertibleTo(diffArgTy, fpProtoTy, CurDC)) {
+      // TODO: consider generalizing to aggregate types of FloatingPoint and/or
+      // DifferentiationArgument.
+      for (auto &arg : diffArgTypes) {
+        auto argTy = arg.getType();
+        // If diff arg type does not have type variables, then it must conform
+        // to FloatingPoint or DifferentiationArgument.
+        if (!argTy->hasTypeVariable() && !isValidDiffArgType(argTy)) {
           TC.diagnose(GE->getLoc(),
-                      diag::gradient_expr_argument_not_differentiable,
-                      diffArgTy);
+                      diag::gradient_expr_argument_not_differentiable, argTy);
           return nullptr;
         }
       }

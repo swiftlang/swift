@@ -2463,7 +2463,9 @@ namespace {
                                     bool preservingPrimalResult) {
       auto &TC = cs.getTypeChecker();
       auto gradType = simplifyType(cs.getType(expr));
-      assert(gradType && "Gradient expression should've been assigned a type");
+      auto gradFnType = gradType->getAs<AnyFunctionType>();
+      assert(gradFnType &&
+             "Gradient expression should've been assigned a function type");
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
 
@@ -2490,6 +2492,45 @@ namespace {
         return nullptr;
       }
       expr->setResolvedPrimal(primalDecl);
+
+      // Get FloatingPoint and DifferentiationArgument protocol types.
+      auto &ctx = cs.getASTContext();
+      Type fpProtoTy = ctx.getProtocol(KnownProtocolKind::FloatingPoint)
+        ->getDeclaredInterfaceType();
+      Type diffArgProtoTy =
+        ctx.getProtocol(KnownProtocolKind::DifferentiationArgument)
+          ->getDeclaredInterfaceType();
+      auto isValidDiffArgType = [&](Type argTy) {
+        return TC.isConvertibleTo(argTy, fpProtoTy, dc) ||
+          TC.isConvertibleTo(argTy, diffArgProtoTy, dc);
+      };
+
+      // Verify that diff arguments conform either to FloatingPoint or to
+      // DifferentiationArgument.
+      auto primalType = cs.getType(primalExpr)->getAs<AnyFunctionType>();
+      assert(primalType && "Primal should have function type");
+      auto gradParams = gradFnType->getParams();
+      assert(gradFnType->getNumParams() == primalType->getNumParams() &&
+             "Gradient expression should have same param count as primal");
+      SmallVector<Type, 8> diffArgTypes;
+      if (expr->getArguments().empty()) {
+        for (auto &gradParam : gradParams)
+          diffArgTypes.push_back(gradParam.getType());
+      } else {
+        // Check only index arguments. 'self' arguments are already checked in
+        // CSGen.
+        for (auto &arg : expr->getArguments())
+          if (arg.getKind() == AutoDiffArgument::Kind::Index)
+            diffArgTypes.push_back(gradParams[arg.getIndex()].getType());
+      }
+      for (auto &argTy : diffArgTypes) {
+        if (!isValidDiffArgType(argTy)) {
+          TC.diagnose(expr->getLoc(),
+                      diag::gradient_expr_argument_not_differentiable, argTy);
+          return nullptr;
+        }
+      }
+
       return expr;
     }
 
