@@ -23,30 +23,44 @@
 /// A type that represents a valid argument for automatic differentiation.
 ///
 /// Types that conform to the `DifferentiationArgument` protocol can be
-/// differentiated with-respect-to in #gradient and #valueAndGradient
+/// differentiated with-respect-to in `#gradient` and `#valueAndGradient`
 /// expressions.
 ///
-/// - TODO: Improve description and add examples.
+/// Example:
+///
+///     struct Vector<Scalar> {
+///         var elements: [Scalar]
+///         init(_ elements: [Scalar]) { ... }
+///     }
+///
+///     extension Vector: Numeric where Scalar: Numeric { ... }
+///
+///     extension Vector: DifferentiationArgument where Scalar: FloatingPoint {
+///         associatedtype DifferentiationCurrency = Scalar
+///
+///         init(_ value: DifferentiationCurrency, isomorphicTo other: Self) {
+///             self.init(Array(repeating: value, count: elements.count))
+///         }
+///     }
 ///
 public protocol DifferentiationArgument {
-  /// Returns an instance initialized to zero.
-  func makeZero() -> Self
-  /// Returns an instance initialized to one.
-  func makeOne() -> Self
+  /// The currency type in the mathematical model of differentiation. For
+  /// example, the currency type of `Float` is `Float`, and the currency type
+  /// for a vector of `Float` is still `Float`. The currency type is used to
+  /// initialize intermediate values during automatic differentiation, such as
+  /// the initial adjoint/tangent and the seed.
+  associatedtype DifferentiationCurrency : FloatingPoint
+
+  /// Creates an instance from the specified currency value and another,
+  /// structurally isomorphic instance.
+  ///
+  /// - Parameters:
+  ///   - value: The differentiation currency value for initializing the
+  ///     instance.
+  ///   - other: The other, structurally isomorphic instance.
+  ///
+  init(_ value: DifferentiationCurrency, isomorphicTo other: Self)
+
   /// Adds two values and produces their sum.
   static func + (lhs: Self, rhs: Self) -> Self
-}
-
-extension Float : DifferentiationArgument {
-  /// Returns a Float initialized to zero.
-  public func makeZero() -> Float { return 0 }
-  /// Returns a Float initialized to one.
-  public func makeOne() -> Float { return 1 }
-}
-
-extension Double : DifferentiationArgument {
-  /// Returns a Double initialized to zero.
-  public func makeZero() -> Double { return 0 }
-  /// Returns a Double initialized to one.
-  public func makeOne() -> Double { return 1 }
 }
