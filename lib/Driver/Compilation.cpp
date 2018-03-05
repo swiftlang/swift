@@ -688,7 +688,6 @@ namespace driver {
           NonBatchable.insert(Cmd);
         }
       }
-      PendingExecution.clear();
     }
 
     /// If \p Batch is nonempty, construct a new \c BatchJob from its
@@ -770,6 +769,30 @@ namespace driver {
       }
     }
 
+    // FIXME: at the moment we're not passing OutputFileMaps to frontends, so
+    // due to the multiplication of the number of additional files and the
+    // number of files in a batch, it's pretty easy to construct too-long
+    // command lines here, which will then fail to exec. We address this crudely
+    // by re-forming batches with a finer partition when we overflow.
+    bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
+                                       size_t &NumPartitions) {
+
+      // Stop rebatching if we can't subdivide batches any further.
+      if (NumPartitions > PendingExecution.size())
+        return false;
+
+      for (auto const *B : Batches) {
+        if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
+                                                          B->getArguments())) {
+          // To avoid redoing the batch loop too many times, repartition pretty
+          // aggressively by doubling partition count / halving size.
+          NumPartitions *= 2;
+          return true;
+        }
+      }
+      return false;
+    }
+
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
     /// them together into \p BatchJob instances (also inserted into \p
     /// BatchJobs), and enqueue all \c PendingExecution jobs (whether batched or
@@ -783,19 +806,29 @@ namespace driver {
         return;
       }
 
-      // Split the batchable from non-batchable pending jobs.
+      size_t NumPartitions = Comp.NumberOfParallelCommands;
       CommandSetVector Batchable, NonBatchable;
-      getPendingBatchableJobs(Batchable, NonBatchable);
-
-      // Partition the batchable jobs into sets.
-      BatchPartition Partition(Comp.NumberOfParallelCommands);
-      partitionIntoBatches(Batchable.takeVector(), Partition);
-
-      // Construct a BatchJob from each batch in the partition.
       std::vector<const Job *> Batches;
-      for (auto const &Batch : Partition) {
-        formBatchJobFromPartitionBatch(Batches, Batch);
-      }
+      do {
+        // We might be restarting loop; clear these before proceeding.
+        Batchable.clear();
+        NonBatchable.clear();
+        Batches.clear();
+
+        // Split the batchable from non-batchable pending jobs.
+        getPendingBatchableJobs(Batchable, NonBatchable);
+
+        // Partition the batchable jobs into sets.
+        BatchPartition Partition(NumPartitions);
+        partitionIntoBatches(Batchable.takeVector(), Partition);
+
+        // Construct a BatchJob from each batch in the partition.
+        for (auto const &Batch : Partition) {
+          formBatchJobFromPartitionBatch(Batches, Batch);
+        }
+
+      } while (shouldRetryWithMorePartitions(Batches, NumPartitions));
+      PendingExecution.clear();
 
       // Save batches so we can locate and decompose them on task-exit.
       for (const Job *Cmd : Batches)
@@ -810,15 +843,29 @@ namespace driver {
       do {
         using namespace std::placeholders;
         // Ask the TaskQueue to execute.
-        TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
-                              _1, _2),
-                    std::bind(&PerformJobsState::taskFinished, this,
-                              _1, _2, _3, _4, _5),
-                    std::bind(&PerformJobsState::taskSignalled, this,
-                              _1, _2, _3, _4, _5, _6));
+        if (TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
+                                  _1, _2),
+                        std::bind(&PerformJobsState::taskFinished, this,
+                                  _1, _2, _3, _4, _5),
+                        std::bind(&PerformJobsState::taskSignalled, this,
+                                  _1, _2, _3, _4, _5, _6))) {
+          if (Result == EXIT_SUCCESS) {
+            // FIXME: Error from task queue while Result == EXIT_SUCCESS most
+            // likely means some fork/exec or posix_spawn failed; TaskQueue saw
+            // "an error" at some stage before even calling us with a process
+            // exit / signal (or else a poll failed); unfortunately the task
+            // causing it was dropped on the floor and we have no way to recover
+            // it here, so we report a very poor, generic error.
+            Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
+                                "<unknown>");
+            Result = -2;
+            AnyAbnormalExit = true;
+            return;
+          }
+        }
 
-        // Returning from TaskQueue::execute should mean either an empty
-        // TaskQueue or a failed subprocess.
+        // Returning without error from TaskQueue::execute should mean either an
+        // empty TaskQueue or a failed subprocess.
         assert(!(Result == 0 && TQ->hasRemainingTasks()));
 
         // Task-exit callbacks from TaskQueue::execute may have unblocked jobs,
