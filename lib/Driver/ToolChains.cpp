@@ -37,9 +37,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The limit for passing a list of files on the command line.
-static const size_t TOO_MANY_FILES = 128;
-
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
                             types::ID InputType,

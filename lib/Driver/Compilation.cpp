@@ -788,7 +788,11 @@ namespace driver {
       getPendingBatchableJobs(Batchable, NonBatchable);
 
       // Partition the batchable jobs into sets.
-      BatchPartition Partition(Comp.NumberOfParallelCommands);
+      // FIXME: at present we set a maximum batch size of TOO_MANY_FILES
+      // so that we don't overflow command-line lengths. This can go away
+      // when we're passing OFMs to the frontend processes.
+      BatchPartition Partition(std::max(size_t(Comp.NumberOfParallelCommands),
+                                        Batchable.size() / TOO_MANY_FILES));
       partitionIntoBatches(Batchable.takeVector(), Partition);
 
       // Construct a BatchJob from each batch in the partition.
