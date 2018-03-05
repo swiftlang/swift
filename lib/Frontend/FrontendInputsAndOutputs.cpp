@@ -124,12 +124,9 @@ FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
 }
 
 std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
-  // FIXME: "batch" should probably be some concatenation of all the primary
-  // input names, in order to keep the stats file names unique. (Or perhaps just
-  // the first primary?)
-  return isWholeModule()
-             ? "all"
-             : primaryInputCount() == 1 ? firstPrimaryInput().file() : "batch";
+  // Use the first primary, even if there are multiple primaries.
+  // That's enough to keep the file names unique.
+  return isWholeModule() ? "all" : firstPrimaryInput().file();
 }
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
