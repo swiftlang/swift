@@ -132,15 +132,15 @@ public func testStraightLineXORTraining() {
 // This testcase exposed bb argument and source location manipulation problems.
 public func testEagerLoop() -> Int32 { // expected-note 5 {{value used here}}
   var a = Tensor<Int32>(6)
-  var count = Tensor<Int32>(0)
+  // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
+  var count = Tensor<Int32>(0)  // expected-warning 7 {{value implicitly copied to the host}}
   while (a != 1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
     if (a % 2 == 0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
       a = a / 2
     } else {
       a = 3 * a + 1
     }
-    // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
-    count += 1  // expected-warning 7 {{implicitly copied}}
+    count += 1 // expected-note {{value used here}}
   }
   return count.scalar!  // expected-note {{value used here}}
 }

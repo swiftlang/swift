@@ -47,7 +47,7 @@ bool tf::shouldDumpIntermediates() {
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.
 Type tf::isTensorHandle(Type ty) {
-  if (auto bgct = ty->getAs<BoundGenericClassType>()) {
+  if (auto *bgct = ty->getAs<BoundGenericClassType>()) {
     if (bgct->getDecl()->getNameStr() == "TensorHandle") {
       assert(bgct->getGenericArgs().size() == 1 && "Expected one generic arg");
       return bgct->getGenericArgs()[0];
