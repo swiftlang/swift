@@ -18,13 +18,10 @@
 #ifndef SWIFT_TYPE_OR_EXTENSION_DECL_H
 #define SWIFT_TYPE_OR_EXTENSION_DECL_H
 
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
-class Decl;
-class NominalTypeDecl;
-class ExtensionDecl;
-class DeclContext;
 
 /// \brief Describes either a nominal type declaration or an extension
 /// declaration.
