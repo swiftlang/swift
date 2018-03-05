@@ -492,6 +492,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
     Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfEnumTypeSpecificMetadataMembers());
+    }
+
     void addPayloadSize() {
       Layout.PayloadSizeOffset = getNextOffset();
       super::addPayloadSize();
@@ -528,6 +533,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     StructMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfStructTypeSpecificMetadataMembers());
+    }
 
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();

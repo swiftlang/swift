@@ -75,10 +75,10 @@ class C<T> : B {}
 //   Field offset vector offset.
 // CHECK-32-SAME: i32 15,
 // CHECK-64-SAME: i32 12,
-//   Instantiation function.
-// CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMi"
 //   Instantiation cache.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMI"
+//   Instantiation pattern.
+// CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMP"
 //   Generic parameter count.
 // CHECK-SAME: i32 1,
 //   Generic requirement count.
@@ -93,6 +93,10 @@ class C<T> : B {}
 // CHECK-SAME: i8 0,
 // CHECK-SAME: i8 0,
 // CHECK-SAME: i8 0 }>, section
+
+// CHECK-LABEL: @"$S14class_metadata1CCMP" =
+//   Instantiation function.
+// CHECK-SAME:  i32 {{.*}} @"$S14class_metadata1CCMi"
 
 // For stupid reasons, when we declare the superclass after the subclass,
 // we end up using an indirect reference to the nominal type descriptor.

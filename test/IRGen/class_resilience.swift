@@ -441,11 +441,11 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericChild metadata initialization function
 
-// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8**)
 
 // Get the superclass size and address point...
 
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}} @"$S16class_resilience21ResilientGenericChildCMP" to i8**))
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 
 // Initialize the superclass pointer...
 // CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentCMa"(%swift.type* %T)

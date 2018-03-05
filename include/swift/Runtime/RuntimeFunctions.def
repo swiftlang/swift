@@ -800,19 +800,19 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
 //                                              const void * const *arguments,
-//                                              const void *template);
+//                                              const void * const *template);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
-//                                              const void *template,
-//                                              size_t templateSize,
-//                                              const void * const *arguments);
+//                                              const void * const *arguments,
+//                                              const void * const *template,
+//                                              size_t extraSize);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, SizeTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // const ProtocolWitnessTable *
