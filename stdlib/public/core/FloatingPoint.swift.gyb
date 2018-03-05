@@ -1011,94 +1011,85 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
   var nextDown: Self { get }
 
-  /// Returns a Boolean value indicating whether this instance is equal to the
-  /// given value.
+  /// Returns a Boolean value indicating whether `lhs` is equal to `rhs`.
   ///
-  /// This method serves as the basis for the equal-to operator (`==`) for
-  /// floating-point values. When comparing two values with this method, `-0`
-  /// is equal to `+0`. NaN is not equal to any value, including itself. For
-  /// example:
+  /// When comparing two values with this method, `-0` is equal to `+0`. NaN
+  /// is not equal to any value, including itself. For example:
   ///
   ///     let x = 15.0
-  ///     x.isEqual(to: 15.0)
+  ///     x == 15.0
   ///     // true
-  ///     x.isEqual(to: .nan)
+  ///     x == .nan
   ///     // false
-  ///     Double.nan.isEqual(to: .nan)
+  ///     Double.nan == .nan
   ///     // false
   ///
-  /// The `isEqual(to:)` method implements the equality predicate defined by
+  /// The `==` operator implements the equality predicate defined by
   /// the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` has the same value as this instance;
-  ///   otherwise, `false`. If either this value or `other` is NaN, the result
-  ///   of this method is `false`.
-  func isEqual(to other: Self) -> Bool
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` and `rhs` represent the same extended real
+  ///   number value; otherwise, `false`. If either `lhs` or `rhs` is NaN,
+  ///   the result of this oeprator is `false`.
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool
 
-  /// Returns a Boolean value indicating whether this instance is less than the
-  /// given value.
-  ///
-  /// This method serves as the basis for the less-than operator (`<`) for
-  /// floating-point values. Some special cases apply:
-  ///
-  /// - Because NaN compares not less than nor greater than any value, this
-  ///   method returns `false` when called on NaN or when NaN is passed as
-  ///   `other`.
-  /// - `-infinity` compares less than all values except for itself and NaN.
-  /// - Every value except for NaN and `+infinity` compares less than
-  ///   `+infinity`.
-  ///
-  ///     let x = 15.0
-  ///     x.isLess(than: 20.0)
-  ///     // true
-  ///     x.isLess(than: .nan)
-  ///     // false
-  ///     Double.nan.isLess(than: x)
-  ///     // false
-  ///
-  /// The `isLess(than:)` method implements the less-than predicate defined by
-  /// the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if this value is less than `other`; otherwise, `false`.
-  ///   If either this value or `other` is NaN, the result of this method is
-  ///   `false`.
-  func isLess(than other: Self) -> Bool
-
-  /// Returns a Boolean value indicating whether this instance is less than or
-  /// equal to the given value.
-  ///
-  /// This method serves as the basis for the less-than-or-equal-to operator
-  /// (`<=`) for floating-point values. Some special cases apply:
+  /// Returns a Boolean value indicating whether `lhs` is less than `rhs`.
+  /// Some special cases apply:
   ///
   /// - Because NaN is incomparable with any value, this method returns `false`
-  ///   when called on NaN or when NaN is passed as `other`.
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than all values except `-infinity` and NaN.
+  /// - Every value except `+infinity` and NaN compares less than `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x < 20.0
+  ///     // true
+  ///     x < .nan
+  ///     // false
+  ///     .nan < x
+  ///     // false
+  ///
+  /// The `<` operator implements the less-than predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than `rhs`, otherwise `false`. If
+  ///   either `lhs` or `rhs` is NaN, the result of this operator is `false`.
+  static func <(_ lhs: Self, _ rhs: Self) -> Bool
+
+  /// Returns a Boolean value indicating whether `lhs` is less than or equal
+  /// to `rhs`. Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
   /// - `-infinity` compares less than or equal to all values except NaN.
   /// - Every value except NaN compares less than or equal to `+infinity`.
   ///
   ///     let x = 15.0
-  ///     x.isLessThanOrEqualTo(20.0)
+  ///     x <= 20.0
   ///     // true
-  ///     x.isLessThanOrEqualTo(.nan)
+  ///     x <= .nan
   ///     // false
-  ///     Double.nan.isLessThanOrEqualTo(x)
+  ///     .nan <= x
   ///     // false
   ///
-  /// The `isLessThanOrEqualTo(_:)` method implements the less-than-or-equal
-  /// predicate defined by the [IEEE 754 specification][spec].
+  /// The `<=` operator implements the less-than-or-equal predicate defined by
+  /// the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is greater than this value; otherwise,
-  ///   `false`. If either this value or `other` is NaN, the result of this
-  ///   method is `false`.
-  func isLessThanOrEqualTo(_ other: Self) -> Bool
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than or equal to `rhs`, otherwise
+  ///   `false`. If either `lhs` or `rhs` is NaN, the result of this operator
+  ///   is `false`.
+  static func <=(_ lhs: Self, _ rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether this instance should precede
   /// or tie positions with the given value in an ascending sort.
@@ -1397,32 +1388,14 @@ public enum FloatingPointRoundingRule {
 extension FloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.isEqual(to: rhs)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func < (lhs: Self, rhs: Self) -> Bool {
-    return lhs.isLess(than: rhs)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func <= (lhs: Self, rhs: Self) -> Bool {
-    return lhs.isLessThanOrEqualTo(rhs)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
-    return rhs.isLess(than: lhs)
+    return rhs < lhs
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
-    return rhs.isLessThanOrEqualTo(lhs)
+    return rhs <= lhs
   }
 }
 
@@ -1591,16 +1564,88 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   ///   binary, and `x.significandWidth` is 23.
   var significandWidth: Int { get }
 
-  /*  TODO: Implement these once it becomes possible to do so. (Requires
-   *  revised Integer protocol).
-  func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool
+  /// Returns a Boolean value indicating whether `lhs` is equal to `rhs`.
+  ///
+  /// When comparing two values with this method, `-0` is equal to `+0`. NaN
+  /// is not equal to any value, including itself. For example:
+  ///
+  ///     let x = 15.0
+  ///     x == 15.0
+  ///     // true
+  ///     x == .nan
+  ///     // false
+  ///     Double.nan == .nan
+  ///     // false
+  ///
+  /// The `==` operator implements the equality predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` and `rhs` represent the same extended real
+  ///   number value; otherwise, `false`. If either `lhs` or `rhs` is NaN,
+  ///   the result of this oeprator is `false`.
+  static func == <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint
 
-  func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool
+  /// Returns a Boolean value indicating whether `lhs` is less than `rhs`.
+  /// Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than all values except `-infinity` and NaN.
+  /// - Every value except `+infinity` and NaN compares less than `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x < 20.0
+  ///     // true
+  ///     x < .nan
+  ///     // false
+  ///     .nan < x
+  ///     // false
+  ///
+  /// The `<` operator implements the less-than predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than `rhs`, otherwise `false`. If
+  ///   either `lhs` or `rhs` is NaN, the result of this operator is `false`.
+  static func < <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint
 
-  func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool
-
-  func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool
-  */
+  /// Returns a Boolean value indicating whether `lhs` is less than or equal
+  /// to `rhs`. Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than or equal to all values except NaN.
+  /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x <= 20.0
+  ///     // true
+  ///     x <= .nan
+  ///     // false
+  ///     .nan <= x
+  ///     // false
+  ///
+  /// The `<=` operator implements the less-than-or-equal predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than or equal to `rhs`, otherwise
+  ///   `false`. If either `lhs` or `rhs` is NaN, the result of this operator
+  ///   is `false`.
+  static func <= <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint
 }
 
 extension FloatingPoint {
@@ -2336,43 +2381,110 @@ extension BinaryFloatingPoint {
     return true
   }
 
-
-  /*  TODO: uncomment these default implementations when it becomes possible
-      to use them.
   //  TODO: The following comparison implementations are not quite correct for
   //  the unusual case where one type has more exponent range and the other
   //  uses more fractional bits, *and* the value with more exponent range is
   //  subnormal when converted to the other type. This is an extremely niche
   //  corner case, however (it cannot occur with the usual IEEE 754 floating-
   //  point types). Nonetheless, this should be fixed someday.
-  public func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool {
+
+  /// Returns a Boolean value indicating whether `lhs` is equal to `rhs`.
+  ///
+  /// When comparing two values with this method, `-0` is equal to `+0`. NaN
+  /// is not equal to any value, including itself. For example:
+  ///
+  ///     let x = 15.0
+  ///     x == 15.0
+  ///     // true
+  ///     x == .nan
+  ///     // false
+  ///     Double.nan == .nan
+  ///     // false
+  ///
+  /// The `==` operator implements the equality predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` and `rhs` represent the same extended real
+  ///   number value; otherwise, `false`. If either `lhs` or `rhs` is NaN,
+  ///   the result of this oeprator is `false`.
+  public static func == <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint {
     if Self.significandBitCount >= Other.significandBitCount {
-      return self.isEqual(to: Self(other))
+      return lhs == Self(rhs)
     }
-    return other.isEqual(to: Other(self))
+    return Other(lhs) == rhs
   }
 
-  public func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool {
+  /// Returns a Boolean value indicating whether `lhs` is less than `rhs`.
+  /// Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than all values except `-infinity` and NaN.
+  /// - Every value except `+infinity` and NaN compares less than `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x < 20.0
+  ///     // true
+  ///     x < .nan
+  ///     // false
+  ///     .nan < x
+  ///     // false
+  ///
+  /// The `<` operator implements the less-than predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than `rhs`, otherwise `false`. If
+  ///   either `lhs` or `rhs` is NaN, the result of this operator is `false`.
+  public static func < <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint {
     if Self.significandBitCount >= Other.significandBitCount {
-      return self.isLess(than: Self(other))
+      return lhs < Self(rhs)
     }
-    return Other(self).isLess(than: other)
+    return Other(lhs) < rhs
   }
 
-  public func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool {
+  /// Returns a Boolean value indicating whether `lhs` is less than or equal
+  /// to `rhs`. Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than or equal to all values except NaN.
+  /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x <= 20.0
+  ///     // true
+  ///     x <= .nan
+  ///     // false
+  ///     .nan <= x
+  ///     // false
+  ///
+  /// The `<=` operator implements the less-than-or-equal predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than or equal to `rhs`, otherwise
+  ///   `false`. If either `lhs` or `rhs` is NaN, the result of this operator
+  ///   is `false`.
+  public static func <= <Other>(_ lhs: Self, _ rhs: Other) -> Bool
+    where Other: BinaryFloatingPoint {
     if Self.significandBitCount >= Other.significandBitCount {
-      return self.isLessThanOrEqualTo(Self(other))
+      return lhs <= Self(rhs)
     }
-    return Other(self).isLessThanOrEqualTo(other)
+    return Other(lhs) <= rhs
   }
-
-  public func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool {
-    if Self.significandBitCount >= Other.significandBitCount {
-      return self.totalOrder(with: Self(other))
-    }
-    return Other(self).totalOrder(with: other)
-  }
-  */
 }
 
 /// Returns the absolute value of `x`.
@@ -2435,6 +2547,24 @@ extension FloatingPoint {
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public mutating func divide(by other: Self) {
     self /= other
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.2, message: "Please use operators instead.")
+  public func isEqual(to other: Self) -> Bool {
+    return self == other
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.2, message: "Please use operators instead.")
+  public func isLess(than other: Self) -> Bool {
+    return self < other
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.2, message: "Please use operators instead.")
+  public func isLessThanOrEqualTo(_ other: Self) -> Bool {
+    return self <= other
   }
 }
 

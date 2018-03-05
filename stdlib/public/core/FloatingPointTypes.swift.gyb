@@ -1152,100 +1152,96 @@ extension ${Self}: BinaryFloatingPoint {
     _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
   }
 
-  /// Returns a Boolean value indicating whether this instance is equal to the
-  /// given value.
+  /// Returns a Boolean value indicating whether `lhs` is equal to `rhs`.
   ///
-  /// This method serves as the basis for the equal-to operator (`==`) for
-  /// floating-point values. When comparing two values with this method, `-0`
-  /// is equal to `+0`. NaN is not equal to any value, including itself. For
-  /// example:
+  /// When comparing two values with this method, `-0` is equal to `+0`. NaN
+  /// is not equal to any value, including itself. For example:
   ///
   ///     let x = 15.0
-  ///     x.isEqual(to: 15.0)
+  ///     x == 15.0
   ///     // true
-  ///     x.isEqual(to: .nan)
+  ///     x == .nan
   ///     // false
-  ///     Double.nan.isEqual(to: .nan)
+  ///     Double.nan == .nan
   ///     // false
   ///
-  /// The `isEqual(to:)` method implements the equality predicate defined by
+  /// The `==` operator implements the equality predicate defined by
   /// the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` has the same value as this instance;
-  ///   otherwise, `false`.
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` and `rhs` represent the same extended real
+  ///   number value; otherwise, `false`. If either `lhs` or `rhs` is NaN,
+  ///   the result of this oeprator is `false`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func isEqual(to other: ${Self}) -> Bool {
-    return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(self._value, other._value))
+  public static func ==(_ lhs: ${Self}, _ rhs: ${Self}) -> Bool {
+    return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs._value, rhs._value))
   }
 
-  /// Returns a Boolean value indicating whether this instance is less than the
-  /// given value.
-  ///
-  /// This method serves as the basis for the less-than operator (`<`) for
-  /// floating-point values. Some special cases apply:
-  ///
-  /// - Because NaN compares not less than nor greater than any value, this
-  ///   method returns `false` when called on NaN or when NaN is passed as
-  ///   `other`.
-  /// - `-infinity` compares less than all values except for itself and NaN.
-  /// - Every value except for NaN and `+infinity` compares less than
-  ///   `+infinity`.
-  ///
-  ///     let x = 15.0
-  ///     x.isLess(than: 20.0)
-  ///     // true
-  ///     x.isLess(than: .nan)
-  ///     // false
-  ///     Double.nan.isLess(than: x)
-  ///     // false
-  ///
-  /// The `isLess(than:)` method implements the less-than predicate defined by
-  /// the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public func isLess(than other: ${Self}) -> Bool {
-    return Bool(Builtin.fcmp_olt_FPIEEE${bits}(self._value, other._value))
-  }
-
-  /// Returns a Boolean value indicating whether this instance is less than or
-  /// equal to the given value.
-  ///
-  /// This method serves as the basis for the less-than-or-equal-to operator
-  /// (`<=`) for floating-point values. Some special cases apply:
+  /// Returns a Boolean value indicating whether `lhs` is less than `rhs`.
+  /// Some special cases apply:
   ///
   /// - Because NaN is incomparable with any value, this method returns `false`
-  ///   when called on NaN or when NaN is passed as `other`.
+  ///   when either `lhs` or `rhs` is NaN.
+  /// - `-infinity` compares less than all values except `-infinity` and NaN.
+  /// - Every value except `+infinity` and NaN compares less than `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x < 20.0
+  ///     // true
+  ///     x < .nan
+  ///     // false
+  ///     .nan < x
+  ///     // false
+  ///
+  /// The `<` operator implements the less-than predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than `rhs`, otherwise `false`. If
+  ///   either `lhs` or `rhs` is NaN, the result of this operator is `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func <(_ lhs: ${Self}, _ rhs: ${Self}) -> Bool {
+    return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs._value, rhs._value))
+  }
+
+  /// Returns a Boolean value indicating whether `lhs` is less than or equal
+  /// to `rhs`. Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when either `lhs` or `rhs` is NaN.
   /// - `-infinity` compares less than or equal to all values except NaN.
   /// - Every value except NaN compares less than or equal to `+infinity`.
   ///
   ///     let x = 15.0
-  ///     x.isLessThanOrEqualTo(20.0)
+  ///     x <= 20.0
   ///     // true
-  ///     x.isLessThanOrEqualTo(.nan)
+  ///     x <= .nan
   ///     // false
-  ///     Double.nan.isLessThanOrEqualTo(x)
+  ///     .nan <= x
   ///     // false
   ///
-  /// The `isLessThanOrEqualTo(_:)` method implements the less-than-or-equal
-  /// predicate defined by the [IEEE 754 specification][spec].
+  /// The `<=` operator implements the less-than-or-equal predicate defined by
+  /// the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
+  /// - lhs: The first value to compare.
+  /// - rhs: The second value to compare.
+  /// - Returns: `true` if `lhs` is less than or equal to `rhs`, otherwise
+  ///   `false`. If either `lhs` or `rhs` is NaN, the result of this operator
+  ///   is `false`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public func isLessThanOrEqualTo(_ other: ${Self}) -> Bool {
-    return Bool(Builtin.fcmp_ole_FPIEEE${bits}(self._value, other._value))
+  public static func <=(_ lhs: ${Self}, _ rhs: ${Self}) -> Bool {
+    return Bool(Builtin.fcmp_ole_FPIEEE${bits}(lhs._value, rhs._value))
   }
 
   /// A Boolean value indicating whether this instance is normal.
