@@ -1731,6 +1731,8 @@ extension ${Self} {
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(gradient: _adjointAdd)
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs += rhs
@@ -1739,6 +1741,8 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(gradient: _adjointSubtract)
   public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs -= rhs
@@ -1747,6 +1751,8 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(gradient: _adjointMultiply)
   public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs *= rhs
@@ -1755,10 +1761,48 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(gradient: _adjointDivide)
   public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs /= rhs
     return lhs
+  }
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// Adjoints of standard binary operators.
+extension ${Self} {
+  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  static func _adjointAdd(
+    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+  ) -> (${Self}, ${Self}) {
+    return (adjoint, adjoint)
+  }
+
+  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  static func _adjointSubtract(
+    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+  ) -> (${Self}, ${Self}) {
+    return (adjoint, -adjoint)
+  }
+
+  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  static func _adjointMultiply(
+    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+  ) -> (${Self}, ${Self}) {
+    return (rhs * adjoint, lhs * adjoint)
+  }
+
+  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  static func _adjointDivide(
+    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+  ) -> (${Self}, ${Self}) {
+    return (adjoint / rhs, -lhs / (rhs * rhs) * adjoint)
   }
 }
 
