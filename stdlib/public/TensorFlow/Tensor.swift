@@ -425,8 +425,11 @@ public extension Tensor where Scalar == Double {
   ///
   @_inlineable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
-    self = Tensor(shape: shape, scalars: scalars) * stddev + mean
+    let handle : TensorHandle<Scalar> = _TFHoistable {
+      let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
+      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+    }
+    self = Tensor(handle: handle).toDevice() * stddev + mean
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -434,12 +437,16 @@ public extension Tensor where Scalar == Double {
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - seed: A random seed for the operation.
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape) {
-    let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomUniform() }
-    self.init(shape: shape, scalars: scalars)
+    let handle : TensorHandle<Scalar> = _TFHoistable {
+      let scalars = (0..<shape.contiguousSize).map { _ in
+        Scalar.randomUniform()
+      }
+      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+    }
+    self = Tensor(handle: handle).toDevice()
   }
 }
 
