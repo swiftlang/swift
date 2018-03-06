@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-run-simple-swift
+// RUN: %target-swift-frontend -c -verify -o /dev/null
 
 #warning("this should be a warning") // expected-warning {{this should be a warning}}
 #error("this should be an error") // expected-error {{this should be an error}}
