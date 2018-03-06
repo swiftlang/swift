@@ -181,12 +181,17 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 2
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
+// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK: }
+
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 //   Lay out fields.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i64 3
 // CHECK:   [[T2:%.*]] = getelementptr inbounds i8**, i8*** [[TYPES:%.*]], i32 0
 // CHECK:   call void @swift_initStructMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[TYPES]], i64* [[T1]])
-// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK:   ret %swift.type* null
 // CHECK: }
 
 // Check that we directly delegate buffer witnesses to a single dynamic field:
