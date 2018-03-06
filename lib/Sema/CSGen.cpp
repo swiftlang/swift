@@ -1287,20 +1287,12 @@ namespace {
         return nullptr;
       }
 
-      // Get FloatingPoint and Differentiable protocol types.
+      // Get Differentiable protocol type.
       auto &ctx = CS.getASTContext();
-      ProtocolDecl *fpProto =
-        ctx.getProtocol(KnownProtocolKind::FloatingPoint);
       ProtocolDecl *diffProto =
         ctx.getProtocol(KnownProtocolKind::Differentiable);
-      assert(fpProto && "FloatingPoint protocol could not be found.");
       assert(diffProto && "Differentiable protocol could not be found.");
-      Type fpProtoTy = fpProto->getDeclaredInterfaceType();
       Type diffProtoTy = diffProto->getDeclaredInterfaceType();
-      auto isValidDiffArgType = [&](Type argTy) {
-        return CS.TC.isConvertibleTo(argTy, fpProtoTy, CurDC) ||
-          CS.TC.isConvertibleTo(argTy, diffProtoTy, CurDC);
-      };
 
       // Compute the gradient type.
       auto primalParams = primalTy->getParams();
@@ -1375,7 +1367,7 @@ namespace {
             }
             // 'self' type must conform to either FloatingPoint or
             // Differentiable.
-            if (!isValidDiffArgType(selfTy)) {
+            if (!CS.TC.isConvertibleTo(selfTy, diffProtoTy, CurDC)) {
               TC.diagnose(arg.getLoc(),
                           diag::gradient_expr_argument_not_differentiable,
                           selfTy);
@@ -1389,15 +1381,18 @@ namespace {
         }
       }
 
-      // Differentiation argument types must conform to either FloatingPoint or
-      // Differentiable.
-      // TODO: consider generalizing to aggregate types of FloatingPoint and/or
-      // Differentiable.
+      // Differentiation argument types must conform to Differentiable.
+      // TODO: consider generalizing to aggregate types of Differentiable.
       for (auto &arg : diffArgTypes) {
         auto argTy = arg.getType();
-        // If diff arg type does not have type variables, then it must conform
-        // to FloatingPoint or Differentiable.
-        if (!argTy->hasTypeVariable() && !isValidDiffArgType(argTy)) {
+        // If diff arg type does not have type variables, it must conform to
+        // Differentiable.
+        // NOTE: It is intentional that diff arg types with type variables are
+        // not constrained to Differentiable. Instead, conformance to
+        // Differentiable is checked in CSApply to produce better diagnostics
+        // about specific non-differentiable types.
+        if (!argTy->hasTypeVariable() &&
+            !CS.TC.isConvertibleTo(argTy, diffProtoTy, CurDC)) {
           TC.diagnose(GE->getLoc(),
                       diag::gradient_expr_argument_not_differentiable, argTy);
           return nullptr;
