@@ -55,9 +55,9 @@ class ClassProtocolFieldClass {
   }
 }
 
-// CHECK: %T22class_bounded_generics017ClassGenericFieldD0C = type <{ %swift.refcounted, %TSi, %objc_object*, %TSi }>
-// CHECK: %T22class_bounded_generics23ClassGenericFieldStructV = type <{ %TSi, %objc_object*, %TSi }>
-// CHECK: %T22class_bounded_generics24ClassProtocolFieldStructV = type <{ %TSi, %T22class_bounded_generics10ClassBoundP, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics017ClassGenericFieldD0C = type <{ %swift.refcounted, %TSi, %objc_object*, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics23ClassGenericFieldStructV = type <{ %TSi, %objc_object*, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics24ClassProtocolFieldStructV = type <{ %TSi, %T22class_bounded_generics10ClassBoundP, %TSi }>
 
 // CHECK-LABEL: define hidden swiftcc %objc_object* @"$S22class_bounded_generics0a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
 func class_bounded_archetype<T : ClassBound>(_ x: T) -> T {

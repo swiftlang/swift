@@ -4,7 +4,7 @@ class C {}
 protocol P: class {}
 protocol Q: class {}
 
-// CHECK: @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
+// CHECK: @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMP"
 // CHECK: define internal %swift.type* @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
 struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   var z: T
@@ -96,7 +96,7 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
 public class Base {
    var a: UInt32 = 0
 }
-// CHECK-LABEL: %swift.type* @{{.*}}7DerivedCMi"(%swift.type_descriptor*, i8**)
+// CHECK-LABEL: %swift.type* @{{.*}}7DerivedCMi"(%swift.type_descriptor*, i8**, i8**)
 // CHECK-NOT: store {{.*}}getelementptr{{.*}}SBomWV
 // CHECK: call %swift.type* @"$S29type_layout_reference_storage1P_pXmTMa"()
 // CHECK: store {{.*}}getelementptr{{.*}}SBoWV
