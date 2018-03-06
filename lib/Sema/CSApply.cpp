@@ -2482,94 +2482,91 @@ namespace {
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
       auto &ctx = cs.getASTContext();
       auto &tc = cs.getTypeChecker();
-      Expr *result = expr;
 
       auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
+
+      // It is theoretically possible for #tfop to have zero operands (other
+      // than the string).  In that case the argument list will not be a tuple
+      // expr, but there are no operands to change anyway.
+      if (auto *tuple = dyn_cast<TupleExpr>(expr->getArg())) {
+        // Check each argument of the #tfop expression to see if any of them
+        // conforms to the TensorProtocol protocol.  If so, project out the
+        // handle value and pass that instead.
+        bool changedArg = false;
+        for (auto &elt : tuple->getElements().drop_front()) {
+          auto eltType = cs.getType(elt);
+          assert(eltType && "elt type cannot be NULL!");
+          if (!tensorProto || eltType->is<UnresolvedType>() ||
+              !tc.conformsToProtocol(eltType, tensorProto, cs.DC,
+                                     ConformanceCheckFlags::Used)) {
+            continue;
+          }
+
+          auto name = ctx.getIdentifier("handle");
+          Expr *newElt =
+            new (ctx) UnresolvedDotExpr(elt, elt->getEndLoc(),
+                                        DeclName(name),
+                                        DeclNameLoc(elt->getEndLoc()),
+                                         /*implicit*/true);
+          cs.setSubExprTypes(newElt);
+
+          bool failed = tc.typeCheckExpressionShallow(newElt, cs.DC);
+          assert(!failed && "Could not access 'handle' member?"); (void)failed;
+          cs.cacheExprTypes(newElt);
+          elt = newElt;
+          changedArg = true;
+        }
+
+        // If we changed any of the arguments, then we need to recompute the
+        // tuple type.
+        if (changedArg) {
+          // Make sure to set all of the types for the tuple, including the
+          // string and any operands we didn't touch.
+          cs.setSubExprTypes(tuple);
+
+          // Clear the type of the tuple so it gets recomputed.
+          Expr *newTuple = tuple;
+          newTuple->setType(Type());
+
+          bool failed = tc.typeCheckExpressionShallow(newTuple, cs.DC);
+          assert(!failed && "Could not retypecheck tuple?"); (void)failed;
+          cs.cacheExprTypes(newTuple);
+          expr->setArg(newTuple);
+        }
+      }
 
       // If the #tfop returns a type that conforms to TensorProtocol, we change
       // it to return a TensorHandle<T> and then use the init(handle:)
       // initializer of the expected result type to project it back to the type
       // that we want.
-      auto exprType = cs.getType(expr);
-      assert(exprType && "expr Type cannot be NULL!");
-      if (tensorProto && !exprType->is<UnresolvedType>() &&
-          tc.conformsToProtocol(exprType, tensorProto, cs.DC,
+      auto type = simplifyType(cs.getType(expr));
+      assert(type && "expr Type cannot be NULL!");
+      if (tensorProto && !type->is<UnresolvedType>() &&
+          tc.conformsToProtocol(type, tensorProto, cs.DC,
                                 ConformanceCheckFlags::Used)) {
-        auto resultTy = exprType;
         // Look up the handle member on our type, to get the concrete
         // TensorHandle<T> type to use for this value.
         auto handleId = ctx.getIdentifier("handle");
-        auto lookup = tc.lookupMember(cs.DC, exprType,
-                                      DeclName(handleId));
+        auto lookup = tc.lookupMember(cs.DC, type, DeclName(handleId));
         assert(lookup && "TensorProtocol didn't have a handle member?");
         auto decl = lookup.front().getValueDecl();
-        auto handleTy =
-            exprType->getTypeOfMember(cs.DC->getParentModule(), decl);
+        auto handleTy = type->getTypeOfMember(cs.DC->getParentModule(), decl);
 
         // Now that we have the handle type, switch the ObjectLiteralExpr to be
         // that type, and build the original TensorProtocol type by using the
         // init(handle:) initializer.
-        expr->setType(handleTy);
-        cs.cacheExprTypes(expr);
+        cs.setType(expr, handleTy);
 
         auto funcName = DeclName(ctx, ctx.Id_init, { handleId });
-        result = convertLiteral(expr, resultTy, resultTy,
-                                tensorProto, handleTy, funcName,
-                                tensorProto, handleTy, funcName,
-                                /*no filter*/nullptr,
-                                diag::string_literal_broken_proto,
-                                diag::string_literal_broken_proto);
-        if (!result)
-          return nullptr;
+        return convertLiteral(expr, type, type,
+                              tensorProto, handleTy, funcName,
+                              tensorProto, handleTy, funcName,
+                              /*no filter*/nullptr,
+                              diag::string_literal_broken_proto,
+                              diag::string_literal_broken_proto);
       }
 
-      // It is theoretically possible for #tfop to have zero operands (other
-      // than the string).  In that case the argument list will not be a tuple
-      // expr, but there are no operands to change anyway.
-      auto *tuple = dyn_cast<TupleExpr>(expr->getArg());
-      if (!tuple) return result;
-
-
-      // Check each argument of the #tfop expression to see if any of them
-      // conforms to the TensorProtocol protocol.  If so, project out the handle
-      // value and pass that instead.
-      bool changedArg = false;
-      for (auto &elt : tuple->getElements().drop_front()) {
-        auto eltType = cs.getType(elt);
-        assert(eltType && "elt Type cannot be NULL!");
-        if (!tensorProto || eltType->is<UnresolvedType>() ||
-            !tc.conformsToProtocol(eltType, tensorProto, cs.DC,
-                                   ConformanceCheckFlags::Used))
-          continue;
-
-        auto name = ctx.getIdentifier("handle");
-        Expr *newElt =
-          new (ctx) UnresolvedDotExpr(elt, elt->getEndLoc(),
-                                       DeclName(name),
-                                      DeclNameLoc(elt->getEndLoc()),
-                                       /*implicit*/true);
-
-        cs.cacheSubExprTypes(newElt);
-        cs.setSubExprTypes(newElt);
-        bool failed = tc.typeCheckExpressionShallow(newElt, cs.DC);
-        assert(!failed && "Could not access 'handle' member?"); (void)failed;
-        cs.cacheExprTypes(newElt);
-        elt = newElt;
-        changedArg = true;
-      }
-
-      // If we changed any of the arguments, then we need to recompute the tuple
-      // type.
-      if (changedArg) {
-        Expr *newTuple = tuple;
-        newTuple->setType(Type());
-        bool failed = tc.typeCheckExpressionShallow(newTuple, cs.DC);
-        assert(!failed && "Could not retypecheck tuple?"); (void)failed;
-        cs.cacheExprTypes(newTuple);
-        expr->setArg(newTuple);
-      }
-
-      return result;
+      return expr;
     }
 
 
