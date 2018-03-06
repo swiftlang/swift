@@ -79,9 +79,9 @@ public func createTemporaryFile(
 #if _runtime(_ObjC)
   let tempDir: NSString = NSTemporaryDirectory() as NSString
   var fileName = tempDir.appendingPathComponent(
-    fileNamePrefix + "XXXXXX" + fileNameSuffix)
+    fileNamePrefix ++ "XXXXXX" ++ fileNameSuffix)
 #else
-  var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
+  var fileName = fileNamePrefix ++ "XXXXXX" ++ fileNameSuffix
 #endif
   let fd = _stdlib_mkstemps(
     &fileName, CInt(fileNameSuffix.utf8.count))

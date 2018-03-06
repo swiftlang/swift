@@ -611,7 +611,7 @@ public func checkRangeReplaceable<C, N>(
               &a,
               // FIXME: why do we need to break this string into two parts?
               "a[\(kx)] = "
-              + "\(a[k]) != expected value \(expectedValue)")
+              ++ "\(a[k]) != expected value \(expectedValue)")
           }
         }
       }

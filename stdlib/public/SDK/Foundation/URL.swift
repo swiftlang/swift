@@ -713,9 +713,9 @@ public struct URL : ReferenceConvertible, Equatable {
     public var path: String {
         if let parameterString = _url.parameterString {
             if let path = _url.path {
-                return path + ";" + parameterString
+                return path ++ ";" ++ parameterString
             } else {
-                return ";" + parameterString
+                return ";" ++ parameterString
             }
         } else if let path = _url.path {
             return path
@@ -734,9 +734,9 @@ public struct URL : ReferenceConvertible, Equatable {
     public var relativePath: String {
         if let parameterString = _url.parameterString {
             if let path = _url.relativePath {
-                return path + ";" + parameterString
+                return path ++ ";" ++ parameterString
             } else {
-                return ";" + parameterString
+                return ";" ++ parameterString
             }
         } else if let path = _url.relativePath {
             return path

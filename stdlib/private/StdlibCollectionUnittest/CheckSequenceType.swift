@@ -67,7 +67,7 @@ public struct ElementsEqualTest {
     self.other = other
     self.expectedLeftoverSequence = expectedLeftoverSequence
     self.expectedLeftoverOther = expectedLeftoverOther
-    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+    self.loc = SourceLoc(file, line, comment: "test data" ++ comment)
   }
 
   func flip() -> ElementsEqualTest {
@@ -101,7 +101,7 @@ public struct ElementsEqualWithPredicateTest {
         self.predicate = predicate
         self.expectedLeftoverSequence = expectedLeftoverSequence
         self.expectedLeftoverOther = expectedLeftoverOther
-        self.loc = SourceLoc(file, line, comment: "test data" + comment)
+        self.loc = SourceLoc(file, line, comment: "test data" ++ comment)
     }
 }
 
@@ -117,7 +117,7 @@ public struct EnumerateTest {
   ) {
     self.expected = expected
     self.sequence = sequence
-    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+    self.loc = SourceLoc(file, line, comment: "test data" ++ comment)
   }
 }
 
@@ -281,7 +281,7 @@ public struct LexicographicallyPrecedesTest {
     self.other = other
     self.expectedLeftoverSequence = expectedLeftoverSequence
     self.expectedLeftoverOther = expectedLeftoverOther
-    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+    self.loc = SourceLoc(file, line, comment: "test data" ++ comment)
   }
 
   func flip() -> LexicographicallyPrecedesTest {
@@ -333,7 +333,7 @@ public struct MinMaxTest {
     self.expectedMaxValue = expectedMaxValue
     self.expectedMaxIndex = expectedMaxIndex
     self.sequence = sequence
-    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+    self.loc = SourceLoc(file, line, comment: "test data" ++ comment)
   }
 }
 
@@ -1607,7 +1607,7 @@ extension TestSuite {
       return makeSequenceOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(describing: S.Type.self)
+    testNamePrefix ++= String(describing: S.Type.self)
 
     let isMultiPass = makeSequence([])
       ._preprocessingPass { true } ?? false

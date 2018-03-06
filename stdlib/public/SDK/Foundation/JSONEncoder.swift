@@ -1035,13 +1035,13 @@ open class JSONDecoder {
                 result = joinedString
             } else if (!leadingUnderscoreRange.isEmpty && !trailingUnderscoreRange.isEmpty) {
                 // Both leading and trailing underscores
-                result = String(stringKey[leadingUnderscoreRange]) + joinedString + String(stringKey[trailingUnderscoreRange])
+                result = String(stringKey[leadingUnderscoreRange]) ++ joinedString ++ String(stringKey[trailingUnderscoreRange])
             } else if (!leadingUnderscoreRange.isEmpty) {
                 // Just leading
-                result = String(stringKey[leadingUnderscoreRange]) + joinedString
+                result = String(stringKey[leadingUnderscoreRange]) ++ joinedString
             } else {
                 // Just trailing
-                result = joinedString + String(stringKey[trailingUnderscoreRange])
+                result = joinedString ++ String(stringKey[trailingUnderscoreRange])
             }
             return result
         }

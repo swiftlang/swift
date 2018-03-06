@@ -540,7 +540,7 @@ extension TestSuite {
       return makeCollectionOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(describing: C.Type.self)
+    testNamePrefix ++= String(describing: C.Type.self)
 
     //===------------------------------------------------------------------===//
     // generate()
@@ -713,7 +713,7 @@ extension TestSuite {
         let sliceFromRight = elements.count - test.bounds.upperBound
         print(
           "\(elements)/sliceFromLeft=\(sliceFromLeft)"
-          + "/sliceFromRight=\(sliceFromRight)")
+          ++ "/sliceFromRight=\(sliceFromRight)")
         let base = makeWrappedCollection(elements)
         let sliceStartIndex =
           base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
@@ -1190,7 +1190,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(describing: C.Type.self)
+    testNamePrefix ++= String(describing: C.Type.self)
 
     // FIXME: swift-3-indexing-model - add tests for the follow?
     //          index(before: of i: Index) -> Index
@@ -1504,7 +1504,7 @@ extension TestSuite {
 
     addBidirectionalCollectionTests(${forwardTestArgs})
 
-    testNamePrefix += String(describing: C.Type.self)
+    testNamePrefix ++= String(describing: C.Type.self)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))

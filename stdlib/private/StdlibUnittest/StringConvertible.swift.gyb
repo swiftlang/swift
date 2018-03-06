@@ -116,7 +116,7 @@ public func expectPrinted<T>(
   if !patterns.contains(actual) {
     expectationFailure(
       "expected: any of \(String(reflecting: patterns))\n"
-      + "actual: \(String(reflecting: actual))",
+      ++ "actual: \(String(reflecting: actual))",
       trace: ${trace})
   }
 }

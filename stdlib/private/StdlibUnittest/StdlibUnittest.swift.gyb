@@ -180,7 +180,7 @@ public func expectEqual(_ expected: ${Lhs}, _ actual: ${Rhs}, ${TRACE}) {
   if !(expected == actual) {
     expectationFailure(
       "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -210,7 +210,7 @@ public func expectEqualTest<T>(
   if !equal(expected, actual) {
     expectationFailure(
       "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -239,7 +239,7 @@ public func expectOptionalEqual<T>(
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -248,7 +248,7 @@ public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
   if expected != actual {
     expectationFailure(
       "expected: \"\(expected.debugDescription)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -282,7 +282,7 @@ public func expectOptionalEqual${Generic}(
   if (actual == nil) || expected != actual! {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -440,7 +440,7 @@ public struct AssertionResult : CustomStringConvertible {
 
   public func withDescription(_ description: String) -> AssertionResult {
     var result = self
-    result.description += description
+    result.description ++= description
     return result
   }
 
@@ -606,7 +606,7 @@ func _printDebuggingAdvice(_ fullTestName: String) {
         invocation.insert(interpreterCmd, at: 0)
     }
   }
-  print("$ \(invocation.joined(separator: " ")) " +
+  print("$ \(invocation.joined(separator: " ")) " ++
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
@@ -637,11 +637,11 @@ func _childProcess() {
     let maybeNSException =
         unsafeBitCast(exception, to: _StdlibUnittestNSException.self)
     if let name = maybeNSException.name {
-      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " ++
         "\(name): \(exception)",
         to: &stderr)
     } else {
-      print("*** [StdlibUnittest] Terminating due to uncaught exception: " +
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: " ++
         "\(exception)",
         to: &stderr)
     }
@@ -1021,8 +1021,8 @@ struct _ParentProcess {
         for testParameter in t.parameterValues {
           var testName = t.name
           if let testParameter = testParameter {
-            testName += "/"
-            testName += String(testParameter)
+            testName ++= "/"
+            testName ++= String(testParameter)
           }
           let fullTestName = "\(testSuite.name).\(testName)"
           if let filter = _filter,
@@ -1175,12 +1175,12 @@ public func runAllTests() {
       }
       if arg == "--help" {
         let message =
-"optional arguments:\n" +
-"--stdlib-unittest-in-process\n" +
-"                        run tests in-process without intercepting crashes.\n" +
-"                        Useful for running under a debugger.\n" +
-"--stdlib-unittest-filter FILTER-STRING\n" +
-"                        only run tests whose names contain FILTER-STRING as\n" +
+"optional arguments:\n" ++
+"--stdlib-unittest-in-process\n" ++
+"                        run tests in-process without intercepting crashes.\n" ++
+"                        Useful for running under a debugger.\n" ++
+"--stdlib-unittest-filter FILTER-STRING\n" ++
+"                        only run tests whose names contain FILTER-STRING as\n" ++
 "                        a substring."
         print(message)
         return
@@ -2060,8 +2060,8 @@ internal func _checkEquatableImpl<Instance : Equatable>(
         predictedXY, isEqualXY,
         (predictedXY
            ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+           : "expected not equal, found equal\n") ++
+        "lhs (at index \(i)): \(String(reflecting: x))\n" ++
         "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
@@ -2216,23 +2216,23 @@ public func checkComparable<Instances : Collection>(
 
     expectFalse(
       x < x,
-      "found 'x < x'\n" +
+      "found 'x < x'\n" ++
       "at index \(i): \(String(reflecting: x))",
       stackTrace: ${stackTrace})
 
     expectFalse(
       x > x,
-      "found 'x > x'\n" +
+      "found 'x > x'\n" ++
       "at index \(i): \(String(reflecting: x))",
       stackTrace: ${stackTrace})
 
     expectTrue(x <= x,
-      "found 'x <= x' to be false\n" +
+      "found 'x <= x' to be false\n" ++
       "at index \(i): \(String(reflecting: x))",
       stackTrace: ${stackTrace})
 
     expectTrue(x >= x,
-      "found 'x >= x' to be false\n" +
+      "found 'x >= x' to be false\n" ++
       "at index \(i): \(String(reflecting: x))",
       stackTrace: ${stackTrace})
 
@@ -2244,30 +2244,30 @@ public func checkComparable<Instances : Collection>(
       expectEqual(
         expected.flip(), oracle(j, i),
         "bad oracle: missing antisymmetry: "
-        + "(\(String(reflecting: i)), \(String(reflecting: j)))",
+        ++ "(\(String(reflecting: i)), \(String(reflecting: j)))",
         stackTrace: ${stackTrace})
 
       expectEqual(expected.isLT(), x < y,
-        "x < y\n" +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "x < y\n" ++
+        "lhs (at index \(i)): \(String(reflecting: x))\n" ++
         "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       expectEqual(expected.isLE(), x <= y,
-        "x <= y\n" +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "x <= y\n" ++
+        "lhs (at index \(i)): \(String(reflecting: x))\n" ++
         "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       expectEqual(expected.isGE(), x >= y,
-        "x >= y\n" +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "x >= y\n" ++
+        "lhs (at index \(i)): \(String(reflecting: x))\n" ++
         "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       expectEqual(expected.isGT(), x > y,
-        "x > y\n" +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "x > y\n" ++
+        "lhs (at index \(i)): \(String(reflecting: x))\n" ++
         "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
@@ -2277,8 +2277,8 @@ public func checkComparable<Instances : Collection>(
           expectEqual(
             expected, oracle(i, k),
             "bad oracle: missing transitivity "
-            + "(\(String(reflecting: i)), \(String(reflecting: j)), "
-            + "\(String(reflecting: k)))", stackTrace: ${stackTrace})
+            ++ "(\(String(reflecting: i)), \(String(reflecting: j)), "
+            ++ "\(String(reflecting: k)))", stackTrace: ${stackTrace})
         }
       }
     }
@@ -2393,7 +2393,7 @@ public func expectEqualSequence<
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -2443,13 +2443,13 @@ public func expectEqualsUnordered<T : Strideable>(
 ) where T.Stride: SignedInteger {
   if expected.count != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      ++ "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
   for e in actual {
     if !expected.contains(e) {
       expectationFailure("expected elements: \"\(expected)\"\n"
-        + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+        ++ "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
         trace: ${trace})
     }
   }
@@ -2543,7 +2543,7 @@ public func expectEqualUnicodeScalars(
   if !expected.elementsEqual(actualUnicodeScalars) {
     expectationFailure(
       "expected elements: \"\(asHex(expected))\"\n"
-      + "actual: \"\(asHex(actualUnicodeScalars))\"",
+      ++ "actual: \"\(asHex(actualUnicodeScalars))\"",
       trace: ${trace})
   }
 }

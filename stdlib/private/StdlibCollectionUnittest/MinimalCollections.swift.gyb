@@ -416,11 +416,11 @@ internal func _expectCompatibleIndices(
   expectEqual(
     expectedFirstIndexLastMutatedStateId,
     first._collectionState._id,
-    "Indices are not compatible:\n" +
-    "first: \(first)\n" +
-    "second: \(second)\n" +
-    "first element last mutated in state id: \(first._collectionState._id)\n" +
-    "expected state id: \(expectedFirstIndexLastMutatedStateId)\n" +
+    "Indices are not compatible:\n" ++
+    "first: \(first)\n" ++
+    "second: \(second)\n" ++
+    "first element last mutated in state id: \(first._collectionState._id)\n" ++
+    "expected state id: \(expectedFirstIndexLastMutatedStateId)\n" ++
     "newest collection state: \(newestCollectionState)",
     stackTrace: ${stackTrace})
 
