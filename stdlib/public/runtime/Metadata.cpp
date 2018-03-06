@@ -230,6 +230,13 @@ static GenericMetadataCache &unsafeGetInitializedCache(
 extern "C" void *_objc_empty_cache;
 #endif
 
+static void copyMetadataPattern(void **section,
+                                const GenericMetadataPartialPattern *pattern) {
+  memcpy(section + pattern->OffsetInWords,
+         pattern->Pattern.get(),
+         size_t(pattern->SizeInWords) * sizeof(void*));
+}
+
 static void
 initializeClassMetadataFromPattern(ClassMetadata *metadata,
                                    ClassMetadataBounds bounds,
@@ -241,8 +248,15 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   // Install the extra-data pattern.
   void **metadataExtraData =
     reinterpret_cast<void**>(rawMetadata) + bounds.PositiveSizeInWords;
-  memcpy(metadataExtraData, pattern->getExtraDataPattern(),
-         size_t(pattern->NumExtraDataWords) * sizeof(void*));
+  if (pattern->hasExtraDataPattern()) {
+    auto extraDataPattern = pattern->getExtraDataPattern();
+
+    // Zero memory up to the offset.
+    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+
+    // Copy the pattern into the rest of the extra data.
+    copyMetadataPattern(metadataExtraData, extraDataPattern);
+  }
 
   // Install the immediate members pattern:
   void **immediateMembers =
@@ -253,10 +267,9 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   memset(immediateMembers, 0, description->getImmediateMembersSize());
 
   // Copy the immediate-members pattern.
-  if (auto immediateSize = pattern->ImmediateMembersPattern_Size) {
-    memcpy(immediateMembers + pattern->ImmediateMembersPattern_TargetOffset,
-           pattern->getImmediateMembersPattern(),
-           size_t(immediateSize) * sizeof(void*));
+  if (pattern->hasImmediateMembersPattern()) {
+    auto immediateMembersPattern = pattern->getImmediateMembersPattern();
+    copyMetadataPattern(immediateMembers, immediateMembersPattern);
   }
 
   // Initialize the header:
@@ -352,7 +365,11 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
 
   // Augment that with any required extra data from the pattern.
   auto allocationBounds = bounds;
-  allocationBounds.PositiveSizeInWords += pattern->NumExtraDataWords;
+  if (pattern->hasExtraDataPattern()) {
+    auto extraDataPattern = pattern->getExtraDataPattern();
+    allocationBounds.PositiveSizeInWords +=
+      extraDataPattern->OffsetInWords + extraDataPattern->SizeInWords;
+  }
 
   auto entry = GenericCacheEntry::allocate(cache.getAllocator(),
                                            argumentsAsArray,
@@ -371,28 +388,74 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
+static void
+initializeValueMetadataFromPattern(ValueMetadata *metadata,
+                                   const ValueTypeDescriptor *description,
+                                   const GenericValueMetadataPattern *pattern) {
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
+
+  if (pattern->hasExtraDataPattern()) {
+    void **metadataExtraData =
+      reinterpret_cast<void**>(rawMetadata) + sizeof(ValueMetadata);
+    auto extraDataPattern = pattern->getExtraDataPattern();
+
+    // Zero memory up to the offset.
+    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+
+    // Copy the pattern into the rest of the extra data.
+    copyMetadataPattern(metadataExtraData, extraDataPattern);
+  }
+
+  // Put the VWT pattern in place as if it was the real VWT.
+  // The various initialization functions will instantiate this as
+  // necessary.
+  fullMetadata->setValueWitnesses(pattern->getValueWitnessesPattern());
+
+  // Set the metadata kind.
+  metadata->setKind(pattern->getMetadataKind());
+
+  // Set the type descriptor.
+  metadata->Description = description;
+}
+
 ValueMetadata *
 swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
-                                          const void *metadataTemplate,
-                                          size_t templateSize,
-                                          const void *arguments) {
+                                          const void *arguments,
+                                    const GenericValueMetadataPattern *pattern,
+                                          size_t extraDataSize) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   auto &generics = description->getFullGenericContextHeader();
+  auto &cache = unsafeGetInitializedCache(generics);
+
   size_t numGenericArguments = generics.Base.NumKeyArguments;
 
-  auto &cache = unsafeGetInitializedCache(generics);
-  char *bytes =
+  static_assert(sizeof(StructMetadata::HeaderType)
+                  == sizeof(ValueMetadata::HeaderType),
+                "struct metadata header unexpectedly has extra members");
+  static_assert(sizeof(StructMetadata) == sizeof(ValueMetadata),
+                "struct metadata unexpectedly has extra members");
+  static_assert(sizeof(EnumMetadata::HeaderType)
+                  == sizeof(ValueMetadata::HeaderType),
+                "enum metadata header unexpectedly has extra members");
+  static_assert(sizeof(EnumMetadata) == sizeof(ValueMetadata),
+                "enum metadata unexpectedly has extra members");
+
+  size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
+
+  auto entry =
     GenericCacheEntry::allocate(cache.getAllocator(),
                                 argumentsAsArray, numGenericArguments,
-                                templateSize)->getData<char>();
+                                totalSize);
 
-  // Copy in the metadata template.
-  memcpy(bytes, metadataTemplate, templateSize);
+  auto bytes = entry->getData<char>();
+  auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
+  auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
-  // Okay, move to the address point.
-  bytes += ValueTypeMetadataAddressPoint;
-  auto *metadata = reinterpret_cast<ValueMetadata*>(bytes);
-  
+  initializeValueMetadataFromPattern(metadata, description, pattern);
+
+  assert(GenericCacheEntry::getFromMetadata(metadata) == entry);
+
   return metadata;
 }
 
@@ -407,7 +470,13 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
   auto entry = getCache(generics).findOrAdd(genericArgs, numGenericArgs,
     [&]() -> GenericCacheEntry* {
       // Create new metadata to cache.
-      auto metadata = generics.InstantiationFunction(description, arguments);
+
+      // Find a pattern.  Currently we always use the default pattern.
+      auto pattern = generics.DefaultInstantiationPattern.get();
+
+      // Call the pattern's instantiation function.
+      auto metadata =
+        pattern->InstantiationFunction(description, arguments, pattern);
       auto entry = GenericCacheEntry::getFromMetadata(metadata);
       entry->Value = metadata;
       return entry;
