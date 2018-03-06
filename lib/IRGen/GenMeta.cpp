@@ -2061,6 +2061,7 @@ namespace {
           return emitFromTypeMetadata(type);
         }
         // Otherwise, this is a metatype that looks like a pointer.
+        LLVM_FALLTHROUGH;
       case MetatypeRepresentation::ObjC:
         // Thick metatypes look like pointers with spare bits.
         return emitFromValueWitnessTable(
