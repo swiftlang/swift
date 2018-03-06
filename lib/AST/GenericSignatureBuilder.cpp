@@ -4143,7 +4143,9 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // ... from the same module as the protocol.
         if (type->getModuleContext() != proto->getModuleContext()) continue;
 
-        // Or is constrained.
+        // Ignore types defined in constrained extensions; their equivalence
+        // to the associated type would have to be conditional, which we cannot
+        // model.
         if (auto ext = dyn_cast<ExtensionDecl>(type->getDeclContext())) {
           if (ext->isConstrainedExtension()) continue;
         }
