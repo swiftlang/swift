@@ -50,7 +50,8 @@ public:
     // EnumMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // Instantiation-specific.
+    // Everything after this is type-specific.
+    asImpl().noteStartOfTypeSpecificMembers();
 
     // Generic arguments.
     // This must always be the first piece of trailing data.
@@ -85,6 +86,7 @@ public:
     addPointer();
   }
   void addPayloadSize() { addPointer(); }
+  void noteStartOfTypeSpecificMembers() {}
 
 private:
   void addPointer() {

@@ -3380,7 +3380,14 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     return entry;
   }
 
-  llvm::Type *argTys[] = {TypeContextDescriptorPtrTy, Int8PtrPtrTy};
+  llvm::Type *argTys[] = {
+    /// Type descriptor.
+    TypeContextDescriptorPtrTy,
+    /// Generic arguments.
+    Int8PtrPtrTy,
+    /// Generic metadata pattern.
+    Int8PtrPtrTy
+  };
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
                                         argTys, /*isVarArg*/ false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);

@@ -27,10 +27,10 @@
 // CHECK-SAME:   i32 1,
 // -- field offset vector offset
 // CHECK-SAME:   i32 16,
-// -- instantiation function
-// CHECK-SAME:   @"$S13generic_types1ACMi"
 // -- instantiation cache
 // CHECK-SAME:   @"$S13generic_types1ACMI"
+// -- instantiation pattern
+// CHECK-SAME:   @"$S13generic_types1ACMP"
 // -- num generic params
 // CHECK-SAME:   i32 1,
 // -- num generic requirement
@@ -43,9 +43,12 @@
 // CHECK-SAME:   i8 -128,
 
 // CHECK-LABEL: @"$S13generic_types1ACMP" = internal constant
-// CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD",
+// -- instantiation function
+// CHECK-SAME:   @"$S13generic_types1ACMi"
+// -- heap destructor
+// CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD"
 // -- ivar destroyer
-// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i32 0,
 // -- flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
@@ -54,34 +57,46 @@
 
 // CHECK-LABEL: @"$S13generic_types1BCMn" = hidden constant
 // CHECK-SAME:   @"$S13generic_types1BCMa"
-// CHECK-SAME:   @"$S13generic_types1BCMi"
 // CHECK-SAME:   @"$S13generic_types1BCMI"
+// CHECK-SAME:   @"$S13generic_types1BCMP"
 
 // CHECK-LABEL: @"$S13generic_types1BCMP" = internal constant
-// CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD",
+// -- instantiation function
+// CHECK-SAME:   @"$S13generic_types1BCMi"
+// -- heap destructor
+// CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD"
 // -- ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 0,
+// -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S13generic_types1CCMP" = internal constant
-// CHECK-SAME:   void ([[C]]*)* @"$S13generic_types1CCfD",
+// -- instantiation function
+// CHECK-SAME:   @"$S13generic_types1CCMi"
+// -- heap destructor
+// CHECK-SAME:   void ([[C]]*)* @"$S13generic_types1CCfD"
 // -- ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 0,
+// -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
 // CHECK-LABEL: @"$S13generic_types1DCMP" = internal constant
-// CHECK-SAME:   void ([[D]]*)* @"$S13generic_types1DCfD",
+// -- instantiation function
+// CHECK-SAME:   @"$S13generic_types1DCMi"
+// -- heap destructor
+// CHECK-SAME:   void ([[D]]*)* @"$S13generic_types1DCfD"
 // -- ivar destroyer
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   i32 0,
+// -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}}* @"$S13generic_types1ACMP" to i8**))
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
@@ -89,10 +104,10 @@
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}}* @"$S13generic_types1BCMP" to i8**))
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
