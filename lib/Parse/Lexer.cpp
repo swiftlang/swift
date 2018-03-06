@@ -1739,8 +1739,9 @@ void Lexer::lexStringLiteral() {
 /// string literal, diagnose the problem and return a pointer to the end of the
 /// entire string literal.  This helps us avoid parsing the body of the string
 /// as program tokens, which will only lead to massive confusion.
-const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
-  
+const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
+                                                    bool EmitDiagnostics) {
+
   while (true) {
     // Don't bother with string interpolations.
     if (*Body == '\\' && *(Body + 1) == '(')
@@ -1752,7 +1753,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
 
     // Get the next character.
     const char *CharStart = Body;
-    unsigned CharValue = lexCharacter(Body, '\0', false);
+    unsigned CharValue = lexCharacter(Body, '\0', /*EmitDiagnostics=*/false);
     // If the character was incorrectly encoded, give up.
     if (CharValue == ~1U) return nullptr;
     
@@ -1764,8 +1765,11 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
     // If we found an ending curly quote (common since this thing started with
     // an opening curly quote) diagnose it with a fixit and then return.
     if (CharValue == 0x0000201D) {
-      diagnose(CharStart, diag::lex_invalid_curly_quote)
-        .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body), "\"");
+      if (EmitDiagnostics) {
+        diagnose(CharStart, diag::lex_invalid_curly_quote)
+            .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body),
+                               "\"");
+      }
       return Body;
     }
     
@@ -1862,6 +1866,79 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   
   // No end of conflict marker found.
   return false;
+}
+
+bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
+  const char *Tmp = CurPtr - 1;
+
+  if (advanceIfValidContinuationOfIdentifier(Tmp, BufferEnd)) {
+    // If this is a valid identifier continuation, but not a valid identifier
+    // start, attempt to recover by eating more continuation characters.
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_identifier_start_character);
+    }
+    while (advanceIfValidContinuationOfIdentifier(Tmp, BufferEnd))
+      ;
+    CurPtr = Tmp;
+    return true;
+  }
+
+  // This character isn't allowed in Swift source.
+  uint32_t Codepoint = validateUTF8CharacterAndAdvance(Tmp, BufferEnd);
+  if (Codepoint == ~0U) {
+    diagnose(CurPtr - 1, diag::lex_invalid_utf8)
+        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
+    CurPtr = Tmp;
+    return false; // Skip presumed whitespace.
+  } else if (Codepoint == 0x0000201D) {
+    // If this is an end curly quote, just diagnose it with a fixit hint.
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), "\"");
+    }
+    CurPtr = Tmp;
+    return true;
+  } else if (Codepoint == 0x0000201C) {
+    auto EndPtr = Tmp;
+    // If this is a start curly quote, do a fuzzy match of a string literal
+    // to improve recovery.
+    if (auto Tmp2 =
+            findEndOfCurlyQuoteStringLiteral(Tmp, EmitDiagnosticsIfToken))
+      Tmp = Tmp2;
+
+    // Note, we intentionally diagnose the end quote before the start quote,
+    // so that the IDE suggests fixing the end quote before the start quote.
+    // This, in turn, works better with our error recovery because we won't
+    // diagnose an end curly quote in the middle of a straight quoted
+    // literal.
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(EndPtr),
+                             "\"");
+    }
+    CurPtr = Tmp;
+    return true;
+  }
+
+  diagnose(CurPtr - 1, diag::lex_invalid_character)
+      .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
+
+  char ExpectedCodepoint;
+  if ((ExpectedCodepoint =
+           confusable::tryConvertConfusableCharacterToASCII(Codepoint))) {
+
+    llvm::SmallString<4> ConfusedChar;
+    EncodeToUTF8(Codepoint, ConfusedChar);
+    llvm::SmallString<1> ExpectedChar;
+    ExpectedChar += ExpectedCodepoint;
+    diagnose(CurPtr - 1, diag::lex_confusable_character, ConfusedChar,
+             ExpectedChar)
+        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp),
+                           ExpectedChar);
+  }
+
+  CurPtr = Tmp;
+  return false; // Skip presumed whitespace.
 }
 
 Lexer::NulCharacterKind Lexer::getNulCharacterKind(const char *Ptr) const {
@@ -2094,71 +2171,18 @@ Restart:
   
   switch ((signed char)*CurPtr++) {
   default: {
-    char const *tmp = CurPtr-1;
-    if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
+    char const *Tmp = CurPtr-1;
+    if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd))
       return lexIdentifier();
     
-    if (advanceIfValidStartOfOperator(tmp, BufferEnd))
+    if (advanceIfValidStartOfOperator(Tmp, BufferEnd))
       return lexOperatorIdentifier();
-    
-    if (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd)) {
-      // If this is a valid identifier continuation, but not a valid identifier
-      // start, attempt to recover by eating more continuation characters.
-      diagnose(CurPtr-1, diag::lex_invalid_identifier_start_character);
-      while (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd));
-    } else {
-      // This character isn't allowed in Swift source.
-      uint32_t codepoint = validateUTF8CharacterAndAdvance(tmp, BufferEnd);
-      if (codepoint == ~0U) {
-        diagnose(CurPtr-1, diag::lex_invalid_utf8)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
-        CurPtr = tmp;
-        goto Restart;  // Skip presumed whitespace.
-      } else if (codepoint == 0x0000201D) {
-        // If this is an end curly quote, just diagnose it with a fixit hint.
-        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
-      } else if (codepoint == 0x0000201C) {
-        auto endPtr = tmp;
-        // If this is a start curly quote, do a fuzzy match of a string literal
-        // to improve recovery.
-        if (auto tmp2 = findEndOfCurlyQuoteStringLiteral(tmp))
-          tmp = tmp2;
 
-        // Note, we intentionally diagnose the end quote before the start quote,
-        // so that the IDE suggests fixing the end quote before the start quote.
-        // This, in turn, works better with our error recovery because we won't
-        // diagnose an end curly quote in the middle of a straight quoted
-        // literal.
-        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(endPtr),"\"");
-
-      } else {
-        diagnose(CurPtr-1, diag::lex_invalid_character)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
-
-        char expectedCodepoint;
-        if ((expectedCodepoint =
-            confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
-
-          llvm::SmallString<4> confusedChar;
-          EncodeToUTF8(codepoint, confusedChar);
-          llvm::SmallString<1> expectedChar;
-          expectedChar += expectedCodepoint;
-          diagnose(CurPtr-1, diag::lex_confusable_character,
-                   confusedChar, expectedChar)
-            .fixItReplaceChars(getSourceLoc(CurPtr-1),
-                               getSourceLoc(tmp),
-                               expectedChar);
-        }
-
-        CurPtr = tmp;
-        goto Restart;  // Skip presumed whitespace.
-      }
+    bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/true);
+    if (ShouldTokenize) {
+      return formToken(tok::unknown, TokStart);
     }
-
-    CurPtr = tmp;
-    return formToken(tok::unknown, TokStart);
+    goto Restart; // Skip presumed whitespace.
   }
 
   case '\n':
@@ -2341,7 +2365,6 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
     if (IsForTrailingTrivia)
@@ -2433,8 +2456,46 @@ Restart:
       break;
     }
     break;
-  default:
+  // Start character of tokens.
+  case -1: case -2:
+  case '@': case '{': case '[': case '(': case '}': case ']': case ')':
+  case ',': case ';': case ':': case '\\': case '$':
+  case '0': case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
+  case '"': case '\'': case '`':
+  // Start of identifiers.
+  case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
+  case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
+  case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
+  case 'V': case 'W': case 'X': case 'Y': case 'Z':
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'v': case 'w': case 'x': case 'y': case 'z':
+  case '_':
+  // Start of operators.
+  case '%': case '!': case '?': case '=':
+  case '-': case '+': case '*':
+  case '&': case '|': case '^': case '~': case '.':
     break;
+  default:
+    const char *Tmp = CurPtr - 1;
+    if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd)) {
+      break;
+    }
+    if (advanceIfValidStartOfOperator(Tmp, BufferEnd)) {
+      break;
+    }
+
+    bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
+    if (ShouldTokenize) {
+      CurPtr = Tmp;
+      return;
+    }
+
+    size_t Length = CurPtr - TriviaStart;
+    Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+    goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
