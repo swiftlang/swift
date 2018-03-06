@@ -521,3 +521,20 @@ void SILBuilder::emitShallowDestructureAddressOperation(
               return P.createAddressProjection(*this, Loc, V).get();
             });
 }
+
+DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
+                                             SILDebugVariable Var) {
+  // Debug location overrides cannot apply to debug value instructions.
+  DebugLocOverrideRAII LocOverride{*this, None};
+  return insert(
+      DebugValueInst::create(getSILDebugLocation(Loc), src, getModule(), Var));
+}
+
+DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
+                                                     SILValue src,
+                                                     SILDebugVariable Var) {
+  // Debug location overrides cannot apply to debug addr instructions.
+  DebugLocOverrideRAII LocOverride{*this, None};
+  return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
+                                           getModule(), Var));
+}

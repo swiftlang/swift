@@ -129,9 +129,9 @@ func testSwitch() {
   var x:Int
   x = 0
   switch (switchfoo(), switchbar()) {
-  // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE+1]]
+  // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE-1]]
   case (1,2):
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-1]]:11
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-3]]:10
   // FIXME: Location info is missing.
   // CHECK: cond_br
   //
