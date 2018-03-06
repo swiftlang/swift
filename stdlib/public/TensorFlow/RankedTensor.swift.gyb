@@ -371,16 +371,16 @@ extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 
-  /// Creates an instance from the specified currency value and another,
-  /// structurally isomorphic instance.
+  /// Creates an instance by numerically broadcasting the specified currency
+  /// value to be structurally isomorphic to another instance.
   ///
   /// - Parameters:
   ///   - value: The differentiation currency value for initializing the
   ///     instance.
-  ///   - other: The other, structurally isomorphic instance.
+  ///   - other: The other structurally isomorphic instance.
   ///
   @_inlineable @inline(__always)
-  public init(_ value: Scalar, isomorphicTo other: ${TensorXD}) {
+  public init(numericallyBroadcasting value: Scalar, to other: ${TensorXD}) {
     self.init(handle: #tfop("Fill", other.shapeTensor, value))
   }
 }
