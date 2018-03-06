@@ -362,6 +362,8 @@ ERROR(expected_lbrace_class,PointsToFirstBadToken,
       "expected '{' in class", ())
 ERROR(expected_rbrace_class,none,
       "expected '}' in class", ())
+ERROR(expected_colon_class, PointsToFirstBadToken,
+      "expected ':' before inheritance identifier",())
 
 // Protocol
 ERROR(generic_arguments_protocol,PointsToFirstBadToken,

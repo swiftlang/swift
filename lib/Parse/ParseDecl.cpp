@@ -5656,7 +5656,18 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
     CD->setInherited(Context.AllocateCopy(Inherited));
-  }
+  
+  // Parse python style inheritance clause and replace parentheses with a colon
+  } else if (Tok.is(tok::l_paren)) {
+    SourceLoc LParenLoc = consumeToken();
+    if (Tok.is(tok::identifier) && peekToken().is(tok::r_paren)) {
+      consumeToken();
+      SourceLoc RParenLoc = consumeToken();
+      diagnose(LParenLoc, diag::expected_colon_class)
+        .fixItReplace(LParenLoc, ": ")
+        .fixItRemove(RParenLoc);
+    }
+  } 
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
