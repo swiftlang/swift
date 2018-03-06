@@ -5916,7 +5916,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::Differentiable:
-  case KnownProtocolKind::FloatingPoint:
     return SpecialProtocol::None;
   }
 
