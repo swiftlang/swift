@@ -2365,7 +2365,6 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
     if (IsForTrailingTrivia)
@@ -2457,8 +2456,46 @@ Restart:
       break;
     }
     break;
-  default:
+  // Start character of tokens.
+  case -1: case -2:
+  case '@': case '{': case '[': case '(': case '}': case ']': case ')':
+  case ',': case ';': case ':': case '\\': case '$':
+  case '0': case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
+  case '"': case '\'': case '`':
+  // Start of identifiers.
+  case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
+  case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
+  case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
+  case 'V': case 'W': case 'X': case 'Y': case 'Z':
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'v': case 'w': case 'x': case 'y': case 'z':
+  case '_':
+  // Start of operators.
+  case '%': case '!': case '?': case '=':
+  case '-': case '+': case '*':
+  case '&': case '|': case '^': case '~': case '.':
     break;
+  default:
+    const char *Tmp = CurPtr - 1;
+    if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd)) {
+      break;
+    }
+    if (advanceIfValidStartOfOperator(Tmp, BufferEnd)) {
+      break;
+    }
+
+    bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
+    if (ShouldTokenize) {
+      CurPtr = Tmp;
+      return;
+    }
+
+    size_t Length = CurPtr - TriviaStart;
+    Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+    goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
