@@ -2181,6 +2181,24 @@ extension Dictionary {
       _variantBuffer: _variantBuffer.mapValues(transform))
   }
 
+  /// Returns a new dictionary containing the keys of this dictionary with the
+  /// values transformed by the given closure .
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each value of the dictionary as its parameter and returns a
+  ///   transformed value of the same or of a different type.
+  /// - Returns: A dictionary containing the keys and transformed values of
+  ///   this dictionary.
+  @_inlineable // FIXME(sil-serialize-all)
+    public func compactMapValues<T>(
+      _ transform: (Value) throws -> T?
+    ) rethrows -> Dictionary<Key, T> {
+      return try self.reduce(into: [Key: T](), { (result, x) in
+        if let value = try transform(x.value) {
+          result[x.key] = value
+        }
+    })
+  }
+
   /// Updates the value stored in the dictionary for the given key, or adds a
   /// new key-value pair if the key does not exist.
   ///
