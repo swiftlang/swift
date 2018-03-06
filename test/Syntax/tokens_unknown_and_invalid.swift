@@ -82,11 +82,11 @@ jjj
 // CHECK-LABEL: 52:3
 // CHECK-NEXT:  (Token identifier
 // CHECK-NEXT:   (trivia newline 1)
-// CHECK-NEXT:   (trivia garbage_text \302)
+// CHECK-NEXT:   (trivia garbageText \302)
 // CHECK-NEXT:   (trivia space 1)
 // CHECK-NEXT:   (text="bbb")
 // CHECK-NEXT:   (trivia space 1)
-// CHECK-NEXT:   (trivia garbage_text \302))
+// CHECK-NEXT:   (trivia garbageText \302))
 
 // Checks around ccc
 // CHECK-LABEL: 54:5
@@ -120,8 +120,8 @@ jjj
 // CHECK-LABEL: 65:5
 // CHECK-NEXT:  (Token identifier
 // CHECK-NEXT:   (trivia newline 1)
-// CHECK-NEXT:   (trivia garbage_text \341\232\200)
+// CHECK-NEXT:   (trivia garbageText \341\232\200)
 // CHECK-NEXT:   (trivia space 1)
 // CHECK-NEXT:   (text="iii")
 // CHECK-NEXT:   (trivia space 1)
-// CHECK-NEXT:   (trivia garbage_text \341\232\200))
+// CHECK-NEXT:   (trivia garbageText \341\232\200))
