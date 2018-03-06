@@ -33,6 +33,9 @@ enum {
   /// The number of words (pointers) in a value buffer.
   NumWords_ValueBuffer = 3,
 
+  /// The number of words in a metadata completion context.
+  NumWords_MetadataCompletionContext = 4,
+
   /// The number of words in a yield-once coroutine buffer.
   NumWords_YieldOnceBuffer = 4,
 
