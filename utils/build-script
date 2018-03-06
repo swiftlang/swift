@@ -20,6 +20,8 @@ import time
 
 from build_swift import defaults
 from build_swift import driver_arguments
+from build_swift import presets
+from build_swift.migration import migrate_swift_sdks
 
 from swift_build_support.swift_build_support import (
     arguments,
@@ -32,16 +34,12 @@ from swift_build_support.swift_build_support import (
     targets,
     workspace
 )
-
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
-    get_all_preset_names,
-    get_preset_options,
 )
-
 from swift_build_support.swift_build_support.cmake import CMake
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -484,6 +482,7 @@ class BuildScriptInvocation(object):
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
+            "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
@@ -977,15 +976,25 @@ def main_preset():
 
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
-            os.path.join(HOME, ".swift-build-presets"),
             os.path.join(
                 SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils",
                 "build-presets.ini")
         ]
 
+        user_presets_file = os.path.join(HOME, '.swift-build-presets')
+        if os.path.isfile(user_presets_file):
+            args.preset_file_names.append(user_presets_file)
+
+    preset_parser = presets.PresetParser()
+
+    try:
+        preset_parser.read(args.preset_file_names)
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
+
     if args.show_presets:
-        for name in sorted(get_all_preset_names(args.preset_file_names),
-                           key=str.lower):
+        for name in sorted(preset_parser.preset_names(),
+                           key=lambda name: name.lower()):
             print(name)
         return 0
 
@@ -993,26 +1002,30 @@ def main_preset():
         diagnostics.fatal("missing --preset option")
 
     args.preset_substitutions = {}
-
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
 
-    preset_args = get_preset_options(
-        args.preset_substitutions, args.preset_file_names, args.preset)
+    try:
+        preset = preset_parser.get_preset(args.preset,
+                                          vars=args.preset_substitutions)
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
+
+    preset_args = migrate_swift_sdks(preset.format_args())
 
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
+
     build_script_args += preset_args
     if args.distcc:
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
 
-    diagnostics.note(
-        "using preset '" + args.preset + "', which expands to \n\n" +
-        shell.quote_command(build_script_args) + "\n")
+    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+        args.preset, shell.quote_command(build_script_args)))
 
     if args.expand_build_script_invocation:
         return 0

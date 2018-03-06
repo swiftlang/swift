@@ -32,10 +32,13 @@ extern "C" {
 // in the system library, so we use 'swift_addr_t'.
 typedef uint64_t swift_addr_t;
 
+typedef void (*FreeBytesFunction)(void *reader_context, const void *bytes, void *context);
+
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
 typedef uint8_t (*SizeSizeFunction)(void *reader_context);
-typedef int (*ReadBytesFunction)(void *reader_context, swift_addr_t address,
-                                 void *dest, uint64_t size);
+typedef const void *(*ReadBytesFunction)(void *reader_context, swift_addr_t address,
+                                         uint64_t size,
+                                         void **outFreeContext);
 typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
                                             swift_addr_t address);
 typedef swift_addr_t (*GetSymbolAddressFunction)(void *reader_context,
@@ -53,6 +56,9 @@ typedef struct MemoryReaderImpl {
   /// Get the size in bytes of the target's size type.
   SizeSizeFunction getSizeSize;
 
+  /// Free memory returned from readBytes. May be NULL if memory never needs to be freed.
+  FreeBytesFunction free;
+
   // FIXME: -Wdocumentation complains about \param and \returns on function pointers.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -60,9 +66,12 @@ typedef struct MemoryReaderImpl {
   /// Read a sequence of bytes at an address in the target.
   ///
   /// \param address the address in the target address space
-  /// \param dest the caller-owned buffer into which to store the string
   /// \param size the number of bytes to read
-  /// \returns true if the read was successful
+  /// \param outFreeContext on return, an arbitrary context pointer that the caller will
+  ///                       pass to the free function
+  /// \returns A pointer to the requested memory, or NULL if the memory could not be read.
+  ///          The caller must invoke the free function on the returned pointer once it's
+  ///          done using the memory.
   ReadBytesFunction readBytes;
 
   /// Get the string length at the given address.

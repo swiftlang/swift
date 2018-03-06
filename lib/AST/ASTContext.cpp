@@ -2515,7 +2515,7 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // Note: This should be treated as a lookup for intra-module dependency
     // purposes, but a subclass already depends on its superclasses and any
     // extensions for many other reasons.
-    auto selector = method->getObjCSelector(nullptr);
+    auto selector = method->getObjCSelector();
     AbstractFunctionDecl *overriddenMethod
       = lookupObjCMethodInType(classDecl->getSuperclass(),
                                selector,
@@ -3376,9 +3376,10 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   return compTy;
 }
 
-ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
+ReferenceStorageType *ReferenceStorageType::get(Type T,
+                                                ReferenceOwnership ownership,
                                                 const ASTContext &C) {
-  assert(ownership != Ownership::Strong &&
+  assert(ownership != ReferenceOwnership::Strong &&
          "ReferenceStorageType is unnecessary for strong ownership");
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
   auto properties = T->getRecursiveProperties();
@@ -3390,16 +3391,17 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
 
 
   switch (ownership) {
-  case Ownership::Strong: llvm_unreachable("not possible");
-  case Ownership::Unowned:
+  case ReferenceOwnership::Strong:
+    llvm_unreachable("not possible");
+  case ReferenceOwnership::Unowned:
     return entry = new (C, arena) UnownedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     assert(T->getOptionalObjectType() &&
            "object of weak storage type is not optional");
     return entry = new (C, arena)
                WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Unmanaged:
     return entry = new (C, arena) UnmanagedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
   }
@@ -3564,9 +3566,10 @@ void AnyFunctionType::decomposeInput(
       
   default:
 //    assert(type->is<InOutType>() && "Found naked inout type");
-    result.push_back(AnyFunctionType::Param(type->getInOutObjectType(),
-                                            Identifier(),
-                                            ParameterTypeFlags::fromParameterType(type, false, false)));
+    result.push_back(
+        AnyFunctionType::Param(type->getInOutObjectType(), Identifier(),
+                               ParameterTypeFlags::fromParameterType(
+                                   type, false, ValueOwnership::Default)));
     return;
   }
 }

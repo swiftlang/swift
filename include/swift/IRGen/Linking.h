@@ -90,9 +90,8 @@ class LinkEntity {
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
-    // These fields appear in the TypeMetadata kind.
+    // This field appears in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
-    IsPatternShift = 10, IsPatternMask = 0x0400,
 
     // This field appears in associated type access functions.
     AssociatedTypeIndexShift = 8, AssociatedTypeIndexMask = ~KindMask,
@@ -140,9 +139,25 @@ class LinkEntity {
     /// The pointer is a ClassDecl*.
     ClassMetadataBaseOffset,
 
+    /// The property descriptor for a public property or subscript.
+    /// The pointer is an AbstractStorageDecl*.
+    PropertyDescriptor,
+
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
+
+    /// The metadata pattern for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataPattern,
+
+    /// The instantiation cache for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInstantiationCache,
+
+    /// The instantiation function for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInstantiationFunction,
 
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
@@ -440,20 +455,36 @@ public:
   }
 
   static LinkEntity forTypeMetadata(CanType concreteType,
-                                    TypeMetadataAddress addr,
-                                    bool isPattern) {
+                                    TypeMetadataAddress addr) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
-                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr))
-                | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
+                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataPattern(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataPattern, decl);
     return entity;
   }
 
   static LinkEntity forTypeMetadataAccessFunction(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataAccessFunction, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInstantiationCache(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInstantiationCache, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
     return entity;
   }
 
@@ -478,6 +509,12 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
   }
 
@@ -716,15 +753,8 @@ public:
     assert(getKind() == Kind::TypeMetadata);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
-  bool isMetadataPattern() const {
-    assert(getKind() == Kind::TypeMetadata);
-    return LINKENTITY_GET_FIELD(Data, IsPattern);
-  }
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
-  }
-  bool isObjCClassRef() const {
-    return getKind() == Kind::ObjCClassRef;
   }
 
   /// Determine whether this entity will be weak-imported.

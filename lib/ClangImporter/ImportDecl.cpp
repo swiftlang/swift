@@ -2054,7 +2054,8 @@ applyPropertyOwnership(VarDecl *prop,
     return;
   }
   if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
-    prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Weak));
+    prop->getAttrs().add(new (ctx)
+                             ReferenceOwnershipAttr(ReferenceOwnership::Weak));
     prop->setType(WeakStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
@@ -2062,7 +2063,8 @@ applyPropertyOwnership(VarDecl *prop,
   }
   if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
       (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
-    prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Unmanaged));
+    prop->getAttrs().add(
+        new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
     prop->setType(UnmanagedStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(UnmanagedStorageType::get(
         prop->getInterfaceType(), ctx));
@@ -4735,7 +4737,7 @@ namespace {
           !isa<clang::ObjCProtocolDecl>(redecl->getDeclContext()))
         original->setImplicit(false);
 
-      if (!original->getAttrs().hasAttribute<OwnershipAttr>() &&
+      if (!original->getAttrs().hasAttribute<ReferenceOwnershipAttr>() &&
           !original->getAttrs().hasAttribute<NSCopyingAttr>()) {
         applyPropertyOwnership(original,
                                redecl->getPropertyAttributesAsWritten());

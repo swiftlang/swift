@@ -21,6 +21,7 @@
 
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/FlagSet.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
@@ -981,19 +982,74 @@ public:
 
 /// Flags for nominal type context descriptors. These values are used as the
 /// kindSpecificFlags of the ContextDescriptorFlags for the type.
-enum class TypeContextDescriptorFlags: uint16_t {
-  /// Set if the context descriptor is includes metadata for dynamically
-  /// constructing a class's vtables at metadata instantiation time.
-  HasVTable = 0x8000u,
-  
-  /// Set if the context descriptor is for a class with resilient ancestry.
-  HasResilientSuperclass = 0x4000u,
-  
-  /// Set if the type represents an imported C tag type.
-  IsCTag = 0x2000u,
-  
-  /// Set if the type represents an imported C typedef type.
-  IsCTypedef = 0x1000u,
+class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    // All of these values are bit offsets or widths.
+    // Generic flags build upwards from 0.
+    // Type-specific flags build downwards from 15.
+
+    /// Set if the type represents an imported C tag type.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsCTag = 0,
+
+    /// Set if the type represents an imported C typedef type.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsCTypedef = 1,
+
+    /// Set if the type supports reflection.  C and Objective-C enums
+    /// currently don't.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    IsReflectable = 2,
+
+    /// Set if the context descriptor is includes metadata for dynamically
+    /// constructing a class's vtables at metadata instantiation time.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasVTable = 15,
+
+    /// Set if the context descriptor is for a class with resilient ancestry.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasResilientSuperclass = 14,
+
+    /// The kind of reference that this class makes to its superclass
+    /// descriptor.  A TypeMetadataRecordKind.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_SuperclassReferenceKind = 12,
+    Class_SuperclassReferenceKind_width = 2,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 11,
+  };
+
+public:
+  explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr TypeContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
+                                class_hasVTable,
+                                class_setHasVTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
+                                class_hasResilientSuperclass,
+                                class_setHasResilientSuperclass)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
+                                class_areImmediateMembersNegative,
+                                class_setAreImmediateMembersNegative)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
+                                 Class_SuperclassReferenceKind_width,
+                                 TypeMetadataRecordKind,
+                                 class_getSuperclassReferenceKind,
+                                 class_setSuperclassReferenceKind)
 };
 
 enum class GenericParamKind : uint8_t {
@@ -1119,6 +1175,47 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+/// Flags used by generic metadata patterns.
+class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
+  enum {
+    // All of these values are bit offsets or widths.
+    // General flags build up from 0.
+    // Kind-specific flags build down from 31.
+
+    /// Does this pattern have an extra-data pattern?
+    HasExtraDataPattern = 0,
+
+    // Class-specific flags.
+
+    /// Does this pattern have an immediate-members pattern?
+    Class_HasImmediateMembersPattern = 31,
+
+    // Value-specific flags.
+
+    /// For value metadata: the metadata kind of the type.
+    Value_MetadataKind = 21,
+    Value_MetadataKind_width = 11,
+  };
+
+public:
+  explicit GenericMetadataPatternFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr GenericMetadataPatternFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasImmediateMembersPattern,
+                                class_hasImmediateMembersPattern,
+                                class_setHasImmediateMembersPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
+                                hasExtraDataPattern,
+                                setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
+                                 Value_MetadataKind_width,
+                                 MetadataKind,
+                                 value_getMetadataKind,
+                                 value_setMetadataKind)
 };
 
 } // end namespace swift

@@ -1403,6 +1403,11 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Buffer << "Mn";
 }
 
+void Remangler::manglePropertyDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MV";
+}
+
 void Remangler::mangleNonObjCAttribute(Node *node) {
   Buffer << "TO";
 }
@@ -1695,6 +1700,16 @@ void Remangler::mangleTypeMetadata(Node *node) {
 void Remangler::mangleTypeMetadataAccessFunction(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Ma";
+}
+
+void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MI";
+}
+
+void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mi";
 }
 
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {

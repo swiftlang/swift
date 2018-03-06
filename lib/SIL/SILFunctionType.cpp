@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
@@ -592,36 +593,43 @@ private:
 
     assert(numEltTypes > 0);
 
-    // If we don't have 'self', we don't need to do anything special.
-    if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
-      CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
-                                                 /*canonicalVararg*/true)
-                      ->getCanonicalType();
+    auto handleParameter = [&](AbstractionPattern pattern,
+                               ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
       // materializable -- if it doesn't contain an l-value type -- then it's
       // a valid target for substitution and we should not expand it.
-      if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
-        auto flags = (params.size() == 1)
-                   ? params.front().getParameterFlags()
-                   : ParameterTypeFlags();
-        if (flags.isShared()) {
-          visitSharedType(origType, ty, extInfo.getSILRepresentation());
+      auto silExtInfo = extInfo.getSILRepresentation();
+      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+        if (paramFlags.isShared()) {
+          visitSharedType(pattern, ty, silExtInfo);
         } else {
-          visit(origType, ty);
+          visit(pattern, ty);
         }
         return;
       }
 
       for (auto i : indices(tty.getElementTypes())) {
-        if (tty->getElement(i).getParameterFlags().isShared()) {
-          visitSharedType(origType.getTupleElementType(i),
-                          tty.getElementType(i),
-                          extInfo.getSILRepresentation());
+        auto patternEltTy = pattern.getTupleElementType(i);
+        auto trueEltTy = tty.getElementType(i);
+        auto flags = tty->getElement(i).getParameterFlags();
+        if (flags.isShared()) {
+          visitSharedType(patternEltTy, trueEltTy, silExtInfo);
         } else {
-          visit(origType.getTupleElementType(i), tty.getElementType(i));
+          visit(patternEltTy, trueEltTy);
         }
       }
+    };
+
+    // If we don't have 'self', we don't need to do anything special.
+    if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
+      CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
+                                                 /*canonicalVararg*/true)
+                      ->getCanonicalType();
+      auto flags = (params.size() == 1) ? params.front().getParameterFlags()
+                                        : ParameterTypeFlags();
+
+      handleParameter(origType, flags, ty);
       return;
     }
 
@@ -629,25 +637,11 @@ private:
 
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {
-      CanType ty =  params[i].getType();
-      CanTupleType tty = dyn_cast<TupleType>(ty);
+      CanType ty = params[i].getType();
       AbstractionPattern eltPattern = origType.getTupleElementType(i);
-      // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-        if (params[i].isShared()) {
-          visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
-        } else {
-          visit(eltPattern, ty);
-        }
-        continue;
-      }
+      auto flags = params[i].getParameterFlags();
 
-      assert(eltPattern.isTuple());
-      for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
-        visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
-      }
+      handleParameter(eltPattern, flags, ty);
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1249,6 +1243,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   case SILFunctionType::Representation::WitnessMethod: {
     switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DefaultInitializerConventions(), ForeignInfo(),
                                 constant, witnessMethodConformance);
@@ -1271,7 +1266,6 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 getNormalArgumentConvention(M), ForeignInfo(),
                                 constant, witnessMethodConformance);
@@ -1723,19 +1717,12 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  /// Does the given selector start with the given string as a
-  /// prefix, in the sense of the selector naming conventions?
-  auto hasPrefix = [](StringRef text, StringRef prefix) {
-    if (!text.startswith(prefix)) return false;
-    if (text.size() == prefix.size()) return true;
-    assert(text.size() > prefix.size());
-    return !clang::isLowercase(text[prefix.size()]);
-  };
+  StringRef firstWord = camel_case::getFirstWord(text);
 
   auto result = SelectorFamily::None;
   if (false) /*for #define purposes*/;
 #define CHECK_PREFIX(LABEL, PREFIX) \
-  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
+  else if (firstWord == PREFIX) result = SelectorFamily::LABEL;
   FOREACH_FAMILY(CHECK_PREFIX)
 #undef CHECK_PREFIX
 
@@ -1744,61 +1731,49 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   return result;
 }
 
-/// Get the ObjC selector family a SILDeclRef implicitly belongs to.
+/// Get the ObjC selector family a foreign SILDeclRef belongs to.
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
+  assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor)
-      return getSelectorFamily(FD->getName());
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsGetter:
-      // Getter selectors can belong to families if their name begins with the
-      // wrong thing.
-      if (accessor->getStorage()->isObjC() || c.isForeign) {
-        auto declName = accessor->getStorage()->getBaseName();
-        switch (declName.getKind()) {
-        case DeclBaseName::Kind::Normal:
-          return getSelectorFamily(declName.getIdentifier());
-        case DeclBaseName::Kind::Subscript:
-          return SelectorFamily::None;
-        case DeclBaseName::Kind::Destructor:
-          return SelectorFamily::None;
-        }
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+        break;
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::IsMaterializeForSet:
+        llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
-      return SelectorFamily::None;
-
-      // Other accessors are never selector family members.
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
-      return SelectorFamily::None;
     }
+
+    return getSelectorFamily(FD->getObjCSelector().getSelectorPieces().front());
   }
   case SILDeclRef::Kind::Initializer:
-    case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
 
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::IVarDestroyer:
+    return SelectorFamily::None;
+
+  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return SelectorFamily::None;
+    llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");

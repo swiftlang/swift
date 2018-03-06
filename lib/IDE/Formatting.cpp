@@ -843,6 +843,9 @@ public:
     auto AddIndentFunc = [&] () {
       auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
                                       : FmtOptions.IndentWidth;
+      // We don't need to add additional indentation if Width is zero.
+      if (!Width)
+        return;
       // Increment indent.
       ExpandedIndent += Width;
       // Normalize indent to align on proper column indent width.
@@ -982,6 +985,15 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
                                                        CodeFormatOptions Options,
                                                        SourceManager &SM,
                                                        SourceFile &SF) {
+  // Sanitize 0-width tab
+  if (Options.UseTabs && !Options.TabWidth) {
+    // If IndentWidth is specified, use it as the tab width.
+    if (Options.IndentWidth)
+      Options.TabWidth = Options.IndentWidth;
+    // Otherwise, use the default value,
+    else
+      Options.TabWidth = 4;
+  }
   FormatWalker walker(SF, SM);
   auto SourceBufferID = SF.getBufferID().getValue();
   StringRef Text = SM.getLLVMSourceMgr()

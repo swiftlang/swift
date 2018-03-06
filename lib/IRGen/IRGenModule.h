@@ -97,6 +97,7 @@ namespace swift {
   class SourceLoc;
   class SourceFile;
   class Type;
+  enum class TypeMetadataRecordKind : unsigned;
 
 namespace Lowering {
   class TypeConverter;
@@ -162,6 +163,11 @@ public:
   bool hasFlags() const { return Info.getInt() != 0; }
 };
 
+enum RequireMetadata_t : bool {
+  DontRequireMetadata = false,
+  RequireMetadata = true
+};
+
 /// The principal singleton which manages all of IR generation.
 ///
 /// The IRGenerator delegates the emission of different top-level entities
@@ -190,23 +196,34 @@ private:
   // The current IGM for which IR is generated.
   IRGenModule *CurrentIGM = nullptr;
 
-  /// The set of type metadata that is not emitted eagerly.
-  llvm::SmallPtrSet<NominalTypeDecl*, 4> eligibleLazyMetadata;
+  struct LazyTypeGlobalsInfo {
+    /// Is there a use of the type metadata?
+    bool IsMetadataUsed = false;
 
-  /// The set of type metadata that have been enqueue for lazy emission.
+    /// Is there a use of the nominal type descriptor?
+    bool IsDescriptorUsed = false;
+
+    /// Have we already emitted a definition for the type metadata with
+    /// the current requirements?
+    bool IsMetadataEmitted = false;
+
+    /// Have we already emitted a definition for the type descriptor with
+    /// the current requirements?
+    bool IsDescriptorEmitted = false;
+
+    /// Is the type a lazy type?
+    bool IsLazy = false;
+  };
+
+  /// The set of type metadata that have been enqueued for lazy emission.
   ///
   /// It can also contain some eagerly emitted metadata. Those are ignored in
   /// lazy emission.
-  llvm::SmallPtrSet<NominalTypeDecl*, 4> scheduledLazyMetadata;
-
-  /// The set of type metadata that have been enqueue for lazy emission.
-  ///
-  /// It can also contain some eagerly emitted metadata. Those are ignored in
-  /// lazy emission.
-  llvm::SmallPtrSet<NominalTypeDecl*, 4> scheduledLazyTypeContextDescriptors;
+  llvm::DenseMap<NominalTypeDecl*, LazyTypeGlobalsInfo> LazyTypeGlobals;
 
   /// The queue of lazy type metadata to emit.
-  llvm::SmallVector<NominalTypeDecl*, 4> LazyMetadata;
+  llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeMetadata;
+
   /// The queue of lazy type context descriptors to emit.
   llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeContextDescriptors;
 
@@ -326,34 +343,21 @@ public:
       DefaultIGMForFunction[f] = CurrentIGM;
     }
   }
-  
-  void addLazyTypeMetadata(NominalTypeDecl *Nominal) {
-    // Add it to the queue if it hasn't already been put there.
-    if (scheduledLazyMetadata.insert(Nominal).second) {
-      LazyMetadata.push_back(Nominal);
-      
-      // We don't need to emit only the type context descriptor anymore if we
-      // forced the metadata.
-      if (!scheduledLazyTypeContextDescriptors.insert(Nominal).second) {
-        auto newEnd = std::remove(LazyTypeContextDescriptors.begin(),
-                                  LazyTypeContextDescriptors.end(),
-                                  Nominal);
-        LazyTypeContextDescriptors.erase(newEnd,
-                                         LazyTypeContextDescriptors.end());
-      }
-    }
-  }
-  
-  void addLazyTypeContextDescriptor(NominalTypeDecl *Nominal) {
-    // Emitting the metadata will already include the nominal type descriptor.
-    if (scheduledLazyMetadata.count(Nominal))
-      return;
 
-    // Add it to the queue if it hasn't already been put there.
-    if (scheduledLazyTypeContextDescriptors.insert(Nominal).second) {
-      LazyTypeContextDescriptors.push_back(Nominal);
-    }
+  void noteUseOfTypeMetadata(NominalTypeDecl *type) {
+    noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
+
+  void noteUseOfTypeContextDescriptor(NominalTypeDecl *type,
+                                      RequireMetadata_t requireMetadata) {
+    noteUseOfTypeGlobals(type, false, requireMetadata);
+  }
+
+private:
+  void noteUseOfTypeGlobals(NominalTypeDecl *type,
+                            bool isUseOfMetadata,
+                            RequireMetadata_t requireMetadata);
+public:
 
   /// Return true if \p wt can be emitted lazily.
   bool canEmitWitnessTableLazily(SILWitnessTable *wt);
@@ -408,6 +412,18 @@ public:
   explicit operator bool() const {
     return ValueAndIsIndirect.getPointer() != nullptr;
   }
+};
+
+/// A reference to a declared type entity.
+class TypeEntityReference {
+  TypeMetadataRecordKind Kind;
+  llvm::Constant *Value;
+public:
+  TypeEntityReference(TypeMetadataRecordKind kind, llvm::Constant *value)
+    : Kind(kind), Value(value) {}
+
+  TypeMetadataRecordKind getKind() const { return Kind; }
+  llvm::Constant *getValue() const { return Value; }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -506,8 +522,6 @@ public:
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
   llvm::PointerType *FullBoxMetadataPtrTy;/// %swift.full_boxmetadata*
-  llvm::StructType *TypeMetadataPatternStructTy;/// %swift.type_pattern = type { ... }
-  llvm::PointerType *TypeMetadataPatternPtrTy;/// %swift.type_pattern*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
@@ -543,7 +557,6 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
-  llvm::StructType *WitnessTableSliceTy;     /// { witness_table**, i64 }
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -575,6 +588,18 @@ public:
   }
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
+  }
+
+  /// Return the offset, relative to the address point, of the start of the
+  /// type-specific members of an enum metadata.
+  Size getOffsetOfEnumTypeSpecificMetadataMembers() {
+    return getPointerSize() * 2;
+  }
+
+  /// Return the offset, relative to the address point, of the start of the
+  /// type-specific members of a struct metadata.
+  Size getOffsetOfStructTypeSpecificMetadataMembers() {
+    return getPointerSize() * 2;
   }
 
   Size::int_type getOffsetInWords(Size offset) {
@@ -875,7 +900,7 @@ private:
   /// List of protocol conformances to generate records for.
   SmallVector<const NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
-  SmallVector<CanType, 4> RuntimeResolvableTypes;
+  SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -1035,11 +1060,9 @@ public:
   ///
   /// The \p SF is the source file for which the llvm module is generated when
   /// doing multi-threaded whole-module compilation. Otherwise it is null.
-  IRGenModule(IRGenerator &irgen,
-              std::unique_ptr<llvm::TargetMachine> &&target,
+  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
-              StringRef ModuleName,
-              StringRef OutputFilename,
+              StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo);
   ~IRGenModule();
 
@@ -1111,9 +1134,20 @@ public:
                                   ConstantInitFuture init,
                                   llvm::StringRef section = {});
 
-  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
-  ConstantReference getAddrOfTypeMetadata(CanType concreteType, bool isPattern,
+  TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
+
+  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
+  ConstantReference getAddrOfTypeMetadata(CanType concreteType,
                                           SymbolReferenceKind kind);
+  llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
+  llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
+                                               bool isConstant,
+                                               ConstantInit init,
+                                               StringRef section);
+  llvm::Function *getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
+                                             ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
+                                             ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
@@ -1127,9 +1161,10 @@ public:
   /// Determine whether the given type requires foreign type metadata.
   bool requiresForeignTypeMetadata(CanType type);
 
-  llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
-                                                 ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
+                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
+                                      RequireMetadata_t requireMetadata,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfAnonymousContextDescriptor(DeclContext *DC,
                                       ConstantInit definition = ConstantInit());
@@ -1145,6 +1180,8 @@ public:
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
                                   const NormalProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfPropertyDescriptor(AbstractStorageDecl *D,
+                                      ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
@@ -1240,7 +1277,7 @@ private:
                                         SymbolReferenceKind refKind);
 
   void emitLazyPrivateDefinitions();
-  void addRuntimeResolvableType(CanType type);
+  void addRuntimeResolvableType(NominalTypeDecl *nominal);
 
   /// Add all conformances of \p Nominal to LazyWitnessTables.
   void addLazyConformances(NominalTypeDecl *Nominal);

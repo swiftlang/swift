@@ -791,38 +791,39 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
+// Metadata *swift_getGenericMetadata(TypeContextDescriptor *type,
 //                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+// Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
 //                                              const void * const *arguments,
-//                                              objc_class *superclass,
-//                                              size_t numImmediateMembers);
+//                                              const void * const *template);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
-//                                              const void * const *arguments);
+// Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
+//                                              const void * const *arguments,
+//                                              const void * const *template,
+//                                              size_t extraSize);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,
-//                              void * const *instantiationArgs);
+//                              void ** const *instantiationArgs);
 FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
               TypeMetadataPtrTy,
-              Int8PtrPtrTy),
+              WitnessTablePtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);

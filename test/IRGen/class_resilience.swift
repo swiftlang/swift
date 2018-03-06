@@ -16,9 +16,11 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
-// CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}global [[INT]] 0
+// CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
 
-// CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}constant [[INT]] {{52|80}}
+// CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
+// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
 // CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd" = hidden constant [[INT]] {{8|16}}
 // CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|20}}
@@ -28,9 +30,11 @@
 
 // CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [15 x i8] c"ResilientChild\00"
 
+// CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[BOUNDS]] zeroinitializer
+
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
-// --       flags: class, unique, has vtable, has resilient superclass
-// CHECK-SAME:   <i32 0xC000_0050>
+// --       flags: class, unique, reflectable, has vtable, has resilient superclass
+// CHECK-SAME:   <i32 0xD004_0050>
 // --       name:
 // CHECK-SAME:   [15 x i8]* [[RESILIENTCHILD_NAME]]
 // --       num fields
@@ -39,17 +43,23 @@
 // CHECK-SAME:   i32 3,
 // CHECK-SAME: }>
 
-// CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[INT]] 0
+// CHECK: @"$S16class_resilience16FixedLayoutChildCMo" = {{(protected )?}}global [[BOUNDS]] zeroinitializer
 
-// CHECK: @"$S16class_resilience16FixedLayoutChildCMo" = {{(protected )?}}global [[INT]] 0
+// CHECK: @"$S16class_resilience17MyResilientParentCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
+// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
-// CHECK: @"$S16class_resilience17MyResilientParentCMo" = {{(protected )?}}constant [[INT]] {{52|80}}
+// CHECK: @"$S16class_resilience16MyResilientChildCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK-SAME-32: { [[INT]] 60, i32 2, i32 15 }
+// CHECK-SAME-64: { [[INT]] 96, i32 2, i32 12 }
 
-// CHECK: @"$S16class_resilience16MyResilientChildCMo" = {{(protected )?}}constant [[INT]] {{60|96}}
+// CHECK: @"$S16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
+// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
-// CHECK: @"$S16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}constant [[INT]] {{52|80}}
-
-// CHECK: @"$S16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}constant [[INT]] {{64|104}}
+// CHECK: @"$S16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
+// CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
 
 import resilient_class
 import resilient_struct
@@ -273,7 +283,7 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds %T16class_resilience21ResilientGenericChildC, %T16class_resilience21ResilientGenericChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience21ResilientGenericChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{16|32}}
 // CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to i8*
 // CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_ADDR]], [[INT]] [[METADATA_OFFSET]]
@@ -305,7 +315,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T15resilient_class29ResilientGenericOutsideParentC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class29ResilientGenericOutsideParentCMo"
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class29ResilientGenericOutsideParentCMo", i32 0, i32 0)
 // CHECK-NEXT: [[GENERIC_PARAM_OFFSET:%.*]] = add [[INT]] [[BASE]], 0
 // CHECK-NEXT: [[ISA_TMP:%.*]] = bitcast %swift.type* [[ISA]] to i8*
 // CHECK-NEXT: [[GENERIC_PARAM_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_TMP]], [[INT]] [[GENERIC_PARAM_OFFSET]]
@@ -352,39 +362,21 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-LABEL: define private void @initialize_metadata_ResilientChild(i8*)
 
-// Get the superclass size and address point...
-
-// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
-// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
-// CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
-// CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
-// CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
-
-// CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
-
-// Initialize class metadata base offset...
-// CHECK-32:           store [[INT]] [[OFFSET]], [[INT]]* @"$S16class_resilience14ResilientChildCMo"
-
-// CHECK-64:           [[OFFSET_ZEXT:%.*]] = zext i32 [[OFFSET]] to i64
-// CHECK-64:           store [[INT]] [[OFFSET_ZEXT]], [[INT]]* @"$S16class_resilience14ResilientChildCMo"
-
 // Initialize the superclass field...
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
 
 // Relocate metadata if necessary...
 // CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
 
 // Initialize field offset vector...
-// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience14ResilientChildCMo"
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
 // CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{12|24}}
 
 // CHECK:              call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
 
 // Initialize constructor vtable override...
-// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{16|32}}
 // CHECK:              [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:              [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
@@ -392,7 +384,7 @@ extension ResilientGenericOutsideParent {
 // CHECK:              store i8* bitcast (%T16class_resilience14ResilientChildC* (%T16class_resilience14ResilientChildC*)* @"$S16class_resilience14ResilientChildCACycfc" to i8*), i8** [[VTABLE_ENTRY_TMP]]
 
 // Initialize getValue() vtable override...
-// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S15resilient_class22ResilientOutsideParentCMo"
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
 // CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{28|56}}
 // CHECK:              [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:              [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
@@ -410,7 +402,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself)
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience14ResilientChildCMo"
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
 // CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[BASE]]
 // CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to i32 (%T16class_resilience14ResilientChildC*)**
@@ -423,7 +415,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %1, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience14ResilientChildCMo"
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
 // CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
 // CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[METADATA_OFFSET]]
@@ -437,26 +429,8 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-LABEL: define private void @initialize_metadata_FixedLayoutChild(i8*)
 
-// Get the superclass size and address point...
-
-// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
-// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
-// CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
-// CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
-// CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
-
-// CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
-
-// Initialize class metadata base offset...
-// CHECK-32:           store [[INT]] [[OFFSET]], [[INT]]* @"$S16class_resilience16FixedLayoutChildCMo"
-
-// CHECK-64:           [[OFFSET_ZEXT:%.*]] = zext i32 [[OFFSET]] to i64
-// CHECK-64:           store [[INT]] [[OFFSET_ZEXT]], [[INT]]* @"$S16class_resilience16FixedLayoutChildCMo"
-
 // Initialize the superclass field...
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
 
 // Relocate metadata if necessary...
@@ -467,27 +441,18 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericChild metadata initialization function
 
-// CHECK-LABEL: define private %swift.type* @create_generic_metadata_ResilientGenericChild(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8**)
 
 // Get the superclass size and address point...
 
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+
+// Initialize the superclass pointer...
 // CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentCMa"(%swift.type* %T)
-// CHECK:              [[SUPER_TMP:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
-// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %objc_class* [[SUPER_TMP]] to i8*
-// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
-// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
-// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
-// CHECK:              [[ADDRESS_POINT_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{40|60}}
-// CHECK:              [[ADDRESS_POINT_ADDR:%.*]] = bitcast i8* [[ADDRESS_POINT_TMP]] to i32*
-// CHECK:              [[ADDRESS_POINT:%.*]] = load i32, i32* [[ADDRESS_POINT_ADDR]]
+// CHECK:              [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:              [[SUPER_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_ADDR]],
 
-// CHECK:              [[OFFSET:%.*]] = sub i32 [[SIZE]], [[ADDRESS_POINT]]
+// CHECK:              call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]],
 
-// Initialize class metadata base offset...
-// CHECK-32:           store [[INT]] [[OFFSET]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
-
-// CHECK-64:           [[OFFSET_ZEXT:%.*]] = zext i32 [[OFFSET]] to i64
-// CHECK-64:           store [[INT]] [[OFFSET_ZEXT]], [[INT]]* @"$S16class_resilience21ResilientGenericChildCMo"
-
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 5)
 // CHECK:              ret %swift.type* [[METADATA]]

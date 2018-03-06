@@ -530,6 +530,8 @@ ERROR(expected_sil_instr_opcode,none,
       "expected SIL instruction opcode", ())
 ERROR(expected_tok_in_sil_instr,none,
       "expected '%0' in SIL instruction", (StringRef))
+ERROR(sil_property_generic_signature_mismatch,none,
+      "sil_property generic signature must match original declaration", ())
 ERROR(sil_string_no_encoding,none,
       "string_literal instruction requires an encoding", ())
 ERROR(sil_string_invalid_encoding,none,
@@ -1521,7 +1523,7 @@ WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
-      "plaform condition appears to be testing for simulator environment; "
+      "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",
       ())
 

@@ -53,8 +53,12 @@ public:
     return mangleTypeSymbol(type, "Mf");
   }
 
-  std::string mangleTypeMetadataFull(Type type, bool isPattern) {
-    return mangleTypeSymbol(type, isPattern ? "MP" : "N");
+  std::string mangleTypeMetadataFull(Type type) {
+    return mangleTypeSymbol(type, "N");
+  }
+
+  std::string mangleTypeMetadataPattern(const NominalTypeDecl *decl) {
+    return mangleNominalTypeSymbol(decl, "MP");
   }
 
   std::string mangleClassMetaClass(const ClassDecl *Decl) {
@@ -67,6 +71,15 @@ public:
 
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
+  }
+
+  std::string mangleTypeMetadataInstantiationCache(const NominalTypeDecl *Decl){
+    return mangleNominalTypeSymbol(Decl, "MI");
+  }
+
+  std::string mangleTypeMetadataInstantiationFunction(
+                                                  const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mi");
   }
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
@@ -109,6 +122,13 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
     appendOperator("Mc");
+    return finalize();
+  }
+  
+  std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
+    beginMangling();
+    appendEntity(storage);
+    appendOperator("MV");
     return finalize();
   }
 

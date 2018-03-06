@@ -804,7 +804,10 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
-    return getBestImportKind(type->getAnyNominal());
+    auto *nominal = type->getAnyNominal();
+    if (!nominal)
+      return ImportKind::Type;
+    return getBestImportKind(nominal);
   }
 
   case DeclKind::Accessor:
@@ -1174,7 +1177,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
   // Look through most attributes.
   if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     // Weak ownership implies optionality.
-    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
+    if (attributed->getAttrs().getOwnership() == ReferenceOwnership::Weak)
       return true;
 
     return isDefaultInitializable(attributed->getTypeRepr());
@@ -3905,8 +3908,8 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
   return None;
 }
 
-ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
-               LazyResolver *resolver, Identifier preferredName) const {
+ObjCSelector
+AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
@@ -3917,7 +3920,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind(resolver)) {
+    switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
@@ -3937,8 +3940,8 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
   return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
 
-ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
-               LazyResolver *resolver, Identifier preferredName) const {
+ObjCSelector
+AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -3950,7 +3953,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // Subscripts use a specific selector.
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind(resolver)) {
+    switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
 
@@ -4413,8 +4416,8 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
 }
 
 ParameterTypeFlags ParamDecl::getParameterFlags() const {
-  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(), isShared())
-            .withInOut(isInOut());
+  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(),
+                                               getValueOwnership());
 }
 
 /// Return the full source range of this parameter.
@@ -4551,8 +4554,7 @@ Type SubscriptDecl::getElementInterfaceType() const {
   return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
-ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
-                    LazyResolver *resolver) const {
+ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   auto indexTy = getIndicesInterfaceType();
 
   // Look through a named 1-tuple.
@@ -4738,8 +4740,8 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   return getNameLoc();
 }
 
-ObjCSelector AbstractFunctionDecl::getObjCSelector(
-               LazyResolver *resolver, DeclName preferredName) const {
+ObjCSelector
+AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
   // If there is an @objc attribute with a name, use that name.
   auto *objc = getAttrs().getAttribute<ObjCAttr>();
   if (auto name = getNameFromObjcAttribute(objc, preferredName)) {
@@ -4777,9 +4779,9 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
     // For a getter or setter, go through the variable or subscript decl.
     auto asd = accessor->getStorage();
     if (accessor->isGetter())
-      return asd->getObjCGetterSelector(resolver, baseName);
+      return asd->getObjCGetterSelector(baseName);
     if (accessor->isSetter())
-      return asd->getObjCSetterSelector(resolver, baseName);
+      return asd->getObjCSetterSelector(baseName);
   }
 
   // If this is a zero-parameter initializer with a long selector

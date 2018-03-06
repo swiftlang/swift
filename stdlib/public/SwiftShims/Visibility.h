@@ -72,19 +72,37 @@
 // SWIFT_RUNTIME_EXPORT on the library it's exported from.
 
 /// Attribute used to export symbols from the runtime.
-#if defined(__MACH__) || defined(__ELF__)
+#if defined(__MACH__)
+
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
 
-#else  // FIXME: this #else should be some sort of #elif Windows
+#elif defined(__ELF__)
+
+// We make assumptions that the runtime and standard library can refer to each
+// other's symbols as DSO-local, which means we can't allow the dynamic linker
+// to relocate these symbols. We must give them protected visibility while
+// building the standard library and runtime.
+# if defined(swiftCore_EXPORTS)
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("protected")))
+# else
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
+# endif
+
+// FIXME: this #else should be some sort of #elif Windows
+#else // !__MACH__ && !__ELF__
+
 # if defined(__CYGWIN__)
 #  define SWIFT_EXPORT_ATTRIBUTE
 # else
+
 #  if defined(swiftCore_EXPORTS)
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllexport)
 #  else
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllimport)
 #  endif
+
 # endif
+
 #endif
 
 #if defined(__cplusplus)

@@ -873,8 +873,7 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer name = popNode();
     NodePointer result = createNode(Node::Kind::RelatedEntityDeclName,
                                     StringRef(&relatedEntityKind, 1));
-    result->addChild(name, *this);
-    return result;
+    return addChild(result, name);
   }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
@@ -1438,6 +1437,10 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'a':
       return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'I':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
+    case 'i':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1464,6 +1467,9 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
     }
+    case 'V':
+      return createWithChild(Node::Kind::PropertyDescriptor,
+                             popNode(isEntity));
     case 'X':
       return demanglePrivateContextDescriptor();
     default:
@@ -2243,9 +2249,9 @@ NodePointer Demangler::demangleSpecialType() {
       auto name = popNode(Node::Kind::Identifier);
       auto parent = popContext();
       auto anon = createNode(Node::Kind::AnonymousContext);
-      anon->addChild(name, *this);
-      anon->addChild(parent, *this);
-      anon->addChild(types, *this);
+      anon = addChild(anon, name);
+      anon = addChild(anon, parent);
+      anon = addChild(anon, types);
       return anon;
     }
     case 'e':

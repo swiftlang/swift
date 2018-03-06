@@ -70,6 +70,7 @@ public:
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
   bool parseSILCoverageMap(Parser &P) override;
+  bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
 };
 } // end namespace swift
@@ -373,7 +374,12 @@ namespace {
     bool parseSILFunctionRef(SILLocation InstLoc, SILFunction *&ResultFn);
 
     bool parseSILBasicBlock(SILBuilder &B);
-    
+    bool parseKeyPathPatternComponent(KeyPathPatternComponent &component,
+                                      SmallVectorImpl<SILType> &operandTypes,
+                                      SourceLoc componentLoc,
+                                      Identifier componentKind,
+                                      SILLocation InstLoc,
+                                      GenericEnvironment *patternEnv);
     bool isStartOfSILInstruction();
 
     bool parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
@@ -879,6 +885,7 @@ void SILParser::convertRequirements(SILFunction *F,
 
 static bool parseDeclSILOptional(bool *isTransparent,
                                  IsSerialized_t *isSerialized,
+                                 bool *isCanonical,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
@@ -903,6 +910,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isSerialized = IsSerialized;
     else if (isSerialized && SP.P.Tok.getText() == "serializable")
       *isSerialized = IsSerializable;
+    else if (isCanonical && SP.P.Tok.getText() == "canonical")
+      *isCanonical = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
@@ -927,6 +936,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *MRK = EffectsKind::ReadOnly;
     else if (MRK && SP.P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
+    else if (MRK && SP.P.Tok.getText() == "releasenone")
+      *MRK = EffectsKind::ReleaseNone;
     else if (Semantics && SP.P.Tok.getText() == "_semantics") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
@@ -1825,6 +1836,300 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   return false;
 }
 
+bool
+SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
+                                        SmallVectorImpl<SILType> &operandTypes,
+                                        SourceLoc componentLoc,
+                                        Identifier componentKind,
+                                        SILLocation InstLoc,
+                                        GenericEnvironment *patternEnv) {
+   auto parseComponentIndices =
+     [&](SmallVectorImpl<KeyPathPatternComponent::Index> &indexes) -> bool {
+       while (true) {
+         unsigned index;
+         CanType formalTy;
+         SILType loweredTy;
+         if (P.parseToken(tok::oper_prefix,
+                          diag::expected_tok_in_sil_instr, "%")
+             || P.parseToken(tok::sil_dollar,
+                             diag::expected_tok_in_sil_instr, "$"))
+           return true;
+         
+         if (!P.Tok.is(tok::integer_literal)
+             || P.Tok.getText().getAsInteger(0, index))
+           return true;
+         
+         P.consumeToken(tok::integer_literal);
+         
+         SourceLoc formalTyLoc;
+         SourceLoc loweredTyLoc;
+         GenericEnvironment *ignoredParsedEnv;
+         if (P.parseToken(tok::colon,
+                          diag::expected_tok_in_sil_instr, ":")
+             || P.parseToken(tok::sil_dollar,
+                             diag::expected_tok_in_sil_instr, "$")
+             || parseASTType(formalTy, formalTyLoc, patternEnv)
+             || P.parseToken(tok::colon,
+                             diag::expected_tok_in_sil_instr, ":")
+             || parseSILType(loweredTy, loweredTyLoc,
+                             ignoredParsedEnv, patternEnv))
+           return true;
+         
+         if (patternEnv)
+           loweredTy = SILType::getPrimitiveType(
+             loweredTy.getSwiftRValueType()->mapTypeOutOfContext()
+               ->getCanonicalType(),
+             loweredTy.getCategory());
+
+         // Formal type must be hashable.
+         auto proto = P.Context.getProtocol(KnownProtocolKind::Hashable);
+         Type contextFormalTy = formalTy;
+         if (patternEnv)
+           contextFormalTy = patternEnv->mapTypeIntoContext(formalTy);
+         auto lookup = P.SF.getParentModule()->lookupConformance(
+                                                 contextFormalTy, proto);
+         if (!lookup) {
+           P.diagnose(formalTyLoc,
+                      diag::sil_keypath_index_not_hashable,
+                      formalTy);
+           return true;
+         }
+         auto conformance = ProtocolConformanceRef(*lookup);
+         
+         indexes.push_back({index, formalTy, loweredTy, conformance});
+         
+         if (operandTypes.size() <= index)
+           operandTypes.resize(index+1);
+         if (operandTypes[index] && operandTypes[index] != loweredTy) {
+           P.diagnose(loweredTyLoc,
+                      diag::sil_keypath_index_operand_type_conflict,
+                      index,
+                      operandTypes[index].getSwiftRValueType(),
+                      loweredTy.getSwiftRValueType());
+           return true;
+         }
+         operandTypes[index] = loweredTy;
+         
+         if (P.consumeIf(tok::comma))
+           continue;
+         if (P.consumeIf(tok::r_square))
+           break;
+         return true;
+       }
+       return false;
+     };
+  
+  if (componentKind.str() == "stored_property") {
+    ValueDecl *prop;
+    CanType ty;
+    if (parseSILDottedPath(prop)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar,
+                        diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+    component =
+      KeyPathPatternComponent::forStoredProperty(cast<VarDecl>(prop), ty);
+    return false;
+  } else if (componentKind.str() == "external") {
+    ValueDecl *externalDecl;
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+    SmallVector<Substitution, 4> subs;
+    SmallVector<KeyPathPatternComponent::Index, 4> indexes;
+    CanType ty;
+
+    if (parseSILDottedPath(externalDecl)
+        || parseSubstitutions(parsedSubs, patternEnv))
+      return true;
+
+    if (P.consumeIf(tok::l_square)) {
+      if (parseComponentIndices(indexes))
+        return true;
+    }
+    
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar,
+                        diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+    
+    if (!parsedSubs.empty()) {
+      auto genericEnv = externalDecl->getInnermostDeclContext()
+                                    ->getGenericEnvironmentOfContext();
+      if (!genericEnv) {
+        P.diagnose(P.Tok,
+                   diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      if (getApplySubstitutionsFromParsed(*this, genericEnv,
+                                          parsedSubs, subs))
+        return true;
+      
+      // Map the substitutions out of the pattern context so that they
+      // use interface types.
+      auto subsMap = genericEnv->getGenericSignature()
+        ->getSubstitutionMap(subs);
+      subsMap = subsMap.mapReplacementTypesOutOfContext();
+      subs.clear();
+      genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
+      
+      for (auto &sub : subs)
+        sub = sub.getCanonicalSubstitution();
+    }
+    
+    auto indexesCopy = P.Context.AllocateCopy(indexes);
+    auto subsCopy = P.Context.AllocateCopy(subs);
+    
+    component = KeyPathPatternComponent::forExternal(
+        cast<AbstractStorageDecl>(externalDecl),
+        subsCopy, indexesCopy, ty);
+    return false;
+  } else if (componentKind.str() == "gettable_property"
+             || componentKind.str() == "settable_property") {
+    bool isSettable = componentKind.str()[0] == 's';
+    
+    CanType componentTy;
+    if (P.parseToken(tok::sil_dollar,diag::expected_tok_in_sil_instr,"$")
+        || parseASTType(componentTy, patternEnv)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+    
+    SILFunction *idFn = nullptr;
+    SILDeclRef idDecl;
+    VarDecl *idProperty = nullptr;
+    SILFunction *getter = nullptr;
+    SILFunction *setter = nullptr;
+    SILFunction *equals = nullptr;
+    SILFunction *hash = nullptr;
+    SmallVector<KeyPathPatternComponent::Index, 4> indexes;
+    while (true) {
+      Identifier subKind;
+      SourceLoc subKindLoc;
+      if (parseSILIdentifier(subKind, subKindLoc,
+                             diag::sil_keypath_expected_component_kind))
+        return true;
+
+      if (subKind.str() == "id") {
+        // The identifier can be either a function ref, a SILDeclRef
+        // to a class or protocol method, or a decl ref to a property:
+        // @static_fn_ref : $...
+        // #Type.method!whatever : (T) -> ...
+        // ##Type.property
+        if (P.Tok.is(tok::at_sign)) {
+          if (parseSILFunctionRef(InstLoc, idFn))
+            return true;
+        } else if (P.Tok.is(tok::pound)) {
+          if (P.peekToken().is(tok::pound)) {
+            ValueDecl *propertyValueDecl;
+            P.consumeToken(tok::pound);
+            if (parseSILDottedPath(propertyValueDecl))
+              return true;
+            idProperty = cast<VarDecl>(propertyValueDecl);
+          } else if (parseSILDeclRef(idDecl, /*fnType*/ true))
+            return true;
+        } else {
+          P.diagnose(subKindLoc, diag::expected_tok_in_sil_instr, "# or @");
+          return true;
+        }
+      } else if (subKind.str() == "getter" || subKind.str() == "setter") {
+        bool isSetter = subKind.str()[0] == 's';
+        if (parseSILFunctionRef(InstLoc, isSetter ? setter : getter))
+          return true;
+      } else if (subKind.str() == "indices") {
+        if (P.parseToken(tok::l_square,
+                         diag::expected_tok_in_sil_instr, "[")
+            || parseComponentIndices(indexes))
+          return true;
+      } else if (subKind.str() == "indices_equals") {
+        if (parseSILFunctionRef(InstLoc, equals))
+          return true;
+      } else if (subKind.str() == "indices_hash") {
+        if (parseSILFunctionRef(InstLoc, hash))
+          return true;
+      } else {
+        P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
+                   subKind);
+        return true;
+      }
+      
+      if (!P.consumeIf(tok::comma))
+        break;
+    }
+    
+    if ((idFn == nullptr && idDecl.isNull() && idProperty == nullptr)
+        || getter == nullptr
+        || (isSettable && setter == nullptr)) {
+      P.diagnose(componentLoc,
+                 diag::sil_keypath_computed_property_missing_part,
+                 isSettable);
+      return true;
+    }
+    
+    if ((idFn != nullptr) + (!idDecl.isNull()) + (idProperty != nullptr)
+          != 1) {
+      P.diagnose(componentLoc,
+                 diag::sil_keypath_computed_property_missing_part,
+                 isSettable);
+      return true;
+    }
+    
+    KeyPathPatternComponent::ComputedPropertyId id;
+    if (idFn)
+      id = idFn;
+    else if (!idDecl.isNull())
+      id = idDecl;
+    else if (idProperty)
+      id = idProperty;
+    else
+      llvm_unreachable("no id?!");
+    
+    auto indexesCopy = P.Context.AllocateCopy(indexes);
+    
+    if (!indexes.empty() && (!equals || !hash)) {
+      P.diagnose(componentLoc,
+                 diag::sil_keypath_computed_property_missing_part,
+                 isSettable);
+    }
+    
+    if (isSettable) {
+      component = KeyPathPatternComponent::forComputedSettableProperty(
+                             id, getter, setter,
+                             indexesCopy, equals, hash, componentTy);
+    } else {
+      component = KeyPathPatternComponent::forComputedGettableProperty(
+                             id, getter,
+                             indexesCopy, equals, hash, componentTy);
+    }
+    return false;
+  } else if (componentKind.str() == "optional_wrap"
+               || componentKind.str() == "optional_chain"
+               || componentKind.str() == "optional_force") {
+    CanType ty;
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+    KeyPathPatternComponent::Kind kind;
+    
+    if (componentKind.str() == "optional_wrap") {
+      kind = KeyPathPatternComponent::Kind::OptionalWrap;
+    } else if (componentKind.str() == "optional_chain") {
+      kind = KeyPathPatternComponent::Kind::OptionalChain;
+    } else if (componentKind.str() == "optional_force") {
+      kind = KeyPathPatternComponent::Kind::OptionalForce;
+    } else {
+      llvm_unreachable("unpossible");
+    }
+    
+    component = KeyPathPatternComponent::forOptional(kind, ty);
+    return false;
+  } else {
+    P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
+               componentKind);
+    return true;
+  }
+}
+
 /// sil-instruction-result ::= sil-value-name '='
 /// sil-instruction-result ::= '(' sil-value-name? ')'
 /// sil-instruction-result ::= '(' sil-value-name (',' sil-value-name)* ')'
@@ -2505,81 +2810,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
         return true;
       
-      auto parseComponentIndices =
-        [&](SmallVectorImpl<KeyPathPatternComponent::Index> &indexes) -> bool {
-          while (true) {
-            unsigned index;
-            CanType formalTy;
-            SILType loweredTy;
-            if (P.parseToken(tok::oper_prefix,
-                             diag::expected_tok_in_sil_instr, "%")
-                || P.parseToken(tok::sil_dollar,
-                                diag::expected_tok_in_sil_instr, "$"))
-              return true;
-            
-            if (!P.Tok.is(tok::integer_literal)
-                || P.Tok.getText().getAsInteger(0, index))
-              return true;
-            
-            P.consumeToken(tok::integer_literal);
-            
-            SourceLoc formalTyLoc;
-            SourceLoc loweredTyLoc;
-            GenericEnvironment *ignoredParsedEnv;
-            if (P.parseToken(tok::colon,
-                             diag::expected_tok_in_sil_instr, ":")
-                || P.parseToken(tok::sil_dollar,
-                                diag::expected_tok_in_sil_instr, "$")
-                || parseASTType(formalTy, formalTyLoc, patternEnv)
-                || P.parseToken(tok::colon,
-                                diag::expected_tok_in_sil_instr, ":")
-                || parseSILType(loweredTy, loweredTyLoc,
-                                ignoredParsedEnv, patternEnv))
-              return true;
-            
-            if (patternEnv)
-              loweredTy = SILType::getPrimitiveType(
-                loweredTy.getSwiftRValueType()->mapTypeOutOfContext()
-                  ->getCanonicalType(),
-                loweredTy.getCategory());
-
-            // Formal type must be hashable.
-            auto proto = P.Context.getProtocol(KnownProtocolKind::Hashable);
-            Type contextFormalTy = formalTy;
-            if (patternEnv)
-              contextFormalTy = patternEnv->mapTypeIntoContext(formalTy);
-            auto lookup = P.SF.getParentModule()->lookupConformance(
-                                                    contextFormalTy, proto);
-            if (!lookup) {
-              P.diagnose(formalTyLoc,
-                         diag::sil_keypath_index_not_hashable,
-                         formalTy);
-              return true;
-            }
-            auto conformance = ProtocolConformanceRef(*lookup);
-            
-            indexes.push_back({index, formalTy, loweredTy, conformance});
-            
-            operandTypes.resize(index+1);
-            if (operandTypes[index] && operandTypes[index] != loweredTy) {
-              P.diagnose(loweredTyLoc,
-                         diag::sil_keypath_index_operand_type_conflict,
-                         index,
-                         operandTypes[index].getSwiftRValueType(),
-                         loweredTy.getSwiftRValueType());
-              return true;
-            }
-            operandTypes[index] = loweredTy;
-            
-            if (P.consumeIf(tok::comma))
-              continue;
-            if (P.consumeIf(tok::r_square))
-              break;
-            return true;
-          }
-          return false;
-        };
-      
       while (true) {
         Identifier componentKind;
         SourceLoc componentLoc;
@@ -2587,6 +2817,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                diag::sil_keypath_expected_component_kind))
           return true;
 
+        
         if (componentKind.str() == "root") {
           if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
               || parseASTType(rootType, patternEnv))
@@ -2602,213 +2833,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
             P.Context.AllocateCopy<char>(objcStringValue.begin(),
                                          objcStringValue.end()),
             objcStringValue.size());
-        } else if (componentKind.str() == "stored_property") {
-          ValueDecl *prop;
-          CanType ty;
-          if (parseSILDottedPath(prop)
-              || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-              || P.parseToken(tok::sil_dollar,
-                              diag::expected_tok_in_sil_instr, "$")
-              || parseASTType(ty, patternEnv))
-            return true;
-          components.push_back(
-            KeyPathPatternComponent::forStoredProperty(cast<VarDecl>(prop), ty));
-        } else if (componentKind.str() == "external") {
-          ValueDecl *externalDecl;
-          SmallVector<ParsedSubstitution, 4> parsedSubs;
-          SmallVector<Substitution, 4> subs;
-          SmallVector<KeyPathPatternComponent::Index, 4> indexes;
-          CanType ty;
-
-          if (parseSILDottedPath(externalDecl)
-              || parseSubstitutions(parsedSubs, patternEnv))
-            return true;
-
-          if (P.consumeIf(tok::l_square)) {
-            if (parseComponentIndices(indexes))
-              return true;
-          }
-          
-          if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-              || P.parseToken(tok::sil_dollar,
-                              diag::expected_tok_in_sil_instr, "$")
-              || parseASTType(ty, patternEnv))
-            return true;
-          
-          if (!parsedSubs.empty()) {
-            auto genericEnv = externalDecl->getInnermostDeclContext()
-                                          ->getGenericEnvironmentOfContext();
-            if (!genericEnv) {
-              P.diagnose(P.Tok,
-                         diag::sil_substitutions_on_non_polymorphic_type);
-              return true;
-            }
-            if (getApplySubstitutionsFromParsed(*this, genericEnv,
-                                                parsedSubs, subs))
-              return true;
-            
-            // Map the substitutions out of the pattern context so that they
-            // use interface types.
-            auto subsMap = genericEnv->getGenericSignature()
-              ->getSubstitutionMap(subs);
-            subsMap = subsMap.mapReplacementTypesOutOfContext();
-            subs.clear();
-            genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
-            
-            for (auto &sub : subs)
-              sub = sub.getCanonicalSubstitution();
-          }
-          
-          auto indexesCopy = P.Context.AllocateCopy(indexes);
-          auto subsCopy = P.Context.AllocateCopy(subs);
-          
-          components.push_back(
-            KeyPathPatternComponent::forExternal(
-              cast<AbstractStorageDecl>(externalDecl),
-              subsCopy, indexesCopy, ty));
-        } else if (componentKind.str() == "gettable_property"
-                   || componentKind.str() == "settable_property") {
-          bool isSettable = componentKind.str()[0] == 's';
-          
-          CanType componentTy;
-          if (P.parseToken(tok::sil_dollar,diag::expected_tok_in_sil_instr,"$")
-              || parseASTType(componentTy, patternEnv)
-              || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-            return true;
-          
-          SILFunction *idFn = nullptr;
-          SILDeclRef idDecl;
-          VarDecl *idProperty = nullptr;
-          SILFunction *getter = nullptr;
-          SILFunction *setter = nullptr;
-          SILFunction *equals = nullptr;
-          SILFunction *hash = nullptr;
-          SmallVector<KeyPathPatternComponent::Index, 4> indexes;
-          while (true) {
-            Identifier subKind;
-            SourceLoc subKindLoc;
-            if (parseSILIdentifier(subKind, subKindLoc,
-                                   diag::sil_keypath_expected_component_kind))
-              return true;
-
-            if (subKind.str() == "id") {
-              // The identifier can be either a function ref, a SILDeclRef
-              // to a class or protocol method, or a decl ref to a property:
-              // @static_fn_ref : $...
-              // #Type.method!whatever : (T) -> ...
-              // ##Type.property
-              if (P.Tok.is(tok::at_sign)) {
-                if (parseSILFunctionRef(InstLoc, idFn))
-                  return true;
-              } else if (P.Tok.is(tok::pound)) {
-                if (P.peekToken().is(tok::pound)) {
-                  ValueDecl *propertyValueDecl;
-                  P.consumeToken(tok::pound);
-                  if (parseSILDottedPath(propertyValueDecl))
-                    return true;
-                  idProperty = cast<VarDecl>(propertyValueDecl);
-                } else if (parseSILDeclRef(idDecl, /*fnType*/ true))
-                  return true;
-              } else {
-                P.diagnose(subKindLoc, diag::expected_tok_in_sil_instr, "# or @");
-                return true;
-              }
-            } else if (subKind.str() == "getter" || subKind.str() == "setter") {
-              bool isSetter = subKind.str()[0] == 's';
-              if (parseSILFunctionRef(InstLoc, isSetter ? setter : getter))
-                return true;
-            } else if (subKind.str() == "indices") {
-              if (P.parseToken(tok::l_square,
-                               diag::expected_tok_in_sil_instr, "[")
-                  || parseComponentIndices(indexes))
-                return true;
-            } else if (subKind.str() == "indices_equals") {
-              if (parseSILFunctionRef(InstLoc, equals))
-                return true;
-            } else if (subKind.str() == "indices_hash") {
-              if (parseSILFunctionRef(InstLoc, hash))
-                return true;
-            } else {
-              P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
-                         subKind);
-              return true;
-            }
-            
-            if (!P.consumeIf(tok::comma))
-              break;
-          }
-          
-          if ((idFn == nullptr && idDecl.isNull() && idProperty == nullptr)
-              || getter == nullptr
-              || (isSettable && setter == nullptr)) {
-            P.diagnose(componentLoc,
-                       diag::sil_keypath_computed_property_missing_part,
-                       isSettable);
-            return true;
-          }
-          
-          if ((idFn != nullptr) + (!idDecl.isNull()) + (idProperty != nullptr)
-                != 1) {
-            P.diagnose(componentLoc,
-                       diag::sil_keypath_computed_property_missing_part,
-                       isSettable);
-            return true;
-          }
-          
-          KeyPathPatternComponent::ComputedPropertyId id;
-          if (idFn)
-            id = idFn;
-          else if (!idDecl.isNull())
-            id = idDecl;
-          else if (idProperty)
-            id = idProperty;
-          else
-            llvm_unreachable("no id?!");
-          
-          auto indexesCopy = P.Context.AllocateCopy(indexes);
-          
-          if (!indexes.empty() && (!equals || !hash)) {
-            P.diagnose(componentLoc,
-                       diag::sil_keypath_computed_property_missing_part,
-                       isSettable);
-          }
-          
-          if (isSettable) {
-            components.push_back(
-                KeyPathPatternComponent::forComputedSettableProperty(
-                                   id, getter, setter,
-                                   indexesCopy, equals, hash, componentTy));
-          } else {
-            components.push_back(
-                KeyPathPatternComponent::forComputedGettableProperty(
-                                   id, getter,
-                                   indexesCopy, equals, hash, componentTy));
-          }
-        } else if (componentKind.str() == "optional_wrap"
-                     || componentKind.str() == "optional_chain"
-                     || componentKind.str() == "optional_force") {
-          CanType ty;
-          if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-              || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
-              || parseASTType(ty, patternEnv))
-            return true;
-          KeyPathPatternComponent::Kind kind;
-          
-          if (componentKind.str() == "optional_wrap") {
-            kind = KeyPathPatternComponent::Kind::OptionalWrap;
-          } else if (componentKind.str() == "optional_chain") {
-            kind = KeyPathPatternComponent::Kind::OptionalChain;
-          } else if (componentKind.str() == "optional_force") {
-            kind = KeyPathPatternComponent::Kind::OptionalForce;
-          } else {
-            llvm_unreachable("unpossible");
-          }
-          
-          components.push_back(KeyPathPatternComponent::forOptional(kind, ty));
         } else {
-          P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
-                     componentKind);
-          return true;
+          KeyPathPatternComponent component;
+          if (parseKeyPathPatternComponent(component, operandTypes,
+                                           componentLoc, componentKind,
+                                           InstLoc, patternEnv))
+            return true;
+          components.push_back(component);
         }
         
         if (!P.consumeIf(tok::semi))
@@ -5092,6 +5123,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   Scope S(&P, ScopeKind::TopLevel);
   bool isTransparent = false;
   IsSerialized_t isSerialized = IsNotSerialized;
+  bool isCanonical = false;
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false, isWeakLinked = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -5101,7 +5133,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
-      parseDeclSILOptional(&isTransparent, &isSerialized, &isThunk, &isGlobalInit,
+      parseDeclSILOptional(&isTransparent, &isSerialized, &isCanonical,
+                           &isThunk, &isGlobalInit,
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &Semantics, &SpecAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
@@ -5127,6 +5160,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setSerialized(IsSerialized_t(isSerialized));
+    FunctionState.F->setWasDeserializedCanonical(isCanonical);
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setWeakLinked(isWeakLinked);
@@ -5260,7 +5294,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   Scope S(&P, ScopeKind::TopLevel);
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
-      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
+      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, &isLet, nullptr, nullptr, nullptr,
                            nullptr, nullptr, State) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -5292,6 +5326,60 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   return false;
 }
 
+/// decl-sil-property: [[only in SIL mode]]
+///   'sil_property' sil-decl-ref '(' sil-key-path-pattern-component ')'
+
+bool SILParserTUState::parseSILProperty(Parser &P) {
+  Lexer::SILBodyRAII Tmp(*P.L);
+
+  auto loc = P.consumeToken(tok::kw_sil_property);
+  auto InstLoc = RegularLocation(loc);
+  SILParser SP(P);
+  
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, SP))
+    return true;
+  
+  ValueDecl *VD;
+  
+  if (SP.parseSILDottedPath(VD))
+    return true;
+  
+  GenericParamList *generics;
+  GenericEnvironment *patternEnv;
+  Scope toplevelScope(&P, ScopeKind::TopLevel);
+  Scope genericsScope(&P, ScopeKind::Generics);
+  generics = P.maybeParseGenericParams().getPtrOrNull();
+  patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
+  
+  if (patternEnv->getGenericSignature()->getCanonicalSignature()
+        != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
+      ->getCanonicalSignature()) {
+    P.diagnose(loc, diag::sil_property_generic_signature_mismatch);
+    return true;
+  }
+
+  Identifier ComponentKind;
+  KeyPathPatternComponent Component;
+  SourceLoc ComponentLoc;
+  SmallVector<SILType, 4> OperandTypes;
+
+  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+      || P.parseIdentifier(ComponentKind, ComponentLoc,
+                           diag::expected_tok_in_sil_instr, "component kind")
+      || SP.parseKeyPathPatternComponent(Component, OperandTypes,
+               ComponentLoc, ComponentKind, InstLoc,
+               patternEnv)
+      || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+    return true;
+  
+  SILProperty::create(M, Serialized,
+                      cast<AbstractStorageDecl>(VD), Component);
+  return false;
+}
+
 /// decl-sil-vtable: [[only in SIL mode]]
 ///   'sil_vtable' ClassName decl-sil-vtable-body
 /// decl-sil-vtable-body:
@@ -5303,7 +5391,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   SILParser VTableState(P);
 
   IsSerialized_t Serialized = IsNotSerialized;
-  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr,
+  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, VTableState))
     return true;
@@ -5653,7 +5741,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   parseSILLinkage(Linkage, P);
   
   IsSerialized_t isSerialized = IsNotSerialized;
-  if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
+  if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, WitnessState))
     return true;

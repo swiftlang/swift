@@ -990,7 +990,7 @@ public:
                                               CanType conformingType) const = 0;
 };
 
-static std::pair<llvm::Value *, llvm::Value *>
+static llvm::Value *
 emitConditionalConformancesBuffer(IRGenFunction &IGF, CanType conformingType,
                                   const ProtocolConformance *conformance) {
   // Pointers to the witness tables, in the right order, which will be included
@@ -1034,13 +1034,9 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF, CanType conformingType,
         return /*finished?*/ false;
       });
 
-  // No conditional requirements means no need for a buffer, and size == 0 means
-  // no reading of the pointer.
-  // FIXME(cond. conf. assert): once the dynamic assertion is removed from the
-  // instantiation function, we can have size as undef too.
+  // No conditional requirements means no need for a buffer.
   if (tables.empty()) {
-    return {llvm::UndefValue::get(IGF.IGM.WitnessTablePtrPtrTy),
-            llvm::ConstantInt::get(IGF.IGM.SizeTy, 0)};
+    return llvm::UndefValue::get(IGF.IGM.WitnessTablePtrPtrTy);
   }
 
   auto buffer = IGF.createAlloca(
@@ -1055,8 +1051,7 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF, CanType conformingType,
     IGF.Builder.CreateStore(tables[idx], slot);
   }
 
-  auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy, tables.size());
-  return {buffer.getAddress(), count};
+  return buffer.getAddress();
 }
 
 static llvm::Value *emitWitnessTableAccessorCall(
@@ -1074,12 +1069,11 @@ static llvm::Value *emitWitnessTableAccessorCall(
       *srcMetadataCache = IGF.emitTypeMetadataRef(conformingType);
     }
 
-    llvm::Value *conditionalTables, *numConditionalTables;
-    std::tie(conditionalTables, numConditionalTables) =
+    auto conditionalTables =
         emitConditionalConformancesBuffer(IGF, conformingType, conformance);
 
-    call = IGF.Builder.CreateCall(
-        accessor, {*srcMetadataCache, conditionalTables, numConditionalTables});
+    call = IGF.Builder.CreateCall(accessor,
+                                  {*srcMetadataCache, conditionalTables});
 
   } else {
     call = IGF.Builder.CreateCall(accessor, {});
@@ -1210,7 +1204,8 @@ public:
           ConcreteType(SILWT->getConformance()->getDeclContext()
                          ->mapTypeIntoContext(
                            SILWT->getConformance()->getType()
-                             ->getCanonicalType())),
+                             ->getCanonicalType())
+                         ->getCanonicalType()),
           Conformance(*SILWT->getConformance()),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
@@ -1762,17 +1757,15 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   Explosion params = IGF.collectParameters();
   llvm::Value *metadata;
-  llvm::Value *conditionalReqtWtables;
-  llvm::Value *numConditionalReqtWtables;
+  llvm::Value *instantiationArgs;
 
   if (Conformance.witnessTableAccessorRequiresArguments()) {
     metadata = params.claimNext();
-    conditionalReqtWtables = params.claimNext();
-    numConditionalReqtWtables = params.claimNext();
+    instantiationArgs = params.claimNext();
   } else {
     metadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-    conditionalReqtWtables = nullptr;
-    numConditionalReqtWtables = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    instantiationArgs =
+        llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrPtrTy);
   }
 
   // Okay, we need a cache.  Build the cache structure.
@@ -1803,7 +1796,6 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   // We need an instantiation function if the base conformance
   // is non-dependent.
-  // TODO: the conformance might be conditional.
   llvm::Constant *instantiationFn;
   if (SpecializedBaseConformances.empty() &&
       ConditionalRequirementPrivateDataIndices.empty()) {
@@ -1845,31 +1837,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   cacheData.finishAndSetAsInitializer(cache);
   cache->setConstant(true);
 
-  // Create the slice structure for the conditional conformances, which is
-  // passed as the last argument to the instantiation function.
-  // FIXME(cond. conf. assert): Elide this local/replace it with `undef` once
-  // the size assertion in the instantiation function is gone.
-  auto conditionalSlice =
-      IGF.createAlloca(IGF.IGM.WitnessTableSliceTy,
-                       IGF.IGM.getPointerAlignment(), "conditional.tables");
+  auto call = IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
+                                     {cache, metadata, instantiationArgs});
 
-  // Only store a pointer if it will be read. If not (i.e. size == 0/this
-  // conformance is unconditional), we can leave it as undef.
-  if (conditionalReqtWtables) {
-    auto tableSlot = IGF.Builder.CreateStructGEP(conditionalSlice, 0, Size(0));
-    IGF.Builder.CreateStore(conditionalReqtWtables, tableSlot);
-  }
-
-  auto sizeSlot = IGF.Builder.CreateStructGEP(conditionalSlice, 1,
-                                              Size(IGF.IGM.getPointerSize()));
-  IGF.Builder.CreateStore(numConditionalReqtWtables, sizeSlot);
-
-  auto instantiationArgs =
-      IGF.Builder.CreateBitCast(conditionalSlice, IGM.Int8PtrPtrTy);
-
-  auto call =
-      IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
-                             {cache, metadata, instantiationArgs.getAddress()});
   call->setDoesNotThrow();
 
   IGF.Builder.CreateRet(call);
@@ -1889,39 +1859,11 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   Explosion params = IGF.collectParameters();
   Address wtable(params.claimNext(), PointerAlignment);
   llvm::Value *metadata = params.claimNext();
-  Address instantiationArgs(params.claimNext(), PointerAlignment);
-
-  // The details of any conditional conformances are in the last argument, as a
-  // pointer/size pair.
-  auto conditionalTablesSlice = IGF.Builder.CreateElementBitCast(
-      instantiationArgs, IGF.IGM.WitnessTableSliceTy);
-
-  auto conditionalTablesPtr =
-      IGF.Builder.CreateStructGEP(conditionalTablesSlice, 0, Size(0));
-  Address conditionalTables(IGF.Builder.CreateLoad(conditionalTablesPtr),
-                            PointerAlignment);
-
-  auto numConditionalTablesPtr =
-    IGF.Builder.CreateStructGEP(conditionalTablesSlice, 1, Size(PointerSize));
-  auto numConditionalTables = IGF.Builder.CreateLoad(numConditionalTablesPtr);
-
-  // Assert that the number of witness tables passed in is the number required
-  // for the conditional conformances of this witness table.
-
-  // FIXME(cond. conf. assert): remove this once we're confident in conditional
-  // conformances and especially dynamic casting. (Look for the other
-  // 'cond. conf. assert' FIXMEs too.)
-  auto failBB = IGF.createBasicBlock("bad_witness_table_count");
-  auto contBB = IGF.createBasicBlock("cont");
-
-  auto cmp = IGF.Builder.CreateICmpEQ(
-      numConditionalTables,
-      llvm::ConstantInt::get(IGM.SizeTy,
-                             ConditionalRequirementPrivateDataIndices.size()));
-  IGF.Builder.CreateCondBr(cmp, contBB, failBB);
-
-  // All good: now we can actually fill in the witness table.
-  IGF.Builder.emitBlock(contBB);
+  llvm::Value *instantiationArgs = params.claimNext();
+  Address conditionalTables(
+      IGF.Builder.CreateBitCast(instantiationArgs,
+                                IGF.IGM.WitnessTablePtrPtrTy),
+      PointerAlignment);
 
   /// Run through the conditional conformance witness tables, pulling them out
   /// of the slice and putting them into the private data of the witness table.
@@ -1965,10 +1907,6 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
 
 
   IGF.Builder.CreateRetVoid();
-
-  // The counts didn't match; abort.
-  IGF.Builder.emitBlock(failBB);
-  IGF.emitTrap(/*EmitUnreachable=*/true);
 
   return fn;
 }

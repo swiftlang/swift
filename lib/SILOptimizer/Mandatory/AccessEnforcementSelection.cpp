@@ -244,6 +244,20 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
   // capture and, for some reason, the closure is dead.
 }
 
+// Verify that accesses are not nested before mandatory inlining.
+// Closure captures should also not be nested within an access.
+static void checkUsesOfAccess(BeginAccessInst *access) {
+#ifndef NDEBUG
+  // These conditions are only true prior to mandatory inlining.
+  assert(!access->getFunction()->wasDeserializedCanonical());
+  for (auto *use : access->getUses()) {
+    auto user = use->getUser();
+    assert(!isa<BeginAccessInst>(user));
+    assert(!isa<PartialApplyInst>(user));
+  }
+#endif
+}
+
 void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
   for (auto *use : projection->getUses()) {
     auto user = use->getUser();
@@ -252,6 +266,8 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
     if (auto *access = dyn_cast<BeginAccessInst>(user)) {
       if (access->getEnforcement() == SILAccessEnforcement::Unknown)
         Accesses.push_back(access);
+
+      checkUsesOfAccess(access);
 
       continue;
     }
@@ -562,24 +578,28 @@ void AccessEnforcementSelection::run() {
 }
 
 void AccessEnforcementSelection::processFunction(SILFunction *F) {
-  if (F->wasDeserializedCanonical()) {
-    DEBUG(llvm::dbgs() << "Skipping Access Enforcement Selection of "
-                          "deserialized "
-                       << F->getName() << "\n");
-    return;
-  }
   DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
                      << "\n");
+
+  // This ModuleTransform needs to analyze closures and their parent scopes in
+  // the same pass, and the parent needs to be analyzed before the closure.
 #ifndef NDEBUG
   auto *CSA = getAnalysis<ClosureScopeAnalysis>();
   if (isNonEscapingClosure(F->getLoweredFunctionType())) {
     for (auto *scopeF : CSA->getClosureScopes(F)) {
       DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName() << "\n");
       assert(visited.count(scopeF));
+      // Closures must be defined in the same module as their parent scope.
+      assert(scopeF->wasDeserializedCanonical()
+             == F->wasDeserializedCanonical());
     }
   }
   visited.insert(F);
 #endif
+  // Deserialized functions, which have been mandatory inlined, no longer meet
+  // the structural requirements on access markers required by this pass.
+  if (F->wasDeserializedCanonical())
+    return;
 
   for (auto &bb : *F) {
     for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {

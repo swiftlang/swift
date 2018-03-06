@@ -2,9 +2,10 @@ from Child import Child
 
 
 class Trait(object):
-    def __init__(self, trait_name, children):
+    def __init__(self, trait_name, description=None, children=None):
         self.trait_name = trait_name
         self.children = children
+        self.description = description
 
 
 TRAITS = [

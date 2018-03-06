@@ -1356,8 +1356,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
     OI.SelectedSanitizers = parseSanitizerArgValues(
         Args, A, TC.getTriple(), Diags,
-        [&](StringRef sanitizerName) {
-          return TC.sanitizerRuntimeLibExists(Args, sanitizerName);
+        [&](StringRef sanitizerName, bool shared) {
+          return TC.sanitizerRuntimeLibExists(Args, sanitizerName, shared);
         });
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
@@ -1966,7 +1966,16 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
   } else if (!outputPath.empty()) {
     output.setAdditionalOutputForType(outputType, outputPath);
   } else {
-    // Put the auxiliary output file next to the primary output file.
+    // Put the auxiliary output file next to "the" primary output file.
+    //
+    // FIXME: when we're in WMO and have multiple primary outputs, we derive the
+    // additional filename here from the _first_ primary output name, which
+    // means that in the derived OFM (in Job.cpp) the additional output will
+    // have a possibly-surprising name. But that's only half the problem: it
+    // also get associated with the first primary _input_, even when there are
+    // multiple primary inputs; really it should be associated with the build as
+    // a whole -- derived OFM input "" -- but that's a more general thing to
+    // fix.
     llvm::SmallString<128> path;
     if (output.getPrimaryOutputType() != types::TY_Nothing)
       path = output.getPrimaryOutputFilenames()[0];
@@ -1976,6 +1985,7 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
       formFilenameFromBaseAndExt(OI.ModuleName, /*newExt=*/"", workingDirectory,
                                  path);
     }
+    assert(!path.empty());
 
     bool isTempFile = C.isTemporaryFile(path);
     llvm::sys::path::replace_extension(path,
@@ -2290,7 +2300,7 @@ void Driver::computeMainOutput(
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, workingDirectory,
                                      TC.getTriple(), C.getArgs(), AtTopLevel,
                                      Base, Primary, Diags, Buf);
-      Output->addPrimaryOutput(CommandInputPair{Base, Primary},
+      Output->addPrimaryOutput(CommandInputPair(Base, Primary),
                                OutputFile);
     };
     // Add an output file for each input action.
@@ -2312,9 +2322,8 @@ void Driver::computeMainOutput(
     OutputFile = getOutputFilename(C, JA, OI, OutputMap, workingDirectory,
                                    TC.getTriple(), C.getArgs(), AtTopLevel,
                                    BaseInput, PrimaryInput, Diags, Buf);
-    Output->addPrimaryOutput(
-        CommandInputPair{BaseInput, PrimaryInput},
-        OutputFile);
+    Output->addPrimaryOutput(CommandInputPair(BaseInput, PrimaryInput),
+                             OutputFile);
   }
 }
 
@@ -2369,10 +2378,11 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
       Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
     }
-  } else {
+  } else if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     // We're only generating the module as an intermediate, so put it next
     // to the primary output of the compile command.
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+    assert(!Path.empty());
     bool isTempFile = C.isTemporaryFile(Path);
     llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
     Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
@@ -2399,7 +2409,7 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
     // Prefer a path from the OutputMap.
     Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
                                        OFMModuleDocOutputPath);
-  } else {
+  } else if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     // Otherwise, put it next to the swiftmodule file.
     llvm::SmallString<128> Path(
         Output->getAnyOutputForType(types::TY_SwiftModuleFile));

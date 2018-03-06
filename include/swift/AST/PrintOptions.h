@@ -18,6 +18,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/DenseMap.h"
 #include <limits.h>
 #include <vector>
 

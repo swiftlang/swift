@@ -151,10 +151,10 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         // Override the node kind if this is a Clang-imported type so we give it
         // a stable mangling.
-        auto typeFlags = type->Flags.getKindSpecificFlags();
-        if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTag) {
+        auto typeFlags = type->getTypeContextDescriptorFlags();
+        if (typeFlags.isCTag()) {
           nodeKind = Node::Kind::Structure;
-        } else if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef) {
+        } else if (typeFlags.isCTypedef()) {
           nodeKind = Node::Kind::TypeAlias;
         }
         
@@ -263,7 +263,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 #endif
     description = classType->getDescription();
     break;

@@ -37,6 +37,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
 } // namespace swift
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
@@ -50,8 +51,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   }
 };
 
-
-
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   // HeapObject header;
   {
@@ -79,7 +79,7 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   0 // int entries; (zero'd bits)
 };
 
-
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   // HeapObject header;
   {

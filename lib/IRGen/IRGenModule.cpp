@@ -236,15 +236,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
-  // A metadata pattern is a structure from which generic type
-  // metadata are allocated.  We leave this struct type intentionally
-  // opaque, because the compiler basically never needs to access
-  // anything from one.
-  TypeMetadataPatternStructTy =
-    llvm::StructType::create(getLLVMContext(), "swift.type_pattern");
-  TypeMetadataPatternPtrTy =
-    TypeMetadataPatternStructTy->getPointerTo(DefaultAS);
-
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
 
@@ -407,8 +398,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
 
   WitnessTablePtrPtrTy = WitnessTablePtrTy->getPointerTo(DefaultAS);
-  WitnessTableSliceTy = createStructType(*this, "swift.witness_table_slice",
-                                         {WitnessTablePtrPtrTy, SizeTy});
 
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});

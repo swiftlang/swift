@@ -174,5 +174,11 @@ void SerializedSILLoader::getAllDefaultWitnessTables() {
     Des->getAllDefaultWitnessTables();
 }
 
+/// Deserialize all Properties in all SILModules.
+void SerializedSILLoader::getAllProperties() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllProperties();
+}
+
 // Anchor the SerializedSILLoader v-table.
 void SerializedSILLoader::Callback::_anchor() {}
