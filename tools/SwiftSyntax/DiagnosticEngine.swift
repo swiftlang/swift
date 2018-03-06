@@ -53,7 +53,7 @@ public class DiagnosticEngine {
   }
 
   /// If any of the diagnostics in this engine have the `error` severity.
-  var hasErrors: Bool {
+  public var hasErrors: Bool {
     return diagnostics.contains(where: { $0.message.severity == .error })
   }
 
