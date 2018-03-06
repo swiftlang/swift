@@ -98,12 +98,18 @@ public:
 };
 
 class DetailedCommandBasedMessage : public CommandBasedMessage {
+  std::string Executable;
+  SmallVector<std::string, 16> Arguments;
   std::string CommandLine;
   SmallVector<CommandInput, 4> Inputs;
   SmallVector<OutputPair, 8> Outputs;
 public:
   DetailedCommandBasedMessage(StringRef Kind, const Job &Cmd) :
       CommandBasedMessage(Kind, Cmd) {
+    Executable = Cmd.getExecutable();
+    for (const auto &A : Cmd.getArguments()) {
+      Arguments.push_back(A);
+    }
     llvm::raw_string_ostream wrapper(CommandLine);
     Cmd.printCommandLine(wrapper, "");
     wrapper.flush();
@@ -141,7 +147,9 @@ public:
 
   void provideMapping(swift::json::Output &out) override {
     Message::provideMapping(out);
-    out.mapRequired("command", CommandLine);
+    out.mapRequired("command", CommandLine); // Deprecated, do not document
+    out.mapRequired("command_executable", Executable);
+    out.mapRequired("command_arguments", Arguments);
     out.mapOptional("inputs", Inputs);
     out.mapOptional("outputs", Outputs);
   }
