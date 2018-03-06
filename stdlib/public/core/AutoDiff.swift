@@ -22,7 +22,7 @@
 
 /// A type that represents a valid argument for automatic differentiation.
 ///
-/// Types that conform to the `DifferentiationArgument` protocol can be
+/// Types that conform to the `Differentiable` protocol can be
 /// differentiated with-respect-to in `#gradient` and `#valueAndGradient`
 /// expressions.
 ///
@@ -35,7 +35,7 @@
 ///
 ///     extension Vector: Numeric where Scalar: Numeric { ... }
 ///
-///     extension Vector: DifferentiationArgument where Scalar: FloatingPoint {
+///     extension Vector: Differentiable where Scalar: FloatingPoint {
 ///         associatedtype DifferentiationCurrency = Scalar
 ///
 ///         init(_ value: DifferentiationCurrency, isomorphicTo other: Self) {
@@ -43,7 +43,7 @@
 ///         }
 ///     }
 ///
-public protocol DifferentiationArgument {
+public protocol Differentiable {
   /// The currency type in the mathematical model of differentiation. For
   /// example, the currency type of `Float` is `Float`, and the currency type
   /// for a vector of `Float` is still `Float`. The currency type is used to
