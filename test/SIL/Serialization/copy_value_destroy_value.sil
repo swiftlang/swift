@@ -1,6 +1,5 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
-// RUN: rm -rfv %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name copydestroy_value
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name copydestroy_value
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name copydestroy_value | %FileCheck %s
