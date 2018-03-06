@@ -625,7 +625,20 @@ extension ${Self}: BinaryFloatingPoint {
   /// almost never is.
   @_inlineable // FIXME(sil-serialize-all)
   public var ulp: ${Self} {
-    if !isFinite { return ${Self}.nan }
+%if bits == 32 or bits == 64:
+    guard _fastPath(isFinite) else { return .nan }
+    if _fastPath(isNormal) {
+      let bitPattern_ = bitPattern & ${Self}.infinity.bitPattern
+      return ${Self}(bitPattern: bitPattern_) / 0x1p${SignificandBitCount}
+    }
+#if arch(arm)
+    // On arm, flush positive subnormal values to 0.
+    return 0
+#else
+    return .leastNonzeroMagnitude
+#endif
+%else:
+    guard _fastPath(isFinite) else { return .nan }
     if exponentBitPattern > UInt(${Self}.significandBitCount) {
       // self is large enough that self.ulp is normal, so we just compute its
       // exponent and construct it with a significand of zero.
@@ -645,6 +658,7 @@ extension ${Self}: BinaryFloatingPoint {
     return ${Self}(sign: .plus,
       exponentBitPattern: 0,
       significandBitPattern: 1)
+%end
   }
 
   /// The least positive normal number.
@@ -917,17 +931,30 @@ extension ${Self}: BinaryFloatingPoint {
   /// - If `x` is `greatestFiniteMagnitude`, then `x.nextUp` is `infinity`.
   @_inlineable // FIXME(sil-serialize-all)
   public var nextUp: ${Self} {
-    if isNaN { return self }
-    if sign == .minus {
+%if bits == 32 or bits == 64:
+    // Silence signaling NaNs, map -0 to +0.
+    let x = self + 0
 #if arch(arm)
-      // On arm, subnormals are flushed to zero.
-      if (exponentBitPattern == 1 && significandBitPattern == 0) ||
-         (exponentBitPattern == 0 && significandBitPattern != 0) {
-        return ${Self}(sign: .minus,
-          exponentBitPattern: 0,
-          significandBitPattern: 0)
+    // On arm, skip positive subnormal values.
+    if _slowPath(x.bitPattern & (-${Self}.infinity).bitPattern == 0) {
+      return .leastNormalMagnitude
+    }
+#endif
+    if _fastPath(x < .infinity) {
+      let increment = Int${bits}(bitPattern: x.bitPattern) &>> ${bits - 1} | 1
+      let bitPattern_ = x.bitPattern &+ UInt${bits}(bitPattern: increment)
+#if arch(arm)
+      // On arm, flush negative subnormal values to -0.
+      if _slowPath(bitPattern_ & ${Self}.infinity.bitPattern == 0) {
+        return -0.0
       }
 #endif
+      return ${Self}(bitPattern: bitPattern_)
+    }
+    return x
+%else:
+    if isNaN { /* Silence signaling NaNs. */ return self + 0 }
+    if sign == .minus {
       if significandBitPattern == 0 {
         if exponentBitPattern == 0 {
           return .leastNonzeroMagnitude
@@ -946,15 +973,10 @@ extension ${Self}: BinaryFloatingPoint {
         exponentBitPattern: exponentBitPattern + 1,
         significandBitPattern: 0)
     }
-#if arch(arm)
-    // On arm, subnormals are skipped.
-    if exponentBitPattern == 0 {
-      return .leastNonzeroMagnitude
-    }
-#endif
     return ${Self}(sign: .plus,
       exponentBitPattern: exponentBitPattern,
       significandBitPattern: significandBitPattern + 1)
+%end
   }
 
   /// Rounds the value to an integral value using the specified rounding rule.
@@ -1369,7 +1391,19 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // y.exponent == 4
   @_inlineable // FIXME(sil-serialize-all)
   public var binade: ${Self} {
-    if !isFinite { return .nan }
+%if bits == 32 or bits == 64:
+    guard _fastPath(isFinite) else { return .nan }
+#if !arch(arm)
+    if _slowPath(isSubnormal) {
+      let bitPattern_ =
+        (self * 0x1p${SignificandBitCount}).bitPattern
+          & (-${Self}.infinity).bitPattern
+      return ${Self}(bitPattern: bitPattern_) / 0x1p${SignificandBitCount}
+    }
+#endif
+    return ${Self}(bitPattern: bitPattern & (-${Self}.infinity).bitPattern)
+%else:
+    guard _fastPath(isFinite) else { return .nan }
     if exponentBitPattern != 0 {
       return ${Self}(sign: sign, exponentBitPattern: exponentBitPattern,
         significandBitPattern: 0)
@@ -1379,6 +1413,7 @@ extension ${Self}: BinaryFloatingPoint {
     let index = significandBitPattern._binaryLogarithm()
     return ${Self}(sign: sign, exponentBitPattern: 0,
       significandBitPattern: 1 &<< index)
+%end
   }
 
   /// The number of bits required to represent the value's significand.
@@ -1490,6 +1525,7 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 %   if bits == builtinFloatLiteralBits:
     self = ${Self}(_bits: value)
 %   elif bits < builtinFloatLiteralBits:
+    // FIXME: This can result in double rounding errors (SR-7124).
     self = ${Self}(_bits: Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
