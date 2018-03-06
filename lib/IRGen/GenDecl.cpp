@@ -3991,8 +3991,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
     // conditional requirements are passed indirectly, as an array of witness
     // tables.
     fnType = llvm::FunctionType::get(
-        WitnessTablePtrTy, {TypeMetadataPtrTy, WitnessTablePtrPtrTy, SizeTy},
-        false);
+        WitnessTablePtrTy, {TypeMetadataPtrTy, WitnessTablePtrPtrTy}, false);
   } else {
     fnType = llvm::FunctionType::get(WitnessTablePtrTy, false);
   }
