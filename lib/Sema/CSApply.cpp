@@ -2425,20 +2425,19 @@ namespace {
       }
       expr->setResolvedPrimal(primalDecl);
 
-      // Get FloatingPoint and DifferentiationArgument protocol types.
+      // Get FloatingPoint and Differentiable protocol types.
       auto &ctx = cs.getASTContext();
       Type fpProtoTy = ctx.getProtocol(KnownProtocolKind::FloatingPoint)
         ->getDeclaredInterfaceType();
-      Type diffArgProtoTy =
-        ctx.getProtocol(KnownProtocolKind::DifferentiationArgument)
-          ->getDeclaredInterfaceType();
+      Type diffProtoTy = ctx.getProtocol(KnownProtocolKind::Differentiable)
+        ->getDeclaredInterfaceType();
       auto isValidDiffArgType = [&](Type argTy) {
         return TC.isConvertibleTo(argTy, fpProtoTy, dc) ||
-          TC.isConvertibleTo(argTy, diffArgProtoTy, dc);
+          TC.isConvertibleTo(argTy, diffProtoTy, dc);
       };
 
       // Verify that diff arguments conform either to FloatingPoint or to
-      // DifferentiationArgument.
+      // Differentiable.
       auto primalType = cs.getType(primalExpr)->getAs<AnyFunctionType>();
       assert(primalType && "Primal should have function type");
       auto gradParams = gradFnType->getParams();

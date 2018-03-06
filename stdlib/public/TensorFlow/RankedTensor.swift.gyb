@@ -367,7 +367,7 @@ public extension ${TensorXD} where Scalar == Double {
 // Automatic differentiation
 //===----------------------------------------------------------------------===//
 
-extension ${TensorXD} : DifferentiationArgument where Scalar : FloatingPoint {
+extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 
