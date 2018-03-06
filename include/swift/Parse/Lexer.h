@@ -531,6 +531,9 @@ private:
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker(bool EatNewline);
 
+  /// Returns it should be tokenize.
+  bool lexUnknown();
+
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };
   
