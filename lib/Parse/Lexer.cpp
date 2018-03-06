@@ -1739,8 +1739,9 @@ void Lexer::lexStringLiteral() {
 /// string literal, diagnose the problem and return a pointer to the end of the
 /// entire string literal.  This helps us avoid parsing the body of the string
 /// as program tokens, which will only lead to massive confusion.
-const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
-  
+const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
+                                                    bool EmitDiagnostics) {
+
   while (true) {
     // Don't bother with string interpolations.
     if (*Body == '\\' && *(Body + 1) == '(')
@@ -1752,7 +1753,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
 
     // Get the next character.
     const char *CharStart = Body;
-    unsigned CharValue = lexCharacter(Body, '\0', false);
+    unsigned CharValue = lexCharacter(Body, '\0', /*EmitDiagnostics=*/false);
     // If the character was incorrectly encoded, give up.
     if (CharValue == ~1U) return nullptr;
     
@@ -1764,8 +1765,11 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
     // If we found an ending curly quote (common since this thing started with
     // an opening curly quote) diagnose it with a fixit and then return.
     if (CharValue == 0x0000201D) {
-      diagnose(CharStart, diag::lex_invalid_curly_quote)
-        .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body), "\"");
+      if (EmitDiagnostics) {
+        diagnose(CharStart, diag::lex_invalid_curly_quote)
+            .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body),
+                               "\"");
+      }
       return Body;
     }
     
@@ -1864,13 +1868,15 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   return false;
 }
 
-bool Lexer::lexUnknown() {
+bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
   const char *Tmp = CurPtr - 1;
 
   if (advanceIfValidContinuationOfIdentifier(Tmp, BufferEnd)) {
     // If this is a valid identifier continuation, but not a valid identifier
     // start, attempt to recover by eating more continuation characters.
-    diagnose(CurPtr - 1, diag::lex_invalid_identifier_start_character);
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_identifier_start_character);
+    }
     while (advanceIfValidContinuationOfIdentifier(Tmp, BufferEnd))
       ;
     CurPtr = Tmp;
@@ -1886,15 +1892,18 @@ bool Lexer::lexUnknown() {
     return false; // Skip presumed whitespace.
   } else if (Codepoint == 0x0000201D) {
     // If this is an end curly quote, just diagnose it with a fixit hint.
-    diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
-        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), "\"");
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), "\"");
+    }
     CurPtr = Tmp;
     return true;
   } else if (Codepoint == 0x0000201C) {
     auto EndPtr = Tmp;
     // If this is a start curly quote, do a fuzzy match of a string literal
     // to improve recovery.
-    if (auto Tmp2 = findEndOfCurlyQuoteStringLiteral(Tmp))
+    if (auto Tmp2 =
+            findEndOfCurlyQuoteStringLiteral(Tmp, EmitDiagnosticsIfToken))
       Tmp = Tmp2;
 
     // Note, we intentionally diagnose the end quote before the start quote,
@@ -1902,9 +1911,11 @@ bool Lexer::lexUnknown() {
     // This, in turn, works better with our error recovery because we won't
     // diagnose an end curly quote in the middle of a straight quoted
     // literal.
-    diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
-        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(EndPtr),
-                           "\"");
+    if (EmitDiagnosticsIfToken) {
+      diagnose(CurPtr - 1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(EndPtr),
+                             "\"");
+    }
     CurPtr = Tmp;
     return true;
   }
@@ -2167,7 +2178,7 @@ Restart:
     if (advanceIfValidStartOfOperator(Tmp, BufferEnd))
       return lexOperatorIdentifier();
 
-    bool ShouldTokenize = lexUnknown();
+    bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/true);
     if (ShouldTokenize) {
       return formToken(tok::unknown, TokStart);
     }
