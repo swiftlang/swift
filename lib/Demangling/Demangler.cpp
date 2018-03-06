@@ -873,8 +873,7 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer name = popNode();
     NodePointer result = createNode(Node::Kind::RelatedEntityDeclName,
                                     StringRef(&relatedEntityKind, 1));
-    result->addChild(name, *this);
-    return result;
+    return addChild(result, name);
   }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
@@ -2250,9 +2249,9 @@ NodePointer Demangler::demangleSpecialType() {
       auto name = popNode(Node::Kind::Identifier);
       auto parent = popContext();
       auto anon = createNode(Node::Kind::AnonymousContext);
-      anon->addChild(name, *this);
-      anon->addChild(parent, *this);
-      anon->addChild(types, *this);
+      anon = addChild(anon, name);
+      anon = addChild(anon, parent);
+      anon = addChild(anon, types);
       return anon;
     }
     case 'e':
