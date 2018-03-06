@@ -575,7 +575,7 @@ public extension AccelerableByTensorFlow {
 // Automatic differentiation
 //===----------------------------------------------------------------------===//
 
-extension Tensor : DifferentiationArgument where Scalar : FloatingPoint {
+extension Tensor : Differentiable where Scalar : FloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 
