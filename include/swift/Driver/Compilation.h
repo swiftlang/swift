@@ -51,6 +51,9 @@ namespace driver {
 enum class OutputLevel {
   /// Indicates that normal output should be produced.
   Normal,
+  
+  /// Indicates that only jobs should be printed and not run. (-###)
+  PrintJobs,
 
   /// Indicates that verbose output should be produced. (-v)
   Verbose,
