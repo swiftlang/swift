@@ -13,11 +13,11 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/Driver/Action.h"
-#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/Option/Option.h"
+#include "swift/Driver/Action.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Option/Option.h"
 
 #include <memory>
 
@@ -54,6 +54,9 @@ protected:
   private:
     Compilation &C;
 
+    /// The limit for passing a list of files on the command line.
+    static const size_t TOO_MANY_FILES = 128;
+
   public:
     ArrayRef<const Job *> Inputs;
     ArrayRef<const Action *> InputActions;
@@ -83,6 +86,41 @@ protected:
     /// arguments.
     const char *getTemporaryFilePath(const llvm::Twine &name,
                                      StringRef suffix = "") const;
+
+    /// Test the number of files to see if an input file list is needed.
+    bool shouldUseInputFileList() const;
+
+    /// Test the number of primary files to see if a primary file list is
+    /// needed.
+    bool shouldUsePrimaryInputFileList() const;
+
+    /// Returns true if merge module input file list is needed.
+    bool shouldUseMergeModuleInputFileList() const;
+
+    /// Returns true if link input file list is needed.
+    bool shouldUseLinkInputFileList() const;
+
+    /// Return true if a file list is needed for the main outputs.
+    bool shouldUseMainOutputFileList() const;
+
+    /// Test the number of files to see if the command line would be too long
+    /// without using a file list for the supplementary outputs. Can only be
+    /// true for batch jobs.
+    bool shouldUseSupplementaryOutputFileList() const;
+
+    const char *computeFrontendModeForCompile() const;
+
+    void addCompileArgumentsEitherOnCommandLineOrInFilelists(
+        llvm::opt::ArgStringList &Arguments,
+        std::vector<FilelistInfo> &FilelistInfos) const;
+
+  private:
+    void addInputArguments(const bool mayHavePrimaryInputs,
+                           const bool useFileList,
+                           const bool usePrimaryFileList,
+                           llvm::opt::ArgStringList &arguments) const;
+    void
+    addSupplementaryOutputArguments(llvm::opt::ArgStringList &arguments) const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.

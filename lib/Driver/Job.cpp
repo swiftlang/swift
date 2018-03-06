@@ -240,6 +240,10 @@ StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
   return getAdditionalOutputForType(Type);
 }
 
+const OutputFileMap &CommandOutput::getDerivedOutputMap() const {
+  return DerivedOutputMap;
+}
+
 StringRef CommandOutput::getBaseInput(size_t Index) const {
   assert(Index < Inputs.size());
   return Inputs[Index].Base;

@@ -17,12 +17,13 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
-#include "swift/Driver/Driver.h"
-#include "swift/Driver/Job.h"
-#include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Driver/Driver.h"
+#include "swift/Driver/Job.h"
+#include "swift/Driver/Util.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"

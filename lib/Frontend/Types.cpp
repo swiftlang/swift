@@ -10,15 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/Types.h"
+#include "swift/Frontend/Types.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
-using namespace swift::driver;
-using namespace swift::driver::types;
+using namespace swift::types;
 
 struct TypeInfo {
   const char *Name;
@@ -27,9 +26,8 @@ struct TypeInfo {
 };
 
 static const TypeInfo TypeInfos[] = {
-#define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
-  { NAME, FLAGS, TEMP_SUFFIX },
-#include "swift/Driver/Types.def"
+#define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) {NAME, FLAGS, TEMP_SUFFIX},
+#include "swift/Frontend/Types.def"
 };
 
 static const TypeInfo &getInfo(unsigned Id) {
@@ -37,31 +35,25 @@ static const TypeInfo &getInfo(unsigned Id) {
   return TypeInfos[Id];
 }
 
-StringRef types::getTypeName(ID Id) {
-  return getInfo(Id).Name;
-}
+StringRef types::getTypeName(ID Id) { return getInfo(Id).Name; }
 
-StringRef types::getTypeTempSuffix(ID Id) {
-  return getInfo(Id).TempSuffix;
-}
+StringRef types::getTypeTempSuffix(ID Id) { return getInfo(Id).TempSuffix; }
 
 ID types::lookupTypeForExtension(StringRef Ext) {
   if (Ext.empty())
     return TY_INVALID;
   assert(Ext.front() == '.' && "not a file extension");
   return llvm::StringSwitch<types::ID>(Ext.drop_front())
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
-           .Case(SUFFIX, TY_##ID)
-#include "swift/Driver/Types.def"
-           .Default(TY_INVALID);
+#define TYPE(NAME, ID, SUFFIX, FLAGS) .Case(SUFFIX, TY_##ID)
+#include "swift/Frontend/Types.def"
+      .Default(TY_INVALID);
 }
 
 ID types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<types::ID>(Name)
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
-           .Case(NAME, TY_##ID)
-#include "swift/Driver/Types.def"
-           .Default(TY_INVALID);
+#define TYPE(NAME, ID, SUFFIX, FLAGS) .Case(NAME, TY_##ID)
+#include "swift/Frontend/Types.def"
+      .Default(TY_INVALID);
 }
 
 bool types::isTextual(ID Id) {

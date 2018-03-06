@@ -133,6 +133,9 @@ ERROR(error_stdlib_not_found,Fatal,
 ERROR(error_underlying_module_not_found,none,
       "underlying Objective-C module %0 not found", (Identifier))
 
+ERROR(error_unable_to_load_supplementary_output_file_map, none,
+      "unable to load supplementary output file map '%0': %1", (StringRef, StringRef))
+
 ERROR(error_repl_requires_no_input_files,none,
   "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,none,
@@ -162,6 +165,9 @@ ERROR(error_cannot_have_input_files_with_file_list,none,
 
 ERROR(error_cannot_have_primary_files_with_primary_file_list,none,
 "cannot have primary input files with primary file list", ())
+
+ERROR(error_cannot_have_supplementary_outputs_with_supplementary_ouputs_file_map,none,
+"cannot have '%0' with '%1'", (StringRef, StringRef))
 
 ERROR(error_duplicate_input_file,none,
 "duplicate input file '%0'", (StringRef))

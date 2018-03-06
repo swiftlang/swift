@@ -15,7 +15,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/Types.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 

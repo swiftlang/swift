@@ -21,9 +21,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
-#include "swift/Driver/OutputFileMap.h"
-#include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
+#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -44,13 +44,13 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
+
 namespace driver {
   class Action;
   class CommandOutput;
   class Compilation;
   class Job;
   class JobAction;
-  class OutputFileMap;
   class ToolChain;
 
 /// \brief A class encapsulating information about the outputs the driver
@@ -116,6 +116,14 @@ public:
   std::string SDKPath;
 
   OptionSet<SanitizerKind> SelectedSanitizers;
+
+  /// Might this sort of compile have explicit primary inputs?
+  /// When running a single compile for the whole module (in other words
+  /// "whole-module-optimization" mode) there must be no -primary-input's and
+  /// nothing in a (preferably non-existent) -primary-filelist. Left to its own
+  /// devices, the driver would forget to omit the primary input files, so
+  /// return a flag here.
+  bool mightHaveExplicitPrimaryInputs() const;
 };
 
 class Driver {

@@ -21,12 +21,13 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Option/Options.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -45,6 +46,47 @@ ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
 }
 const char *ToolChain::JobContext::getAllSourcesPath() const {
   return C.getAllSourcesPath();
+}
+
+bool ToolChain::JobContext::shouldUseInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return getTopLevelInputFiles().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
+  // SingleCompile's must not return true because then all inputs erroniously
+  // end up in primary flielist.
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return InputActions.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseMergeModuleInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Inputs.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseLinkInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Inputs.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseMainOutputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  static const uint UpperBoundOnSupplementaryOutputFileTypes =
+      types::TY_INVALID;
+  return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
+         TOO_MANY_FILES;
 }
 
 const char *

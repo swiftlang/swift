@@ -25,6 +25,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -36,9 +37,9 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "CompilationRecord.h"
 
@@ -786,11 +787,15 @@ namespace driver {
       }
     }
 
-    // FIXME: at the moment we're not passing OutputFileMaps to frontends, so
-    // due to the multiplication of the number of additional files and the
+    // Due to the multiplication of the number of additional files and the
     // number of files in a batch, it's pretty easy to construct too-long
     // command lines here, which will then fail to exec. We address this crudely
     // by re-forming batches with a finer partition when we overflow.
+    //
+    // Now that we're passing OutputFileMaps to frontends, this should never
+    // happen, but keep this as insurance, because the decision to pass output
+    // file maps cannot know the exact length of the command line, so may
+    // possibly fail to use the OutputFileMap.
     bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
                                        size_t &NumPartitions) {
 
@@ -804,6 +809,9 @@ namespace driver {
           // To avoid redoing the batch loop too many times, repartition pretty
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
+#ifndef NDEBUG
+          llvm::errs() << "Should have used a supplementary output file map.\n";
+#endif
           return true;
         }
       }
@@ -1125,12 +1133,22 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
         out << IA->getInputArg().getValue() << "\n";
       }
       break;
-    case FilelistInfo::WhichFiles::Output:
+    case FilelistInfo::WhichFiles::Output: {
       const CommandOutput &outputInfo = job->getOutput();
       assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
       for (auto &output : outputInfo.getPrimaryOutputFilenames())
         out << output << "\n";
       break;
+    }
+    case FilelistInfo::WhichFiles::SupplementaryOutput: {
+      std::vector<StringRef> inputs;
+      for (const Action *A : job->getSource().getInputs()) {
+        const auto *IA = cast<InputAction>(A);
+        inputs.push_back(IA->getInputArg().getValue());
+      }
+      job->getOutput().getDerivedOutputMap().write(out, inputs);
+      break;
+    }
     }
   }
   return ok;

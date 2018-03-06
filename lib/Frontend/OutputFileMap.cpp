@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/OutputFileMap.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
@@ -18,37 +18,31 @@
 #include <system_error>
 
 using namespace swift;
-using namespace swift::driver;
 
-std::unique_ptr<OutputFileMap>
-OutputFileMap::loadFromPath(StringRef Path, StringRef workingDirectory) {
+std::string OutputFileMap::loadFromPath(StringRef Path,
+                                        StringRef workingDirectory) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(Path);
+      llvm::MemoryBuffer::getFile(Path);
   if (!FileBufOrErr)
-    return nullptr;
+    return FileBufOrErr.getError().message();
   return loadFromBuffer(std::move(FileBufOrErr.get()), workingDirectory);
 }
 
-std::unique_ptr<OutputFileMap>
-OutputFileMap::loadFromBuffer(StringRef Data, StringRef workingDirectory) {
+std::string OutputFileMap::loadFromBuffer(StringRef Data,
+                                          StringRef workingDirectory) {
   std::unique_ptr<llvm::MemoryBuffer> Buffer{
-    llvm::MemoryBuffer::getMemBuffer(Data)
-  };
+      llvm::MemoryBuffer::getMemBuffer(Data)};
   return loadFromBuffer(std::move(Buffer), workingDirectory);
 }
 
-std::unique_ptr<OutputFileMap>
+std::string
 OutputFileMap::loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
                               StringRef workingDirectory) {
-  std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
-
-  if (OFM->parse(std::move(Buffer), workingDirectory))
-    return nullptr;
-
-  return OFM;
+  return parse(std::move(Buffer), workingDirectory);
 }
 
-const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
+const TypeToPathMap *
+OutputFileMap::getOutputMapForInput(StringRef Input) const {
   auto iter = InputToOutputsMap.find(Input);
   if (iter == InputToOutputsMap.end())
     return nullptr;
@@ -56,8 +50,7 @@ const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
     return &iter->second;
 }
 
-TypeToPathMap &
-OutputFileMap::getOrCreateOutputMapForInput(StringRef Input) {
+TypeToPathMap &OutputFileMap::getOrCreateOutputMapForInput(StringRef Input) {
   return InputToOutputsMap[Input];
 }
 
@@ -65,16 +58,15 @@ const TypeToPathMap *OutputFileMap::getOutputMapForSingleOutput() const {
   return getOutputMapForInput(StringRef());
 }
 
-TypeToPathMap &
-OutputFileMap::getOrCreateOutputMapForSingleOutput() {
+TypeToPathMap &OutputFileMap::getOrCreateOutputMapForSingleOutput() {
   return InputToOutputsMap[StringRef()];
 }
 
 void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   typedef std::pair<types::ID, std::string> TypePathPair;
 
-  auto printOutputPair = [&os] (StringRef InputPath,
-                                const TypePathPair &OutputPair) -> void {
+  auto printOutputPair = [&os](StringRef InputPath,
+                               const TypePathPair &OutputPair) -> void {
     os << InputPath << " -> " << types::getTypeName(OutputPair.first) << ": \""
        << OutputPair.second << "\"\n";
   };
@@ -85,10 +77,10 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
     for (auto &InputPair : InputToOutputsMap) {
       Maps.emplace_back(InputPair.first(), InputPair.second);
     }
-    std::sort(Maps.begin(), Maps.end(), [] (const PathMapPair &LHS,
-                                            const PathMapPair &RHS) -> bool {
-      return LHS.first < RHS.first;
-    });
+    std::sort(Maps.begin(), Maps.end(),
+              [](const PathMapPair &LHS, const PathMapPair &RHS) -> bool {
+                return LHS.first < RHS.first;
+              });
     for (auto &InputPair : Maps) {
       const TypeToPathMap &Map = InputPair.second;
       std::vector<TypePathPair> Pairs;
@@ -108,21 +100,42 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   }
 }
 
-bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                          StringRef workingDirectory) {
+void OutputFileMap::write(llvm::raw_ostream &os,
+                          ArrayRef<StringRef> inputs) const {
+  auto printQuotedString = [&os](StringRef s) -> void {
+    os << "\"" << s << "\"";
+  };
+  for (const auto input : inputs) {
+    const TypeToPathMap *outputMap = getOutputMapForInput(input);
+    if (!outputMap)
+      continue;
+    printQuotedString(input);
+    os << " :\n";
+    for (auto &typeAndOutputPath : *outputMap) {
+      types::ID type = typeAndOutputPath.getFirst();
+      StringRef output = typeAndOutputPath.getSecond();
+      os << "  " << types::getTypeName(type) << ": ";
+      printQuotedString(output);
+      os << "\n";
+      }
+    }
+}
+
+std::string OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                                 StringRef workingDirectory) {
   llvm::SourceMgr SM;
   llvm::yaml::Stream YAMLStream(Buffer->getMemBufferRef(), SM);
   auto I = YAMLStream.begin();
   if (I == YAMLStream.end())
-    return true;
+    return "empty YAMLStream";
 
   auto Root = I->getRoot();
   if (!Root)
-    return true;
+    return "no root";
 
   auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
   if (!Map)
-    return true;
+    return "root was not a MappingNode";
 
   auto resolvePath =
       [workingDirectory](
@@ -149,19 +162,19 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
     llvm::yaml::Node *Value = Pair.getValue();
 
     if (!Key)
-      return true;
+      return "bad key";
 
     if (!Value)
-      return true;
+      return "bad value";
 
     auto *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
     if (!InputPath)
-      return true;
+      return "input path not a scalar node";
 
     llvm::yaml::MappingNode *OutputMapNode =
-      dyn_cast<llvm::yaml::MappingNode>(Value);
+        dyn_cast<llvm::yaml::MappingNode>(Value);
     if (!OutputMapNode)
-      return true;
+      return "output map not a MappingNode";
 
     TypeToPathMap OutputMap;
 
@@ -171,15 +184,15 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
 
       auto *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
       if (!KindNode)
-        return true;
+        return "kind not a ScalarNode";
 
       auto *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
       if (!Path)
-        return true;
+        return "path not a scalar node";
 
       llvm::SmallString<16> KindStorage;
       types::ID Kind =
-        types::lookupTypeForName(KindNode->getValue(KindStorage));
+          types::lookupTypeForName(KindNode->getValue(KindStorage));
 
       // Ignore unknown types, so that an older swiftc can be used with a newer
       // build system.
@@ -196,5 +209,5 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
         std::move(OutputMap);
   }
 
-  return false;
+  return "";
 }

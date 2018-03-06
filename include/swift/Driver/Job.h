@@ -15,16 +15,16 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
-#include "swift/Driver/OutputFileMap.h"
-#include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
-#include "llvm/Option/Option.h"
+#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Option/Option.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -205,6 +205,9 @@ public:
   /// output -- primary or additional -- of type \p type associated with that
   /// the sole primary input.
   StringRef getAnyOutputForType(types::ID type) const;
+
+  /// Return the whole derived output map.
+  const OutputFileMap &getDerivedOutputMap() const;
 
   /// Return the BaseInput numbered by \p Index.
   StringRef getBaseInput(size_t Index) const;

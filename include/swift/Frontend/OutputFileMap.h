@@ -14,9 +14,10 @@
 #define SWIFT_DRIVER_OUTPUTFILEMAP_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Driver/Types.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
@@ -25,7 +26,6 @@
 #include <string>
 
 namespace swift {
-namespace driver {
 
 typedef llvm::DenseMap<types::ID, std::string> TypeToPathMap;
 
@@ -38,24 +38,27 @@ public:
 
   ~OutputFileMap() = default;
 
-  /// Loads an OutputFileMap from the given \p Path, if possible.
+  /// Loads an OutputFileMap from the given \p Path into the receiver, if
+  /// possible. Mutate the receiver in place in order to free the return value
+  /// to be used for an error string.
   ///
   /// When non-empty, \p workingDirectory is used to resolve relative paths in
   /// the output file map.
-  static std::unique_ptr<OutputFileMap>
-  loadFromPath(StringRef Path, StringRef workingDirectory);
+  ///
+  /// \return a non-empty error description on error.
+  std::string loadFromPath(StringRef Path, StringRef workingDirectory);
 
-  static std::unique_ptr<OutputFileMap>
-  loadFromBuffer(StringRef Data, StringRef workingDirectory);
+  std::string loadFromBuffer(StringRef Data, StringRef workingDirectory);
 
-  /// Loads an OutputFileMap from the given \p Buffer, taking ownership
-  /// of the buffer in the process.
+  /// Loads into the OutputFileMap receiver from the given \p Buffer, taking
+  /// ownership of the buffer in the process.
   ///
   /// When non-empty, \p workingDirectory is used to resolve relative paths in
   /// the output file map.
-  static std::unique_ptr<OutputFileMap>
-  loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                 StringRef workingDirectory);
+  ///
+  /// \return a non-empty string with an error description if there's an error.
+  std::string loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                             StringRef workingDirectory);
 
   /// Get the map of outputs for the given \p Input, if present in the
   /// OutputFileMap. (If not present, returns nullptr.)
@@ -74,6 +77,9 @@ public:
   /// Dump the OutputFileMap to the given \p os.
   void dump(llvm::raw_ostream &os, bool Sort = false) const;
 
+  /// Write the OutputFilemap for the \p inputs so it can be parsed.
+  void write(llvm::raw_ostream &os, ArrayRef<StringRef> inputs) const;
+
 private:
   /// \brief Parses the given \p Buffer into the OutputFileMap, taking ownership
   /// of \p Buffer in the process.
@@ -81,12 +87,14 @@ private:
   /// When non-empty, \p workingDirectory is used to resolve relative paths in
   /// the output file map.
   ///
-  /// \returns true on error, false on success
-  bool parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-             StringRef workingDirectory);
+  /// \returns a helpful string on error, empty string on success
+  ///
+  /// FIXME: Make the returned error strings more specific by including some of
+  /// the source.
+  std::string parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                    StringRef workingDirectory);
 };
 
-} // end namespace driver
 } // end namespace swift
 
 #endif

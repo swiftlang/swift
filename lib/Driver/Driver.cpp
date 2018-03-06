@@ -17,25 +17,25 @@
 #include "swift/Driver/Driver.h"
 
 #include "ToolChains.h"
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/TaskQueue.h"
-#include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TaskQueue.h"
+#include "swift/Basic/Version.h"
+#include "swift/Config.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "swift/Driver/ToolChain.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Config.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1705,10 +1705,12 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
     return nullptr;
 
   // TODO: perform some preflight checks to ensure the file exists.
-  auto OFM = OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
-  if (!OFM) {
-    // TODO: emit diagnostic with error string
-    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
+  std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
+  std::string error = OFM->loadFromPath(A->getValue(), workingDirectory);
+  if (!error.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
+                   error);
+    OFM.reset();
   }
   return OFM;
 }
@@ -2649,4 +2651,17 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
+}
+
+bool OutputInfo::mightHaveExplicitPrimaryInputs() const {
+  switch (CompilerMode) {
+  case Mode::StandardCompile:
+  case Mode::BatchModeCompile:
+    return true;
+  case Mode::SingleCompile:
+    return false;
+  case Mode::Immediate:
+  case Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
 }
