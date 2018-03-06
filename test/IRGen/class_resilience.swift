@@ -442,10 +442,11 @@ extension ResilientGenericOutsideParent {
 // ResilientGenericChild metadata initialization function
 
 // CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8**)
-
-// Get the superclass size and address point...
-
 // CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK:              ret %swift.type* [[METADATA]]
+
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**)
 
 // Initialize the superclass pointer...
 // CHECK:              [[SUPER:%.*]] = call %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentCMa"(%swift.type* %T)
@@ -454,5 +455,4 @@ extension ResilientGenericOutsideParent {
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_ADDR]],
 
 // CHECK:              call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]],
-
-// CHECK:              ret %swift.type* [[METADATA]]
+// CHECK:              ret %swift.type* null

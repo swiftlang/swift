@@ -3241,12 +3241,15 @@ namespace {
     }
 
     /// Emit the create function for the template.
-    void emitCreateFunction() {
-      // Metadata *(*CreateFunction)(TypeContextDescriptor*, const void * const *)
+    void emitInstantiationFunction() {
+      // using MetadataInstantiator =
+      //   Metadata *(TypeContextDescriptor *type,
+      //              const void * const *arguments,
+      //              const GenericMetadataPattern *pattern);
       llvm::Function *f =
         IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
       f->setAttributes(IGM.constructInitialAttributes());
-      
+
       IRGenFunction IGF(IGM, f);
 
       // Skip instrumentation when building for TSan to avoid false positives.
@@ -3269,12 +3272,13 @@ namespace {
       }
 
       // Allocate the metadata.
-      llvm::Value *metadataValue =
+      llvm::Value *metadata =
         asImpl().emitAllocateMetadata(IGF, descriptor, args, templatePointer);
 
       // Execute the fill ops. Cast the parameters to word pointers because the
       // fill indexes are word-indexed.
-      auto *metadataWords = IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy);
+      auto *metadataWords =
+        IGF.Builder.CreateBitCast(metadata, IGM.Int8PtrPtrTy);
 
       auto genericReqtOffset = IGM.getNominalMetadataLayout(Target)
           .getGenericRequirementsOffset(IGF);
@@ -3298,16 +3302,56 @@ namespace {
             IGF, IGM.getPointerSize());
       }
 
+      IGF.Builder.CreateRet(metadata);
+    }
+
+    void emitCompletionFunction() {
+      // using MetadataCompleter =
+      //   Metadata *(Metadata *type,
+      //              MetadataCompletionContext *context,
+      //              const GenericMetadataPattern *pattern);
+      llvm::Function *f =
+        IGM.getAddrOfTypeMetadataCompletionFunction(Target, ForDefinition);
+      f->setAttributes(IGM.constructInitialAttributes());
+
+      IRGenFunction IGF(IGM, f);
+
+      // Skip instrumentation when building for TSan to avoid false positives.
+      // The synchronization for this happens in the Runtime and we do not see it.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+      Explosion params = IGF.collectParameters();
+      llvm::Value *metadata = params.claimNext();
+      llvm::Value *context = params.claimNext();
+      llvm::Value *templatePointer = params.claimNext();
+
+      (void) context;
+      (void) templatePointer;
+
+      // Bind the generic arguments.
+      // FIXME: this will be problematic if we ever try to bind superclass
+      // types from type metadata!
+      if (Target->isGenericContext()) {
+        auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
+        IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata);
+      }
+
       // A dependent VWT means that we have dependent metadata.
       if (HasDependentVWT)
         HasDependentMetadata = true;
 
       if (HasDependentMetadata) {
-        asImpl().emitInitializeMetadata(IGF, metadataValue, false);
+        asImpl().emitInitializeMetadata(IGF, metadata, false);
       }
       
-      // The metadata is now complete.
-      IGF.Builder.CreateRet(metadataValue);
+      // The metadata is now complete.  Return null to indicate success.
+      auto nullDependency =
+        llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy);
+      IGF.Builder.CreateRet(nullDependency);
     }
 
     /// The information necessary to fill in a GenericMetadataPartialPattern
@@ -3358,8 +3402,11 @@ namespace {
 
     // Emit the fields of GenericMetadataPattern.
     void layoutHeader() {
-      // RelativePointer<InstantiationFunction_t> InstantiationFunction;
+      // RelativePointer<MetadataInstantiator> InstantiationFunction;
       asImpl().addInstantiationFunction();
+
+      // RelativePointer<MetadataCompleter> CompletionFunction;
+      asImpl().addCompletionFunction();
 
       // ClassMetadataPatternFlags PatternFlags;
       asImpl().addPatternFlags();
@@ -3367,6 +3414,17 @@ namespace {
 
     void addInstantiationFunction() {
       auto function = IGM.getAddrOfTypeMetadataInstantiationFunction(Target,
+                                                              NotForDefinition);
+      B.addRelativeAddress(function);
+    }
+
+    void addCompletionFunction() {
+      if (!asImpl().hasCompletionFunction()) {
+        B.addInt32(0);
+        return;
+      }
+
+      auto function = IGM.getAddrOfTypeMetadataCompletionFunction(Target,
                                                               NotForDefinition);
       B.addRelativeAddress(function);
     }
@@ -3415,7 +3473,11 @@ namespace {
       (void) asImpl().emitNominalTypeDescriptor();
 
       // Emit the instantiation function.
-      asImpl().emitCreateFunction();
+      asImpl().emitInstantiationFunction();
+
+      // Emit the completion function.
+      if (asImpl().hasCompletionFunction())
+        asImpl().emitCompletionFunction();
 
       // Emit the instantiation cache.
       asImpl().emitInstantiationCache();
@@ -4389,6 +4451,14 @@ namespace {
       return metadata;
     }
 
+    bool hasCompletionFunction() {
+      // TODO: recognize cases where this is not required.
+      // For example, under ObjCInterop mode we can move class realization
+      // into the allocation phase if the superclass is trivial and there's
+      // no layout to do.
+      return true;
+    }
+
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 bool isVWTMutable) {
@@ -5090,6 +5160,11 @@ namespace {
       return getValueWitnessTableForGenericValueType(IGM, Target,
                                                      HasDependentVWT);
     }
+
+    bool hasCompletionFunction() {
+      // TODO: recognize cases where this is not required
+      return true;
+    }
                         
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
@@ -5257,6 +5332,11 @@ namespace {
     llvm::Constant *emitValueWitnessTable() {
       return getValueWitnessTableForGenericValueType(IGM, Target,
                                                      HasDependentVWT);
+    }
+
+    bool hasCompletionFunction() {
+      // TODO: recognize cases where this is not required
+      return true;
     }
 
     void emitInitializeMetadata(IRGenFunction &IGF,

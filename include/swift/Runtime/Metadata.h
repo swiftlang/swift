@@ -3067,17 +3067,70 @@ struct TargetGenericMetadataInstantiationCache {
 using GenericMetadataInstantiationCache =
   TargetGenericMetadataInstantiationCache<InProcess>;
 
+/// A function that instantiates metadata.  This function is required
+/// to succeed.
+///
+/// In general, the metadata returned by this function should have all the
+/// basic structure necessary to identify itself: that is, it must have a
+/// type descriptor and generic arguments.  However, it does not need to be
+/// fully functional as type metadata; for example, it does not need to have
+/// a meaningful value witness table, v-table entries, or a superclass.
+///
+/// Operations which may fail (due to e.g. recursive dependencies) but which
+/// must be performed in order to prepare the metadata object to be fully
+/// functional as type metadata should be delayed until the completion
+/// function.
+using MetadataInstantiator =
+  Metadata *(const TargetTypeContextDescriptor<InProcess> *type,
+             const void *arguments,
+             const TargetGenericMetadataPattern<InProcess> *pattern);
+
+/// The opaque completion context of a metadata completion function.
+/// A completion function that needs to report a completion dependency
+/// can use this to figure out where it left off and thus avoid redundant
+/// work when re-invoked.  It will be zero on first entry for a type, and
+/// the runtime is free to copy it to a different location between
+/// invocations.
+struct MetadataCompletionContext {
+  void *Data[NumWords_MetadataCompletionContext];
+};
+
+/// A function which attempts to complete the given metadata.
+///
+/// This function may fail due to a dependency on the completion of some
+/// other metadata object.  It can indicate this by returning the metadata
+/// on which it depends.  In this case, the function will be invoked again
+/// when the dependency is resolved.  The function must be careful not to
+/// indicate a completion dependency on a type that has always been
+/// completed; the runtime cannot reliably distinguish this sort of
+/// programming failure from a race in which the dependent type was
+/// completed immediately after it was observed to be incomplete, and so
+/// the function will be repeatedly re-invoked.
+///
+/// The function will never be called multiple times simultaneously, but
+/// it may be called many times as successive dependencies are resolved.
+/// If the function ever completes successfully (by returning null), it
+/// will not be called again for the same type.
+///
+/// \return null to indicate that the type has been completed, or a non-null
+///   pointer to indicate that completion is blocked on the completion of
+///   some other type
+using MetadataCompleter =
+  Metadata *(const Metadata *type,
+             MetadataCompletionContext *context,
+             const TargetGenericMetadataPattern<InProcess> *pattern);
+
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
 struct TargetGenericMetadataPattern {
-  using InstantiationFunction_t =
-    TargetMetadata<Runtime> *(const TargetTypeContextDescriptor<Runtime> *type,
-                              const void *arguments,
-                        const TargetGenericMetadataPattern<Runtime> *pattern);
-
   /// The function to call to instantiate the template.
-  TargetRelativeDirectPointer<Runtime, InstantiationFunction_t>
+  TargetRelativeDirectPointer<Runtime, MetadataInstantiator>
     InstantiationFunction;
+
+  /// The function to call to complete the instantiation.  If this is null,
+  /// the instantiation function must always generate complete metadata.
+  TargetRelativeDirectPointer<Runtime, MetadataCompleter, /*nullable*/ true>
+    CompletionFunction;
 
   /// Flags describing the layout of this instantiation pattern.
   GenericMetadataPatternFlags PatternFlags;

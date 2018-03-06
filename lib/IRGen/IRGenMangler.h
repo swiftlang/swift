@@ -81,6 +81,10 @@ public:
                                                   const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
+
+  std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
+    return mangleNominalTypeSymbol(Decl, "Mr");
+  }
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
