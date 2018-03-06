@@ -38,7 +38,8 @@
 ///     extension Vector: Differentiable where Scalar: FloatingPoint {
 ///         associatedtype DifferentiationCurrency = Scalar
 ///
-///         init(_ value: DifferentiationCurrency, isomorphicTo other: Self) {
+///         init(numericallyBroadcasting value: DifferentiationCurrency,
+///              to other: Self) {
 ///             self.init(Array(repeating: value, count: elements.count))
 ///         }
 ///     }
@@ -51,16 +52,27 @@ public protocol Differentiable {
   /// the initial adjoint/tangent and the seed.
   associatedtype DifferentiationCurrency : FloatingPoint
 
-  /// Creates an instance from the specified currency value and another,
-  /// structurally isomorphic instance.
+  /// Creates an instance by numerically broadcasting the specified currency
+  /// value to be structurally isomorphic to another instance.
   ///
   /// - Parameters:
   ///   - value: The differentiation currency value for initializing the
   ///     instance.
-  ///   - other: The other, structurally isomorphic instance.
+  ///   - other: The other structurally isomorphic instance.
   ///
-  init(_ value: DifferentiationCurrency, isomorphicTo other: Self)
+  init(numericallyBroadcasting value: DifferentiationCurrency, to other: Self)
 
   /// Adds two values and produces their sum.
   static func + (lhs: Self, rhs: Self) -> Self
+}
+
+public extension FloatingPoint {
+  /// The currency type in the mathematical model of differentiation.
+  typealias DifferentiationCurrency = Self
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  init(numericallyBroadcasting value: Self, to other: Self) {
+    self = value
+  }
 }
