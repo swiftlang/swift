@@ -1682,6 +1682,10 @@ public:
     // No lowering support needed.
   }
 
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
+    // No lowering support needed.
+  }
+
   void visitVarDecl(VarDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
