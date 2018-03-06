@@ -41,6 +41,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySetElement
     single-source/ArraySubscript
     single-source/BinaryFloatingPointConversionFromBinaryInteger
+    single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/ByteSwap
     single-source/COWTree
