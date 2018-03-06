@@ -2457,19 +2457,12 @@ namespace {
       }
       expr->setResolvedPrimal(primalDecl);
 
-      // Get FloatingPoint and Differentiable protocol types.
+      // Get Differentiable protocol type.
       auto &ctx = cs.getASTContext();
-      Type fpProtoTy = ctx.getProtocol(KnownProtocolKind::FloatingPoint)
-        ->getDeclaredInterfaceType();
       Type diffProtoTy = ctx.getProtocol(KnownProtocolKind::Differentiable)
         ->getDeclaredInterfaceType();
-      auto isValidDiffArgType = [&](Type argTy) {
-        return TC.isConvertibleTo(argTy, fpProtoTy, dc) ||
-          TC.isConvertibleTo(argTy, diffProtoTy, dc);
-      };
 
-      // Verify that diff arguments conform either to FloatingPoint or to
-      // Differentiable.
+      // Verify that diff arguments conform to Differentiable.
       auto primalType = cs.getType(primalExpr)->getAs<AnyFunctionType>();
       assert(primalType && "Primal should have function type");
       auto gradParams = gradFnType->getParams();
@@ -2487,7 +2480,7 @@ namespace {
             diffArgTypes.push_back(gradParams[arg.getIndex()].getType());
       }
       for (auto &argTy : diffArgTypes) {
-        if (!isValidDiffArgType(argTy)) {
+        if (! TC.isConvertibleTo(argTy, diffProtoTy, dc)) {
           TC.diagnose(expr->getLoc(),
                       diag::gradient_expr_argument_not_differentiable, argTy);
           return nullptr;
