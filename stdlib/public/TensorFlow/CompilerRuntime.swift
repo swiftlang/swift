@@ -54,7 +54,13 @@ public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
   /// - Note: Set to true only for debugging purposes.
+  // TODO: asynchronous execution on Darwin platforms needs testing and is
+  // temporarily disabled. Synchronous execution works for demo purposes.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  static public var usesSynchronousExecution = true
+#else
   static public var usesSynchronousExecution = false
+#endif
 
   /// When true, uses the TF eager C API, and TF interpreter backend.
   /// Otherwise uses the TF C API, with execution mode set below.
