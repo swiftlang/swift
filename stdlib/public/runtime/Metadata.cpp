@@ -477,6 +477,14 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
       // Call the pattern's instantiation function.
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
+
+      // Complete the metadata's instantiation.
+      if (!pattern->CompletionFunction.isNull()) {
+        MetadataCompletionContext context = {};
+        auto dep = pattern->CompletionFunction(metadata, &context, pattern);
+        assert(!dep && "completion dependencies not yet supported"); (void) dep;
+      }
+
       auto entry = GenericCacheEntry::getFromMetadata(metadata);
       entry->Value = metadata;
       return entry;

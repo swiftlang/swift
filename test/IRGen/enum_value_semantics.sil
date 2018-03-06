@@ -159,11 +159,12 @@ enum GenericFixedLayout<T> {
 // CHECK-SAME:    @"$S20enum_value_semantics18GenericFixedLayoutOMP"
 
 // CHECK-LABEL: @"$S20enum_value_semantics18GenericFixedLayoutOMP" = internal constant <{ {{.*}} }> <{
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
+// CHECK-SAME:    @"$S20enum_value_semantics18GenericFixedLayoutOMr"
 //   Pattern flags.  0x400000 == (MetadataKind::Enum << 21).
 // CHECK-SAME:    i32 4194304,
 //   Value witness table.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([18 x i8*]* @"$S20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32 }>, <{ i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 2) to i64)) to i32)
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([18 x i8*]* @"$S20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
 // CHECK-SAME:  }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
