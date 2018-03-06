@@ -3743,13 +3743,11 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     if (!nestedPA)
       return ResolvedType::forUnresolved(baseEquivClass);
 
-    if (resolutionKind != ArchetypeResolutionKind::AlreadyKnown) {
-      // Update for all of the concrete decls with this name, which will
-      // introduce various same-type constraints.
-      for (auto concreteDecl : concreteDecls) {
-        (void)basePA->updateNestedTypeForConformance(*this, concreteDecl,
-                                                     resolutionKind);
-      }
+    // Update for all of the concrete decls with this name, which will
+    // introduce various same-type constraints.
+    for (auto concreteDecl : concreteDecls) {
+      (void)basePA->updateNestedTypeForConformance(*this, concreteDecl,
+                                                   resolutionKind);
     }
 
     // If base resolved to the anchor, then the nested potential archetype
