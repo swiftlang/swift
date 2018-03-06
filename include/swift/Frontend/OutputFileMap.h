@@ -14,9 +14,11 @@
 #define SWIFT_DRIVER_OUTPUTFILEMAP_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Driver/Types.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
@@ -25,7 +27,6 @@
 #include <string>
 
 namespace swift {
-namespace driver {
 
 typedef llvm::DenseMap<types::ID, std::string> TypeToPathMap;
 
@@ -38,14 +39,12 @@ public:
 
   ~OutputFileMap() = default;
 
-  /// Loads an OutputFileMap from the given \p Path, if possible.
-  ///
-  /// When non-empty, \p workingDirectory is used to resolve relative paths in
-  /// the output file map.
-  static std::unique_ptr<OutputFileMap>
-  loadFromPath(StringRef Path, StringRef workingDirectory);
+  /// Loads an OutputFileMap from the given \p Path into the receiver, if
+  /// possible.
+  static llvm::Expected<OutputFileMap> loadFromPath(StringRef Path,
+                                                    StringRef workingDirectory);
 
-  static std::unique_ptr<OutputFileMap>
+  static llvm::Expected<OutputFileMap>
   loadFromBuffer(StringRef Data, StringRef workingDirectory);
 
   /// Loads an OutputFileMap from the given \p Buffer, taking ownership
@@ -53,7 +52,7 @@ public:
   ///
   /// When non-empty, \p workingDirectory is used to resolve relative paths in
   /// the output file map.
-  static std::unique_ptr<OutputFileMap>
+  static llvm::Expected<OutputFileMap>
   loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
                  StringRef workingDirectory);
 
@@ -74,19 +73,16 @@ public:
   /// Dump the OutputFileMap to the given \p os.
   void dump(llvm::raw_ostream &os, bool Sort = false) const;
 
+  /// Write the OutputFilemap for the \p inputs so it can be parsed.
+  void write(llvm::raw_ostream &os, ArrayRef<StringRef> inputs) const;
+
 private:
-  /// \brief Parses the given \p Buffer into the OutputFileMap, taking ownership
-  /// of \p Buffer in the process.
-  ///
-  /// When non-empty, \p workingDirectory is used to resolve relative paths in
-  /// the output file map.
-  ///
-  /// \returns true on error, false on success
-  bool parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-             StringRef workingDirectory);
+  /// \brief Parses the given \p Buffer and returns either an OutputFileMap or
+  /// error, taking ownership of \p Buffer in the process.
+  static llvm::Expected<OutputFileMap>
+  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);
 };
 
-} // end namespace driver
 } // end namespace swift
 
 #endif
