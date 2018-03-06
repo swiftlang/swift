@@ -192,6 +192,9 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
+    else if (name.startswith("-D"))
+      diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
+                     name);
     else if (!Lexer::isIdentifier(name))
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
                      name);
