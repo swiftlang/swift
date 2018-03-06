@@ -148,6 +148,8 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
     (void) fd;
   }
 
+  Scope S(*this, vd);
+
   auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
     ->getInput();
   selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
@@ -185,6 +187,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
           emitCanonicalFunctionThunk(vd, toClosure, closureFnTy, resultFnTy);
     }
   }
+  toClosure = S.popPreservingValue(toClosure);
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
 }
 
