@@ -1886,8 +1886,11 @@ public:
   Binding(Binding) {}
 
   IfExpr *getIf() {
-    if (Binding && Binding->getNumPatternEntries() == 1)
-      return dyn_cast<IfExpr>(Binding->getInit(0));
+    if (Binding && Binding->getNumPatternEntries() == 1) {
+      if (auto *Init = Binding->getInit(0)) {
+        return dyn_cast<IfExpr>(Init);
+      }
+    }
 
     return nullptr;
   }
