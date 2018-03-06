@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // RUN: %utils/chex.py < %s > %t/generic_structs.sil
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
 

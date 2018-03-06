@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 
 // FIXME: BEGIN -enable-source-import hackaround

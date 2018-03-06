@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t/stats-pre && mkdir -p %t/stats-post
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t/stats-pre && mkdir -p %t/stats-post
 //
 // Compile swiftmodule with decl member name tables
 // RUN: %target-swift-frontend -emit-module -o %t/NamedLazyMembers.swiftmodule %S/Inputs/NamedLazyMembers/NamedLazyMembers.swift

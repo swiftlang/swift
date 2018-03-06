@@ -1,15 +1,16 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
 
 // If the module cache already exists, the pcm gets indexed.
-// RUN: rm -rf %t/idx
+// RUN: %empty-directory(%t/idx)
 // RUN: %target-swift-frontend -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
 
 // FIXME: index the bridging header!
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir %t
 // RUN: echo 'import ClangModuleA' > %t/s2.swift
 // RUN: %target-swift-frontend -index-store-path %t/idx %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx > %t/both.txt

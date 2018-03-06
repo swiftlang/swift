@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: not --crash %t/a.out 2>&1 | PYTHONPATH=%lldb-python-path %utils/symbolicate-linux-fatal %t/a.out - | %utils/backtrace-check -u

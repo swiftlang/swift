@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t/rdar32973206_a.swiftmodule %S/Inputs/rdar32973206_a.swift
 // RUN: %target-swift-frontend -I %t -emit-module -o %t/rdar32973206_b.swiftmodule %S/Inputs/rdar32973206_b.swift

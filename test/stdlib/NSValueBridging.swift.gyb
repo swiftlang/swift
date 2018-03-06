@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // RUN: %gyb %s -o %t/NSValueBridging.swift
 // RUN: %target-build-swift -g -module-name a %t/NSValueBridging.swift -o %t.out
 // RUN: %target-run %t.out

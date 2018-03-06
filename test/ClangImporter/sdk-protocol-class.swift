@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s
 
 // RUN: %target-swift-frontend -typecheck %S/Inputs/sdk-protocol-class/os1.swift

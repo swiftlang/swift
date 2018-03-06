@@ -5,7 +5,8 @@ func foo(_ a : Int) -> Int {
   return 1
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
+// RUN: mkdir -p %t.result
 // RUN: %refactor -extract-expr -source-filename %s -pos=4:13 -end-pos=4:18 >> %t.result/C13-18.swift
 // RUN: diff -u %S/Outputs/basic/C13-18.swift.expected %t.result/C13-18.swift
 // RUN: %refactor -extract-expr -source-filename %s -pos=4:13 -end-pos=4:26 >> %t.result/C13-26.swift

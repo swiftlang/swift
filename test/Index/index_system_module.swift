@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 //
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/my_system_overlay/my_system_overlay.swift -Xcc -I -Xcc %S/Inputs/my_system_overlay

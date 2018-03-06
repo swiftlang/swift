@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 //
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g

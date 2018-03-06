@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -index-store-path %t/idx1 -o %t/file.o -typecheck %s
 // RUN: %target-swift-frontend -index-store-path %t/idx2 -o %t/file.o -typecheck -primary-file %s
 // RUN: c-index-test core -print-record %t/idx1 | %FileCheck %s

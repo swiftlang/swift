@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module-path %t/availability_overloads_other.swiftmodule -emit-module -primary-file %S/Inputs/availability_overloads_other.swift
 

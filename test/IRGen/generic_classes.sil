@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // RUN: %utils/chex.py < %s > %t/generic_classes.sil
 // RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE

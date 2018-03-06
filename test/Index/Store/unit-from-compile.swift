@@ -1,6 +1,6 @@
 // XFAIL: linux
 
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir %t
 // RUN: %target-swift-frontend -c -index-store-path %t/idx %s -o %t/file1.o -module-name some_module_test
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 //
 // RUN: echo "public var dummyVar = Int()" | %target-swift-frontend -module-name DummyModule -emit-module -o %t -

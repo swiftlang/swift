@@ -7,7 +7,7 @@
 // RUN: %llvm-profdata show %t/default.profdata -function=f_public | %FileCheck %s --check-prefix=CHECK-PUBLIC
 // RUN: %llvm-profdata show %t/default.profdata -function=main | %FileCheck %s --check-prefix=CHECK-MAIN
 // RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | %FileCheck %s --check-prefix=CHECK-COV
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx

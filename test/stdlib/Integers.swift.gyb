@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/Integers.swift
 // RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -swift-version 4 -Onone -o %t/a.out
 // RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out

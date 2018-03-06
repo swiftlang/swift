@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/redundant_conformance_A.swift

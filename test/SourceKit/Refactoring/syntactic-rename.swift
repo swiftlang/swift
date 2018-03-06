@@ -92,7 +92,8 @@ func genfoo<T: P, U, V where U: P>(x: T, y: U, z: V, a: P) -> P where V: P {
   fatalError()
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
+// RUN: mkdir -p %t.result
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/z.in.json %s >> %t.result/z.expected
@@ -117,7 +118,8 @@ func genfoo<T: P, U, V where U: P>(x: T, y: U, z: V, a: P) -> P where V: P {
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.result/rename-P.expected
 // RUN: diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
 
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
+// RUN: mkdir -p %t.ranges
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
 // RUN: diff -u %S/find-rename-ranges/x.expected %t.ranges/x.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/z.in.json %s >> %t.ranges/z.expected

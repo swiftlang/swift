@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/System/Library/Frameworks/TestFramework.framework/Modules/TestFramework.swiftmodule
 // RUN: mkdir -p %t/Library/Frameworks/TestFramework2.framework/Modules/TestFramework2.swiftmodule
 // RUN: %target-build-swift -emit-module -o %t/System/Library/Frameworks/TestFramework.framework/Modules/TestFramework.swiftmodule/%target-swiftmodule-name -module-name TestFramework %s -DFRAMEWORK

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_generic_subscript.swift
 // RUN: llvm-bcanalyzer %t/has_generic_subscript.swiftmodule | %FileCheck %s

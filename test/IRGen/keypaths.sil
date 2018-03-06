@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
 // RUN: %utils/chex.py < %s > %t/keypaths.sil
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os

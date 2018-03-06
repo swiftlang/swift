@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && cd %t
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t && cd %t
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
 // RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread -o %t/tsan-binary

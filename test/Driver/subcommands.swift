@@ -2,7 +2,7 @@
 //
 // REQUIRES: swift_interpreter
 //
-// RUN: rm -rf %t.dir
+// RUN: %empty-directory(%t.dir)
 // RUN: mkdir -p %t.dir/usr/bin
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t.dir/usr/bin/swift)
 

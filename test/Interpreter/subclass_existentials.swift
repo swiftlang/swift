@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
