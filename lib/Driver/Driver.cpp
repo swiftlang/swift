@@ -553,7 +553,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
                                     options::OPT_disable_batch_mode,
-                                    false);
+                                    true);
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
