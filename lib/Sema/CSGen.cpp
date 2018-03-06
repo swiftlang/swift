@@ -1250,20 +1250,19 @@ namespace {
         return nullptr;
       }
 
-      // Get FloatingPoint and DifferentiationArgument protocol types.
+      // Get FloatingPoint and Differentiable protocol types.
       auto &ctx = CS.getASTContext();
       ProtocolDecl *fpProto =
         ctx.getProtocol(KnownProtocolKind::FloatingPoint);
-      ProtocolDecl *diffArgProto =
-        ctx.getProtocol(KnownProtocolKind::DifferentiationArgument);
+      ProtocolDecl *diffProto =
+        ctx.getProtocol(KnownProtocolKind::Differentiable);
       assert(fpProto && "FloatingPoint protocol could not be found.");
-      assert(diffArgProto &&
-             "DifferentiationArgument protocol could not be found.");
+      assert(diffProto && "Differentiable protocol could not be found.");
       Type fpProtoTy = fpProto->getDeclaredInterfaceType();
-      Type diffArgProtoTy = diffArgProto->getDeclaredInterfaceType();
+      Type diffProtoTy = diffProto->getDeclaredInterfaceType();
       auto isValidDiffArgType = [&](Type argTy) {
         return CS.TC.isConvertibleTo(argTy, fpProtoTy, CurDC) ||
-          CS.TC.isConvertibleTo(argTy, diffArgProtoTy, CurDC);
+          CS.TC.isConvertibleTo(argTy, diffProtoTy, CurDC);
       };
 
       // Compute the gradient type.
@@ -1338,7 +1337,7 @@ namespace {
               return nullptr;
             }
             // 'self' type must conform to either FloatingPoint or
-            // DifferentiationArgument.
+            // Differentiable.
             if (!isValidDiffArgType(selfTy)) {
               TC.diagnose(arg.getLoc(),
                           diag::gradient_expr_argument_not_differentiable,
@@ -1354,13 +1353,13 @@ namespace {
       }
 
       // Differentiation argument types must conform to either FloatingPoint or
-      // DifferentiationArgument.
+      // Differentiable.
       // TODO: consider generalizing to aggregate types of FloatingPoint and/or
-      // DifferentiationArgument.
+      // Differentiable.
       for (auto &arg : diffArgTypes) {
         auto argTy = arg.getType();
         // If diff arg type does not have type variables, then it must conform
-        // to FloatingPoint or DifferentiationArgument.
+        // to FloatingPoint or Differentiable.
         if (!argTy->hasTypeVariable() && !isValidDiffArgType(argTy)) {
           TC.diagnose(GE->getLoc(),
                       diag::gradient_expr_argument_not_differentiable, argTy);
