@@ -1,5 +1,16 @@
+import CTensorFlow
+import CTensorFlowTestClusterAPI
 import TensorFlow
 import StdlibUnittest
+
+
+// s has C type TF_Status*
+public func checkOk(_ s: OpaquePointer?, file: StaticString = #file,
+  line: UInt = #line) {
+  assert(TF_GetCode(s) == TF_OK,
+    String(cString: TF_Message(s)),
+    file: file, line: line)
+}
 
 /// Determines if two floating point numbers are very nearly equal.
 public func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
@@ -101,4 +112,18 @@ public func shouldDoLoopTest() -> Bool {
     _RuntimeConfig.executionMode = .xla
   }
   return true
+}
+
+public func runAllTestsWithRemoteSession() {
+  let status = TF_NewStatus()
+  let cluster_handle = TF_NewClusterHandle()
+  let remote_server_address = TF_StartTensorFlowProcessCluster(
+    /*num_processes*/ 2, cluster_handle, status)
+  checkOk(status)
+  _RuntimeConfig.session = .remote(
+    grpcAddress: "grpc://" + String(cString: remote_server_address!))
+
+  runAllTests()
+
+  TF_StopTensorFlowProcessCluster(cluster_handle)
 }
