@@ -16,12 +16,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// NOTE: Pretty much everything here is marked @_inlineable/@_versioned.  This
-// causes the body to be serialized into the generated Swift module, which
-// allows it to be inlined into the user's code during deabstraction.  This is
-// really gross, and will get better one way or the other, through compiler
-// changes.
-
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#else
+import Glibc
+#endif
 import CTensorFlow
 
 //===----------------------------------------------------------------------===//
@@ -325,60 +324,79 @@ public extension Tensor where Scalar : Numeric {
 // Random initialization
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin
-#else
-import Glibc
-#endif
-
-fileprivate let randomSeed: Void = srandom(UInt32(time(nil)))
-
-fileprivate func randomStandardUniform() -> Int {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  return Int(arc4random())
-#else
-  _ = randomSeed
-  return random()
-#endif
-}
-
-internal extension Float {
-  @_versioned
-  static func randomUniform() -> Float {
-    return Float(randomStandardUniform()) / 0xFFFFFFFF
+public extension Float {
+  static func randomUniform(state: RandomState? = nil) -> Float {
+    let state = state ?? RandomState.global
+    return Float(state.generate()) / 0xFFFFFFFF
   }
 
   private static var boxMullerHelper: Float = randomUniform()
 
   /// Random value from normal distribution using the Box-Muller method.
-  @_versioned
-  static func randomNormal() -> Float {
-    let tmp = randomUniform()
+  static func randomNormal(mean: Float = 0, stddev: Float = 1,
+                           state: RandomState? = nil) -> Float {
+    let tmp = randomUniform(state: state)
     let result = sqrtf(-2 * logf(tmp)) * cosf(2 * .pi * boxMullerHelper)
     boxMullerHelper = result
-    return result
+    return result * stddev + mean
   }
 }
 
-internal extension Double {
-  @_versioned
-  static func randomUniform() -> Double {
-    return Double(randomStandardUniform()) / 0xFFFFFFFF
+public extension Double {
+  static func randomUniform(state: RandomState? = nil) -> Double {
+    let state = state ?? RandomState.global
+    return Double(state.generate()) / 0xFFFFFFFF
   }
 
   private static var boxMullerHelper: Double = randomUniform()
 
   /// Random value from normal distribution using the Box-Muller method.
-  @_versioned
-  static func randomNormal() -> Double {
-    let tmp = randomUniform()
+  static func randomNormal(mean: Double = 0, stddev: Double = 1,
+                           state: RandomState? = nil) -> Double {
+    let tmp = randomUniform(state: state)
     let result = sqrt(-2 * log(tmp)) * cos(2 * .pi * boxMullerHelper)
     boxMullerHelper = result
-    return result
+    return result * stddev + mean
   }
 }
 
-public extension Tensor where Scalar == Float {
+public extension Tensor where Scalar == Int32 {
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a discrete uniform distribution.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
+  ///
+  @_inlineable @inline(__always)
+  init(randomStandardUniform shape: TensorShape, state: RandomState? = nil) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let state = state ?? RandomState.global
+        return _TFTensorFromScalars(state.generate(Int(shape.contiguousSize)),
+                                    shape: shape.dimensions)
+      }
+    ).toDevice()
+  }
+}
+
+public extension Tensor where Scalar : FloatingPoint {
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution between 0 and 1.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
+  ///
+  @_inlineable @inline(__always)
+  init(randomUniform shape: TensorShape, state: RandomState? = nil) {
+    self = Tensor<Scalar>(
+      Tensor<Int32>(randomStandardUniform: shape, state: state)
+    ) / 0xFFFFFFFF
+  }
+
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a normal distribution.
   ///
@@ -386,67 +404,16 @@ public extension Tensor where Scalar == Float {
   ///   - shape: The dimensions of the tensor.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
   ///
   @_inlineable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    let handle : TensorHandle<Scalar> = _TFHoistable {
-      let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
-      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-    }
-    self = Tensor(handle: handle).toDevice() * stddev + mean
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///
-  @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape) {
-    let handle : TensorHandle<Scalar> = _TFHoistable {
-      let scalars = (0..<shape.contiguousSize).map { _ in
-        Scalar.randomUniform()
-      }
-      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-    }
-    self = Tensor(handle: handle).toDevice()
-  }
-}
-
-public extension Tensor where Scalar == Double {
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a normal distribution.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///   - mean: The mean of the distribution.
-  ///   - stddev: The standard deviation of the distribution.
-  ///
-  @_inlineable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    let handle : TensorHandle<Scalar> = _TFHoistable {
-      let scalars = (0..<shape.contiguousSize).map { _ in Scalar.randomNormal() }
-      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-    }
-    self = Tensor(handle: handle).toDevice() * stddev + mean
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///
-  @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape) {
-    let handle : TensorHandle<Scalar> = _TFHoistable {
-      let scalars = (0..<shape.contiguousSize).map { _ in
-        Scalar.randomUniform()
-      }
-      return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-    }
-    self = Tensor(handle: handle).toDevice()
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
+       state: RandomState? = nil) {
+    let uniform = Tensor<Scalar>(randomUniform: shape, state: state)
+    let boxMullerHelper = Tensor<Scalar>(randomUniform: shape, state: state)
+    let result = sqrt(-2 * log(uniform)) * cos(2 * .pi * boxMullerHelper)
+    self = result * stddev + mean
   }
 }
 
@@ -484,10 +451,10 @@ public extension Tensor {
   @_inlineable @inline(__always)
   // FIXME: Uncomment @differentiable attribute when differenting with respect
   // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self),
-  //   gradient: _adjointReshaped(toShape:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self),
+    gradient: _adjointReshaped(toShape:partial:seed:)
+  )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return #tfop("Reshape", handle, newShape)
   }
@@ -510,10 +477,10 @@ public extension Tensor {
   @_inlineable @inline(__always)
   // FIXME: Uncomment @differentiable attribute when differenting with respect
   // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self),
-  //   gradient: _adjointExpandingShape(at:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self),
+    gradient: _adjointExpandingShape(at:partial:seed:)
+  )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
                  Tdim: Int32.self)
@@ -531,7 +498,7 @@ public extension Tensor {
 
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one scalar.
-  @_inlineable @inline(__always)
+  @_inlineable
   func scalarized() -> Scalar {
     return _TFGetScalarOrDie(reshaped(to: []).handle)
   }

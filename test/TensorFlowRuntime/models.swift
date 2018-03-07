@@ -20,6 +20,8 @@ var ModelTests = TestSuite("Model")
 ModelTests.testAllBackends("StraightLineXORTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
+  // FIXME: TPU execution on TAP is timing out. (b/74155319)
+  guard _RuntimeConfig.executionMode != .tpu else { return }
   // FIXME: GPU training won't converge.
 #if CUDA
   return
@@ -34,8 +36,9 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   var loss = Float.infinity
 
   // Parameters
-  var w1 = Tensor<Float>(randomUniform: [2, 4])
-  var w2 = Tensor<Float>(randomUniform: [4, 1])
+  let state = RandomState(seed: 42)
+  var w1 = Tensor<Float>(randomUniform: [2, 4], state: state)
+  var w2 = Tensor<Float>(randomUniform: [4, 1], state: state)
   var b1 = Tensor<Float>(zeros: [1, 4])
   var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -81,6 +84,8 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
 ModelTests.testAllBackends("XORClassifierTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
+  // FIXME: TPU execution on TAP is timing out. (b/74155319)
+  guard _RuntimeConfig.executionMode != .tpu else { return }
   // FIXME: GPU training won't converge.
 #if CUDA
   return
@@ -92,10 +97,15 @@ ModelTests.testAllBackends("XORClassifierTraining") {
   // The classifier struct.
   struct MLPClassifier {
     // Parameters
-    var w1 = Tensor<Float>(randomUniform: [2, 4])
-    var w2 = Tensor<Float>(randomUniform: [4, 1])
-    var b1 = Tensor<Float>(zeros: [1, 4])
-    var b2 = Tensor<Float>(zeros: [1, 1])
+    let state = RandomState(seed: 42)
+    var w1, w2, b1, b2: Tensor<Float>
+
+    init() {
+      w1 = Tensor(randomUniform: [2, 4], state: state)
+      w2 = Tensor(randomUniform: [4, 1], state: state)
+      b1 = Tensor(zeros: [1, 4])
+      b2 = Tensor(zeros: [1, 1])
+    }
 
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = sigmoid(x ⊗ w1 + b1)
@@ -120,16 +130,16 @@ ModelTests.testAllBackends("XORClassifierTraining") {
       // FIXME: Loop crasher b/73088003
       var i = 0
       repeat {
-        let z1 = x.dot(w1) + b1
+        let z1 = x ⊗ w1 + b1
         let h1 = sigmoid(z1)
-        let z2 = h1.dot(w2) + b2
+        let z2 = h1 ⊗ w2 + b2
         let pred = sigmoid(z2)
 
         let dz2 = pred - y
-        let dw2 = h1.transposed(withPermutations: [1, 0]).dot(dz2)
+        let dw2 = h1.transposed(withPermutations: [1, 0]) ⊗ dz2
         let db2 = dz2.sum(alongAxes: [0])
-        let dz1 = dz2.dot(w2.transposed(withPermutations: [1, 0])) * h1 * (1 - h1)
-        let dw1 = x.transposed(withPermutations: [1, 0]).dot(dz1)
+        let dz1 = dz2 ⊗ w2.transposed(withPermutations: [1, 0]) * h1 * (1 - h1)
+        let dw1 = x.transposed(withPermutations: [1, 0]) ⊗ dz1
         let db1 = dz1.sum(alongAxes: [0])
 
         // Gradient descent
