@@ -25,6 +25,13 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   }
 }
 
+internal func _castASCIIBuffer(
+  _ ptr: UnsafePointer<_FixedArray16<HashType>>
+) -> UnsafeRawPointer {
+  return UnsafeRawPointer(ptr)
+}
+
+typealias HashType = UInt
 extension _UnmanagedString where CodeUnit == UInt16 {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
@@ -32,21 +39,38 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt8>,
 
+    var buf = _FixedArray16<HashType>(allZeros: ())
+    var idx = 0
+
     for (i, cu) in self.enumerated() {
       let cuIsASCII = cu <= 0x7F
   ) {
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
       guard cuIsASCII && isSingleSegmentScalar else {
+        if idx != 0 {
+          let ptr = _castASCIIBuffer(&buf)
+          hasher.append(ptr, byteCount: idx)
+        }
+
         let codeUnitSequence = IteratorSequence(
           _NormalizedCodeUnitIterator(self[i...])
         )
         for element in codeUnitSequence {
-          hasher.append(UInt(element))
+          hasher.append(HashType(element))
         }
         break
       }
 
-      hasher.append(UInt(cu))
+      buf[idx] = HashType(cu)
+      idx += 1
+
+      if idx >= buf.capacity {
+        let ptr = _castASCIIBuffer(&buf)
+        hasher.append(ptr, byteCount: buf.capacity)
+        idx = 0
+      }
+
+      hasher.append(HashType(cu))
     }
   }
 }
@@ -58,6 +82,9 @@ extension _UnmanagedOpaqueString {
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt16>,
 
+    var buf = _FixedArray16<HashType>(allZeros: ())
+    var idx = 0
+
     into hasher: inout _Hasher
   ) {
     for (i, cu) in self.enumerated() {
@@ -66,13 +93,27 @@ extension _UnmanagedOpaqueString {
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       guard cuIsASCII && isSingleSegmentScalar else {
+        if idx != 0 {
+          let ptr = _castASCIIBuffer(&buf)
+          hasher.append(ptr, byteCount: idx)
+        }
+
         let codeUnitSequence = IteratorSequence(
           _NormalizedCodeUnitIterator(self[i...])
         )
         for element in codeUnitSequence {
-          hasher.append(Int(element))
+          hasher.append(HashType(element))
         }
         break
+      }
+
+      buf[idx] = HashType(cu)
+      idx += 1
+
+      if idx >= buf.capacity {
+        let ptr = _castASCIIBuffer(&buf)
+        hasher.append(ptr, byteCount: buf.capacity)
+        idx = 0
       }
 
       hasher.append(Int(truncatingIfNeeded: cu))
