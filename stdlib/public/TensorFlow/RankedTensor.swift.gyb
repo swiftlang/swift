@@ -307,12 +307,16 @@ public extension ${TensorXD} where Scalar == Float {
   ///   - shape: The dimensions of the ${TensorXD}.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
   ///
   @_inlineable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
+       state: RandomState? = nil) {
     precondition(shape.count == ${rank},
                  "The given shape doesn't match rank ${rank}")
-    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev))
+    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev,
+                           state: state))
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -322,12 +326,14 @@ public extension ${TensorXD} where Scalar == Float {
   ///   - shape: The dimensions of the tensor.
   ///   - min: The lower bound of the distribution.
   ///   - max: The upper bound of the distribution.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
   ///
   @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape) {
+  init(randomUniform shape: TensorShape, state: RandomState? = nil) {
     precondition(shape.count == ${rank},
                  "The given shape doesn't match rank ${rank}")
-    self.init(base: Tensor(randomUniform: shape))
+    self.init(base: Tensor(randomUniform: shape, state: state))
   }
 }
 
@@ -339,12 +345,16 @@ public extension ${TensorXD} where Scalar == Double {
   ///   - shape: The dimensions of the ${TensorXD}.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
   ///
   @_inlineable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
+       state: RandomState? = nil) {
     precondition(shape.count == ${rank},
                  "The given shape doesn't match rank ${rank}")
-    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev))
+    self.init(base: Tensor(randomNormal: shape, mean: mean, stddev: stddev,
+                           state: state))
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -354,12 +364,14 @@ public extension ${TensorXD} where Scalar == Double {
   ///   - shape: The dimensions of the tensor.
   ///   - min: The lower bound of the distribution.
   ///   - max: The upper bound of the distribution.
+  ///   - state: The pseudorandom state in which the random numbers are being
+  ///     generated.
   ///
   @_inlineable @inline(__always)
-  init(randomUniform shape: TensorShape) {
+  init(randomUniform shape: TensorShape, state: RandomState? = nil) {
     precondition(shape.count == ${rank},
                  "The given shape doesn't match rank ${rank}")
-    self.init(base: Tensor(randomUniform: shape))
+    self.init(base: Tensor(randomUniform: shape, state: state))
   }
 }
 
