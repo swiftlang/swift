@@ -450,4 +450,8 @@ func testShapeGetter4() {
 }
 TensorTests.testAllBackends("ShapeGetter4", testShapeGetter4)
 
+#if CPU && !CUDA
+runAllTestsWithRemoteSession()
+#else
 runAllTests()
+#endif //  CPU && !CUDA

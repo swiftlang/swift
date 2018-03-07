@@ -84,6 +84,16 @@ public enum _RuntimeConfig {
     }
   }
 
+  /// Specifies whether the TensorFlow computation runs in a local (in-process)
+  /// session, or a remote session with the specified server address (must start
+  /// with "grpc://" in that case).
+  /// Only defined when usesTFEagerAPI == false.
+  public enum RuntimeSession {
+    case local
+    case remote(grpcAddress: String)
+  }
+  static public var session: RuntimeSession = .local
+
   /// When true, prints various debug messages on the runtime state.
   ///
   /// If the value is true when running tensor computation for the first time in
@@ -100,6 +110,41 @@ public enum _RuntimeConfig {
         fatalError("Invalid tensorflowVerboseLogLevel value \(newValue)")
       }
     }
+  }
+}
+
+private func configureRuntimeFromEnvironment() {
+  do {
+    let rawValue = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS")
+    guard let value = rawValue else { return }
+    let grpcAddress = String(cString: value)
+    guard grpcAddress.prefix(7) == "grpc://" else {
+      fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
+    }
+    _RuntimeConfig.session = .remote(grpcAddress: grpcAddress)
+    debugLog("Setting TF server address to \(grpcAddress) from env.")
+  }
+
+  do {
+    let rawValue = getenv("SWIFT_TENSORFLOW_ENABLE_DEBUG_LOGGING")
+    guard let value = rawValue else { return }
+    if String(cString: value).lowercased() == "true" {
+      _RuntimeConfig.printsDebugLog = true
+      debugLog("Turning ond debug logging from env.")
+    }
+  }
+
+  do {
+    let rawValue = getenv("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL")
+    guard let value = rawValue else { return }
+    guard var verboseLevel = Int32(String(cString: value)) else {
+      fatalError("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL must take an int value.")
+    }
+    if verboseLevel > 4 {
+      verboseLevel = 4
+    }
+    _RuntimeConfig.tensorflowVerboseLogLevel = verboseLevel
+    debugLog("Setting TF logging verbose level to \(verboseLevel) from env.")
   }
 }
 
@@ -134,25 +179,12 @@ public final class _ExecutionContext {
 
   /// Initializes a new execution context by initializing available devices.
   private init() {
-    // A simple way to turn on debug logging via commandline arguments.
-    for arg in CommandLine.arguments {
-      if arg == "--enable-debuglog" {
-        _RuntimeConfig.printsDebugLog = true
-      } else if arg.prefix(4) == "--v=" {
-        guard var verboseLevel = Int32(arg.dropFirst(4)) else {
-          fatalError("Commandline argument \(arg) is not of form --v=<int>")
-        }
-        if verboseLevel > 4 {
-          verboseLevel = 4
-        }
-        _RuntimeConfig.tensorflowVerboseLogLevel = verboseLevel
-        debugLog("Setting TF logging verbose level to \(verboseLevel)")
-      }
-    }
+    configureRuntimeFromEnvironment()
 
     debugLog("Initializing global context.")
 
-    // Initialize the TF runtime exactly once.
+    // Initialize the TF runtime exactly once. Only affects local execution
+    // (when _RuntimeConfig.tensorFlowServer is set to "").
     InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
                           _RuntimeConfig.tensorflowVerboseLogLevel)
 
@@ -431,6 +463,10 @@ private class TFState {
     if _RuntimeConfig.executionMode == .xla {
       debugLog("Enable XLA execution.")
       TF_EnableXLACompilation(opts, 1)
+    }
+    if case .remote(let grpcAddress) = _RuntimeConfig.session {
+      debugLog("Set TensorFlow server to \(grpcAddress).")
+      TF_SetTarget(opts, grpcAddress)
     }
     cSession = TF_NewSession(graph, opts, status)
     checkOk(status)
