@@ -677,13 +677,6 @@ FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt))
 
-// bool swift_isEscapingClosure(const struct HeapObject *object);
-FUNCTION(IsEscapingClosure, swift_isEscapingClosure,
-         C_CC,
-         RETURNS(Int1Ty),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind, ZExt))
-
 // bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
 //                                            const unsigned char *filename,
 //                                            int32_t filenameLength,

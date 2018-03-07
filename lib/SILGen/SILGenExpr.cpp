@@ -5310,8 +5310,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
 }
 
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
-    MakeTemporarilyEscapableExpr *E,
-    SGFContext C) {
+    MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
   auto functionValue =
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
@@ -5319,20 +5318,33 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
 
   // Convert it to an escaping function value.
-  functionValue =
+  auto escapingClosure =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
 
-  // Bind the opaque value to the escaping function.
-  SILGenFunction::OpaqueValueState opaqueValue{
-    functionValue,
-    /*consumable*/ true,
-    /*hasBeenConsumed*/ false,
-  };
-  SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
-                                                  opaqueValue);
+  RValue rvalue;
+  auto loc = SILLocation(E);
+  auto borrowedClosure = escapingClosure.borrow(SGF, loc);
+  {
+    // Bind the opaque value to the escaping function.
+    SILGenFunction::OpaqueValueState opaqueValue{
+        borrowedClosure,
+        /*consumable*/ false,
+        /*hasBeenConsumed*/ false,
+    };
+    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
+                                                    opaqueValue);
 
-  // Emit the guarded expression.
-  return visit(E->getSubExpr(), C);
+    // Emit the guarded expression.
+    rvalue = visit(E->getSubExpr(), C);
+  }
+
+  // Now create the verification of the withoutActuallyEscaping operand.
+  // Either we fail the uniquenes check (which means the closure has escaped)
+  // and abort or we continue and destroy the ultimate reference.
+  auto isEscaping =
+      SGF.B.createIsEscapingClosure(loc, borrowedClosure.getValue());
+  SGF.B.createCondFail(loc, isEscaping);
+  return rvalue;
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

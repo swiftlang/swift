@@ -82,6 +82,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
@@ -3147,7 +3148,8 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
   SGF.B.createReturn(loc, result);
 }
 
-ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
+ManagedValue
+SILGenFunction::createWithoutActuallyEscapingClosure(
     SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
 
   auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
@@ -3189,7 +3191,6 @@ ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnType), subs,
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
-
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we rerpresent these captures by the same value the following works.
   thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);
