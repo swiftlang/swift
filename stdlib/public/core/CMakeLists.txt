@@ -87,7 +87,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
-  NewtypeWrapper.swift.gyb
+  NewtypeWrapper.swift
   NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
   Optional.swift
@@ -129,7 +129,7 @@ set(SWIFTLIB_ESSENTIAL
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift
-  StringRangeReplaceableCollection.swift.gyb
+  StringRangeReplaceableCollection.swift
   StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
