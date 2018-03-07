@@ -838,11 +838,10 @@ namespace {
               auto param = params[index];
               auto flags = param.getParameterFlags();
 
-              auto parameterFlags = ParameterFlags()
-                                        .withInOut(flags.isInOut())
-                                        .withShared(flags.isShared())
-                                        .withOwned(flags.isOwned())
-                                        .withVariadic(flags.isVariadic());
+              auto parameterFlags =
+                  ParameterFlags()
+                      .withValueOwnership(flags.getValueOwnership())
+                      .withVariadic(flags.isVariadic());
 
               processor(index, getFunctionParameterRef(param), parameterFlags);
             }
