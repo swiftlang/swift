@@ -855,6 +855,12 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   configureInterfaceType(func, sig);
+
+  // Make sure that there are no unresolved
+  // dependent types in the generic signature.
+  assert(func->getInterfaceType()->hasError() ||
+         !func->getInterfaceType()->findUnresolvedDependentMemberType());
+
   return sig;
 }
 

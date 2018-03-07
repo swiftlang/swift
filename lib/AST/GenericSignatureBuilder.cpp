@@ -1693,13 +1693,7 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
 
   // When building the name for debugging purposes, include the protocol into
   // which the associated type or type alias was resolved.
-  ProtocolDecl *proto = nullptr;
-  if (auto assocType = getResolvedAssociatedType()) {
-    proto = assocType->getProtocol();
-  } else if (auto concreteDecl = getConcreteTypeDecl()) {
-    proto = concreteDecl->getDeclContext()
-              ->getAsProtocolOrProtocolExtensionContext();
-  }
+  auto *proto = getResolvedType()->getProtocol();
 
   if (proto) {
     result.push_back('[');
@@ -2748,7 +2742,7 @@ static void concretizeNestedTypeFromConcreteParent(
 
   // These requirements are all implied based on the parent's concrete
   // conformance.
-  auto assocType = nestedPA->getResolvedAssociatedType();
+  auto assocType = nestedPA->getResolvedType();
   if (!assocType) return;
 
   auto proto = assocType->getProtocol();
@@ -2794,18 +2788,14 @@ static void concretizeNestedTypeFromConcreteParent(
 }
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                                              GenericSignatureBuilder &builder,
-                                              TypeDecl *type,
-                                              ArchetypeResolutionKind kind) {
-  if (!type) return nullptr;
-
-  AssociatedTypeDecl *assocType = dyn_cast<AssociatedTypeDecl>(type);
+    GenericSignatureBuilder &builder, AssociatedTypeDecl *assocType,
+    ArchetypeResolutionKind kind) {
+  if (!assocType)
+    return nullptr;
 
   // Always refer to the archetype anchor.
   if (assocType)
     assocType = assocType->getAssociatedTypeAnchor();
-
-  TypeDecl *concreteDecl = assocType ? nullptr : type;
 
   // If we were asked for a complete, well-formed archetype, make sure we
   // process delayed requirements if anything changed.
@@ -2814,28 +2804,18 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       builder.processDelayedRequirements();
   };
 
-  Identifier name = assocType ? assocType->getName() : concreteDecl->getName();
-  ProtocolDecl *proto =
-    assocType ? assocType->getProtocol()
-              : concreteDecl->getDeclContext()
-                  ->getAsProtocolOrProtocolExtensionContext();
+  Identifier name = assocType->getName();
+  auto *proto = assocType->getProtocol();
 
   // Look for either an unresolved potential archetype (which we can resolve
-  // now) or a potential archetype with the appropriate associated type or
-  // concrete type.
+  // now) or a potential archetype with the appropriate associated type.
   PotentialArchetype *resultPA = nullptr;
   auto knownNestedTypes = NestedTypes.find(name);
   bool shouldUpdatePA = false;
   if (knownNestedTypes != NestedTypes.end()) {
     for (auto existingPA : knownNestedTypes->second) {
       // Do we have an associated-type match?
-      if (assocType && existingPA->getResolvedAssociatedType() == assocType) {
-        resultPA = existingPA;
-        break;
-      }
-
-      // Do we have a concrete type match?
-      if (concreteDecl && existingPA->getConcreteTypeDecl() == concreteDecl) {
+      if (assocType && existingPA->getResolvedType() == assocType) {
         resultPA = existingPA;
         break;
       }
@@ -2852,10 +2832,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       getOrCreateEquivalenceClass(builder)->modified(builder);
 
       void *mem = builder.Impl->Allocator.Allocate<PotentialArchetype>();
-      if (assocType)
-        resultPA = new (mem) PotentialArchetype(this, assocType);
-      else
-        resultPA = new (mem) PotentialArchetype(this, concreteDecl);
+      resultPA = new (mem) PotentialArchetype(this, assocType);
 
       NestedTypes[name].push_back(resultPA);
       builder.addedNestedType(resultPA);
@@ -2870,50 +2847,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
   // If we have a potential archetype that requires more processing, do so now.
   if (shouldUpdatePA) {
-    // For concrete types, introduce a same-type requirement to the aliased
-    // type.
-    if (concreteDecl) {
-      // FIXME (recursive decl validation): if the alias doesn't have an
-      // interface type when getNestedType is called while building a
-      // protocol's generic signature (i.e. during validation), then it'll
-      // fail completely, because building that alias's interface type
-      // requires the protocol to be validated. This seems to occur when the
-      // alias's RHS involves archetypes from the protocol.
-      if (!concreteDecl->hasInterfaceType())
-        builder.getLazyResolver()->resolveDeclSignature(concreteDecl);
-      if (concreteDecl->hasInterfaceType()) {
-        // The protocol concrete type has an underlying type written in terms
-        // of the protocol's 'Self' type.
-        auto type = concreteDecl->getDeclaredInterfaceType();
-
-        if (proto) {
-          // Substitute in the type of the current PotentialArchetype in
-          // place of 'Self' here.
-          auto subMap = SubstitutionMap::getProtocolSubstitutions(
-            proto, getDependentType(builder.getGenericParams()),
-            ProtocolConformanceRef(proto));
-          type = type.subst(subMap, SubstFlags::UseErrorType);
-          if (!type)
-            type = ErrorType::get(proto->getASTContext());
-        } else {
-          // Substitute in the superclass type.
-          auto superclass = getEquivalenceClassIfPresent()->superclass;
-          auto superclassDecl = superclass->getClassOrBoundGenericClass();
-          type = superclass->getTypeOfMember(
-                   superclassDecl->getParentModule(), concreteDecl,
-                   concreteDecl->getDeclaredInterfaceType());
-        }
-
-        builder.addSameTypeRequirement(
-                         UnresolvedType(resultPA),
-                         UnresolvedType(type),
-                         RequirementSource::forConcreteTypeBinding(
-                           builder,
-                           resultPA->getDependentType(builder.getGenericParams())),
-                         UnresolvedHandlingKind::GenerateConstraints);
-      }
-    }
-
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
     if (proto) {
@@ -2960,7 +2893,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
       return parentType;
 
     // If we've resolved to an associated type, use it.
-    if (auto assocType = getResolvedAssociatedType())
+    if (auto assocType = getResolvedType())
       return DependentMemberType::get(parentType, assocType);
 
     return DependentMemberType::get(parentType, getNestedName());
@@ -3645,10 +3578,17 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
     if (!type->isTypeParameter())
       return None;
 
+    auto resolved = builder.maybeResolveEquivalenceClass(
+        Type(type), ArchetypeResolutionKind::WellFormed, true);
+
+    if (!resolved)
+      return ErrorType::get(Type(type));
+
+    if (auto concreteType = resolved.getAsConcreteType())
+      return concreteType;
+
     // Map the type parameter to an equivalence class.
-    auto equivClass =
-      builder.resolveEquivalenceClass(Type(type),
-                                      ArchetypeResolutionKind::WellFormed);
+    auto equivClass = resolved.getEquivalenceClass(builder);
     if (!equivClass)
       return ErrorType::get(Type(type));
 
@@ -3679,6 +3619,47 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
+static Type substituteConcreteType(GenericSignatureBuilder &builder,
+                                   PotentialArchetype *basePA,
+                                   TypeDecl *concreteDecl) {
+  assert(concreteDecl);
+
+  auto *proto =
+      concreteDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+
+  if (!concreteDecl->hasInterfaceType())
+    builder.getLazyResolver()->resolveDeclSignature(concreteDecl);
+
+  if (!concreteDecl->hasInterfaceType())
+    return Type();
+
+  // The protocol concrete type has an underlying type written in terms
+  // of the protocol's 'Self' type.
+  auto type = concreteDecl->getDeclaredInterfaceType();
+
+  if (proto) {
+    // Substitute in the type of the current PotentialArchetype in
+    // place of 'Self' here.
+    Type parentType = basePA->getDependentType(builder.getGenericParams());
+
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+        proto, parentType, ProtocolConformanceRef(proto));
+
+    type = type.subst(subMap, SubstFlags::UseErrorType);
+    if (!type)
+      return ErrorType::get(proto->getASTContext());
+  } else {
+    // Substitute in the superclass type.
+    auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
+    auto superclassDecl = superclass->getClassOrBoundGenericClass();
+    type = superclass->getTypeOfMember(
+        superclassDecl->getParentModule(), concreteDecl,
+        concreteDecl->getDeclaredInterfaceType());
+  }
+
+  return type;
+};
+
 ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
@@ -3706,8 +3687,20 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
 
     // Find the nested type declaration for this.
     auto baseEquivClass = resolvedBase.getEquivalenceClass(*this);
-    TypeDecl *nestedTypeDecl;
-    SmallVector<TypeDecl *, 4> concreteDecls;
+
+    // Retrieve the "smallest" type in the equivalence class, by depth, and
+    // use that to find a nested potential archetype. We used the smallest
+    // type by depth to limit expansion of the type graph.
+    PotentialArchetype *basePA;
+    if (wantExactPotentialArchetype) {
+      basePA = resolvedBase.getPotentialArchetypeIfKnown();
+      if (!basePA)
+        return ResolvedType::forUnresolved(baseEquivClass);
+    } else {
+      basePA = baseEquivClass->members.front();
+    }
+
+    AssociatedTypeDecl *nestedTypeDecl = nullptr;
     if (auto assocType = depMemTy->getAssocType()) {
       // Check whether this associated type references a protocol to which
       // the base conforms. If not, it's unresolved.
@@ -3717,24 +3710,15 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
 
       nestedTypeDecl = assocType;
     } else {
-      nestedTypeDecl =
-        baseEquivClass->lookupNestedType(*this, depMemTy->getName(),
-                                         &concreteDecls);
+      auto *typeAlias =
+          baseEquivClass->lookupNestedType(*this, depMemTy->getName());
 
-      if (!nestedTypeDecl) {
+      if (!typeAlias)
         return ResolvedType::forUnresolved(baseEquivClass);
-      }
-    }
 
-    // Retrieve the "smallest" type in the equivalence class, by depth, and
-    // use that to find a nested potential archetype. We used the smallest
-    // type by depth to limit expansion of the type graph.
-    PotentialArchetype *basePA;
-    if (wantExactPotentialArchetype) {
-      basePA = resolvedBase.getPotentialArchetypeIfKnown();
-      if (!basePA) return ResolvedType::forUnresolved(baseEquivClass);
-    } else {
-      basePA = baseEquivClass->members.front();
+      auto type = substituteConcreteType(*this, basePA, typeAlias);
+      return maybeResolveEquivalenceClass(type, resolutionKind,
+                                          wantExactPotentialArchetype);
     }
 
     auto nestedPA =
@@ -3742,15 +3726,6 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                              resolutionKind);
     if (!nestedPA)
       return ResolvedType::forUnresolved(baseEquivClass);
-
-    if (resolutionKind != ArchetypeResolutionKind::AlreadyKnown) {
-      // Update for all of the concrete decls with this name, which will
-      // introduce various same-type constraints.
-      for (auto concreteDecl : concreteDecls) {
-        (void)basePA->updateNestedTypeForConformance(*this, concreteDecl,
-                                                     resolutionKind);
-      }
-    }
 
     // If base resolved to the anchor, then the nested potential archetype
     // we found is the resolved potential archetype. Return it directly,
@@ -4704,7 +4679,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       // Otherwise, make the nested types equivalent.
       AssociatedTypeDecl *assocTypeT2 = nullptr;
       for (auto T2 : T2Nested.second) {
-        assocTypeT2 = T2->getResolvedAssociatedType();
+        assocTypeT2 = T2->getResolvedType();
         if (assocTypeT2) break;
       }
 
@@ -5288,7 +5263,7 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
     bool foundNonAssociatedType = false;
     for (auto currentPA = pa; auto parentPA = currentPA->getParent();
          currentPA = parentPA){
-      if (!currentPA->getResolvedAssociatedType()) {
+      if (!currentPA->getResolvedType()) {
         foundNonAssociatedType = true;
         break;
       }
@@ -5962,28 +5937,11 @@ void GenericSignatureBuilder::checkConformanceConstraints(
   }
 }
 
-/// Compare dependent types for use in anchors.
-///
-/// FIXME: This is a hack that will go away once we eliminate potential
-/// archetypes that refer to concrete type declarations.
-static int compareAnchorDependentTypes(Type type1, Type type2) {
-  // We don't want any unresolved dependent member types to be anchors, so
-  // prefer that they don't get through.
-  bool hasUnresolvedDependentMember1 =
-    type1->findUnresolvedDependentMemberType() != nullptr;
-  bool hasUnresolvedDependentMember2 =
-    type2->findUnresolvedDependentMemberType() != nullptr;
-  if (hasUnresolvedDependentMember1 != hasUnresolvedDependentMember2)
-    return hasUnresolvedDependentMember2 ? -1 : +1;
-
-  return compareDependentTypes(type1, type2);
-}
-
 namespace swift {
   bool operator<(const DerivedSameTypeComponent &lhs,
                  const DerivedSameTypeComponent &rhs) {
-    return compareAnchorDependentTypes(getUnresolvedType(lhs.anchor, { }),
-                                       getUnresolvedType(rhs.anchor, { })) < 0;
+    return compareDependentTypes(getUnresolvedType(lhs.anchor, {}),
+                                 getUnresolvedType(rhs.anchor, {})) < 0;
   }
 } // namespace swift
 
@@ -6119,9 +6077,9 @@ static void computeDerivedSameTypeComponents(
     componentOf[depType] = componentIndex;
 
     // If this is a better anchor, record it.
-    if (compareAnchorDependentTypes(
-                depType,
-                getUnresolvedType(components[componentIndex].anchor, { })) < 0)
+    if (compareDependentTypes(
+            depType, getUnresolvedType(components[componentIndex].anchor, {})) <
+        0)
       components[componentIndex].anchor = pa;
   }
 
@@ -6256,8 +6214,7 @@ static bool isSelfDerivedNestedTypeNameMatchEdge(
   DependentMemberType *sourceDepMemTy;
   while ((sourceDepMemTy = sourceType->getAs<DependentMemberType>()) &&
          target->getParent() &&
-         sourceDepMemTy->getAssocType() &&
-         sourceDepMemTy->getAssocType() == target->getResolvedAssociatedType()){
+         sourceDepMemTy->getAssocType() == target->getResolvedType()) {
     sourceType = sourceDepMemTy->getBase();
     target = target->getParent();
 
@@ -6438,9 +6395,8 @@ static void collapseSameTypeComponents(
       auto &newComponent = newComponents[newRepresentativeIndex];
 
       // If the old component has a better anchor, keep it.
-      if (compareAnchorDependentTypes(
-                            getUnresolvedType(oldComponent.anchor, { }),
-                            getUnresolvedType(newComponent.anchor, { })) < 0)
+      if (compareDependentTypes(getUnresolvedType(oldComponent.anchor, {}),
+                                getUnresolvedType(newComponent.anchor, {})) < 0)
         newComponent.anchor = oldComponent.anchor;
 
       // If the old component has a better concrete type source, keep it.
@@ -6838,7 +6794,7 @@ static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
       rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].anchor,
       { });
 
-  return compareAnchorDependentTypes(lhsType, rhsType);
+  return compareDependentTypes(lhsType, rhsType);
 }
 
 void GenericSignatureBuilder::enumerateRequirements(
