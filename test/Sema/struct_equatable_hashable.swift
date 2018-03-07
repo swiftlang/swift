@@ -2,13 +2,16 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown
 
+var hasher = _Hasher()
+
 struct Point: Hashable {
   let x: Int
   let y: Int
 }
 
 if Point(x: 1, y: 2) == Point(x: 2, y: 1) { }
-var pointHash: Int = Point(x: 3, y: 5).hashValue
+let pointHash: Int = Point(x: 3, y: 5).hashValue
+Point(x: 3, y: 5)._hash(into: &hasher)
 
 Point(x: 1, y: 2) == Point(x: 2, y: 1) // expected-warning {{result of operator '==' is unused}}
 
@@ -24,7 +27,8 @@ struct Pair<T: Hashable>: Hashable {
 let p1 = Pair(first: "a", second: "b")
 let p2 = Pair(first: "a", second: "c")
 if p1 == p2 { }
-var pairHash: Int = p1.hashValue
+let _: Int = p1.hashValue
+p1._hash(into: &hasher)
 
 func localStruct() -> Bool {
   struct Local: Equatable {
@@ -44,12 +48,14 @@ struct CustomHashable: Hashable {
 }
 
 if CustomHashable(x: 1, y: 2) == CustomHashable(x: 2, y: 3) { }
-var custHash: Int = CustomHashable(x: 1, y: 2).hashValue
+let _: Int = CustomHashable(x: 1, y: 2).hashValue
+CustomHashable(x: 1, y: 2)._hash(into: &hasher)
 
 // Check use of an struct's synthesized members before the struct is actually declared.
 struct UseStructBeforeDeclaration {
   let eqValue = StructToUseBeforeDeclaration(v: 4) == StructToUseBeforeDeclaration(v: 5)
   let hashValue = StructToUseBeforeDeclaration(v: 1).hashValue
+  let hashInto: (inout _Hasher) -> Void = StructToUseBeforeDeclaration(v: 1)._hash(into:)
 }
 struct StructToUseBeforeDeclaration: Hashable {
   let v: Int
@@ -58,6 +64,7 @@ struct StructToUseBeforeDeclaration: Hashable {
 // Check structs from another file in the same module.
 if FromOtherFile(v: "a") == FromOtherFile(v: "b") {}
 let _: Int = FromOtherFile(v: "c").hashValue
+FromOtherFile(v: "d")._hash(into: &hasher)
 
 func getFromOtherFile() -> AlsoFromOtherFile { return AlsoFromOtherFile(v: 4) }
 if AlsoFromOtherFile(v: 3) == getFromOtherFile() {}
@@ -93,7 +100,7 @@ struct StructIgnoresComputedProperties: Hashable {
 }
 if StructIgnoresComputedProperties(a: 1, b: "a") == StructIgnoresComputedProperties(a: 2, b: "c") {}
 let _: Int = StructIgnoresComputedProperties(a: 3, b: "p").hashValue
-
+StructIgnoresComputedProperties(a: 4, b: "q")._hash(into: &hasher)
 
 // Structs should be able to derive conformances based on the conformances of
 // their generic arguments.
@@ -101,15 +108,18 @@ struct GenericHashable<T: Hashable>: Hashable {
   let value: T
 }
 if GenericHashable<String>(value: "a") == GenericHashable<String>(value: "b") { }
-var genericHashableHash: Int = GenericHashable<String>(value: "a").hashValue
+let _: Int = GenericHashable<String>(value: "c").hashValue
+GenericHashable<String>(value: "c")._hash(into: &hasher)
 
 // But it should be an error if the generic argument doesn't have the necessary
 // constraints to satisfy the conditions for derivation.
-struct GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
+struct GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform to protocol 'Hashable'}}
   let value: T
 }
 if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "b") { }
-var genericNotHashableHash: Int = GenericNotHashable<String>(value: "a").hashValue // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hashValue'}}
+let gnh = GenericNotHashable<String>(value: "b")
+let _: Int = gnh.hashValue // No error. hashValue is always synthesized, even if Hashable derivation fails
+gnh._hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member '_hash'}}
 
 
 // Conformance cannot be synthesized in an extension.
@@ -147,6 +157,30 @@ extension OtherFileNonconforming: Hashable {
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+
+// Verify that we can add Hashable conformance in an extension by only
+// implementing _hash(into:)
+struct StructConformsAndImplementsHashIntoInExtension: Equatable {
+  let v: String
+}
+extension StructConformsAndImplementsHashIntoInExtension: Hashable {
+  func _hash(into hasher: inout _Hasher) {
+    hasher.append(v)
+  }
+}
+let _: Int = StructConformsAndImplementsHashIntoInExtension(v: "a").hashValue
+StructConformsAndImplementsHashIntoInExtension(v: "b")._hash(into: &hasher)
+
+struct GenericHashIntoInExtension<T: Hashable>: Equatable {
+  let value: T
+}
+extension GenericHashIntoInExtension: Hashable {
+  func _hash(into hasher: inout _Hasher) {
+    hasher.append(value)
+  }
+}
+let _: Int = GenericHashIntoInExtension<String>(value: "a").hashValue
+GenericHashIntoInExtension(value: "b")._hash(into: &hasher)
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
