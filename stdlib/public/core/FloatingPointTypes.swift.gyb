@@ -625,18 +625,14 @@ extension ${Self}: BinaryFloatingPoint {
   /// almost never is.
   @_inlineable // FIXME(sil-serialize-all)
   public var ulp: ${Self} {
-%if bits == 32 or bits == 64:
+%if bits != 80:
     guard _fastPath(isFinite) else { return .nan }
     if _fastPath(isNormal) {
       let bitPattern_ = bitPattern & ${Self}.infinity.bitPattern
-      return ${Self}(bitPattern: bitPattern_) / 0x1p${SignificandBitCount}
+      return ${Self}(bitPattern: bitPattern_) * 0x1p-${SignificandBitCount}
     }
-#if arch(arm)
-    // On arm, flush positive subnormal values to 0.
-    return 0
-#else
-    return .leastNonzeroMagnitude
-#endif
+    // On arm, flush subnormal values to 0.
+    return .leastNormalMagnitude * 0x1p-${SignificandBitCount}
 %else:
     guard _fastPath(isFinite) else { return .nan }
     if exponentBitPattern > UInt(${Self}.significandBitCount) {
@@ -931,24 +927,17 @@ extension ${Self}: BinaryFloatingPoint {
   /// - If `x` is `greatestFiniteMagnitude`, then `x.nextUp` is `infinity`.
   @_inlineable // FIXME(sil-serialize-all)
   public var nextUp: ${Self} {
-%if bits == 32 or bits == 64:
+%if bits != 80:
     // Silence signaling NaNs, map -0 to +0.
     let x = self + 0
 #if arch(arm)
-    // On arm, skip positive subnormal values.
-    if _slowPath(x.bitPattern & (-${Self}.infinity).bitPattern == 0) {
-      return .leastNormalMagnitude
-    }
+    // On arm, treat subnormal values as zero.
+    if _slowPath(x == 0) { return .leastNonzeroMagnitude }
+    if _slowPath(x == -.leastNonzeroMagnitude) { return -0.0 }
 #endif
     if _fastPath(x < .infinity) {
       let increment = Int${bits}(bitPattern: x.bitPattern) &>> ${bits - 1} | 1
       let bitPattern_ = x.bitPattern &+ UInt${bits}(bitPattern: increment)
-#if arch(arm)
-      // On arm, flush negative subnormal values to -0.
-      if _slowPath(bitPattern_ & ${Self}.infinity.bitPattern == 0) {
-        return -0.0
-      }
-#endif
       return ${Self}(bitPattern: bitPattern_)
     }
     return x
@@ -1391,14 +1380,14 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // y.exponent == 4
   @_inlineable // FIXME(sil-serialize-all)
   public var binade: ${Self} {
-%if bits == 32 or bits == 64:
+%if bits != 80:
     guard _fastPath(isFinite) else { return .nan }
 #if !arch(arm)
     if _slowPath(isSubnormal) {
       let bitPattern_ =
         (self * 0x1p${SignificandBitCount}).bitPattern
           & (-${Self}.infinity).bitPattern
-      return ${Self}(bitPattern: bitPattern_) / 0x1p${SignificandBitCount}
+      return ${Self}(bitPattern: bitPattern_) * 0x1p-${SignificandBitCount}
     }
 #endif
     return ${Self}(bitPattern: bitPattern & (-${Self}.infinity).bitPattern)
