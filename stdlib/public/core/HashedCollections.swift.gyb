@@ -1776,6 +1776,7 @@ public struct Dictionary<Key : Hashable, Value> {
   ///   the new dictionary. Every key in `keysAndValues` must be unique.
   /// - Returns: A new dictionary initialized with the elements of
   ///   `keysAndValues`.
+  /// - Precondition: The sequence must not have duplicate keys.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S: Sequence>(
     uniqueKeysWithValues keysAndValues: S
