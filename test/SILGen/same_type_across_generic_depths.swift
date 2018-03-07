@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s > %t/out.sil
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %t/out.sil | %FileCheck %s
 class X<A> {}

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %utils/chex.py < %s > %t/generic_vtable.swift
 // RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK
 

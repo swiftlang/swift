@@ -1,6 +1,7 @@
 // REQUIRES: objc_interop
 // RUN: %target-swift-frontend -typecheck -swift-version 3 %s
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/to_int_max.result -emit-remap-file-path %t/to_int_max.remap -o /dev/null
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/to_int_max.result -emit-remap-file-path %t/to_int_max.remap -o /dev/null
 // RUN: diff -u %S/to_int_max.swift.expected %t/to_int_max.result
 // RUN: %target-swift-frontend -typecheck -swift-version 4 %t/to_int_max.result
 

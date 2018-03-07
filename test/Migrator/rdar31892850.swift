@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -typecheck -primary-file %s -module-cache-path %t/mcp -emit-remap-file-path %t/edits.remap
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -typecheck -primary-file %s -module-cache-path %t/mcp -emit-remap-file-path %t/edits.remap
 // RUN: %FileCheck %s -input-file=%t/edits.remap
 
 enum SomeStringEnum : String {
@@ -14,12 +15,12 @@ func foo() {
 // CHECK:[
 // CHECK:  {
 // CHECK:    "file": "{{.*}}rdar31892850.swift",
-// CHECK:    "offset": 305,
+// CHECK:    "offset": 306,
 // CHECK:    "text": "SomeStringEnum(rawValue: "
 // CHECK:  },
 // CHECK:  {
 // CHECK:    "file": "{{.*}}rdar31892850.swift",
-// CHECK:    "offset": 309,
+// CHECK:    "offset": 310,
 // CHECK:    "text": ")!"
 // CHECK:  }
 // CHECK:]
