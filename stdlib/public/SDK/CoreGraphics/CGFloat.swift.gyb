@@ -254,18 +254,18 @@ extension CGFloat : BinaryFloatingPoint {
   }
 
   @_transparent
-  public func isEqual(to other: CGFloat) -> Bool {
-    return self.native.isEqual(to: other.native)
+  public static func ==(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
+    return lhs.native == rhs.native
   }
 
   @_transparent
-  public func isLess(than other: CGFloat) -> Bool {
-    return self.native.isLess(than: other.native)
+  public static func <(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
+    return lhs.native < rhs.native
   }
 
   @_transparent
-  public func isLessThanOrEqualTo(_ other: CGFloat) -> Bool {
-    return self.native.isLessThanOrEqualTo(other.native)
+  public static func <=(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
+    return lhs.native <= rhs.native
   }
 
   @_transparent
