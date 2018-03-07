@@ -2209,8 +2209,10 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
-  // Make sure we only unwrap at most one layer of optional.
-  if (insideOptional == OptionalUnwrapping::None) {
+  // Unwrap optional as much as possible.
+  if (insideOptional == OptionalUnwrapping::None ||
+      insideOptional == OptionalUnwrapping::OptionalToOptional ||
+      insideOptional == OptionalUnwrapping::ValueToOptional) {
     // Value-to-optional and optional-to-optional.
     if (auto obj2 = t2.getOptionalObjectType()) {
       // Optional-to-optional.
