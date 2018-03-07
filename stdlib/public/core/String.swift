@@ -44,6 +44,12 @@ public protocol StringProtocol
   func lowercased() -> String
   func uppercased() -> String
 
+  /// Creates a string having the given substring's unicode scalars as its content.
+  ///
+  /// - Parameters:
+  ///   - content: The `unicodeScalars` of a subsequence of this string.
+  init(_ content: SubSequence.UnicodeScalarView)
+    
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
   ///
