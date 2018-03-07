@@ -1514,8 +1514,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
   if (Loc.wasValidated())
     return Loc.isError();
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
