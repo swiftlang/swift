@@ -275,7 +275,7 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
   if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
     LeadingTrivia.push_back(TriviaPiece::backtick());
-    assert(TrailingTrivia.size() == 0 && "TrailingTrivia is empty here");
+    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
     TrailingTrivia.push_back(TriviaPiece::backtick());
   }
   formToken(tok::identifier, TokStart);

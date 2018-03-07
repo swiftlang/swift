@@ -4289,7 +4289,7 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
-  if (argumentNames.size() == 0) {
+  if (argumentNames.empty()) {
     SimpleOrCompound = BaseNameAndCompound(baseName, true);
     return;
   }

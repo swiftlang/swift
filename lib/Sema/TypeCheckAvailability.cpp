@@ -433,7 +433,7 @@ private:
       // If this query expression has no queries, we will not introduce a new
       // refinement context. We do not diagnose here: a diagnostic will already
       // have been emitted by the parser.
-      if (Query->getQueries().size() == 0)
+      if (Query->getQueries().empty())
         continue;
 
       AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);

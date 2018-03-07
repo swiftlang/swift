@@ -2920,7 +2920,7 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
 
 void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
                                      Explosion &result) {
-  if (result.size() == 0) {
+  if (result.empty()) {
     Builder.CreateRetVoid();
     return;
   }
@@ -3008,7 +3008,7 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
                                                 IRGenFunction &IGF,
                                                 Explosion &native,
                                                 SILType type) const {
-  if (native.size() == 0) {
+  if (native.empty()) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
   }
@@ -3142,7 +3142,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
                                                 Explosion &fromNonNative,
                                                 SILType type,
                                                 bool isOutlined) const {
-  if (fromNonNative.size() == 0) {
+  if (fromNonNative.empty()) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
   }
@@ -3275,7 +3275,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
 
 void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
                                      bool isSwiftCCReturn, bool isOutlined) {
-  if (result.size() == 0) {
+  if (result.empty()) {
     assert(IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM).empty() &&
            "Empty explosion must match the native calling convention");
 
