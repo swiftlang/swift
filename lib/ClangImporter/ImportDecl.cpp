@@ -1870,7 +1870,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      SourceLoc(), C.Id_errorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationStarted();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
@@ -2740,7 +2740,7 @@ namespace {
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
-          //   public static var _nsErrorDomain: String { return error-domain }
+          //   public static var errorDomain: String { return error-domain }
           addErrorDomain(errorWrapper, enumInfo.getErrorDomain(), Impl);
 
           // Note: the Code will be added after it's created.
@@ -7777,6 +7777,22 @@ static void finishInheritedConformances(
   }
 }
 
+static Type
+recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
+                              DependentMemberType *depMemTy) {
+  Type origBase = depMemTy->getBase();
+  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
+    Type substBase = recursivelySubstituteBaseType(conformance, depBase);
+    ModuleDecl *module = conformance->getDeclContext()->getParentModule();
+    return depMemTy->substBaseType(module, substBase);
+  }
+
+  const ProtocolDecl *proto = conformance->getProtocol();
+  assert(origBase->isEqual(proto->getSelfInterfaceType()));
+  return conformance->getTypeWitness(depMemTy->getAssocType(),
+                                     /*resolver=*/nullptr);
+}
+
 /// Collect conformances for the requirement signature.
 static void finishSignatureConformances(
     NormalProtocolConformance *conformance) {
@@ -7793,9 +7809,7 @@ static void finishSignatureConformances(
       substTy = conformance->getType();
     } else {
       auto *depMemTy = origTy->castTo<DependentMemberType>();
-      assert(depMemTy->getBase()->isEqual(proto->getSelfInterfaceType()));
-      substTy = conformance->getTypeWitness(depMemTy->getAssocType(),
-                                            /*resolver=*/nullptr);
+      substTy = recursivelySubstituteBaseType(conformance, depMemTy);
     }
     auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
 

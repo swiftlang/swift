@@ -24,7 +24,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
   }
 
   IntentsTestSuite.test("extension/\(swiftVersion)") {
-    expectEqual("IntentsErrorDomain", INIntentError._nsErrorDomain)
+    expectEqual("IntentsErrorDomain", INIntentError.errorDomain)
   }
 }
 
