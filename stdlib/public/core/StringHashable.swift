@@ -110,7 +110,7 @@ extension _UnmanagedString where CodeUnit == UTF16.CodeUnit {
   @inline(never) // Hide the CF dependency
   internal func computeHashValue() -> Int {
 #if _runtime(_ObjC)
-    let temp = _NSContiguousString(_StringGuts(self))
+    let temp = _NSContiguousString(_StringGuts(_large: self))
     let hash = temp._unsafeWithNotEscapedSelfPointer {
       return _stdlib_NSStringHashValuePointer($0, isASCII: false)
     }

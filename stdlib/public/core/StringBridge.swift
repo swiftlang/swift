@@ -30,6 +30,7 @@ func _stdlib_binary_CFStringCreateCopy(
 }
 
 @_inlineable // FIXME(sil-serialize-all)
+@effects(readonly)
 public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
@@ -144,12 +145,13 @@ internal func _getCocoaStringPointer(
 internal
 func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   if let ascii = cocoaString as? _ASCIIStringStorage {
-    return _StringGuts(ascii)
+    return _StringGuts(_large: ascii)
   } else if let utf16 = cocoaString as? _UTF16StringStorage {
-    return _StringGuts(utf16)
+    return _StringGuts(_large: utf16)
   } else if let wrapped = cocoaString as? _NSContiguousString {
     return wrapped._guts
   } else if _isObjCTaggedPointer(cocoaString) {
+    // TODO(SSO): small check
     return _StringGuts(_taggedCocoaObject: cocoaString)
   }
   // "copy" it into a value to be sure nobody will modify behind
@@ -159,15 +161,18 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
   if _isObjCTaggedPointer(immutableCopy) {
+    // TODO(SSO): small check
     return _StringGuts(_taggedCocoaObject: immutableCopy)
   }
 
   let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
 
+  // TODO(SSO): small check
+
   let length = _StringGuts.getCocoaLength(
     _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
   return _StringGuts(
-    _nonTaggedCocoaObject: immutableCopy,
+    _largeNonTaggedCocoaObject: immutableCopy,
     count: length,
     isSingleByte: !isUTF16,
     start: start)
@@ -240,9 +245,9 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
     _sanityCheck(!guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     if guts.isASCII {
-      self._guts = _StringGuts(guts._unmanagedASCIIView)
+      self._guts = _StringGuts(_large: guts._unmanagedASCIIView)
     } else {
-      self._guts = _StringGuts(guts._unmanagedUTF16View)
+      self._guts = _StringGuts(_large: guts._unmanagedUTF16View)
     }
     super.init()
   }
@@ -252,9 +257,9 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
     _sanityCheck(!guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     if guts.isASCII {
-      self._guts = _StringGuts(guts._unmanagedASCIIView[range])
+      self._guts = _StringGuts(_large: guts._unmanagedASCIIView[range])
     } else {
-      self._guts = _StringGuts(guts._unmanagedUTF16View[range])
+      self._guts = _StringGuts(_large: guts._unmanagedUTF16View[range])
     }
     super.init()
   }
