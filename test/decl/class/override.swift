@@ -18,6 +18,12 @@ class A {
   func ret_subclass_uoptional_rev() -> B { return B() }
   func ret_subclass_optional_uoptional() -> A? { return .none }
   func ret_subclass_optional_uoptional_rev() -> B! { return B() }
+  func ret_nonclass_nested_optional() -> Int?? { return .none } // expected-note{{potential overridden instance method 'ret_nonclass_nested_optional()'}}
+  func ret_nonclass_nested_optional_rev() -> Int { return 0 }
+  func ret_class_nested_optional() -> B?? { return .none } // expected-note{{potential overridden instance method 'ret_class_nested_optional()'}}
+  func ret_class_nested_optional_rev() -> A { return self }
+  func ret_subclass_nested_optional() -> A?? { return .none } // expected-note{{potential overridden instance method 'ret_subclass_nested_optional()'}}
+  func ret_subclass_nested_optional_rev() -> B { return B() }
 
   func param_sametype(_ x : Int) {}
   func param_subclass(_ x : B) {}
@@ -36,6 +42,12 @@ class A {
   func param_subclass_uoptional_rev(_ x : A!) {}
   func param_subclass_optional_uoptional(_ x : B!) {}
   func param_subclass_optional_uoptional_rev(_ x : A?) {}
+  func param_nonclass_nested_optional(_ x : Int) {} // expected-note{{potential overridden instance method 'param_nonclass_nested_optional'}}
+  func param_nonclass_nested_optional_rev(_ x : Int??) {}
+  func param_class_nested_optional(_ x : B) {} // expected-note{{potential overridden instance method 'param_class_nested_optional'}}
+  func param_class_nested_optional_rev(_ x : B??) {}
+  func param_subclass_nested_optional(_ x : B) {} // expected-note{{potential overridden instance method 'param_subclass_nested_optional'}}
+  func param_subclass_nested_optional_rev(_ x : A??) {}
 }
 
 class B : A {
@@ -56,6 +68,12 @@ class B : A {
   func ret_subclass_uoptional_rev() -> A! { return self }
   override func ret_subclass_optional_uoptional() -> B! { return self }
   func ret_subclass_optional_uoptional_rev() -> A? { return self }
+  override func ret_nonclass_nested_optional() -> Int { return 0 } // expected-error{{method does not override any method from its superclass}}
+  func ret_nonclass_nested_optional_rev() -> Int? { return 0 }
+  override func ret_class_nested_optional() -> B { return self } // expected-error{{method does not override any method from its superclass}}
+  func ret_class_nested_optional_rev() -> A? { return self }
+  override func ret_subclass_nested_optional() -> B { return self } // expected-error{{method does not override any method from its superclass}}
+  func ret_subclass_nested_optional_rev() -> A? { return self }
 
   override func param_sametype(_ x : Int) {}
   override func param_subclass(_ x : A) {}
@@ -74,6 +92,12 @@ class B : A {
   func param_subclass_uoptional_rev(_ x : B) {}
   override func param_subclass_optional_uoptional(_ x : A?) {}
   func param_subclass_optional_uoptional_rev(_ x : B!) {}
+  override func param_nonclass_nested_optional(_ x : Int??) {} // expected-error{{method does not override any method from its superclass}}
+  func param_nonclass_nested_optional_rev(_ x : Int) {}
+  override func param_class_nested_optional(_ x : B??) {} // expected-error{{method does not override any method from its superclass}}
+  func param_class_nested_optional_rev(_ x : B) {}
+  override func param_subclass_nested_optional(_ x : A??) {} // expected-error{{method does not override any method from its superclass}}
+  func param_subclass_nested_optional_rev(_ x : B) {}
 }
 
 class C<T> {
