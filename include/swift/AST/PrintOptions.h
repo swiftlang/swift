@@ -397,6 +397,7 @@ struct PrintOptions {
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
+    result.PrintDocumentationComments = false;
     return result;
   }
 
@@ -413,6 +414,7 @@ struct PrintOptions {
     result.ElevateDocCommentFromConformance = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
+    result.PrintDocumentationComments = true;
     return result;
   }
 
