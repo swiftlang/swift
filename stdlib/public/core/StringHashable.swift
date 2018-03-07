@@ -32,20 +32,21 @@ internal func _castASCIIBuffer(
 }
 
 typealias HashType = UInt
-extension _UnmanagedString where CodeUnit == UInt16 {
+extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt8>,
+    var buffer = _FixedArray16<HashType>(allZeros: ())
+    var bufferIndex = 0
 
-    var buf = _FixedArray16<HashType>(allZeros: ())
-    var idx = 0
+    var i = startIndex
 
     for (i, cu) in self.enumerated() {
       let cuIsASCII = cu <= 0x7F
   ) {
-      let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
+      defer { i = index(after: i) }
       guard cuIsASCII && isSingleSegmentScalar else {
         if idx != 0 {
           let ptr = _castASCIIBuffer(&buf)
@@ -93,30 +94,30 @@ extension _UnmanagedOpaqueString {
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       guard cuIsASCII && isSingleSegmentScalar else {
-        if idx != 0 {
-          let ptr = _castASCIIBuffer(&buf)
-          hasher.append(ptr, byteCount: idx)
+        if bufferIndex != 0 {
+          let ptr = _castASCIIBuffer(&buffer)
+          hasher.append(ptr, byteCount: bufferIndex)
         }
 
         let codeUnitSequence = IteratorSequence(
-          _NormalizedCodeUnitIterator(self[i...])
+          _NormalizedCodeUnitIterator(self[i..<endIndex])
         )
         for element in codeUnitSequence {
-          hasher.append(HashType(element))
+          hasher.append(Int(element))
         }
         break
       }
 
-      buf[idx] = HashType(cu)
-      idx += 1
+      buffer[bufferIndex] = HashType(cu)
+      bufferIndex += 1
 
-      if idx >= buf.capacity {
-        let ptr = _castASCIIBuffer(&buf)
-        hasher.append(ptr, byteCount: buf.capacity)
-        idx = 0
+      if bufferIndex >= buffer.capacity {
+        let ptr = _castASCIIBuffer(&buffer)
+        hasher.append(ptr, byteCount: buffer.capacity)
+        bufferIndex = 0
       }
 
-      hasher.append(Int(truncatingIfNeeded: cu))
+      hasher.append(UInt(cu))
     }
   }
 }

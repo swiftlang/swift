@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-//HACK: This gets rid of some retains/releases that was slowing down the 
+//HACK: This gets rid of some retains/releases that was slowing down the
 //memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
 @effects(readonly)
@@ -348,14 +348,14 @@ extension _UnmanagedOpaqueString {
     if idx+1 < self.count {
       buffer[0] = self[idx]
       buffer[1] = self[idx+1]
-  
+
       let bufferPointer = _unsafeBufferPointerCast(
         &buffer, 2, to: UInt16.self
       )
       return Swift._parseRawScalar(buffer: bufferPointer, startingFrom: 0)
     } else {
       buffer[0] = self[idx]
-  
+
       let bufferPointer = _unsafeBufferPointerCast(
         &buffer, 1, to: UInt16.self
       )
@@ -387,7 +387,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     _sanityCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
     return (UnicodeScalar(_unchecked: value), idx+2)
   }
-  
+
   internal func _reverseParseRawScalar(
     endingAt idx: Int // one-past-the-end
   ) -> (UnicodeScalar, scalarStartIndex: Int) {
@@ -418,7 +418,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   ) -> Int? {
     return self._tryNormalize(into: _castOutputBuffer(outputBuffer))
   }
-  
+
   internal func _tryNormalize(
     into outputBuffer: UnsafeMutableBufferPointer<UInt16>
   ) -> Int? {
@@ -437,7 +437,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return numericCast(count)
   }
-  
+
   internal func _slowNormalize() -> [UInt16] {
     _sanityCheck(self.count > 0, "called on empty string")
 
@@ -505,7 +505,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   }
 }
 
-public extension _StringGuts {  
+public extension _StringGuts {
   @inline(__always)
   public
   func _compareContiguous(_ other: _StringGuts) -> Int {
@@ -532,8 +532,8 @@ public extension _StringGuts {
   @inline(__always)
   public
   func _compareContiguous(
-    _ selfRange: Range<Int>, 
-    _ other: _StringGuts, 
+    _ selfRange: Range<Int>,
+    _ other: _StringGuts,
     _ otherRange: Range<Int>
   ) -> Int {
     _sanityCheck(self._isContiguous && other._isContiguous)
@@ -578,7 +578,7 @@ extension _UnmanagedOpaqueString {
     // really ASCII strings that were bridged improperly. E.g., unknown nul-
     // termination of an all-ASCII file loaded by String.init(contentsOfFile:).
     //
-    
+
     let selfCount = self.count
     let otherCount = otherRange.count
     let count = Swift.min(selfCount, otherCount)
@@ -595,14 +595,14 @@ extension _UnmanagedOpaqueString {
     //
     let selfIsASCII = selfCU <= 0x7F
     let otherIsASCII = otherCU <= 0x7F
-    
-    let selfIsSingleSegmentScalar = 
-        self.hasNormalizationBoundary(after: idx) 
+
+    let selfIsSingleSegmentScalar =
+        self.hasNormalizationBoundary(after: idx)
         && _hasNormalizationBoundary(before: selfCU)
-    let otherIsSingleSegmentScalar = 
-        other.hasNormalizationBoundary(after: idx) 
+    let otherIsSingleSegmentScalar =
+        other.hasNormalizationBoundary(after: idx)
         && _hasNormalizationBoundary(before: otherCU)
-    
+
     if _fastPath(selfIsASCII || otherIsASCII) {
       _sanityCheck(idx < selfCount && idx < otherCount,
         "Should be caught by check against min-count")
@@ -610,16 +610,16 @@ extension _UnmanagedOpaqueString {
       // "_isNormalizedSuperASCII" case. 99.9% of the time, we're here because
       // the non-contig string is ASCII. We never want to hit the pathological
       // path for those.
-      
-      if selfIsASCII && otherIsASCII {            
+
+      if selfIsASCII && otherIsASCII {
         if selfIsSingleSegmentScalar && otherIsSingleSegmentScalar {
           return _lexicographicalCompare(selfCU, otherCU)
         }
-        
+
         return self._compareOpaquePathological(
           other, otherRange, startingFrom: Swift.max(0, idx-1))
       }
-      
+
       if selfIsASCII && selfIsSingleSegmentScalar
       && self._parseRawScalar(startingFrom: idx).0._isNormalizedSuperASCII {
          return .less
@@ -641,7 +641,7 @@ extension _UnmanagedOpaqueString {
   ) -> _Ordering {
     // Compare by pulling in a segment at a time, normalizing then comparing
     // individual code units
-    var selfIterator = _NormalizedCodeUnitIterator(self, startIndex: startingFrom)
+    var selfIterator = _NormalizedCodeUnitIterator(self[startingFrom...])
     return selfIterator.compare(with:
       _NormalizedCodeUnitIterator(other, otherRange, startIndex: startingFrom)
     )
@@ -788,8 +788,8 @@ extension _UnmanagedString where CodeUnit == UInt8 {
     let otherCU = other[idx]
 
     //
-    // Fast path: if other is super-ASCII post-normalization, we must be less. If
-    // other is ASCII and a single-scalar segment, we have our answer.
+    // Fast path: if other is super-ASCII post-normalization, we must be less.
+    // If other is ASCII and a single-scalar segment, we have our answer.
     //
     if otherCU > 0x7F {
       if _fastPath(
@@ -824,7 +824,7 @@ extension _StringGuts {
     if nextIndex >= self.count {
       return true
     }
-    
+
     let nextCU = self[nextIndex]
     return _hasNormalizationBoundary(before: nextCU)
   }
@@ -836,7 +836,7 @@ extension _UnmanagedOpaqueString {
     if nextIndex >= self.count {
       return true
     }
-    
+
     let nextCU = self[nextIndex]
     return _hasNormalizationBoundary(before: nextCU)
   }
@@ -848,7 +848,19 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     if nextIndex >= self.count {
       return true
     }
-    
+
+    let nextCU = self[nextIndex]
+    return _hasNormalizationBoundary(before: nextCU)
+  }
+}
+
+extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
+  func hasNormalizationBoundary(after index: Index) -> Bool {
+    let nextIndex = self.index(after: index)
+    if nextIndex == self.endIndex {
+      return true
+    }
+
     let nextCU = self[nextIndex]
     return _hasNormalizationBoundary(before: nextCU)
   }
@@ -899,7 +911,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return segmentEndIdx
   }
-  
+
   internal func _findNormalizationSegmentStart(
     endingAt idx: Int // one-past-the-end
   ) -> Int {
@@ -922,8 +934,8 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     // Corner case: if we're sub-surrogate, back up
     if _slowPath(
-      idx > 0 
-      && _isTrailingSurrogate(self[idx]) 
+      idx > 0
+      && _isTrailingSurrogate(self[idx])
       && _isLeadingSurrogate(self[idx-1])
     ) {
       idx -= 1
@@ -973,7 +985,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     let nextCU = self[idx+1]
     return nextCU < 0x300 || _hasNormalizationBoundary(before: nextCU)
   }
-  
+
   @_versioned
   internal
   func _compareStringsPreLoop(
@@ -1011,7 +1023,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     if self.count == other.count {
       return false
     }
-  
+
     let minimumLength = Swift.min(self.count, other.count)
     for i in 0..<minimumLength {
       if self[i] != other[i] {
@@ -1020,7 +1032,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return true
   }
-  
+
   private func _compareStringsSuffix(
     other: _UnmanagedString<UInt16>,
     randomIndex: Int
@@ -1042,9 +1054,9 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     // which case, we will want to effectively compare the two consecutive
     // segments together.
     //
-    let (selfSegmentStartIdx, selfSegmentEndIdx) = 
+    let (selfSegmentStartIdx, selfSegmentEndIdx) =
       self._findNormalizationSegment(spanning: randomIndex)
-    let (otherSegmentStartIdx, otherSegmentEndIdx) = 
+    let (otherSegmentStartIdx, otherSegmentEndIdx) =
       other._findNormalizationSegment(spanning: randomIndex)
     let comparisonStartIdx = Swift.min(selfSegmentStartIdx, otherSegmentStartIdx)
 
@@ -1100,7 +1112,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     } else {
       otherSegmentLengthOpt = otherSegment._tryNormalize(into: &otherOutputBuffer)
     }
-  
+
     if _slowPath(selfSegmentLengthOpt == nil || otherSegmentLengthOpt == nil) {
       // If we couldn't normalize a segment into a generously large stack buffer,
       // we have a pathological String.
@@ -1113,7 +1125,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     if Swift.shorterPrefixesOther(
       &selfOutputBuffer, selfLength,
-      &otherOutputBuffer, otherLength) 
+      &otherOutputBuffer, otherLength)
     {
       let selfSlice = self[selfSegmentStartIdx...]
       let otherSlice = other[otherSegmentStartIdx...]
@@ -1184,7 +1196,7 @@ private func shorterPrefixesOther(
   if selfBuffer.count == otherBuffer.count {
     return false
   }
-  
+
   let minimumLength = Swift.min(selfBuffer.count, otherBuffer.count)
   for i in 0..<minimumLength {
     if selfBuffer[i] != otherBuffer[i] {
