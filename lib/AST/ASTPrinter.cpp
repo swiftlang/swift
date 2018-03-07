@@ -1758,28 +1758,13 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
                                   PrintOptions Options) {
-  auto Nominal = ExtendedType->getAnyNominal();
-  assert(Nominal && "extension of non-nominal type");
-  if (auto nt = ExtendedType->getAs<NominalType>()) {
-    if (auto ParentType = nt->getParent()) {
-      if (auto *ParentNT = ParentType->getAs<NominalOrBoundGenericNominalType>()) {
-        // Avoid using the parent type directly because it can be bound
-        // generic type and sugared.
-        ParentNT->getDecl()->getDeclaredType().print(Printer, Options);
-      } else {
-        ParentType.print(Printer, Options);
-      }
-      Printer << ".";
-    }
-  }
+  Options.FullyQualifiedTypes = false;
+  Options.FullyQualifiedTypesIfAmbiguous = false;
 
-  // Respect alias type.
-  if (isa<NameAliasType>(ExtendedType.getPointer())) {
-    ExtendedType.print(Printer, Options);
-    return;
-  }
+  // Strip off generic arguments, if any.
+  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
 
-  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getName());
+  Ty->print(Printer, Options);
 }
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
