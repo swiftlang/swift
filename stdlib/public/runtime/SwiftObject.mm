@@ -1391,12 +1391,22 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   int32_t line) {
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
+
+  // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *fatalErr = reinterpret_cast<const unsigned char *>("Fatal error");
-    auto *message = reinterpret_cast<const unsigned char *>(
-        "closure argument was escaped in withoutActuallyEscaping block");
-    _swift_stdlib_reportFatalErrorInFile(fatalErr, 11, message, 62, filename,
-                                         filenameLength, line, 0 /* flags */);
+    auto *message = "Fatal error: closure argument was escaped in "
+                              "withoutActuallyEscaping block";
+    auto messageLength = strlen(message);
+
+    if (_swift_reportFatalErrorsToDebugger)
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, message);
+
+    char *log;
+    swift_asprintf(&log, "%.*s: file %.*s, line %" PRIu32 "\n", messageLength,
+                   message, filenameLength, filename, line);
+
+    swift_reportError(RuntimeErrorFlagFatal, log);
+    free(log);
   }
   return isEscaping;
 }
