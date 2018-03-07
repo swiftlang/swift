@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -4146,10 +4147,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       SmallVector<ASTNode, 16> Entries;
       {
         llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-        if (!isDelayedParsingEnabled())
+        if (!isDelayedParsingEnabled()) {
+          if (Context.Stats)
+            Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
           parseBraceItems(Entries);
-        else
+        } else {
           consumeGetSetBody(TheDecl, LBLoc);
+        }
       }
 
       SourceLoc RBLoc;
@@ -5193,6 +5198,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
         diagnose(Tok, diag::protocol_method_with_body);
         skipUntilDeclRBrace();
       } else if (!isDelayedParsingEnabled()) {
+        if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
         ParserResult<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
@@ -6063,6 +6071,9 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ParseFunctionBody CC(*this, CD);
 
       if (!isDelayedParsingEnabled()) {
+        if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
         ParserResult<BraceStmt> Body =
           parseBraceItemList(diag::invalid_diagnostic);
 
@@ -6131,7 +6142,11 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
     ParseFunctionBody CC(*this, DD);
     if (!isDelayedParsingEnabled()) {
-      ParserResult<BraceStmt> Body=parseBraceItemList(diag::invalid_diagnostic);
+      if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+      ParserResult<BraceStmt> Body =
+        parseBraceItemList(diag::invalid_diagnostic);
 
       if (!Body.isNull())
         DD->setBody(Body.get());
