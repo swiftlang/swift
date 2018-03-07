@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: no_asan
 // RUN: %empty-directory(%t)
 // RUN: touch  %t/f_1_1.swift %t/f_1_2.swift %t/f_1_3.swift %t/f_1_4.swift %t/f_1_5.swift %t/f_1_6.swift %t/f_1_7.swift %t/f_1_8.swift %t/f_1_9.swift %t/f_1_10.swift
 // RUN: touch  %t/f_2_1.swift %t/f_2_2.swift %t/f_2_3.swift %t/f_2_4.swift %t/f_2_5.swift %t/f_2_6.swift %t/f_2_7.swift %t/f_2_8.swift %t/f_2_9.swift %t/f_2_10.swift
