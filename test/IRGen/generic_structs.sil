@@ -6,6 +6,23 @@
 
 import Builtin
 
+// -- Generic structs with fixed layout should have no completion function
+//    and emit the field offset vector as part of the pattern.
+// CHECK:       [[PATTERN:@.*]] = internal constant [3 x i64] [i64 0, i64 1, i64 8]
+// CHECK-LABEL: @"$S15generic_structs18FixedLayoutGenericVMP" = internal constant <{ {{.*}} }> <{
+// -- instantiation function
+// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S15generic_structs18FixedLayoutGenericVMi"
+// -- completion function
+// CHECK-SAME:   i32 0,
+// -- pattern flags
+// CHECK-SAME:   i32 2097153,
+// -- vwtable pointer
+// CHECK-SAME:   @"$S15generic_structs18FixedLayoutGenericVWV"
+// -- extra data pattern
+// CHECK-SAME: [3 x i64]* [[PATTERN]]
+// CHECK-SAME: i16 1,
+// CHECK-SAME: i16 3 }>
+
 // -- Generic structs with dynamic layout contain the vwtable pattern as part
 //    of the metadata pattern, and no independent vwtable symbol
 // CHECK: @"$S15generic_structs13SingleDynamicVWV" = internal constant
@@ -87,6 +104,12 @@ import Builtin
 // CHECK: @"$S15generic_structs8StringlyVMf" = internal constant <{ {{.*}} i64, i64, i64 }> <{
 // CHECK-SAME:   i64 0, i64 8, i64 16
 // CHECK-SAME: }>
+
+struct FixedLayoutGeneric<T> {
+  var x: Byteful
+  var y: Byteful
+  var z: Intish
+}
 
 struct SingleDynamic<T> {
   var x : T

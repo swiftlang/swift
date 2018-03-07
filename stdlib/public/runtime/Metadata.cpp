@@ -397,7 +397,7 @@ initializeValueMetadataFromPattern(ValueMetadata *metadata,
 
   if (pattern->hasExtraDataPattern()) {
     void **metadataExtraData =
-      reinterpret_cast<void**>(rawMetadata) + sizeof(ValueMetadata);
+      reinterpret_cast<void**>(rawMetadata + sizeof(ValueMetadata));
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
