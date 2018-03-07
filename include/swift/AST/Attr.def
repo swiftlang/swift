@@ -308,17 +308,17 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
           LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
           /*Not serialized*/74)
 
-// SWIFT_ENABLE_TENSORFLOW
-// FIXME: Make it serialized
-DECL_ATTR(differentiable, Differentiable,
-          OnFunc | LongAttribute | NotSerialized,
-          /* Not serialized */ 75)
-
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
                  OnEnum | OnStruct | OnClass | OnProtocol |
                  OnFunc | OnVar | OnSubscript | OnConstructor | OnEnumElement |
                  UserInaccessible,
                  75)
+
+// SWIFT_ENABLE_TENSORFLOW
+// FIXME: Make it serialized
+DECL_ATTR(differentiable, Differentiable,
+          OnFunc | LongAttribute | NotSerialized,
+          /* Not serialized */ 76)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
