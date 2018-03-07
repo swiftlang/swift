@@ -36,8 +36,7 @@ BLOCKIFYASM_PATH = os.path.join(SWIFT_REPO, "utils", "dev-scripts",
                                 "blockifyasm")
 
 
-def create_swift_disassemble_viewcfg(debugger, command, exec_ctx, result,
-                                     internal_dict):
+def disassemble_asm_cfg(debugger, command, exec_ctx, result, internal_dict):
     """
     This function disassembles the current assembly frame into a temporary file
     and then uses that temporary file as input to blockifyasm | viewcfg. This
@@ -71,6 +70,6 @@ def disassemble_to_file(debugger, command, exec_ctx, result, internal_dict):
 def __lldb_init_module(debugger, internal_dict):
     import_llvm_dataformatters(debugger)
     debugger.HandleCommand('command script add disassemble-asm-cfg '
-                           '-f lldbToolBox.create_swift_disassemble_viewcfg')
+                           '-f lldbToolBox.disassemble_asm_cfg')
     debugger.HandleCommand('command script add disassemble-to-file '
                            '-f lldbToolBox.disassemble_to_file')
