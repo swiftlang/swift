@@ -4011,17 +4011,21 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // Retrieve the requirement that a given typealias introduces when it
   // overrides an inherited associated type with the same name, as a string
   // suitable for use in a where clause.
-  auto getTypeAliasReq = [&](TypeAliasDecl *typealias, const char *start) {
+  auto getConcreteTypeReq = [&](TypeDecl *type, const char *start) {
     std::string result;
     {
       llvm::raw_string_ostream out(result);
       out << start;
-      out << typealias->getFullName() << " == ";
-      if (auto underlyingTypeRepr =
-            typealias->getUnderlyingTypeLoc().getTypeRepr())
-        underlyingTypeRepr->print(out);
-      else
-        typealias->getUnderlyingTypeLoc().getType().print(out);
+      out << type->getFullName() << " == ";
+      if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
+        if (auto underlyingTypeRepr =
+              typealias->getUnderlyingTypeLoc().getTypeRepr())
+          underlyingTypeRepr->print(out);
+        else
+          typealias->getUnderlyingTypeLoc().getType().print(out);
+      } else {
+        type->print(out);
+      }
     }
     return result;
   };
@@ -4151,51 +4155,68 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       inheritedTypeDecls.erase(knownInherited);
       continue;
     }
+  }
 
-    if (auto typealias = dyn_cast<TypeAliasDecl>(Member)) {
-      // Check whether we inherited any types with the same name.
-      auto knownInherited = inheritedTypeDecls.find(typealias->getFullName());
-      if (knownInherited == inheritedTypeDecls.end()) continue;
+  // Check all remaining inherited type declarations to determine if
+  // this protocol has a non-associated-type type with the same name.
+  inheritedTypeDecls.remove_if(
+    [&](const std::pair<DeclName, TinyPtrVector<TypeDecl *>> &inherited) {
+      auto name = inherited.first;
+      for (auto found : proto->lookupDirect(name)) {
+        // We only want concrete type declarations.
+        auto type = dyn_cast<TypeDecl>(found);
+        if (!type || isa<AssociatedTypeDecl>(type)) continue;
 
-      bool shouldWarnAboutRedeclaration =
-        source->kind == RequirementSource::RequirementSignatureSelf;
+        // ... from the same module as the protocol.
+        if (type->getModuleContext() != proto->getModuleContext()) continue;
 
-      for (auto inheritedType : knownInherited->second) {
-        // If we have inherited associated type...
-        if (auto inheritedAssocTypeDecl =
-              dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // Infer a same-type requirement between the typealias' underlying
-          // type and the inherited associated type.
-          addInferredSameTypeReq(inheritedAssocTypeDecl, typealias);
-
-          // Warn that one should use where clauses for this.
-          if (shouldWarnAboutRedeclaration) {
-            auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
-            auto fixItWhere = getProtocolWhereLoc();
-            Diags.diagnose(typealias,
-                           diag::typealias_override_associated_type,
-                           typealias->getFullName(),
-                           inheritedFromProto->getDeclaredInterfaceType())
-              .fixItInsertAfter(fixItWhere.first,
-                                getTypeAliasReq(typealias, fixItWhere.second))
-              .fixItRemove(typealias->getSourceRange());
-            Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                           inheritedAssocTypeDecl->getFullName());
-
-            shouldWarnAboutRedeclaration = false;
-          }
-
-          continue;
+        // Or is constrained.
+        if (auto ext = dyn_cast<ExtensionDecl>(type->getDeclContext())) {
+          if (ext->isConstrainedExtension()) continue;
         }
 
-        // Two typealiases that should be the same.
-        addInferredSameTypeReq(inheritedType, typealias);
+        // We found something.
+        bool shouldWarnAboutRedeclaration =
+          source->kind == RequirementSource::RequirementSignatureSelf;
+
+        for (auto inheritedType : inherited.second) {
+          // If we have inherited associated type...
+          if (auto inheritedAssocTypeDecl =
+                dyn_cast<AssociatedTypeDecl>(inheritedType)) {
+            // Infer a same-type requirement between the typealias' underlying
+            // type and the inherited associated type.
+            addInferredSameTypeReq(inheritedAssocTypeDecl, type);
+
+            // Warn that one should use where clauses for this.
+            if (shouldWarnAboutRedeclaration) {
+              auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
+              auto fixItWhere = getProtocolWhereLoc();
+              Diags.diagnose(type,
+                             diag::typealias_override_associated_type,
+                             name,
+                             inheritedFromProto->getDeclaredInterfaceType())
+                .fixItInsertAfter(fixItWhere.first,
+                                  getConcreteTypeReq(type, fixItWhere.second))
+                .fixItRemove(type->getSourceRange());
+              Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
+                             inheritedAssocTypeDecl->getFullName());
+
+              shouldWarnAboutRedeclaration = false;
+            }
+
+            continue;
+          }
+
+          // Two typealiases that should be the same.
+          addInferredSameTypeReq(inheritedType, type);
+        }
+
+        // We can remove this entry.
+        return true;
       }
 
-      inheritedTypeDecls.erase(knownInherited);
-      continue;
-    }
-  }
+      return false;
+  });
 
   // Infer same-type requirements among inherited type declarations.
   for (auto &entry : inheritedTypeDecls) {

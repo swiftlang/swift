@@ -48,7 +48,8 @@ public:
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // Instantiation-specific.
+    // Everything after this is type-specific.
+    asImpl().noteStartOfTypeSpecificMembers();
 
     // Generic arguments.
     // This must always be the first piece of trailing data.
@@ -84,6 +85,7 @@ public:
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
+  void noteStartOfTypeSpecificMembers() {}
 
 private:
   void addPointer() {

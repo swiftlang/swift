@@ -116,17 +116,17 @@ import Swift
 // CHECK-SAME:   i32 1,
 // --       No empty cases
 // CHECK-SAME:   i32 0,
-// --       generic instantiation function
-// CHECK-SAME:   @"$S4enum16DynamicSingletonOMi"
+// --       generic instantiation pattern
+// CHECK-SAME:   @"$S4enum16DynamicSingletonOMP"
 // --       generic parameters, requirements, key, extra
 // CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
 // --       generic param
 // CHECK-SAME:   i8 -128,
 // CHECK-SAME: }>
 
-// CHECK: @"$S4enum16DynamicSingletonOMP" = internal constant <{ {{.*}}, %swift.type* }> <{
+// CHECK: @"$S4enum16DynamicSingletonOMP" = internal constant <{ {{.*}} }> <{
+// CHECK-SAME:   @"$S4enum16DynamicSingletonOMi"
 // CHECK-SAME:   [18 x i8*]* @"$S4enum16DynamicSingletonOWV"
-// CHECK-SAME:   @"$S4enum16DynamicSingletonOMn"
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
@@ -169,7 +169,8 @@ import Swift
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxs" to i8*)
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxg" to i8*)
 
-// CHECK: @"$S4enum20DynamicSinglePayloadOMP" = internal constant <{ {{.*}}, %swift.type* }> <{
+// CHECK: @"$S4enum20DynamicSinglePayloadOMP" = internal constant <{ {{.*}} }> <{
+// CHECK-SAME:   @"$S4enum20DynamicSinglePayloadOMi"
 // CHECK-SAME:   [18 x i8*]* @"$S4enum20DynamicSinglePayloadOWV"
 
 // CHECK: @"$S4enum18MultiPayloadNestedOWV" = internal constant [18 x i8*] [
@@ -2677,24 +2678,35 @@ entry(%x : $*MyOptional):
 }
 
 // -- Fill function for dynamic singleton.
-// CHECK: define{{( protected)?}} internal %swift.type* @"$S4enum16DynamicSingletonOMi"(%swift.type_descriptor*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum16DynamicSingletonOMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}} @"$S4enum16DynamicSingletonOMP" to i8**), [[WORD]] {{16|32}}, i8** %1)
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2, [[WORD]] {{4|8}})
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], [[WORD]] 2
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]]
+
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum16DynamicSingletonOMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
 // CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
-// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK:   ret %swift.type* null
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum20DynamicSinglePayloadOMi"(%swift.type_descriptor*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum20DynamicSinglePayloadOMi"
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
+
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum20DynamicSinglePayloadOMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
+// CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
+// CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
+// CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
 // CHECK:   call void @swift_initEnumMetadataSinglePayload(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]], i32 3)
 
 // CHECK-64-LABEL: define linkonce_odr hidden void @"$S4enum17StructWithWeakVarVwxs"(%swift.opaque* noalias %dest, i32 %index, %swift.type* %StructWithWeakVar)

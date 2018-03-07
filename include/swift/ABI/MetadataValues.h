@@ -33,6 +33,9 @@ enum {
   /// The number of words (pointers) in a value buffer.
   NumWords_ValueBuffer = 3,
 
+  /// The number of words in a metadata completion context.
+  NumWords_MetadataCompletionContext = 4,
+
   /// The number of words in a yield-once coroutine buffer.
   NumWords_YieldOnceBuffer = 4,
 
@@ -1175,6 +1178,47 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+/// Flags used by generic metadata patterns.
+class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
+  enum {
+    // All of these values are bit offsets or widths.
+    // General flags build up from 0.
+    // Kind-specific flags build down from 31.
+
+    /// Does this pattern have an extra-data pattern?
+    HasExtraDataPattern = 0,
+
+    // Class-specific flags.
+
+    /// Does this pattern have an immediate-members pattern?
+    Class_HasImmediateMembersPattern = 31,
+
+    // Value-specific flags.
+
+    /// For value metadata: the metadata kind of the type.
+    Value_MetadataKind = 21,
+    Value_MetadataKind_width = 11,
+  };
+
+public:
+  explicit GenericMetadataPatternFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr GenericMetadataPatternFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasImmediateMembersPattern,
+                                class_hasImmediateMembersPattern,
+                                class_setHasImmediateMembersPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
+                                hasExtraDataPattern,
+                                setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
+                                 Value_MetadataKind_width,
+                                 MetadataKind,
+                                 value_getMetadataKind,
+                                 value_setMetadataKind)
 };
 
 } // end namespace swift

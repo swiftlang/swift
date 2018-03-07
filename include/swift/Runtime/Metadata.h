@@ -118,8 +118,8 @@ struct InProcess {
   using FarRelativeDirectPointer = FarRelativeDirectPointer<T, Nullable>;
 
   template <typename T, bool Nullable = false>
-  using FarRelativeIndirectablePointer =
-    FarRelativeIndirectablePointer<T, Nullable>;
+  using RelativeIndirectablePointer =
+    RelativeIndirectablePointer<T, Nullable>;
   
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
@@ -151,7 +151,7 @@ struct External {
   using FarRelativeDirectPointer = StoredPointer;
 
   template <typename T, bool Nullable = false>
-  using FarRelativeIndirectablePointer = StoredSize;
+  using RelativeIndirectablePointer = int32_t;
   
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = int32_t;
@@ -180,8 +180,8 @@ using TargetRelativeDirectPointer
   = typename Runtime::template RelativeDirectPointer<Pointee, Nullable>;
 
 template <typename Runtime, typename Pointee, bool Nullable = true>
-using TargetFarRelativeIndirectablePointer
-  = typename Runtime::template FarRelativeIndirectablePointer<Pointee,Nullable>;
+using TargetRelativeIndirectablePointer
+  = typename Runtime::template RelativeIndirectablePointer<Pointee,Nullable>;
 
 struct HeapObject;
 class WeakReference;
@@ -758,6 +758,7 @@ template <typename Runtime> class TargetClassDescriptor;
 template <typename Runtime> class TargetValueTypeDescriptor;
 template <typename Runtime> class TargetEnumDescriptor;
 template <typename Runtime> class TargetStructDescriptor;
+template <typename Runtime> struct TargetGenericMetadataPattern;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -1716,7 +1717,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       : TargetMetadata<Runtime>(Kind), Description(description) {}
 
   /// An out-of-line description of the type.
-  ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>
+  ConstTargetMetadataPointer<Runtime, TargetValueTypeDescriptor>
     Description;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -2238,75 +2239,6 @@ struct TargetExistentialMetatypeMetadata
 };
 using ExistentialMetatypeMetadata
   = TargetExistentialMetatypeMetadata<InProcess>;
-
-/// The instantiation cache for generic metadata.  This must be guaranteed
-/// to zero-initialized before it is first accessed.  Its contents are private
-/// to the runtime.
-template <typename Runtime>
-struct TargetGenericMetadataInstantiationCache {
-  /// Data that the runtime can use for its own purposes.  It is guaranteed
-  /// to be zero-filled by the compiler.
-  TargetPointer<Runtime, void>
-  PrivateData[swift::NumGenericMetadataPrivateDataWords];
-};
-using GenericMetadataInstantiationCache =
-  TargetGenericMetadataInstantiationCache<InProcess>;
-
-/// The pattern for class metadata.
-template <typename Runtime>
-struct TargetGenericClassMetadataPattern {
-  using StoredPointer = typename Runtime::StoredPointer;
-
-  /// The heap-destructor function.
-  TargetPointer<Runtime, HeapObjectDestroyer> Destroy;
-
-  /// The ivar-destructor function.
-  TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
-
-  /// The class flags.
-  ClassFlags Flags;
-
-  /// The size of the immedate-members pattern, in words.
-  ///
-  /// This pattern will be copied into the immediate-members section of
-  /// the allocated class metadata.  The pattern data is at the start of
-  /// the pattern buffer.
-  ///
-  /// The rest of the immediate-members section will be zeroed.
-  uint16_t ImmediateMembersPattern_Size;
-
-  /// The offset into the immediate-members section of the metadata, in
-  /// words, into which to copy the immediate-members pattern.
-  uint16_t ImmediateMembersPattern_TargetOffset;
-
-  /// The total amount of extra space to allocate in the metadata, in words.
-  /// This space will always be allocated after the metadata.
-  uint16_t NumExtraDataWords;
-
-  // TODO: only in ObjC interop
-
-  /// The offset of the class RO-data within the extra data pattern,
-  /// in words.
-  uint16_t ClassRODataOffset;
-
-  /// The offset of the metaclass object within the extra data pattern,
-  /// in words.
-  uint16_t MetaclassObjectOffset;
-
-  /// The offset of the metaclass RO-data within the extra data pattern,
-  /// in words.
-  uint16_t MetaclassRODataOffset;
-
-  const StoredPointer *getImmediateMembersPattern() const {
-    return reinterpret_cast<const StoredPointer *>(this + 1);
-  }
-
-  const StoredPointer *getExtraDataPattern() const {
-    return getImmediateMembersPattern() + ImmediateMembersPattern_Size;
-  }
-};
-using GenericClassMetadataPattern =
-  TargetGenericClassMetadataPattern<InProcess>;
 
 /// Heap metadata for a box, which may have been generated statically by the
 /// compiler or by the runtime.
@@ -3122,16 +3054,263 @@ public:
   }
 };
 
+/// The instantiation cache for generic metadata.  This must be guaranteed
+/// to zero-initialized before it is first accessed.  Its contents are private
+/// to the runtime.
 template <typename Runtime>
-struct TargetTypeGenericContextDescriptorHeader {
-  using InstantiationFunction_t =
-    TargetMetadata<Runtime> *(const TargetTypeContextDescriptor<Runtime> *type,
-                              const void *arguments);
+struct TargetGenericMetadataInstantiationCache {
+  /// Data that the runtime can use for its own purposes.  It is guaranteed
+  /// to be zero-filled by the compiler.
+  TargetPointer<Runtime, void>
+  PrivateData[swift::NumGenericMetadataPrivateDataWords];
+};
+using GenericMetadataInstantiationCache =
+  TargetGenericMetadataInstantiationCache<InProcess>;
 
+/// A function that instantiates metadata.  This function is required
+/// to succeed.
+///
+/// In general, the metadata returned by this function should have all the
+/// basic structure necessary to identify itself: that is, it must have a
+/// type descriptor and generic arguments.  However, it does not need to be
+/// fully functional as type metadata; for example, it does not need to have
+/// a meaningful value witness table, v-table entries, or a superclass.
+///
+/// Operations which may fail (due to e.g. recursive dependencies) but which
+/// must be performed in order to prepare the metadata object to be fully
+/// functional as type metadata should be delayed until the completion
+/// function.
+using MetadataInstantiator =
+  Metadata *(const TargetTypeContextDescriptor<InProcess> *type,
+             const void *arguments,
+             const TargetGenericMetadataPattern<InProcess> *pattern);
+
+/// The opaque completion context of a metadata completion function.
+/// A completion function that needs to report a completion dependency
+/// can use this to figure out where it left off and thus avoid redundant
+/// work when re-invoked.  It will be zero on first entry for a type, and
+/// the runtime is free to copy it to a different location between
+/// invocations.
+struct MetadataCompletionContext {
+  void *Data[NumWords_MetadataCompletionContext];
+};
+
+/// A function which attempts to complete the given metadata.
+///
+/// This function may fail due to a dependency on the completion of some
+/// other metadata object.  It can indicate this by returning the metadata
+/// on which it depends.  In this case, the function will be invoked again
+/// when the dependency is resolved.  The function must be careful not to
+/// indicate a completion dependency on a type that has always been
+/// completed; the runtime cannot reliably distinguish this sort of
+/// programming failure from a race in which the dependent type was
+/// completed immediately after it was observed to be incomplete, and so
+/// the function will be repeatedly re-invoked.
+///
+/// The function will never be called multiple times simultaneously, but
+/// it may be called many times as successive dependencies are resolved.
+/// If the function ever completes successfully (by returning null), it
+/// will not be called again for the same type.
+///
+/// \return null to indicate that the type has been completed, or a non-null
+///   pointer to indicate that completion is blocked on the completion of
+///   some other type
+using MetadataCompleter =
+  Metadata *(const Metadata *type,
+             MetadataCompletionContext *context,
+             const TargetGenericMetadataPattern<InProcess> *pattern);
+
+/// An instantiation pattern for type metadata.
+template <typename Runtime>
+struct TargetGenericMetadataPattern {
   /// The function to call to instantiate the template.
-  TargetRelativeDirectPointer<Runtime, InstantiationFunction_t>
+  TargetRelativeDirectPointer<Runtime, MetadataInstantiator>
     InstantiationFunction;
 
+  /// The function to call to complete the instantiation.  If this is null,
+  /// the instantiation function must always generate complete metadata.
+  TargetRelativeDirectPointer<Runtime, MetadataCompleter, /*nullable*/ true>
+    CompletionFunction;
+
+  /// Flags describing the layout of this instantiation pattern.
+  GenericMetadataPatternFlags PatternFlags;
+
+  bool hasExtraDataPattern() const {
+    return PatternFlags.hasExtraDataPattern();
+  }
+};
+using GenericMetadataPattern =
+  TargetGenericMetadataPattern<InProcess>;
+
+/// Part of a generic metadata instantiation pattern.
+template <typename Runtime>
+struct TargetGenericMetadataPartialPattern {
+  /// A reference to the pattern.  The pattern must always be at least
+  /// word-aligned.
+  TargetRelativeDirectPointer<Runtime, typename Runtime::StoredPointer> Pattern;
+
+  /// The offset into the section into which to copy this pattern, in words.
+  uint16_t OffsetInWords;
+
+  /// The size of the pattern, in words.
+  uint16_t SizeInWords;
+};
+using GenericMetadataPartialPattern =
+  TargetGenericMetadataPartialPattern<InProcess>;
+
+/// A base class for conveniently adding trailing fields to a
+/// generic metadata pattern.
+template <typename Runtime,
+          typename Self,
+          typename... ExtraTrailingObjects>
+class TargetGenericMetadataPatternTrailingObjects :
+  protected swift::ABI::TrailingObjects<Self,
+                                TargetGenericMetadataPartialPattern<Runtime>,
+                                ExtraTrailingObjects...> {
+
+  using TrailingObjects =
+    swift::ABI::TrailingObjects<Self,
+                                TargetGenericMetadataPartialPattern<Runtime>,
+                                ExtraTrailingObjects...>;
+  friend TrailingObjects;
+
+  using GenericMetadataPartialPattern =
+    TargetGenericMetadataPartialPattern<Runtime>;
+
+  const Self *asSelf() const {
+    return static_cast<const Self *>(this);
+  }
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
+  /// Return the extra-data pattern.
+  ///
+  /// For class metadata, the existence of this pattern creates the need
+  /// for extra data to be allocated in the metadata.  The amount of extra
+  /// data allocated is the sum of the offset and the size of this pattern.
+  ///
+  /// In value metadata, the size of the extra data section is passed to the
+  /// allocation function; this is because it is currently not stored elsewhere
+  /// and because the extra data is principally used for storing values that
+  /// cannot be patterned anyway.
+  ///
+  /// In value metadata, this section is relative to the end of the
+  /// metadata header (e.g. after the last members declared in StructMetadata).
+  /// In class metadata, this section is relative to the end of the entire
+  /// class metadata.
+  const GenericMetadataPartialPattern *getExtraDataPattern() const {
+    assert(asSelf()->hasExtraDataPattern());
+    return this->template getTrailingObjects<GenericMetadataPartialPattern>();
+  }
+
+protected:
+  /// Return the class immediate-members pattern.
+  const GenericMetadataPartialPattern *class_getImmediateMembersPattern() const{
+    assert(asSelf()->class_hasImmediateMembersPattern());
+    return this->template getTrailingObjects<GenericMetadataPartialPattern>()
+             + size_t(asSelf()->hasExtraDataPattern());
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericMetadataPartialPattern>) const{
+    return size_t(asSelf()->hasExtraDataPattern())
+         + size_t(asSelf()->class_hasImmediateMembersPattern());
+  }
+};
+
+/// An instantiation pattern for class metadata.
+template <typename Runtime>
+struct TargetGenericClassMetadataPattern final :
+       TargetGenericMetadataPattern<Runtime>,
+       TargetGenericMetadataPatternTrailingObjects<Runtime,
+         TargetGenericClassMetadataPattern<Runtime>> {
+  using TrailingObjects =
+       TargetGenericMetadataPatternTrailingObjects<Runtime,
+         TargetGenericClassMetadataPattern<Runtime>>;
+  friend TrailingObjects;
+
+  using TargetGenericMetadataPattern<Runtime>::PatternFlags;
+
+  /// The heap-destructor function.
+  TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
+
+  /// The ivar-destructor function.
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+
+  /// The class flags.
+  ClassFlags Flags;
+
+  // The following fields are only present in ObjC interop.
+
+  /// The offset of the class RO-data within the extra data pattern,
+  /// in words.
+  uint16_t ClassRODataOffset;
+
+  /// The offset of the metaclass object within the extra data pattern,
+  /// in words.
+  uint16_t MetaclassObjectOffset;
+
+  /// The offset of the metaclass RO-data within the extra data pattern,
+  /// in words.
+  uint16_t MetaclassRODataOffset;
+
+  uint16_t Reserved;
+
+  bool hasImmediateMembersPattern() const {
+    return PatternFlags.class_hasImmediateMembersPattern();
+  }
+  const GenericMetadataPartialPattern *getImmediateMembersPattern() const{
+    return this->class_getImmediateMembersPattern();
+  }
+
+private:
+  bool class_hasImmediateMembersPattern() const {
+    return hasImmediateMembersPattern();
+  }
+};
+using GenericClassMetadataPattern =
+  TargetGenericClassMetadataPattern<InProcess>;
+
+/// An instantiation pattern for value metadata.
+template <typename Runtime>
+struct TargetGenericValueMetadataPattern final :
+       TargetGenericMetadataPattern<Runtime>,
+       TargetGenericMetadataPatternTrailingObjects<Runtime,
+         TargetGenericValueMetadataPattern<Runtime>> {
+  using TrailingObjects =
+       TargetGenericMetadataPatternTrailingObjects<Runtime,
+         TargetGenericValueMetadataPattern<Runtime>>;
+  friend TrailingObjects;
+
+  using TargetGenericMetadataPattern<Runtime>::PatternFlags;
+
+  /// The value-witness table.  Indirectable so that we can re-use tables
+  /// from other libraries if that seems wise.
+  TargetRelativeIndirectablePointer<Runtime, const ValueWitnessTable>
+    ValueWitnesses;
+
+  const ValueWitnessTable *getValueWitnessesPattern() const {
+    return ValueWitnesses.get();
+  }
+
+  /// Return the metadata kind to use in the instantiation.
+  MetadataKind getMetadataKind() const {
+    return PatternFlags.value_getMetadataKind();
+  }
+
+private:
+  bool class_hasImmediateMembersPattern() const {
+    // It's important to not look at the flag because we use those
+    // bits for other things.
+    return false;
+  }
+};
+using GenericValueMetadataPattern =
+  TargetGenericValueMetadataPattern<InProcess>;
+
+template <typename Runtime>
+struct TargetTypeGenericContextDescriptorHeader {
   /// The metadata instantiation cache.
   TargetRelativeDirectPointer<Runtime,
                               TargetGenericMetadataInstantiationCache<Runtime>>
@@ -3140,6 +3319,10 @@ struct TargetTypeGenericContextDescriptorHeader {
   GenericMetadataInstantiationCache *getInstantiationCache() const {
     return InstantiationCache.get();
   }
+
+  /// The default instantiation pattern.
+  TargetRelativeDirectPointer<Runtime, TargetGenericMetadataPattern<Runtime>>
+    DefaultInstantiationPattern;
 
   /// The base header.  Must always be the final member.
   TargetGenericContextDescriptorHeader<Runtime> Base;
@@ -3829,13 +4012,15 @@ swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                    const void *arguments,
                                    const GenericClassMetadataPattern *pattern);
 
-// Callback to allocate a generic struct/enum metadata object.
+/// Allocate a generic value metadata object.  This is intended to be
+/// called by the metadata instantiation function of a generic struct or
+/// enum.
 SWIFT_RUNTIME_EXPORT
 ValueMetadata *
 swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
-                                   const void *metadataTemplate,
-                                   size_t metadataTemplateSize,
-                                   const void *arguments);
+                                   const void *arguments,
+                                   const GenericValueMetadataPattern *pattern,
+                                   size_t extraDataSize);
 
 /// Instantiate a resilient or generic protocol witness table.
 ///

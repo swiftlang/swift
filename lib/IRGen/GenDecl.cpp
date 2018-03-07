@@ -1459,6 +1459,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return SILLinkage::Private;
 
@@ -1652,6 +1653,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::AnonymousDescriptor:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return false;
 
@@ -3376,7 +3378,40 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     return entry;
   }
 
-  llvm::Type *argTys[] = {TypeContextDescriptorPtrTy, Int8PtrPtrTy};
+  llvm::Type *argTys[] = {
+    /// Type descriptor.
+    TypeContextDescriptorPtrTy,
+    /// Generic arguments.
+    Int8PtrPtrTy,
+    /// Generic metadata pattern.
+    Int8PtrPtrTy
+  };
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+                                        argTys, /*isVarArg*/ false);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
+                                              ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forTypeMetadataCompletionFunction(D);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  llvm::Type *argTys[] = {
+    /// Type metadata.
+    TypeMetadataPtrTy,
+    /// Metadata completion context.
+    Int8PtrTy,
+    /// Generic metadata pattern.
+    Int8PtrPtrTy
+  };
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
                                         argTys, /*isVarArg*/ false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);

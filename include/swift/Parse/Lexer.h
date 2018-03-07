@@ -525,11 +525,15 @@ private:
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
-  const char *findEndOfCurlyQuoteStringLiteral(const char*);
+  const char *findEndOfCurlyQuoteStringLiteral(const char *,
+                                               bool EmitDiagnostics);
 
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker(bool EatNewline);
+
+  /// Returns it should be tokenize.
+  bool lexUnknown(bool EmitDiagnosticsIfToken);
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };

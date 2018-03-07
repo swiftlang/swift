@@ -313,6 +313,14 @@ public:
     bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
     bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
     bool IsKeywordBase = IsInit || IsSubscript;
+    
+    // Filter out non-semantic keyword basename locations with no labels.
+    // We've already filtered out those in active code, so these are
+    // any appearance of just 'init' or 'subscript' in strings, comments, and
+    // inactive code.
+    if (IsKeywordBase && (Config.Usage == NameUsage::Unknown &&
+                           Resolved.LabelType == LabelRangeType::None))
+      return RegionType::Unmatched;
 
     if (!Config.IsFunctionLike || !IsKeywordBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
@@ -352,7 +360,8 @@ public:
                         Resolved.LabelType == LabelRangeType::CallArg;
 
       if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
-        return RegionType::Mismatch;
+        return Config.Usage == NameUsage::Unknown ?
+            RegionType::Unmatched : RegionType::Mismatch;
     }
 
     return RegionKind;
@@ -2895,6 +2904,8 @@ swift::ide::FindRenameRangesAnnotatingConsumer::~FindRenameRangesAnnotatingConsu
 void swift::ide::FindRenameRangesAnnotatingConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<RenameRangeDetail> Ranges) {
+  if (RegionType == RegionType::Mismatch || RegionType == RegionType::Unmatched)
+    return;
   for (const auto &Range : Ranges) {
     Impl.accept(SM, Range);
   }
@@ -2923,6 +2934,12 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
       return Scratch;
+    
+    // Disallow renaming init with no arguments.
+    if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+      if (!CD->getParameters()->size())
+        return Scratch;
+    }
   }
 
   // Always return local rename for parameters.

@@ -590,6 +590,18 @@ public:
     return getPointerAlignment();
   }
 
+  /// Return the offset, relative to the address point, of the start of the
+  /// type-specific members of an enum metadata.
+  Size getOffsetOfEnumTypeSpecificMetadataMembers() {
+    return getPointerSize() * 2;
+  }
+
+  /// Return the offset, relative to the address point, of the start of the
+  /// type-specific members of a struct metadata.
+  Size getOffsetOfStructTypeSpecificMetadataMembers() {
+    return getPointerSize() * 2;
+  }
+
   Size::int_type getOffsetInWords(Size offset) {
     assert(offset.isMultipleOf(getPointerSize()));
     return offset / getPointerSize();
@@ -1132,6 +1144,8 @@ public:
                                                bool isConstant,
                                                ConstantInit init,
                                                StringRef section);
+  llvm::Function *getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
+                                             ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,

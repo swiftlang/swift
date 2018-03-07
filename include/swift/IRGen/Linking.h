@@ -159,6 +159,10 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataInstantiationFunction,
 
+    /// The completion function for a generic or resilient nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataCompletionFunction,
+
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
     ModuleDescriptor,
@@ -485,6 +489,12 @@ public:
   static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
     LinkEntity entity;
     entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataCompletionFunction(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataCompletionFunction, decl);
     return entity;
   }
 

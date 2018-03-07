@@ -30,20 +30,18 @@ import Builtin
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
 // --       generic instantiation info
-// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**)* @"$S15generic_structs13SingleDynamicVMi"
 // CHECK-SAME:   [{{[0-9]+}} x i8*]* @"$S15generic_structs13SingleDynamicVMI"
+// CHECK-SAME:   @"$S15generic_structs13SingleDynamicVMP"
 // --       generic params, requirements, key args, extra args
 // CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
 // --       generic parameters
 // CHECK-SAME:   <i8 0x80>
 // CHECK-SAME: }>
 // CHECK: @"$S15generic_structs13SingleDynamicVMP" = internal constant <{ {{.*}} }> <{
+// -- instantiation function
+// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S15generic_structs13SingleDynamicVMi"
 // -- vwtable pointer
 // CHECK-SAME:   @"$S15generic_structs13SingleDynamicVWV"
-// -- address point
-// CHECK-SAME:   i64 1, {{.*}}* @"$S15generic_structs13SingleDynamicVMn"
-// -- field offset vector; generic parameter vector
-// CHECK-SAME:   %swift.type* null, i64 0 }>
 
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
@@ -78,8 +76,6 @@ import Builtin
 // CHECK-SAME: }>
 
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMP" = internal constant <{ {{.*}} }> <{
-// -- field offset vector; generic parameter vector
-// CHECK:   %swift.type* null, %swift.type* null, i8** null, i8** null, i64 0, i64 0 }>
 
 // -- Fixed-layout struct metadata contains fixed field offsets
 // CHECK: @"$S15generic_structs6IntishVMf" = internal constant <{ {{.*}} i64 }> <{
@@ -176,6 +172,28 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   return %v : $()
 }
 
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMi"(%swift.type_descriptor*, i8**, i8**)
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2, i64 16)
+// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+//   Fill type argument.
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 2
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
+// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
+// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK: }
+
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+//   Lay out fields.
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i64 3
+// CHECK:   [[T2:%.*]] = getelementptr inbounds i8**, i8*** [[TYPES:%.*]], i32 0
+// CHECK:   call void @swift_initStructMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[TYPES]], i64* [[T1]])
+// CHECK:   ret %swift.type* null
+// CHECK: }
+
 // Check that we directly delegate buffer witnesses to a single dynamic field:
 
 //   initializeBufferWithCopyOfBuffer
@@ -205,23 +223,6 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.opaque* [[T0]] to {{.*}}
 // CHECK-NEXT: [[T2:%.*]] = bitcast {{.*}} [[T1]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T2]]
-
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMi"(%swift.type_descriptor*, i8**)
-// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
-// CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** bitcast ({{.*}} @"$S15generic_structs13SingleDynamicVMP" to i8**), i64 40, i8** %1)
-// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-//   Fill type argument.
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 2
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
-//   Lay out fields.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i64 3
-// CHECK:   [[T2:%.*]] = getelementptr inbounds i8**, i8*** [[TYPES:%.*]], i32 0
-// CHECK:   call void @swift_initStructMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[TYPES]], i64* [[T1]])
-// CHECK:   ret %swift.type* [[METADATA]]
-// CHECK: }
 
 protocol HasAssociatedType {
   associatedtype Assoc

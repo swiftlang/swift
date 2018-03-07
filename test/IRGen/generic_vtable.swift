@@ -64,7 +64,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal constant <{{.*}}> <{
 // -- ivar destroyer
-// CHECK-SAME: i8* null
+// CHECK-SAME: i32 0
 // --
 // CHECK-SAME: }>, align 8
 
@@ -98,13 +98,16 @@ public class Concrete : Derived<Int> {
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8**)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** bitcast ({{.*}} @"$S14generic_vtable7DerivedCMP" to i8**))
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK: ret %swift.type* [[METADATA]]
 
+// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 
 // -- method override for 'm2()'
@@ -117,7 +120,7 @@ public class Concrete : Derived<Int> {
 // CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
 
-// CHECK: ret %swift.type* [[METADATA]]
+// CHECK: ret %swift.type* null
 
 
 //// Metadata initialization function for 'Concrete' copies superclass vtable
