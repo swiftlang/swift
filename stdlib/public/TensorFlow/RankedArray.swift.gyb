@@ -296,6 +296,13 @@ extension ${ArrayXD} : CustomStringConvertible {
   }
 }
 
+// Xcode Playground display conversion
+extension ${ArrayXD} : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
+  }
+}
+
 public struct ${SliceXD}<Scalar>  {
   /// The underlying ShapedArraySlice of the ${SliceXD}.
   fileprivate var base: ShapedArraySlice<Scalar>
@@ -470,6 +477,13 @@ extension ${SliceXD} : CustomStringConvertible {
   /// A textual representation of this ${SliceXD}.
   public var description: String {
     return base.description
+  }
+}
+
+// Xcode Playground display conversion
+extension ${SliceXD} : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
 % end
