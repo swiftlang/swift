@@ -3676,10 +3676,9 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::Owned,
-                                          SourceLoc(),SourceLoc(),
-                                          Identifier(), nameLoc, name,
-                                          Type(), P.CurDeclContext);
+  auto result = new (P.Context)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                Identifier(), nameLoc, name, Type(), P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
 

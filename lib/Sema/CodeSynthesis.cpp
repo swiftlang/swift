@@ -203,11 +203,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, false);
   auto storageInterfaceType = getTypeOfStorage(storage, true);
-  valueDecl = buildArgument(storage->getLoc(),
-                            storage->getDeclContext(), "value",
-                            storageType,
-                            storageInterfaceType,
-                            VarDecl::Specifier::Owned);
+  valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
+                            "value", storageType, storageInterfaceType,
+                            VarDecl::Specifier::Default);
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -314,15 +312,10 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //                           inout storage: Builtin.UnsafeValueBuffer,
   //                           indices...).
   ParamDecl *bufferElements[] = {
-    buildArgument(loc, DC, "buffer",
-                  ctx.TheRawPointerType,
-                  ctx.TheRawPointerType,
-                  VarDecl::Specifier::Owned),
-    buildArgument(loc, DC, "callbackStorage",
-                  ctx.TheUnsafeValueBufferType,
-                  ctx.TheUnsafeValueBufferType,
-                  VarDecl::Specifier::InOut)
-  };
+      buildArgument(loc, DC, "buffer", ctx.TheRawPointerType,
+                    ctx.TheRawPointerType, VarDecl::Specifier::Default),
+      buildArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType,
+                    ctx.TheUnsafeValueBufferType, VarDecl::Specifier::InOut)};
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
 
   // The accessor returns (temporary: Builtin.RawPointer,
@@ -1934,9 +1927,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       }
 
       // Create the parameter.
-      auto *arg = new (context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), 
-                                          Loc, var->getName(),
-                                          Loc, var->getName(), varType, decl);
+      auto *arg = new (context)
+          ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
+                    var->getName(), Loc, var->getName(), varType, decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
