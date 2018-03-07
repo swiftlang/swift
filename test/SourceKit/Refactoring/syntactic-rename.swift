@@ -104,7 +104,7 @@ _ = Memberwise1.init(x: 2)
 _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 #endif
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/z.in.json %s >> %t.result/z.expected
@@ -131,7 +131,7 @@ _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 3 >> %t.result/keywordbase.expected
 // RUN: diff -u %S/syntactic-rename/keywordbase.expected %t.result/keywordbase.expected
 
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
 // RUN: diff -u %S/find-rename-ranges/x.expected %t.ranges/x.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/z.in.json %s >> %t.ranges/z.expected

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: echo "func foo() {}" > %t/theinput.swift
 
 // RUN: %target-swift-frontend -index-store-path %t/idx -typecheck %t/theinput.swift -o %t/s.o

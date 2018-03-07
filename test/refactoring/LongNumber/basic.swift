@@ -5,7 +5,7 @@ func foo() {
   _ = -1234567
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -simplify-long-number -source-filename %s -pos=2:9 > %t.result/Integer.swift
 // RUN: diff -u %S/Outputs/Integer.expected %t.result/Integer.swift
 // RUN: %refactor -simplify-long-number -source-filename %s -pos=3:9 > %t.result/Float.swift
