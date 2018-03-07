@@ -1208,7 +1208,7 @@ static void VisitNodeFunction(
       auto name = child->getChild(1); // First child is number.
       FindNamedDecls(ast, ast->getIdentifier(name->getText()),
                      decl_scope_result);
-      if (decl_scope_result._decls.size() == 0) {
+      if (decl_scope_result._decls.empty()) {
         llvm::raw_string_ostream OS(result._error);
         OS << "demangled identifier " << name->getText()
            << " could not be found by name lookup";
@@ -1231,7 +1231,7 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::PostfixOperator:
       FindNamedDecls(ast, ast->getIdentifier((*pos)->getText()),
                      decl_scope_result);
-      if (decl_scope_result._decls.size() == 0) {
+      if (decl_scope_result._decls.empty()) {
         result._error = stringWithFormat(
             "demangled identifier %s could not be found by name lookup",
             (*pos)->getText().str().c_str());

@@ -2192,7 +2192,7 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
 
   // Determine if the method is a property getter or setter.
   bool isGetter;
-  if (clangDecl->parameters().size() == 0)
+  if (clangDecl->parameters().empty())
     isGetter = true;
   else if (clangDecl->parameters().size() == 1)
     isGetter = false;

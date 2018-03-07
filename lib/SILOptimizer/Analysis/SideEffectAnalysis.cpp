@@ -488,7 +488,7 @@ void SideEffectAnalysis::recompute(FunctionInfo *Initial) {
 }
 
 void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS) {
-  assert(ApplyEffects.ParamEffects.size() == 0 &&
+  assert(ApplyEffects.ParamEffects.empty() &&
          "Not using a new ApplyEffects?");
   ApplyEffects.ParamEffects.resize(FAS.getNumArguments());
 

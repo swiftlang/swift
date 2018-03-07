@@ -114,7 +114,7 @@ Optional<Version> Version::parseCompilerVersionString(
   bool isValidVersion = true;
 
   auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
-    unsigned limit = CV.Components.size() == 0 ? 9223371 : 999;
+    unsigned limit = CV.Components.empty() ? 9223371 : 999;
 
     if (Component > limit) {
       if (Diags)

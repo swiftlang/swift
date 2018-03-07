@@ -3482,7 +3482,7 @@ public:
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
         } else {
-          require(dest->getArguments().size() == 0 ||
+          require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 0 or 1 "
                   "arguments");
@@ -3502,7 +3502,7 @@ public:
         }
 
       } else {
-        require(dest->getArguments().size() == 0,
+        require(dest->getArguments().empty(),
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
@@ -3560,7 +3560,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The destination BB must not have BB arguments.
-      require(dest->getArguments().size() == 0,
+      require(dest->getArguments().empty(),
               "switch_enum_addr destination must take no BB args");
     }
 
@@ -4704,7 +4704,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
     return;
 #endif
   if (isDeclaration())
-    assert(getEntries().size() == 0 &&
+    assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
   auto *protocol = getConformance()->getProtocol();

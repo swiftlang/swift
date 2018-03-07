@@ -189,7 +189,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
   SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   assert(SILInstruction::Bits.AllocRefInstBase.NumTailTypes ==
          ElementTypes.size() && "Truncation");
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
 }
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
@@ -199,7 +199,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    ArrayRef<SILValue> ElementCountOperands,
                                    SILOpenedArchetypesState &OpenedArchetypes) {
   assert(ElementTypes.size() == ElementCountOperands.size());
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
                                        ElementCountOperands.end());
   for (SILType ElemType : ElementTypes) {

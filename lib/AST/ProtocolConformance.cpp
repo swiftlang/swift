@@ -375,7 +375,7 @@ ProtocolConformanceRef::getConditionalRequirements() const {
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
-  assert(ConditionalRequirements.size() == 0 &&
+  assert(ConditionalRequirements.empty() &&
          "should not recompute conditional requirements");
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();

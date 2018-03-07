@@ -4465,7 +4465,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
     if (instTy->getAnyNominal()) {
       // If we are invoking a constructor on a nominal type and there are
       // absolutely no candidates, then they must all be private.
-      if (CCI.size() == 0 || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
+      if (CCI.empty() || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
                               isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
         CS.TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
                        instTy);
