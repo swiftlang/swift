@@ -564,17 +564,17 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// Make "print(someTensor)" print a pretty form of the tensor.
+/// String conversion.
 extension Tensor : CustomStringConvertible {
   public var description: String {
-    fatalError("Unimplemented")
+    return array.description
   }
 }
 
-// Make Tensors show up nicely in the Xcode Playground results sidebar.
-extension Tensor : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    fatalError("Unimplemented")
+// Xcode Playground display conversion
+extension Tensor : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
 

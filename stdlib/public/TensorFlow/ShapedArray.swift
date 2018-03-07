@@ -551,6 +551,13 @@ extension ShapedArray : CustomStringConvertible {
   }
 }
 
+// Xcode Playground display conversion
+extension ShapedArray : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // ShapedArraySlice
 //===----------------------------------------------------------------------===//
@@ -834,5 +841,12 @@ extension ShapedArraySlice : CustomStringConvertible {
   /// A textual representation of this shaped array.
   public var description: String {
     return _description
+  }
+}
+
+// Xcode Playground display conversion
+extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }

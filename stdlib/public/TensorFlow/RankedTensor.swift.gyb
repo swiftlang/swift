@@ -537,11 +537,10 @@ extension ${TensorXD} : CustomStringConvertible {
   }
 }
 
-/// Make ${TensorXD}s show up nicely in the Xcode Playground results sidebar.
-extension ${TensorXD} : CustomPlaygroundQuickLookable {
-  @_inlineable
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
+// Xcode Playground display conversion
+extension ${TensorXD} : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
 
