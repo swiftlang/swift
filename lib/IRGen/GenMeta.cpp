@@ -5037,6 +5037,10 @@ namespace {
   public:
     void noteStartOfTypeSpecificMembers() {}
 
+    SILType getLoweredType() {
+      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
+    }
+
     MetadataKind getMetadataKind() {
       return MetadataKind::Struct;
     }
@@ -5067,8 +5071,7 @@ namespace {
     void addFieldOffset(VarDecl *var) {
       assert(var->hasStorage() &&
              "storing field offset for computed property?!");
-      SILType structType =
-        IGM.getLoweredType(Target->getDeclaredTypeInContext());
+      SILType structType = getLoweredType();
 
       llvm::Constant *offset =
         emitPhysicalStructMemberFixedOffset(IGM, structType, var);
@@ -5162,19 +5165,64 @@ namespace {
                                                      HasDependentVWT);
     }
 
-    bool hasCompletionFunction() {
-      // TODO: recognize cases where this is not required
+    bool hasExtraDataPattern() {
+      auto &ti = IGM.getTypeInfo(getLoweredType());
+      if (!isa<FixedTypeInfo>(ti))
+        return false;
+
+      if (Target->getStoredProperties().empty())
+        return false;
+
       return true;
     }
-                        
+
+    /// Fill in a constant field offset vector if possible.
+    PartialPattern buildExtraDataPattern() {
+      ConstantInitBuilder builder(IGM);
+      auto init = builder.beginArray(IGM.SizeTy);
+
+      struct Scanner : StructMetadataScanner<Scanner> {
+        SILType Type;
+        ConstantArrayBuilder &B;
+        Scanner(IRGenModule &IGM, StructDecl *target, SILType type,
+                ConstantArrayBuilder &B)
+          : StructMetadataScanner(IGM, target), Type(type), B(B) {}
+
+        void addFieldOffset(VarDecl *field) {
+          auto offset = emitPhysicalStructMemberFixedOffset(IGM, Type, field);
+          if (offset) {
+            B.add(offset);
+            return;
+          }
+          assert(IGM.isKnownEmpty(Type.getFieldType(field, IGM.getSILModule()),
+                                  ResilienceExpansion::Maximal));
+          B.addInt(IGM.SizeTy, 0);
+        }
+      };
+      Scanner(IGM, Target, getLoweredType(), init).layout();
+      Size vectorSize = init.getNextOffsetFromGlobal();
+
+      auto global = init.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                               /*constant*/ true);
+
+      auto &layout = IGM.getMetadataLayout(Target);
+      return { global,
+               layout.getFieldOffsetVectorOffset().getStatic()
+                 - IGM.getOffsetOfStructTypeSpecificMetadataMembers(),
+               vectorSize };
+    }
+
+    bool hasCompletionFunction() {
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+    }
+
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 bool isVWTMutable) {
       // Nominal types are always preserved through SIL lowering.
-      auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForUnlowered(structTy)
-        .initializeMetadata(IGF, metadata, isVWTMutable,
-                            IGF.IGM.getLoweredType(structTy));
+      auto loweredTy = getLoweredType();
+      IGM.getTypeInfo(loweredTy)
+        .initializeMetadata(IGF, metadata, isVWTMutable, loweredTy);
     }
   };
 } // end anonymous namespace
@@ -5231,6 +5279,10 @@ namespace {
       : super(IGM, theEnum), B(B) {
     }
 
+    SILType getLoweredType() {
+      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
+    }
+
   public:
     void noteStartOfTypeSpecificMembers() {}
 
@@ -5270,6 +5322,19 @@ namespace {
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
+
+    Optional<Size> getConstantPayloadSize() {
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
+      if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
+        return None;
+      }
+
+      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
+             "non-generic, non-resilient enums don't need payload size in metadata");
+      auto &strategy = getEnumImplStrategy(IGM, enumTy);
+      return Size(strategy.getPayloadSizeForMetadata());
+    }
   };
 
   class EnumMetadataBuilder
@@ -5281,19 +5346,17 @@ namespace {
                         ConstantStructBuilder &B)
       : EnumMetadataBuilderBase(IGM, theEnum, B) {}
 
+
+
     void addPayloadSize() {
-      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
-      if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
+      auto payloadSize = getConstantPayloadSize();
+      if (!payloadSize) {
         B.addInt(IGM.IntPtrTy, 0);
         HasUnfilledPayloadSize = true;
         return;
       }
 
-      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
-             "non-generic, non-resilient enums don't need payload size in metadata");
-      auto &strategy = getEnumImplStrategy(IGM, enumTy);
-      B.addInt(IGM.IntPtrTy, strategy.getPayloadSizeForMetadata());
+      B.addInt(IGM.IntPtrTy, payloadSize->getValue());
     }
 
     bool canBeConstant() {
@@ -5325,9 +5388,24 @@ namespace {
                          - IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
       auto extraSizeV = IGM.getSize(extraSize);
 
-      return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
-                                    {descriptor, arguments, templatePointer,
-                                     extraSizeV});
+      auto metadata =
+        IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
+                               {descriptor, arguments, templatePointer,
+                                extraSizeV});
+
+      // Initialize the payload-size field if we have a constant value for it.
+      // This is so small that we just do it inline instead of bothering
+      // with a pattern.
+      if (layout.hasPayloadSizeOffset()) {
+        if (auto size = getConstantPayloadSize()) {
+          auto offset = layout.getPayloadSizeOffset();
+          auto slot = IGF.emitAddressAtOffset(metadata, offset, IGM.SizeTy,
+                                              IGM.getPointerAlignment());
+          IGF.Builder.CreateStore(IGM.getSize(*size), slot);
+        }
+      }
+
+      return metadata;
     }
 
     llvm::Constant *emitValueWitnessTable() {
@@ -5336,18 +5414,16 @@ namespace {
     }
 
     bool hasCompletionFunction() {
-      // TODO: recognize cases where this is not required
-      return true;
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
     }
 
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 bool isVWTMutable) {
       // Nominal types are always preserved through SIL lowering.
-      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForUnlowered(enumTy)
-        .initializeMetadata(IGF, metadata, isVWTMutable,
-                            IGF.IGM.getLoweredType(enumTy));
+      auto enumTy = getLoweredType();
+      IGM.getTypeInfo(enumTy)
+        .initializeMetadata(IGF, metadata, isVWTMutable, enumTy);
     }
   };
 
