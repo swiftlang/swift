@@ -24,7 +24,7 @@ func testExpandAssignOnlyTupleTernaryExpr() {
   (x, y) = a < 5 ? (a, b) : (b, a)
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 
 // RUN: %refactor -expand-ternary-expr -source-filename %s -pos=4:3 -end-pos=4:24 > %t.result/L4-3.swift
 // RUN: diff -u %S/Outputs/basic/L4-3.swift.expected %t.result/L4-3.swift
