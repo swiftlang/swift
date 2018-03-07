@@ -26,19 +26,18 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 }
 
 internal func _castASCIIBuffer(
-  _ ptr: UnsafePointer<_FixedArray16<HashType>>
+  _ ptr: UnsafePointer<_FixedArray16<UInt8>>
 ) -> UnsafeRawPointer {
   return UnsafeRawPointer(ptr)
 }
 
-typealias HashType = UInt
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
   internal static func hashUTF16(
     _ string: UnsafeBufferPointer<UInt8>,
-    var buffer = _FixedArray16<HashType>(allZeros: ())
+    var buffer = _FixedArray16<UInt8>(allZeros: ())
     var bufferIndex = 0
 
     var i = startIndex
@@ -97,18 +96,19 @@ extension _UnmanagedOpaqueString {
         if bufferIndex != 0 {
           let ptr = _castASCIIBuffer(&buffer)
           hasher.append(ptr, byteCount: bufferIndex)
+          bufferIndex = 0
         }
 
         let codeUnitSequence = IteratorSequence(
           _NormalizedCodeUnitIterator(self[i..<endIndex])
         )
         for element in codeUnitSequence {
-          hasher.append(Int(element))
+          hasher.append(UInt(element))
         }
         break
       }
 
-      buffer[bufferIndex] = HashType(cu)
+      buffer[bufferIndex] = UInt8(truncatingIfNeeded: cu)
       bufferIndex += 1
 
       if bufferIndex >= buffer.capacity {
@@ -116,9 +116,15 @@ extension _UnmanagedOpaqueString {
         hasher.append(ptr, byteCount: buffer.capacity)
         bufferIndex = 0
       }
-
-      hasher.append(UInt(cu))
     }
+
+    if bufferIndex != 0 {
+      let ptr = _castASCIIBuffer(&buffer)
+      hasher.append(ptr, byteCount: bufferIndex)
+      bufferIndex = 0
+    }
+
+    return hasher._finalizeAndReturnIntHash()
   }
 }
 
