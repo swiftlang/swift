@@ -325,7 +325,7 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
   if (paths.size() == N)
     return paths;
 
-  if (paths.size() == 0)
+  if (paths.empty())
     return std::vector<std::string>(N, std::string());
 
   Diags.diagnose(SourceLoc(), diag::error_wrong_number_of_arguments,

@@ -117,7 +117,7 @@ class InlineTree {
     bool isTopLevel = false;
 
     const NodeList &getChildren() {
-      if (SortedChildren.size() == 0 && UnsortedChildren.size() > 0)
+      if (SortedChildren.empty() && UnsortedChildren.size() > 0)
         sortNodes(UnsortedChildren, SortedChildren);
       return SortedChildren;
     }
@@ -274,7 +274,7 @@ void InlineTree::printNode(Node *Nd, int indent, raw_ostream &os) {
 void InlineTree::build(Module *M) {
   // Build the trees for all top-level functions.
   for (Function &F : *M) {
-    if (F.size() == 0)
+    if (F.empty())
       continue;
     buildTree(&F);
   }

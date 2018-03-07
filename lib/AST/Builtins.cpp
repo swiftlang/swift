@@ -307,7 +307,7 @@ static ValueDecl *getBinaryPredicate(Identifier Id, Type ArgType) {
 static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
                                    BuiltinValueKind VK,
                                    ArrayRef<Type> Types) {
-  if (Types.size() == 0 || Types.size() > 2) return nullptr;
+  if (Types.empty() || Types.size() > 2) return nullptr;
   Type Input = Types[0];
   Type Output = Types.size() == 2 ? Types[1] : Type();
 
