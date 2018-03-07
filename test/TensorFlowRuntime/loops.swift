@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// Tensor API tests.
+// Loop tests.
 
 import TensorFlow
 #if TPU
