@@ -7556,8 +7556,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
   }
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;
 
