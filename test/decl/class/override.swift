@@ -12,6 +12,12 @@ class A {
   func ret_class_uoptional_rev() -> A { return self }
   func ret_class_optional_uoptional() -> B? { return .none }
   func ret_class_optional_uoptional_rev() -> A! { return self }
+  func ret_subclass_optional() -> A? { return .none }
+  func ret_subclass_optional_rev() -> B { return B() }
+  func ret_subclass_uoptional() -> A! { return self }
+  func ret_subclass_uoptional_rev() -> B { return B() }
+  func ret_subclass_optional_uoptional() -> A? { return .none }
+  func ret_subclass_optional_uoptional_rev() -> B! { return B() }
 
   func param_sametype(_ x : Int) {}
   func param_subclass(_ x : B) {}
@@ -24,6 +30,12 @@ class A {
   func param_class_uoptional_rev(_ x : B!) {}
   func param_class_optional_uoptional(_ x : B!) {}
   func param_class_optional_uoptional_rev(_ x : B?) {}
+  func param_subclass_optional(_ x : B) {}
+  func param_subclass_optional_rev(_ x : A?) {}
+  func param_subclass_uoptional(_ x : B) {}
+  func param_subclass_uoptional_rev(_ x : A!) {}
+  func param_subclass_optional_uoptional(_ x : B!) {}
+  func param_subclass_optional_uoptional_rev(_ x : A?) {}
 }
 
 class B : A {
@@ -38,6 +50,12 @@ class B : A {
   func ret_class_uoptional_rev() -> A! { return self }
   override func ret_class_optional_uoptional() -> B! { return self }
   override func ret_class_optional_uoptional_rev() -> A? { return self }
+  override func ret_subclass_optional() -> B { return self }
+  func ret_subclass_optional_rev() -> A? { return self }
+  override func ret_subclass_uoptional() -> B { return self }
+  func ret_subclass_uoptional_rev() -> A! { return self }
+  override func ret_subclass_optional_uoptional() -> B! { return self }
+  func ret_subclass_optional_uoptional_rev() -> A? { return self }
 
   override func param_sametype(_ x : Int) {}
   override func param_subclass(_ x : A) {}
@@ -50,6 +68,12 @@ class B : A {
   func param_class_uoptional_rev(_ x : B) {}
   override func param_class_optional_uoptional(_ x : B?) {}
   override func param_class_optional_uoptional_rev(_ x : B!) {}
+  override func param_subclass_optional(_ x : A?) {}
+  func param_subclass_optional_rev(_ x : B) {}
+  override func param_subclass_uoptional(_ x : A!) {}
+  func param_subclass_uoptional_rev(_ x : B) {}
+  override func param_subclass_optional_uoptional(_ x : A?) {}
+  func param_subclass_optional_uoptional_rev(_ x : B!) {}
 }
 
 class C<T> {
