@@ -15,44 +15,66 @@ if(SWIFT_ENABLE_TENSORFLOW)
   include_directories(BEFORE
     "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
   )
+  set(outputs)
+
+  # modulemap
+  add_custom_command(
+      OUTPUT "${SWIFTLIB_DIR}/CTensorFlow"
+      COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${SWIFTLIB_DIR}/CTensorFlow")
+
+
   configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_template"
         "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_configured")
 
-  # Cause the underlying build system to copy module.modulemap_configured
-  # in the current directory to module.modulemap in  ${SWIFTLIB_DIR}/CTensorFlow.
-  set(input "module.modulemap_configured")
-  set(modulemap_output "module.modulemap")
-  set(output_dir "${SWIFTLIB_DIR}/CTensorFlow")
-
   add_custom_command(
-      OUTPUT "${output_dir}"
-      COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
-  set(outputs)
-
-  add_custom_command(
-      OUTPUT "${output_dir}/${modulemap_output}"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
+      OUTPUT "${SWIFTLIB_DIR}/CTensorFlow/module.modulemap"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_configured"
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_if_different"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${modulemap_output}")
-  list(APPEND outputs "${output_dir}/${modulemap_output}")
+        "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap_configured"
+        "${SWIFTLIB_DIR}/CTensorFlow/module.modulemap"
+  )
+  list(APPEND outputs "${SWIFTLIB_DIR}/CTensorFlow/module.modulemap")
+
+  macro(copy_headers src dst)
+    set(output_dir "${SWIFTLIB_DIR}/CTensorFlow")
+    add_custom_command(
+        OUTPUT "${output_dir}/${dst}"
+        DEPENDS "${src}"
+        COMMAND
+          "${CMAKE_CURRENT_SOURCE_DIR}/fix-tf-includes.sh"
+          "${src}"
+          "${output_dir}/${dst}"
+    )
+    list(APPEND outputs "${output_dir}/${dst}")
+    set(outputs "${outputs}")
+    MESSAGE( STATUS "Outputs ${outputs}")
+  endmacro(copy_headers)
+
+  copy_headers("${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/c_api.h" c_api.h)
+  copy_headers("${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/c_api_experimental.h" c_api_experimental.h)
+  copy_headers("${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/eager/c_api.h" c_api_eager.h)
+  copy_headers("${CMAKE_CURRENT_SOURCE_DIR}/ctensorflow_init.h" ctensorflow_init.h)
 
   # Put the output dir itself last so that it isn't considered the primary output.
   list(APPEND outputs "${output_dir}")
+  MESSAGE( STATUS "Outputs ${outputs}")
 
   add_custom_target("copy_ctensorflow_modulemap"
       DEPENDS "${outputs}"
-      COMMENT "Copying CTensorFlow modulemap to ${output_dir}")
+      COMMENT "Copying CTensorFlow module to ${output_dir}")
 
-  set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
+  swift_install_in_component(stdlib
+      DIRECTORY "${SWIFTLIB_DIR}/CTensorFlow/"
+      DESTINATION "lib/swift/CTensorFlow/")
 
   add_swift_library(swiftTensorFlowInit OBJECT_LIBRARY TARGET_LIBRARY
       ctensorflow_init.cpp
-      "${output_dir}/${modulemap_output}"
+      "${SWIFTLIB_DIR}/CTensorFlow/module.modulemap"
       C_COMPILE_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}"
       LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}"
+      INTERFACE_LINK_LIBRARIES "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so" "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow_framework.so"
       INSTALL_IN_COMPONENT never_install)
 
 endif()
