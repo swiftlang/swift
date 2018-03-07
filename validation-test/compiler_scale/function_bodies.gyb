@@ -1,0 +1,5 @@
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select NumFunctionsParsed %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func method${N}() {}
