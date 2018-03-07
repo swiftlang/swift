@@ -406,27 +406,6 @@ void ClangImporter::clearTypeResolver() {
 
 #define SHIMS_INCLUDE_FLAG "-isystem"
 
-static StringRef
-getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {
-  switch(getDarwinPlatformKind(triple)) {
-    case DarwinPlatformKind::MacOS:
-      return "-mmacosx-version-min=";
-    case DarwinPlatformKind::IPhoneOS:
-      return "-mios-version-min=";
-    case DarwinPlatformKind::IPhoneOSSimulator:
-      return "-mios-simulator-version-min=";
-    case DarwinPlatformKind::TvOS:
-      return "-mtvos-version-min=";
-    case DarwinPlatformKind::TvOSSimulator:
-      return "-mtvos-simulator-version-min=";
-    case DarwinPlatformKind::WatchOS:
-      return "-mwatchos-version-min=";
-    case DarwinPlatformKind::WatchOSSimulator:
-      return "-mwatchos-simulator-version-min=";
-  }
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -658,24 +637,6 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   invocationArgStrs.push_back("-target");
   invocationArgStrs.push_back(triple.str());
-
-  if (triple.isOSDarwin()) {
-    std::string minVersionBuf;
-    llvm::raw_string_ostream minVersionOpt{minVersionBuf};
-    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
-
-    unsigned major, minor, micro;
-    if (triple.isiOS()) {
-      triple.getiOSVersion(major, minor, micro);
-    } else if (triple.isWatchOS()) {
-      triple.getWatchOSVersion(major, minor, micro);
-    } else {
-      assert(triple.isMacOSX());
-      triple.getMacOSXVersion(major, minor, micro);
-    }
-    minVersionOpt << clang::VersionTuple(major, minor, micro);
-    invocationArgStrs.push_back(std::move(minVersionOpt.str()));
-  }
 
   invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
 
