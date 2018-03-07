@@ -1,6 +1,6 @@
 module CTensorFlow {
-  header "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/c_api.h"
-  header "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/c_api_experimental.h"
-  header "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}/tensorflow/c/eager/c_api.h"
-  header "${CMAKE_CURRENT_SOURCE_DIR}/ctensorflow_init.h"
+  header "c_api.h"
+  header "c_api_experimental.h"
+  header "c_api_eager.h"
+  header "ctensorflow_init.h"
 }
