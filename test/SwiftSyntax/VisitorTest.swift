@@ -37,4 +37,20 @@ VisitorTests.test("Basic") {
   })
 }
 
+VisitorTests.test("RewritingNodeWithEmptyChild") {
+  class ClosureRewriter: SyntaxRewriter {
+    override func visit(_ node: ClosureExprSyntax) -> ExprSyntax {
+      // Perform a no-op transform that requires rebuilding the node.
+      return node.withSignature(node.signature)
+    }
+  }
+  expectDoesNotThrow({
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SwiftLang.parse(getInput("closure.swift")))
+    let rewriter = ClosureRewriter()
+    let rewritten = rewriter.visit(parsed)
+    expectEqual(parsed.description, rewritten.description)
+  })
+}
+
 runAllTests()
