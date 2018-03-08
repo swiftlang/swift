@@ -1085,12 +1085,7 @@ extension ${Self}: BinaryFloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func formRemainder(dividingBy other: ${Self}) {
-%if bits == 80:
-    var other = other
-    _stdlib_remainderl(&self, &other)
-%else:
     self = _stdlib_remainder${cFuncSuffix}(self, other)
-%end
   }
 
   /// Replaces this value with the remainder of itself divided by the given
@@ -1133,11 +1128,7 @@ extension ${Self}: BinaryFloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func formSquareRoot( ) {
-%if bits == 80:
-    _stdlib_squareRootl(&self)
-%else:
     self = _stdlib_squareRoot${cFuncSuffix}(self)
-%end
   }
 
   /// Adds the product of the two given values to this value in place, computed

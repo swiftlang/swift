@@ -2983,6 +2983,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
                       CanType &baseType,
                       SubstitutionList &subs,
                       SmallVectorImpl<Substitution> &subsBuf) {
+  // If the storage is at global scope, then the base value () is a formality.
+  // There no real argument to pass to the underlying accessors.
+  if (!storage->getDeclContext()->isTypeContext())
+    return ManagedValue();
+  
   auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
@@ -3147,7 +3152,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   SmallVector<Substitution, 2> subsBuf;
   
-  auto paramSubstValue = emitKeyPathRValueBase(subSGF, property,
+  auto baseSubstValue = emitKeyPathRValueBase(subSGF, property,
                                                loc, baseArg,
                                                baseType, subs, subsBuf);
   
@@ -3155,7 +3160,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                                          indexes,
                                                          indexPtrArg);
   
-  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, paramSubstValue,
+  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, baseSubstValue,
                                    baseType, /*super*/false,
                                    property, std::move(indexValue),
                                    subs, AccessSemantics::Ordinary,
@@ -3448,6 +3453,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto equatable = *subMap
         .lookupConformance(CanType(hashableSig->getGenericParams()[0]),
                            equatableProtocol);
+      
+      assert(equatable.isAbstract() == hashable.isAbstract());
+      if (equatable.isConcrete())
+        assert(equatable.getConcrete()->getType()->isEqual(
+                  hashable.getConcrete()->getType()));
       auto equatableSub = Substitution(formalTy,
                    C.AllocateCopy(ArrayRef<ProtocolConformanceRef>(equatable)));
     
@@ -3690,15 +3700,21 @@ lowerKeyPathSubscriptIndexPatterns(
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
-  auto subMap =
-            subscript->getGenericSignature()->getSubstitutionMap(subscriptSubs);
-  auto subscriptSubstTy = subscript->getInterfaceType().subst(subMap);
+  auto subscriptSubstTy = subscript->getInterfaceType();
+  SubstitutionMap subMap;
+  auto sig = subscript->getGenericSignature();
+  if (sig) {
+    subMap = sig->getSubstitutionMap(subscriptSubs);
+    subscriptSubstTy = subscriptSubstTy.subst(subMap);
+  }
   needsGenericContext |= subscriptSubstTy->hasArchetype();
 
   unsigned i = 0;
   for (auto *index : *subscript->getIndices()) {
-    auto indexTy = index->getInterfaceType().subst(subMap)
-                        ->getCanonicalType();
+    auto indexTy = index->getInterfaceType();
+    if (sig) {
+      indexTy = indexTy.subst(subMap);
+    }
     auto hashable = indexHashables[i++];
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(indexTy));
@@ -3718,20 +3734,24 @@ lowerKeyPathSubscriptIndexPatterns(
   }
 };
 
-static KeyPathPatternComponent
-emitKeyPathComponentForDecl(SILGenModule &SGM,
-                            SILLocation loc,
-                            GenericEnvironment *genericEnv,
-                            unsigned &baseOperand,
-                            bool &needsGenericContext,
-                            SubstitutionList subs,
-                            AbstractStorageDecl *storage,
-                            ArrayRef<ProtocolConformanceRef> indexHashables,
-                            CanType baseTy) {
+KeyPathPatternComponent
+SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
+                                GenericEnvironment *genericEnv,
+                                unsigned &baseOperand,
+                                bool &needsGenericContext,
+                                SubstitutionList subs,
+                                AbstractStorageDecl *storage,
+                                ArrayRef<ProtocolConformanceRef> indexHashables,
+                                CanType baseTy) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    auto componentTy = baseTy->getTypeOfMember(SGM.SwiftModule, var)
-      ->getReferenceStorageReferent()
-      ->getCanonicalType();
+    CanType componentTy;
+    if (!var->getDeclContext()->isTypeContext()) {
+      componentTy = storage->getStorageInterfaceType()->getCanonicalType();
+    } else {
+      componentTy = baseTy->getTypeOfMember(SwiftModule, var)
+        ->getReferenceStorageReferent()
+        ->getCanonicalType();
+    }
   
     switch (auto strategy = var->getAccessStrategy(AccessSemantics::Ordinary,
                                                     AccessKind::ReadWrite)) {
@@ -3741,9 +3761,9 @@ emitKeyPathComponentForDecl(SILGenModule &SGM,
       auto componentObjTy = componentTy->getWithoutSpecifierType();
       if (genericEnv)
         componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-      auto storageTy = SGM.Types.getSubstitutedStorageType(var,
+      auto storageTy = Types.getSubstitutedStorageType(var,
                                                            componentObjTy);
-      auto opaqueTy = SGM.Types
+      auto opaqueTy = Types
         .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
       
       if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
@@ -3756,9 +3776,9 @@ emitKeyPathComponentForDecl(SILGenModule &SGM,
     case AccessStrategy::DispatchToAccessor: {
       // We need thunks to bring the getter and setter to the right signature
       // expected by the key path runtime.
-      auto id = getIdForKeyPathComponentComputedProperty(SGM, var,
+      auto id = getIdForKeyPathComponentComputedProperty(*this, var,
                                                          strategy);
-      auto getter = getOrCreateKeyPathGetter(SGM, loc,
+      auto getter = getOrCreateKeyPathGetter(*this, loc,
                var, subs,
                strategy,
                needsGenericContext ? genericEnv : nullptr,
@@ -3766,7 +3786,7 @@ emitKeyPathComponentForDecl(SILGenModule &SGM,
                baseTy, componentTy);
       
       if (var->isSettable(var->getDeclContext())) {
-        auto setter = getOrCreateKeyPathSetter(SGM, loc,
+        auto setter = getOrCreateKeyPathSetter(*this, loc,
                var, subs,
                strategy,
                needsGenericContext ? genericEnv : nullptr,
@@ -3796,28 +3816,30 @@ emitKeyPathComponentForDecl(SILGenModule &SGM,
     auto componentTy = baseSubscriptInterfaceTy.getResult();
   
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
-    lowerKeyPathSubscriptIndexPatterns(SGM, indexPatterns,
+    lowerKeyPathSubscriptIndexPatterns(*this, indexPatterns,
                                        decl, subs, indexHashables,
                                        baseOperand,
                                        needsGenericContext);
     
     SILFunction *indexEquals = nullptr, *indexHash = nullptr;
-    getOrCreateKeyPathEqualsAndHash(SGM, loc,
+    // TODO: Property descriptors for external key paths should get their
+    // equality and hashing from the client.
+    getOrCreateKeyPathEqualsAndHash(*this, loc,
              needsGenericContext ? genericEnv : nullptr,
              indexPatterns,
              indexEquals, indexHash);
 
-    auto id = getIdForKeyPathComponentComputedProperty(SGM, decl, strategy);
-    auto getter = getOrCreateKeyPathGetter(SGM, loc,
+    auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
+    auto getter = getOrCreateKeyPathGetter(*this, loc,
              decl, subs,
              strategy,
              needsGenericContext ? genericEnv : nullptr,
              indexPatterns,
              baseTy, componentTy);
   
-    auto indexPatternsCopy = SGM.getASTContext().AllocateCopy(indexPatterns);
+    auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
     if (decl->isSettable()) {
-      auto setter = getOrCreateKeyPathSetter(SGM, loc,
+      auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
              strategy,
              needsGenericContext ? genericEnv : nullptr,
@@ -3952,7 +3974,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       } else {
         unsigned numOperands = operands.size();
         loweredComponents.push_back(
-          emitKeyPathComponentForDecl(SGF.SGM, SILLocation(E),
+          SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
                               SGF.F.getGenericEnvironment(),
                               numOperands,
                               needsGenericContext,
