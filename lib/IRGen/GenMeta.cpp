@@ -436,9 +436,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   // Grab the substitutions.
   GenericArguments genericArgs;
   genericArgs.collect(IGF, theType);
-  assert((genericArgs.Values.size() > 0 ||
-          theDecl->getGenericSignature()->areAllParamsConcrete())
-         && "no generic args?!");
+  assert((!genericArgs.Values.empty() ||
+          theDecl->getGenericSignature()->areAllParamsConcrete()) &&
+         "no generic args?!");
 
   // Call the generic metadata accessor function.
   llvm::Function *accessor =
@@ -1302,9 +1302,9 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
     callerArgArray = &arg;
   }
 
-  assert((genericArgs.Values.size() > 0 ||
-          nominal->getGenericSignature()->areAllParamsConcrete())
-         && "no generic args?!");
+  assert((!genericArgs.Values.empty() ||
+          nominal->getGenericSignature()->areAllParamsConcrete()) &&
+         "no generic args?!");
 
   Address argsBuffer;
   if (callerArgArray) {

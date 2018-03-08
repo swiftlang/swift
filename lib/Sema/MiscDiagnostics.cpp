@@ -3330,7 +3330,7 @@ public:
 
         // Only print the parentheses if there are some argument
         // names, because "()" would indicate a call.
-        if (argNames.size() > 0) {
+        if (!argNames.empty()) {
           out << "(";
           for (auto argName : argNames) {
             if (argName.empty()) out << "_";

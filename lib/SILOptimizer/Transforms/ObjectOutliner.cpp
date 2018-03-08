@@ -286,7 +286,7 @@ bool ObjectOutliner::optimizeObjectAllocation(
   ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
   SILType TailType;
   unsigned NumTailElems = 0;
-  if (TailCounts.size() > 0) {
+  if (!TailCounts.empty()) {
     // We only support a single tail allocated array.
     if (TailCounts.size() > 1)
       return false;

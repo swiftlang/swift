@@ -290,7 +290,7 @@ parse_operator:
           CodeCompletion->completeAssignmentRHS(assign);
         }
         consumeToken();
-        if (SequencedExprs.size() > 0 && (SequencedExprs.size() & 1) == 0) {
+        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
           // Make sure we have odd number of sequence exprs.
           SequencedExprs.pop_back();
         }
@@ -3189,7 +3189,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
 
     // Try and construct a FixIt for the argument label.
-    if (argLabelLocs.size() > 0 && !argLabels[0].empty()) {
+    if (!argLabelLocs.empty() && !argLabels[0].empty()) {
       auto ArgLoc = argLabelLocs[0];
       auto FirstElementName = argLabels[0];
             

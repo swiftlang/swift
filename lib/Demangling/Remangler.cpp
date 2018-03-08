@@ -414,7 +414,7 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
     Buffer << ListSeparator;
     ListSeparator = "";
   }
-  if (Chain.size() > 0)
+  if (!Chain.empty())
     addSubstitution(entry);
   return {(int)Chain.size(), node};
 }
@@ -922,7 +922,7 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
         case FunctionSigSpecializationParamKind::ConstantPropString: {
           NodePointer TextNd = Param->getChild(2);
           StringRef Text = TextNd->getText();
-          if (Text.size() > 0 && (isDigit(Text[0]) || Text[0] == '_')) {
+          if (!Text.empty() && (isDigit(Text[0]) || Text[0] == '_')) {
             std::string Buffer = "_";
             Buffer.append(Text.data(), Text.size());
             TextNd = Factory.createNode(Node::Kind::Identifier, Buffer);

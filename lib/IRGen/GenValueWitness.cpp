@@ -605,7 +605,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *value = getArg(argv, "value");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    if (strategy.getElementsWithPayload().size() > 0) {
+    if (!strategy.getElementsWithPayload().empty()) {
       strategy.destructiveProjectDataForLoad(
           IGF, concreteType,
           Address(value, type.getBestKnownAlignment()));

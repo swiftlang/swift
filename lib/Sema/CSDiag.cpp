@@ -1293,7 +1293,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
     if (auto overloadedFn
           = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
-      if (overloadedFn->getDecls().size() > 0) {
+      if (!overloadedFn->getDecls().empty()) {
         // Fetch any declaration to check if the name is '~='
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
 

@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (Args.size() > 0) {
+  if (!Args.empty()) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);

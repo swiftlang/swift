@@ -1522,9 +1522,9 @@ static void diagnoseInvalidMultilineIndents(
     // These lines were valid; there's nothing to correct.
     return;
   }
-  
-  assert(LineStarts.size() > 0);
-  
+
+  assert(!LineStarts.empty());
+
   auto getLoc = [&](size_t offset) -> SourceLoc {
     return Lexer::getSourceLoc((const char *)Bytes.bytes_begin() + offset);
   };

@@ -7834,7 +7834,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     // If we're performing pattern matching, "as" means something completely different...
     if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
       auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
-      if (overloadedFn && overloadedFn->getDecls().size() > 0) {
+      if (overloadedFn && !overloadedFn->getDecls().empty()) {
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
         if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
           return false;
@@ -8132,7 +8132,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     // they are invalid or there are no arguments.
     SourceLoc TupleStartLoc = base->getStartLoc();
     SourceLoc TupleEndLoc = base->getEndLoc();
-    if (arguments.size() > 0) {
+    if (!arguments.empty()) {
       SourceLoc AltStartLoc = arguments.front()->getStartLoc();
       SourceLoc AltEndLoc = arguments.back()->getEndLoc();
       if (AltStartLoc.isValid() && AltEndLoc.isValid()) {

@@ -1892,8 +1892,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           return nullptr;
         StringRef Text = Name->getText();
         if (ParamKind ==
-              FunctionSigSpecializationParamKind::ConstantPropString &&
-            Text.size() > 0 && Text[0] == '_') {
+                FunctionSigSpecializationParamKind::ConstantPropString &&
+            !Text.empty() && Text[0] == '_') {
           // A '_' escapes a leading digit or '_' of a string constant.
           Text = Text.drop_front(1);
         }
