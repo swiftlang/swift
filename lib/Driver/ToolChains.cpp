@@ -1763,8 +1763,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       }
 
       if (needsUbsan)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
-
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments,
+                                        "ubsan_standalone", *this);
     }
   }
 
