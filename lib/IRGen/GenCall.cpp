@@ -1920,7 +1920,7 @@ void CallEmission::setFromCallee() {
 
     // Fill in the context pointer if necessary.
     if (!contextPtr) {
-      assert(!CurCallee.getOrigFunctionType()->isNoEscape() &&
+      assert(!CurCallee.getOrigFunctionType()->getExtInfo().hasContext() &&
              "Missing context?");
       contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
     }
