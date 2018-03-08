@@ -339,6 +339,16 @@ public:
                                  AccessKind accessKind);
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
 
+  KeyPathPatternComponent
+  emitKeyPathComponentForDecl(SILLocation loc,
+                              GenericEnvironment *genericEnv,
+                              unsigned &baseOperand,
+                              bool &needsGenericContext,
+                              SubstitutionList subs,
+                              AbstractStorageDecl *storage,
+                              ArrayRef<ProtocolConformanceRef> indexHashables,
+                              CanType baseTy);
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
