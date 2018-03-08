@@ -2132,8 +2132,21 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
-  if (flags.isShared())
+
+  switch (flags.getValueOwnership()) {
+  case ValueOwnership::Default:
+    /* nothing */
+    break;
+  case ValueOwnership::InOut:
+    /* handled as part of an InOutType */
+    break;
+  case ValueOwnership::Shared:
     printer << "__shared ";
+    break;
+  case ValueOwnership::Owned:
+    printer << "__owned ";
+    break;
+  }
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2154,14 +2167,15 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       // Map all non-let specifiers to 'var'.  This is not correct, but
       // SourceKit relies on this for info about parameter decls.
       switch (decl->getSpecifier()) {
-        case VarDecl::Specifier::Owned:
-          Printer << tok::kw_let;
-          break;
-        case VarDecl::Specifier::Var:
-        case VarDecl::Specifier::InOut:
-        case VarDecl::Specifier::Shared:
-          Printer << tok::kw_var;
-          break;
+      case VarDecl::Specifier::Let:
+        Printer << tok::kw_let;
+        break;
+      case VarDecl::Specifier::Var:
+      case VarDecl::Specifier::InOut:
+      case VarDecl::Specifier::Shared:
+      case VarDecl::Specifier::Owned:
+        Printer << tok::kw_var;
+        break;
       }
       Printer << " ";
     }

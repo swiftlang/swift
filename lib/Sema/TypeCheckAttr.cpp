@@ -693,7 +693,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isLet())
+    else if (cast<VarDecl>(storage)->isImmutable())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;

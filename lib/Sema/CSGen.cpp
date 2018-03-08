@@ -1954,7 +1954,7 @@ namespace {
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openUnboundGenericType(type, locator);
-          assert(!param->isLet() || !openedType->is<InOutType>());
+          assert(!param->isImmutable() || !openedType->is<InOutType>());
           param->setType(openedType->getInOutObjectType());
           param->setInterfaceType(openedType->getInOutObjectType());
           continue;
