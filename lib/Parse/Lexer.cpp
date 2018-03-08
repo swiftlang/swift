@@ -206,11 +206,24 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   ArtificialEOF = BufferStart + EndOffset;
   CurPtr = BufferStart + Offset;
 
-  assert(NextToken.is(tok::NUM_TOKENS));
-  lexImpl();
-  assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
-         "The token should be at the beginning of the line, "
-         "or we should be lexing from the middle of the buffer");
+  if (isWithTrivia()) {
+    assert(NextToken.is(tok::NUM_TOKENS));
+    lexImpl();
+    assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
+           "The token should be at the beginning of the line, "
+           "or we should be lexing from the middle of the buffer");
+  } else {
+    unsigned StartOffset = SourceMgr.getLocOffsetInBuffer(
+        SourceLoc(llvm::SMLoc::getFromPointer(CurPtr)), BufferID);
+    unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(
+        SourceLoc(llvm::SMLoc::getFromPointer(ArtificialEOF)), BufferID);
+
+    TriviaLexer = std::unique_ptr<Lexer>(new Lexer(
+        LangOpts, SourceMgr, BufferID, Diags, InSILMode, RetainComments,
+        TriviaRetentionMode::WithOnlyLeadingTrivia, StartOffset, EndOffset));
+    NextToken = TriviaLexer->NextToken;
+    CurPtr = TriviaLexer->CurPtr;
+  }
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
@@ -2156,6 +2169,11 @@ void Lexer::getStringLiteralSegments(
 //===----------------------------------------------------------------------===//
 
 void Lexer::lexImpl() {
+  if (!isWithTrivia()) {
+    lexImplByTriviaLexer();
+    return;
+  }
+
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
@@ -2351,6 +2369,15 @@ Restart:
   case '`':
     return lexEscapedIdentifier();
   }
+}
+
+void Lexer::lexImplByTriviaLexer() {
+  TriviaLexer->Diags = Diags;
+  TriviaLexer->CurPtr = CurPtr;
+  TriviaLexer->InSILBody = InSILBody;
+  TriviaLexer->lexImpl();
+  NextToken = TriviaLexer->NextToken;
+  CurPtr = TriviaLexer->CurPtr;
 }
 
 Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {

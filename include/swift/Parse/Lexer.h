@@ -134,7 +134,9 @@ class Lexer {
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
   syntax::Trivia TrailingTrivia;
-  
+
+  std::unique_ptr<Lexer> TriviaLexer;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
@@ -477,6 +479,9 @@ private:
   }
 
   void lexImpl();
+
+  void lexImplByTriviaLexer();
+
   InFlightDiagnostic diagnose(const char *Loc, Diagnostic Diag);
   
   template<typename ...DiagArgTypes, typename ...ArgTypes>
