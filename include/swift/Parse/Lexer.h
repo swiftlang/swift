@@ -64,8 +64,8 @@ enum class ConflictMarkerKind {
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
-  DiagnosticEngine *Diags;
   const unsigned BufferID;
+  DiagnosticEngine *Diags;
 
   using State = LexerState;
 
@@ -137,20 +137,18 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
+  struct PrincipalTag {};
+
   /// The principal constructor used by public constructors below.
   /// Don't use this constructor for other purposes, it does not initialize
   /// everything.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, DiagnosticEngine *Diags,
-        unsigned BufferID, bool InSILMode,
+  Lexer(const PrincipalTag &, const LangOptions &LangOpts,
+        const SourceManager &SourceMgr, unsigned BufferID,
+        DiagnosticEngine *Diags, bool InSILMode,
         CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
-  /// @{
-  /// Helper routines used in \c Lexer constructors.
-  void primeLexer();
-  void initSubLexer(Lexer &Parent, State BeginState, State EndState);
-  /// @}
+  void initialize(unsigned Offset, unsigned EndOffset);
 
 public:
   /// \brief Create a normal lexer that scans the whole source buffer.
@@ -166,31 +164,18 @@ public:
   ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
-        CommentRetentionMode RetainComments = CommentRetentionMode::None,
-        TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
-              TriviaRetention) {
-    primeLexer();
-  }
+  Lexer(
+      const LangOptions &Options, const SourceManager &SourceMgr,
+      unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      CommentRetentionMode RetainComments = CommentRetentionMode::None,
+      TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
+  Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
+        unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
         CommentRetentionMode RetainComments,
-        TriviaRetentionMode TriviaRetention,
-        unsigned Offset, unsigned EndOffset)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
-              TriviaRetention) {
-    assert(Offset <= EndOffset && "invalid range");
-    initSubLexer(
-        *this,
-        State(getLocForStartOfBuffer().getAdvancedLoc(Offset)),
-        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
-  }
+        TriviaRetentionMode TriviaRetention, unsigned Offset,
+        unsigned EndOffset);
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
   /// a subrange of the buffer.
@@ -198,12 +183,7 @@ public:
   /// \param Parent the parent lexer that scans the whole buffer
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
-  Lexer(Lexer &Parent, State BeginState, State EndState)
-      : Lexer(Parent.LangOpts, Parent.SourceMgr, Parent.Diags, Parent.BufferID,
-              Parent.InSILMode, Parent.RetainComments,
-              Parent.TriviaRetention) {
-    initSubLexer(Parent, BeginState, EndState);
-  }
+  Lexer(Lexer &Parent, State BeginState, State EndState);
 
   /// \brief Returns true if this lexer will produce a code completion token.
   bool isCodeCompletion() const {

@@ -168,38 +168,44 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(const LangOptions &Options,
-             const SourceManager &SM, DiagnosticEngine *Diags,
-             unsigned BufferID, bool InSILMode,
+Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
+             const SourceManager &SourceMgr, unsigned BufferID,
+             DiagnosticEngine *Diags, bool InSILMode,
              CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
-    : LangOpts(Options), SourceMgr(SM), Diags(Diags), BufferID(BufferID),
-      InSILMode(InSILMode), RetainComments(RetainComments),
-      TriviaRetention(TriviaRetention) {
+    : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
+      Diags(Diags), InSILMode(InSILMode), RetainComments(RetainComments),
+      TriviaRetention(TriviaRetention) {}
+
+void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
+  assert(Offset <= EndOffset);
+
   // Initialize buffer pointers.
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
+  StringRef contents =
+      SourceMgr.extractText(SourceMgr.getRangeForBuffer(BufferID));
   BufferStart = contents.data();
   BufferEnd = contents.data() + contents.size();
+  assert(*BufferEnd == 0);
+  assert(BufferStart + Offset <= BufferEnd);
+  assert(BufferStart + EndOffset <= BufferEnd);
 
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
-  size_t BOMLength = llvm::StringSwitch<size_t>(contents)
-    .StartsWith("\xEF\xBB\xBF", 3)
-    .Default(0);
+  size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
 
   // Keep information about existance of UTF-8 BOM for transparency source code
   // editing with libSyntax.
-  CurPtr = BufferStart;
   ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
-  if (BufferID == SM.getCodeCompletionBufferID()) {
-    const char *Ptr = BufferStart + SM.getCodeCompletionOffset();
+  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
+    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
     if (Ptr >= BufferStart && Ptr <= BufferEnd)
       CodeCompletionPtr = Ptr;
   }
-}
 
-void Lexer::primeLexer() {
+  ArtificialEOF = BufferStart + EndOffset;
+  CurPtr = BufferStart + Offset;
+
   assert(NextToken.is(tok::NUM_TOKENS));
   lexImpl();
   assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
@@ -207,25 +213,38 @@ void Lexer::primeLexer() {
          "or we should be lexing from the middle of the buffer");
 }
 
-void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
+Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
+             unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+             CommentRetentionMode RetainComments,
+             TriviaRetentionMode TriviaRetention)
+    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
+            RetainComments, TriviaRetention) {
+  unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
+  initialize(/*Offset=*/0, EndOffset);
+}
+
+Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
+             unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+             CommentRetentionMode RetainComments,
+             TriviaRetentionMode TriviaRetention, unsigned Offset,
+             unsigned EndOffset)
+    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
+            RetainComments, TriviaRetention) {
+  initialize(Offset, EndOffset);
+}
+
+Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
+    : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
+            Parent.Diags, Parent.InSILMode, Parent.RetainComments,
+            Parent.TriviaRetention) {
   assert(BufferID == SourceMgr.findBufferContainingLoc(BeginState.Loc) &&
          "state for the wrong buffer");
   assert(BufferID == SourceMgr.findBufferContainingLoc(EndState.Loc) &&
          "state for the wrong buffer");
 
-  // If the parent lexer should stop prematurely, and the ArtificialEOF
-  // position is in this subrange, then we should stop at that point, too.
-  const char *BeginStatePtr = getBufferPtrForSourceLoc(BeginState.Loc);
-  const char *EndStatePtr = getBufferPtrForSourceLoc(EndState.Loc);
-  if (Parent.ArtificialEOF &&
-      Parent.ArtificialEOF >= BeginStatePtr &&
-      Parent.ArtificialEOF <= EndStatePtr) {
-    ArtificialEOF = Parent.ArtificialEOF;
-  } else
-    ArtificialEOF = EndStatePtr;
-
-  primeLexer();
-  restoreState(BeginState);
+  unsigned Offset = SourceMgr.getLocOffsetInBuffer(BeginState.Loc, BufferID);
+  unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(EndState.Loc, BufferID);
+  initialize(Offset, EndOffset);
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
@@ -255,7 +274,7 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
   // we are past the imaginary EOF, and synthesize a tok::eof in this case.
-  if (Kind != tok::eof && ArtificialEOF && TokStart >= ArtificialEOF) {
+  if (Kind != tok::eof && TokStart >= ArtificialEOF) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
