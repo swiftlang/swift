@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
            TypeInfo.NumFields);
   
     for (unsigned i = 0; i < TypeInfo.NumFields; ++i) {
-      swift_childinfo_t ChildInfo = swift_reflection_interop_childOfInstance(
+      swift_childinfo_interop_t ChildInfo = swift_reflection_interop_childOfInstance(
         Context, Obj, i);
       printf("  [%u]: %s Offset:%u Kind:%u\n", i,
              ChildInfo.Name, ChildInfo.Offset, ChildInfo.Kind);

@@ -73,25 +73,25 @@ static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index);
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index);
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index);
@@ -732,32 +732,48 @@ swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef Context
   return Library->Functions.infoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
 }
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
-                                       swift_typeref_interop_t OpaqueTypeRef,
+                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
-  return Library->Functions.childOfTypeRef(Library->Context,
-                                           OpaqueTypeRef.Typeref,
-                                           Index);
+  swift_childinfo_t LibResult = Library->Functions.childOfTypeRef(Library->Context,
+                                                                  OpaqueTypeRef.Typeref,
+                                                                  Index);
+  swift_childinfo_interop_t Result;
+  Result.Name = LibResult.Name;
+  Result.Offset = LibResult.Offset;
+  Result.Kind = LibResult.Kind;
+  Result.TR.Typeref = LibResult.TR;
+  Result.TR.Library = OpaqueTypeRef.Library;
+  return Result;
 }
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   return Library->Functions.infoForMetadata(Library->Context, Metadata.Metadata);
 }
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index) {
   DECLARE_LIBRARY(Metadata.Library);
-  return Library->Functions.childOfMetadata(Library->Context, Metadata.Metadata, Index);
+  swift_childinfo_t LibResult = Library->Functions.childOfMetadata(Library->Context,
+                                                                   Metadata.Metadata,
+                                                                   Index);
+  swift_childinfo_interop_t Result;
+  Result.Name = LibResult.Name;
+  Result.Offset = LibResult.Offset;
+  Result.Kind = LibResult.Kind;
+  Result.TR.Typeref = LibResult.TR;
+  Result.TR.Library = Metadata.Library;
+  return Result;
 }
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object) {
   swift_typeinfo_t Result = {};
@@ -776,7 +792,7 @@ swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef Contex
   return Result;
 }
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index) {
@@ -784,10 +800,18 @@ swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef Contex
     if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
       continue;
     
-    return Library->Functions.childOfInstance(Library->Context, Object, Index);
+    swift_childinfo_t LibResult = Library->Functions.childOfInstance(Library->Context,
+                                                                     Object, Index);
+    swift_childinfo_interop_t Result;
+    Result.Name = LibResult.Name;
+    Result.Offset = LibResult.Offset;
+    Result.Kind = LibResult.Kind;
+    Result.TR.Typeref = LibResult.TR;
+    Result.TR.Library = LIBRARY_INDEX;
+    return Result;
   }
   
-  swift_childinfo_t Result = {};
+  swift_childinfo_interop_t Result = {};
   Result.Kind = SWIFT_UNKNOWN;
   return Result;
 }
