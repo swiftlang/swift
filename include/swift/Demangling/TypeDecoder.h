@@ -56,8 +56,9 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
-  void setShared() { Flags = Flags.withShared(true); }
-  void setInOut() { Flags = Flags.withInOut(true); }
+  void setValueOwnership(ValueOwnership ownership) {
+    Flags = Flags.withValueOwnership(ownership);
+  }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -531,17 +532,23 @@ private:
         [&](const Demangle::NodePointer &typeNode,
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
-      switch (node->getKind()) {
-      case NodeKind::InOut:
-        param.setInOut();
+
+      auto setOwnership = [&](ValueOwnership ownership) {
+        param.setValueOwnership(ownership);
         node = node->getFirstChild();
         hasParamFlags = true;
+      };
+      switch (node->getKind()) {
+      case NodeKind::InOut:
+        setOwnership(ValueOwnership::InOut);
         break;
 
       case NodeKind::Shared:
-        param.setShared();
-        hasParamFlags = true;
-        node = node->getFirstChild();
+        setOwnership(ValueOwnership::Shared);
+        break;
+
+      case NodeKind::Owned:
+        setOwnership(ValueOwnership::Owned);
         break;
 
       default:

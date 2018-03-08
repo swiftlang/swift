@@ -34,10 +34,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                               AC.getIdentifier("$metatype"), SourceLoc(),
-                               AC.getIdentifier("$metatype"), Type(),
-                               DC);
+  auto VD =
+      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                         AC.getIdentifier("$metatype"), SourceLoc(),
+                         AC.getIdentifier("$metatype"), Type(), DC);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
@@ -61,7 +61,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"), Type(),

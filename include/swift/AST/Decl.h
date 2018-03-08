@@ -316,14 +316,14 @@ protected:
     StorageKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+2+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
 
     /// \brief The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
-    Specifier : 2,
+    Specifier : 4,
 
     /// \brief Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
@@ -4445,17 +4445,18 @@ class VarDecl : public AbstractStorageDecl {
 public:
   enum class Specifier : uint8_t {
     // For Var Decls
-    
-    Let  = 0,
-    Var  = 1,
-    
+
+    Let = 0,
+    Var = 1,
+
     // For Param Decls
-    
-    Owned  = Let,
+
+    Default = Let,
     InOut = 2,
     Shared = 3,
+    Owned = 4,
   };
-  
+
 protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
@@ -4602,10 +4603,23 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
+  bool isImmutable() const {
+    switch (getSpecifier()) {
+    case Specifier::Let:
+    case Specifier::Shared:
+    case Specifier::Owned:
+      return true;
+    case Specifier::Var:
+    case Specifier::InOut:
+      return false;
+    }
+  }
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
   /// Is this an immutable 'shared' property?
   bool isShared() const { return getSpecifier() == Specifier::Shared; }
+  /// Is this an immutable 'owned' property?
+  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
 
   ValueOwnership getValueOwnership() const {
     switch (getSpecifier()) {
@@ -4617,6 +4631,8 @@ public:
       return ValueOwnership::InOut;
     case Specifier::Shared:
       return ValueOwnership::Shared;
+    case Specifier::Owned:
+      return ValueOwnership::Owned;
     }
   }
 

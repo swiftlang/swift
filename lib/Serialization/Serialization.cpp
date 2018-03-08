@@ -2529,6 +2529,8 @@ static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
     return uint8_t(serialization::VarDeclSpecifier::InOut);
   case swift::VarDecl::Specifier::Shared:
     return uint8_t(serialization::VarDeclSpecifier::Shared);
+  case swift::VarDecl::Specifier::Owned:
+    return uint8_t(serialization::VarDeclSpecifier::Owned);
   }
   llvm_unreachable("bad variable decl specifier kind");
 }
@@ -3501,6 +3503,7 @@ static uint8_t getRawStableValueOwnership(swift::ValueOwnership ownership) {
   SIMPLE_CASE(ValueOwnership, Default)
   SIMPLE_CASE(ValueOwnership, InOut)
   SIMPLE_CASE(ValueOwnership, Shared)
+  SIMPLE_CASE(ValueOwnership, Owned)
   }
   llvm_unreachable("bad ownership kind");
 }

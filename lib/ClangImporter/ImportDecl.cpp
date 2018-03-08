@@ -434,7 +434,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
-  auto param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
+  auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  rawTy,
@@ -708,7 +708,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
-  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
+  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Default,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedFieldDecl->getType(),
@@ -1267,7 +1267,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
-        ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), argName,
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationStarted();
@@ -1689,7 +1689,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(),
                         elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);

@@ -495,14 +495,24 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       auto flags = func->getParameterFlags(i);
       auto input = _swift_buildDemanglingForMetadata(param, Dem);
 
-      if (flags.isInOut()) {
-        NodePointer inout = Dem.createNode(Node::Kind::InOut);
-        inout->addChild(input, Dem);
-        input = inout;
-      } else if (flags.isShared()) {
-        NodePointer shared = Dem.createNode(Node::Kind::Shared);
-        shared->addChild(input, Dem);
-        input = shared;
+      auto wrapInput = [&](Node::Kind kind) {
+        auto parent = Dem.createNode(kind);
+        parent->addChild(input, Dem);
+        input = parent;
+      };
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
+        wrapInput(Node::Kind::InOut);
+        break;
+      case ValueOwnership::Shared:
+        wrapInput(Node::Kind::Shared);
+        break;
+      case ValueOwnership::Owned:
+        wrapInput(Node::Kind::Owned);
+        break;
       }
 
       inputs.push_back({input, flags.isVariadic()});

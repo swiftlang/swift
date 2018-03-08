@@ -1998,12 +1998,14 @@ namespace {
         patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes) {
-        assert(!paramDeclElt.first->isLet() || !paramDeclElt.second->is<InOutType>());
+        assert(!paramDeclElt.first->isImmutable() ||
+               !paramDeclElt.second->is<InOutType>());
         paramDeclElt.first->setType(paramDeclElt.second->getInOutObjectType());
       }
       
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
-        assert(!paramDeclIfaceElt.first->isLet() || !paramDeclIfaceElt.second->is<InOutType>());
+        assert(!paramDeclIfaceElt.first->isImmutable() ||
+               !paramDeclIfaceElt.second->is<InOutType>());
         paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
       }
       
@@ -6471,10 +6473,10 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // 'inout' from type because that might help to diagnose actual problem
       // e.g. type inference doesn't give us much information anyway.
       if (param->isInOut() && paramType->hasUnresolvedType()) {
-        assert(!param->isLet() || !paramType->is<InOutType>());
+        assert(!param->isImmutable() || !paramType->is<InOutType>());
         param->setType(CS.getASTContext().TheUnresolvedType);
         param->setInterfaceType(paramType->getInOutObjectType());
-        param->setSpecifier(swift::VarDecl::Specifier::Owned);
+        param->setSpecifier(swift::VarDecl::Specifier::Default);
       }
     }
 
