@@ -2384,7 +2384,7 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
-  switch (*CurPtr++) {
+  switch ((signed char)*CurPtr++) {
   case '\n':
     if (IsForTrailingTrivia)
       break;
