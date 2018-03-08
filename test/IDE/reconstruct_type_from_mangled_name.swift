@@ -270,3 +270,15 @@ fileprivate struct VeryPrivateData {}
 // FIXME
 // CHECK: decl: FAILURE for 'privateFunction'
 fileprivate func privateFunction(_ d: VeryPrivateData) {}
+
+struct HasSubscript {
+  // CHECK: decl: subscript(t: Int) -> Int { get set }
+  subscript(_ t: Int) -> Int {
+    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
+    get {
+      return t
+    }
+    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
+    set {}
+  }
+}
