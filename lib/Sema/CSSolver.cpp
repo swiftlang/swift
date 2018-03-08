@@ -1776,6 +1776,8 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
     return true;
   }
 
+  return false;
+
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.
 
