@@ -55,6 +55,9 @@ static inline int
 swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef,
                                      uintptr_t *outIsaMask);
 
+/// Look up a metadata pointer and return an interop structure that can
+/// be passed to other calls. Returns { 0, 0 } if the metadata pointer
+/// was not recognized.
 static inline swift_metadata_interop_t
 swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef ContextRef,
                                        uintptr_t RemoteTyperef);
