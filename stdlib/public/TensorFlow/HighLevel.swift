@@ -16,7 +16,6 @@
 
 // TODO:
 // - Add/improve documentation.
-// - Come up with better names for Parameterized and ParameterizedFunction.
 // - Implement @parameter attribute, add compiler support for synthesized
 //   Parameters struct and `parameters` variable.
 
@@ -41,21 +40,20 @@ public protocol Parameterized {
 }
 
 //===----------------------------------------------------------------------===//
-// ParameterizedFunction
+// Module
 //===----------------------------------------------------------------------===//
 
-/// A function with parameters.
+/// A neural network module.
 ///
-/// Types that conform to `ParameterizedFunction` represent functions that
-/// map inputs to outputs. They may have an internal state represented by
-/// parameters, such as weight tensors.
+/// Types that conform to `Module` represent functions that map inputs to
+/// outputs. They may have an internal state represented by parameters, such as
+/// weight tensors.
 ///
-/// `ParameterizedFunction` instances define an `applied` method for mapping
-/// inputs to outputs.
-public protocol ParameterizedFunction : Parameterized {
-  /// The input type of the function.
+/// `Module` instances define an `applied` method for mapping inputs to outputs.
+public protocol Module : Parameterized {
+  /// The input type of the module.
   associatedtype Input
-  /// The output type of the function.
+  /// The output type of the module.
   associatedtype Output
 
   /// Returns the output obtained from applying to an input.
@@ -63,14 +61,37 @@ public protocol ParameterizedFunction : Parameterized {
 }
 
 //===----------------------------------------------------------------------===//
+// DifferentiableModule
+//===----------------------------------------------------------------------===//
+
+/// A differentiable neural network module.
+///
+/// Types that conform to `DifferentiableModule` represent differentiable
+/// functions that map inputs to outputs. The `Input`, `Output`, and
+/// `Parameters` associated types for `DifferentiableModule` must all conform to
+/// `Differentiable`.
+///
+/// `DifferentiableModule` instances define a `gradient` method that computes
+/// the gradient with respect to an input and the instance's parameters.
+public protocol DifferentiableModule : Module
+  where Input : Differentiable,
+        Output : Differentiable,
+        Parameters : Differentiable {
+  /// Returns the gradient with respect to an input and the instance's
+  /// parameters, backpropagating an adjoint value.
+  func gradient(
+    for input: Input, backpropagating adjoint: Output
+  ) -> (Input, Parameters)
+}
+
+//===----------------------------------------------------------------------===//
 // Learnable
 //===----------------------------------------------------------------------===//
 
-/// A parameterized function that can be differentiated.
+/// A differentiable neural network module that defines a loss function.
 ///
-/// Types that conform to `Learnable` define a `gradient` method that computes
-/// the gradient with respect to inputs and parameters, and a `loss` method that
-/// computes the loss of a predicted output from an expected output.
+/// Types that conform to `Learnable` define a `loss` function that computes the
+/// loss of a predicted output from an expected output.
 ///
 /// Example:
 ///
@@ -79,7 +100,7 @@ public protocol ParameterizedFunction : Parameterized {
 ///         @parameter var b: Tensor1D<Float>
 ///
 ///         // The synthesized `Parameters` struct is:
-///         // struct Parameters {
+///         // struct Parameters : Differentiable {
 ///         //     var w: Tensor2D<Float>
 ///         //     var b: Tensor1D<Float>
 ///         //
@@ -117,17 +138,11 @@ public protocol ParameterizedFunction : Parameterized {
 ///         }
 ///     }
 ///
-public protocol Learnable : ParameterizedFunction
+public protocol Learnable : DifferentiableModule
   where Input : Differentiable,
         Output : Differentiable,
         Parameters : Differentiable {
   associatedtype Loss : FloatingPoint
-
-  /// Returns the gradient with respect to the input and parameters,
-  /// backpropagating an adjoint value.
-  func gradient(
-    for input: Input, backpropagating adjoint: Output
-  ) -> (Input, Parameters)
 
   /// Returns the loss of a predicted output from an expected output.
   func loss(of predicted: Output, from expected: Output) -> Loss
