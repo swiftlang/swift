@@ -3288,7 +3288,7 @@ void RewriteTreeNode::mergeIntoRec(
   for (auto child : children)
     child->mergeIntoRec(other, matchPath);
 
-  if (auto assocType = getMatch())
+  if (getMatch())
     matchPath.pop_back();
 }
 
@@ -3646,8 +3646,6 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
         proto, parentType, ProtocolConformanceRef(proto));
 
     type = type.subst(subMap, SubstFlags::UseErrorType);
-    if (!type)
-      return ErrorType::get(proto->getASTContext());
   } else {
     // Substitute in the superclass type.
     auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
