@@ -100,18 +100,18 @@ public protocol DifferentiableModule : Module
 ///         @parameter var b: Tensor1D<Float>
 ///
 ///         // The synthesized `Parameters` struct is:
-///         // struct Parameters : Differentiable {
-///         //     var w: Tensor2D<Float>
-///         //     var b: Tensor1D<Float>
+///         // public struct Parameters : Differentiable {
+///         //     public var w: Tensor2D<Float>
+///         //     public var b: Tensor1D<Float>
+///         // }
 ///         //
-///         //     var parameters: Parameters {
-///         //         get {
-///         //             return Parameters(w: w, b: b)
-///         //         }
-///         //         set {
-///         //             w = newValue.w
-///         //             b = newValue.b
-///         //         }
+///         // public var parameters: Parameters {
+///         //     get {
+///         //         return Parameters(w: w, b: b)
+///         //     }
+///         //     set {
+///         //         w = newValue.w
+///         //         b = newValue.b
 ///         //     }
 ///         // }
 ///
@@ -138,10 +138,7 @@ public protocol DifferentiableModule : Module
 ///         }
 ///     }
 ///
-public protocol Learnable : DifferentiableModule
-  where Input : Differentiable,
-        Output : Differentiable,
-        Parameters : Differentiable {
+public protocol Learnable : DifferentiableModule {
   associatedtype Loss : FloatingPoint
 
   /// Returns the loss of a predicted output from an expected output.
@@ -168,4 +165,99 @@ public protocol Optimizer : AnyObject {
     _ instance: inout Trainee.Parameters,
     gradient: Trainee.Parameters
   )
+}
+
+//===----------------------------------------------------------------------===//
+//
+// Convolution layer
+//
+//===----------------------------------------------------------------------===//
+
+/// A layer with a 4-D kernel that computes 2-D convolutions given 4-D inputs.
+public struct Convolution2DLayer<Scalar> : DifferentiableModule
+  where Scalar : FloatingPoint & AccelerableByTensorFlow {
+  /// A 4-D filter tensor.
+  // TODO: To be marked with @parameter.
+  public var filter: Tensor<Scalar>
+
+  /// The strides of the sliding window for each dimension of a 4-D input.
+  /// `strides.count` must equal 4 and `strides[0]` and `strides[3]` must equal
+  /// 1.
+  public var strides: [Int32]
+
+  /// The padding algorithm for convolution.
+  public var padding: Padding
+
+  // TODO: The `Parameters` struct type and the `parameters` stored property
+  // will be compiler synthesized. Remove their explicit declarations when
+  // compiler synthesization is implemented.
+  public struct Parameters : Differentiable {
+    // The currency type of differentiation. This will be compiler synthesized
+    // to be the currency type of the stored properties with least precision.
+    // The currency type is important for initializing intermediate values
+    // during automatic differentiation, such as the initial adjoint/tangent and
+    // the seed.
+    public typealias DifferentiationCurrency = Scalar
+
+    // Synthesized property. `filter` will be synthesized in `Parameters`
+    // because it will be marked with `@parameter`.
+    public var filter: Tensor<Scalar>
+
+    // An initializer which sets the values for each parameter.
+    public init(filter: Tensor<Scalar>) {
+      self.filter = filter
+    }
+
+    // This initializer is a `Differentiable` requirement and will be
+    // compiler synthesized.
+    @_inlineable @inline(__always)
+    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
+      self.filter = Tensor<Scalar>(shape: other.filter.shape, repeating: value)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(
+        filter: lhs.filter + rhs.filter
+      )
+    }
+  }
+
+  /// An instance of `Parameters`. This will be synthesized.
+  public var parameters: Parameters {
+    get {
+      return Parameters(filter: filter)
+    }
+    set {
+      filter = newValue.filter
+    }
+  }
+
+  /// Computes a 2-D convolution Tensor given a 4-D input Tensor, using the 4-D
+  /// filter Tensor.
+  @_inlineable @inline(__always)
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+    return input.convolved2D(
+      withFilter: filter, strides: strides, padding: padding
+    )
+  }
+
+  /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
+  /// input Tensor and the 4-D filter Tensor. This can be automatically computed
+  /// after more support for automatic differentiation is added.
+  @_inlineable @inline(__always)
+  public func gradient(
+    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  ) -> (Tensor<Scalar>, Parameters) {
+    let (dInput, dFilter) = input._adjointConvolved2D(
+      filter: filter,
+      strides: strides,
+      padding: padding,
+      partial: applied(to: input),
+      seed: adjoint
+    )
+    return (dInput, Parameters(filter: dFilter))
+  }
 }
