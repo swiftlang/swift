@@ -302,7 +302,7 @@ namespace irgen {
 
     /// There is no unique accessor function for the given type metadata, but
     /// one should be made automatically.
-    NonUniqueAccessor
+    NonUniqueAccessor,
   };
 
   /// Is it basically trivial to access the given metadata?  If so, we don't

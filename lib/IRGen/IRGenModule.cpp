@@ -447,6 +447,7 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the

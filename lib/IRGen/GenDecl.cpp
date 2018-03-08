@@ -3084,10 +3084,10 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 /// implementation detail of type metadata access functions.
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                              ForDefinition_t forDefinition) {
+                                                    ConstantInit definition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                TypeMetadataPtrTy, DebugTypeInfo());
 }
 

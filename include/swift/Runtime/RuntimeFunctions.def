@@ -1364,6 +1364,12 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(GetConcreteTypeByMangledName, swift_getConcreteTypeByMangledName,
+         SwiftCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

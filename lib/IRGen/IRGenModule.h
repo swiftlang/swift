@@ -1157,7 +1157,7 @@ public:
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                               ForDefinition_t forDefinition);
+                                      ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
 
   /// Determine whether the given type requires foreign type metadata.

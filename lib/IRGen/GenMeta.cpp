@@ -184,7 +184,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
 // FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 // resolving relative references to coalesceable symbols.
 // It should be removed when fixed. rdar://problem/22674524
-static llvm::Constant *getTypeRef(IRGenModule &IGM, CanType type) {
+llvm::Constant *getTypeRef(IRGenModule &IGM, CanType type) {
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type,
                                                     IGM.getSwiftModule(),
@@ -566,7 +566,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     llvm_unreachable("bad formal linkage");
   }
 
-  // Everything else requires a shared accessor function.
   return MetadataAccessStrategy::NonUniqueAccessor;
 }
 
@@ -1549,7 +1548,8 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   // there is some non-trivial computation that needs to be cached.
   if (!isTypeMetadataAccessTrivial(IGM, type)) {
     cacheVariable = cast<llvm::GlobalVariable>(
-        IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+        IGM.getAddrOfTypeMetadataLazyCacheVariable(type,
+                             ConstantInit::getDelayed(IGM.TypeMetadataPtrTy)));
 
     if (IGM.getOptions().optimizeForSize())
       accessor->addFnAttr(llvm::Attribute::NoInline);
@@ -1625,6 +1625,236 @@ getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
   return getTypeMetadataAccessFunction(IGM, declaredType, shouldDefine);
 }
 
+/// Emit a call to a type metadata accessor using a mangled name.
+static llvm::Value *
+emitCallToTypeMetadataAccessFunctionUsingMangling(IRGenFunction &IGF,
+                                                  CanType type) {
+  auto &IGM = IGF.IGM;
+  auto mangledString = getTypeRef(IGM, type);
+  
+  auto &pointerSpareBits = IGM.TargetInfo.PointerSpareBits;
+  bool canUseSingleWordInPlace = pointerSpareBits.size() == 64
+    && pointerSpareBits[pointerSpareBits.size() - 1];
+  
+  llvm::StructType *cacheStructTy = nullptr;
+  if (!canUseSingleWordInPlace) {
+    cacheStructTy = llvm::StructType::get(IGM.getLLVMContext(),
+                                          {IGM.TypeMetadataPtrTy, IGM.Int32Ty});
+  }
+  
+  // Emit the mangling instantiation function if we haven't yet.
+  auto fn = cast<llvm::Function>(
+    IGM.getModule()
+      ->getOrInsertFunction("__swift_instantiateConcreteTypeFromMangledName", IGF.IGM.TypeMetadataPtrTy, IGF.IGM.Int8PtrTy)
+      ->stripPointerCasts());
+  
+  if (fn->empty()) {
+    fn->setVisibility(llvm::GlobalValue::HiddenVisibility);
+    fn->setLinkage(llvm::GlobalValue::LinkOnceODRLinkage);
+    fn->setDoesNotAccessMemory();
+    fn->setDoesNotThrow();
+    fn->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::NoInline);
+    
+    if (canUseSingleWordInPlace) [&IGM, fn]{
+      // If the platform doesn't use the high bit in pointers, then we can
+      // do initialization in-place from "negative" to "positive".
+      IRGenFunction subIGF(IGM, fn);
+      
+      auto params = subIGF.collectParameters();
+      
+      // The address of the caching data structure is passed in from the caller.
+      auto cache = params.claimNext();
+      cache = subIGF.Builder.CreateBitCast(cache, IGM.SizeTy->getPointerTo());
+      // Load the existing value.
+      // Conceptually, this needs to establish memory ordering with the
+      // store we do later in the function: if the metadata value is
+      // non-null, we must be able to see any stores performed by the
+      // initialization of the metadata.  However, any attempt to read
+      // from the metadata will be address-dependent on the loaded
+      // metadata pointer, which is sufficient to provide adequate
+      // memory ordering guarantees on all the platforms we care about:
+      // ARM has special rules about address dependencies, and x86's
+      // memory ordering is strong enough to guarantee the visibility
+      // even without the address dependency.
+      //
+      // And we do not need to worry about the compiler because the
+      // address dependency naturally forces an order to the memory
+      // accesses.
+      //
+      // Therefore, we can perform a completely naked load here.
+      // FIXME: Technically should be "consume", but that introduces barriers
+      // in the current LLVM ARM backend.
+      auto load = subIGF.Builder.CreateLoad(cache, IGM.getPointerAlignment());
+      // Make this barrier explicit when building for TSan to avoid false positives.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        load->setOrdering(llvm::AtomicOrdering::Acquire);
+      
+      // Compare the load result against zero. It'll be "negative" if we haven't
+      // initialized yet.
+      auto isUnfilledBB = subIGF.createBasicBlock("cacheIsUnfilled");
+      auto contBB = subIGF.createBasicBlock("cont");
+      llvm::Value *comparison = subIGF.Builder.CreateICmpSLE(load,
+          llvm::ConstantInt::get(IGM.SizeTy, 0));
+      subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
+      auto loadBB = subIGF.Builder.GetInsertBlock();
+
+      // If the load is negative, emit the call to instantiate the type
+      // metadata.
+      subIGF.Builder.emitBlock(isUnfilledBB);
+      // The mangled name is packed in as a 32-bit relative reference from
+      // the cache variable.
+      auto offset = subIGF.Builder.CreateTruncOrBitCast(load, IGM.Int32Ty);
+      offset = subIGF.Builder.CreateSExtOrBitCast(offset, IGM.SizeTy);
+      
+      auto stringAddr = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+      // On a 64-bit big-endian platform the relative offset
+      // will be located four bytes from the beginning of the cache variable.
+      if (IGM.getModule()->getDataLayout().isBigEndian()
+          && IGM.SizeTy == IGM.Int64Ty) {
+        stringAddr = subIGF.Builder.CreateAdd(stringAddr,
+                                         llvm::ConstantInt::get(IGM.SizeTy, 4));
+      }
+      stringAddr = subIGF.Builder.CreateAdd(stringAddr, offset);
+      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+
+      auto call =
+        subIGF.Builder.CreateCall(IGM.getGetConcreteTypeByMangledNameFn(),
+                                  stringAddr);
+      call->setDoesNotThrow();
+      call->setOnlyAccessesArgMemory();
+      call->setCallingConv(IGM.SwiftCC);
+      
+      auto callPtrCast = subIGF.Builder.CreatePtrToInt(call, IGM.SizeTy);
+      // Store it back to the cache variable.  This needs to be a store-release
+      // because it needs to propagate memory visibility to the other threads
+      // that can access the cache: the initializing stores might be visible
+      // to this thread, but they aren't transitively guaranteed to be visible
+      // to other threads unless this is a store-release.
+      subIGF.Builder.CreateStore(callPtrCast, cache, IGM.getPointerAlignment())
+        ->setAtomic(llvm::AtomicOrdering::Release);
+      
+      
+      subIGF.Builder.CreateBr(contBB);
+      
+      subIGF.Builder.emitBlock(contBB);
+      auto phi = subIGF.Builder.CreatePHI(IGM.SizeTy, 2);
+      phi->addIncoming(load, loadBB);
+      phi->addIncoming(callPtrCast, isUnfilledBB);
+      
+      auto phiPtrCast = subIGF.Builder.CreateIntToPtr(phi,
+                                                      IGM.TypeMetadataPtrTy);
+      subIGF.Builder.CreateRet(phiPtrCast);
+    }(); else [&IGM, fn, cacheStructTy]{
+      // Otherwise, we need separate words for the cache and string offset.
+      IRGenFunction subIGF(IGM, fn);
+      
+      auto params = subIGF.collectParameters();
+      
+      // The address of the caching data structure is passed in from the caller.
+      auto cacheStruct = params.claimNext();
+      cacheStruct = subIGF.Builder.CreateBitCast(cacheStruct,
+                                           cacheStructTy->getPointerTo());
+      auto cache = subIGF.Builder.CreateStructGEP(cacheStructTy,
+                                                  cacheStruct, 0);
+      
+      // Load the existing value. See above comment about memory ordering
+      // concerns.
+      auto load = subIGF.Builder.CreateLoad(cache, IGM.getPointerAlignment());
+      // Make this barrier explicit when building for TSan to avoid false positives.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        load->setOrdering(llvm::AtomicOrdering::Acquire);
+      
+      // Compare the load result against zero. It'll be null if we haven't
+      // initialized yet.
+      auto isUnfilledBB = subIGF.createBasicBlock("cacheIsUnfilled");
+      auto contBB = subIGF.createBasicBlock("cont");
+      llvm::Value *comparison = subIGF.Builder.CreateICmpEQ(load,
+          llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
+      auto loadBB = subIGF.Builder.GetInsertBlock();
+
+      // If the load is null, emit the call to instantiate the type
+      // metadata.
+      subIGF.Builder.emitBlock(isUnfilledBB);
+      auto stringAddr = subIGF.Builder.CreateStructGEP(cacheStructTy,
+                                                       cacheStruct, 1);
+      auto offsetLoad = subIGF.Builder.CreateLoad(stringAddr,
+                                              IGM.getPointerAlignment());
+      subIGF.setInvariantLoad(offsetLoad);
+      auto offset = subIGF.Builder.CreateSExtOrBitCast(offsetLoad, IGM.SizeTy);
+      stringAddr = subIGF.Builder.CreatePtrToInt(stringAddr, IGM.SizeTy);
+      stringAddr = subIGF.Builder.CreateAdd(stringAddr, offset);
+      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+
+      auto call =
+        subIGF.Builder.CreateCall(IGM.getGetConcreteTypeByMangledNameFn(),
+                                  stringAddr);
+      call->setDoesNotThrow();
+      call->setOnlyAccessesArgMemory();
+      call->setCallingConv(IGM.SwiftCC);
+
+      // Store it back to the cache variable. See above comment about memory
+      // ordering.
+      subIGF.Builder.CreateStore(call, cache, IGM.getPointerAlignment())
+        ->setAtomic(llvm::AtomicOrdering::Release);
+      
+      subIGF.Builder.CreateBr(contBB);
+      
+      subIGF.Builder.emitBlock(contBB);
+      auto phi = subIGF.Builder.CreatePHI(IGM.TypeMetadataPtrTy, 2);
+      phi->addIncoming(load, loadBB);
+      phi->addIncoming(call, isUnfilledBB);
+      
+      subIGF.Builder.CreateRet(phi);
+    }();
+  }
+  
+  // Emit the caching data structure for instantiating this type, if we
+  // haven't yet.
+  auto cacheVariable = IGM.getAddrOfTypeMetadataLazyCacheVariable(type);
+  if (cast<llvm::GlobalVariable>(cacheVariable->stripPointerCasts())
+        ->isDeclaration()) {
+    ConstantInit init;
+    ConstantInitBuilder builder(IGM);
+    if (canUseSingleWordInPlace) {
+      // The cache variable starts out with a relative reference to the typeref
+      // string in it and the high bit set. We emit this as [2 x i32] because
+      // emitting it as `relativeReference | 0x8000...` will cause the assembler
+      // to try to generate a 64-bit relocation, which may not be possible on
+      // some targets.
+      auto arrayBuilder = builder.beginArray(IGM.Int32Ty);
+      
+      if (IGM.getModule()->getDataLayout().isBigEndian()) {
+        arrayBuilder.addInt(IGM.Int32Ty, 0x80000000u);
+        arrayBuilder.addRelativeAddress(mangledString);
+      } else {
+        arrayBuilder.addRelativeAddress(mangledString);
+        arrayBuilder.addInt(IGM.Int32Ty, 0x80000000u);
+      }
+      init = arrayBuilder.finishAndCreateFuture();
+    } else {
+      // The cache variable starts out as a null pointer, and the string offset
+      // appears immediately after it.
+      auto structBuilder = builder.beginStruct(cacheStructTy);
+      structBuilder.add(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      structBuilder.addRelativeAddress(mangledString);
+      init = structBuilder.finishAndCreateFuture();
+    }
+    
+    cacheVariable =
+      IGM.getAddrOfTypeMetadataLazyCacheVariable(type, init);
+  }
+  
+  // Call the accessor function with our cache variable.
+  auto call = IGF.Builder.CreateCall(fn,
+                llvm::ConstantExpr::getBitCast(cacheVariable, IGM.Int8PtrTy));
+  call->setDoesNotAccessMemory();
+  call->setDoesNotThrow();
+  
+  return call;
+}
+
 /// Emit a call to the type metadata accessor for the given function.
 static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
                                                          CanType type,
@@ -1633,6 +1863,19 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   if (auto local =
         IGF.tryGetLocalTypeData(type, LocalTypeDataKind::forTypeMetadata()))
     return local;
+  
+  // If instantiating a bound generic type would require multiple runtime calls
+  // to instantiate the type and its parameters, it's better for code size to
+  // instantiate from a mangled name than by inline code.
+  if (shouldDefine) {
+    if (auto bgt = type->getAs<BoundGenericType>()) {
+      for (auto arg : bgt->getGenericArgs()) {
+        if (!isTypeMetadataAccessTrivial(IGF.IGM, arg->getCanonicalType())) {
+          return emitCallToTypeMetadataAccessFunctionUsingMangling(IGF, type);
+        }
+      }
+    }
+  }
   
   llvm::Constant *accessor =
     getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);

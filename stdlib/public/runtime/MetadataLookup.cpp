@@ -1048,6 +1048,17 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
     });
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const Metadata * _Nullable
+swift_getConcreteTypeByMangledName(const char *typeNameStart) {
+  auto typeName = makeSymbolicMangledNameStringRef(typeNameStart);
+  
+  return _getTypeByMangledName(typeName,
+    [&](unsigned depth, unsigned index) -> const Metadata * {
+      return nullptr;
+    });
+}
+
 void swift::swift_getFieldAt(
     const Metadata *base, unsigned index,
     std::function<void(llvm::StringRef name, FieldType fieldInfo)>
