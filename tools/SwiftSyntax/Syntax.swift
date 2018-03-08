@@ -68,6 +68,12 @@ extension Syntax {
     return SyntaxChildren(node: self)
   }
 
+  /// The number of children, `present` or `missing`, in this node.
+  /// This value can be used safely with `child(at:)`.
+  public var numberOfChildren: Int {
+    return data.childCaches.count
+  }
+
   /// Whether or not this node it marked as `present`.
   public var isPresent: Bool {
     return raw.presence == .present

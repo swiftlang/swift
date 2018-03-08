@@ -512,22 +512,22 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
                                  const SILModule& Module) {
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
-  C.NumSILGenFunctions = Module.getFunctionList().size();
-  C.NumSILGenVtables = Module.getVTableList().size();
-  C.NumSILGenWitnessTables = Module.getWitnessTableList().size();
-  C.NumSILGenDefaultWitnessTables = Module.getDefaultWitnessTableList().size();
-  C.NumSILGenGlobalVariables = Module.getSILGlobalList().size();
+  C.NumSILGenFunctions += Module.getFunctionList().size();
+  C.NumSILGenVtables += Module.getVTableList().size();
+  C.NumSILGenWitnessTables += Module.getWitnessTableList().size();
+  C.NumSILGenDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
+  C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
 }
 
 static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
                                  const SILModule& Module) {
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
-  C.NumSILOptFunctions = Module.getFunctionList().size();
-  C.NumSILOptVtables = Module.getVTableList().size();
-  C.NumSILOptWitnessTables = Module.getWitnessTableList().size();
-  C.NumSILOptDefaultWitnessTables = Module.getDefaultWitnessTableList().size();
-  C.NumSILOptGlobalVariables = Module.getSILGlobalList().size();
+  C.NumSILOptFunctions += Module.getFunctionList().size();
+  C.NumSILOptVtables += Module.getVTableList().size();
+  C.NumSILOptWitnessTables += Module.getWitnessTableList().size();
+  C.NumSILOptDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
+  C.NumSILOptGlobalVariables += Module.getSILGlobalList().size();
 }
 
 static std::unique_ptr<llvm::raw_fd_ostream>
