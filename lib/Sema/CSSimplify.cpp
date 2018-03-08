@@ -1235,8 +1235,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   // Result type can be covariant (or equal).
-  return matchTypes(func1->getResult(), func2->getResult(), subKind, subflags,
-                    locator.withPathElement(ConstraintLocator::FunctionResult));
+  return matchTypes(func1->getResult(), func2->getResult(), subKind,
+                     subflags,
+                     locator.withPathElement(
+                       ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::SolutionKind
@@ -1562,8 +1564,6 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
-  auto origType1 = type1;
-
   bool isArgumentTupleConversion
           = kind == ConstraintKind::ArgumentTupleConversion ||
             kind == ConstraintKind::OperatorArgumentTupleConversion;
@@ -2324,32 +2324,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
-    auto isClosureResult = [&]() {
-      if (elt->getKind() == ConstraintLocator::ClosureResult)
-        return true;
-
-      // If constraint is matching function results where
-      // left-hand side is a 'closure result' we need to allow
-      // certain implicit conversions.
-      if (elt->getKind() != ConstraintLocator::FunctionResult)
-        return false;
-
-      if (auto *typeVar = origType1->getAs<TypeVariableType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        if (!locator)
-          return false;
-
-        auto path = locator->getPath();
-        if (path.empty())
-          return false;
-
-        return path.back().getKind() == ConstraintLocator::ClosureResult;
-      }
-
-      return false;
-    };
-
-    if (isClosureResult()) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
       if (concrete && kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
