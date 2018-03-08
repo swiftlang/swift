@@ -283,6 +283,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
+  assert(isWithTrivia() && "formToken is used by only trivia Lexer");
 
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
@@ -305,11 +306,13 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-  if (isWithTrivia()) {
-    LeadingTrivia.push_back(TriviaPiece::backtick());
-    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-    TrailingTrivia.push_back(TriviaPiece::backtick());
-  }
+  assert(isWithTrivia() &&
+         "formEscapedIdentifierToken is used by only trivia Lexer");
+
+  LeadingTrivia.push_back(TriviaPiece::backtick());
+  assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
+  TrailingTrivia.push_back(TriviaPiece::backtick());
+
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
   // this as escaped-identifier in this case.
@@ -2176,19 +2179,17 @@ void Lexer::lexImpl() {
 
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
+  assert(isWithTrivia() && "lexImpl is used by only trivia Lexer");
 
-  if (isWithTrivia()) {
-    LeadingTrivia.clear();
-    TrailingTrivia.clear();
-  }
+  LeadingTrivia.clear();
+  TrailingTrivia.clear();
+
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      if (isWithTrivia()) {
-        // Add UTF-8 BOM to LeadingTrivia.
-        LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
-      }
+      // Add UTF-8 BOM to LeadingTrivia.
+      LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2224,16 +2225,15 @@ Restart:
 
   case '\n':
   case '\r':
-    assert(isWithTrivia() &&
-           "newlines should be eaten by lexTrivia as LeadingTrivia");
-    NextToken.setAtStartOfLine(true);
-    goto Restart;  // Skip whitespace.
+    assert(false && "newlines should be eaten as LeadingTrivia");
+    abort();
 
   case ' ':
   case '\t':
   case '\f':
   case '\v':
-    goto Restart;  // Skip whitespace.
+    assert(false && "whitespaces should be eaten as LeadingTrivia");
+    abort();
 
   case -1:
   case -2:
@@ -2291,18 +2291,18 @@ Restart:
       // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten as LeadingTrivia");
       skipSlashSlashComment(/*EatNewline=*/true);
       SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      return formToken(tok::comment, TokStart);
     }
     if (CurPtr[0] == '*') { // "/*"
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten as LeadingTrivia");
       skipSlashStarComment();
       SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      return formToken(tok::comment, TokStart);
     }
     return lexOperatorIdentifier();
   case '%':
@@ -2414,7 +2414,8 @@ void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
   case TriviaRetentionMode::WithTrivia:
     break;
   case TriviaRetentionMode::WithoutTrivia:
-    return;
+    assert(false && "lexTrivia is used by only trivia Lexer");
+    abort();
   }
 
 Restart:
