@@ -23,6 +23,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
+#include <deque>
 
 using namespace swift;
 using namespace constraints;
@@ -1888,17 +1889,17 @@ bool ConstraintSystem::solveSimplified(
   // this might happen when there are multiple binary operators
   // chained together. If so, disable choices which differ
   // from currently selected representative.
-  auto pruneOverloadSet = [&](Constraint *disjunction) -> bool {
+  auto pruneOverloadSet = [&](Constraint *disjunction,
+                              llvm::SmallVectorImpl<Constraint *> &disabled) {
     auto *choice = disjunction->getNestedConstraints().front();
     auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
     if (!typeVar)
-      return false;
+      return;
 
     auto *repr = typeVar->getImpl().getRepresentative(nullptr);
     if (!repr || repr == typeVar)
-      return false;
+      return;
 
-    bool isPruned = false;
     for (auto resolved = resolvedOverloadSets; resolved;
          resolved = resolved->Previous) {
       if (!resolved->BoundType->isEqual(repr))
@@ -1906,7 +1907,7 @@ bool ConstraintSystem::solveSimplified(
 
       auto &representative = resolved->Choice;
       if (!representative.isDecl())
-        return false;
+        return;
 
       // Disable all of the overload choices which are different from
       // the one which is currently picked for representative.
@@ -1917,28 +1918,38 @@ bool ConstraintSystem::solveSimplified(
 
         if (choice.getDecl() != representative.getDecl()) {
           constraint->setDisabled();
-          isPruned = true;
+          disabled.push_back(constraint);
         }
       }
       break;
     }
-
-    return isPruned;
   };
 
-  bool hasDisabledChoices = pruneOverloadSet(disjunction);
+  llvm::SmallVector<Constraint *, 16> modifiedChoices;
+  pruneOverloadSet(disjunction, modifiedChoices);
 
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
   Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
-  // Try each of the constraints within the disjunction.
+
+  std::deque<std::pair<unsigned, Constraint *>> choices;
   for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, disjunction, constraints[index]);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
+    auto *choice = constraints[index];
+    if (!choice->isDisabled())
+      choices.push_back({index, choice});
+  }
+
+  // Try each of the constraints within the disjunction.
+  while (!choices.empty()) {
+    auto choice = choices.front();
+    auto currentChoice = DisjunctionChoice(this, disjunction, choice.second);
+
+    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore)) {
+      choices.pop_front();
       continue;
+    }
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
@@ -1977,7 +1988,7 @@ bool ConstraintSystem::solveSimplified(
     if (disjunction->shouldRememberChoice()) {
       auto locator = disjunction->getLocator();
       assert(locator && "remembered disjunction doesn't have a locator?");
-      DisjunctionChoices.push_back({locator, index});
+      DisjunctionChoices.push_back({locator, choice.first});
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
@@ -1988,6 +1999,19 @@ bool ConstraintSystem::solveSimplified(
       }
 
       lastSolvedChoice = {currentChoice, *score};
+
+      // Let's enable any hidden witness choices we might have
+      // if this was the protocol requirement choice.
+      for (auto witness : Witnesses[choice.second]) {
+        auto *choice = witness.second;
+
+        if (!choice->isDisabled())
+          continue;
+
+        choices.push_front(witness);
+        choice->setEnabled();
+        modifiedChoices.push_back(choice);
+      }
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
       // FIXME: This should be more general.
@@ -2001,18 +2025,20 @@ bool ConstraintSystem::solveSimplified(
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth) << ")\n";
     }
+
+    choices.pop_front();
   }
 
   // Put the disjunction constraint back in its place.
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  if (hasDisabledChoices) {
-    // Re-enable previously disabled overload choices.
-    for (auto *choice : disjunction->getNestedConstraints()) {
-      if (choice->isDisabled())
-        choice->setEnabled();
-    }
+  // Undo all of the changes done to disjunction choices.
+  for (auto *choice : modifiedChoices) {
+    if (choice->isDisabled())
+      choice->setEnabled();
+    else
+      choice->setDisabled();
   }
 
   // If we are exiting due to an expression that is too complex, do

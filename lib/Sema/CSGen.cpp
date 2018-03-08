@@ -1382,16 +1382,16 @@ namespace {
       SmallVector<OverloadChoice, 4> choices;
       
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
+        auto *choice = decls[i];
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
-        CS.getTypeChecker().validateDecl(decls[i]);
-        if (decls[i]->isInvalid())
+        CS.getTypeChecker().validateDecl(choice);
+        if (choice->isInvalid())
           continue;
 
-        OverloadChoice choice =
-            OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
-        choices.push_back(choice);
+        choices.push_back(
+            OverloadChoice(Type(), choice, expr->getFunctionRefKind()));
       }
 
       // If there are no valid overloads, give up.

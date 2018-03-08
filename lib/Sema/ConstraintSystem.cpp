@@ -18,6 +18,8 @@
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
@@ -1432,13 +1434,71 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     
     overloads.push_back(bindOverloadConstraint);
   }
-  
+
+  // Collects all of the protocol requirement choices we have
+  // in this overload set, this would allow us to hide their
+  // witnesses until the requirement itself matches.
+  llvm::SmallVector<std::pair<Constraint *, ValueDecl *>, 8> requirements;
+
   for (auto choice : choices) {
     if (favoredChoice && (favoredChoice == &choice))
       continue;
-    
-    overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
-                                                       useDC, locator));
+
+    auto *constraint = Constraint::createBindOverload(*this, boundType, choice,
+                                                      useDC, locator);
+    overloads.push_back(constraint);
+    if (!choice.isDecl())
+      continue;
+
+    auto *decl = choice.getDecl();
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (decl->isProtocolRequirement())
+        requirements.push_back({constraint, decl});
+    }
+  }
+
+  // Try to hide witness choices under the main requirement
+  // choice, that helps to significately reduce the number
+  // of choices we consider blindly.
+  for (auto index : indices(overloads)) {
+    auto *constraint = overloads[index];
+    auto choice = constraint->getOverloadChoice();
+    if (!choice.isDecl())
+      continue;
+
+    auto *decl = choice.getDecl();
+    auto *nominal =
+        decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!nominal)
+      continue;
+
+    auto type = nominal->getDeclaredType();
+    for (auto &req : requirements) {
+      const auto &requirement = req.second;
+      auto *protocol = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
+      assert(protocol && "requirement has to have protocol context!");
+
+      ConformanceCheckOptions options;
+      options |= ConformanceCheckFlags::InExpression;
+      options |= ConformanceCheckFlags::SuppressDependencyTracking;
+      options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+      auto result = TC.conformsToProtocol(type, protocol,
+                                          decl->getDeclContext(), options);
+
+      if (!result || !result->isConcrete())
+        continue;
+
+      auto conformance = result->getConcrete();
+      auto wintess = conformance->getWitnessDecl(req.second, &TC);
+      if (wintess == decl) {
+        // Looks like this choice satisfies protocol requirement
+        // already present in the overload set, let's record and
+        // hide the witness.
+        Witnesses[req.first].push_back({index, constraint});
+        constraint->setDisabled();
+      }
+    }
   }
 
   addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
@@ -1799,11 +1859,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
-  
-  // If we're binding to an init member, the 'throws' need to line up between
-  // the bound and reference types.
+
   if (choice.isDecl()) {
-    auto decl = choice.getDecl();
+    auto *decl = choice.getDecl();
+    // If we're binding to an init member, the 'throws' need to line up between
+    // the bound and reference types.
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
         

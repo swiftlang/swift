@@ -1510,7 +1510,7 @@ public protocol BinaryInteger :
   ///     // x.trailingZeroBitCount == 3
   var trailingZeroBitCount: Int { get }
 
-% for x in chain(*binaryArithmetic.values()):
+% for x in binaryArithmetic['BinaryInteger']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
 ${operatorComment(x.operator, False)}
