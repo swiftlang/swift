@@ -88,7 +88,7 @@ private:
       m_decls.push_back(VD);
     }
     ~VisibleDeclsConsumer() override = default;
-    explicit operator bool() { return m_decls.size() > 0; }
+    explicit operator bool() { return !m_decls.empty(); }
 
     decltype(m_decls)::const_iterator begin() { return m_decls.begin(); }
 
@@ -1540,7 +1540,7 @@ static void VisitNodeSetterGetter(
 
     if (decl_ctx_result._decls.size() == 1) {
       var_decl = dyn_cast_or_null<VarDecl>(decl_ctx_result._decls[0]);
-    } else if (decl_ctx_result._decls.size() > 0) {
+    } else if (!decl_ctx_result._decls.empty()) {
       // TODO: can we use the type to pick the right one? can we really have
       // multiple variables with the same name?
       result._error = stringWithFormat(
@@ -1901,7 +1901,7 @@ static void VisitNodeProtocolListWithClass(
     }
 
     if (protocol_types_result._error.empty() &&
-        protocol_types_result._types.size() > 0 &&
+        !protocol_types_result._types.empty() &&
         class_type_result._types.size() == 1) {
       SmallVector<Type, 2> members;
       members.push_back(class_type_result._types.front());

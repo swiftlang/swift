@@ -2855,7 +2855,7 @@ public:
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();
-    if (ArgLabels.size() > 0) {
+    if (!ArgLabels.empty()) {
       if (!HaveLParen)
         Builder.addLeftParen();
       else

@@ -50,10 +50,8 @@ struct ExistentialLayout {
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?
-    return ((superclass ||
-             hasExplicitAnyObject ||
-             getProtocols().size() > 0)
-            && !containsNonObjCProtocol);
+    return ((superclass || hasExplicitAnyObject || !getProtocols().empty()) &&
+            !containsNonObjCProtocol);
   }
 
   /// Whether the existential requires a class, either via an explicit

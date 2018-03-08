@@ -296,7 +296,7 @@ namespace {
       // - -1 -- if we have a payload
       // -  0 -- if there's no payload
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-          ElementsWithPayload.size() > 0 ? -1 : 0);
+                                    !ElementsWithPayload.empty() ? -1 : 0);
     }
 
     llvm::Value *
@@ -3502,7 +3502,7 @@ namespace {
       
     found_empty_case:
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
-      if (CommonSpareBits.size() > 0) {
+      if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
           .emitCompare(IGF, APInt::getAllOnesValue(CommonSpareBits.size()),
                        payloadValue);
@@ -3843,7 +3843,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGM, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = APInt(CommonSpareBits.size(), tagIndex);
       }
@@ -3886,7 +3886,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGF, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
 #if defined(__BIG_ENDIAN__) && defined(__LP64__)
@@ -4755,8 +4755,8 @@ namespace {
 
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
       ClusteredBitVector bits;
-      
-      if (CommonSpareBits.size() > 0)
+
+      if (!CommonSpareBits.empty())
         bits = getBitVectorFromAPInt(payloadPart);
 
       unsigned totalSize

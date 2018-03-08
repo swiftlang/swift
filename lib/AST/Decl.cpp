@@ -1090,7 +1090,7 @@ void PatternBindingEntry::setInit(Expr *E) {
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   SmallVector<VarDecl *, 8> variables;
   getPattern()->collectVariables(variables);
-  assert(variables.size() > 0);
+  assert(!variables.empty());
   return variables[0];
 }
 
@@ -1685,8 +1685,8 @@ bool swift::conflicting(const OverloadSignature& sig1,
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
-    return !((sig1.IsProperty && sig2.Name.getArgumentNames().size() > 0) ||
-             (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
+    return !((sig1.IsProperty && !sig2.Name.getArgumentNames().empty()) ||
+             (sig2.IsProperty && !sig1.Name.getArgumentNames().empty()));
   }
   
   return sig1.Name == sig2.Name;

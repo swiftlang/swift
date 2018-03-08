@@ -339,7 +339,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
 }
 
 void SILSerializer::processSILFunctionWorklist() {
-  while (Worklist.size() > 0) {
+  while (!Worklist.empty()) {
     const SILFunction *F = Worklist.back();
     Worklist.pop_back();
     assert(F != nullptr);
