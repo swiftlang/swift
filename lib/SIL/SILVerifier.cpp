@@ -4388,9 +4388,9 @@ public:
     auto numArgs = F->getArguments().size();
     int lastIndex = -1;
     for (auto argIdx : Attr.getArgIndices()) {
+      require(argIdx < numArgs, "Argument index out of bounds.");
       auto currentIdx = (int)argIdx;
-      require(currentIdx > lastIndex, "Argument indices are not ascending.");
-      require(currentIdx < numArgs, "Argument indices are out of bounds.");
+      require(currentIdx > lastIndex, "Argument indices not ascending.");
       lastIndex = currentIdx;
     }
     // TODO: Verify if the specified adjoint function has the right signature.
