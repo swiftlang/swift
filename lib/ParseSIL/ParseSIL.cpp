@@ -3605,7 +3605,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (IsObjC && ElementTypes.size() != 0) {
+    if (IsObjC && !ElementTypes.empty()) {
       P.diagnose(P.Tok, diag::sil_objc_with_tail_elements);
       return true;
     }

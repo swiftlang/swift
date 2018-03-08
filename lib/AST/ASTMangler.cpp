@@ -1609,7 +1609,7 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
       else
         appendOperator("_");
     }
-  } else if (parameters.size() > 0) {
+  } else if (!parameters.empty()) {
     appendOperator("y");
   }
 

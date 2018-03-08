@@ -928,7 +928,7 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // PatternBindingDecl are added to all of the VarDecls for the pattern
     // binding.
     ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
-    if (Entries.size() > 0) {
+    if (!Entries.empty()) {
       VarDecl *VD = Entries.front().getPattern()->getSingleVar();
       if (VD)
         return VD;
@@ -937,7 +937,7 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // Similar to the PatternBindingDecl case above, we return the
     // first EnumElementDecl.
     ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
-    if (Elems.size() > 0) {
+    if (!Elems.empty()) {
       return Elems.front();
     }
   }

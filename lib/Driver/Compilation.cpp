@@ -761,7 +761,7 @@ namespace driver {
         llvm::outs() << "Forming into " << Partition.size() << " batches\n";
       }
 
-      assert(Partition.size() > 0);
+      assert(!Partition.empty());
       maybeShuffleBatchable(Batchable);
 
       size_t i = 0;
