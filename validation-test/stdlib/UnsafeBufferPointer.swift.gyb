@@ -325,6 +325,91 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(-1.0, allocated[count-1])
 }
 
+let bufCount = 4
+let sliceRange: Range = 1..<bufCount-1
+% for mutable in [True, False]:
+% for raw in [True, False]:
+% for action in ['read', 'change']:
+% if action != 'change' or mutable:
+for testIndex in (0..<bufCount) {
+% Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
+  ${Type}TestSuite.test("${action}Element\(testIndex)ViaSlice") {
+% if raw:
+    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount, alignedTo: 8)
+    for i in 0..<bufCount {
+      allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+    }
+% else:
+    let allocated = UnsafeMutablePointer<Int>.allocate(capacity: bufCount)
+    for i in 0..<bufCount { allocated[i] = i }
+% end # if mutable
+    defer { allocated.deallocate() }
+
+    let buffer = ${Type}(start: allocated, count: bufCount)
+    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+
+    if _isDebugAssertConfiguration(),
+       testIndex < sliceRange.lowerBound ||
+       testIndex >= sliceRange.upperBound {
+      expectCrashLater()
+    }
+% if action == 'read':
+    let value = slice[testIndex]
+    expectEqual(buffer[testIndex], value)
+% else:
+    slice[testIndex] = 103
+    expectEqual(buffer[testIndex], 103)
+% end # if action
+  }
+}
+% end # if action or mutable
+% end # for action
+% end # for raw
+% end # for mutable
+
+let testRanges = (0..<bufCount-1).map({ i -> Range<Int> in i..<i+2 })
+% for mutable in [True, False]:
+% for raw in [True, False]:
+% for action in ['read', 'change']:
+% if action != 'change' or mutable:
+for testRange in testRanges {
+% Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
+  ${Type}TestSuite.test("${action}Slice\(testRange)ViaSlice") {
+% if raw:
+    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount+2, alignedTo: 8)
+    for i in 0..<bufCount+2 {
+      allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+    }
+% else:
+    let allocated = UnsafeMutablePointer<Int>.allocate(capacity: bufCount+2)
+    for i in 0..<bufCount+2 { allocated[i] = i }
+% end # if mutable
+    defer { allocated.deallocate() }
+
+    let buffer = ${Type}(start: allocated, count: bufCount+2)
+    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+
+    if _isDebugAssertConfiguration(),
+      testRange.lowerBound < sliceRange.lowerBound ||
+      testRange.upperBound > sliceRange.upperBound {
+      expectCrashLater()
+    }
+
+% if action == 'read':
+    let value = slice[testRange]
+    expectEqualSequence(buffer[testRange], value)
+% else:
+    let sourceSlice = buffer[bufCount..<bufCount+2]
+    slice[testRange] = sourceSlice
+    expectEqualSequence(buffer[testRange], sourceSlice)
+% end # if action
+  }
+}
+% end # if action or mutable
+% end # for action
+% end # for raw
+% end # for mutable
+
 protocol SubscriptTest {
   static var start: Int { get }
   static var end: Int { get }
