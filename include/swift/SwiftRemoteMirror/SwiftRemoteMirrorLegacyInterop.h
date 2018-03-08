@@ -55,8 +55,8 @@ static inline int
 swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef,
                                      uintptr_t *outIsaMask);
 
-static inline swift_typeref_interop_t
-swift_reflection_interop_lookupTyperef(SwiftReflectionInteropContextRef ContextRef,
+static inline swift_metadata_interop_t
+swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef ContextRef,
                                        uintptr_t RemoteTyperef);
 
 static inline swift_typeref_interop_t
