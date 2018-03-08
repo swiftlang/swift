@@ -773,10 +773,8 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
           TriviaRetentionMode::WithTrivia,
           /*Offset=*/5, /*EndOffset=*/SourceLen);
 
-  // Current implementation has a bug.
-  // It must be FALSE because Offset = 5.
-  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
-                             "1, 2: nul character embedded in middle of file"));
-  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
-                             "1, 4: nul character embedded in middle of file"));
+  ASSERT_FALSE(containsPrefix(
+      DiagConsumer.messages, "1, 2: nul character embedded in middle of file"));
+  ASSERT_FALSE(containsPrefix(
+      DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
 }
