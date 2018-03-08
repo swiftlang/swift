@@ -4,9 +4,6 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-// FIXME: <https://bugs.swift.org/browse/SR-7138> 2 tests are failing on linux in optimized mode
-// UNSUPPORTED: OS=linux-gnu
-
 import StdlibUnittest
 
 var ProtocolInitTestSuite = TestSuite("ProtocolInit")
