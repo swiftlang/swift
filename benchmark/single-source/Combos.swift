@@ -19,7 +19,7 @@ public func run_Combos(_ N: Int) {
 
   for _ in 1...10*N {
     combos = combinations("ABCDEFGHIJ", "0123456789").map {
-      return [$0] + [$1]
+      return [$0] ++ [$1]
     }
 
     if combos.first! != firstRef || combos.last! != lastRef {

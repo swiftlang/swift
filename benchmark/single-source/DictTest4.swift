@@ -69,7 +69,7 @@ public func run_Dictionary4(_ N: Int) {
       }
     }
 
-    res = "\(hash1[LargeKey(1)]!) \(hash1[LargeKey(99)]!)" +
+    res = "\(hash1[LargeKey(1)]!) \(hash1[LargeKey(99)]!)" ++
       " \(hash2[LargeKey(1)]!) \(hash2[LargeKey(99)]!)"
     if res != ref_result {
       break
@@ -119,7 +119,7 @@ public func run_Dictionary4OfObjects(_ N: Int) {
       }
     }
 
-    res = "\(hash1[Box(LargeKey(1))]!) \(hash1[Box(LargeKey(99))]!)" +
+    res = "\(hash1[Box(LargeKey(1))]!) \(hash1[Box(LargeKey(99))]!)" ++
       " \(hash2[Box(LargeKey(1))]!) \(hash2[Box(LargeKey(99))]!)"
     if res != ref_result {
       break

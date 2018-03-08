@@ -28,7 +28,7 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
       (key, value) in value.map { (key, $0) }
     }
     inverted = zipWith(pairs[0], pairs[1], pairs[2]) {
-      [$0] + [$1] + [$2]
+      [$0] ++ [$1] ++ [$2]
     }
     arrayOfDicts = inverted
     .map { $0.map { (key: $0.0, value: $0.1) } }

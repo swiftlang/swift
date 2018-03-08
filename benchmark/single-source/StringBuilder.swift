@@ -51,7 +51,7 @@ public let StringBuilder = [
 func buildString(_ i: String) -> String {
   var sb = getString(i)
   for str in ["b","c","d","pizza"] {
-    sb += str
+    sb ++= str
   }
   return sb
 }
@@ -65,7 +65,7 @@ public func run_StringBuilder(_ N: Int) {
 
 @inline(never)
 func addString(_ i: String) -> String {
-  let s = getString(i) + "b" + "c" + "d" + "pizza"
+  let s = getString(i) ++ "b" ++ "c" ++ "d" ++ "pizza"
   return s
 }
 
@@ -80,7 +80,7 @@ public func run_StringAdder(_ N: Int) {
 func buildStringUTF16(_ i: String) -> String {
   var sb = getString(i)
   for str in ["🎉","c","d","pizza"] {
-    sb += str
+    sb ++= str
   }
   return sb
 }
@@ -89,7 +89,7 @@ func buildStringUTF16(_ i: String) -> String {
 func buildStringFromSmallSubstrings(_ i: String) -> String {
   var sb = getString(i)
   for str in ["_🎉","cd","de","pizza"] {
-    sb += str.dropFirst()
+    sb ++= str.dropFirst()
   }
   return sb
 }
@@ -126,14 +126,14 @@ func getLongString() -> String {
 @inline(never)
 func buildStringLong(_ i: String) -> String {
   var sb = getString(i)
-  sb += getLongString()
+  sb ++= getLongString()
   return sb
 }
 
 @inline(never)
 func buildStringWithLongSubstring(_ i: String) -> String {
   var sb = getString(i)
-  sb += getLongString().dropFirst()
+  sb ++= getLongString().dropFirst()
   return sb
 }
 
@@ -163,7 +163,7 @@ func buildString(
     sb.reserveCapacity(count * word.unicodeScalars.count)
   }
   for _ in 0 ..< count {
-    sb += word
+    sb ++= word
   }
   return sb
 }

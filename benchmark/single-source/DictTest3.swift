@@ -29,7 +29,7 @@ public func run_Dictionary3(_ N: Int) {
   for _ in 1...N {
     hash1 = [:]
     for i in 0..<size1 {
-      hash1["foo_" + String(i)] = i
+      hash1["foo_" ++ String(i)] = i
     }
 
     hash2 = hash1
@@ -40,8 +40,8 @@ public func run_Dictionary3(_ N: Int) {
       }
     }
 
-    res = (String(hash1["foo_1"]!) + " " + String(hash1["foo_99"]!) + " " +
-           String(hash2["foo_1"]!) + " " + String(hash2["foo_99"]!))
+    res = (String(hash1["foo_1"]!) ++ " " ++ String(hash1["foo_99"]!) ++ " " ++
+           String(hash2["foo_1"]!) ++ " " ++ String(hash2["foo_99"]!))
     if res != ref_result {
       break
     }
@@ -77,7 +77,7 @@ public func run_Dictionary3OfObjects(_ N: Int) {
   for _ in 1...N {
     hash1 = [:]
     for i in 0..<size1 {
-      hash1[Box("foo_" + String(i))] = Box(i)
+      hash1[Box("foo_" ++ String(i))] = Box(i)
     }
 
     hash2 = hash1
@@ -88,8 +88,8 @@ public func run_Dictionary3OfObjects(_ N: Int) {
       }
     }
 
-    res = (String(hash1[Box("foo_1")]!.value) + " " + String(hash1[Box("foo_99")]!.value) + " " +
-           String(hash2[Box("foo_1")]!.value) + " " + String(hash2[Box("foo_99")]!.value))
+    res = (String(hash1[Box("foo_1")]!.value) ++ " " ++ String(hash1[Box("foo_99")]!.value) ++ " " ++
+           String(hash2[Box("foo_1")]!.value) ++ " " ++ String(hash2[Box("foo_99")]!.value))
     if res != ref_result {
       break
     }

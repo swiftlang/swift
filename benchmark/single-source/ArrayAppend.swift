@@ -94,7 +94,7 @@ public func run_ArrayAppendArrayOfInt(_ N: Int) {
 }
 
 // Identical to run_ArrayAppendArrayOfInt
-// except +=, to check equally performant.
+// except ++=, to check equally performant.
 @inline(never)
 public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
   let other = Array(repeating: 1, count: 10_000)
@@ -102,7 +102,7 @@ public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
     for _ in 0..<10 {
       var nums = [Int]()
       for _ in 0..<8 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -118,7 +118,7 @@ public func run_ArrayAppendStrings(_ N: Int) {
       var nums = [String]()
       // lower inner count due to string slowness
       for _ in 0..<4 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -138,7 +138,7 @@ public func run_ArrayAppendGenericStructs(_ N: Int) {
     for _ in 0..<10 {
       var nums = [S<Int,Double>]()
       for _ in 0..<8 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -154,7 +154,7 @@ public func run_ArrayAppendOptionals(_ N: Int) {
     for _ in 0..<10 {
       var nums = [Int?]()
       for _ in 0..<8 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -171,7 +171,7 @@ public func run_ArrayAppendLazyMap(_ N: Int) {
     for _ in 0..<10 {
       var nums = [Int]()
       for _ in 0..<8 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -188,7 +188,7 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
     for _ in 0..<10 {
       var nums = [Int]()
       for _ in 0..<8 {
-        nums += other
+        nums ++= other
       }
     }
   }
@@ -263,27 +263,27 @@ public func run_ArrayAppendToFromGeneric(_ N: Int) {
   }
 }
 
-// Append a single element array with the += operator
+// Append a single element array with the ++= operator
 @inline(never)
 public func run_ArrayPlusEqualSingleElementCollection(_ N: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
        var nums = [Int]()
        for _ in 0..<40_000 {
-         nums += [1]
+         nums ++= [1]
        }
     }
   }
 }
 
-// Append a five element array with the += operator
+// Append a five element array with the ++= operator
 @inline(never)
 public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
        var nums = [Int]()
        for _ in 0..<40_000 {
-         nums += [1, 2, 3, 4, 5]
+         nums ++= [1, 2, 3, 4, 5]
        }
     }
   }
@@ -291,7 +291,7 @@ public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
 
 @inline(never)
 public func appendThreeElements(_ a: inout [Int]) {
-  a += [1, 2, 3]
+  a ++= [1, 2, 3]
 }
 
 @inline(never)
@@ -310,7 +310,7 @@ public func run_ArrayAppendAscii(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums ++= s.utf8
        }
     }
   }
@@ -324,7 +324,7 @@ public func run_ArrayAppendLatin1(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums ++= s.utf8
        }
     }
   }
@@ -338,7 +338,7 @@ public func run_ArrayAppendUTF16(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums ++= s.utf8
        }
     }
   }

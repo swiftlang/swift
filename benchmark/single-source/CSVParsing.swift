@@ -36,7 +36,7 @@ func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
         }
 
         // Append until the next quote
-        result += remainder.prefix(upTo: nextQuoteIndex)
+        result ++= remainder.prefix(upTo: nextQuoteIndex)
         remainder.remove(upToAndIncluding: nextQuoteIndex)
 
         if let peek = remainder.utf16.first {

@@ -93,7 +93,7 @@ class Hash {
     var In = In
     var Res = ""
     for _ in 0..<8 {
-      Res = HexTbl[Int(In & 0xF)] + Res
+      Res = HexTbl[Int(In & 0xF)] ++ Res
       In = In >> 4
     }
     return Res
@@ -282,7 +282,7 @@ class MD5 : Hash {
   func hashState() -> String {
     var S = ""
     for h in [h0, h1, h2, h3] {
-      S += toHex(reverseBytes(h))
+      S ++= toHex(reverseBytes(h))
     }
     return S
   }
@@ -421,7 +421,7 @@ class SHA1 : Hash {
   func hashState() -> String {
     var Res: String = ""
     for state in [h0, h1, h2, h3, h4] {
-      Res += toHex(state)
+      Res ++= toHex(state)
     }
     return Res
   }
@@ -558,7 +558,7 @@ class SHA256 :  Hash {
   func hashState() -> String {
     var Res: String = ""
     for state in [h0, h1, h2, h3, h4, h5, h6, h7] {
-      Res += toHex(state)
+      Res ++= toHex(state)
     }
     return Res
   }
@@ -599,7 +599,7 @@ public func run_HashTest(_ N: Int) {
     // Check that we don't crash on large strings.
     var S: String = ""
     for _ in 1...size {
-      S += "a"
+      S ++= "a"
       MD.reset()
       MD.update(S)
     }
@@ -608,7 +608,7 @@ public func run_HashTest(_ N: Int) {
     MD.reset()
     var L: String = ""
     for _ in 1...size {
-      L += "a"
+      L ++= "a"
       MD.update("a")
     }
     let MD2 = MD5()
@@ -657,7 +657,7 @@ public func run_HashTest(_ N: Int) {
     // Check that we don't crash on large strings.
     S = ""
     for _ in 1...size {
-      S += "a"
+      S ++= "a"
       SH.reset()
       SH.update(S)
     }
@@ -666,7 +666,7 @@ public func run_HashTest(_ N: Int) {
     SH.reset()
     L = ""
     for _ in 1...size {
-      L += "a"
+      L ++= "a"
       SH.update("a")
     }
     let SH2 = SHA1()

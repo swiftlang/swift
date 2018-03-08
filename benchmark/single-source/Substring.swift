@@ -34,7 +34,7 @@ let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢ
 @inline(never)
 public func run_SubstringFromLongString(_ N: Int) {
   var s = longWide
-  s += "!" // ensure the string has a real buffer
+  s ++= "!" // ensure the string has a real buffer
   for _ in 1...N*500 {
     blackHole(Substring(s))
   }
@@ -49,7 +49,7 @@ func create<T : RangeReplaceableCollection, U : Collection>(
 @inline(never)
 public func run_SubstringFromLongStringGeneric(_ N: Int) {
   var s = longWide
-  s += "!" // ensure the string has a real buffer
+  s ++= "!" // ensure the string has a real buffer
   for _ in 1...N*500 {
     create(Substring.self, from: s)
   }
@@ -58,7 +58,7 @@ public func run_SubstringFromLongStringGeneric(_ N: Int) {
 @inline(never)
 public func run_StringFromLongWholeSubstring(_ N: Int) {
   var s0 = longWide
-  s0 += "!" // ensure the string has a real buffer
+  s0 ++= "!" // ensure the string has a real buffer
   let s = Substring(s0)
   for _ in 1...N*500 {
     blackHole(String(s))
@@ -68,7 +68,7 @@ public func run_StringFromLongWholeSubstring(_ N: Int) {
 @inline(never)
 public func run_StringFromLongWholeSubstringGeneric(_ N: Int) {
   var s0 = longWide
-  s0 += "!" // ensure the string has a real buffer
+  s0 ++= "!" // ensure the string has a real buffer
   let s = Substring(s0)
   for _ in 1...N*500 {
     create(String.self, from: s)
@@ -78,7 +78,7 @@ public func run_StringFromLongWholeSubstringGeneric(_ N: Int) {
 private func equivalentWithDistinctBuffers() -> (String, Substring) {
   var s0 = longWide
   withUnsafeMutablePointer(to: &s0) { blackHole($0) }
-  s0 += "!"
+  s0 ++= "!"
   
   // These two should be equal but with distinct buffers, both refcounted.
   let a = Substring(s0).dropFirst()
@@ -199,7 +199,7 @@ public func run_LessSubstringSubstringGenericComparable(_ N: Int) {
 @inline(never)
 public func run_SubstringEquatable(_ N: Int) {
 	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
+	string ++= ",✒️,🍍,🍏,✒️"
 	let substrings = string.split(separator: ",")
 	var count = 0
 	for _ in 1...N*500 {
@@ -213,7 +213,7 @@ public func run_SubstringEquatable(_ N: Int) {
 @inline(never)
 public func run_SubstringEqualString(_ N: Int) {
 	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
+	string ++= ",✒️,🍍,🍏,✒️"
 	let substrings = string.split(separator: ",")
 	let pineapple = "pineapple"
 	let apple = "🍏"
@@ -229,9 +229,9 @@ public func run_SubstringEqualString(_ N: Int) {
 @inline(never)
 public func run_SubstringComparable(_ N: Int) {
 	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
+	string ++= ",✒️,🍍,🍏,✒️"
 	let substrings = string.split(separator: ",")
-	let comparison = substrings + ["PPAP"]
+	let comparison = substrings ++ ["PPAP"]
 	var count = 0
 	for _ in 1...N*500 {
 		if substrings.lexicographicallyPrecedes(comparison) {

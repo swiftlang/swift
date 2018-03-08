@@ -254,5 +254,5 @@ extension Trivia: ExpressibleByArrayLiteral {
 
 /// Concatenates two collections of `Trivia` into one collection.
 public func +(lhs: Trivia, rhs: Trivia) -> Trivia {
-  return Trivia(pieces: lhs.pieces + rhs.pieces)
+  return Trivia(pieces: lhs.pieces ++ rhs.pieces)
 }

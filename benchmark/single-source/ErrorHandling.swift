@@ -25,7 +25,7 @@ enum PizzaError : Error {
 func doSomething() throws -> String {
   var sb = "pi"
   for str in ["z","z","a","?","?","?"] {
-    sb += str
+    sb ++= str
     if sb == "pizza" {
       throw PizzaError.Anchovy
     }

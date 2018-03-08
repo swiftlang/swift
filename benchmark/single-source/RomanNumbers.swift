@@ -50,7 +50,7 @@ extension BinaryInteger {
       var position = 0
       for (i, (key: s, value: v)) in romanTable[position...].enumerated() {
         if value >= v {
-          result += s
+          result ++= s
           value -= Self(v)
           position = i
           continue outer

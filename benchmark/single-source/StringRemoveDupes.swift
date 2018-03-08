@@ -13,11 +13,11 @@ public var StringRemoveDupes = BenchmarkInfo(
 @inline(never)
 public func run_StringRemoveDupes(_ N: Int) {
   let textLengthRef = 25
-  let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +
-             "Morbi nisi metus, accumsan eu sagittis et, condimentum ut " +
-             "arcu. Morbi aliquet porta velit, accumsan aliquam ante " +
-             "facilisis non. Maecenas lobortis erat vel elit fringilla " +
-             "blandit. Praesent euismod mauris sodales velit facilisis " +
+  let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " ++
+             "Morbi nisi metus, accumsan eu sagittis et, condimentum ut " ++
+             "arcu. Morbi aliquet porta velit, accumsan aliquam ante " ++
+             "facilisis non. Maecenas lobortis erat vel elit fringilla " ++
+             "blandit. Praesent euismod mauris sodales velit facilisis " ++
              "blandit. Morbi leo neque, finibus ut mi in, auctor sagittis."
   var s = ""
 
