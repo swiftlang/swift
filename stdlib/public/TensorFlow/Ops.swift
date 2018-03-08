@@ -76,132 +76,132 @@ extension Tensor4D : TensorProtocol {
 extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointAdd(_:_:partial:seed:))
-  public static func +(lhs: Self, rhs: Self) -> Self {
+  public static func + (lhs: Self, rhs: Self) -> Self {
     return #tfop("Add", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointSubtract(_:_:partial:seed:))
-  public static func -(lhs: Self, rhs: Self) -> Self {
+  public static func - (lhs: Self, rhs: Self) -> Self {
     return #tfop("Sub", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointMultiply(_:_:partial:seed:))
-  public static func *(lhs: Self, rhs: Self) -> Self {
+  public static func * (lhs: Self, rhs: Self) -> Self {
     return #tfop("Mul", lhs, rhs)
   }
 }
 
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
-  static func +(lhs: Scalar, rhs: Self) -> Self {
+  static func + (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) + rhs
   }
 
   @_inlineable @inline(__always)
-  static func +(lhs: Self, rhs: Scalar) -> Self {
+  static func + (lhs: Self, rhs: Scalar) -> Self {
     return lhs + Self(handle: _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func +=(lhs: inout Self, rhs: Self) {
+  static func += (lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
   @_inlineable @inline(__always)
-  static func +=(lhs: inout Self, rhs: Scalar) {
+  static func += (lhs: inout Self, rhs: Scalar) {
     lhs = lhs + rhs
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Scalar, rhs: Self) -> Self {
+  static func - (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) - rhs
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Self, rhs: Scalar) -> Self {
+  static func - (lhs: Self, rhs: Scalar) -> Self {
     return lhs - Self(handle: _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func -=(lhs: inout Self, rhs: Self) {
+  static func -= (lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
 
   @_inlineable @inline(__always)
-  static func -=(lhs: inout Self, rhs: Scalar) {
+  static func -= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs - rhs
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Scalar, rhs: Self) -> Self {
+  static func * (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) * rhs
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Self, rhs: Scalar) -> Self {
+  static func * (lhs: Self, rhs: Scalar) -> Self {
     return lhs * Self(handle: _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func *=(lhs: inout Self, rhs: Self) {
+  static func *= (lhs: inout Self, rhs: Self) {
     lhs = lhs * rhs
   }
 
   @_inlineable @inline(__always)
-  static func *=(lhs: inout Self, rhs: Scalar) {
+  static func *= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs * rhs
   }
 
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointDivide(_:_:partial:seed:))
-  static func /(lhs: Self, rhs: Self) -> Self {
+  static func / (lhs: Self, rhs: Self) -> Self {
     return #tfop("Div", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Scalar, rhs: Self) -> Self {
+  static func / (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) / rhs
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Self, rhs: Scalar) -> Self {
+  static func / (lhs: Self, rhs: Scalar) -> Self {
     return lhs / Self(handle: _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func /=(lhs: inout Self, rhs: Self) {
+  static func /= (lhs: inout Self, rhs: Self) {
     lhs = lhs / rhs
   }
 
   @_inlineable @inline(__always)
-  static func /=(lhs: inout Self, rhs: Scalar) {
+  static func /= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs / rhs
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Self, rhs: Self) -> Self {
+  static func % (lhs: Self, rhs: Self) -> Self {
     return #tfop("Mod", lhs, rhs)
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Self, rhs: Scalar) -> Self {
+  static func % (lhs: Self, rhs: Scalar) -> Self {
     return #tfop("Mod", lhs, _TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Scalar, rhs: Self) -> Self {
+  static func % (lhs: Scalar, rhs: Self) -> Self {
     return #tfop("Mod", _TFMakeScalarTensor(lhs), rhs)
   }
 
   @_inlineable @inline(__always)
-  static func %=(lhs: inout Self, rhs: Self) {
+  static func %= (lhs: inout Self, rhs: Self) {
     lhs = lhs % rhs
   }
 
   @_inlineable @inline(__always)
-  static func %=(lhs: inout Self, rhs: Scalar) {
+  static func %= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs % rhs
   }
 }
@@ -374,77 +374,77 @@ public extension TensorProtocol where Scalar == Bool {
 
 public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
-  static func +(lhs: Scalar, rhs: Tensor) -> Tensor {
+  static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) + rhs
   }
 
   @_inlineable @inline(__always)
-  static func +(lhs: Tensor, rhs: Scalar) -> Tensor {
+  static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs + Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func +=(lhs: inout Tensor, rhs: Scalar) {
+  static func += (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs + rhs
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Scalar, rhs: Tensor) -> Tensor {
+  static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) - rhs
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Tensor, rhs: Scalar) -> Tensor {
+  static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs - Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func -=(lhs: inout Tensor, rhs: Scalar) {
+  static func -= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs - Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Scalar, rhs: Tensor) -> Tensor {
+  static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) * rhs
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Tensor, rhs: Scalar) -> Tensor {
+  static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs * Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func *=(lhs: inout Tensor, rhs: Scalar) {
+  static func *= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs * rhs
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Scalar, rhs: Tensor) -> Tensor {
+  static func / (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) / rhs
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Tensor, rhs: Scalar) -> Tensor {
+  static func / (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs / Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func /=(lhs: inout Tensor, rhs: Scalar) {
+  static func /= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs / rhs
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Tensor, rhs: Scalar) -> Tensor {
+  static func % (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs % Tensor(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Scalar, rhs: Tensor) -> Tensor {
+  static func % (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) % rhs
   }
 
   @_inlineable @inline(__always)
-  static func %=(lhs: inout Tensor, rhs: Scalar) {
+  static func %= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs % rhs
   }
 }
@@ -610,7 +610,7 @@ public extension TensorProtocol {
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointNegate(_:partial:seed:))
-  static prefix func -(rhs: Self) -> Self {
+  static prefix func - (rhs: Self) -> Self {
     return #tfop("Neg", rhs)
   }
 }
