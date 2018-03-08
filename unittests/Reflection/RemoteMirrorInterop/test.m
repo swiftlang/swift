@@ -111,6 +111,13 @@ int main(int argc, char **argv) {
     printf("Unknown typeref!\n");
   }
   
+  uintptr_t Metadata = *(uintptr_t *)Obj;
+  swift_metadata_interop_t LookedUp =
+    swift_reflection_interop_lookupMetadata(Context, Metadata);
+  printf("Original metadata: %p\n", (void *)Metadata);
+  printf("Looked up metadata: Metadata=%p Library=%d\n",
+         (void *)LookedUp.Metadata, LookedUp.Library);
+  
   swift_typeinfo_t TypeInfo = swift_reflection_interop_infoForInstance(Context, Obj);
   if (TypeInfo.Kind != SWIFT_UNKNOWN) {
     printf("Kind:%u Size:%u Alignment:%u Stride:%u NumFields:%u\n",
