@@ -73,6 +73,8 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
       index = collection.startIndex
     }
     
+    @_specialize(where Source == _UnmanagedString<UInt16>)
+    @_specialize(where Source == _UnmanagedOpaqueString)
     mutating func tryFill(buffer: UnsafeMutableBufferPointer<UInt16>) -> Int? {
       var bufferIndex = 0
       let originalIndex = index
