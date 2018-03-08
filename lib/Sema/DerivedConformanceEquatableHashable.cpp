@@ -591,10 +591,10 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   auto enumTy = parentDC->getDeclaredTypeInContext();
   auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
 
-  auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    Identifier(), SourceLoc(), C.getIdentifier(s),
-                                    enumTy, parentDC);
+  auto getParamDecl = [&](StringRef s) -> ParamDecl * {
+    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                                    SourceLoc(), Identifier(), SourceLoc(),
+                                    C.getIdentifier(s), enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);
     return param;
   };

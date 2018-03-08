@@ -1219,8 +1219,8 @@ static void configureImplicitSelf(TypeChecker &tc,
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   auto specifier = selfParam.getParameterFlags().isInOut()
-                 ? VarDecl::Specifier::InOut
-                 : VarDecl::Specifier::Owned;
+                       ? VarDecl::Specifier::InOut
+                       : VarDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());

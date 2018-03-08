@@ -855,8 +855,8 @@ ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(inout_as_attr_disallowed,none,
-      "%0 before a parameter name is not allowed, place it before the parameter type instead",
+ERROR(parameter_specifier_as_attr_disallowed,none,
+      "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
       "parameter must not have multiple '__owned', 'inout', '__shared',"

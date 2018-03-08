@@ -160,10 +160,9 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 
   SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
-    auto PD = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                      Identifier(), SourceLoc(),
-                                      Identifier(), argType,
-                                      DC);
+    auto PD = new (Context)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), SourceLoc(), Identifier(), argType, DC);
     PD->setInterfaceType(argType);
     PD->setValidationStarted();
     PD->setImplicit();
@@ -221,8 +220,8 @@ getBuiltinGenericFunction(Identifier Id,
     auto paramType = ArgBodyTypes[i];
     auto paramIfaceType = ArgParamTypes[i].getType();
     auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
-                   ? VarDecl::Specifier::InOut
-                   : VarDecl::Specifier::Owned;
+                         ? VarDecl::Specifier::InOut
+                         : VarDecl::Specifier::Default;
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),

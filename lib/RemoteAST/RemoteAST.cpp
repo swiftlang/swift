@@ -350,9 +350,11 @@ public:
 
       auto label = Ctx.getIdentifier(param.getLabel());
       auto flags = param.getFlags();
+      auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(flags.isInOut())
-                                .withShared(flags.isShared())
+                                .withInOut(ownership == ValueOwnership::InOut)
+                                .withShared(ownership == ValueOwnership::Shared)
+                                .withOwned(ownership == ValueOwnership::Owned)
                                 .withVariadic(flags.isVariadic());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));

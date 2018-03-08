@@ -13,9 +13,9 @@ func test2s(__shared let x : Int) {}  // expected-error {{parameter must not hav
 // expected-error @-1 {{'__shared' before a parameter name is not allowed, place it before the parameter type instead}} {{13-21=}} {{30-30=__shared }}
 
 func test1o(__owned var x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{21-25=}}
-// expected-error @-1 {{'__owned' as a parameter attribute is not allowed}} {{13-20=}}
+// expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
 func test2o(__owned let x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{21-25=}}
-// expected-error @-1 {{'__owned' as a parameter attribute is not allowed}} {{13-20=}}
+// expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
 
 func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}

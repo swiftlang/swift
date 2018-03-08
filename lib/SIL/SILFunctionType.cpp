@@ -268,6 +268,42 @@ public:
   getIndirectSelfParameter(const AbstractionPattern &type) const = 0;
   virtual ParameterConvention
   getDirectSelfParameter(const AbstractionPattern &type) const = 0;
+
+  // Helpers that branch based on a value ownership.
+  ParameterConvention getIndirect(ValueOwnership ownership, bool forSelf,
+                                  unsigned index,
+                                  const AbstractionPattern &type,
+                                  const TypeLowering &substTL) const {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      if (forSelf)
+        return getIndirectSelfParameter(type);
+      return getIndirectParameter(index, type, substTL);
+    case ValueOwnership::InOut:
+      return ParameterConvention::Indirect_Inout;
+    case ValueOwnership::Shared:
+      return ParameterConvention::Indirect_In_Guaranteed;
+    case ValueOwnership::Owned:
+      return ParameterConvention::Indirect_In;
+    }
+  }
+
+  ParameterConvention getDirect(ValueOwnership ownership, bool forSelf,
+                                unsigned index, const AbstractionPattern &type,
+                                const TypeLowering &substTL) const {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      if (forSelf)
+        return getDirectSelfParameter(type);
+      return getDirectParameter(index, type, substTL);
+    case ValueOwnership::InOut:
+      return ParameterConvention::Indirect_Inout;
+    case ValueOwnership::Shared:
+      return ParameterConvention::Direct_Guaranteed;
+    case ValueOwnership::Owned:
+      return ParameterConvention::Direct_Owned;
+    }
+  }
 };
 
 /// A visitor for breaking down formal result types into a SILResultInfo
@@ -523,40 +559,6 @@ private:
     }
   }
 
-  void visitSharedType(AbstractionPattern origType, CanType substType,
-                       SILFunctionTypeRepresentation rep) {
-    NextOrigParamIndex++;
-
-    auto &substTL =
-      M.Types.getTypeLowering(origType, substType);
-    ParameterConvention convention;
-    if (origType.getAs<InOutType>()) {
-      convention = ParameterConvention::Indirect_Inout;
-    } else if (isa<TupleType>(substType) && !origType.isTypeParameter()) {
-      // Do not lower tuples @guaranteed.  This can create conflicts with
-      // substitutions for witness thunks e.g. we take $*(T, T)
-      // @in_guaranteed and try to substitute it for $*T.
-      return visit(origType, substType);
-    } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
-      if (rep == SILFunctionTypeRepresentation::WitnessMethod)
-        convention = ParameterConvention::Indirect_In_Guaranteed;
-      else
-        convention = Convs.getIndirectSelfParameter(origType);
-      assert(isIndirectFormalParameter(convention));
-
-    } else if (substTL.isTrivial()) {
-      convention = ParameterConvention::Direct_Unowned;
-    } else {
-      convention = Convs.getDirectSelfParameter(origType);
-      assert(!isIndirectFormalParameter(convention));
-    }
-
-    auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-    Inputs.push_back(SILParameterInfo(loweredType, convention));
-
-    maybeAddForeignParameters();
-  }
-
   /// This is a special entry point that allows destructure inputs to handle
   /// self correctly.
   void visitTopLevelParams(AbstractionPattern origType,
@@ -565,11 +567,15 @@ private:
     unsigned numEltTypes = params.size();
     unsigned numNonSelfParams = numEltTypes - 1;
 
+    auto silRepresentation = extInfo.getSILRepresentation();
+
     // We have to declare this out here so that the lambda scope lasts for
     // the duration of the loop below.
     auto handleForeignSelf = [&] {
-      visit(origType.getTupleElementType(numNonSelfParams),
-            params[numNonSelfParams].getType());
+      // This is a "self", but it's not a Swift self, we handle it differently.
+      visit(ValueOwnership::Default,
+            /*forSelf=*/false, origType.getTupleElementType(numNonSelfParams),
+            params[numNonSelfParams].getType(), silRepresentation);
     };
 
     // If we have a foreign-self, install handleSelf as the handler.
@@ -587,7 +593,8 @@ private:
     // to substitute.
     if (params.empty()) {
       if (origType.isTypeParameter())
-        visit(origType, M.getASTContext().TheEmptyTupleType);
+        visit(ValueOwnership::Default, /*forSelf=*/false, origType,
+              M.getASTContext().TheEmptyTupleType, silRepresentation);
       return;
     }
 
@@ -599,13 +606,9 @@ private:
       // If the abstraction pattern is opaque, and the tuple type is
       // materializable -- if it doesn't contain an l-value type -- then it's
       // a valid target for substitution and we should not expand it.
-      auto silExtInfo = extInfo.getSILRepresentation();
       if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
-        if (paramFlags.isShared()) {
-          visitSharedType(pattern, ty, silExtInfo);
-        } else {
-          visit(pattern, ty);
-        }
+        visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
+              silRepresentation);
         return;
       }
 
@@ -613,11 +616,8 @@ private:
         auto patternEltTy = pattern.getTupleElementType(i);
         auto trueEltTy = tty.getElementType(i);
         auto flags = tty->getElement(i).getParameterFlags();
-        if (flags.isShared()) {
-          visitSharedType(patternEltTy, trueEltTy, silExtInfo);
-        } else {
-          visit(patternEltTy, trueEltTy);
-        }
+        visit(flags.getValueOwnership(), /*forSelf=*/false, patternEltTy,
+              trueEltTy, silRepresentation);
       }
     };
 
@@ -647,25 +647,41 @@ private:
     // Process the self parameter.  Note that we implicitly drop self
     // if this is a static foreign-self import.
     if (!Foreign.Self.isImportAsMember()) {
-      visitSharedType(origType.getTupleElementType(numNonSelfParams),
-                      params[numNonSelfParams].getType(),
-                      extInfo.getSILRepresentation());
+      visit(ValueOwnership::Default, /*forSelf=*/true,
+            origType.getTupleElementType(numNonSelfParams),
+            params[numNonSelfParams].getType(), silRepresentation);
     }
 
     // Clear the foreign-self handler for safety.
     HandleForeignSelf.reset();
   }
 
-  void visit(AbstractionPattern origType, CanType substType) {
-    // Expand tuples.
+  void visit(ValueOwnership ownership, bool forSelf,
+             AbstractionPattern origType, CanType substType,
+             SILFunctionTypeRepresentation rep) {
+    // Tuples get handled specially, in some cases:
     CanTupleType substTupleTy = dyn_cast<TupleType>(substType);
     if (substTupleTy && !origType.isTypeParameter()) {
       assert(origType.getNumTupleElements() == substTupleTy->getNumElements());
-      for (auto i : indices(substTupleTy.getElementTypes())) {
-        visit(origType.getTupleElementType(i),
-              substTupleTy.getElementType(i));
+      switch (ownership) {
+      case ValueOwnership::Default:
+      case ValueOwnership::Owned:
+        // Expand the tuple.
+        for (auto i : indices(substTupleTy.getElementTypes())) {
+          visit(ownership, forSelf, origType.getTupleElementType(i),
+                substTupleTy.getElementType(i), rep);
+        }
+        return;
+      case ValueOwnership::Shared:
+        // Do not lower tuples @guaranteed.  This can create conflicts with
+        // substitutions for witness thunks e.g. we take $*(T, T)
+        // @in_guaranteed and try to substitute it for $*T.
+        return visit(ValueOwnership::Default, forSelf, origType, substType,
+                     rep);
+      case ValueOwnership::InOut:
+        // handled below
+        break;
       }
-      return;
     }
 
     unsigned origParamIndex = NextOrigParamIndex++;
@@ -676,14 +692,17 @@ private:
       assert(origType.isTypeParameter() || origType.getAs<InOutType>());
       convention = ParameterConvention::Indirect_Inout;
     } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
-      convention = Convs.getIndirectParameter(origParamIndex,
-                                              origType, substTL);
+      if (forSelf && rep == SILFunctionTypeRepresentation::WitnessMethod)
+        convention = ParameterConvention::Indirect_In_Guaranteed;
+      else
+        convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
+                                       origType, substTL);
       assert(isIndirectFormalParameter(convention));
     } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
-      convention = Convs.getDirectParameter(origParamIndex, origType,
-                                            substTL);
+      convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
+                                   substTL);
       assert(!isIndirectFormalParameter(convention));
     }
     auto loweredType = substTL.getLoweredType().getSwiftRValueType();
