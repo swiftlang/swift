@@ -1,3 +1,5 @@
+#include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -702,4 +704,79 @@ TEST_F(LexerTest, NestedPlaceholder) {
   };
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
   EXPECT_EQ("<#aa#>", Toks[2].getText());
+}
+
+class StringCaptureDiagnosticConsumer : public DiagnosticConsumer {
+public:
+  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                                DiagnosticKind Kind, StringRef FormatString,
+                                ArrayRef<DiagnosticArgument> FormatArgs,
+                                const swift::DiagnosticInfo &Info) override {
+    std::string DiagMsg;
+    llvm::raw_string_ostream DiagOS(DiagMsg);
+    DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);
+    auto LC = SM.getLineAndColumn(Loc);
+    std::ostringstream StrOS;
+    StrOS << LC.first << ", " << LC.second << ": " << DiagOS.str();
+    messages.push_back(StrOS.str());
+  }
+
+  std::vector<std::string> messages;
+};
+
+bool containsPrefix(const std::vector<std::string> &strs,
+                    const std::string &prefix) {
+  for (auto &str : strs) {
+    if (StringRef(str).startswith(StringRef(prefix))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST_F(LexerTest, DiagnoseEmbeddedNul) {
+  const char Source[] = " \0 \0 aaa \0 \0 bbb";
+  size_t SourceLen = sizeof(Source) - 1;
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
+
+  StringCaptureDiagnosticConsumer DiagConsumer;
+  DiagnosticEngine Diags(SourceMgr);
+  Diags.addConsumer(DiagConsumer);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
+          /*InSILMode=*/false, CommentRetentionMode::None,
+          TriviaRetentionMode::WithTrivia);
+
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 2: nul character embedded in middle of file"));
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 4: nul character embedded in middle of file"));
+}
+
+TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
+  const char Source[] = " \0 \0 aaa \0 \0 bbb";
+  size_t SourceLen = sizeof(Source) - 1;
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
+
+  StringCaptureDiagnosticConsumer DiagConsumer;
+  DiagnosticEngine Diags(SourceMgr);
+  Diags.addConsumer(DiagConsumer);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
+          /*InSILMode=*/false, CommentRetentionMode::None,
+          TriviaRetentionMode::WithTrivia,
+          /*Offset=*/5, /*EndOffset=*/SourceLen);
+
+  // Current implementation has a bug.
+  // It must be FALSE because Offset = 5.
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 2: nul character embedded in middle of file"));
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 4: nul character embedded in middle of file"));
 }
