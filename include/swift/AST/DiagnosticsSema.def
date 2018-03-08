@@ -2482,7 +2482,7 @@ NOTE(silence_inject_forced_downcast,none,
      "add parentheses around the cast to silence this warning", ())
 
 ERROR(conditional_downcast_foreign,none,
-      "conditional downcast to CoreFoundation type %0 will always succeed",
+      "conditional downcast to CoreFoundation type %0 will always succeed; did you mean to use 'as!' to force downcast?",
       (Type))
 
 ERROR(optional_used_as_boolean,none,
