@@ -49,6 +49,7 @@ enum class CommentRetentionMode {
 enum class TriviaRetentionMode {
   WithoutTrivia,
   WithTrivia,
+  WithOnlyLeadingTrivia
 };
 
 /// Kinds of conflict marker which the lexer might encounter.
@@ -210,6 +211,16 @@ public:
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
   }
 
+  bool isWithTrivia() const {
+    switch (TriviaRetention) {
+    case TriviaRetentionMode::WithTrivia:
+    case TriviaRetentionMode::WithOnlyLeadingTrivia:
+      return true;
+    case TriviaRetentionMode::WithoutTrivia:
+      return false;
+    }
+  }
+
   unsigned getBufferID() const { return BufferID; }
 
   /// peekNextToken - Return the next token to be returned by Lex without
@@ -234,7 +245,7 @@ public:
     if (TokStart.isInvalid())
       TokStart = Tok.getLoc();
     auto S = getStateForBeginningOfTokenLoc(TokStart);
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+    if (isWithTrivia())
       S.LeadingTrivia = LeadingTrivia;
     return S;
   }
@@ -259,7 +270,7 @@ public:
     lexImpl();
 
     // Restore Trivia.
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+    if (isWithTrivia())
       if (auto &LTrivia = S.LeadingTrivia)
         LeadingTrivia = std::move(*LTrivia);
   }

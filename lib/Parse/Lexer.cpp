@@ -292,7 +292,7 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+  if (isWithTrivia()) {
     LeadingTrivia.push_back(TriviaPiece::backtick());
     assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
     TrailingTrivia.push_back(TriviaPiece::backtick());
@@ -2159,7 +2159,7 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+  if (isWithTrivia()) {
     LeadingTrivia.clear();
     TrailingTrivia.clear();
   }
@@ -2167,7 +2167,7 @@ void Lexer::lexImpl() {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+      if (isWithTrivia()) {
         // Add UTF-8 BOM to LeadingTrivia.
         LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
       }
@@ -2206,7 +2206,7 @@ Restart:
 
   case '\n':
   case '\r':
-    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
+    assert(isWithTrivia() &&
            "newlines should be eaten by lexTrivia as LeadingTrivia");
     NextToken.setAtStartOfLine(true);
     goto Restart;  // Skip whitespace.
@@ -2378,8 +2378,17 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
 }
 
 void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
-  if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
+  switch (TriviaRetention) {
+  case TriviaRetentionMode::WithOnlyLeadingTrivia:
+    if (IsForTrailingTrivia) {
+      return;
+    }
+    break;
+  case TriviaRetentionMode::WithTrivia:
+    break;
+  case TriviaRetentionMode::WithoutTrivia:
     return;
+  }
 
 Restart:
   const char *TriviaStart = CurPtr;
