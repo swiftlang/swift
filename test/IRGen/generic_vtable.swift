@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %empty-directory(%t)
+// RUN: %utils/chex.py < %s > %t/generic_vtable.swift
+// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK
 
 // REQUIRES: CPU=x86_64
 
@@ -21,18 +23,14 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Base' does not have any method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 0,
+// -- flags: has vtable, reflectable, is class, is unique
+// CHECK-SAME: <i32 0x8004_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 10,
 // -- vtable size
 // CHECK-SAME: i32 3
 // -- no method descriptors -- class is fully concrete
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Base' has a static vtable.
 
@@ -50,12 +48,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Derived' has method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 1,
+// -- flags: has vtable, reflectable, is class, is unique, is generic
+// CHECK-SAME: <i32 0x8004_00D0>,
 // -- vtable offset
 // CHECK-SAME: i32 14,
 // -- vtable size
@@ -63,16 +57,14 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for m3()
 // CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m3yyF"
 // --
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
 
-// CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal global <{{.*}}> <{
-// -- nominal type descriptor
-// CHECK-SAME: @"$S14generic_vtable7DerivedCMn",
+// CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal constant <{{.*}}> <{
 // -- ivar destroyer
-// CHECK-SAME: i8* null
+// CHECK-SAME: i32 0
 // --
 // CHECK-SAME: }>, align 8
 
@@ -80,12 +72,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Concrete' has method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 0,
+// -- flags: has vtable, reflectable, is class, is unique
+// CHECK-SAME: <i32 0x8004_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 15,
 // -- vtable size
@@ -93,7 +81,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for m4()
 // CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
 // --
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
 //// filled in at initialization time.
@@ -110,13 +98,16 @@ public class Concrete : Derived<Int> {
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define private %swift.type* @create_generic_metadata_Derived(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8**)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, {{.*}}, i64 2)
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK: ret %swift.type* [[METADATA]]
 
+// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 
 // -- method override for 'm2()'
@@ -129,7 +120,7 @@ public class Concrete : Derived<Int> {
 // CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
 
-// CHECK: ret %swift.type* [[METADATA]]
+// CHECK: ret %swift.type* null
 
 
 //// Metadata initialization function for 'Concrete' copies superclass vtable

@@ -37,6 +37,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
 } // namespace swift
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
@@ -50,8 +51,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   }
 };
 
-
-
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   // HeapObject header;
   {
@@ -79,7 +79,7 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   0 // int entries; (zero'd bits)
 };
 
-
+SWIFT_RUNTIME_STDLIB_INTERFACE
 swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   // HeapObject header;
   {
@@ -129,8 +129,13 @@ void swift::_swift_instantiateInertHeapObject(void *address,
 
 namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
-  // LLVM libs into the runtime, so define this here.
-  size_t fixed_seed_override = 0;
+  // LLVM libs into the runtime, so define it as a weak symbol.
+  //
+  // Systems that compile this code into a dynamic library will do so with
+  // hidden visibility, making this all internal to the dynamic library.
+  // Systems that statically link the Swift runtime into applications (e.g. on
+  // Linux) need this to handle the case when the app already uses LLVM.
+  size_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
 } // namespace detail
 } // namespace hashing
 } // namespace llvm

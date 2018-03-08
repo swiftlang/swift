@@ -34,7 +34,8 @@ public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;
   bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName)
+                                 StringRef sanitizerLibName,
+                                 bool shared)
       const override;
 };
 
@@ -73,7 +74,8 @@ public:
   GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~GenericUnix() = default;
   bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName)
+                                 StringRef sanitizerLibName,
+                                 bool shared)
       const override;
 };
 

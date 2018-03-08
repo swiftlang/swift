@@ -477,11 +477,18 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<Projection, SingleValueInstruction *>;
+
+  struct ProjInstPair {
+    Projection P;
+    SingleValueInstruction *I;
+
+    // When sorting, just look at the projection and ignore the instruction.
+    bool operator<(const ProjInstPair &RHS) const { return P < RHS.P; }
+  };
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
-  llvm::SmallVector<ProjInstPairTy, 8> Projections;
+  llvm::SmallVector<ProjInstPair, 8> Projections;
   for (auto *UI : getNonDebugUses(LI)) {
     auto *User = UI->getUser();
 
@@ -503,8 +510,8 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   Projection *LastProj = nullptr;
   LoadInst *LastNewLoad = nullptr;
   for (auto &Pair : Projections) {
-    auto &Proj = Pair.first;
-    auto *Inst = Pair.second;
+    auto &Proj = Pair.P;
+    auto *Inst = Pair.I;
 
     // If this projection is the same as the last projection we processed, just
     // replace all uses of the projection with the load we created previously.
@@ -679,6 +686,20 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   return nullptr;
 }
 
+static bool isValueToBridgeObjectremovable(ValueToBridgeObjectInst *VTBOI) {
+  SILValue operand = VTBOI->getOperand();
+  // If operand is a struct $UInt (% : $Builtin.), fetch the real source
+  if (auto *SI = dyn_cast<StructInst>(operand)) {
+    assert(SI->SILInstruction::getAllOperands().size() == 1 &&
+           "Expected a single operand");
+    operand = SI->getOperand(0);
+  }
+  if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
+    return (BI->getBuiltinInfo().ID == BuiltinValueKind::StringObjectOr);
+  }
+  return false;
+}
+
 SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   // Retain of ThinToThickFunction is a no-op.
   SILValue funcOper = SRI->getOperand();
@@ -691,6 +712,15 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
       isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
+
+  // Retain and Release of tagged strings is a no-op.
+  // The builtin code pattern to find tagged strings is:
+  // builtin "stringObjectOr_Int64" (or to tag the string)
+  // value_to_bridge_object (cast the UInt to bridge object)
+  if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
+    if (isValueToBridgeObjectremovable(VTBOI))
+      return eraseInstFromFunction(*SRI);
+  }
 
   // Sometimes in the stdlib due to hand offs, we will see code like:
   //
@@ -1133,6 +1163,15 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
       isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
+
+  // Retain and Release of tagged strings is a no-op.
+  // The builtin code pattern to find tagged strings is:
+  // builtin "stringObjectOr_Int64" (or to tag the string)
+  // value_to_bridge_object (cast the UInt to bridge object)
+  if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
+    if (isValueToBridgeObjectremovable(VTBOI))
+      return eraseInstFromFunction(*SRI);
+  }
 
   // Release of a classbound existential converted from a class is just a
   // release of the class, squish the conversion.

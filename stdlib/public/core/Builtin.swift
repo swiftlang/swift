@@ -259,6 +259,13 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T 
   return Builtin.castReference(x)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+  _sanityCheck(x is T, "invalid unsafeDowncast")
+  return Builtin.castReference(x)
+}
+
 import SwiftShims
 
 @_inlineable // FIXME(sil-serialize-all)
@@ -356,6 +363,14 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 #endif
 }
 
+@_inlineable
+@_versioned
+internal
+func _isValidAddress(_ address: UInt) -> Bool {
+  // TODO: define (and use) ABI max valid pointer value
+  return address >= _swift_abi_LeastValidPointerValue
+}
+
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
@@ -418,6 +433,155 @@ internal func _nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
 @inline(__always)
 internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
+}
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned
+@inline(__always)
+internal func _isObjCTaggedPointer(_ x: UInt) -> Bool {
+  return (x & _objCTaggedPointerBits) != 0
+}
+
+/// TODO: describe extras
+
+@_inlineable /*@_versioned*/ @inline(__always) public // FIXME
+func _isTaggedObject(_ x: Builtin.BridgeObject) -> Bool {
+  return _bitPattern(x) & _objCTaggedPointerBits != 0
+}
+@_inlineable /*@_versioned*/ @inline(__always) public // FIXME
+func _isNativePointer(_ x: Builtin.BridgeObject) -> Bool {
+  return (
+    _bitPattern(x) & (_objCTaggedPointerBits | _objectPointerIsObjCBit)
+  ) == 0
+}
+@_inlineable /*@_versioned*/ @inline(__always) public // FIXME
+func _isNonTaggedObjCPointer(_ x: Builtin.BridgeObject) -> Bool {
+  return !_isTaggedObject(x) && !_isNativePointer(x)
+}
+
+@_inlineable
+@_versioned
+@inline(__always)
+func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
+  // Zero out the tag bits, and leave them all at the top.
+  _sanityCheck(_isTaggedObject(x), "not tagged!")
+  return (_bitPattern(x) & ~_objCTaggedPointerBits)
+    >> _objectPointerLowSpareBitShift
+}
+
+// Values -> BridgeObject
+@inline(__always)
+@_inlineable
+public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
+  _sanityCheck(!_isObjCTaggedPointer(x))
+  let object = Builtin.castToBridgeObject(x, 0._builtinWordValue)
+  _sanityCheck(_isNativePointer(object))
+  return object
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(
+  fromNonTaggedObjC x: AnyObject
+) -> Builtin.BridgeObject {
+  _sanityCheck(!_isObjCTaggedPointer(x))
+  let object = _makeObjCBridgeObject(x)
+  _sanityCheck(_isNonTaggedObjCPointer(object))
+  return object
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
+  _sanityCheck(x & _objCTaggedPointerBits != 0)
+  let object: Builtin.BridgeObject = Builtin.valueToBridgeObject(x)
+  _sanityCheck(_isTaggedObject(object))
+  return object
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(taggingPayload x: UInt) -> Builtin.BridgeObject {
+  let shifted = x &<< _objectPointerLowSpareBitShift
+  _sanityCheck(x == (shifted &>> _objectPointerLowSpareBitShift),
+    "out-of-range: limited bit range requires some zero top bits")
+  _sanityCheck(shifted & _objCTaggedPointerBits == 0,
+    "out-of-range: post-shift use of tag bits")
+  return _bridgeObject(fromTagged: shifted | _objCTaggedPointerBits)
+}
+
+// BridgeObject -> Values
+@inline(__always)
+@_inlineable
+public func _bridgeObject(toNative x: Builtin.BridgeObject) -> AnyObject {
+  _sanityCheck(_isNativePointer(x))
+  return Builtin.castReferenceFromBridgeObject(x)
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(
+  toNonTaggedObjC x: Builtin.BridgeObject
+) -> AnyObject {
+  _sanityCheck(_isNonTaggedObjCPointer(x))
+  return Builtin.castReferenceFromBridgeObject(x)
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(toTagged x: Builtin.BridgeObject) -> UInt {
+  _sanityCheck(_isTaggedObject(x))
+  let bits = _bitPattern(x)
+  _sanityCheck(bits & _objCTaggedPointerBits != 0)
+  return bits
+}
+@inline(__always)
+@_inlineable
+public func _bridgeObject(toTagPayload x: Builtin.BridgeObject) -> UInt {
+  return _getNonTagBits(x)
+}
+
+@inline(__always)
+@_inlineable
+public func _bridgeObject(
+  fromNativeObject x: Builtin.NativeObject
+) -> Builtin.BridgeObject {
+  return _bridgeObject(fromNative: _nativeObject(toNative: x))
+}
+
+//
+// NativeObject
+//
+
+@inline(__always)
+@_inlineable
+public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
+  _sanityCheck(!_isObjCTaggedPointer(x))
+  let native = Builtin.unsafeCastToNativeObject(x)
+  // _sanityCheck(native == Builtin.castToNativeObject(x))
+  return native
+}
+@inline(__always)
+@_inlineable
+public func _nativeObject(
+  fromBridge x: Builtin.BridgeObject
+) -> Builtin.NativeObject {
+  return _nativeObject(fromNative: _bridgeObject(toNative: x))
+}
+
+@inline(__always)
+@_inlineable
+public func _nativeObject(toNative x: Builtin.NativeObject) -> AnyObject {
+  return Builtin.castFromNativeObject(x)
+}
+
+// FIXME
+extension ManagedBufferPointer {
+  // FIXME: String Guts
+  @inline(__always)
+  @_inlineable
+  public init(_nativeObject buffer: Builtin.NativeObject) {
+    self._nativeBuffer = buffer
+  }
 }
 
 /// Create a `BridgeObject` around the given `nativeObject` with the

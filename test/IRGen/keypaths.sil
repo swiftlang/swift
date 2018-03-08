@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
 // RUN: %utils/chex.py < %s > %t/keypaths.sil
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os
@@ -25,6 +25,11 @@ class C: Hashable {
 
   var hashValue: Int { get }
   static func ==(_: C, _: C) -> Bool
+}
+
+struct G<T> {
+  var x: T
+  subscript<U: Hashable>(x: U) -> T { get set }
 }
 
 sil_vtable C {}
@@ -64,7 +69,7 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16 }>
-// CHECK-64-SAME: i32 32 }>
+// CHECK-64-SAME: i32 24 }>
 
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -74,9 +79,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_0008> }>
-// CHECK-64-SAME: <i32 0x4000_0010> }>
+// -- 0x0200_0000 (class) + offset of C.x
+// CHECK-32-SAME: <i32 0x0200_0008> }>
+// CHECK-64-SAME: <i32 0x0200_0010> }>
 
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -86,9 +91,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x4000_0000 (class) + offset of C.y
-// CHECK-32-SAME: <i32 0x4000_000c> }>
-// CHECK-64-SAME: <i32 0x4000_0018> }>
+// -- 0x0200_0000 (class) + offset of C.y
+// CHECK-32-SAME: <i32 0x0200_000c> }>
+// CHECK-64-SAME: <i32 0x0200_0018> }>
 
 // -- %f: C.z
 // CHECK: [[KP_F:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -98,9 +103,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_0018> }>
-// CHECK-64-SAME: <i32 0x4000_0030> }>
+// -- 0x0200_0000 (class) + offset of C.z
+// CHECK-32-SAME: <i32 0x0200_0018> }>
+// CHECK-64-SAME: <i32 0x0200_0028> }>
 
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -114,12 +119,12 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16,
-// CHECK-64-SAME: i32 32,
+// CHECK-64-SAME: i32 24,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
-// -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_0008> }>
-// CHECK-64-SAME: <i32 0x4000_0010> }>
+// -- 0x0200_0000 (class) + offset of C.x
+// CHECK-32-SAME: <i32 0x0200_0008> }>
+// CHECK-64-SAME: <i32 0x0200_0010> }>
 
 // -- %h: C.z.x
 // CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -131,9 +136,9 @@ sil_vtable C {}
 //                  -- instantiable in-line, size 20
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_0018>,
-// CHECK-64-SAME: <i32 0x4000_0030>,
+// -- 0x0200_0000 (class) + offset of C.z
+// CHECK-32-SAME: <i32 0x0200_0018>,
+// CHECK-64-SAME: <i32 0x0200_0028>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- offset of S.x
@@ -150,7 +155,7 @@ sil_vtable C {}
 //              -- instantiable in-line, size 12
 // CHECK-32-SAME: <i32 0x8000_000c>,
 // -- computed, get-only, identified by function pointer, no args
-// CHECK-SAME: <i32 0x2000_0000>,
+// CHECK-SAME: <i32 0x0100_0000>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: void ()* @k_id,
 // CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get }>
@@ -166,7 +171,7 @@ sil_vtable C {}
 //              -- instantiable in-line, size 16
 // CHECK-32-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by vtable, no args
-// CHECK-SAME: <i32 0x2a00_0000>,
+// CHECK-SAME: <i32 0x0150_0000>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: [[WORD]]
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get,
@@ -183,7 +188,7 @@ sil_vtable C {}
 //              -- instantiable in-line, size 16
 // CHECK-32-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by property offset, no args
-// CHECK-SAME: <i32 0x3c00_0000>,
+// CHECK-SAME: <i32 0x01e0_0000>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: [[WORD]]
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get,
@@ -199,9 +204,9 @@ sil_vtable C {}
 // CHECK-SAME: i32 8,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //             -- struct with runtime-resolved offset
-// CHECK-SAME: <i32 0x1ffffffe>,
-// CHECK-32-SAME: i32 8 }>
-// CHECK-64-SAME: i32 16 }>
+// CHECK-SAME: <i32 0x00fffffe>,
+// CHECK-32-SAME: i32 16 }>
+// CHECK-64-SAME: i32 32 }>
 
 // -- %j: Gen<A>.y
 // CHECK: [[KP_J:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -212,9 +217,9 @@ sil_vtable C {}
 // CHECK-SAME: i32 8,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //             -- struct with runtime-resolved offset
-// CHECK-SAME: <i32 0x1ffffffe>,
-// CHECK-32-SAME: i32 12 }>
-// CHECK-64-SAME: i32 24 }>
+// CHECK-SAME: <i32 0x00fffffe>,
+// CHECK-32-SAME: i32 20 }>
+// CHECK-64-SAME: i32 40 }>
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
@@ -398,6 +403,27 @@ entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
       indices_equals @s_equals : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
       indices_hash @s_hash : $@convention(thin) <T: Hashable, U: Hashable> (UnsafeRawPointer) -> Int
   ) <A, B> (%3, %4, %5)
+
+  return undef : $()
+}
+
+sil @generic_external : $@convention(thin) <A: Hashable, B: Hashable> (@in A, @in B, @in A, @in B, @in A, @in B) -> () {
+entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
+  %t = keypath $KeyPath<G<B>, B>, <Z> (
+    root $G<Z>;
+    external #G.x<Z> : $Z
+  ) <B>
+
+  %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
+    root $G<Y>;
+    external #G.subscript<Y, X> [%$0 : $X : $*X] : $Y
+  ) <B, A> (%1)
+
+  %v = keypath $KeyPath<G<G<B>>, B>, <X: Hashable, Y: Hashable> (
+    root $G<G<X>>;
+    external #G.subscript<G<X>, Y> [%$1 : $Y : $*Y] : $G<X>;
+    external #G.subscript<X, X> [%$0 : $X : $*X] : $X
+  ) <B, A> (%3, %4)
 
   return undef : $()
 }

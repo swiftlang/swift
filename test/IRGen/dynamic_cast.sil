@@ -26,7 +26,7 @@ bb0(%0 : $*P):
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @"$S12dynamic_cast1P_pMa"()
-  // CHECK: call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
+  // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr P in %0 : $*P to S in %1 : $*S
   destroy_addr %1 : $*S
@@ -36,7 +36,7 @@ bb0(%0 : $*P):
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$S12dynamic_cast1P_pMa"()
-// CHECK:       call %swift.type* @swift_rt_swift_getExistentialTypeMetadata(
+// CHECK:       call %swift.type* @swift_getExistentialTypeMetadata(
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testUnconditional1(
 sil @testUnconditional1 : $@convention(thin) (@in P) -> () {
@@ -45,7 +45,7 @@ bb0(%0 : $*P):
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @"$S12dynamic_cast1P_pMa"()
-  // CHECK: call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
+  // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr P in %0 : $*P to S in %1 : $*S
   destroy_addr %1 : $*S
@@ -61,7 +61,7 @@ bb0(%0 : $*P):
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @"$S12dynamic_cast1P_pMa"()
-  // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 6)
+  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 6)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S
   checked_cast_addr_br take_always P in %0 : $*P to S in %1 : $*S, bb1, bb2
@@ -81,7 +81,7 @@ bb0(%0 : $*P):
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @"$S12dynamic_cast1P_pMa"()
-  // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 2)
+  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 2)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S
   checked_cast_addr_br take_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2
@@ -101,7 +101,7 @@ bb0(%0 : $*P):
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @"$S12dynamic_cast1P_pMa"()
-  // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 0)
+  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 0)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S
   checked_cast_addr_br copy_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2

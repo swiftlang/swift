@@ -2,48 +2,11 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-@_silgen_name("swift_StringToNSString")
-public func _convertStringToNSString(_ string: String) -> NSString
-
-@_silgen_name("swift_NSStringToString")
-public func _convertNSStringToString(_ nsstring: NSString?) -> String
-
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
 public let NSUTF8StringEncoding: UInt = 8
-
-// NSArray bridging entry points
-public func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
-  return [T]()
-}
-
-public func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
-  return NSArray()
-}
-
-// NSDictionary bridging entry points
-public func _convertDictionaryToNSDictionary<Key, Value>(
-    _ d: Dictionary<Key, Value>
-) -> NSDictionary {
-  return NSDictionary()
-}
-
-public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
-       _ d: NSDictionary?
-     ) -> Dictionary<K, V> {
-  return Dictionary<K, V>()
-}
-
-// NSSet bridging entry points
-public func _convertSetToNSSet<T>(_ s: Set<T>) -> NSSet {
-  return NSSet()
-}
-
-public func _convertNSSetToSet<T>(_ s: NSSet?) -> Set<T> {
-  return Set<T>()
-}
 
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {

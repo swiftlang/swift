@@ -40,13 +40,15 @@ public enum SyntaxFactory {
     let data = SyntaxData(raw: .node(.unknown, 
                                      tokens.map { $0.data.raw },
                                      .present))
-    return Syntax(root: data, data: data)
+    return UnknownSyntax(root: data, data: data)
   }
 
 /// MARK: Syntax Node Creation APIs
 
 % for node in SYNTAX_NODES:
-%   if node.children:
+%   if node.is_base():
+%     pass
+%   elif node.children:
 %     child_params = []
 %     for child in node.children:
 %         param_type = child.type_name
@@ -75,14 +77,16 @@ public enum SyntaxFactory {
   }
 %   end
 
+%   if not node.is_base():
   public static func makeBlank${node.syntax_kind}() -> ${node.name} {
     let data = SyntaxData(raw: .node(.${node.swift_syntax_kind}, [
-%   for child in node.children:
+%     for child in node.children:
       ${make_missing_swift_child(child)},
-%   end
+%     end
     ], .present))
     return ${node.name}(root: data, data: data)
   }
+%   end
 % end
 
 /// MARK: Token Creation APIs
@@ -193,10 +197,10 @@ public enum SyntaxFactory {
 
   public static func makeVariableExpr(_ text: String,
     leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> SymbolicReferenceExprSyntax {
+    trailingTrivia: Trivia = []) -> IdentifierExprSyntax {
     let string = makeIdentifier(text,
       leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia)
-    return makeSymbolicReferenceExpr(identifier: string,
-                                     genericArgumentClause: nil)
+    return makeIdentifierExpr(identifier: string,
+                              declNameArguments: nil)
   }
 }

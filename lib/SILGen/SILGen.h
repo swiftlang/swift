@@ -213,6 +213,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitIfConfigDecl(IfConfigDecl *icd);
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
@@ -332,6 +333,22 @@ public:
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
   
+  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
+                                 AccessKind accessKind);
+  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+
+  KeyPathPatternComponent
+  emitKeyPathComponentForDecl(SILLocation loc,
+                              GenericEnvironment *genericEnv,
+                              unsigned &baseOperand,
+                              bool &needsGenericContext,
+                              SubstitutionList subs,
+                              AbstractStorageDecl *storage,
+                              ArrayRef<ProtocolConformanceRef> indexHashables,
+                              CanType baseTy);
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
@@ -420,6 +437,9 @@ public:
   SubstitutionList
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
+  /// Emit a property descriptor for the given storage decl if it needs one.
+  void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
+  
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

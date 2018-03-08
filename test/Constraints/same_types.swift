@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 protocol Fooable {
-  associatedtype Foo
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; do you want to add it?}}
 
   var foo: Foo { get }
 }
@@ -148,7 +148,7 @@ rdar19137463(1)
 
 struct Brunch<U : Fooable> where U.Foo == X {}
 
-struct BadFooable : Fooable {
+struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}}
   typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
   var foo: Foo { while true {} }
 }

@@ -225,7 +225,7 @@ nay:
 // CHECK:         [[OBJ_PTR:%.*]] = bitcast %T5casts1AC* [[T0]] to i8*
 // CHECK:         [[METADATA:%.*]] = call %swift.type* @"$S5casts1ACMa"()
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
-// CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_rt_swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
+// CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
 // CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT_PTR]] to %T5casts1AC*
 // CHECK:         [[COND:%.*]] = icmp ne %T5casts1AC* [[RESULT]], null
 // CHECK:         br i1 [[COND]]

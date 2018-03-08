@@ -17,13 +17,13 @@ import SwiftShims
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValue")
 internal func _stdlib_NSStringHashValue(
-  _ str: AnyObject, _ isASCII: Bool) -> Int
+  _ str: AnyObject, isASCII: Bool) -> Int
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValuePointer")
 internal func _stdlib_NSStringHashValuePointer(
-  _ str: OpaquePointer, _ isASCII: Bool) -> Int
+  _ str: OpaquePointer, isASCII: Bool) -> Int
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
@@ -82,47 +82,107 @@ extension Unicode {
   }
 }
 
-@_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-internal func _hashString(_ string: String) -> Int {
-  let core = string._core
 #if _runtime(_ObjC)
+#if arch(i386) || arch(arm)
+    private let stringHashOffset = Int(bitPattern: 0x88dd_cc21)
+#else
+    private let stringHashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
+#endif // arch(i386) || arch(arm)
+#endif // _runtime(_ObjC)
+
+extension _UnmanagedString where CodeUnit == UInt8 {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func computeHashValue() -> Int {
+#if _runtime(_ObjC)
+    let hash = _stdlib_CFStringHashCString(OpaquePointer(start), count)
     // Mix random bits into NSString's hash so that clients don't rely on
     // Swift.String.hashValue and NSString.hash being the same.
-#if arch(i386) || arch(arm)
-    let hashOffset = Int(bitPattern: 0x88dd_cc21)
+    return stringHashOffset ^ hash
 #else
-    let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
-#endif
-  // If we have a contiguous string then we can use the stack optimization.
-  let isASCII = core.isASCII
-  if core.hasContiguousStorage {
-    if isASCII {
-      return hashOffset ^ _stdlib_CFStringHashCString(
-                              OpaquePointer(core.startASCII), core.count)
-    } else {
-      let stackAllocated = _NSContiguousString(core)
-      return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
-        return _stdlib_NSStringHashValuePointer($0, false)
-      }
-    }
-  } else {
-    let cocoaString = unsafeBitCast(
-      string._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
-    return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
+    return Unicode.hashASCII(self.buffer)
+#endif // _runtime(_ObjC)
   }
-#else
-  if let asciiBuffer = core.asciiBuffer {
-    return Unicode.hashASCII(UnsafeBufferPointer(
-      start: asciiBuffer.baseAddress!,
-      count: asciiBuffer.count))
-  } else {
-    return Unicode.hashUTF16(
-      UnsafeBufferPointer(start: core.startUTF16, count: core.count))
-  }
-#endif
 }
 
+extension _UnmanagedString where CodeUnit == UTF16.CodeUnit {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func computeHashValue() -> Int {
+#if _runtime(_ObjC)
+    let temp = _NSContiguousString(_StringGuts(self))
+    let hash = temp._unsafeWithNotEscapedSelfPointer {
+      return _stdlib_NSStringHashValuePointer($0, isASCII: false)
+    }
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    return stringHashOffset ^ hash
+#else
+    return Unicode.hashUTF16(self.buffer)
+#endif // _runtime(_ObjC)
+  }
+}
+
+extension _UnmanagedOpaqueString {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func computeHashValue() -> Int {
+#if _runtime(_ObjC)
+    // TODO: ranged hash?
+    let hash = _stdlib_NSStringHashValue(cocoaSlice(), isASCII: false)
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    return stringHashOffset ^ hash
+#else
+    // FIXME: Streaming hash
+    let p = UnsafeMutablePointer<UTF16.CodeUnit>.allocate(capacity: count)
+    defer { p.deallocate(capacity: count) }
+    let buffer = UnsafeMutableBufferPointer(start: p, count: count)
+    _copy(into: buffer)
+    return Unicode.hashUTF16(UnsafeBufferPointer(buffer))
+#endif
+  }
+}
+
+extension _StringGuts {
+  //
+  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
+  //
+  @_versioned
+  @effects(readonly)
+  @inline(never) // Hide the CF dependency
+  internal static func _computeHashValue(
+    _unsafeBitPattern: _RawBitPattern
+  ) -> Int {
+    return _StringGuts(rawBits: _unsafeBitPattern)._computeHashValue()
+  }
+
+  @_versioned
+  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
+  internal func _computeHashValue() -> Int {
+    defer { _fixLifetime(self) }
+    if _slowPath(_isOpaque) {
+      return _asOpaque().computeHashValue()
+    }
+    if isASCII {
+      return _unmanagedASCIIView.computeHashValue()
+    }
+    return _unmanagedUTF16View.computeHashValue()
+  }
+
+  @_versioned
+  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
+  internal func _computeHashValue(_ range: Range<Int>) -> Int {
+    defer { _fixLifetime(self) }
+    if _slowPath(_isOpaque) {
+      return _asOpaque()[range].computeHashValue()
+    }
+    if isASCII {
+      return _unmanagedASCIIView[range].computeHashValue()
+    }
+    return _unmanagedUTF16View[range].computeHashValue()
+  }
+}
 
 extension String : Hashable {
   /// The string's hash value.
@@ -131,7 +191,15 @@ extension String : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashString(self)
+    defer { _fixLifetime(self) }
+    let gutsBits = _guts.rawBits
+    return _StringGuts._computeHashValue(_unsafeBitPattern: gutsBits)
   }
 }
 
+extension StringProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue : Int {
+    return _wholeString._guts._computeHashValue(_encodedOffsetRange)
+  }
+}

@@ -15,11 +15,13 @@
 #include "Scope.h"
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -59,17 +61,7 @@ SILGenModule::~SILGenModule() {
 }
 
 EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
-  auto &ctx = getASTContext();
-  if (elt->getParentEnum()->classifyAsOptionalType()
-        != OTK_ImplicitlyUnwrappedOptional)
-    return elt;
-
-  if (elt == ctx.getImplicitlyUnwrappedOptionalSomeDecl()) {
-    return ctx.getOptionalSomeDecl();
-  } else {
-    assert(elt == ctx.getImplicitlyUnwrappedOptionalNoneDecl());
-    return ctx.getOptionalNoneDecl();
-  }
+  return elt;
 }
 
 static SILDeclRef
@@ -646,7 +638,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
-          if (auto *decl = astNode.get<ValueDecl *>())
+          if (auto *decl = astNode.dyn_cast<ValueDecl *>())
             decl->dump(llvm::dbgs());
           else
             astNode.get<Expr *>()->dump(llvm::dbgs());
@@ -716,6 +708,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
+    FrontendStatsTracer Tracer(getASTContext().Stats, "emit-SIL", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
@@ -1166,6 +1159,115 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     if (auto setter = vd->getSetter())
       emitFunction(setter);
   }
+  
+  tryEmitPropertyDescriptor(vd);
+}
+
+static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
+  // The storage needs a descriptor if it sits at a module's ABI boundary,
+  // meaning it has public linkage.
+  
+  // Any property that's potentially resilient should have accessors
+  // synthesized.
+  if (!decl->getGetter())
+    return false;
+
+  // TODO: If previous versions of an ABI-stable binary needed the descriptor,
+  // then we still do.
+
+  auto getter = SILDeclRef(decl->getGetter());
+  auto getterLinkage = getter.getLinkage(ForDefinition);
+  
+  switch (getterLinkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+    // We may need a descriptor.
+    break;
+    
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::Hidden:
+    // Don't need a public descriptor.
+    return false;
+    
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::SharedExternal:
+    llvm_unreachable("should be definition linkage?");
+  }
+  
+  // TODO: We might be able to avoid a descriptor if the property is committed
+  // to being implemented a certain way, such as if it's promised to remain
+  // stored, or is computed with inlinable accessors, and can't change its
+  // mutability (because it's already promised to be mutable or fully immutable).
+  return true;
+}
+
+void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
+  // TODO: Key path code emission doesn't handle opaque values properly yet.
+  if (!SILModuleConventions(M).useLoweredAddresses())
+    return;
+  
+  if (!doesPropertyNeedDescriptor(decl))
+    return;
+  
+  auto genericEnv = decl->getInnermostDeclContext()
+                        ->getGenericEnvironmentOfContext();
+  unsigned baseOperand = 0;
+  bool needsGenericContext = true;
+  
+  Type baseTy;
+  if (decl->getDeclContext()->isTypeContext()) {
+    baseTy = decl->getDeclContext()->getSelfInterfaceType();
+    if (decl->isStatic()) {
+      // TODO: Static properties should eventually be referenceable as
+      // keypaths from T.Type -> Element
+      //baseTy = MetatypeType::get(baseTy);
+      return;
+    }
+  } else {
+    // TODO: Global variables should eventually be referenceable as
+    // key paths from ()
+    //baseTy = TupleType::getEmpty(getASTContext());
+    return;
+  }
+  
+  SubstitutionList subs = {};
+  if (genericEnv)
+    subs = genericEnv->getForwardingSubstitutions();
+  
+  // TODO: The hashable conformances for the indices need to be provided by the
+  // client, since they may be post-hoc conformances, or a generic subscript
+  // may be invoked with hashable substitutions. We may eventually allow for
+  // non-hashable keypaths as well.
+  SmallVector<ProtocolConformanceRef, 4> indexHashables;
+  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+    auto hashable = getASTContext().getProtocol(KnownProtocolKind::Hashable);
+    for (auto *index : *sub->getIndices()) {
+      if (index->isInOut())
+        return;
+      auto indexTy = index->getInterfaceType();
+      if (genericEnv)
+        indexTy = genericEnv->mapTypeIntoContext(indexTy);
+      
+      auto conformance = sub->getModuleContext()
+                            ->lookupConformance(indexTy, hashable);
+      if (!conformance)
+        return;
+      if (!conformance->getConditionalRequirements().empty())
+        return;
+      indexHashables.push_back(*conformance);
+    }
+  }
+  
+  auto component = emitKeyPathComponentForDecl(SILLocation(decl),
+                                               genericEnv,
+                                               baseOperand, needsGenericContext,
+                                               subs, decl, indexHashables,
+                                               baseTy->getCanonicalType());
+  
+  (void)SILProperty::create(M, /*serialized*/ false, decl, component);
 }
 
 void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
@@ -1177,6 +1279,10 @@ void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
   // Nothing to do for these kinds of decls - anything active has been added
   // to the enclosing declaration.
+}
+
+void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+  // Nothing to do for #error/#warning; they've already been emitted.
 }
 
 void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {

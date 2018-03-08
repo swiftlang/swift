@@ -167,6 +167,25 @@ extension NSKeyedUnarchiver {
     try resolveError(error)
     return result
   }
+
+  @nonobjc
+  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  public static func unarchivedObject<DecodedObjectType>(ofClass cls: DecodedObjectType.Type, from data: Data) throws -> DecodedObjectType? {
+    var error: NSError?
+    let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClass(cls as! AnyClass, data, &error)
+    try resolveError(error)
+    return result as? DecodedObjectType
+  }
+
+  @nonobjc
+  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  public static func unarchivedObject(ofClasses classes: [AnyClass], from data: Data) throws -> Any? {
+    var error: NSError?
+    let classesAsNSObjects = NSSet(array: classes.map { $0 as AnyObject })
+    let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClasses(classesAsNSObjects, data, &error)
+    try resolveError(error)
+    return result
+  }
   
   @nonobjc
   private static let __plistClasses: [AnyClass] = [

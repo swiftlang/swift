@@ -11,6 +11,9 @@ import A.B.C
 @objc import typealias A.B
 import struct A.B
 
+#warning("test warning")
+#error("test error")
+
 #if Blah
 class C {
   func bar(_ a: Int) {}
@@ -37,11 +40,15 @@ class C {
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
     _ = [:]
+    _ = []
     _ = [1, 2, 3, 4]
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
+    _ = type(of: a).self
+    _ = A -> B.C<Int>
+    _ = [(A) throws -> B]()
   }
   func boolAnd() -> Bool { return true && false }
   func boolOr() -> Bool { return true || false }
@@ -66,6 +73,8 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+    _ = self
+    _ = Self
   }
 
   func superExpr() {
@@ -82,6 +91,28 @@ class C {
     _ = .foo[12]
     _ = .foo.bar
   }
+
+  init() {}
+  @objc private init(a: Int)
+  init!(a: Int) {}
+  init?(a: Int) {}
+  public init(a: Int) throws {}
+
+  @objc deinit {}
+  private deinit {}
+
+  internal subscript(x: Int) -> Int { get {} set {} }
+  subscript() -> Int { return 1 }
+}
+
+protocol PP {
+  associatedtype A
+  associatedtype B: Sequence
+  associatedtype C = Int
+  associatedtype D: Sequence = [Int]
+  associatedtype E: Sequence = [[Int]] where A.Element : Sequence
+  private associatedtype F
+  @objc associatedtype G
 }
 
 #endif
@@ -220,9 +251,14 @@ func postfix() {
   foo[] {}
   foo[1] {}
   foo[1][2,x:3]
-  foo?++.bar!(baz)
+  foo?++.bar!(baz).self
+  foo().0
+  foo<Int>.bar
+  foo<Int>()
+  foo.bar<Int>()
 
   foo(x:y:)()
+  foo(x:)<Int> { }
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
   _ = foo(&d)

@@ -434,7 +434,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
-  auto param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
+  auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  rawTy,
@@ -708,7 +708,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
-  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
+  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Default,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedFieldDecl->getType(),
@@ -1267,7 +1267,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
-        ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), argName,
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationStarted();
@@ -1689,7 +1689,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(),
                         elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
@@ -1779,9 +1779,9 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
     return {nullptr, false};
 
   // Unwrap one level of optionality from each.
-  if (Type getterObjectType = getterType->getAnyOptionalObjectType())
+  if (Type getterObjectType = getterType->getOptionalObjectType())
     getterType = getterObjectType;
-  if (Type setterObjectType = setterType->getAnyOptionalObjectType())
+  if (Type setterObjectType = setterType->getOptionalObjectType())
     setterType = setterObjectType;
 
   // If they are still different, fail.
@@ -1792,7 +1792,7 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
 
   // Create an optional of the object type that can be implicitly
   // unwrapped which subsumes both behaviors.
-  return {ImplicitlyUnwrappedOptionalType::get(setterType), true};
+  return {OptionalType::get(setterType), true};
 }
 
 /// Add an AvailableAttr to the declaration for the given
@@ -1870,7 +1870,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      SourceLoc(), C.Id_errorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationStarted();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
@@ -2043,7 +2043,7 @@ static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
   Type ty = prop->getInterfaceType();
-  if (auto innerTy = ty->getAnyOptionalObjectType())
+  if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
   if (!ty->is<GenericTypeParamType>() && !ty->isAnyClassReferenceType())
     return;
@@ -2054,7 +2054,8 @@ applyPropertyOwnership(VarDecl *prop,
     return;
   }
   if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
-    prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Weak));
+    prop->getAttrs().add(new (ctx)
+                             ReferenceOwnershipAttr(ReferenceOwnership::Weak));
     prop->setType(WeakStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
@@ -2062,7 +2063,8 @@ applyPropertyOwnership(VarDecl *prop,
   }
   if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
       (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
-    prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Unmanaged));
+    prop->getAttrs().add(
+        new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
     prop->setType(UnmanagedStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(UnmanagedStorageType::get(
         prop->getInterfaceType(), ctx));
@@ -2689,6 +2691,20 @@ namespace {
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
+          StringRef nameForMangling;
+          ClangImporterSynthesizedTypeAttr::Kind relatedEntityKind;
+          if (decl->getDeclName().isEmpty()) {
+            nameForMangling = decl->getTypedefNameForAnonDecl()->getName();
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon;
+          } else {
+            nameForMangling = decl->getName();
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper;
+          }
+          errorWrapper->getAttrs().add(new (C) ClangImporterSynthesizedTypeAttr(
+              nameForMangling, relatedEntityKind));
+
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
                                       {KnownProtocolKind::BridgedStoredNSError});
@@ -2724,7 +2740,7 @@ namespace {
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
-          //   public static var _nsErrorDomain: String { return error-domain }
+          //   public static var errorDomain: String { return error-domain }
           addErrorDomain(errorWrapper, enumInfo.getErrorDomain(), Impl);
 
           // Note: the Code will be added after it's created.
@@ -3163,11 +3179,13 @@ namespace {
 
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
+        bool isBitField = false;
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
           if (field->isBitField()) {
             // We can't represent this struct completely in SIL anymore,
             // but we're still able to define a memberwise initializer.
             hasUnreferenceableStorage = true;
+            isBitField = true;
 
             makeBitFieldAccessors(Impl,
                                   const_cast<clang::RecordDecl *>(decl),
@@ -3181,7 +3199,7 @@ namespace {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
           makeIndirectFieldAccessors(Impl, ind, members, result, VD);
-        } else if (decl->isUnion()) {
+        } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
@@ -4049,7 +4067,7 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
-        assert(!dc->getSelfInterfaceType()->getAnyOptionalObjectType());
+        assert(!dc->getSelfInterfaceType()->getOptionalObjectType());
         isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
@@ -4059,7 +4077,7 @@ namespace {
           nullability = translateNullability(*typeNullability);
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
-          resultTy = OptionalType::get(nullability, resultTy);
+          resultTy = OptionalType::get(resultTy);
           isIUO = nullability == OTK_ImplicitlyUnwrappedOptional;
         }
 
@@ -4495,15 +4513,15 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto createRootClass = [=](Identifier name,
-                                 DeclContext *dc = nullptr) -> ClassDecl * {
+      auto createFakeRootClass = [=](Identifier name,
+                                     DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
                                           /*allowForwardDeclaration=*/true);
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        AccessLevel::Open,
+                                                        AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
@@ -4531,7 +4549,7 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
+        auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
@@ -4563,7 +4581,7 @@ namespace {
 
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
-          auto result = createRootClass(name);
+          auto result = createFakeRootClass(name);
           result->setImplicit();
           auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
@@ -4586,13 +4604,16 @@ namespace {
       if (declaredNative && nativeDecl)
         return nativeDecl;
 
+      auto access = AccessLevel::Open;
+      if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
+          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+        access = AccessLevel::Public;
+      }
+
       // Create the class declaration and record it.
-      auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                AccessLevel::Open,
-                                Impl.importSourceLoc(decl->getLocStart()),
-                                name,
-                                Impl.importSourceLoc(decl->getLocation()),
-                                None, nullptr, dc);
+      auto result = Impl.createDeclWithClangNode<ClassDecl>(
+          decl, access, Impl.importSourceLoc(decl->getLocStart()), name,
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -4716,7 +4737,7 @@ namespace {
           !isa<clang::ObjCProtocolDecl>(redecl->getDeclContext()))
         original->setImplicit(false);
 
-      if (!original->getAttrs().hasAttribute<OwnershipAttr>() &&
+      if (!original->getAttrs().hasAttribute<ReferenceOwnershipAttr>() &&
           !original->getAttrs().hasAttribute<NSCopyingAttr>()) {
         applyPropertyOwnership(original,
                                redecl->getPropertyAttributesAsWritten());
@@ -5187,7 +5208,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 
   for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
     if (auto *otherProto = ctx.getProtocol(attr->getProtocolKind()))
-      if (otherProto == proto)
+      if (otherProto == proto || otherProto->inheritsFrom(proto))
         return true;
 
   // Only consider extensions from the original module...or from an overlay
@@ -5252,7 +5273,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!storedUnderlyingType)
     return nullptr;
 
-  if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = storedUnderlyingType->getOptionalObjectType())
     storedUnderlyingType = objTy;
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
@@ -5269,7 +5290,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
       Bridgeability::Full, OTK_None);
-  if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
     computedPropertyUnderlyingType = objTy;
 
   bool isBridged =
@@ -5555,7 +5576,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   // Update the failability appropriately based on the imported method type.
   OptionalTypeKind initOptionality = OTK_None;
   if (importedType.isImplicitlyUnwrapped()) {
-    assert(importedType.getType()->getAnyOptionalObjectType());
+    assert(importedType.getType()->getOptionalObjectType());
     initOptionality = OTK_ImplicitlyUnwrappedOptional;
   } else if (importedType.getType()->getOptionalObjectType()) {
     initOptionality = OTK_Optional;
@@ -6090,19 +6111,22 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
-  OptionalTypeKind failability;
-  (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
+  bool resultIsOptional;
+  (void)oldFnType->getResult()->getOptionalObjectType(resultIsOptional);
 
   // Update the failability appropriately based on the imported method type.
-  if (importedType.isImplicitlyUnwrapped()) {
-    assert(failability != OTK_None);
-    failability = OTK_ImplicitlyUnwrappedOptional;
+  assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());
+  OptionalTypeKind failability = OTK_None;
+  if (resultIsOptional) {
+    failability = OTK_Optional;
+    if (importedType.isImplicitlyUnwrapped())
+      failability = OTK_ImplicitlyUnwrappedOptional;
   }
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
-  if (failability)
-    resultTy = OptionalType::get(failability, resultTy);
+  if (resultIsOptional)
+    resultTy = OptionalType::get(resultTy);
 
   type = FunctionType::get(oldFnType->getInput(), resultTy,
                            oldFnType->getExtInfo());
@@ -7753,6 +7777,22 @@ static void finishInheritedConformances(
   }
 }
 
+static Type
+recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
+                              DependentMemberType *depMemTy) {
+  Type origBase = depMemTy->getBase();
+  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
+    Type substBase = recursivelySubstituteBaseType(conformance, depBase);
+    ModuleDecl *module = conformance->getDeclContext()->getParentModule();
+    return depMemTy->substBaseType(module, substBase);
+  }
+
+  const ProtocolDecl *proto = conformance->getProtocol();
+  assert(origBase->isEqual(proto->getSelfInterfaceType()));
+  return conformance->getTypeWitness(depMemTy->getAssocType(),
+                                     /*resolver=*/nullptr);
+}
+
 /// Collect conformances for the requirement signature.
 static void finishSignatureConformances(
     NormalProtocolConformance *conformance) {
@@ -7769,9 +7809,7 @@ static void finishSignatureConformances(
       substTy = conformance->getType();
     } else {
       auto *depMemTy = origTy->castTo<DependentMemberType>();
-      assert(depMemTy->getBase()->isEqual(proto->getSelfInterfaceType()));
-      substTy = conformance->getTypeWitness(depMemTy->getAssocType(),
-                                            /*resolver=*/nullptr);
+      substTy = recursivelySubstituteBaseType(conformance, depMemTy);
     }
     auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
 
@@ -7856,6 +7894,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
+  FrontendStatsTracer StatsTracer(SwiftContext.Stats,
+                                  "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
@@ -8322,12 +8362,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-  RecursiveSharedTimer::Guard guard;
-  if (auto s = D->getASTContext().Stats) {
-    guard = s->getFrontendRecursiveSharedTimers()
-                .ClangImporter__Implementation__loadAllMembers.getGuard();
-  }
 
+  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
@@ -8566,3 +8602,51 @@ ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
       .getBaseIdentifier();
 }
 
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// clang::Decls, is defined here to avoid too much layering violation / circular
+// linkage dependency.
+
+struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
+      ND->printName(OS);
+    } else {
+      OS << "<unnamed-clang-decl>";
+    }
+  }
+
+  static inline bool printClangShortLoc(raw_ostream &OS,
+                                        clang::SourceManager *CSM,
+                                        clang::SourceLocation L) {
+    if (!L.isValid() || !L.isFileID())
+      return false;
+    auto PLoc = CSM->getPresumedLoc(L);
+    OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
+       << ':' << PLoc.getColumn();
+    return true;
+  }
+
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    if (CSM) {
+      const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+      auto Range = CD->getSourceRange();
+      if (printClangShortLoc(OS, CSM, Range.getBegin()))
+        OS << '-';
+      printClangShortLoc(OS, CSM, Range.getEnd());
+    }
+  }
+};
+
+static ClangDeclTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
+  return &TF;
+}

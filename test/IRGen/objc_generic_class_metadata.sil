@@ -39,7 +39,7 @@ entry:
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
   // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
-  // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+  // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
   // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
@@ -56,12 +56,12 @@ entry:
   return undef : $()
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC5thingSQyACGSQySo8NSStringCG_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
+sil @$S27objc_generic_class_metadata8SubclassC5thingACSgSo8NSStringCSg_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
 entry(%0: $Optional<NSString>, %1: $Subclass):
   unreachable
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC13arrayOfThingsSQyACGSaySo8NSStringCG_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
+sil @$S27objc_generic_class_metadata8SubclassC13arrayOfThingsACSgSaySo8NSStringCG_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
 entry(%0: $NSArray, %1: $Subclass):
   unreachable
 }
@@ -71,14 +71,14 @@ entry(%0: $Subclass):
   unreachable
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC7optionsSQyACGs10DictionaryVySo13GenericOptionaypGSg_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
+sil @$S27objc_generic_class_metadata8SubclassC7optionsACSgs10DictionaryVySo13GenericOptionaypGSg_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
 entry(%0: $Subclass, %1: $NSDictionary):
   unreachable
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo12GenericClassCMa"()
 // CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
-// CHECK:         call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+// CHECK:         call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSaySo12GenericClassC_SitGMa"()
 // CHECK:         [[TUPLE:%.*]] = call %swift.type* @"$SSo12GenericClassC_SitMa"()

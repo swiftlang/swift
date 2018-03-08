@@ -68,7 +68,7 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
   // The generic environment is marshaled into the end of the component
   // argument area inside the instance. Bind the generic information out of
   // the buffer.
-  if (!component.getComputedPropertyIndices().empty()) {
+  if (!component.getSubscriptIndices().empty()) {
     auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
       requirements.size() * IGF.IGM.getPointerSize().getValue());
 
@@ -97,10 +97,10 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     accessor = component.getComputedPropertySetter();
     break;
   case Equals:
-    accessor = component.getComputedPropertyIndexEquals();
+    accessor = component.getSubscriptIndexEquals();
     break;
   case Hash:
-    accessor = component.getComputedPropertyIndexHash();
+    accessor = component.getSubscriptIndexHash();
     break;
   }
   
@@ -203,7 +203,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
       // The component arguments are passed alongside the base being projected.
       componentArgsBuf = params.claimNext();
       // Pass the argument pointer down to the underlying function.
-      if (!component.getComputedPropertyIndices().empty()) {
+      if (!component.getSubscriptIndices().empty()) {
         forwardedArgs.add(componentArgsBuf);
       }
       break;
@@ -258,6 +258,8 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     
   {
     IRGenFunction IGF(IGM, layoutFn);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitArtificialFunction(IGF, layoutFn);
     // Unmarshal the generic environment from the argument buffer.
     auto parameters = IGF.collectParameters();
     auto args = parameters.claimNext();
@@ -275,7 +277,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy, 0);
     llvm::Value *alignMask = llvm::ConstantInt::get(IGM.SizeTy, 0);
 
-    for (auto &index : component.getComputedPropertyIndices()) {
+    for (auto &index : component.getSubscriptIndices()) {
       auto ty = genericEnv
         ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), index.LoweredType)
         : index.LoweredType;
@@ -323,7 +325,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                     ArrayRef<GenericRequirement> requirements) {
   // If the only thing we're capturing is generic environment, then we can
   // use a prefab witness table from the runtime.
-  if (component.getComputedPropertyIndices().empty()) {
+  if (component.getSubscriptIndices().empty()) {
     if (auto existing =
           IGM.Module.getNamedGlobal("swift_keyPathGenericWitnessTable"))
       return existing;
@@ -339,7 +341,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
   
   // Are the index values trivial?
   bool isTrivial = true;
-  for (auto &component : component.getComputedPropertyIndices()) {
+  for (auto &component : component.getSubscriptIndices()) {
     auto ty = genericEnv
       ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
       : component.LoweredType;
@@ -377,7 +379,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                                    componentArgsBufSize);
       
       llvm::Value *offset = nullptr;
-      for (auto &component : component.getComputedPropertyIndices()) {
+      for (auto &component : component.getSubscriptIndices()) {
         auto ty = genericEnv
           ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
                                            component.LoweredType)
@@ -426,7 +428,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       
       // Copy over the index values.
       llvm::Value *offset = nullptr;
-      for (auto &component : component.getComputedPropertyIndices()) {
+      for (auto &component : component.getSubscriptIndices()) {
         auto ty = genericEnv
           ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
                                            component.LoweredType)
@@ -509,6 +511,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     
   {
     IRGenFunction IGF(IGM, initFn);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitArtificialFunction(IGF, initFn);
+
     auto params = IGF.collectParameters();
     // Pointer to the argument packet passed into swift_getKeyPath
     auto src = params.claimNext();
@@ -517,7 +522,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     
     SmallVector<Address, 4> srcAddresses;
     int lastOperandNeeded = -1;
-    for (auto &index : component.getComputedPropertyIndices()) {
+    for (auto &index : component.getSubscriptIndices()) {
       lastOperandNeeded = std::max(lastOperandNeeded, (int)index.Operand);
     }
     
@@ -567,8 +572,8 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
     
     // Transfer the operands we want into the destination buffer.
-    for (unsigned i : indices(component.getComputedPropertyIndices())) {
-      auto &index = component.getComputedPropertyIndices()[i];
+    for (unsigned i : indices(component.getSubscriptIndices())) {
+      auto &index = component.getSubscriptIndices()[i];
       
       auto ty = genericEnv
         ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
@@ -602,9 +607,13 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     }
     
     // Transfer the generic environment.
-    if (genericEnv) {
+    // External components don't need to store the key path environment (and
+    // can't), since they need to already have enough information to function
+    // independently of any context using the component.
+    if (genericEnv &&
+        component.getKind() != KeyPathPatternComponent::Kind::External) {
       auto destGenericEnv = dest;
-      if (!component.getComputedPropertyIndices().empty()) {
+      if (!component.getSubscriptIndices().empty()) {
         auto genericEnvAlignMask = llvm::ConstantInt::get(IGM.SizeTy,
           IGM.getPointerAlignment().getMaskValue());
         auto notGenericEnvAlignMask = IGF.Builder.CreateNot(genericEnvAlignMask);
@@ -649,41 +658,69 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
 
+  auto emitGenerator =
+    [&](StringRef name, CanType type, llvm::Type *returnType,
+        llvm::function_ref<void (IRGenFunction&, CanType)> emit)
+    -> llvm::Function * {
+      // TODO: Use the standard metadata accessor when there are no arguments
+      // and the metadata accessor is defined.
+      
+      // Build a stub that loads the necessary bindings from the key path's
+      // argument buffer then fetches the metadata.
+      auto fnTy = llvm::FunctionType::get(returnType,
+                                          {Int8PtrTy}, /*vararg*/ false);
+      auto accessorThunk = llvm::Function::Create(fnTy,
+                                              llvm::GlobalValue::PrivateLinkage,
+                                              name, getModule());
+      accessorThunk->setAttributes(constructInitialAttributes());
+      {
+        IRGenFunction IGF(*this, accessorThunk);
+        if (DebugInfo)
+          DebugInfo->emitArtificialFunction(IGF, accessorThunk);
+        
+        if (type->hasTypeParameter()) {
+          auto bindingsBufPtr = IGF.collectParameters().claimNext();
+          
+          bindFromGenericRequirementsBuffer(IGF, requirements,
+                Address(bindingsBufPtr, getPointerAlignment()),
+                [&](CanType t) {
+                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+                });
+          
+          type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+        }
+        emit(IGF, type);
+      }
+      return accessorThunk;
+    };
+
   /// Generate a metadata accessor that produces metadata for the given type
   /// using arguments from the generic context of the key path.
   auto emitMetadataGenerator = [&](CanType type) -> llvm::Function * {
     // TODO: Use the standard metadata accessor when there are no arguments
     // and the metadata accessor is defined.
-    
-    // Build a stub that loads the necessary bindings from the key path's
-    // argument buffer then fetches the metadata.
-    auto fnTy = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                        {Int8PtrTy}, /*vararg*/ false);
-    auto accessorThunk = llvm::Function::Create(fnTy,
-                                              llvm::GlobalValue::PrivateLinkage,
-                                              "keypath_get_type", getModule());
-    accessorThunk->setAttributes(constructInitialAttributes());
-    {
-      IRGenFunction IGF(*this, accessorThunk);
-      if (DebugInfo)
-        DebugInfo->emitArtificialFunction(IGF, accessorThunk);
-
-      if (type->hasTypeParameter()) {
-        auto bindingsBufPtr = IGF.collectParameters().claimNext();
-
-        bindFromGenericRequirementsBuffer(IGF, requirements,
-          Address(bindingsBufPtr, getPointerAlignment()),
-          [&](CanType t) {
-            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-          });
-      
-        type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
-      }
-      auto ret = IGF.emitTypeMetadataRef(type);
-      IGF.Builder.CreateRet(ret);
-    }
-    return accessorThunk;
+    return emitGenerator("keypath_get_type", type, TypeMetadataPtrTy,
+      [&](IRGenFunction &IGF, CanType substType) {
+        auto ret = IGF.emitTypeMetadataRef(substType);
+        IGF.Builder.CreateRet(ret);
+      });
   };
+    
+  auto emitWitnessTableGenerator =
+    [&](CanType type,
+        ProtocolConformanceRef conformance) -> llvm::Function * {
+      // TODO: Use the standard conformance accessor when there are no arguments
+      // and the conformance accessor is defined.
+      return emitGenerator("keypath_get_witness_table", type, WitnessTablePtrTy,
+        [&](IRGenFunction &IGF, CanType substType) {
+          if (type->hasTypeParameter())
+            conformance = conformance.subst(type,
+              QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+          auto ret = emitWitnessTableRef(IGF, substType, conformance);
+          IGF.Builder.CreateRet(ret);
+        });
+    };
   
   // Start building the key path pattern.
   ConstantInitBuilder builder(*this);
@@ -750,7 +787,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     switch (component.getKind()) {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
-      for (auto &index : component.getComputedPropertyIndices()) {
+    case KeyPathPatternComponent::Kind::External:
+      for (auto &index : component.getSubscriptIndices()) {
         operands[index.Operand].LoweredType = index.LoweredType;
         operands[index.Operand].LastUser = &component;
       }
@@ -772,6 +810,64 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                    baseTy->getWithoutSpecifierType());
     auto &component = pattern->getComponents()[i];
     switch (auto kind = component.getKind()) {
+    case KeyPathPatternComponent::Kind::External: {
+      fields.addInt32(KeyPathComponentHeader::forExternalComponent().getData());
+      // Emit accessors for all of the external declaration's necessary
+      // bindings.
+      SmallVector<llvm::Constant*, 4> descriptorArgs;
+      auto componentSig = component.getExternalDecl()->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+      auto subs = componentSig->getSubstitutionMap(
+                                          component.getExternalSubstitutions());
+      enumerateGenericSignatureRequirements(
+        componentSig->getCanonicalSignature(),
+        [&](GenericRequirement reqt) {
+          auto substType = reqt.TypeParameter.subst(subs)
+            ->getCanonicalType();
+          if (!reqt.Protocol) {
+            // Type requirement.
+            descriptorArgs.push_back(emitMetadataGenerator(substType));
+          } else {
+            // Protocol requirement.
+            auto conformance = subs.lookupConformance(
+                         reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+            descriptorArgs.push_back(emitWitnessTableGenerator(substType,
+                                                               *conformance));
+          }
+        });
+      // If instantiable in-place, pad out the argument count here to ensure
+      // there's room enough to instantiate a settable computed property
+      // with two captured words in-place. The runtime instantiation of the
+      // external component will ignore the padding, and this will make in-place
+      // instantiation more likely to avoid needing an allocation.
+      unsigned argSize = descriptorArgs.size();
+      if (isInstantiableInPlace) {
+        argSize = std::max(argSize, 5u);
+      }
+      
+      fields.addInt32(argSize);
+      fields.add(getAddrOfPropertyDescriptor(component.getExternalDecl()));
+      
+      // Add an initializer function that copies generic arguments out of the
+      // pattern argument buffer into the instantiated object, or null if there
+      // are no arguments.
+      if (component.getSubscriptIndices().empty())
+        fields.addInt(IntPtrTy, 0);
+      else
+        fields.add(getInitializerForComputedComponent(*this, component,
+                                                      operands,
+                                                      genericEnv,
+                                                      requirements));
+      
+      // Add the generic arguments for the external context.
+      for (auto arg : descriptorArgs)
+        fields.add(arg);
+      
+      // Add padding.
+      for (unsigned i = descriptorArgs.size(); i < argSize; ++i)
+        fields.addInt(IntPtrTy, 0);
+      break;
+    }
     case KeyPathPatternComponent::Kind::StoredProperty: {
       auto property = cast<VarDecl>(component.getStoredPropertyDecl());
       
@@ -780,8 +876,10 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           auto offsetValue = offsetInt->getValue().getZExtValue();
           if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
             auto header = isStruct
-              ? KeyPathComponentHeader::forStructComponentWithInlineOffset(offsetValue)
-              : KeyPathComponentHeader::forClassComponentWithInlineOffset(offsetValue);
+              ? KeyPathComponentHeader
+                  ::forStructComponentWithInlineOffset(offsetValue)
+              : KeyPathComponentHeader
+                  ::forClassComponentWithInlineOffset(offsetValue);
             fields.addInt32(header.getData());
             return;
           }
@@ -810,7 +908,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         auto &metadataLayout = getMetadataLayout(theStruct);
         auto fieldOffset = metadataLayout.getStaticFieldOffset(property);
 
-        auto header = KeyPathComponentHeader::forStructComponentWithUnresolvedFieldOffset();
+        auto header = KeyPathComponentHeader
+          ::forStructComponentWithUnresolvedFieldOffset();
         fields.addInt32(header.getData());
         fields.addInt32(fieldOffset.getValue());
         break;
@@ -834,8 +933,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         case FieldAccess::NonConstantDirect: {
           // A constant offset that's determined at class realization time.
           // We have to load the offset from a global ivar.
-          auto header =
-            KeyPathComponentHeader::forClassComponentWithUnresolvedIndirectOffset();
+          auto header = KeyPathComponentHeader
+            ::forClassComponentWithUnresolvedIndirectOffset();
           fields.addInt32(header.getData());
           fields.addAlignmentPadding(getPointerAlignment());
           auto offsetVar = getAddrOfFieldOffset(property, NotForDefinition);
@@ -991,7 +1090,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         // component.
         // If there are only generic parameters, we can use a prefab witness
         // table from the runtime.
-        // TODO: For subscripts we'd generate functions that dispatch out to
+        // For subscripts we generate functions that dispatch out to
         // the copy/destroy/equals/hash functionality of the subscript indexes.
         fields.add(getWitnessTableForComputedComponent(*this, component,
                                                      genericEnv, requirements));

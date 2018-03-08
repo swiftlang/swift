@@ -72,6 +72,7 @@ NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
 
 DECL_ATTR(deprecated)
+DECL_ATTR(fixedLayout)
 
 KEY(kind)
 KEY(name)
@@ -89,6 +90,10 @@ KEY(declAttributes)
 KEY(declKind)
 KEY(ownership)
 KEY(superclassUsr)
+KEY(parentExtensionReqs)
+KEY(hasDefaultArg)
+KEY(conformingProtocols)
+KEY(enumRawTypeName)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)

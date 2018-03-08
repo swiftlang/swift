@@ -112,7 +112,7 @@ public extension DispatchQueue {
 	}
 
 	public class func concurrentPerform(iterations: Int, execute work: (Int) -> Void) {
-		_swift_dispatch_apply_current(UInt32(iterations), work)
+		_swift_dispatch_apply_current(iterations, work)
 	}
 
 	public class var main: DispatchQueue {

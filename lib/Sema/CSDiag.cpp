@@ -528,8 +528,9 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
-        // Skip key path applications, since we don't want them to noise up
-        // unrelated subscript diagnostics.
+      case OverloadChoiceKind::DynamicMemberLookup:
+        // Skip key path applications and dynamic member lookups, since we don't
+        // want them to noise up unrelated subscript diagnostics.
         break;
 
       case OverloadChoiceKind::BaseType:
@@ -1208,7 +1209,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     // This will only happen if we have an unresolved dot expression
     // (.foo) where foo is a protocol member and the contextual type is
     // an optional protocol metatype.
-    if (auto objectTy = instanceTy->getAnyOptionalObjectType()) {
+    if (auto objectTy = instanceTy->getOptionalObjectType()) {
       instanceTy = objectTy;
       baseObjTy = MetatypeType::get(objectTy);
     }
@@ -1292,7 +1293,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
     if (auto overloadedFn
           = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
-      if (overloadedFn->getDecls().size() > 0) {
+      if (!overloadedFn->getDecls().empty()) {
         // Fetch any declaration to check if the name is '~='
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
 
@@ -1644,7 +1645,7 @@ bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
   // comparison against nil was probably expected.
   // TODO: It would be nice to handle "!x" --> x == false, but we have no way
   // to get to the parent expr at present.
-  if (exprType->getAnyOptionalObjectType()) {
+  if (exprType->getOptionalObjectType()) {
     StringRef prefix = "((";
     StringRef suffix = ") != nil)";
     
@@ -1997,12 +1998,14 @@ namespace {
         patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes) {
-        assert(!paramDeclElt.first->isLet() || !paramDeclElt.second->is<InOutType>());
+        assert(!paramDeclElt.first->isImmutable() ||
+               !paramDeclElt.second->is<InOutType>());
         paramDeclElt.first->setType(paramDeclElt.second->getInOutObjectType());
       }
       
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
-        assert(!paramDeclIfaceElt.first->isLet() || !paramDeclIfaceElt.second->is<InOutType>());
+        assert(!paramDeclIfaceElt.first->isImmutable() ||
+               !paramDeclIfaceElt.second->is<InOutType>());
         paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
       }
       
@@ -2152,6 +2155,8 @@ static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
         return type;
       });
       CS.setType(expr, type);
+      // Set new type to the expression directly.
+      expr->setType(type);
 
       return expr;
     }
@@ -2495,10 +2500,10 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       Type toType, KnownProtocolKind kind,
                                       const Expr *expr) {
   // The following fixes apply for optional destination types as well.
-  bool toTypeIsOptional = !toType->getAnyOptionalObjectType().isNull();
-  toType = toType->lookThroughAllAnyOptionalTypes();
+  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
+  toType = toType->lookThroughAllOptionalTypes();
 
-  Type fromTypeUnwrapped = fromType->getAnyOptionalObjectType();
+  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
   bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
   if (fromTypeIsOptional)
     fromType = fromTypeUnwrapped;
@@ -2697,7 +2702,7 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
                                Type fromType, Type toType, Expr *expr) {
   // Look through optional types; casts can add them, but can't remove extra
   // ones.
-  toType = toType->lookThroughAllAnyOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
 
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
       fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
@@ -2736,7 +2741,7 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(
   // the event of an implicit promotion.
   auto srcFT = srcType->getAs<AnyFunctionType>();
   auto dstFT =
-      dstType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
+      dstType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
 
   if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
@@ -3149,9 +3154,17 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     diagID = diag::assignment_bang_has_immutable_subcomponent;
   else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_property;
-  else if (isa<SubscriptExpr>(dest))
+  else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
     diagID = diag::assignment_subscript_has_immutable_base;
-  else {
+    
+    // If the destination is a subscript with a 'dynamicLookup:' label and if
+    // the tuple is implicit, then this was actually a @dynamicMemberLookup
+    // access. Emit a more specific diagnostic.
+    if (sub->getIndex()->isImplicit() &&
+        sub->getArgumentLabels().size() == 1 &&
+        sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
+      diagID = diag::assignment_dynamic_property_has_immutable_base;
+  } else {
     diagID = diag::assignment_lhs_is_immutable_variable;
   }
 
@@ -4294,7 +4307,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       isa<ConstructorDecl>(candidate.getDecl()) && candidate.level == 1) {
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
-        candidate.getResultType()->lookThroughAllAnyOptionalTypes();
+        candidate.getResultType()->lookThroughAllOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
@@ -4338,8 +4351,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 static bool isRawRepresentableMismatch(Type fromType, Type toType,
                                        KnownProtocolKind kind,
                                        const ConstraintSystem &CS) {
-  toType = toType->lookThroughAllAnyOptionalTypes();
-  fromType = fromType->lookThroughAllAnyOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
+  fromType = fromType->lookThroughAllOptionalTypes();
 
   // First check if this is an attempt to convert from something to
   // raw representable.
@@ -4454,7 +4467,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
     if (instTy->getAnyNominal()) {
       // If we are invoking a constructor on a nominal type and there are
       // absolutely no candidates, then they must all be private.
-      if (CCI.size() == 0 || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
+      if (CCI.empty() || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
                               isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
         CS.TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
                        instTy);
@@ -4524,7 +4537,8 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   return false;
 }
 
-bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE, bool inAssignmentDestination) {
+bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
+                                               bool inAssignmentDestination) {
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = CS.getType(baseExpr);
@@ -4628,10 +4642,12 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE, bool inAssignm
           UncurriedCandidate cand = calleeInfo.candidates[0];
           auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                     cand.getDecl(), nullptr);
-          auto paramsType = candType->getAs<FunctionType>()->getInput();
-          if (!typeCheckChildIndependently(indexExpr, paramsType,
-                                           CTP_CallArgument, TCC_ForceRecheck))
-            return true;
+          if (auto *candFunc = candType->getAs<FunctionType>()) {
+            auto paramsType = candFunc->getInput();
+            if (!typeCheckChildIndependently(
+                    indexExpr, paramsType, CTP_CallArgument, TCC_ForceRecheck))
+              return true;
+          }
         }
       }
 
@@ -4772,7 +4788,7 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   // Regardless of whether the type has reference or value semantics,
   // comparison with nil is illegal, albeit for different reasons spelled
   // out by the diagnosis.
-  if (otherType->getAnyOptionalObjectType() &&
+  if (otherType->getOptionalObjectType() &&
       (overloadName == "!==" || overloadName == "===")) {
     auto revisedName = overloadName;
     revisedName.pop_back();
@@ -5399,12 +5415,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
-  auto getFuncType = [](Type type) -> Type {
-    auto fnType = type->getRValueType();
-    if (auto objectType = fnType->getImplicitlyUnwrappedOptionalObjectType())
-      return objectType;
-    return fnType;
-  };
+  auto getFuncType = [](Type type) -> Type { return type->getRValueType(); };
 
   auto fnType = getFuncType(CS.getType(fnExpr));
 
@@ -6015,7 +6026,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     // If the contextual type is one of the UnsafePointer<T> types, then the
     // contextual type of the subexpression must be T.
     Type unwrappedType = contextualType;
-    if (auto unwrapped = contextualType->getAnyOptionalObjectType())
+    if (auto unwrapped = contextualType->getOptionalObjectType())
       unwrappedType = unwrapped;
 
     PointerTypeKind pointerKind;
@@ -6080,7 +6091,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
   auto expr = typeCheckChildIndependently(CE->getSubExpr(),
-                                          CE->getCastTypeLoc().getType(),
+                                          CS.getType(CE->getCastTypeLoc()),
                                           CTP_CoerceOperand);
   if (!expr)
     return true;
@@ -6106,7 +6117,7 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getAnyOptionalObjectType().isNull()) {
+      argType->getOptionalObjectType().isNull()) {
     diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
@@ -6124,7 +6135,7 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getAnyOptionalObjectType().isNull()) {
+      argType->getOptionalObjectType().isNull()) {
     diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());
@@ -6211,11 +6222,12 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   // neither parameter nor return type diagnostics itself,
   // but if we have function type inside, that might
   // signficantly improve diagnostic quality.
-  if (contextualType) {
-    if (auto IUO =
-            CS.lookThroughImplicitlyUnwrappedOptionalType(contextualType))
-      contextualType = IUO;
-  }
+  // FIXME: We need to rework this with IUOs out of the type system.
+  // if (contextualType) {
+  //   if (auto IUO =
+  //           CS.lookThroughImplicitlyUnwrappedOptionalType(contextualType))
+  //     contextualType = IUO;
+  // }
 
   Type expectedResultType;
 
@@ -6461,10 +6473,10 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // 'inout' from type because that might help to diagnose actual problem
       // e.g. type inference doesn't give us much information anyway.
       if (param->isInOut() && paramType->hasUnresolvedType()) {
-        assert(!param->isLet() || !paramType->is<InOutType>());
+        assert(!param->isImmutable() || !paramType->is<InOutType>());
         param->setType(CS.getASTContext().TheUnresolvedType);
         param->setInterfaceType(paramType->getInOutObjectType());
-        param->setSpecifier(swift::VarDecl::Specifier::Owned);
+        param->setSpecifier(swift::VarDecl::Specifier::Default);
       }
     }
 
@@ -6640,7 +6652,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
   Type currentType = rootType;
   auto updateState = [&](bool isProperty, Type newType) {
     // Strip off optionals.
-    newType = newType->lookThroughAllAnyOptionalTypes();
+    newType = newType->lookThroughAllOptionalTypes();
 
     // If updating to a type, just set the new type; there's nothing
     // more to do.
@@ -7031,7 +7043,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
   // If our contextual type is an optional, look through them, because we're
   // surely initializing whatever is inside.
-  contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+  contextualType = contextualType->lookThroughAllOptionalTypes();
 
   // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
   // figure out what the contextual element type is in place.
@@ -7119,7 +7131,7 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   if (auto contextualType = CS.getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
-    contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+    contextualType = contextualType->lookThroughAllOptionalTypes();
 
     auto DLC = CS.TC.getProtocol(
         E->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
@@ -7457,8 +7469,9 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
-  if (auto objTy = CS.lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-    baseTy = baseObjTy = objTy;
+  // FIXME: We need to rework this with IUOs out of the type system.
+  // if (auto objTy = CS.lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
+  //   baseTy = baseObjTy = objTy;
 
   // If the base of this property access is a function that takes an empty
   // argument list, then the most likely problem is that the user wanted to
@@ -7923,12 +7936,13 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     // `Pair<Any, Any>`.
     // Right now we only handle this when the type that's at fault is the
     // top-level type passed to this function.
-    if (loc.getType().isNull()) {
-      return;
-    }
-    
+    auto type = loc.getType();
+    if (!type)
+      type = cs.getType(loc);
+
     ArrayRef<Type> genericArgs;
-    if (auto *boundGenericTy = loc.getType()->getAs<BoundGenericType>()) {
+
+    if (auto *boundGenericTy = type->getAs<BoundGenericType>()) {
       if (boundGenericTy->getDecl() == FoundDecl)
         genericArgs = boundGenericTy->getGenericArgs();
     }

@@ -151,9 +151,6 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
-def propagate_constraints : Flag<["-"], "propagate-constraints">,
-  HelpText<"Enable constraint propagation in the type checker">;
-
 def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
   HelpText<"Enable the iterative type checker">;
 
@@ -456,5 +453,17 @@ def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
 // This is used to guard preemptive testing for the fix-it.
 def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
     HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
+    
+def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
+    HelpText<"Bypass checks for batch-mode errors.">;
+
+def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
+  HelpText<"Enable verification of access markers used to enforce exclusivity.">;
+
+def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
+  HelpText<"Diable verification of access markers used to enforce exclusivity.">;
+
+def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
+  HelpText<"Enable key path resilience.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -73,7 +73,7 @@ bb0:
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
+  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
   // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
   alloc_global @largeGlobal
 
@@ -139,7 +139,7 @@ bb0:
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
 // CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
-// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
+// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]
 // CHECK:   [[OUTLINEADDR:%.*]] = bitcast i8* [[PTR]] to %swift.opaque*

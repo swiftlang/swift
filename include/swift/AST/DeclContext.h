@@ -120,8 +120,8 @@ enum class LocalDeclContextKind : uint8_t {
 ///
 /// The enumerators are ordered in terms of decreasing preference:
 /// an inherited conformance is best, followed by explicit
-/// conformances, then implied conformances. Earlier conformance
-/// kinds supersede later conformance kinds, possibly with a
+/// conformances, then synthesized and implied conformances. Earlier
+/// conformance kinds supersede later conformance kinds, possibly with a
 /// diagnostic (e.g., if an inherited conformance supersedes an
 /// explicit conformance).
 enum class ConformanceEntryKind : unsigned {
@@ -131,11 +131,11 @@ enum class ConformanceEntryKind : unsigned {
   /// Explicitly specified.
   Explicit,
 
-  /// Implied by an explicitly-specified conformance.
-  Implied,
-
   /// Implicitly synthesized.
   Synthesized,
+
+  /// Implied by an explicitly-specified conformance.
+  Implied,
 };
 
 /// Describes the kind of conformance lookup desired.
@@ -262,25 +262,18 @@ public:
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.
-  bool isModuleContext() const {
-    return getContextKind() == DeclContextKind::Module;
-  }
+  bool isModuleContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a context with module-wide scope, e.g. a module
   /// or a source file.
-  bool isModuleScopeContext() const {
-    return getContextKind() == DeclContextKind::Module ||
-           getContextKind() == DeclContextKind::FileUnit;
-  }
+  bool isModuleScopeContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
-  bool isExtensionContext() const {
-    return getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isExtensionContext() const; // see swift/AST/Decl.h
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.

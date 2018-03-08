@@ -140,7 +140,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK:      [[G_COPY:%.*]] = copy_value [[BORROWED_G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
@@ -161,7 +161,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[G_COPY:%.*]] = copy_value [[BORROWED_G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //

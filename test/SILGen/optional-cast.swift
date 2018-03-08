@@ -186,7 +186,7 @@ func baz(_ y : AnyObject?) {
 
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
-// CHECK-LABEL: sil hidden @$S4main07opt_to_B8_trivialySQySiGSiSgF
+// CHECK-LABEL: sil hidden @$S4main07opt_to_B8_trivialySiSgACF
 // CHECK:       bb0(%0 : @trivial $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
 // CHECK-NEXT:  return %0 : $Optional<Int>
@@ -195,14 +195,14 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
-// CHECK-LABEL: sil hidden @$S4main07opt_to_B10_referenceyAA1CCSgSQyADGF :
+// CHECK-LABEL: sil hidden @$S4main07opt_to_B10_referenceyAA1CCSgAEF
 // CHECK:  bb0([[ARG:%.*]] : @owned $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
 // CHECK:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:    [[RESULT:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:    destroy_value [[ARG]]
 // CHECK:    return [[RESULT]] : $Optional<C>
-// CHECK: } // end sil function '$S4main07opt_to_B10_referenceyAA1CCSgSQyADGF'
+// CHECK: } // end sil function '$S4main07opt_to_B10_referenceyAA1CCSgAEF'
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @$S4main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F

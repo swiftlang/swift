@@ -744,7 +744,7 @@ extension UTF16 {
   ///   `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public static func isLeadSurrogate(_ x: CodeUnit) -> Bool {
-    return 0xD800...0xDBFF ~= x
+    return (x & 0xFC00) == 0xD800
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
@@ -771,7 +771,7 @@ extension UTF16 {
   ///   `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public static func isTrailSurrogate(_ x: CodeUnit) -> Bool {
-    return 0xDC00...0xDFFF ~= x
+    return (x & 0xFC00) == 0xDC00
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -871,7 +871,7 @@ extension UTF16 {
       else if let _ = s._error {
         guard _fastPath(repairingIllFormedSequences) else { return nil }
         utf16Count += 1
-        utf16BitUnion |= 0xFFFD
+        utf16BitUnion |= UTF16._replacementCodeUnit
       }
       else {
         return (utf16Count, utf16BitUnion < 0x80)

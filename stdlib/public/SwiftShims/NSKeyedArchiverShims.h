@@ -14,13 +14,26 @@
 
 NS_BEGIN_DECLS
 
-
 NS_INLINE NS_RETURNS_RETAINED _Nullable id __NSKeyedUnarchiverUnarchiveObject(id Self_, NS_NON_BRIDGED(NSData *)data, NSError **_Nullable error) {
     if (error) {
         return [Self_ unarchiveTopLevelObjectWithData:(NSData *)data error:error];
     } else {
         return [Self_ unarchiveObjectWithData:(NSData *)data];
     }
+}
+
+// Re-exposed here until all SDKs contain the relevant methods publicly.
+@interface NSKeyedUnarchiver (SecureMethods)
++ (nullable id)unarchivedObjectOfClass:(Class)cls fromData:(NSData *)data error:(NSError **)error API_AVAILABLE(macos(10.13), ios(11.0), watchos(4.0), tvos(11.0));
++ (nullable id)unarchivedObjectOfClasses:(NSSet<Class> *)classes fromData:(NSData *)data error:(NSError **)error API_AVAILABLE(macos(10.13), ios(11.0), watchos(4.0), tvos(11.0));
+@end
+
+NS_INLINE NS_RETURNS_RETAINED id _Nullable __NSKeyedUnarchiverSecureUnarchiveObjectOfClass(Class cls, NSData *data, NSError * _Nullable * _Nullable error) {
+    return [NSKeyedUnarchiver unarchivedObjectOfClass:cls fromData:data error:error];
+}
+
+NS_INLINE NS_RETURNS_RETAINED id _Nullable __NSKeyedUnarchiverSecureUnarchiveObjectOfClasses(NS_NON_BRIDGED(NSSet *) classes, NSData *data, NSError * _Nullable * _Nullable error) {
+    return [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:error];
 }
 
 NS_END_DECLS

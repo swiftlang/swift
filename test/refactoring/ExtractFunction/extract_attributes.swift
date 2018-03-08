@@ -8,6 +8,6 @@ public func foo() -> Int{
 }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=5:1 -end-pos=6:26 >> %t.result/L5-6.swift
 // RUN: diff -u %S/Outputs/extract_attributes/L5-6.swift.expected %t.result/L5-6.swift

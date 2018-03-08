@@ -694,7 +694,7 @@ class TestCodable : TestCodableSuper {
     }
 
     func test_URLComponents_Plist() {
-    for (testLine, components) in urlComponentsValues {
+        for (testLine, components) in urlComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
         }
     }

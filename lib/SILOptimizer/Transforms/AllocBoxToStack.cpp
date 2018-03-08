@@ -31,20 +31,114 @@ using namespace swift;
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
 //===----------------------------------------------------------------------===//
-//                           alloc_box Promotion
+//                 SIL Utilities for alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-/// This is a list we use to store a set of indices. We create the set by
-/// sorting, uniquing at the appropriate time. The reason why it makes sense to
-/// just use a sorted vector with std::count is because generally functions do
-/// not have that many arguments and even fewer promoted arguments.
-using ArgIndexList = llvm::SmallVector<unsigned, 8>;
+static SILValue stripOffCopyValue(SILValue V) {
+  while (auto *CVI = dyn_cast<CopyValueInst>(V)) {
+    V = CVI->getOperand();
+  }
+  return V;
+}
 
-static SILInstruction* findUnexpectedBoxUse(SILValue Box,
-                                            bool examinePartialApply,
-                                            bool inAppliedFunction,
-                                            llvm::SmallVectorImpl<Operand*> &);
-static bool partialApplyArgumentEscapes(Operand *O);
+/// \brief Returns True if the operand or one of its users is captured.
+static bool useCaptured(Operand *UI) {
+  auto *User = UI->getUser();
+
+  // These instructions do not cause the address to escape.
+  if (isa<DebugValueInst>(User) || isa<DebugValueAddrInst>(User)
+      || isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User)
+      || isa<DestroyValueInst>(User))
+    return false;
+
+  if (auto *Store = dyn_cast<StoreInst>(User)) {
+    if (Store->getDest() == UI->get())
+      return false;
+  } else if (auto *Assign = dyn_cast<AssignInst>(User)) {
+    if (Assign->getDest() == UI->get())
+      return false;
+  }
+
+  return true;
+}
+
+/// Given an apply or partial_apply, return the direct callee or
+/// nullptr if this is not a direct call.
+static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
+  if (auto *Apply = dyn_cast<ApplyInst>(Call))
+    return dyn_cast<FunctionRefInst>(Apply->getCallee());
+  else
+    return dyn_cast<FunctionRefInst>(cast<PartialApplyInst>(Call)->getCallee());
+}
+
+/// Given an operand of a direct apply or partial_apply of a function,
+/// return the argument index of the parameter used in the body of the function
+/// to represent this operand.
+static size_t getArgIndexForOperand(Operand *O) {
+  assert(isa<ApplyInst>(O->getUser())
+         || isa<PartialApplyInst>(O->getUser())
+                && "Expected apply or partial_apply!");
+
+  auto OperandIndex = O->getOperandNumber();
+  assert(OperandIndex != 0 && "Operand cannot be the applied function!");
+
+  // The applied function is the first operand.
+  auto ArgIndex = OperandIndex - ApplyInst::getArgumentOperandNumber();
+
+  if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
+    assert(Apply->getSubstCalleeConv().getNumSILArguments()
+               == Apply->getArguments().size()
+           && "Expected all arguments to be supplied!");
+    (void)Apply;
+  } else {
+    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
+    auto fnConv = PartialApply->getSubstCalleeConv();
+    auto ArgCount = PartialApply->getArguments().size();
+    assert(ArgCount <= fnConv.getNumParameters());
+    ArgIndex += (fnConv.getNumSILArguments() - ArgCount);
+  }
+
+  return ArgIndex;
+}
+
+/// Given an operand of a direct apply or partial_apply of a function,
+/// return the parameter used in the body of the function to represent
+/// this operand.
+static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
+  assert(F && !F->empty() && "Expected a function with a body!");
+
+  auto &Entry = F->front();
+  size_t ArgIndex = getArgIndexForOperand(O);
+  assert(ArgIndex >= F->getConventions().getSILArgIndexOfFirstParam());
+
+  return Entry.getArgument(ArgIndex);
+}
+
+/// Return a pointer to the SILFunction called by Call if we can
+/// determine which function that is, and we have a body for that
+/// function. Otherwise return nullptr.
+static SILFunction *getFunctionBody(SILInstruction *Call) {
+  if (auto *FRI = getDirectCallee(Call))
+    if (auto *F = FRI->getReferencedFunction())
+      if (!F->empty())
+        return F;
+
+  return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+//                 Liveness for alloc_box Promotion
+//===----------------------------------------------------------------------===//
+
+// Is any successor of BB in the LiveIn set?
+static bool successorHasLiveIn(SILBasicBlock *BB,
+                               llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
+  for (auto &Succ : BB->getSuccessors())
+    if (LiveIn.count(Succ))
+      return true;
+
+  return false;
+}
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
@@ -69,23 +163,6 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
     for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
-}
-
-// Is any successor of BB in the LiveIn set?
-static bool successorHasLiveIn(SILBasicBlock *BB,
-                               llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn) {
-  for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.count(Succ))
-      return true;
-
-  return false;
-}
-
-static SILValue stripOffCopyValue(SILValue V) {
-  while (auto *CVI = dyn_cast<CopyValueInst>(V)) {
-    V = CVI->getOperand();
-  }
-  return V;
 }
 
 // Walk backwards in BB looking for strong_release, destroy_value, or
@@ -177,25 +254,30 @@ getFinalReleases(SILValue Box,
   return true;
 }
 
-/// \brief Returns True if the operand or one of its users is captured.
-static bool useCaptured(Operand *UI) {
-  auto *User = UI->getUser();
+//===----------------------------------------------------------------------===//
+//                      alloc_box Escape Analysis
+//===----------------------------------------------------------------------===//
 
-  // These instructions do not cause the address to escape.
-  if (isa<DebugValueInst>(User) || isa<DebugValueAddrInst>(User) ||
-      isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
-      isa<DestroyValueInst>(User))
-    return false;
+/// This is a list we use to store a set of indices. We create the set by
+/// sorting, uniquing at the appropriate time. The reason why it makes sense to
+/// just use a sorted vector with std::count is because generally functions do
+/// not have that many arguments and even fewer promoted arguments.
+using ArgIndexList = llvm::SmallVector<unsigned, 8>;
 
-  if (auto *Store = dyn_cast<StoreInst>(User)) {
-    if (Store->getDest() == UI->get())
-      return false;
-  } else if (auto *Assign = dyn_cast<AssignInst>(User)) {
-    if (Assign->getDest() == UI->get())
-      return false;
-  }
+static bool partialApplyEscapes(SILValue V, bool examineApply);
 
-  return true;
+/// Could this operand to an apply escape that function by being
+/// stored or returned?
+static bool partialApplyArgumentEscapes(Operand *O) {
+  SILFunction *F = getFunctionBody(O->getUser());
+  // If we cannot examine the function body, assume the worst.
+  if (!F)
+    return true;
+
+  // Check the uses of the operand, but do not recurse down into other
+  // apply instructions.
+  auto Param = SILValue(getParameterForOperand(F, O));
+  return partialApplyEscapes(Param, /* examineApply = */ false);
 }
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
@@ -255,83 +337,10 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   return false;
 }
 
-
-/// Given an apply or partial_apply, return the direct callee or
-/// nullptr if this is not a direct call.
-static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
-  if (auto *Apply = dyn_cast<ApplyInst>(Call))
-    return dyn_cast<FunctionRefInst>(Apply->getCallee());
-  else
-    return dyn_cast<FunctionRefInst>(cast<PartialApplyInst>(Call)->getCallee());
-}
-
-/// Given an operand of a direct apply or partial_apply of a function,
-/// return the argument index of the parameter used in the body of the function
-/// to represent this operand.
-static size_t getArgIndexForOperand(Operand *O) {
-  assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
-         "Expected apply or partial_apply!");
-
-  auto OperandIndex = O->getOperandNumber();
-  assert(OperandIndex != 0 && "Operand cannot be the applied function!");
-
-  // The applied function is the first operand.
-  auto ArgIndex = OperandIndex - ApplyInst::getArgumentOperandNumber();
-
-  if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
-    assert(Apply->getSubstCalleeConv().getNumSILArguments()
-               == Apply->getArguments().size()
-           && "Expected all arguments to be supplied!");
-    (void) Apply;
-  } else {
-    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    auto fnConv = PartialApply->getSubstCalleeConv();
-    auto ArgCount = PartialApply->getArguments().size();
-    assert(ArgCount <= fnConv.getNumParameters());
-    ArgIndex += (fnConv.getNumSILArguments() - ArgCount);
-  }
-
-  return ArgIndex;
-}
-
-/// Given an operand of a direct apply or partial_apply of a function,
-/// return the parameter used in the body of the function to represent
-/// this operand.
-static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
-  assert(F && !F->empty() && "Expected a function with a body!");
-
-  auto &Entry = F->front();
-  size_t ArgIndex = getArgIndexForOperand(O);
-  assert(ArgIndex >= F->getConventions().getSILArgIndexOfFirstParam());
-
-  return Entry.getArgument(ArgIndex);
-}
-
-/// Return a pointer to the SILFunction called by Call if we can
-/// determine which function that is, and we have a body for that
-/// function. Otherwise return nullptr.
-static SILFunction *getFunctionBody(SILInstruction *Call) {
-  if (auto *FRI = getDirectCallee(Call))
-    if (auto *F = FRI->getReferencedFunction())
-      if (!F->empty())
-        return F;
-
-  return nullptr;
-}
-
-/// Could this operand to an apply escape that function by being
-/// stored or returned?
-static bool partialApplyArgumentEscapes(Operand *O) {
-  SILFunction *F = getFunctionBody(O->getUser());
-  // If we cannot examine the function body, assume the worst.
-  if (!F)
-    return true;
-
-  // Check the uses of the operand, but do not recurse down into other
-  // apply instructions.
-  auto Param = SILValue(getParameterForOperand(F, O));
-  return partialApplyEscapes(Param, /* examineApply = */ false);
-}
+static SILInstruction *findUnexpectedBoxUse(SILValue Box,
+                                            bool examinePartialApply,
+                                            bool inAppliedFunction,
+                                            llvm::SmallVectorImpl<Operand *> &);
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
 /// if the box pointer argument passed to it has uses that would
@@ -356,10 +365,10 @@ static bool checkPartialApplyBody(Operand *O) {
 /// consideration for promotion to a stack element. Optionally examine the body
 /// of partial_apply to see if there is an unexpected use inside.  Return the
 /// instruction with the unexpected use if we find one.
-static SILInstruction* findUnexpectedBoxUse(SILValue Box,
-                                            bool examinePartialApply,
-                                            bool inAppliedFunction,
-                            llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
+static SILInstruction *
+findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
+                     bool inAppliedFunction,
+                     llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
   assert((Box->getType().is<SILBoxType>()
           || Box->getType()
                  == SILType::getNativeObjectType(Box->getType().getASTContext()))
@@ -431,6 +440,23 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   return true;
 }
 
+//===----------------------------------------------------------------------===//
+//                           alloc_box Promotion
+//===----------------------------------------------------------------------===//
+
+namespace {
+// Pass context and per-function analysis results.
+struct AllocBoxToStackState {
+  SILFunctionTransform *T;
+  bool CFGChanged = false;
+
+  llvm::SmallVector<AllocBoxInst *, 8> Promotable;
+  llvm::SmallVector<Operand *, 8> PromotedOperands;
+
+  AllocBoxToStackState(SILFunctionTransform *T) : T(T) {}
+};
+} // anonymous namespace
+
 static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
   llvm::SmallVector<Operand *, 8> Worklist(HeapBox->use_begin(),
                                            HeapBox->use_end());
@@ -470,8 +496,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
   // at the beginning of the function.
-  SILBuilder Builder(ABI);
-  Builder.setCurrentDebugScope(ABI->getDebugScope());
+  SILBuilderWithScope Builder(ABI);
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
@@ -571,7 +596,8 @@ private:
 };
 } // end anonymous namespace
 
-PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsSerialized_t Serialized,
+PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
+                                         IsSerialized_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
                                          llvm::StringRef ClonedName)
     : SILClonerWithScopes<PromotedParamCloner>(
@@ -773,7 +799,8 @@ void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
 /// references.
 static PartialApplyInst *
 specializePartialApply(PartialApplyInst *PartialApply,
-                       ArgIndexList &PromotedArgIndices, bool &CFGChanged) {
+                       ArgIndexList &PromotedArgIndices,
+                       AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
   auto *F = FRI->getReferencedFunction();
@@ -796,6 +823,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     PromotedParamCloner Cloner(F, Serialized, PromotedArgIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
+    pass.T->notifyAddFunction(ClonedFn, F);
   }
 
   // Now create the new partial_apply using the cloned function.
@@ -823,8 +851,8 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
     if (PAFrontier.empty()) {
       ValueLifetimeAnalysis VLA(PartialApply);
-      CFGChanged |= !VLA.computeFrontier(PAFrontier,
-                                      ValueLifetimeAnalysis::AllowToModifyCFG);
+      pass.CFGChanged |= !VLA.computeFrontier(
+          PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
       assert(!PAFrontier.empty() && "partial_apply must have at least one use "
                                     "to release the returned function");
     }
@@ -848,15 +876,13 @@ specializePartialApply(PartialApplyInst *PartialApply,
       PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }
 
-static void
-rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
-                      bool &CFGChanged) {
+static void rewritePartialApplies(AllocBoxToStackState &pass) {
   llvm::DenseMap<PartialApplyInst *, ArgIndexList> IndexMap;
   ArgIndexList Indices;
 
   // Build a map from partial_apply to the indices of the operands
   // that will be promoted in our rewritten version.
-  for (auto *O : PromotedOperands) {
+  for (auto *O : pass.PromotedOperands) {
     auto ArgIndexNumber = getArgIndexForOperand(O);
 
     Indices.clear();
@@ -882,8 +908,8 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
     std::sort(Indices.begin(), Indices.end());
     Indices.erase(std::unique(Indices.begin(), Indices.end()), Indices.end());
 
-    auto *Replacement = specializePartialApply(PartialApply, Indices,
-                                               CFGChanged);
+    PartialApplyInst *Replacement =
+        specializePartialApply(PartialApply, Indices, pass);
     PartialApply->replaceAllUsesWith(Replacement);
 
     auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
@@ -895,17 +921,16 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
   }
 }
 
-static unsigned
-rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
-                     llvm::SmallVectorImpl<Operand *> &PromotedOperands,
-                     bool &CFGChanged) {
+/// Clone closure bodies and rewrite partial applies. Returns the number of
+/// alloc_box allocations promoted.
+static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
   // First we'll rewrite any partial applies that we can to remove the
   // box container pointer from the operands.
-  rewritePartialApplies(PromotedOperands, CFGChanged);
+  rewritePartialApplies(pass);
 
   unsigned Count = 0;
-  auto rend = Promoted.rend();
-  for (auto I = Promoted.rbegin(); I != rend; ++I) {
+  auto rend = pass.Promotable.rend();
+  for (auto I = pass.Promotable.rbegin(); I != rend; ++I) {
     auto *ABI = *I;
     if (rewriteAllocBoxAsAllocStack(ABI)) {
       ++Count;
@@ -919,33 +944,33 @@ namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
-    llvm::SmallVector<AllocBoxInst *, 8> Promotable;
-    llvm::SmallVector<Operand *, 8> PromotedOperands;
+    // Don't rerun on deserialized functions. Nothing should have changed.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
 
+    AllocBoxToStackState pass(this);
     for (auto &BB : *getFunction()) {
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
-          if (canPromoteAllocBox(ABI, PromotedOperands))
-            Promotable.push_back(ABI);
+          if (canPromoteAllocBox(ABI, pass.PromotedOperands))
+            pass.Promotable.push_back(ABI);
     }
 
-    if (!Promotable.empty()) {
-      bool CFGChanged = false;
-      auto Count = rewritePromotedBoxes(Promotable, PromotedOperands,
-                                        CFGChanged);
+    if (!pass.Promotable.empty()) {
+      auto Count = rewritePromotedBoxes(pass);
       NumStackPromoted += Count;
       if (Count) {
         StackNesting SN;
         if (SN.correctStackNesting(getFunction()) == StackNesting::Changes::CFG)
-          CFGChanged = true;
+          pass.CFGChanged = true;
       }
-      
-      invalidateAnalysis(CFGChanged ?
-                         SILAnalysis::InvalidationKind::FunctionBody :
-                         SILAnalysis::InvalidationKind::CallsAndInstructions);
+
+      invalidateAnalysis(
+          pass.CFGChanged
+              ? SILAnalysis::InvalidationKind::FunctionBody
+              : SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
-
 };
 } // end anonymous namespace
 

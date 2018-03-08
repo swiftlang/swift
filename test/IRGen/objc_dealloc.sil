@@ -91,7 +91,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8, i8* {{.*}}, i64 [[XOFFSET]]
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %T12objc_dealloc1XC**
   // CHECK-NEXT: [[X:%[a-zA-Z0-9]+]] = load %T12objc_dealloc1XC*, %T12objc_dealloc1XC** [[XADDR]], align 8
-  // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T12objc_dealloc1XC*)*)(%T12objc_dealloc1XC* [[X]])
+  // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T12objc_dealloc1XC*)*)(%T12objc_dealloc1XC* [[X]])
   %3 = begin_borrow %0 : $SwiftGizmo
   %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %4 : $*X                           // id: %4
@@ -129,7 +129,7 @@ bb0(%0 : @owned $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @$S12objc_dealloc10SwiftGizmoC7bellsOnSQyACGSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
+sil @$S12objc_dealloc10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }

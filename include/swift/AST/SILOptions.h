@@ -140,6 +140,9 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
+  /// Emit extra exclusvity markers for memory access and verify coverage.
+  bool VerifyExclusivity = false;
+
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 

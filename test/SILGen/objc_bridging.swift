@@ -515,7 +515,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging15bridgeCFunction{{.*}}F
 func bridgeCFunction() -> (String?) -> (String?) {
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSo18NSStringFromStringySQySSGABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo18NSStringFromStringySSSgABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]
   return NSStringFromString
@@ -530,9 +530,9 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared [serializable] @$SSo7NSArrayC7objects5countABSQySPyyXlSgGG_s5Int32VtcfC
+// CHECK-LABEL: sil shared [serializable] @$SSo7NSArrayC7objects5countABSPyyXlSgGSg_s5Int32VtcfC
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
-// CHECK:         [[METHOD:%.*]] = function_ref @$SSo7NSArrayC7objects5countABSQySPyyXlSgGG_s5Int32VtcfcTO
+// CHECK:         [[METHOD:%.*]] = function_ref @$SSo7NSArrayC7objects5countABSPyyXlSgGSg_s5Int32VtcfcTO
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
 

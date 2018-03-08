@@ -51,6 +51,10 @@ func test_pow() {
   pow(1.5, 2.5)
 }
 
+func test_powl() {
+  powl(1.5, 2.5)
+}
+
 func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };
 }
@@ -151,7 +155,7 @@ func test_nested_pointers() {
   nested_pointer_audited(nil)
   nested_pointer_audited2(nil) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 
-  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>!'}}
+  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>?'}}
   nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>?'}}
   nested_pointer_audited2(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 }

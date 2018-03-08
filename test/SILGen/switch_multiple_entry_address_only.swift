@@ -131,3 +131,70 @@ func multipleLabelsVar(e: E) {
     break
   }
 }
+
+// CHECK-LABEL: sil hidden @$S34switch_multiple_entry_address_only20fallthroughWithValue1eyAA1EO_tF : $@convention(thin) (@in E) -> ()
+func fallthroughWithValue(e: E) {
+  // CHECK:      bb0
+  // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
+  // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
+  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt.1: bb1, case #E.b!enumelt.1: bb2, default bb4
+  
+  // CHECK:      bb1:
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt.1
+  // CHECK-NEXT: [[ORIGINAL_ANY_BOX:%.*]] = alloc_stack $Any
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ORIGINAL_ANY_BOX]]
+  // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
+  // CHECK-NEXT: copy_addr [[ORIGINAL_ANY_BOX]] to [initialization] [[ANY_BOX]]
+  // CHECK:      [[FN1:%.*]] = function_ref @$S34switch_multiple_entry_address_only8takesAnyyyypF
+  // CHECK-NEXT: apply [[FN1]]([[ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ORIGINAL_ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: destroy_addr [[ORIGINAL_ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[ORIGINAL_ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
+  // CHECK-NEXT: br bb3
+  
+  // CHECK:      bb2:
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt.1
+  // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: destroy_addr [[ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
+  // CHECK-NEXT: br bb3
+  
+  // CHECK:      bb3:
+  // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
+  // CHECK-NEXT: copy_addr [[X_PHI]] to [initialization] [[ANY_BOX]]
+  // CHECK:      [[FN2:%.*]] = function_ref @$S34switch_multiple_entry_address_only8takesAnyyyypF
+  // CHECK-NEXT: apply [[FN2]]([[ANY_BOX]]
+  // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
+  // CHECK-NEXT: destroy_addr [[X_PHI]]
+  // CHECK-NEXT: br bb6
+  
+  // CHECK:      bb4:
+  // CHECK-NEXT: br bb5
+  
+  // CHECK:      bb5:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
+  // CHECK-NEXT: br bb6
+  
+  // CHECK:      bb6:
+  // CHECK-NEXT: dealloc_stack [[X_PHI]]
+  // CHECK-NEXT: destroy_addr %0
+  // CHECK-NEXT: tuple ()
+  // CHECK-NEXT: return
+  
+  switch e {
+  case .a(let x):
+    takesAny(x)
+    fallthrough
+  case .b(let x):
+    takesAny(x)
+  default:
+    break
+  }
+}

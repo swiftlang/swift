@@ -25,5 +25,15 @@ typedef enum EnumByBoth {
 
 @compatibility_alias SomeClassAlias SNSomeClass;
 
+extern NSString *SomeErrorDomain;
+enum SomeError {
+  SomeErrorBadness
+} __attribute__((ns_error_domain(SomeErrorDomain)));
+
+extern NSString *SomeOtherErrorDomain;
+typedef enum __attribute__((ns_error_domain(SomeOtherErrorDomain))) {
+  SomeOtherErrorBadness
+} SomeOtherError __attribute__((swift_name("SomeRenamedError")));
+
 #endif // __OBJC__
 

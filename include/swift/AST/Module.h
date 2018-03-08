@@ -22,18 +22,19 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
@@ -81,8 +82,6 @@ namespace swift {
   
 namespace syntax {
   class SourceFileSyntax;
-  class SyntaxParsingContext;
-  class SyntaxParsingContextRoot;
 }
 
 /// Discriminator for file-units.
@@ -207,7 +206,7 @@ private:
   struct {
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 2;
+    unsigned ResilienceStrategy : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -493,7 +492,9 @@ public:
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::Module;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 
   static bool classof(const Decl *D) {
@@ -813,7 +814,7 @@ private:
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
-  ReferencedNameTracker *ReferencedNames = nullptr;
+  Optional<ReferencedNameTracker> ReferencedNames;
 
   /// The class in this file marked \@NS/UIApplicationMain.
   ClassDecl *MainClass = nullptr;
@@ -890,7 +891,8 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepSyntaxInfo);
+             ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
+             bool KeepSyntaxTree = false);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -967,13 +969,10 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  ReferencedNameTracker *getReferencedNameTracker() const {
-    return ReferencedNames;
+  ReferencedNameTracker *getReferencedNameTracker() {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
-  void setReferencedNameTracker(ReferencedNameTracker *Tracker) {
-    assert(!ReferencedNames && "This file already has a name tracker.");
-    ReferencedNames = Tracker;
-  }
+  void createReferencedNameTracker();
 
   /// \brief The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
@@ -1079,7 +1078,9 @@ public:
 
   ArrayRef<Token> getAllTokens() const;
 
-  bool shouldKeepSyntaxInfo() const;
+  bool shouldCollectToken() const;
+
+  bool shouldBuildSyntaxTree() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
@@ -1219,6 +1220,18 @@ public:
 
   explicit operator bool() const { return !Mod.isNull(); }
 };
+
+inline bool DeclContext::isModuleContext() const {
+  if (auto D = getAsDeclOrDeclExtensionContext())
+    return ModuleDecl::classof(D);
+  return false;
+}
+
+inline bool DeclContext::isModuleScopeContext() const {
+  if (ParentAndKind.getInt() == ASTHierarchy::FileUnit)
+    return true;
+  return isModuleContext();
+}
 
 } // end namespace swift
 

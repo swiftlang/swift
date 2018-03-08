@@ -24,8 +24,6 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
-swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
-
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
   set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
@@ -85,6 +83,7 @@ endif()
 include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/include
   ${SOURCEKIT_SOURCE_DIR}/include
+  ${SOURCEKIT_BINARY_DIR}/tools/SourceKit/include
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
@@ -153,5 +152,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
 endif()
 
+add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)

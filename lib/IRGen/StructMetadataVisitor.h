@@ -48,16 +48,17 @@ public:
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
-    
+    // Everything after this is type-specific.
+    asImpl().noteStartOfTypeSpecificMembers();
+
+    // Generic arguments.
+    // This must always be the first piece of trailing data.
+    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
+
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
     for (VarDecl *prop : Target->getStoredProperties())
       asImpl().addFieldOffset(prop);
-
-    // Instantiation-specific.
-    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
   }
   
   // Note the start of the field offset vector.
@@ -84,6 +85,7 @@ public:
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
+  void noteStartOfTypeSpecificMembers() {}
 
 private:
   void addPointer() {

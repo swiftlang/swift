@@ -12,7 +12,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 1. Library Organization
     1. What files are where
         1. Brief about CMakeLists
-	1. Brief about GroupInfo.json
+        1. Brief about GroupInfo.json
     1. What tests are where
         1. Furthermore, should there be a split between whitebox tests and blackbox tests?
     1. What benchmarks are where
@@ -23,7 +23,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. Protocol hierarchy
         1. Customization hooks
     1. Use of classes, COW implementation, buffers, etc
-    1. Compatiblity, `@available`, etc.
+    1. Compatibility, `@available`, etc.
     1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
     1. Strings and ICU
     1. Lifetimes
@@ -75,8 +75,8 @@ if _fastPath(...) {
 ...
 if _fastPath(...) {
   // 9% of the time we execute this: very conservative inlining
-	...
-	return
+    ...
+    return
 }
 
 // 1% of the time we execute this: very conservative inlining
@@ -87,7 +87,7 @@ return
 *NOTE: these are due for a rename and possibly a redesign. They conflate multiple notions that don’t match the average standard library programmer’s intuition.*
 
 
-#### `_onFastPath` 
+#### `_onFastPath`
 
 This should be rarely used. It informs the SIL optimizer that any code dominated by it should be treated as the innermost loop of a performance critical section of code. It cranks optimizer heuristics to 11. Injudicious use of this will degrade performance and bloat binary size.
 
@@ -170,5 +170,3 @@ The standard library utilizes thread local storage (TLS) to cache expensive comp
 3. If the field is not trivially destructable, update `_destroyTLS` to properly destroy the value.
 
 See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/ThreadLocalStorage.swift) for more details.
-
-

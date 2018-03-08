@@ -31,7 +31,7 @@ open class SyntaxRewriter {
 %   if is_visitable(node):
   open func visit(_ node: ${node.name}) -> ${node.base_type} {
 %   cast = ('as! ' + node.base_type) if node.base_type != 'Syntax' else ''
-    return visitChildren(node)${cast}
+    return visitChildren(node) ${cast}
   }
 
 %   end
@@ -40,7 +40,18 @@ open class SyntaxRewriter {
   open func visit(_ token: TokenSyntax) -> Syntax {
     return token
   }
+
+  /// The function called before visiting the node and its descendents.
+  ///   - node: the node we are about to visit.
+  open func visitPre(_ node: Syntax) {}
+
+  /// The function called after visting the node and its descendents.
+  ///   - node: the node we just finished visiting.
+  open func visitPost(_ node: Syntax) {}
+
   public func visit(_ node: Syntax) -> Syntax {
+    visitPre(node)
+    defer { visitPost(node) }
     switch node.raw.kind {
     case .token: return visit(node as! TokenSyntax)
 % for node in SYNTAX_NODES:
@@ -53,8 +64,18 @@ open class SyntaxRewriter {
   }
 
   func visitChildren(_ node: Syntax) -> Syntax {
-    let newLayout = node.children.map { visit($0).raw }
-    return Syntax.fromRaw(node.raw.replacingLayout(newLayout))
+    // Visit all children of this node, returning `nil` if child is not
+    // present. This will ensure that there are always the same number
+    // of children after transforming.
+    let newLayout = (0..<node.numberOfChildren).map { (i: Int) -> RawSyntax? in
+      guard let child = node.child(at: i) else { return nil }
+      return visit(child).raw
+    }
+
+    // Sanity check, ensure the new children are the same length.
+    assert(newLayout.count == node.raw.layout.count)
+
+    return makeSyntax(node.raw.replacingLayout(newLayout))
   }
 }
 
@@ -70,7 +91,17 @@ open class SyntaxVisitor {
 
   open func visit(_ token: TokenSyntax) {}
 
+  /// The function called before visiting the node and its descendents.
+  ///   - node: the node we are about to visit.
+  open func visitPre(_ node: Syntax) {}
+
+  /// The function called after visting the node and its descendents.
+  ///   - node: the node we just finished visiting.
+  open func visitPost(_ node: Syntax) {}
+
   public func visit(_ node: Syntax) {
+    visitPre(node)
+    defer { visitPost(node) }
     switch node.raw.kind {
     case .token: visit(node as! TokenSyntax)
 % for node in SYNTAX_NODES:

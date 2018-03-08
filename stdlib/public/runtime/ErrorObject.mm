@@ -382,10 +382,13 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
     reinterpret_cast<GetDefaultFn*> (dlsym(RTLD_DEFAULT,
     MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)))));
   if (!foundationGetDefaultUserInfo) {
-    T->vw_destroy(error);
+    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
     return nullptr;
   }
 
+  // +0 Convention: In the case where we have the +1 convention, this will
+  // destroy the error for us, otherwise, it will take the value guaranteed. The
+  // conclusion is that we can leave this alone.
   return foundationGetDefaultUserInfo(error, T, Error);
 }
 
@@ -518,7 +521,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 
   // If so, attempt the bridge.
   NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
-  objc_retain(srcInstance);
+  SWIFT_CC_PLUSONE_GUARD(objc_retain(srcInstance));
   if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       objc_release(srcInstance);

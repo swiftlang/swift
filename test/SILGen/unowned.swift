@@ -116,7 +116,7 @@ func test_unowned_let_capture(_ aC : C) {
   takeClosure { bC.f() }
 }
 
-// CHECK-LABEL: sil private @$S7unowned05test_A12_let_captureyyAA1CCFSiycfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
+// CHECK-LABEL: sil private @$S7unowned05test_A12_let_captureyyAA1CCFSiyXEfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C

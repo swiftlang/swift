@@ -496,7 +496,8 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(FullApplySite AI,
                                        SILType ClassOrMetatypeType,
-                                       OptRemark::Emitter *ORE) {
+                                       OptRemark::Emitter *ORE,
+                                       bool isEffectivelyFinalMethod) {
 
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
@@ -516,6 +517,15 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
+    return false;
+  }
+
+  // We need to disable the  “effectively final” opt if a function is inlinable
+  if (isEffectivelyFinalMethod &&
+      F->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
+                          "it is an effectively-final inlinable: "
+                       << F->getName() << "\n");
     return false;
   }
 
@@ -701,10 +711,12 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   return std::make_pair(ResultValue, NewAI);
 }
 
-DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
-                                                         SILValue ClassInstance,
-                                                         OptRemark::Emitter *ORE) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE))
+DevirtualizationResult
+swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+                                  OptRemark::Emitter *ORE,
+                                  bool isEffectivelyFinalMethod) {
+  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE,
+                                  isEffectivelyFinalMethod))
     return std::make_pair(nullptr, FullApplySite());
   return devirtualizeClassMethod(AI, ClassInstance, ORE);
 }
@@ -1025,7 +1037,8 @@ DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance, ORE);
+      return tryDevirtualizeClassMethod(FAS, Instance, ORE,
+                                        true /*isEffectivelyFinalMethod*/);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
@@ -1091,7 +1104,9 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
-      return canDevirtualizeClassMethod(AI, Instance->getType());
+      return canDevirtualizeClassMethod(AI, Instance->getType(),
+                                        nullptr /*ORE*/,
+                                        true /*isEffectivelyFinalMethod*/);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.

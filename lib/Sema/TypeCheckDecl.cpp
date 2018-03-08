@@ -824,7 +824,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
-  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType())
+  if (type->getReferenceStorageReferent()->getOptionalObjectType())
     return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
@@ -980,63 +980,6 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
             other->getDeclContext()->getModuleScopeContext());
         if (otherFile && otherFile->isSIB())
           continue;
-      }
-
-      // Signatures are the same, but interface types are not. We must
-      // have a type that we've massaged as part of signature
-      // interface type generation. If it's a result of remapping a
-      // function parameter from 'inout T!' to 'inout T?', emit a
-      // warning that these overloads are deprecated and will no
-      // longer be supported in the future.
-      if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
-          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
-            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
-            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
-          }
-
-          if (currFnTy && otherFnTy) {
-            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-
-            if (currParams.size() == otherParams.size()) {
-              auto diagnosed = false;
-              for (unsigned i : indices(currParams)) {
-                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
-                  auto currParamTy = currParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  auto otherParamTy = otherParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  OptionalTypeKind currOTK;
-                  OptionalTypeKind otherOTK;
-                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
-                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
-                  if (currOTK != OTK_None && otherOTK != OTK_None &&
-                      currOTK != otherOTK) {
-                    tc.diagnose(current, diag::deprecated_redecl_by_optionality,
-                                current->getFullName(), currParamTy,
-                                otherParamTy);
-                    tc.diagnose(other, diag::invalid_redecl_prev,
-                                other->getFullName());
-                    tc.diagnose(current,
-                                diag::deprecated_redecl_by_optionality_note);
-                    diagnosed = true;
-                    break;
-                  }
-                }
-              }
-
-              if (diagnosed)
-                break;
-            }
-          }
-        }
       }
 
       // If the conflicting declarations have non-overlapping availability and,
@@ -1276,8 +1219,8 @@ static void configureImplicitSelf(TypeChecker &tc,
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   auto specifier = selfParam.getParameterFlags().isInOut()
-                 ? VarDecl::Specifier::InOut
-                 : VarDecl::Specifier::Owned;
+                       ? VarDecl::Specifier::InOut
+                       : VarDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
@@ -1937,6 +1880,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     llvm_unreachable("does not have access control");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     // Does not have access control.
   case DeclKind::EnumCase:
     // Handled at the EnumElement level.
@@ -2683,7 +2627,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
       // Handle methods first.
       if (auto overriddenFunc = dyn_cast<AbstractFunctionDecl>(overridden)) {
         // Determine the selector of the overridden method.
-        ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector(&tc);
+        ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector();
 
         // Dig out the @objc attribute on the method, if it exists.
         auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
@@ -2923,7 +2867,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
             return None;
           }
         };
-        auto sel = method->getObjCSelector(&TC);
+        auto sel = method->getObjCSelector();
         if (auto diagID = isForbiddenSelector(sel)) {
           auto diagInfo = getObjCMethodDiagInfo(method);
           TC.diagnose(method, *diagID,
@@ -4005,10 +3949,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
-    UnifiedStatsReporter::FrontendStatsTracer Tracer;
-    if (TC.Context.Stats)
-      Tracer = TC.Context.Stats->getStatsTracer("type-checking",
-                                                decl->getSourceRange());
+    FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -4374,6 +4315,13 @@ public:
 
     validateAttributes(TC, SD);
 
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     if (!checkOverrides(TC, SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
@@ -4414,13 +4362,6 @@ public:
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
         !SD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(SD, TC);
-    }
-
-    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = SD->getASTContext();
-      SD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
     }
 
     TC.checkDeclAttributes(SD);
@@ -4518,20 +4459,24 @@ public:
       {
         // Check for duplicate enum members.
         llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        bool hasErrors = false;
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
-            EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
-            if (auto *RawValueExpr = EED->getRawValueExpr())
-              RawValueExpr->setType(ErrorType::get(TC.Context));
 
             auto PreviousEED = Res.first->second;
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
             TC.diagnose(PreviousEED->getLoc(),
                         diag::previous_decldef, true, EED->getName());
+            hasErrors = true;
           }
         }
+
+        // If one of the cases is invalid, let's mark
+        // whole enum as invalid as well.
+        if (hasErrors)
+          ED->setInvalid();
       }
     }
 
@@ -4885,8 +4830,15 @@ public:
       llvm::errs() << "Requirement signature: ";
       requirementsSig->print(llvm::errs());
       llvm::errs() << "\n";
+
+      // Note: One cannot canonicalize a requirement signature, because
+      // requirement signatures are necessarily missing requirements.
       llvm::errs() << "Canonical requirement signature: ";
-      requirementsSig->getCanonicalSignature()->print(llvm::errs());
+      auto canRequirementSig =
+        GenericSignature::getCanonical(requirementsSig->getGenericParams(),
+                                       requirementsSig->getRequirements(),
+                                       /*skipValidation=*/true);
+      canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
   }
@@ -5608,7 +5560,7 @@ public:
   static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
     // We've hit the result type.
     if (uncurryLevel == 0) {
-      if (auto objectTy = type->getAnyOptionalObjectType())
+      if (auto objectTy = type->getOptionalObjectType())
         return objectTy;
 
       return type;
@@ -5651,34 +5603,24 @@ public:
       if (!paramTy || !parentParamTy)
         return;
 
-      OptionalTypeKind paramOTK;
-      (void)paramTy->getAnyOptionalObjectType(paramOTK);
-      if (paramOTK == OTK_Optional)
-        if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-          return;
-
-      OptionalTypeKind parentOTK;
-      (void)parentParamTy->getAnyOptionalObjectType(parentOTK);
-
       TypeLoc TL = decl->getTypeLoc();
       if (!TL.getTypeRepr())
         return;
 
-      if (paramOTK == OTK_None) {
-        switch (parentOTK) {
-        case OTK_None:
-          return;
-        case OTK_ImplicitlyUnwrappedOptional:
+      bool paramIsOptional;
+      (void)paramTy->getOptionalObjectType(paramIsOptional);
+
+      bool parentIsOptional;
+      (void)parentParamTy->getOptionalObjectType(parentIsOptional);
+
+      if (paramIsOptional == parentIsOptional)
+        return;
+
+      if (!paramIsOptional) {
+        if (parentDecl->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
           if (!treatIUOResultAsError)
             return;
-          break;
-        case OTK_Optional:
-          if (parentDecl->getAttrs()
-                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-            if (!treatIUOResultAsError)
-              return;
-          break;
-        }
 
         emittedError = true;
         auto diag = TC.diagnose(decl->getStartLoc(),
@@ -5695,7 +5637,7 @@ public:
         return;
       }
 
-      if (parentOTK != OTK_None)
+      if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         return;
 
       // Allow silencing this warning using parens.
@@ -5734,14 +5676,17 @@ public:
       if (!resultTy || !parentResultTy)
         return;
 
-      OptionalTypeKind resultOTK;
-      if (!resultTy->getAnyOptionalObjectType(resultOTK))
+      if (!resultTy->getOptionalObjectType())
         return;
 
       TypeRepr *TR = resultTL.getTypeRepr();
 
-      if (resultOTK == OTK_Optional || treatIUOResultAsError) {
-        if (parentResultTy->getAnyOptionalObjectType())
+      bool resultIsPlainOptional = true;
+      if (member->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        resultIsPlainOptional = false;
+
+      if (resultIsPlainOptional || treatIUOResultAsError) {
+        if (parentResultTy->getOptionalObjectType())
           return;
         emittedError = true;
         auto diag = TC.diagnose(resultTL.getSourceRange().Start,
@@ -5758,7 +5703,7 @@ public:
         return;
       }
 
-      if (!parentResultTy->getAnyOptionalObjectType())
+      if (!parentResultTy->getOptionalObjectType())
         return;
 
       // Allow silencing this warning using parens.
@@ -5927,6 +5872,60 @@ public:
     }
   }
 
+  static bool parameterTypesMatch(const ValueDecl *derivedDecl,
+                                  const ValueDecl *baseDecl,
+                                  TypeMatchOptions matchMode) {
+    const ParameterList *derivedParams;
+    const ParameterList *baseParams;
+    if (auto *derived = dyn_cast<AbstractFunctionDecl>(derivedDecl)) {
+      auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getParameterList(1);
+      derivedParams = derived->getParameterList(1);
+    } else {
+      auto *base = dyn_cast<SubscriptDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getIndices();
+      derivedParams = cast<SubscriptDecl>(derivedDecl)->getIndices();
+    }
+
+    if (baseParams->size() != derivedParams->size())
+      return false;
+
+    auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
+                                                          /*derivedSubs=*/None);
+
+    for (auto i : indices(baseParams->getArray())) {
+      auto baseItfTy = baseParams->get(i)->getInterfaceType();
+      auto baseParamTy =
+          baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+      baseParamTy = baseParamTy.subst(subs);
+      auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParams->get(i)
+              ->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
+
+      // If there is no match, then we're done.
+      return false;
+    }
+
+    return true;
+  }
+
   /// Determine which method or subscript this method or subscript overrides
   /// (if any).
   ///
@@ -6067,14 +6066,13 @@ public:
         bool objCMatch = false;
         if (parentDecl->isObjC() && decl->isObjC()) {
           if (method) {
-            if (method->getObjCSelector(&TC)
-                  == parentMethod->getObjCSelector(&TC))
+            if (method->getObjCSelector() == parentMethod->getObjCSelector())
               objCMatch = true;
           } else if (auto *parentSubscript =
                        dyn_cast<SubscriptDecl>(parentStorage)) {
             // If the subscript kinds don't match, it's not an override.
-            if (subscript->getObjCSubscriptKind(&TC)
-                  == parentSubscript->getObjCSubscriptKind(&TC))
+            if (subscript->getObjCSubscriptKind()
+                  == parentSubscript->getObjCSubscriptKind())
               objCMatch = true;
           }
 
@@ -6113,7 +6111,13 @@ public:
         auto canDeclTy = declTy->getCanonicalType(genericSig);
         auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
-        if (canDeclTy == canParentDeclTy) {
+        auto declIUOAttr =
+            decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        auto parentDeclIUOAttr =
+            parentDecl->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+        if (declIUOAttr == parentDeclIUOAttr && canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
           hadExactMatch = true;
           continue;
@@ -6139,8 +6143,22 @@ public:
               TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
-        if (declTy->matches(parentDeclTy, matchMode, &TC)) {
-          // If the Objective-C selectors match, always call it exact.
+        auto declFnTy = declTy->getAs<AnyFunctionType>();
+        auto parentDeclFnTy = parentDeclTy->getAs<AnyFunctionType>();
+        if (declFnTy && parentDeclFnTy) {
+          auto paramsAndResultMatch = [=]() -> bool {
+            return parameterTypesMatch(decl, parentDecl, matchMode) &&
+                   declFnTy->getResult()->matches(parentDeclFnTy->getResult(),
+                                                  matchMode);
+          };
+
+          if (declFnTy->matchesFunctionType(parentDeclFnTy, matchMode,
+                                            paramsAndResultMatch)) {
+            matches.push_back({parentDecl, objCMatch, parentDeclTy});
+            hadExactMatch |= objCMatch;
+            continue;
+          }
+        } else if (declTy->matches(parentDeclTy, matchMode)) {
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
           continue;
@@ -6151,11 +6169,11 @@ public:
         if (objCMatch) {
           if (method) {
             TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                        method->getObjCSelector(&TC), declTy);
+                        method->getObjCSelector(), declTy);
           } else {
             TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
                         static_cast<unsigned>(
-                          subscript->getObjCSubscriptKind(&TC)),
+                          subscript->getObjCSubscriptKind()),
                         declTy);
           }
           TC.diagnose(parentDecl, diag::overridden_here_with_type,
@@ -6207,13 +6225,15 @@ public:
 
     // If we have an explicit ownership modifier and our parent doesn't,
     // complain.
-    auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
-    if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
-      Ownership parentOwnership;
+    auto parentAttr =
+        matchDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+    if (auto ownershipAttr =
+            decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      ReferenceOwnership parentOwnership;
       if (parentAttr)
         parentOwnership = parentAttr->get();
       else
-        parentOwnership = Ownership::Strong;
+        parentOwnership = ReferenceOwnership::Strong;
       if (parentOwnership != ownershipAttr->get()) {
         TC.diagnose(decl, diag::override_ownership_mismatch,
                     (unsigned)parentOwnership,
@@ -6315,8 +6335,13 @@ public:
         (attempt == OverrideCheckingAttempt::MismatchedOptional ||
          attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
 
+    auto declIUOAttr =
+        decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto matchDeclIUOAttr =
+        matchDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
     // If this is an exact type match, we're successful!
-    if (declTy->isEqual(matchType)) {
+    if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(matchType)) {
       // Nothing to do.
       
     } else if (method) {
@@ -6373,10 +6398,9 @@ public:
       auto propertyTy = property->getInterfaceType();
       auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
           matchDecl, decl, matchDecl->getInterfaceType());
-      
+
       if (!propertyTy->matches(parentPropertyTy,
-                               TypeMatchFlags::AllowOverride,
-                               &TC)) {
+                               TypeMatchFlags::AllowOverride)) {
         TC.diagnose(property, diag::override_property_type_mismatch,
                     property->getName(), propertyTy, parentPropertyTy);
         noteFixableMismatchedTypes(TC, decl, matchDecl);
@@ -6386,9 +6410,9 @@ public:
       
       // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
       bool IsSilentDifference = false;
-      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+      if (auto propertyTyNoOptional = propertyTy->getOptionalObjectType())
         if (auto parentPropertyTyNoOptional =
-            parentPropertyTy->getAnyOptionalObjectType())
+                parentPropertyTy->getOptionalObjectType())
           if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
             IsSilentDifference = true;
       
@@ -6440,6 +6464,7 @@ public:
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(GKInspectable)
@@ -6482,7 +6507,7 @@ public:
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
-    UNINTERESTING_ATTR(Ownership)
+    UNINTERESTING_ATTR(ReferenceOwnership)
 
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
@@ -6500,6 +6525,8 @@ public:
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
+    UNINTERESTING_ATTR(ClangImporterSynthesizedType)
+    UNINTERESTING_ATTR(WeakLinked)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -7054,6 +7081,15 @@ public:
     TC.checkDeclAttributes(ICD);
   }
 
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+    if (PDD->hasBeenEmitted()) { return; }
+    PDD->markEmitted();
+    TC.diagnose(PDD->getMessage()->getStartLoc(),
+      PDD->isError() ? diag::pound_error : diag::pound_warning,
+      PDD->getMessage()->getValue())
+      .highlight(PDD->getMessage()->getSourceRange());
+  }
+
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (!IsFirstPass) {
       if (CD->getBody()) {
@@ -7255,13 +7291,23 @@ public:
     if (CD->isRequired()) {
       if (auto nominal = CD->getDeclContext()
               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-        auto requiredAccess = std::min(nominal->getFormalAccess(),
-                                       AccessLevel::Public);
-        if (requiredAccess == AccessLevel::Private)
+        AccessLevel requiredAccess;
+        switch (nominal->getFormalAccess()) {
+        case AccessLevel::Open:
+          requiredAccess = AccessLevel::Public;
+          break;
+        case AccessLevel::Public:
+        case AccessLevel::Internal:
+          requiredAccess = AccessLevel::Internal;
+          break;
+        case AccessLevel::FilePrivate:
+        case AccessLevel::Private:
           requiredAccess = AccessLevel::FilePrivate;
+          break;
+        }
         if (CD->getFormalAccess() < requiredAccess) {
-          auto diag = TC.diagnose(CD,
-                                  diag::required_initializer_not_accessible);
+          auto diag = TC.diagnose(CD, diag::required_initializer_not_accessible,
+                                  nominal->getFullName());
           fixItAccess(diag, CD, requiredAccess);
         }
       }
@@ -7510,8 +7556,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
   }
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;
 
@@ -7526,6 +7570,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8114,6 +8159,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8355,7 +8401,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 #undef CHECK_LITERAL_PROTOCOL
 
     // For optional types, use 'nil'.
-    if (type->getAnyOptionalObjectType())
+    if (type->getOptionalObjectType())
       return std::string("nil");
 
     return None;
@@ -9157,7 +9203,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
       if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
-          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)) {
+          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
+          || isa<ExtensionDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.

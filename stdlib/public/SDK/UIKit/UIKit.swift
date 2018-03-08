@@ -231,6 +231,7 @@ internal struct _UIViewQuickLookState {
 }
 
 extension UIView : _DefaultCustomPlaygroundQuickLookable {
+  @available(*, deprecated, message: "UIView._defaultCustomPlaygroundQuickLook will be removed in a future Swift version")
   public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
       return .view(UIImage())

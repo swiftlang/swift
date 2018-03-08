@@ -74,6 +74,26 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @handle_deallocation
+// CHECK:      global_value
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @handle_deallocation : $@convention(thin) () -> () {
+bb0:
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %6 = ref_element_addr %5 : $Obj, #Obj.value
+  store %4 to %6 : $*Int64
+  set_deallocating %5 : $Obj
+  dealloc_ref %5 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @dont_outline_global_double_store
 // CHECK: alloc_ref
 // CHECK: store
@@ -203,5 +223,3 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
-
-

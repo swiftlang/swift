@@ -34,10 +34,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                               AC.getIdentifier("$metatype"), SourceLoc(),
-                               AC.getIdentifier("$metatype"), Type(),
-                               DC);
+  auto VD =
+      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                         AC.getIdentifier("$metatype"), SourceLoc(),
+                         AC.getIdentifier("$metatype"), Type(), DC);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
@@ -57,20 +57,25 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     RValue tuple(type);
     for (auto fieldType : tupleTy.getElementTypes())
       tuple.addElement(emitImplicitValueConstructorArg(SGF, loc, fieldType, DC));
-
     return tuple;
-  } else {
-    auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"),
-                                 SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"), Type(),
-                                 DC);
-    VD->setInterfaceType(interfaceType);
-    SILValue arg =
-        SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(type), VD);
-    return RValue(SGF, loc, type, SGF.emitManagedRValueWithCleanup(arg));
   }
+
+  auto &AC = SGF.getASTContext();
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                               AC.getIdentifier("$implicit_value"),
+                               SourceLoc(),
+                               AC.getIdentifier("$implicit_value"), Type(),
+                               DC);
+  VD->setInterfaceType(interfaceType);
+  SILFunctionArgument *arg =
+      SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(type), VD);
+  ManagedValue mvArg;
+  if (arg->getArgumentConvention().isOwnedConvention()) {
+    mvArg = SGF.emitManagedRValueWithCleanup(arg);
+  } else {
+    mvArg = ManagedValue::forUnmanaged(arg);
+  }
+  return RValue(SGF, loc, type, mvArg);
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -428,7 +433,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     B.createReturn(ReturnLoc, emitEmptyTuple(Loc));
   } else {
     assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
-    SILValue result = mv.forward(*this);
+    SILValue result = mv.ensurePlusOne(*this, ReturnLoc).forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
   }
@@ -588,8 +593,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
-  emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
+  uint16_t ArgNo = emitProlog(ctor->getParameterList(1),
+                              TupleType::getEmpty(F.getASTContext()), ctor,
+                              ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   ManagedValue selfArg = B.createFunctionArgument(selfTy, selfDecl);
@@ -597,7 +603,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-    B.createDebugValue(PrologueLoc, selfArg.getValue());
+    SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
+    B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
   }
 
   if (!ctor->hasStubImplementation()) {
@@ -1035,7 +1042,9 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
-  B.createDebugValue(PrologueLoc, selfArg);
+  // Hard-code self as argument number 1.
+  SILDebugVariable DbgVar(selfDecl->isLet(), 1);
+  B.createDebugValue(PrologueLoc, selfArg, DbgVar);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");

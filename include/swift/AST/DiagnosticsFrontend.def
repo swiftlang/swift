@@ -150,6 +150,9 @@ ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))
 
+ERROR(error_if_any_output_files_are_specified_they_all_must_be,none,
+  "if any output files are specified, they all must be", ())
+
 ERROR(error_primary_file_not_found,none,
       "primary file '%0' was not found in file list '%1'",
       (StringRef, StringRef))
@@ -187,6 +190,9 @@ ERROR(error_index_failed_status_check,none,
 ERROR(error_index_inputs_more_than_outputs,none,
   "index output filenames do not match input source files", ())
 
+ERROR(error_wrong_number_of_arguments,none,
+"wrong number of '%0' arguments (expected %1, got %2)", (StringRef, int, int))
+
 ERROR(error_formatting_multiple_file_ranges,none,
   "file ranges don't support multiple input files", ())
 
@@ -202,6 +208,10 @@ ERROR(symbol_in_tbd_not_in_ir,none,
 ERROR(symbol_in_ir_not_in_tbd,none,
       "symbol '%0' (%1) is in generated IR file, but not in TBD file",
       (StringRef, StringRef))
+
+ERROR(redundant_prefix_compilation_flag,none,
+      "invalid argument '-D%0'; did you provide a redundant '-D' in your build settings?", 
+      (StringRef))    
 
 ERROR(invalid_conditional_compilation_flag,none,
       "conditional compilation flags must be valid Swift identifiers (rather than '%0')",

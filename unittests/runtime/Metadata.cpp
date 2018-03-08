@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 #include <iterator>
 #include <functional>
-#include <sys/mman.h>
 #include <vector>
 #include <pthread.h>
 
@@ -164,41 +163,6 @@ uint32_t Global1 = 0;
 uint32_t Global2 = 0;
 uint32_t Global3 = 0;
 
-/// The general structure of a generic metadata.
-template <typename Instance, unsigned NumArguments>
-struct GenericMetadataTest {
-  GenericMetadata Header;
-  Instance Template;
-  void *Storage[NumArguments];
-};
-
-GenericMetadataTest<StructMetadata, 1> MetadataTest1 = {
-  // Header
-  {
-    // allocation function
-    [](GenericMetadata *pattern, const void *args) -> Metadata * {
-      auto metadata = swift_allocateGenericValueMetadata(pattern, args);
-      auto metadataWords = reinterpret_cast<const void**>(metadata);
-      auto argsWords = reinterpret_cast<const void* const*>(args);
-      metadataWords[2] = argsWords[0];
-      return metadata;
-    },
-    3 * sizeof(void*), // metadata size
-    1, // num arguments
-    0, // address point
-    {} // private data
-  },
-
-  // Fields
-  {
-    MetadataKind::Struct,
-    reinterpret_cast<const NominalTypeDescriptor*>(&Global1)
-  },
-
-  // Arguments
-  {nullptr}
-};
-
 struct TestObjContainer {
   swift_once_t token;
   HeapObject obj;
@@ -286,51 +250,9 @@ TEST(Concurrent, ConcurrentMap) {
   }
 }
 
-
-TEST(MetadataTest, getGenericMetadata) {
-  auto metadataTemplate = (GenericMetadata*) &MetadataTest1;
-
-  void *args[] = { &Global2 };
-
-  auto result1 = RaceTest_ExpectEqual<const Metadata *>(
-    [&]() -> const Metadata * {
-      auto inst = static_cast<const StructMetadata*>
-        (swift_getGenericMetadata(metadataTemplate, args));
-
-      auto fields = reinterpret_cast<void * const *>(inst);
-
-      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
-                inst->Description);
-
-      EXPECT_EQ(&Global2, fields[2]);
-
-      return inst;
-    });
-
-  args[0] = &Global3;
-
-  RaceTest_ExpectEqual<const Metadata *>(
-    [&]() -> const Metadata * {
-      auto inst = static_cast<const StructMetadata*>
-        (swift_getGenericMetadata(metadataTemplate, args));
-      EXPECT_NE(inst, result1);
-
-      auto fields = reinterpret_cast<void * const *>(inst);
-      EXPECT_EQ(MetadataKind::Struct, inst->getKind());
-      EXPECT_EQ(reinterpret_cast<const NominalTypeDescriptor *>(&Global1),
-                inst->Description);
-
-      EXPECT_EQ(&Global3, fields[2]);
-
-      return inst;
-    });
-}
-
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
-    ClassFlags(), 0, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -604,53 +526,6 @@ TEST(MetadataTest, getExistentialMetadata) {
     });
 }
 
-static SWIFT_CC(swift) void destroySuperclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
-
-struct {
-  void *Prefix[4];
-  FullMetadata<ClassMetadata> Metadata;
-} SuperclassWithPrefix = {
-  { &Global1, &Global3, &Global2, &Global3 },
-  { { { &destroySuperclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
-      0, 0, 0, sizeof(SuperclassWithPrefix),
-      sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
-};
-ClassMetadata * const SuperclassWithPrefix_AddressPoint =
-  &SuperclassWithPrefix.Metadata;
-
-static SWIFT_CC(swift) void destroySubclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
-
-struct {
-  GenericMetadata Header;
-  FullMetadata<ClassMetadata> Pattern;
-  void *Suffix[3];
-} GenericSubclass = {
-  {
-    // allocation function
-    [](GenericMetadata *pattern, const void *args) -> Metadata* {
-      auto metadata =
-        swift_allocateGenericClassMetadata(pattern, args,
-                                           SuperclassWithPrefix_AddressPoint, 0);
-      char *bytes = (char*) metadata + sizeof(ClassMetadata);
-      auto metadataWords = reinterpret_cast<const void**>(bytes);
-      auto argsWords = reinterpret_cast<const void* const *>(args);
-      metadataWords[2] = argsWords[0];
-      return metadata;
-    },
-    sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix), // pattern size
-    1, // num arguments
-    sizeof(HeapMetadataHeader), // address point
-    {} // private data
-  },
-  { { { &destroySubclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
-      0, 0, 0,
-      sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
-      sizeof(HeapMetadataHeader) } },
-  { &Global2, &Global1, &Global2 }
-};
-
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
   ProtocolDescriptorFlags().withSwift(true)
                           .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
@@ -896,14 +771,9 @@ static void initializeRelativePointer(int32_t *ptr, T value) {
 // Tests for resilient witness table instantiation, with runtime-provided
 // default requirements
 
-struct WitnessTableSlice {
-  WitnessTable **tables;
-  size_t count;
-};
-
 static void witnessTableInstantiator(WitnessTable *instantiatedTable,
                                      const Metadata *type,
-                                     void * const *instantiationArgs) {
+                                     void **const *instantiationArgs) {
   EXPECT_EQ(type, nullptr);
 
   EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 123);
@@ -913,11 +783,10 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
   ((void **) instantiatedTable)[3] = (void *) 345;
 
   auto conditionalTables =
-      reinterpret_cast<const WitnessTableSlice *>(instantiationArgs);
+      reinterpret_cast<const WitnessTable *const *>(instantiationArgs);
 
-  EXPECT_EQ(conditionalTables->count, 1UL);
-  EXPECT_EQ(conditionalTables->tables[0], (void *)678);
-  ((void **)instantiatedTable)[-1] = conditionalTables->tables[0];
+  EXPECT_EQ(conditionalTables[0], (void *)678);
+  ((void **)instantiatedTable)[-1] = (void *)conditionalTables[0];
 }
 
 static void fakeDefaultWitness1() {}
@@ -984,7 +853,6 @@ const void *witnesses[] = {
 };
 
 WitnessTable *conditionalTablesBuffer[] = {(WitnessTable *)678};
-WitnessTableSlice conditionalTablesSlice = {conditionalTablesBuffer, 1};
 
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
@@ -1034,7 +902,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -1073,7 +941,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -1113,7 +981,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 

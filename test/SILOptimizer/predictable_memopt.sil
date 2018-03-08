@@ -436,14 +436,14 @@ enum IndirectCase {
 sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
 // CHECK: bb0([[X:%.*]] : $Int):
 entry(%x : $Int):
-  // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
+  %b = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
-  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %ba = project_box %b : ${ var Int }, 0
   // CHECK: store [[X]] to [[PB]]
   store %x to %ba : $*Int
-  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : $<τ_0_0> { var τ_0_0 } <Int>
-  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : ${ var Int }
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : ${ var Int }
   // CHECK: return [[E]]
   return %e : $IndirectCase
 }

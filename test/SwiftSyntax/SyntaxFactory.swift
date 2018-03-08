@@ -34,7 +34,7 @@ SyntaxFactoryAPI.test("Generated") {
               }
               """)
 
-  let forType = SyntaxFactory.makeIdentifier("for", 
+  let forType = SyntaxFactory.makeIdentifier("for",
                                              leadingTrivia: .backticks(1),
                                              trailingTrivia: [
                                                .backticks(1), .spaces(1)
@@ -53,15 +53,16 @@ SyntaxFactoryAPI.test("Generated") {
               """)
 
   expectNotEqual(structDecl.members, renamed.members)
-  expectEqual(structDecl, structDecl.root)
+  expectEqual(structDecl, structDecl.root as? StructDeclSyntax)
   expectNil(structDecl.parent)
   expectNotNil(structDecl.members.parent)
-  expectEqual(structDecl.members.parent, structDecl)
+  expectEqual(structDecl.members.parent as? StructDeclSyntax, structDecl)
 
   // Ensure that accessing children via named identifiers is exactly the
   // same as accessing them as their underlying data.
-  expectEqual(structDecl.members, structDecl.child(at: 7))
-  
+  expectEqual(structDecl.members,
+              structDecl.child(at: 7) as? MemberDeclBlockSyntax)
+
   expectEqual("\(structDecl.members.rightBrace)",
               """
 

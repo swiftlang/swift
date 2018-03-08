@@ -352,18 +352,18 @@ func s130_____________wrap<T>(_ x: T) -> T? {
 // ---
 // CHECK-LABEL: sil hidden @$S20opaque_values_silgen21s140______forEachStmtyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<CountableRange<Int>> }
+// CHECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<Range<Int>> }
 // CHECK:   [[APPLY_ARG1:%.*]] = apply
 // CHECK-NOT: alloc_stack $Int
 // CHECK-NOT: store [[APPLY_ARG1]] to [trivial]
-// CHECK-NOT: alloc_stack $CountableRange<Int>
+// CHECK-NOT: alloc_stack $Range<Int>
 // CHECK-NOT: dealloc_stack
-// CHECK:   [[APPLY_ARG2:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK:   [[APPLY_ARG2:%.*]] = apply %{{.*}}<Range<Int>>
 // CHECK:   store [[APPLY_ARG2]] to [trivial] [[PROJ_BOX_ARG]]
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK-NOT: alloc_stack $Optional<Int>
-// CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<Range<Int>>
 // CHECK-NOT: dealloc_stack
 // CHECK:   switch_enum [[APPLY_ARG3]]
 // CHECK: bb2:
@@ -680,11 +680,11 @@ func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // Tests support for address only let closures under opaque value mode - they are not by-address anymore
 // ---
-// CHECK-LABEL: sil private @$S20opaque_values_silgen21s330___addrLetClosureyxxlFxycfU_xycfU_ : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil private @$S20opaque_values_silgen21s330___addrLetClosureyxxlFxyXEfU_xyXEfU_ : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   return [[COPY_ARG]] : $T
-// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s330___addrLetClosureyxxlFxycfU_xycfU_'
+// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s330___addrLetClosureyxxlFxyXEfU_xyXEfU_'
 func s330___addrLetClosure<T>(_ x:T) -> T {
   return { { x }() }()
 }
@@ -782,14 +782,14 @@ func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
 
 // Tests contextual init() of opaque value types
 // ---
-// CHECK-LABEL: sil hidden @$S20opaque_values_silgen21s370_____optToOptCastyxSgSQyxGlF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden @$S20opaque_values_silgen21s370_____optToOptCastyxSgAClF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
 // CHECK: bb0([[ARG:%.*]] : $Optional<T>):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $Optional<T>, $Optional<T>
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[COPY__ARG]] : $Optional<T>
-// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s370_____optToOptCastyxSgSQyxGlF'
+// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s370_____optToOptCastyxSgAClF'
 func s370_____optToOptCast<T>(_ x : T!) -> T? {
   return x
 }

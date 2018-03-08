@@ -13,6 +13,10 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
+# Build the runtime with -Wall to catch, e.g., uninitialized variables
+# warnings.
+list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
+
 set(SWIFT_RUNTIME_CORE_CXX_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}")
 set(SWIFT_RUNTIME_CORE_LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}")
 

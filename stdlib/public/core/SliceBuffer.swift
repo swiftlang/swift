@@ -389,7 +389,7 @@ internal struct _SliceBuffer<Element>
     }
   }
 
-  internal typealias Indices = CountableRange<Int>
+  internal typealias Indices = Range<Int>
 
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

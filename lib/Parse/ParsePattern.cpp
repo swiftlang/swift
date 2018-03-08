@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -211,6 +212,12 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // better fixits.
           param.SpecifierKind = VarDecl::Specifier::Shared;
           param.SpecifierLoc = consumeToken();
+        } else if (Tok.is(tok::identifier) &&
+                   Tok.getRawText().equals("__owned")) {
+          // This case is handled later when mapping to ParamDecls for
+          // better fixits.
+          param.SpecifierKind = VarDecl::Specifier::Owned;
+          param.SpecifierLoc = consumeToken();
         } else {
           diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
             .fixItRemove(Tok.getLoc());
@@ -351,6 +358,28 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     return status;
   });
 }
+template <typename T>
+static TypeRepr *
+validateParameterWithSpecifier(Parser &parser,
+                               Parser::ParsedParameter &paramInfo,
+                               StringRef specifierName) {
+  auto type = paramInfo.Type;
+  auto loc = paramInfo.SpecifierLoc;
+  if (isa<SpecifierTypeRepr>(type)) {
+    parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
+  } else {
+    llvm::SmallString<128> replacement(specifierName);
+    replacement += " ";
+    parser
+        .diagnose(loc, diag::parameter_specifier_as_attr_disallowed,
+                  specifierName)
+        .fixItRemove(loc)
+        .fixItInsert(type->getStartLoc(), replacement);
+    type = new (parser.Context) T(type, loc);
+  }
+
+  return type;
+}
 
 /// Map parsed parameters to a ParameterList.
 static ParameterList *
@@ -383,28 +412,14 @@ mapParsedParameters(Parser &parser,
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
       if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
-        auto InOutLoc = paramInfo.SpecifierLoc;
-        if (isa<InOutTypeRepr>(type)) {
-          parser.diagnose(InOutLoc, diag::parameter_specifier_repeated)
-            .fixItRemove(InOutLoc);
-        } else {
-          parser.diagnose(InOutLoc, diag::inout_as_attr_disallowed, "'inout'")
-            .fixItRemove(InOutLoc)
-            .fixItInsert(type->getStartLoc(), "inout ");
-          type = new (ctx) InOutTypeRepr(type, InOutLoc);
-        }
+        type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
+                                                             "inout");
       } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
-        auto SpecifierLoc = paramInfo.SpecifierLoc;
-        if (isa<SharedTypeRepr>(type)) {
-          parser.diagnose(SpecifierLoc, diag::parameter_specifier_repeated)
-            .fixItRemove(SpecifierLoc);
-        } else {
-          parser.diagnose(SpecifierLoc, diag::inout_as_attr_disallowed,
-                          "'__shared'")
-            .fixItRemove(SpecifierLoc)
-            .fixItInsert(type->getStartLoc(), "__shared ");
-          type = new (ctx) SharedTypeRepr(type, SpecifierLoc);
-        }
+        type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
+                                                              "__shared");
+      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
+        type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
+                                                             "__owned");
       }
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
@@ -423,14 +438,18 @@ mapParsedParameters(Parser &parser,
       case VarDecl::Specifier::Shared:
         specifier = "'shared'";
         break;
+      case VarDecl::Specifier::Owned:
+        specifier = "'owned'";
+        break;
       case VarDecl::Specifier::Let:
       case VarDecl::Specifier::Var:
         llvm_unreachable("can't have let or var here");
+        break;
       }
       parser.diagnose(paramInfo.SpecifierLoc, diag::specifier_must_have_type,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
-      paramInfo.SpecifierKind = VarDecl::Specifier::Owned;
+      paramInfo.SpecifierKind = VarDecl::Specifier::Default;
     }
     return param;
   };

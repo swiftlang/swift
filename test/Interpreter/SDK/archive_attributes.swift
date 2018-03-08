@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=test -DENCODE -o %t/encode
 // RUN: %target-build-swift %s -module-name=test -o %t/decode
+// RUN: %target-build-swift %s -module-name=test -Xfrontend -disable-llvm-optzns -emit-ir | %FileCheck -check-prefix=CHECK-IR %s
 // RUN: %target-run %t/encode %t/test.arc
 // RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
 // RUN: %target-run %t/decode %t/test.arc | %FileCheck %s
@@ -175,4 +176,14 @@ func main() {
 }
 
 main()
+
+// Check that we eagerly create metadata of generic classes, but not for nested classes.
+
+// CHECK-IR-LABEL: define {{.*}} @_swift_eager_class_initialization
+// CHECK-IR-NEXT:  entry:
+// CHECK-IR-NEXT:    call {{.*}}IntClassCMa
+// CHECK-IR-NEXT:    call void asm
+// CHECK-IR-NEXT:    call {{.*}}DoubleClassCMa
+// CHECK-IR-NEXT:    call void asm
+// CHECK-IR-NEXT:    ret
 

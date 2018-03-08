@@ -33,7 +33,7 @@
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -201,11 +201,11 @@ public:
   Token Tok;
 
   /// \brief leading trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia LeadingTrivia;
 
   /// \brief trailing trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
 
   /// \brief The receiver to collect all consumed tokens.
@@ -344,7 +344,7 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
   /// Current syntax parsing context where call backs should be directed to.
-  syntax::SyntaxParsingContext *SyntaxContext;
+  SyntaxParsingContext *SyntaxContext;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
@@ -409,7 +409,7 @@ public:
     DiagnosticTransaction DT;
     /// This context immediately deconstructed with transparent accumulation
     /// on cancelBacktrack().
-    llvm::Optional<syntax::SyntaxParsingContext> SynContext;
+    llvm::Optional<SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
   public:
@@ -755,6 +755,9 @@ public:
   ParserResult<IfConfigDecl> parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
 
+  /// Parse a #error or #warning diagnostic.
+  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
@@ -1002,7 +1005,7 @@ public:
     SourceLoc SpecifierLoc;
     
     /// The parsed specifier kind, if present.
-    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Owned;
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Default;
 
     /// The location of the first name.
     ///
@@ -1441,7 +1444,8 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,
                    unsigned BufferID,
                    unsigned Offset = 0,
-                   unsigned EndOffset = 0);
+                   unsigned EndOffset = 0,
+                   DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

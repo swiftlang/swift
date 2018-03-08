@@ -1,5 +1,5 @@
 // REQUIRES: OS=macosx
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/very-long-directory-name-that-contains-over-128-characters-which-is-not-enough-to-be-illegal-on-its-own-but-presents
 // RUN: cp %s %t/very-long-directory-name-that-contains-over-128-characters-which-is-not-enough-to-be-illegal-on-its-own-but-presents/a-problem-when-combined-with-other-long-path-elements-and-filenames-to-exceed-256-characters-combined-because-yay-arbitrary-limits-amirite.swift
 // RUN: touch %t/main.swift

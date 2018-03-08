@@ -24,7 +24,9 @@
 namespace swift {
 
 enum class ExclusivityFlags : uintptr_t;
-struct ValueBuffer;
+template <typename Runtime> struct TargetValueBuffer;
+struct InProcess;
+using ValueBuffer = TargetValueBuffer<InProcess>;
 
 /// Begin dynamically tracking an access.
 ///

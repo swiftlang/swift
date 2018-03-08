@@ -27,6 +27,10 @@ extension ARCamera {
             
             /** Tracking is limited due to a lack of features visible to the camera. */
             case insufficientFeatures
+
+            /** Tracking is limited due to a relocalization in progress. */
+            @available(iOS, introduced: 11.3)
+            case relocalizing
         }
         
         /** Tracking is not available. */
@@ -49,10 +53,20 @@ extension ARCamera {
         case .limited:
             let reason: TrackingState.Reason
             
-            switch __trackingStateReason {
-            case .initializing: reason = .initializing
-            case .excessiveMotion: reason = .excessiveMotion
-            default: reason = .insufficientFeatures
+            if #available(iOS 11.3, *) {
+                switch __trackingStateReason {
+                case .initializing: reason = .initializing
+                case .relocalizing: reason = .relocalizing
+                case .excessiveMotion: reason = .excessiveMotion
+                default: reason = .insufficientFeatures
+                }
+            }
+            else {
+                switch __trackingStateReason {
+                case .initializing: reason = .initializing
+                case .excessiveMotion: reason = .excessiveMotion
+                default: reason = .insufficientFeatures
+                }
             }
             
             return .limited(reason)
@@ -102,6 +116,41 @@ extension ARFaceGeometry {
      */
     @nonobjc public var triangleIndices: [Int16] {
         let buffer = UnsafeBufferPointer(start: __triangleIndices, count: Int(triangleCount * 3))
+        return Array(buffer)
+    }
+}
+
+@available(iOS, introduced: 11.3)
+extension ARPlaneGeometry {
+    /**
+     The mesh vertices of the geometry.
+     */
+    @nonobjc public var vertices: [vector_float3] {
+        let buffer = UnsafeBufferPointer(start: __vertices, count: Int(__vertexCount))
+        return Array(buffer)
+    }
+    
+    /**
+     The texture coordinates of the geometry.
+     */
+    @nonobjc public var textureCoordinates: [vector_float2] {
+        let buffer = UnsafeBufferPointer(start: __textureCoordinates, count: Int(__textureCoordinateCount))
+        return Array(buffer)
+    }
+    
+    /**
+     The triangle indices of the geometry.
+     */
+    @nonobjc public var triangleIndices: [Int16] {
+        let buffer = UnsafeBufferPointer(start: __triangleIndices, count: Int(triangleCount * 3))
+        return Array(buffer)
+    }
+    
+    /**
+     The vertices of the geometry's outermost boundary.
+     */
+    @nonobjc public var boundaryVertices: [vector_float3] {
+        let buffer = UnsafeBufferPointer(start: __boundaryVertices, count: Int(__boundaryVertexCount))
         return Array(buffer)
     }
 }

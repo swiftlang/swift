@@ -18,6 +18,12 @@
 //  number of invocations, or per-object counters, which represent the
 //  number of runtime functions calls for a specific object.
 
+// By default, this feature is enabled only when assertions are enabled. To control it
+// separately, set the SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS environment variable when
+// invoking build-script:
+// SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=TRUE ./utils/build-script ...
+#if SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
+
 /// Collect all references inside the object using Mirrors.
 /// - Parameter value: the value to be inspected
 /// - Parameter references: the array which should contain the collected
@@ -31,9 +37,7 @@ internal func _collectAllReferencesInsideObjectImpl(
 ) {
   // Use the structural reflection and ignore any
   // custom reflectable overrides.
-  let mirror = Mirror(
-    legacy: _reflect(value),
-    subjectType: type(of: value))
+  let mirror = Mirror(internalReflecting: value)
 
   let id: ObjectIdentifier?
   let ref: UnsafeRawPointer?
@@ -541,3 +545,5 @@ func _measureRuntimeFunctionCountersDiffs(
       mode: savedMode)
     return (globalCountersBefore.diff(globalCountersAfter), objectsCountersDiff)
 }
+
+#endif

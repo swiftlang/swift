@@ -4,13 +4,13 @@
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
 
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C:%T4weak1CC]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[UNKNOWN:%objc_object]] = type opaque
-// CHECK: [[A:%T4weak1AV]] = type <{ [[WEAK:%swift.weak]] }>
-// CHECK: [[WEAK]] = type
-// CHECK: [[B:%T4weak1BV]] = type <{ { [[WEAK]], i8** } }>
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK-DAG: [[C:%T4weak1CC]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK-DAG: [[UNKNOWN:%objc_object]] = type opaque
+// CHECK-DAG: [[A:%T4weak1AV]] = type <{ [[WEAK:%swift.weak]] }>
+// CHECK-DAG: [[WEAK]] = type
+// CHECK-DAG: [[B:%T4weak1BV]] = type <{ { [[WEAK]], i8** } }>
 
 sil_stage canonical
 
@@ -49,7 +49,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
 // CHECK-NEXT: %4 = inttoptr
 // CHECK-NEXT: call [[WEAK]]* bitcast ([[WEAK]]* ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to [[WEAK]]* ([[WEAK]]*, [[C]]*)*)([[WEAK]]* returned [[X]], [[C]]* %4)
 // CHECK-NEXT: %6 = inttoptr i64 %3 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_rt_swift_release([[REF]]* %6)
+// CHECK-NEXT: call void @swift_release([[REF]]* %6)
 // CHECK-NEXT: ret void
 
 struct B {

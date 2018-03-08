@@ -655,8 +655,8 @@ struct FooClosure {
 func testMaterializedSetter() {
   // CHECK: function_ref @$S17materializeForSet10FooClosureVACycfC
   var f = FooClosure()
-  // CHECK: function_ref @$S17materializeForSet10FooClosureV8computedS3iccSgvg
-  // CHECK: function_ref @$S17materializeForSet10FooClosureV8computedS3iccSgvs
+  // CHECK: function_ref @$S17materializeForSet10FooClosureV8computedS3iXEcSgvg
+  // CHECK: function_ref @$S17materializeForSet10FooClosureV8computedS3iXEcSgvs
   f.computed = f.computed
 }
 

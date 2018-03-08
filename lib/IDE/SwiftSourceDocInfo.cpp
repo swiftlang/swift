@@ -192,8 +192,8 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
         ContainerType = SAE->getBase()->getType();
       }
     } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
-      SourceLoc DotLoc = ME->getDotLoc();
-      if (DotLoc.isValid() && DotLoc.getAdvancedLoc(1) == LocToResolve) {
+      SourceLoc MemberLoc = ME->getNameLoc().getBaseNameLoc();
+      if (MemberLoc.isValid() && MemberLoc == LocToResolve) {
         ContainerType = ME->getBase()->getType();
       }
     }

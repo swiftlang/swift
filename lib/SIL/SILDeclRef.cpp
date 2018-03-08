@@ -104,15 +104,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       ResilienceExpansion expansion,
                        bool isCurried, bool isForeign)
-  : loc(vd), kind(kind), Expansion(unsigned(expansion)),
+  : loc(vd), kind(kind),
     isCurried(isCurried), isForeign(isForeign),
     isDirectReference(0), defaultArgIndex(0)
 {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       ResilienceExpansion expansion,
                        bool isCurried, bool asForeign) 
   : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0)
 {
@@ -153,7 +151,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     llvm_unreachable("impossible SILDeclRef loc");
   }
 
-  Expansion = (unsigned) expansion;
   isForeign = asForeign;
 }
 
@@ -689,7 +686,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   if (!overridden)
     return SILDeclRef();
 
-  return SILDeclRef(overridden, kind, getResilienceExpansion(), isCurried);
+  return SILDeclRef(overridden, kind, isCurried);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {

@@ -9,8 +9,8 @@ func noescape_concrete(_ x: (S) -> S) {
 func noescape_generic<T>(_ x: (T) -> T) {
 }
 
-// CHECK-LABEL: sil hidden @$S22noescape_reabstraction0A9_concreteyyAA1SVADcF
-// CHECK:         function_ref [[REABSTRACTION_THUNK:@\$S22noescape_reabstraction1SVACIgyd_A2CIgir_TR]]
+// CHECK-LABEL: sil hidden @$S22noescape_reabstraction0A9_concreteyyAA1SVADXEF
+// CHECK:         function_ref [[REABSTRACTION_THUNK:@\$S22noescape_reabstraction1SVACIgyd_A2CIegir_TR]]
 
 func concrete(_ x: (S) -> S) {
   noescape_generic(x)
@@ -19,5 +19,5 @@ func concrete(_ x: (S) -> S) {
 func generic<T>(_ x: (T) -> T) {
 }
 
-// CHECK-LABEL: sil hidden @$S22noescape_reabstraction8concreteyyAA1SVADcF
+// CHECK-LABEL: sil hidden @$S22noescape_reabstraction8concreteyyAA1SVADXEF
 // CHECK:         function_ref [[REABSTRACTION_THUNK]]

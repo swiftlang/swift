@@ -72,7 +72,9 @@ protected:
 
 public:
   Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Root(Root), Data(Data) {}
+  : Root(Root), Data(Data) {
+    assert(Data != nullptr);
+  }
 
   virtual ~Syntax() {}
 
@@ -87,7 +89,7 @@ public:
   size_t getNumChildren() const;
 
   /// Get the Nth child of this piece of syntax.
-  Syntax getChild(const size_t N) const;
+  llvm::Optional<Syntax> getChild(const size_t N) const;
 
   /// Returns true if the syntax node is of the given type.
   template <typename T>
@@ -124,6 +126,9 @@ public:
 
   /// Return the parent of this node, if it has one.
   llvm::Optional<Syntax> getParent() const;
+
+  /// Return the root syntax of this node.
+  Syntax getRoot() const;
 
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
@@ -171,6 +176,10 @@ public:
     return Root == Other.Root && Data == Other.Data;
   }
 
+  static bool kindof(SyntaxKind Kind) {
+    return true;
+  }
+
   static bool classof(const Syntax *S) {
     // Trivially true.
     return true;
@@ -181,7 +190,7 @@ public:
 
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
-  AbsolutePosition getAbsolutePosition(SourceFileSyntax Root) const;
+  AbsolutePosition getAbsolutePosition() const;
 
   // TODO: hasSameStructureAs ?
 };

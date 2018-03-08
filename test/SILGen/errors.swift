@@ -286,8 +286,8 @@ func create<T>(_ fn: () throws -> T) throws -> T {
 func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSis5Error_pIgdzo_SisAA_pIgrzo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error Error)) -> (@out Int, @error Error)
-// CHECK: bb0(%0 : @trivial $*Int, %1 : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error Error)):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSis5Error_pIgdzo_SisAA_pIegrzo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@noescape @callee_guaranteed () -> (Int, @error Error)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : @trivial $Int):
 // CHECK:   store [[T0]] to [trivial] %0 : $*Int
@@ -301,14 +301,10 @@ func createInt(_ fn: () -> Int) throws {}
 func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
-// CHECK-LABEL: sil hidden @$S6errors12testForceTryyySiycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> ()
-// CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_guaranteed () -> Int):
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK: [[FUNC:%.*]] = function_ref @$S6errors9createIntyySiycKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> @error Error
-// CHECK: try_apply [[FUNC]]([[ARG_COPY]])
-// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK: destroy_value [[ARG]]
+// CHECK-LABEL: sil hidden @$S6errors12testForceTryyySiyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> ()
+// CHECK: bb0([[ARG:%.*]] : @trivial $@noescape @callee_guaranteed () -> Int):
+// CHECK: [[FUNC:%.*]] = function_ref @$S6errors9createIntyySiyXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @error Error
+// CHECK: try_apply [[FUNC]]([[ARG]])
 // CHECK: return
 // CHECK: builtin "unexpectedError"
 // CHECK: unreachable

@@ -43,11 +43,11 @@ public func test(_ t: (Int, Int)) {
 public func testNoLabel(_: (Int, Int)) {
 }
 
-// CHECK: sil @$S4test0A5FnArgyyySi_SitcF :
+// CHECK: sil @$S4test0A5FnArgyyySi_SitXEF :
 public func testFnArg(_: (Int, Int) -> Void) {
 }
 
-// CHECK: sil @$S4test0A5FnArgyyySi_Sit_tcF :
+// CHECK: sil @$S4test0A5FnArgyyySi_Sit_tXEF :
 public func testFnArg(_: ((Int, Int)) -> Void) {
 }
 

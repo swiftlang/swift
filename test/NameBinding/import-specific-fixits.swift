@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/ambiguous_left.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/ambiguous_right.swift
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/ambiguous.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/DeclsUsedWrongly.swift
 
-// RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
 // RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s
@@ -29,7 +29,15 @@ import class Swift.Int64 // expected-error {{'Int64' was imported as 'class', bu
 
 import class Swift.Bool // expected-error {{'Bool' was imported as 'class', but is a struct}} {{8-13=struct}}
 
-import struct FooBar.x // expected-error {{'x' was imported as 'struct', but is a variable}} {{8-14=var}}
+import struct DeclsUsedWrongly.x // expected-error {{'x' was imported as 'struct', but is a variable}} {{8-14=var}}
+
+import struct DeclsUsedWrongly.Choice // expected-error {{'Choice' was imported as 'struct', but is an enum}} {{8-14=enum}}
+
+import struct DeclsUsedWrongly.Callback // expected-error {{type alias 'Callback' (aka '() -> ()') cannot be imported as 'struct'}} {{8-14=typealias}}
+import var DeclsUsedWrongly.Callback // expected-error {{'Callback' was imported as 'var', but is a type}} {{8-11=typealias}}
+
+import struct DeclsUsedWrongly.Pair // expected-error {{type alias 'Pair' cannot be imported as 'struct'}} {{8-14=typealias}}
+import var DeclsUsedWrongly.Pair // expected-error {{'Pair' was imported as 'var', but is a type}} {{8-11=typealias}}
 
 import struct Swift.print // expected-error {{'print' was imported as 'struct', but is a function}} {{8-14=func}}
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -index-store-path %t/idx %S/Inputs/SwiftModuleA.swift -emit-module -o %t/SwiftModuleA.swiftmodule
 // RUN: %target-swift-frontend -index-store-path %t/idx %S/Inputs/SwiftModuleB.swift -emit-module -o %t/SwiftModuleB.swiftmodule -I %t

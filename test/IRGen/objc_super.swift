@@ -74,7 +74,7 @@ func acceptFn(_ fn: () -> Void) { }
 class PartialApply : Gizmo {
   // CHECK: define hidden swiftcc void @"$S10objc_super12PartialApplyC4frobyyF"([[PARTIAL_APPLY_CLASS]]* swiftself) {{.*}} {
   override func frob() {
-    // CHECK: call swiftcc void @"$S10objc_super8acceptFnyyyycF"(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@"\$[A-Za-z0-9_]+"]] to i8*), %swift.refcounted* %4)
+    // CHECK: call swiftcc void @"$S10objc_super8acceptFnyyyyXEF"(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@"\$[A-Za-z0-9_]+"]] to i8*), %swift.opaque* %7)
     acceptFn(super.frob)
   }
   // CHECK: }

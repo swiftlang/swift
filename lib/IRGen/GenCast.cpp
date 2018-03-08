@@ -422,10 +422,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
-                                                    llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic, {});
-    IGF.Builder.CreateUnreachable();
+    IGF.emitTrap(/*EmitUnreachable=*/true);
     break;
   }
   }
@@ -805,7 +802,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(sourceType.isObject());
   assert(targetType.isObject());
 
-  if (auto sourceOptObjectType = sourceType.getAnyOptionalObjectType()) {
+  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
 
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe

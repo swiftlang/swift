@@ -157,8 +157,10 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
-      NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
-                                             CastSuccessBB, ConvFailBB);
+      auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
+                                      SILBridgedTy, CastSuccessBB, ConvFailBB);
+      NewI = CCBI;
+      splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getArgument(0);
     } else {
@@ -201,14 +203,12 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
   CanType OptionalTy;
-  OptionalTypeKind OTK;
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
     InOutOptionalParam = Tmp;
@@ -253,7 +253,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   if (isConditional) {
     // Copy the temporary into Dest.
     // Load from the optional.
-    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl(OTK);
+    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
     SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;

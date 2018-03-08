@@ -17,10 +17,10 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 using namespace swift;
 using namespace swift::syntax;
 

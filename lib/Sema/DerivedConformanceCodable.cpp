@@ -82,7 +82,7 @@ enum CodableConformanceType {
 /// \param proto The \c ProtocolDecl to check conformance to.
 static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     DeclContext *context,
-                                                    Type target,
+                                                    Type target, bool isIUO,
                                                     ProtocolDecl *proto) {
   // Some generic types need to be introspected to get at their "true" Codable
   // conformance.
@@ -92,21 +92,9 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     target = referenceType->getReferentType();
   }
 
-  if (auto genericType = target->getAs<BoundGenericType>()) {
-    auto *nominalTypeDecl = genericType->getAnyNominal();
-
-    // Implicitly unwrapped optionals need to be unwrapped;
-    // ImplicitlyUnwrappedOptional does not need to conform to Codable directly
-    // -- only its inner type does.
-    if (nominalTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl()) {
-      for (auto paramType : genericType->getGenericArgs()) {
-        if (typeConformsToCodable(tc, context, paramType, proto) != Conforms)
-          return DoesNotConform;
-      }
-
-      return Conforms;
-    }
-  }
+  if (isIUO)
+    return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
+                                 false, proto);
 
   return tc.conformsToProtocol(target, proto, context,
                                ConformanceCheckFlags::Used) ? Conforms
@@ -149,7 +137,9 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   if (!varDecl->hasType())
     return TypeNotValidated;
 
-  return typeConformsToCodable(tc, context, varDecl->getType(), proto);
+  bool isIUO =
+      varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  return typeConformsToCodable(tc, context, varDecl->getType(), isIUO, proto);
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
@@ -494,9 +484,9 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             Expr *base, Type returnType,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
-  auto *keyedByDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                        SourceLoc(), C.Id_keyedBy, SourceLoc(),
-                                        C.Id_keyedBy, returnType, DC);
+  auto *keyedByDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, returnType, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -608,15 +598,15 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // Now need to generate `try container.encode(x, forKey: .x)` for all
   // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
-    // Only ill-formed code would produce multiple results for this lookup.
-    // This would get diagnosed later anyway, so we're free to only look at
-    // the first result here.
-    auto matchingVars = targetDecl->lookupDirect(DeclName(elt->getName()));
+    VarDecl *varDecl;
+    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
+      if ((varDecl = dyn_cast<VarDecl>(decl)))
+        break;
 
     // self.x
     auto *selfRef = createSelfDeclRef(encodeDecl);
     auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                          ConcreteDeclRef(matchingVars[0]),
+                                          ConcreteDeclRef(varDecl),
                                           DeclNameLoc(), /*Implicit=*/true);
 
     // CodingKeys.x
@@ -626,17 +616,15 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = C.Id_encode;
-    auto varType = cast<VarDecl>(matchingVars[0])->getType();
+    auto varType = varDecl->getType();
     if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
       // This is a weak/unowned/unmanaged var. Get the inner type before
       // checking optionality.
       varType = referenceType->getReferentType();
     }
 
-    if (varType->getAnyNominal() == C.getOptionalDecl() ||
-        varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
+    if (varType->getAnyNominal() == C.getOptionalDecl())
       methodName = C.Id_encodeIfPresent;
-    }
 
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
     DeclName name(C, methodName, argNames);
@@ -739,9 +727,9 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   // Params: (self [implicit], Encoder)
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
-  auto *encoderParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), C.Id_to, SourceLoc(),
-                                         C.Id_encoder, encoderType, target);
+  auto *encoderParam = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+                SourceLoc(), C.Id_encoder, encoderType, target);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -878,11 +866,10 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // Now need to generate `x = try container.decode(Type.self, forKey: .x)`
     // for all existing properties. Optional properties get `decodeIfPresent`.
     for (auto *elt : enumElements) {
-      // Only ill-formed code would produce multiple results for this lookup.
-      // This would get diagnosed later anyway, so we're free to only look at
-      // the first result here.
-      auto matchingVars = targetDecl->lookupDirect(DeclName(elt->getName()));
-      auto *varDecl = cast<VarDecl>(matchingVars[0]);
+      VarDecl *varDecl;
+      for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
+        if ((varDecl = dyn_cast<VarDecl>(decl)))
+          break;
 
       // Don't output a decode statement for a var let with a default value.
       if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
@@ -900,8 +887,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         varType = referenceType->getReferentType();
       }
 
-      if (varType->getAnyNominal() == C.getOptionalDecl() ||
-          varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
+      if (varType->getAnyNominal() == C.getOptionalDecl()) {
         methodName = C.Id_decodeIfPresent;
 
         // The type we request out of decodeIfPresent needs to be unwrapped
@@ -1079,11 +1065,9 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target,
                                          /*isStatic=*/false,
                                          /*isInOut=*/inOut);
-  auto *decoderParamDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
-                                             SourceLoc(),
-                                             SourceLoc(), C.Id_from,
-                                             SourceLoc(), C.Id_decoder,
-                                             decoderType, target);
+  auto *decoderParamDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_from, SourceLoc(), C.Id_decoder, decoderType, target);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 

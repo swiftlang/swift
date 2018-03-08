@@ -996,6 +996,7 @@ extension Unsafe${Mutable}RawPointer : CustomReflectable {
 extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "Unsafe${Mutable}RawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   internal var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(

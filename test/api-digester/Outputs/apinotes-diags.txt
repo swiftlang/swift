@@ -1,0 +1,15 @@
+
+/* Removed Decls */
+APINotesTest(APINotesTest.h): Var OldType.oldMember has been removed
+APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc2() has been removed
+APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc3() has been removed
+APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.getPropertyA() has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+APINotesTest(APINotesTest.h): Protocol SwiftTypeWithMethodLeft has been renamed to Protocol SwiftTypeWithMethodRight
+
+/* Type Changes */
+
+/* Decl Attribute changes */

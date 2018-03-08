@@ -57,6 +57,23 @@ CompareFunctionTypes(const AnyFunctionType *f, const AnyFunctionType *g,
                      bool *input_matches = nullptr,
                      bool *output_matches = nullptr);
 
+static Optional<ClangTypeKind>
+GetClangTypeKindFromSwiftKind(DeclKind decl_kind) {
+  Optional<ClangTypeKind> clangTypeKind;
+  switch (decl_kind) {
+  case DeclKind::Class:
+    return ClangTypeKind::ObjCClass;
+  case DeclKind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case DeclKind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case DeclKind::Struct:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 class DeclsLookupSource {
 public:
   typedef SmallVectorImpl<ValueDecl *> ValueDecls;
@@ -71,7 +88,7 @@ private:
       m_decls.push_back(VD);
     }
     ~VisibleDeclsConsumer() override = default;
-    explicit operator bool() { return m_decls.size() > 0; }
+    explicit operator bool() { return !m_decls.empty(); }
 
     decltype(m_decls)::const_iterator begin() { return m_decls.begin(); }
 
@@ -152,23 +169,8 @@ public:
         if (!swift_clang_importer)
           return;
 
-        Optional<ClangTypeKind> clangTypeKind;
-        switch (decl_kind) {
-        case DeclKind::Class:
-          clangTypeKind = ClangTypeKind::ObjCClass;
-          break;
-        case DeclKind::Protocol:
-          clangTypeKind = ClangTypeKind::ObjCProtocol;
-          break;
-        case DeclKind::TypeAlias:
-          clangTypeKind = ClangTypeKind::Typedef;
-          break;
-        case DeclKind::Struct:
-          clangTypeKind = ClangTypeKind::Tag;
-          break;
-        default:
-          break;
-        }
+        Optional<ClangTypeKind> clangTypeKind =
+            GetClangTypeKindFromSwiftKind(decl_kind);
         if (clangTypeKind) {
           swift_clang_importer->lookupTypeDecl(name.getIdentifier().str(),
                                                clangTypeKind.getValue(),
@@ -192,6 +194,37 @@ public:
                       result);
     }
     return;
+  }
+
+  void lookupRelatedEntity(StringRef name, StringRef related_entity_kind,
+                           DeclKind decl_kind, ValueDecls &result) {
+    switch (_type) {
+    case LookupKind::ClangImporter: {
+      ASTContext *ast_ctx = _clang_crawler._ast;
+      if (!ast_ctx)
+        return;
+      ClangImporter *swift_clang_importer =
+          (ClangImporter *)ast_ctx->getClangModuleLoader();
+      if (!swift_clang_importer)
+        return;
+      Optional<ClangTypeKind> clang_kind =
+          GetClangTypeKindFromSwiftKind(decl_kind);
+      if (!clang_kind)
+        return;
+      swift_clang_importer->lookupRelatedEntity(name, clang_kind.getValue(),
+                                                related_entity_kind,
+                                                [&](TypeDecl *found) {
+        result.push_back(found);
+      });
+      return;
+    }
+    case LookupKind::SwiftModule:
+    case LookupKind::Decl:
+    case LookupKind::Extension:
+      return;
+    case LookupKind::Invalid:
+      return;
+    }
   }
 
   void lookupValue(ModuleDecl::AccessPathTy path, DeclBaseName name, NLKind kind,
@@ -500,9 +533,8 @@ static bool FindFirstNamedDeclWithKind(
   } else if (result._module) {
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(
-          name, ast->getIdentifier(priv_decl_id.getValue().c_str()),
-          decls);
+      result._module.lookupMember(name, GetIdentifier(ast, priv_decl_id),
+                                  decls);
     else
       result._module.lookupByMangledName(name, decl_kind, decls);
     if (FilterDeclsForKind(decl_kind, decls, result))
@@ -580,8 +612,8 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
     ModuleDecl::AccessPathTy access_path;
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(name,
-          ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
+      result._module.lookupMember(
+          name, ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
     else
       result._module.lookupValue(access_path, name, NLKind::QualifiedLookup,
                                  decls);
@@ -1176,7 +1208,7 @@ static void VisitNodeFunction(
       auto name = child->getChild(1); // First child is number.
       FindNamedDecls(ast, ast->getIdentifier(name->getText()),
                      decl_scope_result);
-      if (decl_scope_result._decls.size() == 0) {
+      if (decl_scope_result._decls.empty()) {
         llvm::raw_string_ostream OS(result._error);
         OS << "demangled identifier " << name->getText()
            << " could not be found by name lookup";
@@ -1199,7 +1231,7 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::PostfixOperator:
       FindNamedDecls(ast, ast->getIdentifier((*pos)->getText()),
                      decl_scope_result);
-      if (decl_scope_result._decls.size() == 0) {
+      if (decl_scope_result._decls.empty()) {
         result._error = stringWithFormat(
             "demangled identifier %s could not be found by name lookup",
             (*pos)->getText().str().c_str());
@@ -1340,7 +1372,8 @@ static void VisitNodeFunctionType(
     }
   }
   CreateFunctionType(ast, arg_type_result, return_type_result,
-                     /*escaping=*/true, throws, result);
+                     cur_node->getKind() == Demangle::Node::Kind::FunctionType,
+                     throws, result);
 }
 
 static void VisitNodeImplFunctionType(
@@ -1507,7 +1540,7 @@ static void VisitNodeSetterGetter(
 
     if (decl_ctx_result._decls.size() == 1) {
       var_decl = dyn_cast_or_null<VarDecl>(decl_ctx_result._decls[0]);
-    } else if (decl_ctx_result._decls.size() > 0) {
+    } else if (!decl_ctx_result._decls.empty()) {
       // TODO: can we use the type to pick the right one? can we really have
       // multiple variables with the same name?
       result._error = stringWithFormat(
@@ -1626,6 +1659,44 @@ static void VisitNodePrivateDeclName(
   }
 }
 
+static void VisitNodeRelatedEntityDeclName(
+    ASTContext *ast,
+    Demangle::NodePointer parent_node,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
+
+  if (cur_node->getNumChildren() != 1 || !cur_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::RelatedEntityDeclName");
+    return;
+  }
+
+  Demangle::NodePointer id_node(cur_node->getChild(0));
+
+  if (!id_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::RelatedEntityDeclName");
+    return;
+  }
+
+  SmallVector<ValueDecl *, 4> decls;
+  if (result._module) {
+    result._module.lookupRelatedEntity(id_node->getText(), cur_node->getText(),
+                                       decl_kind, decls);
+  }
+
+  if (!FilterDeclsForKind(decl_kind, decls, result)) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to find Node::Kind::RelatedEntityDeclName '%s' for '%s'",
+          cur_node->getText().str().c_str(),
+          id_node->getText().str().c_str());
+    return;
+  }
+}
+
 static void VisitNodeNominal(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1644,6 +1715,9 @@ static void VisitNodeNominal(
       break;
     case Demangle::Node::Kind::PrivateDeclName:
       VisitNodePrivateDeclName(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::RelatedEntityDeclName:
+      VisitNodeRelatedEntityDeclName(ast, cur_node, child, result);
       break;
     default:
       VisitNode(ast, child, result);
@@ -1683,6 +1757,9 @@ static void VisitNodeTypeAlias(
       break;
     case Demangle::Node::Kind::PrivateDeclName:
       VisitNodePrivateDeclName(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::RelatedEntityDeclName:
+      VisitNodeRelatedEntityDeclName(ast, cur_node, child, result);
       break;
     default:
       VisitNode(ast, child, result);
@@ -1824,7 +1901,7 @@ static void VisitNodeProtocolListWithClass(
     }
 
     if (protocol_types_result._error.empty() &&
-        protocol_types_result._types.size() > 0 &&
+        !protocol_types_result._types.empty() &&
         class_type_result._types.size() == 1) {
       SmallVector<Type, 2> members;
       members.push_back(class_type_result._types.front());
@@ -2028,6 +2105,7 @@ static void VisitNode(
   case Demangle::Node::Kind::BoundGenericClass:
   case Demangle::Node::Kind::BoundGenericStructure:
   case Demangle::Node::Kind::BoundGenericEnum:
+  case Demangle::Node::Kind::BoundGenericOtherNominalType:
     VisitNodeBoundGeneric(ast, node, result);
     break;
 
@@ -2038,6 +2116,7 @@ static void VisitNode(
   case Demangle::Node::Kind::Structure:
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::OtherNominalType:
   case Demangle::Node::Kind::Protocol:
     VisitNodeNominal(ast, node, result);
     break;
@@ -2085,6 +2164,7 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::FunctionType:
+  case Demangle::Node::Kind::NoEscapeFunctionType:
   case Demangle::Node::Kind::UncurriedFunctionType: // Out of order on
                                                     // purpose.
     VisitNodeFunctionType(ast, node, result);

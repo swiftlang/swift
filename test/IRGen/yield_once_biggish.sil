@@ -150,10 +150,10 @@ no:
   br cont
 
 cont:
-  // CHECK:         call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R0]])
-  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R1]])
-  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R2]])
-  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R3]])
+  // CHECK:         call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R0]])
+  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R1]])
+  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R2]])
+  // CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T18yield_once_biggish12SomeSubclassC*)*)(%T18yield_once_biggish12SomeSubclassC* [[R3]])
   destroy_value %value : $Biggish<SomeSubclass>
 
   // CHECK-NEXT:    ret void

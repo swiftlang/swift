@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -782,11 +783,46 @@ private:
       if (!global.hasAvailableExternallyLinkage() &&
           !global.hasAppendingLinkage() &&
           !global.hasCommonLinkage()) {
-        global.setLinkage(llvm::GlobalValue::ExternalLinkage);
-        if (GlobalsAlreadyEmitted.count(global.getName()))
-          global.setInitializer(nullptr);
-        else
+        if (GlobalsAlreadyEmitted.count(global.getName())) {
+          // Some targets don't support relative references to undefined
+          // symbols. Keep the local copy of an ODR symbol if it's used in
+          // a relative reference expression.
+          bool usedInRelativeReference = false;
+          if (global.hasLinkOnceODRLinkage()) {
+            
+            for (auto user : global.users()) {
+              // A relative reference will look like sub (ptrtoint @Global, _)
+              auto expr = dyn_cast<llvm::ConstantExpr>(user);
+              if (!expr)
+                continue;
+              
+              if (expr->getOpcode() != llvm::Instruction::PtrToInt)
+                continue;
+              
+              for (auto exprUser : expr->users()) {
+                auto exprExpr = dyn_cast<llvm::ConstantExpr>(exprUser);
+                if (!exprExpr)
+                  continue;
+                
+                if (exprExpr->getOpcode() != llvm::Instruction::Sub)
+                  continue;
+                
+                if (exprExpr->getOperand(0) != expr)
+                  continue;
+                
+                usedInRelativeReference = true;
+                goto done;
+              }
+              
+            }
+          }
+        done:
+          if (!usedInRelativeReference)
+            global.setInitializer(nullptr);
+        } else
           GlobalsAlreadyEmitted.insert(global.getName());
+
+        global.setLinkage(llvm::GlobalValue::ExternalLinkage);
       }
     }
 
@@ -861,14 +897,14 @@ private:
     if (!ShouldRun)
       return true;
 
+    const PrimarySpecificPaths PSPs =
+        CI.getPrimarySpecificPathsForAtMostOnePrimary();
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile,
-                                          std::move(sil),
-                                          "REPLLine",
-                                          getGlobalLLVMContext(),
-                                          RC.CurIRGenElem);
+    auto LineModule = performIRGeneration(
+        IRGenOpts, REPLInputFile, std::move(sil), "REPLLine", PSPs,
+        getGlobalLLVMContext(), RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
@@ -953,8 +989,9 @@ public:
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
+    std::string Triple;
     std::vector<std::string> Features;
-    std::tie(TargetOpt, CPU, Features)
+    std::tie(TargetOpt, CPU, Features, Triple)
       = getIRTargetOptions(IRGenOpts, CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
@@ -965,7 +1002,6 @@ public:
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
-    IRGenOpts.OutputFilenames.clear();
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;

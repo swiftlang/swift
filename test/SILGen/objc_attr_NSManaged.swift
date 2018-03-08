@@ -120,8 +120,8 @@ class FinalEntity: NSObject, EntityIDProto {
 // CHECK-LABEL: sil_vtable SwiftGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoCSQyACGycfc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoCACSgycfc
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfc
 // CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: @$S19objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 

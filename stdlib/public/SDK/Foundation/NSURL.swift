@@ -13,6 +13,7 @@
 @_exported import Foundation // Clang module
 
 extension NSURL : CustomPlaygroundQuickLookable {
+  @available(*, deprecated, message: "NSURL.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     guard let str = absoluteString else { return .text("Unknown URL") }
     return .url(str)

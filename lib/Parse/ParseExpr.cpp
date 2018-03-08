@@ -18,10 +18,10 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -290,7 +290,7 @@ parse_operator:
           CodeCompletion->completeAssignmentRHS(assign);
         }
         consumeToken();
-        if (SequencedExprs.size() > 0 && (SequencedExprs.size() & 1) == 0) {
+        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
           // Make sure we have odd number of sequence exprs.
           SequencedExprs.pop_back();
         }
@@ -338,6 +338,7 @@ parse_operator:
 
     case tok::arrow:
     case tok::kw_throws: {
+      SyntaxParsingContext ArrowContext(SyntaxContext, SyntaxKind::ArrowExpr);
       ParserResult<Expr> arrow = parseExprArrow();
       if (arrow.isNull() || arrow.hasCodeCompletion())
         return arrow;
@@ -1136,6 +1137,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (Tok.is(tok::integer_literal)) {
         DeclName name = Context.getIdentifier(Tok.getText());
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
+        SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
         // Don't allow '.<integer literal>' following a numeric literal
         // expression (unless in #if env, for 1.2.3.4 version numbers)
@@ -1156,6 +1158,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (Tok.is(tok::kw_self)) {
         Result = makeParserResult(
             new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
+        SyntaxContext->createNodeInPlace(SyntaxKind::DotSelfExpr);
         continue;
       }
 
@@ -1222,6 +1225,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
           locArgs.push_back(ty);
+        SyntaxContext->createNodeInPlace(SyntaxKind::SpecializeExpr);
         Result = makeParserResult(UnresolvedSpecializeExpr::create(Context,
                                   Result.get(), LAngleLoc, locArgs, RAngleLoc));
       }
@@ -2236,6 +2240,8 @@ Expr *Parser::parseExprIdentifier() {
   ///     period_following comma semicolon
   ///
   if (canParseAsGenericArgumentList()) {
+    SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
+    SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
@@ -2492,20 +2498,21 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
-      Ownership ownershipKind = Ownership::Strong;
+      auto ownershipKind = ReferenceOwnership::Strong;
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Weak;
+        ownershipKind = ReferenceOwnership::Weak;
       } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Unowned;
+        ownershipKind = ReferenceOwnership::Unowned;
 
         // Skip over "safe" and "unsafe" if present.
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
-            ownershipKind = Ownership::Unowned; // FIXME: No "safe" variant.
+            ownershipKind =
+                ReferenceOwnership::Unowned; // FIXME: No "safe" variant.
           else if (Tok.getText() == "unsafe")
-            ownershipKind = Ownership::Unmanaged;
+            ownershipKind = ReferenceOwnership::Unmanaged;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
           consumeIf(tok::identifier);
@@ -2564,17 +2571,17 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Create the VarDecl and the PatternBindingDecl for the captured
       // expression.  This uses the parent declcontext (not the closure) since
       // the initializer expression is evaluated before the closure is formed.
-      auto specifierKind = (ownershipKind != Ownership::Weak)
-                         ? VarDecl::Specifier::Let
-                         : VarDecl::Specifier::Var;
+      auto specifierKind = (ownershipKind != ReferenceOwnership::Weak)
+                               ? VarDecl::Specifier::Let
+                               : VarDecl::Specifier::Var;
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        specifierKind,
                                        /*isCaptureList*/true,
                                        nameLoc, name, Type(), CurDeclContext);
 
       // Attributes.
-      if (ownershipKind != Ownership::Strong)
-        VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));
+      if (ownershipKind != ReferenceOwnership::Strong)
+        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(ownershipKind));
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
@@ -2621,9 +2628,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
         Identifier name = Tok.is(tok::identifier) ?
             Context.getIdentifier(Tok.getText()) : Identifier();
-        auto var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                           SourceLoc(), Identifier(),
-                                           Tok.getLoc(), name, Type(), nullptr);
+        auto var = new (Context)
+            ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                      Identifier(), Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
 
@@ -2878,6 +2885,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
 ///   expr-anon-closure-argument:
 ///     dollarident
 Expr *Parser::parseExprAnonClosureArg() {
+  SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::IdentifierExpr);
   StringRef Name = Tok.getText();
   SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
@@ -2921,9 +2929,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),SourceLoc(),
-                                        Identifier(), varLoc, ident, Type(),
-                                        closure);
+    auto *var = new (Context)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), varLoc, ident, Type(), closure);
     var->setImplicit();
     decls.push_back(var);
   }
@@ -3181,7 +3189,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
 
     // Try and construct a FixIt for the argument label.
-    if (argLabelLocs.size() > 0 && !argLabels[0].empty()) {
+    if (!argLabelLocs.empty() && !argLabels[0].empty()) {
       auto ArgLoc = argLabelLocs[0];
       auto FirstElementName = argLabels[0];
             
@@ -3294,7 +3302,9 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
-    // FIXME: Handle empty array syntax node.
+    if (SyntaxContext->isEnabled())
+      SyntaxContext->addSyntax(
+          SyntaxFactory::makeBlankArrayElementList(&Context.getSyntaxArena()));
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
@@ -3303,7 +3313,6 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [:] is always an empty dictionary.
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
-    // FIXME: Handle empty dictionary syntax node.
     consumeToken(tok::colon);
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
@@ -3573,27 +3582,38 @@ Parser::parsePlatformVersionConstraintSpec() {
 ///     'type' '(' 'of:' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprTypeOf() {
+  // In libSyntax parsing, we parse 'type(of: <expr>)' as a normal function call
+  // expression. The semantic AST builder should treat this as a
+  // DynamicTypeExpr.
+  SyntaxParsingContext CallCtxt(SyntaxContext, SyntaxKind::FunctionCallExpr);
+
   // Consume 'type'
   SourceLoc keywordLoc = consumeToken();
 
   // Parse the leading '('.
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-  // Parse `of` label.
-  if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
-    // Consume the label.
-    consumeToken();
-    consumeToken(tok::colon);
-  } else {
-    // There cannot be a richer diagnostic here because the user may have
-    // defined a function `type(...)` that conflicts with the magic expr.
-    diagnose(Tok, diag::expr_typeof_expected_label_of);
-  }
+  ParserResult<Expr> subExpr;
+  {
+    SyntaxParsingContext ArgCtxt(SyntaxContext,
+                                 SyntaxKind::FunctionCallArgument);
+    // Parse `of` label.
+    if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
+      // Consume the label.
+      consumeToken();
+      consumeToken(tok::colon);
+    } else {
+      // There cannot be a richer diagnostic here because the user may have
+      // defined a function `type(...)` that conflicts with the magic expr.
+      diagnose(Tok, diag::expr_typeof_expected_label_of);
+    }
 
-  // Parse the subexpression.
-  ParserResult<Expr> subExpr = parseExpr(diag::expr_typeof_expected_expr);
-  if (subExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
+    // Parse the subexpression.
+    subExpr = parseExpr(diag::expr_typeof_expected_expr);
+    if (subExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+  }
+  CallCtxt.collectNodesInPlace(SyntaxKind::FunctionCallArgumentList);
 
   // Parse the closing ')'
   SourceLoc rParenLoc;

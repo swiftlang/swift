@@ -28,8 +28,9 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
-  unsigned ArgNo = 1; // Hardcoded for destructors.
-  B.createDebugValue(PrologueLoc, selfValue, {selfDecl->isLet(), ArgNo});
+  uint16_t ArgNo = 1; // Hardcoded for destructors.
+  B.createDebugValue(PrologueLoc, selfValue,
+                     SILDebugVariable(selfDecl->isLet(), ArgNo));
   return selfValue;
 }
 
@@ -144,7 +145,7 @@ public:
     // as a heap object. Escape analysis can eliminate this copy if it's
     // unneeded during optimization.
     CanType objectType = t;
-    if (auto theObjTy = t.getAnyOptionalObjectType())
+    if (auto theObjTy = t.getOptionalObjectType())
       objectType = theObjTy;
     if (functionArgs
         && isa<FunctionType>(objectType)
@@ -226,7 +227,7 @@ struct ArgumentInitHelper {
   /// An ArrayRef that we use in our SILParameterList queue. Parameters are
   /// sliced off of the front as they're emitted.
   ArrayRef<SILParameterInfo> parameters;
-  unsigned ArgNo = 0;
+  uint16_t ArgNo = 0;
 
   ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f)
     : SGF(SGF), f(f), initB(SGF.B),
@@ -265,7 +266,8 @@ struct ArgumentInitHelper {
       if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
         // FIXME: mark a debug location?
         SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-        SGF.B.createDebugValueAddr(loc, address, {vd->isLet(), ArgNo});
+        SGF.B.createDebugValueAddr(loc, address,
+                                   SILDebugVariable(vd->isLet(), ArgNo));
         return;
       }
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -281,17 +283,18 @@ struct ArgumentInitHelper {
         }
       }
     } else {
-      assert((vd->isLet() || vd->isShared())
-             && "expected parameter to be immutable!");
+      assert(vd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
     if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
+      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
+                                 SILDebugVariable(vd->isLet(), ArgNo));
     else
-      SGF.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
+      SGF.B.createDebugValue(loc, argrv.getValue(),
+                             SILDebugVariable(vd->isLet(), ArgNo));
   }
 
   void emitParam(ParamDecl *PD) {
@@ -330,9 +333,11 @@ struct ArgumentInitHelper {
     SILLocation loc(PD);
     loc.markAsPrologue();
     if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(), {PD->isLet(), ArgNo});
+      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
+                                 SILDebugVariable(PD->isLet(), ArgNo));
     else
-      SGF.B.createDebugValue(loc, argrv.getValue(), {PD->isLet(), ArgNo});
+      SGF.B.createDebugValue(loc, argrv.getValue(),
+                             SILDebugVariable(PD->isLet(), ArgNo));
   }
 };
 } // end anonymous namespace
@@ -367,7 +372,7 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
 static void emitCaptureArguments(SILGenFunction &SGF,
                                  AnyFunctionRef closure,
                                  CapturedValue capture,
-                                 unsigned ArgNo) {
+                                 uint16_t ArgNo) {
 
   auto *VD = capture.getDecl();
   SILLocation Loc(VD);
@@ -410,8 +415,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
-    else 
-      SGF.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
+    else {
+      SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+      SGF.B.createDebugValue(Loc, val, DbgVar);
+    }
 
     // TODO: Closure contexts should always be guaranteed.
     if (NeedToDestroyValueAtExit && !lowering.isTrivial())
@@ -430,7 +437,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    SGF.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
+    SILDebugVariable DbgVar(/*Constant*/ false, ArgNo);
+    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
   case CaptureKind::StorageAddress: {
@@ -439,7 +447,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILType ty = SGF.getLoweredType(type).getAddressType();
     SILValue addr = SGF.F.begin()->createFunctionArgument(ty, VD);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
-    SGF.B.createDebugValueAddr(Loc, addr, {/*Constant*/true, ArgNo});
+    SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
   }
@@ -448,7 +457,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
                                 ArrayRef<ParameterList*> paramPatterns,
                                 Type resultType, bool throws) {
-  unsigned ArgNo = emitProlog(paramPatterns, resultType,
+  uint16_t ArgNo = emitProlog(paramPatterns, resultType,
                               TheClosure.getAsDeclContext(), throws);
 
   // Emit the capture argument variables. These are placed last because they
@@ -500,7 +509,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   (void)arg;
 }
 
-unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
+uint16_t SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
                                     Type resultType, DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
@@ -529,8 +538,8 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
       Loc = ACE->getLoc();
     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
     ManagedValue Undef = emitUndef(Loc, NativeErrorTy);
-    B.createDebugValue(Loc, Undef.getValue(),
-                       {"$error", /*Constant*/ false, ++ArgNo});
+    SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
+    B.createDebugValue(Loc, Undef.getValue(), DbgVar);
   }
 
   return ArgNo;

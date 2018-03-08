@@ -419,7 +419,7 @@ extension Unicode.Scalar {
 
 extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// The position of the first code unit.
   @_inlineable // FIXME(sil-serialize-all)
@@ -455,6 +455,14 @@ public // SPI(SwiftExperimental)
 func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
+}
+
+extension Unicode.Scalar {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var _replacementCharacter: Unicode.Scalar {
+    return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
+  }
 }
 
 extension Unicode.Scalar {

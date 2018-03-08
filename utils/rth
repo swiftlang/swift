@@ -30,14 +30,18 @@ def verbose_print_command(command):
 
 class ResilienceTest(object):
 
-    def __init__(self, target_build_swift, target_run, tmp_dir, test_dir,
-                 test_src, additional_compile_flags_library,
+    def __init__(self, target_build_swift, target_run, target_codesign,
+                 tmp_dir, test_dir, test_src, lib_prefix, lib_suffix,
+                 additional_compile_flags_library,
                  no_backward_deployment):
         self.target_build_swift = shlex.split(target_build_swift)
         self.target_run = shlex.split(target_run)
+        self.target_codesign = shlex.split(target_codesign)
         self.tmp_dir = tmp_dir
         self.test_dir = test_dir
         self.test_src = test_src
+        self.lib_prefix = lib_prefix
+        self.lib_suffix = lib_suffix
         self.additional_compile_flags_library = \
             shlex.split(additional_compile_flags_library)
 
@@ -47,7 +51,7 @@ class ResilienceTest(object):
                                'AFTER': self.after_dir}
 
         self.lib_src_name = os.path.basename(self.test_src)[5:]
-        self.lib_obj_name = self.lib_src_name[:-6] + '.o'
+        self.lib_name = self.lib_src_name[:-6]
         self.lib_src = os.path.join(self.test_dir, 'Inputs', self.lib_src_name)
 
         self.no_backward_deployment = no_backward_deployment
@@ -65,22 +69,36 @@ class ResilienceTest(object):
         os.makedirs(self.after_dir)
         os.makedirs(self.before_dir)
 
+    def is_apple_platform(self):
+        return any('-apple-' in arg for arg in self.target_build_swift)
+
     def compile_library(self):
         for config in self.config_dir_map:
-            for emit_flag in ['-emit-library', '-emit-module']:
-                output_obj = os.path.join(self.config_dir_map[config],
-                                          self.lib_obj_name)
-                compiler_flags = [emit_flag,
-                                  '-swift-version', '4',
-                                  '-Xfrontend', '-enable-resilience',
-                                  '-D', config,
-                                  '-c', self.lib_src,
-                                  '-o', output_obj]
-                command = self.target_build_swift + \
-                    self.additional_compile_flags_library + compiler_flags
-                verbose_print_command(command)
-                returncode = subprocess.call(command)
-                assert returncode == 0, str(command)
+            lib_file = self.lib_prefix + self.lib_name + self.lib_suffix
+            output_dylib = os.path.join(self.config_dir_map[config],
+                                        lib_file)
+            compiler_flags = ['-emit-library', '-emit-module',
+                              '-swift-version', '4',
+                              '-Xfrontend', '-enable-resilience',
+                              '-D', config,
+                              self.lib_src,
+                              '-o', output_dylib]
+            if self.is_apple_platform():
+                compiler_flags += ['-Xlinker',
+                                   '-install_name',
+                                   '-Xlinker',
+                                   os.path.join('@rpath', lib_file)]
+
+            command = self.target_build_swift + \
+                self.additional_compile_flags_library + compiler_flags
+            verbose_print_command(command)
+            returncode = subprocess.call(command)
+            assert returncode == 0, str(command)
+
+            codesign_cmd = self.target_codesign + [output_dylib]
+            verbose_print_command(codesign_cmd)
+            returncode = subprocess.call(codesign_cmd)
+            assert returncode == 0, str(codesign_cmd)
 
     def compile_main(self):
         for config in self.config_dir_map:
@@ -110,13 +128,23 @@ class ResilienceTest(object):
             config2_lower = config2.lower()
             output_obj = os.path.join(self.tmp_dir,
                                       config1_lower + '_' + config2_lower)
+            if self.is_apple_platform():
+                rpath_origin = '@executable_path'
+            else:
+                rpath_origin = '$ORIGIN'
+
             compiler_flags = [
-                os.path.join(self.config_dir_map[config1],
-                             self.lib_obj_name),
+                '-L', self.config_dir_map[config2],
+                '-l' + self.lib_name,
                 os.path.join(self.config_dir_map[config2],
                              'main.o'),
+                '-Xlinker', '-rpath', '-Xlinker',
+                os.path.join(rpath_origin,
+                             os.path.relpath(self.config_dir_map[config1],
+                                             self.tmp_dir)),
                 '-o', output_obj
             ]
+
             command = self.target_build_swift + compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)
@@ -128,7 +156,7 @@ class ResilienceTest(object):
             config2_lower = config2.lower()
             output_obj = os.path.join(self.tmp_dir,
                                       config1_lower + '_' + config2_lower)
-            command = self.target_run + [output_obj]
+            command = self.target_run + [output_obj, self.tmp_dir]
             verbose_print_command(command)
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
@@ -138,9 +166,12 @@ def main():
     parser = argparse.ArgumentParser(description='Resilience test helper')
     parser.add_argument('--target-build-swift', required=True)
     parser.add_argument('--target-run', required=True)
+    parser.add_argument('--target-codesign', default='echo')
     parser.add_argument('--t', required=True)
     parser.add_argument('--S', required=True)
     parser.add_argument('--s', required=True)
+    parser.add_argument('--lib-prefix', required=True)
+    parser.add_argument('--lib-suffix', required=True)
     parser.add_argument('--additional-compile-flags-library', default='')
     parser.add_argument('--no-backward-deployment', default=False,
                         action='store_true')
@@ -148,7 +179,9 @@ def main():
     args = parser.parse_args()
 
     resilience_test = ResilienceTest(args.target_build_swift, args.target_run,
-                                     args.t, args.S, args.s,
+                                     args.target_codesign,
+                                     args.t, args.S, args.s, args.lib_prefix,
+                                     args.lib_suffix,
                                      args.additional_compile_flags_library,
                                      args.no_backward_deployment)
 

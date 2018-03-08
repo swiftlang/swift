@@ -1273,7 +1273,7 @@ static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
     IterableDeclContext *IDC) {
   for (auto m : IDC->getCurrentMembersWithoutLoading()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getFullName().matchesRef(name)) {
+      if (v->getFullName().matchesRef(name.getBaseName())) {
         LookupTable.addMember(m);
       }
     }
@@ -1352,12 +1352,10 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
-  RecursiveSharedTimer::Guard guard;
   ASTContext &ctx = getASTContext();
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-    guard = s->getFrontendRecursiveSharedTimers()
-                .NominalTypeDecl__lookupDirect.getGuard();
   }
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have
@@ -1556,6 +1554,18 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
     return true;
 
   return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
+}
+
+Type AbstractStorageDecl::getStorageInterfaceType() const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    return var->getInterfaceType();
+  }
+  
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    return sub->getElementInterfaceType();
+  }
+  
+  llvm_unreachable("unhandled storage decl kind");
 }
 
 bool DeclContext::lookupQualified(Type type,

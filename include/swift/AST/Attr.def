@@ -111,7 +111,8 @@ SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
 SIMPLE_DECL_ATTR(_exported, Exported, OnImport | UserInaccessible, 8)
 
-/// NOTE: 9 is unused.
+SIMPLE_DECL_ATTR(dynamicMemberLookup, DynamicMemberLookup,
+                 OnClass | OnStruct | OnEnum | OnProtocol, 9)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
                  OnVar, 10)
@@ -213,9 +214,9 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
           NotSerialized | RejectByParser, /* Not serialized */48)
 
 // Also handles unowned and unowned(weak).
-DECL_ATTR(weak, Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
+DECL_ATTR(weak, ReferenceOwnership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
-DECL_ATTR_ALIAS(unowned, Ownership)
+DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 
 DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor |
           UserInaccessible, 50)
@@ -226,8 +227,8 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
-SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
-                 OnClass, 53)
+SIMPLE_DECL_ATTR(_objc_non_lazy_realization, ObjCNonLazyRealization,
+                 OnClass | UserInaccessible, 53)
 
 DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
           OnStruct | OnEnum | OnClass | NotSerialized | RejectByParser,
@@ -301,6 +302,17 @@ SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
 DECL_ATTR(_optimize, Optimize,
           OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |
           UserInaccessible, 73)
+
+DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
+          OnClass | OnStruct | OnEnum | OnProtocol | OnTypeAlias |
+          LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
+          /*Not serialized*/74)
+
+SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
+                 OnEnum | OnStruct | OnClass | OnProtocol |
+                 OnFunc | OnVar | OnSubscript | OnConstructor | OnEnumElement |
+                 UserInaccessible,
+                 75)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

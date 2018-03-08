@@ -1,6 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+import Swift
 import StdlibUnittest
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
@@ -175,6 +178,7 @@ enum EG<T, U> { case a }
 
 class CG3<T, U, V> { }
 
+
 DemangleToMetadataTests.test("simple generic specializations") {
   expectEqual([Int].self, _typeByMangledName("SaySiG")!)
   expectEqual(EG<Int, String>.self, _typeByMangledName("4main2EGOySiSSG")!)
@@ -211,6 +215,122 @@ DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(
     CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
     _typeByMangledName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
+}
+
+DemangleToMetadataTests.test("demangle built-in types") {
+  expectEqual(Builtin.Int8.self,     _typeByMangledName("Bi8_")!)
+  expectEqual(Builtin.Int16.self,    _typeByMangledName("Bi16_")!)
+  expectEqual(Builtin.Int32.self,    _typeByMangledName("Bi32_")!)
+  expectEqual(Builtin.Int64.self,    _typeByMangledName("Bi64_")!)
+  expectEqual(Builtin.Int128.self,   _typeByMangledName("Bi128_")!)
+  expectEqual(Builtin.Int256.self,   _typeByMangledName("Bi256_")!)
+  expectEqual(Builtin.Int512.self,   _typeByMangledName("Bi512_")!)
+
+  expectEqual(Builtin.NativeObject.self, _typeByMangledName("Bo")!)
+  expectEqual(Builtin.BridgeObject.self, _typeByMangledName("Bb")!)
+  expectEqual(Builtin.UnsafeValueBuffer.self, _typeByMangledName("BB")!)
+}
+
+class CG4<T: P1, U: P2> {
+  struct InnerGeneric<V: P3> { }
+}
+
+struct ConformsToP1: P1 { }
+struct ConformsToP2: P2 { }
+struct ConformsToP3: P3 { }
+
+DemangleToMetadataTests.test("protocol conformance requirements") {
+  expectEqual(CG4<ConformsToP1, ConformsToP2>.self,
+    _typeByMangledName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP2VG")!)
+  expectEqual(CG4<ConformsToP1, ConformsToP2>.InnerGeneric<ConformsToP3>.self,
+    _typeByMangledName("4main3CG4C12InnerGenericVyAA12ConformsToP1VAA12ConformsToP2V_AA12ConformsToP3VG")!)
+
+  // Failure cases: failed conformance requirements.
+  expectNil(_typeByMangledName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP1VG"))
+  expectNil(_typeByMangledName("4main3CG4CyAA12ConformsToP2VAA12ConformsToP2VG"))
+  expectNil(_typeByMangledName("4main3CG4C12InnerGenericVyAA12ConformsToP1VAA12ConformsToP2V_AA12ConformsToP2VG"))
+}
+
+struct SG5<T: P4> where T.Assoc1: P1, T.Assoc2: P2 { }
+
+struct ConformsToP4a : P4 {
+  typealias Assoc1 = ConformsToP1
+  typealias Assoc2 = ConformsToP2
+}
+
+struct ConformsToP4b : P4 {
+  typealias Assoc1 = ConformsToP1
+  typealias Assoc2 = ConformsToP1
+}
+
+struct ConformsToP4c : P4 {
+  typealias Assoc1 = ConformsToP2
+  typealias Assoc2 = ConformsToP2
+}
+
+DemangleToMetadataTests.test("associated type conformance requirements") {
+  expectEqual(SG5<ConformsToP4a>.self,
+    _typeByMangledName("4main3SG5VyAA13ConformsToP4aVG")!)
+
+  // Failure cases: failed conformance requirements.
+  expectNil(_typeByMangledName("4main3SG5VyAA13ConformsToP4bVG"))
+  expectNil(_typeByMangledName("4main3SG5VyAA13ConformsToP4cVG"))
+  expectNil(_typeByMangledName("4main3SG5VyAA12ConformsToP1cVG"))
+}
+
+struct SG6<T: P4> where T.Assoc1 == T.Assoc2 { }
+struct SG7<T: P4> where T.Assoc1 == Int { }
+struct SG8<T: P4> where T.Assoc1 == [T.Assoc2] { }
+
+struct ConformsToP4d : P4 {
+  typealias Assoc1 = [ConformsToP2]
+  typealias Assoc2 = ConformsToP2
+}
+
+DemangleToMetadataTests.test("same-type requirements") {
+  // Concrete type.
+  expectEqual(SG7<S>.self,
+    _typeByMangledName("4main3SG7VyAA1SVG")!)
+
+  // Other associated type.
+  expectEqual(SG6<ConformsToP4b>.self,
+    _typeByMangledName("4main3SG6VyAA13ConformsToP4bVG")!)
+  expectEqual(SG6<ConformsToP4c>.self,
+    _typeByMangledName("4main3SG6VyAA13ConformsToP4cVG")!)
+
+  // Structural type.
+  expectEqual(SG8<ConformsToP4d>.self,
+    _typeByMangledName("4main3SG8VyAA13ConformsToP4dVG")!)
+
+  // Failure cases: types don't match.
+  expectNil(_typeByMangledName("4main3SG7VyAA13ConformsToP4aVG"))
+  expectNil(_typeByMangledName("4main3SG6VyAA13ConformsToP4aVG"))
+  expectNil(_typeByMangledName("4main3SG8VyAA13ConformsToP4cVG"))
+}
+
+struct SG9<T: AnyObject> { }
+
+DemangleToMetadataTests.test("AnyObject requirements") {
+  expectEqual(SG9<C>.self,
+    _typeByMangledName("4main3SG9VyAA1CCG")!)
+
+  // Failure cases: failed AnyObject constraint.
+  expectNil(_typeByMangledName("4main3SG9VyAA1SVG"))
+}
+
+struct SG10<T: C> { }
+
+class C2 : C { }
+class C3 { }
+
+DemangleToMetadataTests.test("superclass requirements") {
+  expectEqual(SG10<C>.self,
+    _typeByMangledName("4main4SG10VyAA1CCG")!)
+  expectEqual(SG10<C2>.self,
+    _typeByMangledName("4main4SG10VyAA2C2CG")!)
+
+  // Failure cases: not a subclass.
+  expectNil(_typeByMangledName("4main4SG10VyAA2C3CG"))
 }
 
 runAllTests()

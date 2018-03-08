@@ -219,7 +219,6 @@ function (swift_benchmark_compile_archopts)
     endif()
   endif()
 
-  set(common_swift3_options ${common_options} "-swift-version" "3")
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
@@ -247,7 +246,7 @@ function (swift_benchmark_compile_archopts)
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
       SOURCES ${sources}
-      LIBRARY_FLAGS ${common_swift3_options})
+      LIBRARY_FLAGS ${common_swift4_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
@@ -316,10 +315,11 @@ function (swift_benchmark_compile_archopts)
             ${stdlib_dependencies} ${bench_library_objects}
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
-          ${common_swift3_options}
+          ${common_swift4_options}
           ${extra_options}
           "-parse-as-library"
           ${bench_flags}
+          ${SWIFT_BENCHMARK_EXTRA_FLAGS}
           "-module-name" "${module_name}"
           "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
@@ -334,9 +334,10 @@ function (swift_benchmark_compile_archopts)
               ${stdlib_dependencies} ${bench_library_sibfiles}
               "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
-            ${common_swift3_options}
+            ${common_swift4_options}
             "-parse-as-library"
             ${bench_flags}
+            ${SWIFT_BENCHMARK_EXTRA_FLAGS}
             "-module-name" "${module_name}"
             "-I" "${objdir}"
             "-emit-sib"
@@ -364,7 +365,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
@@ -382,7 +383,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -400,7 +401,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
@@ -418,7 +419,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -435,7 +436,7 @@ function (swift_benchmark_compile_archopts)
         ${bench_library_sibfiles} ${bench_driver_sibfiles}
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
-      ${common_swift3_options}
+      ${common_swift4_options}
       "-force-single-frontend-invocation"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"

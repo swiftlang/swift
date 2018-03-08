@@ -446,6 +446,8 @@ void SILType::dump() const {
 
 namespace {
   
+class SILPrinter;
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -1013,16 +1015,16 @@ public:
     }
   }
 
-  void printDebugVar(SILDebugVariable Var) {
-    if (Var.Name.empty())
+  void printDebugVar(Optional<SILDebugVariable> Var) {
+    if (!Var || Var->Name.empty())
       return;
-    if (Var.Constant)
+    if (Var->Constant)
       *this << ", let";
     else
       *this << ", var";
-    *this << ", name \"" << Var.Name << '"';
-    if (Var.ArgNo)
-      *this << ", argno " << Var.ArgNo;
+    *this << ", name \"" << Var->Name << '"';
+    if (Var->ArgNo)
+      *this << ", argno " << Var->ArgNo;
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
@@ -1432,6 +1434,9 @@ public:
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
+  void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand());
+  }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
@@ -1544,7 +1549,7 @@ public:
     interleave(OI->getBaseElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
-    if (OI->getTailElements().size() > 0) {
+    if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
       interleave(OI->getTailElements(),
                  [&](const SILValue &V) { *this << getIDAndType(V); },
@@ -1760,6 +1765,9 @@ public:
 
   void visitEndLifetimeInst(EndLifetimeInst *ELI) {
     *this << getIDAndType(ELI->getOperand());
+  }
+  void visitValueToBridgeObjectInst(ValueToBridgeObjectInst *VBOI) {
+    *this << getIDAndType(VBOI->getOperand());
   }
   void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
     *this << getIDAndType(CBOI->getOperand());
@@ -2010,95 +2018,11 @@ public:
       *this << "objc \"" << pattern->getObjCString() << "\"; ";
     
     *this << "root $" << KPI->getPattern()->getRootType();
-    
+
     for (auto &component : pattern->getComponents()) {
       *this << "; ";
-      
-      switch (auto kind = component.getKind()) {
-      case KeyPathPatternComponent::Kind::StoredProperty: {
-        auto prop = component.getStoredPropertyDecl();
-        *this << "stored_property #";
-        printValueDecl(prop, PrintState.OS);
-        *this << " : $" << component.getComponentType();
-        break;
-      }
-      case KeyPathPatternComponent::Kind::GettableProperty:
-      case KeyPathPatternComponent::Kind::SettableProperty: {
-        *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
-                    ? "gettable_property $" : "settable_property $")
-              << component.getComponentType() << ", "
-              << " id ";
-        auto id = component.getComputedPropertyId();
-        switch (id.getKind()) {
-        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-          auto declRef = id.getDeclRef();
-          *this << declRef << " : "
-                << declRef.getDecl()->getInterfaceType();
-          break;
-        }
-        case KeyPathPatternComponent::ComputedPropertyId::Function: {
-          id.getFunction()->printName(PrintState.OS);
-          *this << " : " << id.getFunction()->getLoweredType();
-          break;
-        }
-        case KeyPathPatternComponent::ComputedPropertyId::Property: {
-          *this << "##";
-          printValueDecl(id.getProperty(), PrintState.OS);
-          break;
-        }
-        }
-        *this << ", getter ";
-        component.getComputedPropertyGetter()->printName(PrintState.OS);
-        *this << " : "
-              << component.getComputedPropertyGetter()->getLoweredType();
-        if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
-          *this << ", setter ";
-          component.getComputedPropertySetter()->printName(PrintState.OS);
-          *this << " : "
-                << component.getComputedPropertySetter()->getLoweredType();
-        }
-        
-        if (!component.getComputedPropertyIndices().empty()) {
-          *this << ", indices [";
-          interleave(component.getComputedPropertyIndices(),
-            [&](const KeyPathPatternComponent::Index &i) {
-              *this << "%$" << i.Operand << " : $"
-                    << i.FormalType << " : "
-                    << i.LoweredType;
-            }, [&]{
-              *this << ", ";
-            });
-          *this << "], indices_equals ";
-          component.getComputedPropertyIndexEquals()->printName(PrintState.OS);
-          *this << " : "
-                << component.getComputedPropertyIndexEquals()->getLoweredType();
-          *this << ", indices_hash ";
-          component.getComputedPropertyIndexHash()->printName(PrintState.OS);
-          *this << " : "
-                << component.getComputedPropertyIndexHash()->getLoweredType();
-        }
-        break;
-      }
-      case KeyPathPatternComponent::Kind::OptionalWrap:
-      case KeyPathPatternComponent::Kind::OptionalChain:
-      case KeyPathPatternComponent::Kind::OptionalForce: {
-        switch (kind) {
-        case KeyPathPatternComponent::Kind::OptionalWrap:
-          *this << "optional_wrap : $";
-          break;
-        case KeyPathPatternComponent::Kind::OptionalChain:
-          *this << "optional_chain : $";
-          break;
-        case KeyPathPatternComponent::Kind::OptionalForce:
-          *this << "optional_force : $";
-          break;
-        default:
-          llvm_unreachable("out of sync");
-        }
-        *this << component.getComponentType();
-        break;
-      }
-      }
+
+      printKeyPathPatternComponent(component);
     }
     
     *this << ')';
@@ -2117,6 +2041,115 @@ public:
         });
       
       *this << ")";
+    }
+  }
+  
+  void
+  printKeyPathPatternComponent(const KeyPathPatternComponent &component) {
+    auto printComponentIndices =
+      [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
+        *this << '[';
+        interleave(indices,
+          [&](const KeyPathPatternComponent::Index &i) {
+            *this << "%$" << i.Operand << " : $"
+                  << i.FormalType << " : "
+                  << i.LoweredType;
+          }, [&]{
+            *this << ", ";
+          });
+        *this << ']';
+      };
+
+    switch (auto kind = component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto prop = component.getStoredPropertyDecl();
+      *this << "stored_property #";
+      printValueDecl(prop, PrintState.OS);
+      *this << " : $" << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty: {
+      *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
+                  ? "gettable_property $" : "settable_property $")
+            << component.getComponentType() << ", "
+            << " id ";
+      auto id = component.getComputedPropertyId();
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
+        *this << declRef << " : "
+              << declRef.getDecl()->getInterfaceType();
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Function: {
+        id.getFunction()->printName(PrintState.OS);
+        *this << " : " << id.getFunction()->getLoweredType();
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property: {
+        *this << "##";
+        printValueDecl(id.getProperty(), PrintState.OS);
+        break;
+      }
+      }
+      *this << ", getter ";
+      component.getComputedPropertyGetter()->printName(PrintState.OS);
+      *this << " : "
+            << component.getComputedPropertyGetter()->getLoweredType();
+      if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+        *this << ", setter ";
+        component.getComputedPropertySetter()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertySetter()->getLoweredType();
+      }
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices ";
+        printComponentIndices(component.getSubscriptIndices());
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce: {
+      switch (kind) {
+      case KeyPathPatternComponent::Kind::OptionalWrap:
+        *this << "optional_wrap : $";
+        break;
+      case KeyPathPatternComponent::Kind::OptionalChain:
+        *this << "optional_chain : $";
+        break;
+      case KeyPathPatternComponent::Kind::OptionalForce:
+        *this << "optional_force : $";
+        break;
+      default:
+        llvm_unreachable("out of sync");
+      }
+      *this << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::External: {
+      *this << "external #";
+      printValueDecl(component.getExternalDecl(), PrintState.OS);
+      if (!component.getExternalSubstitutions().empty()) {
+        printSubstitutions(component.getExternalSubstitutions());
+      }
+      
+      if (!component.getSubscriptIndices().empty()) {
+        printComponentIndices(component.getSubscriptIndices());
+      }
+      
+      *this << " : $" << component.getComponentType();
+    }
     }
   }
 };
@@ -2254,7 +2287,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   if (isGlobalInit())
     OS << "[global_init] ";
-  
+  if (isWeakLinked())
+    OS << "[_weakLinked] ";
+
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;
@@ -2272,8 +2307,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsKind() == EffectsKind::ReadWrite)
+  else if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
+  else if (getEffectsKind() == EffectsKind::ReleaseNone)
+    OS << "[releasenone] ";
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
@@ -2288,6 +2325,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     printValueDecl(getClangNodeOwner(), OS);
     OS << "] ";
   }
+
+  // Handle functions that are deserialized from canonical SIL. Normally, we
+  // should emit SIL with the correct SIL stage, so preserving this attribute
+  // won't be necessary. But consider serializing raw SIL (either textual SIL or
+  // SIB) after importing canonical SIL from another module. If the imported
+  // functions are reserialized (e.g. shared linkage), then we must preserve
+  // this attribute.
+  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+    OS << "[canonical] ";
 
   printName(OS);
   OS << " : $";
@@ -2545,6 +2591,33 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
+void SILProperty::print(SILPrintContext &Ctx) const {
+  PrintOptions Options = PrintOptions::printSIL();
+  
+  auto &OS = Ctx.OS();
+  OS << "sil_property ";
+  if (isSerialized())
+    OS << "[serialized] ";
+  
+  OS << '#';
+  printValueDecl(getDecl(), OS);
+  if (auto sig = getDecl()->getInnermostDeclContext()
+                          ->getGenericSignatureOfContext()) {
+    sig->getCanonicalSignature()->print(OS, Options);
+    OS << ' ';
+  }
+  OS << '(';
+  SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
+  OS << ")\n";
+}
+
+static void printSILProperties(SILPrintContext &Ctx,
+                               const SILModule::PropertyListType &Properties) {
+  for (const SILProperty &P : Properties) {
+    P.print(Ctx);
+  }
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
@@ -2563,11 +2636,11 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+     << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
-  // Print the declarations and types from the origin module, unless we're not
-  // in whole-module mode.
-  if (M && AssociatedDeclContext == M && PrintASTDecls) {
+  // Print the declarations and types from the associated context (origin module or
+  // current file).
+  if (M && PrintASTDecls) {
     PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
@@ -2577,10 +2650,13 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
     Options.PrintDefaultParameterPlaceholder = false;
+    bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
+      if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
+          continue;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D)) &&
           !D->isImplicit()) {
@@ -2598,6 +2674,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMapList());
+  printSILProperties(PrintCtx, getPropertyList());
   
   OS << "\n\n";
 }

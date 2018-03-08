@@ -32,7 +32,7 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
       // Enum tags use negative values for payload cases, so adjust code to be
       // in the range [0, num-cases).
       result = T->vw_getEnumTag(error) +
-        T->getNominalTypeDescriptor()->Enum.getNumPayloadCases();
+        cast<EnumMetadata>(T)->getDescription()->getNumPayloadCases();
       break;
 
     case MetadataKind::Class:
@@ -54,6 +54,6 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
   }
 
   // Destroy the value.
-  T->vw_destroy(error);
+  SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
   return result;
 }

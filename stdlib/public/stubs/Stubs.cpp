@@ -467,6 +467,8 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   *outResult = ParsedValue;
 
   int pos = ValueStream.tellg();
+  if (ValueStream.eof())
+    pos = strlen(nptr);
   if (pos <= 0)
     return nullptr;
 

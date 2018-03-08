@@ -16,12 +16,34 @@
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <mach-o/getsect.h>
+#endif
+
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
 using NativeReflectionContext
-  = swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+
+struct SwiftReflectionContext {
+  NativeReflectionContext *nativeContext;
+  std::vector<std::function<void()>> freeFuncs;
+  std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
+  
+  SwiftReflectionContext(MemoryReaderImpl impl) {
+    auto Reader = std::make_shared<CMemoryReader>(impl);
+    nativeContext = new NativeReflectionContext(Reader);
+  }
+  
+  ~SwiftReflectionContext() {
+    delete nativeContext;
+    for (auto f : freeFuncs)
+      f();
+  }
+};
+
 
 uint16_t
 swift_reflection_getSupportedMetadataVersion() {
@@ -30,63 +52,119 @@ swift_reflection_getSupportedMetadataVersion() {
 
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
-                                         PointerSizeFunction getPointerSize,
-                                         SizeSizeFunction getSizeSize,
-                                         ReadBytesFunction readBytes,
-                                         GetStringLengthFunction getStringLength,
-                                         GetSymbolAddressFunction getSymbolAddress) {
+                                         uint8_t PointerSize,
+                                         FreeBytesFunction Free,
+                                         ReadBytesFunction ReadBytes,
+                                         GetStringLengthFunction GetStringLength,
+                                         GetSymbolAddressFunction GetSymbolAddress) {
+  assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
+  assert(PointerSize == sizeof(uintptr_t) &&
+         "We currently only support the pointer size this file was compiled with.");
+  
+  auto GetSize = PointerSize == 4
+    ? [](void *){ return (uint8_t)4; }
+    : [](void *){ return (uint8_t)8; };
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    getPointerSize,
-    getSizeSize,
-    readBytes,
-    getStringLength,
-    getSymbolAddress
+    GetSize,
+    GetSize,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
   };
 
-  auto Reader = std::make_shared<CMemoryReader>(ReaderImpl);
-  auto Context
-    = new swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>(Reader);
-  return reinterpret_cast<SwiftReflectionContextRef>(Context);
+  return new SwiftReflectionContext(ReaderImpl);
 }
 
 void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef ContextRef) {
-  auto Context = reinterpret_cast<swift::reflection::ReflectionContext<InProcess> *>(ContextRef);
-  delete Context;
+  delete ContextRef;
 }
 
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
+  
   Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
 }
+
+#if defined(__APPLE__) && defined(__MACH__)
+#ifndef __LP64__
+typedef const struct mach_header MachHeader;
+#else
+typedef const struct mach_header_64 MachHeader;
+#endif
+
+template <typename Section>
+static bool findSection(MachHeader *Header, const char *Name,
+                        Section &Sect) {
+  unsigned long Size;
+  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
+  if (!Address)
+    return false;
+  
+  Sect.section.Begin = Address;
+  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
+  Sect.section.End = reinterpret_cast<void *>(End);
+  Sect.offset = 0;
+  
+  return true;
+}
+
+int
+swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
+                          swift_addr_t imageStart) {
+  auto Context = ContextRef->nativeContext;
+  return Context->addImage(RemoteAddress(imageStart));
+}
+#endif
 
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
                              uintptr_t *outIsaMask) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto isaMask = Context->readIsaMask();
-  *outIsaMask = isaMask.second;
-  return isaMask.first;
+  if (isaMask) {
+    *outIsaMask = *isaMask;
+    return true;
+  }
+  *outIsaMask = 0;
+  return false;
 }
 
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = Context->readTypeFromMetadata(Metadata);
   return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+int
+swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
+  auto Context = ContextRef->nativeContext;
+  return Context->ownsObject(RemoteAddress(Object));
+}
+
+uintptr_t
+swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
+                                   uintptr_t Object) {
+  auto Context = ContextRef->nativeContext;
+  auto MetadataAddress = Context->readMetadataFromInstance(Object);
+  if (!MetadataAddress)
+    return 0;
+  return *MetadataAddress;
 }
 
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress.first)
+  if (!MetadataAddress)
     return 0;
-  auto TR = Context->readTypeFromMetadata(MetadataAddress.second);
+  auto TR = Context->readTypeFromMetadata(*MetadataAddress);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -94,7 +172,7 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
@@ -219,7 +297,7 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   return convertTypeInfo(TI);
@@ -229,7 +307,7 @@ swift_childinfo_t
 swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef,
                                 unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto *TI = Context->getTypeInfo(TR);
   return convertChild(TI, Index);
@@ -238,7 +316,7 @@ swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertTypeInfo(TI);
 }
@@ -247,7 +325,7 @@ swift_childinfo_t
 swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertChild(TI, Index);
 }
@@ -255,7 +333,7 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getInstanceTypeInfo(Object);
   return convertTypeInfo(TI);
 }
@@ -264,7 +342,7 @@ swift_childinfo_t
 swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getInstanceTypeInfo(Object);
   return convertChild(TI, Index);
 }
@@ -274,7 +352,7 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
   const TypeRef *InstanceTR = nullptr;
@@ -303,7 +381,7 @@ void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                                          swift_typeref_t OpaqueTypeRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
@@ -315,7 +393,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
 
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TI = Context->getMetadataTypeInfo(Metadata);
   if (TI == nullptr) {
     std::cout << "<null type info>\n";
@@ -326,7 +404,7 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
     std::cout << "<null type info>\n";

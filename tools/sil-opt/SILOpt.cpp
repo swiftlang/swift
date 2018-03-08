@@ -84,6 +84,10 @@ static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
+static llvm::cl::opt<bool>
+VerifyExclusivity("enable-verify-exclusivity",
+                  llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
+
 namespace {
 enum EnforceExclusivityMode {
   Unchecked, // static only
@@ -260,7 +264,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
@@ -324,6 +329,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableGuaranteedNormalArguments =
     EnableGuaranteedNormalArguments;
 
+  SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
     case EnforceExclusivityMode::Unchecked:
@@ -422,7 +428,10 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      auto T = irgen::createIRGenModule(SILMod, getGlobalLLVMContext());
+      auto T = irgen::createIRGenModule(
+          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
+          getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }

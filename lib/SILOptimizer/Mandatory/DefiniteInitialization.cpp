@@ -1350,7 +1350,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   // Only allow enums forming an optional.
-  if (!EI->getType().getAnyOptionalObjectType())
+  if (!EI->getType().getOptionalObjectType())
     return false;
 
   if (!EI->hasOneUse()) return false;
@@ -1636,7 +1636,14 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                            bool SuperInitDone,
                                            bool FailedSelfUse) {
   SILInstruction *Inst = Use.Inst;
-  
+
+  // Stores back to the 'self' box are OK.
+  if (auto store = dyn_cast<StoreInst>(Inst)) {
+    if (store->getDest() == TheMemory.MemoryInst
+        && TheMemory.isClassInitSelf())
+      return;
+  }
+
   if (FailedSelfUse) {
     emitSelfConsumedDiagnostic(Inst);
     return;
@@ -2436,6 +2443,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     auto &Availability = CDElt.Availability;
 
     B.setInsertionPoint(Release);
+    B.setCurrentDebugScope(Release->getDebugScope());
 
     // Value types and root classes don't require any fancy handling.
     // Just conditionally destroy each memory element, and for classes,
@@ -2507,10 +2515,12 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
         // If true, self.init or super.init was called and self was consumed.
         B.setInsertionPoint(ConsumedBlock->begin());
+        B.setCurrentDebugScope(ConsumedBlock->begin()->getDebugScope());
         processUninitializedRelease(Release, true, B.getInsertionPoint());
 
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
@@ -2541,11 +2551,13 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
         // If true, self was consumed or is fully initialized.
         B.setInsertionPoint(LiveBlock->begin());
+        B.setCurrentDebugScope(LiveBlock->begin()->getDebugScope());
         emitReleaseOfSelfWhenNotConsumed(Loc, Release);
         isDeadRelease = false;
 
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
@@ -2951,6 +2963,10 @@ class DefiniteInitialization : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

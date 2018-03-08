@@ -214,6 +214,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::EnumCase:
     case DeclKind::TopLevelCode:
     case DeclKind::IfConfig:
+    case DeclKind::PoundDiagnostic:
     case DeclKind::MissingMember:
     case DeclKind::Module:
       break;

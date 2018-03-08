@@ -26,9 +26,9 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -45,6 +45,7 @@ namespace swift {
 template <typename DF>
 void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
               unsigned BufferID, unsigned Offset, unsigned EndOffset,
+              DiagnosticEngine * Diags,
               CommentRetentionMode RetainComments,
               TriviaRetentionMode TriviaRetention,
               bool TokenizeInterpolatedString, ArrayRef<Token> SplitTokens,
@@ -56,7 +57,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
-  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SM, BufferID, Diags, /*InSILMode=*/false,
           RetainComments, TriviaRetention, Offset, EndOffset);
 
   auto TokComp = [&](const Token &A, const Token &B) {
@@ -260,6 +261,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       std::vector<Token> NewTokens = swift::tokenize(LangOpts, SM, BufID,
                                                      Offset, EndOffset,
+                                                     /*Diags=*/nullptr,
                                                      /*KeepComments=*/true);
       Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
 
@@ -278,12 +280,14 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                                    const SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
+                                   DiagnosticEngine *Diags,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString,
                                    ArrayRef<Token> SplitTokens) {
   std::vector<Token> Tokens;
 
   tokenize(LangOpts, SM, BufferID, Offset, EndOffset,
+           Diags,
            KeepComments ? CommentRetentionMode::ReturnAsTokens
                         : CommentRetentionMode::AttachToNextToken,
            TriviaRetentionMode::WithoutTrivia, TokenizeInterpolatedString,
@@ -299,21 +303,23 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
                           unsigned BufferID, unsigned Offset,
-                          unsigned EndOffset) {
+                          unsigned EndOffset,
+                          DiagnosticEngine *Diags) {
   std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
       Tokens;
   syntax::AbsolutePosition RunningPos;
 
   tokenize(
       LangOpts, SM, BufferID, Offset, EndOffset,
+      Diags,
       CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
       /*TokenizeInterpolatedString=*/false,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
-        auto ThisToken = RawSyntax::make(
-            Tok.getKind(), Tok.getText(), SourcePresence::Present,
-            LeadingTrivia.Pieces, TrailingTrivia.Pieces);
+        auto ThisToken =
+            RawSyntax::make(Tok.getKind(), Tok.getText(), LeadingTrivia.Pieces,
+                            TrailingTrivia.Pieces, SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
         Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
@@ -336,7 +342,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
-              SF.shouldKeepSyntaxInfo()
+              SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
           SF, SIL, PersistentState) {}
@@ -465,10 +471,10 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    TokReceiver(SF.shouldKeepSyntaxInfo() ?
+    TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags, SourceMgr,
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID())) {
   State = PersistentState;
   if (!State) {
@@ -982,7 +988,8 @@ struct ParserUnit::Implementation {
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
-            Opts.KeepSyntaxInfoInSourceFile)) {
+            Opts.CollectParsedToken,
+            Opts.BuildSyntaxTree)) {
   }
 };
 

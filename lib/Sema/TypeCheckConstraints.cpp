@@ -2276,14 +2276,10 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   // If we entered an initializer context, contextualize any
   // auto-closures we might have created.
-  if (initContext) {
+  if (initContext && !hadError) {
     // Check safety of error-handling in the declaration, too.
-    if (!hadError) {
-      checkInitializerErrorHandling(initContext, init);
-    }
-
-    if (!hadError)
-      (void)contextualizeInitializer(initContext, init);
+    checkInitializerErrorHandling(initContext, init);
+    (void)contextualizeInitializer(initContext, init);
   }
 
   if (hadError) {
@@ -2357,7 +2353,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Look through one level of optional; this improves recovery but doesn't
       // change the result.
-      if (auto sequenceObjectType = sequenceType->getAnyOptionalObjectType())
+      if (auto sequenceObjectType = sequenceType->getOptionalObjectType())
         sequenceType = sequenceObjectType;
 
       // If the sequence type is an existential, we should not attempt to
@@ -2821,9 +2817,7 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
-  if (archetype->requiresClass() &&
-      !type->mayHaveSuperclass() &&
-      !type->isObjCExistentialType())
+  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
@@ -2857,7 +2851,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
     auto sub = coerceToRValue(FVE->getSubExpr(), getType, setType);
     FVE->setSubExpr(sub);
-    setType(FVE, getType(sub)->getAnyOptionalObjectType());
+    setType(FVE, getType(sub)->getOptionalObjectType());
     return FVE;
   }
 
@@ -3043,6 +3037,12 @@ void Solution::dump(raw_ostream &out) const {
           << choice.getBaseType()->getString() << "\n";
       break;
 
+    case OverloadChoiceKind::DynamicMemberLookup:
+      out << "dynamic member lookup root "
+          << choice.getBaseType()->getString()
+          << " name='" << choice.getName() << "'\n";
+      break;
+  
     case OverloadChoiceKind::TupleIndex:
       out << "tuple " << choice.getBaseType()->getString() << " index "
         << choice.getTupleIndex() << "\n";
@@ -3118,6 +3118,21 @@ void Solution::dump(raw_ostream &out) const {
 
 void ConstraintSystem::dump() {
   print(llvm::errs());
+}
+
+void ConstraintSystem::dump(Expr *E) {
+  auto getTypeOfExpr = [&](const Expr *E) -> Type {
+    if (hasType(E))
+      return getType(E);
+    return Type();
+  };
+  auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+    if (hasType(TL))
+      return getType(TL);
+    return Type();
+  };
+
+  E->dump(getTypeOfExpr, getTypeOfTypeLoc);
 }
 
 void ConstraintSystem::print(raw_ostream &out) {
@@ -3215,6 +3230,12 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
             << choice.getBaseType()->getString() << "\n";
+        break;
+
+      case OverloadChoiceKind::DynamicMemberLookup:
+        out << "dynamic member lookup:"
+            << choice.getBaseType()->getString() << "  name="
+            << choice.getName() << "\n";
         break;
 
       case OverloadChoiceKind::TupleIndex:
@@ -3353,11 +3374,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // Strip optional wrappers off of the destination type in sync with
   // stripping them off the origin type.
-  while (auto toValueType = toType->getAnyOptionalObjectType()) {
+  while (auto toValueType = toType->getOptionalObjectType()) {
     // Complain if we're trying to increase optionality, e.g.
     // casting an NSObject? to an NSString??.  That's not a subtype
     // relationship.
-    auto fromValueType = fromType->getAnyOptionalObjectType();
+    auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
       if (!suppressDiagnostics) {
         diagnose(diagLoc, diag::downcast_to_more_optional,
@@ -3375,7 +3396,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   // On the other hand, casts can decrease optionality monadically.
   unsigned extraFromOptionals = 0;
-  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
+  while (auto fromValueType = fromType->getOptionalObjectType()) {
     fromType = fromValueType;
     ++extraFromOptionals;
   }

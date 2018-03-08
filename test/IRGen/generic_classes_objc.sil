@@ -32,7 +32,7 @@ bb0(%0 : $GenericInheritsObjC<T>):
   unreachable
 }
 
-sil @$S20generic_classes_objc19GenericInheritsObjCC7bellsOnSQyACyxGGSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @$S20generic_classes_objc19GenericInheritsObjCC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
   unreachable
 }
@@ -60,7 +60,15 @@ bb0(%0 : $GenericInheritsObjC2<T>):
   unreachable
 }
 
-sil @$S20generic_classes_objc20GenericInheritsObjC2C7bellsOnSQyACyxGGSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @$S20generic_classes_objc20GenericInheritsObjC2C7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
   unreachable
 }
+
+@objc protocol P1 { }
+protocol P2 { }
+
+// CHECK: @"$S20generic_classes_objc16Generic3WithReqsCMn" = hidden constant
+// CHECK-SAME: i32 3, i32 3, i32 3, i32 2
+class Generic3WithReqs<T: P1, U: P2, V: P2> { }
+sil_vtable Generic3WithReqs { }

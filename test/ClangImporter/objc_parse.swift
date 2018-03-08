@@ -128,9 +128,10 @@ func properties(_ b: B) {
 
   // Dynamic properties.
   var obj : AnyObject = b
-  var optStr = obj.nsstringProperty
+  var optStr = obj.nsstringProperty // optStr has type String??
   if optStr != nil {
-    var s : String = optStr!
+    var s : String = optStr! // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
+    var t : String = optStr!!
   }
 
   // Properties that are Swift keywords
@@ -214,7 +215,7 @@ func testProtocolMethods(_ b: B, p2m: P2.Type) {
 
 func testId(_ x: AnyObject) {
   x.perform!("foo:", with: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
-  // expected-warning @-1 {{result of call is unused, but produces 'Unmanaged<AnyObject>!'}}
+  // expected-warning @-1 {{result of call is unused, but produces 'Unmanaged<AnyObject>?'}}
 
   _ = x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   _ = x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
@@ -246,18 +247,27 @@ func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var _ : Any = bc[key]
+  var _ : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
-  var value : Any = bc[key] // no-warning, inherited from parent
+  var value : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
-  var value : Any = roc[key] // no-warning, inherited from parent
+  var value : Any = roc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -397,10 +407,22 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
-  value = obj.protoProp()
-  value = obj.protoPropRO()
-  value = type(of: obj).protoClassProp()
-  value = type(of: obj).protoClassPropRO()
+  value = obj.protoProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = obj.protoPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = type(of: obj).protoClassProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = type(of: obj).protoClassPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   _ = value
 }
 

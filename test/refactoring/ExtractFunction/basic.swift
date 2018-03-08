@@ -5,7 +5,7 @@ func foo() -> Int{
   return aaa
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=2:1 -end-pos=5:13 >> %t.result/L2-5.swift
 // RUN: diff -u %S/Outputs/basic/L2-5.swift.expected %t.result/L2-5.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=3:1 -end-pos=5:13 >> %t.result/L3-5.swift

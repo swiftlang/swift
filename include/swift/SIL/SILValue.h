@@ -146,6 +146,23 @@ struct ValueOwnershipKind {
   /// ownership kind otherwise.
   ValueOwnershipKind getProjectedOwnershipKind(SILModule &M,
                                                SILType Proj) const;
+
+  /// Returns true if \p Other can be merged successfully with this, implying
+  /// that the two ownership kinds are "compatibile".
+  ///
+  /// The reason why we do not compare directy is to allow for
+  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  bool isCompatibleWith(ValueOwnershipKind other) const {
+    return merge(other).hasValue();
+  }
+
+  /// Returns true if \p Other is compatible with ValueOwnershipKind::Trivial or
+  /// this. See isCompatibleWith for more information on what "compatibility"
+  /// means.
+  bool isTrivialOrCompatibleWith(ValueOwnershipKind other) const {
+    return isCompatibleWith(ValueOwnershipKind::Trivial) ||
+           isCompatibleWith(other);
+  }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);

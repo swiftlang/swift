@@ -123,10 +123,6 @@ SILWitnessTable::~SILWitnessTable() {
   }
 }
 
-IsSerialized_t SILWitnessTable::isSerialized() const {
-  return Serialized ? IsSerialized : IsNotSerialized;
-}
-
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances,

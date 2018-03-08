@@ -188,6 +188,25 @@
                 "ninja": "release"
             }
         },
+        "swift-4.2-branch" : {
+            "aliases": ["swift-4.2-branch"],
+            "repos": {
+                "llvm": "swift-4.1-branch",
+                "clang": "swift-4.1-branch",
+                "swift": "swift-4.2-branch",
+                "lldb": "swift-4.2-branch",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-4.1-branch",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
+            }
+        },
         "swift-5.0-branch" : {
             "aliases": ["swift-5.0-branch"],
             "repos": {

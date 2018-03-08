@@ -15,34 +15,47 @@ import Foundation
 /// A Syntax node represents a tree of nodes with tokens at the leaves.
 /// Each node has accessors for its known children, and allows efficient
 /// iteration over the children through its `children` property.
-public class Syntax: CustomStringConvertible {
-  /// The type of sequence containing the indices of present children.
-  internal typealias PresentChildIndicesSequence =
-    LazyFilterSequence<CountableRange<Int>>
+public protocol Syntax: 
+  CustomStringConvertible, TextOutputStreamable {}
 
+internal protocol _SyntaxBase: Syntax {
+  /// The type of sequence containing the indices of present children.
+  typealias PresentChildIndicesSequence =
+    LazyFilterSequence<Range<Int>>
+    
   /// The root of the tree this node is currently in.
-  internal let _root: SyntaxData
+  var _root: SyntaxData { get } // Must be of type SyntaxData
 
   /// The data backing this node.
   /// - note: This is unowned, because the reference to the root data keeps it
   ///         alive. This means there is an implicit relationship -- the data
   ///         property must be a descendent of the root. This relationship must
   ///         be preserved in all circumstances where Syntax nodes are created.
-  internal unowned var data: SyntaxData
+  var _data: SyntaxData { get }
 
 #if DEBUG
-  func validate() {
-    // This is for subclasses to override to perform structural validation.
+  func validate()
+#endif
+}
+extension _SyntaxBase {
+  public func validate() {
+    // This is for implementers to override to perform structural validation.
   }
-#endif
+}
 
-  /// Creates a Syntax node from the provided root and data.
-  internal init(root: SyntaxData, data: SyntaxData) {
-    self._root = root
-    self.data = data
-#if DEBUG
-    validate()
-#endif
+extension Syntax {
+  var data: SyntaxData {
+    guard let base = self as? _SyntaxBase else {
+      fatalError("only first-class syntax nodes can conform to Syntax")
+    }
+    return base._data
+  }
+
+  var _root: SyntaxData {
+    guard let base = self as? _SyntaxBase else {
+      fatalError("only first-class syntax nodes can conform to Syntax")
+    }
+    return base._root
   }
 
   /// Access the raw syntax assuming the node is a Syntax.
@@ -53,6 +66,12 @@ public class Syntax: CustomStringConvertible {
   /// An iterator over children of this node.
   public var children: SyntaxChildren {
     return SyntaxChildren(node: self)
+  }
+
+  /// The number of children, `present` or `missing`, in this node.
+  /// This value can be used safely with `child(at:)`.
+  public var numberOfChildren: Int {
+    return data.childCaches.count
   }
 
   /// Whether or not this node it marked as `present`.
@@ -93,7 +112,7 @@ public class Syntax: CustomStringConvertible {
   /// The parent of this syntax node, or `nil` if this node is the root.
   public var parent: Syntax? {
     guard let parentData = data.parent else { return nil }
-    return Syntax.make(root: _root, data: parentData)
+    return makeSyntax(root: _root, data: parentData)
   }
 
   /// The index of this node in the parent's children.
@@ -103,15 +122,17 @@ public class Syntax: CustomStringConvertible {
 
   /// The root of the tree in which this node resides.
   public var root: Syntax {
-    return Syntax.make(root: _root,  data: _root)
+    return makeSyntax(root: _root,  data: _root)
   }
 
   /// The sequence of indices that correspond to child nodes that are not
   /// missing.
   ///
   /// This property is an implementation detail of `SyntaxChildren`.
-  internal var presentChildIndices: PresentChildIndicesSequence {
-    return raw.layout.indices.lazy.filter { self.raw.layout[$0].isPresent }
+  internal var presentChildIndices: _SyntaxBase.PresentChildIndicesSequence {
+    return raw.layout.indices.lazy.filter {
+      self.raw.layout[$0]?.isPresent == true
+    }
   }
 
   /// Gets the child at the provided index in this node's children.
@@ -120,8 +141,8 @@ public class Syntax: CustomStringConvertible {
   ///            is not a child at that index in the node.
   public func child(at index: Int) -> Syntax? {
     guard raw.layout.indices.contains(index) else { return nil }
-    if raw.layout[index].isMissing { return nil }
-    return Syntax.make(root: _root, data: data.cachedChild(at: index))
+    guard let childData = data.cachedChild(at: index) else { return nil }
+    return makeSyntax(root: _root, data: childData)
   }
 
   /// A source-accurate description of this node.
@@ -130,9 +151,7 @@ public class Syntax: CustomStringConvertible {
     self.write(to: &s)
     return s
   }
-}
-
-extension Syntax: TextOutputStreamable {
+  
   /// Prints the raw value of this node to the provided stream.
   /// - Parameter stream: The stream to which to print the raw tree.
   public func write<Target>(to target: inout Target)
@@ -141,21 +160,27 @@ extension Syntax: TextOutputStreamable {
   }
 }
 
-extension Syntax: Hashable {
-  /// Determines if two nodes are equal to each other.
-  public static func ==(lhs: Syntax, rhs: Syntax) -> Bool {
-    return lhs.hashValue == rhs.hashValue
-  }
-  /// Use reference value as the hashValue for this Syntax
-  public var hashValue: Int {
-    return ObjectIdentifier(data).hashValue
-  }
+/// Determines if two nodes are equal to each other.
+public func ==(lhs: Syntax, rhs: Syntax) -> Bool {
+  return lhs.data === rhs.data
 }
 
 /// MARK: - Nodes
 
 /// A Syntax node representing a single token.
-public class TokenSyntax: Syntax {
+public struct TokenSyntax: _SyntaxBase, Hashable {
+  let _root: SyntaxData
+  unowned let _data: SyntaxData 
+
+  /// Creates a Syntax node from the provided root and data.
+  internal init(root: SyntaxData, data: SyntaxData) {
+    self._root = root
+    self._data = data
+#if DEBUG
+    validate()
+#endif
+  }
+
   /// The text of the token as written in the source code.
   public var text: String {
     return tokenKind.text
@@ -229,5 +254,13 @@ public class TokenSyntax: Syntax {
       fatalError("TokenSyntax must have token as its raw")
     }
     return kind
+  }
+
+  public static func ==(lhs: TokenSyntax, rhs: TokenSyntax) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
   }
 }

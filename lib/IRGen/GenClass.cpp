@@ -739,9 +739,10 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   return Alloca.getAddress();
 }
 
-llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
-                                                     llvm::Value *size,
-                                                     TailArraysRef TailArrays) {
+std::pair<llvm::Value *, llvm::Value *>
+irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                    llvm::Value *size, llvm::Value *alignMask,
+                                    TailArraysRef TailArrays) {
   for (const auto &TailArray : TailArrays) {
     SILType ElemTy = TailArray.first;
     llvm::Value *Count = TailArray.second;
@@ -750,16 +751,17 @@ llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
 
     // Align up to the tail-allocated array.
     llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
-    llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
-    size = IGF.Builder.CreateAdd(size, AlignMask);
-    llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+    llvm::Value *ElemAlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+    size = IGF.Builder.CreateAdd(size, ElemAlignMask);
+    llvm::Value *InvertedMask = IGF.Builder.CreateNot(ElemAlignMask);
     size = IGF.Builder.CreateAnd(size, InvertedMask);
 
     // Add the size of the tail allocated array.
     llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
     size = IGF.Builder.CreateAdd(size, AllocSize);
+    alignMask = IGF.Builder.CreateOr(alignMask, ElemAlignMask);
   }
-  return size;
+  return {size, alignMask};
 }
 
 
@@ -800,7 +802,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
   } else {
     // Allocate the object on the heap.
-    size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+    std::tie(size, alignMask)
+      = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
@@ -823,7 +826,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+  std::tie(size, alignMask)
+    = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
@@ -1943,7 +1947,7 @@ namespace {
       if (!prop->isSettable(prop->getDeclContext()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
-      else if (prop->getAttrs().hasAttribute<OwnershipAttr>())
+      else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
         outs << ",W";
       // If the property is @NSCopying, or is bridged to a value class, the
       // property is (copy).

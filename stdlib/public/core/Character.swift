@@ -72,7 +72,7 @@ public struct Character {
   @_versioned
   internal enum Representation {
     case smallUTF16(Builtin.Int63)
-    case large(_StringBuffer._Storage)
+    case large(_UTF16StringStorage)
   }
 
   @_versioned
@@ -91,6 +91,20 @@ public struct Character {
     return String(self).utf16
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_smallRepresentation b: _SmallUTF16) {
+    _sanityCheck(Int64(b._storage) >= 0)
+    _representation = .smallUTF16(
+      Builtin.trunc_Int64_Int63(b._storage._value))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_largeRepresentation storage: _UTF16StringStorage) {
+    _representation = .large(storage)
+  }
+
   /// Creates a Character from a String that is already known to require the
   /// large representation.
   ///
@@ -100,15 +114,8 @@ public struct Character {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    if let native = s._core.nativeBuffer,
-      native.start == s._core._baseAddress!,
-      native.usedCount == s._core.count {
-      _representation = .large(native._storage)
-      return
-    }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    let storage = s._guts._extractNativeStorage(of: UTF16.CodeUnit.self)
+    self.init(_largeRepresentation: storage)
   }
 }
 
@@ -129,9 +136,7 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    self.init(Unicode.Scalar(_builtinUnicodeScalarLiteral: value))
   }
 
   // Inlining ensures that the whole constructor can be folded away to a single
@@ -147,22 +152,22 @@ extension Character
     let utf8 = UnsafeBufferPointer(
       start: UnsafePointer<Unicode.UTF8.CodeUnit>(start),
       count: Int(utf8CodeUnitCount))
-    
+
     if utf8.count == 1 {
       _representation = .smallUTF16(
         Builtin.zext_Int8_Int63(utf8.first._unsafelyUnwrappedUnchecked._value))
       return
     }
 
-  FastPath: 
+  FastPath:
     repeat {
       var shift = 0
       let maxShift = 64 - 16
       var bits: UInt64 = 0
-      
+
       for s8 in Unicode._ParsingIterator(
         codeUnits: utf8.makeIterator(), parser: UTF8.ForwardParser()) {
-        
+
         let s16
           = UTF16.transcode(s8, from: UTF8.self)._unsafelyUnwrappedUnchecked
 
@@ -179,7 +184,7 @@ extension Character
       return
     }
     while false
-    
+
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
     self = Character(_largeRepresentationString:
@@ -198,8 +203,8 @@ extension Character
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
-    let utf16 = UnsafeBufferPointer(
-      start: UnsafePointer<Unicode.UTF16.CodeUnit>(start),
+    let utf16 = _UnmanagedString<UTF16.CodeUnit>(
+      start: UnsafePointer(start),
       count: Int(utf16CodeUnitCount))
 
     switch utf16.count {
@@ -220,18 +225,10 @@ extension Character
         | UInt64(utf16[3]) &<< 48
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
-      _representation = Character(
-        _largeRepresentationString: String(
-          _StringCore(
-            baseAddress: UnsafeMutableRawPointer(start), 
-            count: utf16.count,
-            elementShift: 1,
-            hasCocoaBuffer: false,
-            owner: nil)
-        ))._representation
+      _representation = .large(_StringGuts(utf16)._extractNativeStorage())
     }
   }
-  
+
   /// Creates a character with the specified value.
   ///
   /// Do not call this initalizer directly. It is used by the compiler when
@@ -261,21 +258,134 @@ extension Character
   ///   instance. `s` must contain exactly one extended grapheme cluster.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ s: String) {
-    _precondition(
-      s._core.count != 0, "Can't form a Character from an empty String")
-    _debugPrecondition(
-      s.index(after: s.startIndex) == s.endIndex,
+    let count = s._guts.count
+    _precondition(count != 0,
+      "Can't form a Character from an empty String")
+    _debugPrecondition(s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    if _fastPath(s._core.count <= 4) {
-      let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(s._core)
-      if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
-        _representation = .smallUTF16(
-          Builtin.trunc_Int64_Int63(b._storage._value))
+    self.init(_unverified: s._guts)
+  }
+
+  /// Construct a Character from a _StringGuts, assuming it consists of exactly
+  /// one extended grapheme cluster.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_unverified guts: _StringGuts) {
+    defer { _fixLifetime(guts) }
+    if _slowPath(guts._isOpaque) {
+      self.init(_unverified: guts._asOpaque())
+      return
+    }
+
+    if guts.isASCII {
+      let ascii = guts._unmanagedASCIIView
+      if _fastPath(ascii.count == 1) {
+        self.init(_singleCodeUnit: ascii[0])
+      } else {
+        // The only multi-scalar ASCII grapheme cluster is CR/LF.
+        _sanityCheck(ascii.count == 2)
+        _sanityCheck(ascii.start[0] == _CR)
+        _sanityCheck(ascii.start[1] == _LF)
+        self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+      }
+      return
+    }
+
+    if guts._isNative {
+      self.init(_unverified:
+        guts._object.nativeStorage(of: UTF16.CodeUnit.self))
+    } else {
+      self.init(_unverified: guts._unmanagedUTF16View)
+    }
+  }
+
+  /// Construct a Character from a slice of a _StringGuts, assuming
+  /// the specified range covers exactly one extended grapheme cluster.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_unverified guts: _StringGuts, range: Range<Int>) {
+    defer { _fixLifetime(guts) }
+    if _fastPath(range.count == 1) {
+      let cu = guts.codeUnit(atCheckedOffset: range.lowerBound)
+      // Check for half a surrogate pair. (We may encounter these at boundaries
+      // of String slices or when the data itself has an invalid encoding.)
+      if _fastPath(UTF16._isScalar(cu)) {
+        self.init(_singleCodeUnit: cu)
+      } else {
+        self.init(_singleCodeUnit: UTF16._replacementCodeUnit)
+      }
+      return
+    }
+    if guts.isASCII {
+      let ascii = guts._unmanagedASCIIView
+      // The only multi-scalar ASCII grapheme cluster is CR/LF.
+      ascii._boundsCheck(offsetRange: range)
+      _sanityCheck(range.count == 2)
+      _sanityCheck(ascii.start[range.lowerBound] == _CR)
+      _sanityCheck(ascii.start[range.lowerBound + 1] == _LF)
+      self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+    } else if guts._isContiguous {
+      let utf16 = guts._unmanagedUTF16View.checkedSlice(range)
+      self.init(_unverified: utf16)
+    } else {
+      let opaque = guts._asOpaque().checkedSlice(range)
+      self.init(_unverified: opaque._copyToNativeStorage())
+    }
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init(_singleCodeUnit cu: UInt16) {
+    _sanityCheck(UTF16._isScalar(cu))
+    _representation = .smallUTF16(
+      Builtin.zext_Int16_Int63(Builtin.reinterpretCast(cu)))
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+    init(_codeUnitPair first: UInt16, _ second: UInt16) {
+    _sanityCheck(
+      (UTF16._isScalar(first) && UTF16._isScalar(second)) ||
+      (UTF16.isLeadSurrogate(first) && UTF16.isTrailSurrogate(second)))
+    _representation = .smallUTF16(
+      Builtin.zext_Int32_Int63(
+        Builtin.reinterpretCast(
+          UInt32(first) | UInt32(second) &<< 16)))
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init(_unverified storage: _SwiftStringStorage<Unicode.UTF16.CodeUnit>) {
+    if _fastPath(storage.count <= 4) {
+      _sanityCheck(storage.count > 0)
+      let b = _SmallUTF16(storage.unmanagedView)
+      if _fastPath(Int64(bitPattern: b._storage) >= 0) {
+        self.init(_smallRepresentation: b)
+        _fixLifetime(storage)
         return
       }
     }
-    self = Character(_largeRepresentationString: s)
+    // FIXME: We may want to make a copy if storage.unusedCapacity > 0
+    self.init(_largeRepresentation: storage)
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init<V: _StringVariant>(_unverified variant: V) {
+    if _fastPath(variant.count <= 4) {
+      _sanityCheck(variant.count > 0)
+      let b = _SmallUTF16(variant)
+      if _fastPath(Int64(bitPattern: b._storage) >= 0) {
+        self.init(_smallRepresentation: b)
+        return
+      }
+    }
+    self.init(_largeRepresentation: variant._copyToNativeStorage())
   }
 }
 
@@ -297,14 +407,16 @@ extension Character : CustomDebugStringConvertible {
 }
 
 extension Character {
+  internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _smallUTF16 : _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>? {
+  internal var _smallUTF16 : _SmallUTF16? {
     guard case .smallUTF16(let _63bits) = _representation else { return nil }
     _onFastPath()
     let bits = UInt64(Builtin.zext_Int63_Int64(_63bits))
     let minBitWidth = type(of: bits).bitWidth - bits.leadingZeroBitCount
-    return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
+    return _SmallUTF16(
       _storage: bits,
       _bitCount: UInt8(
         truncatingIfNeeded: 16 * Swift.max(1, (minBitWidth + 15) / 16))
@@ -313,9 +425,18 @@ extension Character {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _largeUTF16 : _StringCore? {
+  internal var _largeUTF16 : _UTF16StringStorage? {
     guard case .large(let storage) = _representation else { return nil }
-    return _StringCore(_StringBuffer(storage))
+    return storage
+  }
+}
+
+extension Character {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal var _count : Int {
+    if let small = _smallUTF16 { return small.count }
+    return _largeUTF16._unsafelyUnwrappedUnchecked.count
   }
 }
 
@@ -329,7 +450,7 @@ extension String {
       self = String(decoding: utf16, as: Unicode.UTF16.self)
     }
     else {
-      self = String(c._largeUTF16!)
+      self = String(_StringGuts(c._largeUTF16!))
     }
   }
 }
@@ -361,7 +482,7 @@ extension Character : Equatable {
         if l == r { return true }
       }
     }
-    
+
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
     return String(lhs) == String(rhs)

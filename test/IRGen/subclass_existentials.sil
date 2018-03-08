@@ -22,8 +22,8 @@ protocol R {}
 // CHECK-native-LABEL: define{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC*, i8**, %swift.refcounted*, i8**)
 // CHECK-NEXT: entry:
 // CHECK-objc-NEXT:   call void @swift_unknownRelease(%objc_object* %2)
-// CHECK-native-NEXT: call void @swift_rt_swift_release(%swift.refcounted* %2)
-// CHECK-NEXT:   call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* %0)
+// CHECK-native-NEXT: call void @swift_release(%swift.refcounted* %2)
+// CHECK-NEXT:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* %0)
 // CHECK-NEXT:   ret void
 
 sil @checkRefcounting : $@convention(thin) (@owned C & P, @owned AnyObject & P) -> () {
@@ -53,7 +53,7 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 // CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds %swift.protocol*, %swift.protocol** [[PROTOCOLS]], i32 0
 // CHECK-NEXT:   store %swift.protocol* @"$S21subclass_existentials1PMp", %swift.protocol** [[PROTOCOL]]
 // CHECK-NEXT:   [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1CCMa"()
-// CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_rt_swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, %swift.protocol** [[PROTOCOLS]])
+// CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, %swift.protocol** [[PROTOCOLS]])
 // CHECK:        ret
 
 sil @checkMetadata : $@convention(thin) () -> () {
@@ -102,7 +102,7 @@ bb0(%0 : $C, %1 : $C & P):
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
   %2 = unconditional_checked_cast %0 : $C to $D & R
 
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
+// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
   destroy_value %2 : $D & R
 
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %1 to i8*
@@ -111,7 +111,7 @@ bb0(%0 : $C, %1 : $C & P):
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[RESULT]] to %T21subclass_existentials1DC*
   %3 = unconditional_checked_cast %1 : $C & P to $D
 
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
+// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
   destroy_value %3 : $D
 
 // CHECK-NEXT:  ret void
@@ -152,7 +152,7 @@ bb0(%0 : $C):
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
   %2 = unconditional_checked_cast %0 : $C to $C & P
 
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* [[VALUE]])
+// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* [[VALUE]])
   destroy_value %2 : $C & P
 
 // CHECK-NEXT:  ret void

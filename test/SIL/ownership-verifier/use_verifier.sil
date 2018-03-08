@@ -55,6 +55,7 @@ struct TupleContainingNonTrivialStruct {
 
 class SuperKlass {
   func d() {}
+  static func f() {}
 }
 class SubKlass : SuperKlass {}
 class X {
@@ -1001,6 +1002,15 @@ bb2(%2 : @owned $Builtin.NativeObject):
   br bb3
 
 bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @super_method_metatype_test : $@convention(thin) (@thick SubKlass.Type) -> () {
+bb0(%0 : @trivial $@thick SubKlass.Type):
+  %1 = upcast %0 : $@thick SubKlass.Type to $@thick SuperKlass.Type
+  %2 = class_method %1 : $@thick SuperKlass.Type, #SuperKlass.f!1 : (SuperKlass.Type) -> () -> (), $@convention(method) (@thick SuperKlass.Type) -> ()
+  apply %2(%1) : $@convention(method) (@thick SuperKlass.Type) -> ()
   %9999 = tuple()
   return %9999 : $()
 }

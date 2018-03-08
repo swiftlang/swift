@@ -35,9 +35,12 @@ static bool isDeclName(Node::Kind kind) {
     case Node::Kind::Identifier:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
     case Node::Kind::InfixOperator:
+    case Node::Kind::UnresolvedSymbolicReference:
+    case Node::Kind::SymbolicReference:
       return true;
     default:
       return false;
@@ -62,7 +65,10 @@ static bool isAnyGeneric(Node::Kind kind) {
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::OtherNominalType:
     case Node::Kind::TypeAlias:
+    case Node::Kind::SymbolicReference:
+    case Node::Kind::UnresolvedSymbolicReference:
       return true;
     default:
       return false;
@@ -116,19 +122,31 @@ static bool isFunctionAttr(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
+llvm::StringRef
+swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
+  if (!base)
+    return {};
+
+  auto end = base;
+  while (*end != '\0') {
+    // Skip over symbolic references.
+    if (*end == '\1')
+      end += 4;
+    ++end;
+  }
+  return StringRef(base, end - base);
+}
+
 int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   if (mangledName.empty()) return 0;
 
-  // Check for the swift-4 prefix
-  if (mangledName.size() >= 3 && mangledName[0] == '_' &&
-      mangledName[1] == 'T' && mangledName[2] == '0')
-    return 3;
+  llvm::StringRef prefixes[] = {/*Swift 4*/ "_T0", /*Swift > 4*/ "$S", "_$S"};
 
-  // Check for the swift > 4 prefix
-  unsigned Offset = (mangledName[0] == '_' ? 1 : 0);
-  if (mangledName.size() >= Offset + 1 &&
-      mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
-    return Offset + 2;
+  // Look for any of the known prefixes
+  for (auto prefix : prefixes) {
+    if (mangledName.startswith(prefix))
+      return prefix.size();
+  }
 
   return 0;
 }
@@ -141,17 +159,104 @@ bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
 }
 
 bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
-  StringRef mangledNameRef(mangledName, 4);
+  StringRef mangledNameRef(mangledName);
   return isSwiftSymbol(mangledNameRef);
 }
 
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
-  return mangledName.size() >= 2 && mangledName[0] == '_' &&
-      mangledName[1] == 'T';
+  return mangledName.startswith("_T");
 }
 
 llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
   return mangledName.drop_front(getManglingPrefixLength(mangledName));
+}
+
+static bool isAliasNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isAliasNode(Node->getChild(0));
+  case Demangle::Node::Kind::TypeAlias:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isAlias(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isAliasNode(Dem.demangleType(mangledName));
+}
+
+static bool isClassNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isClassNode(Node->getChild(0));
+  case Demangle::Node::Kind::Class:
+  case Demangle::Node::Kind::BoundGenericClass:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isClass(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isClassNode(Dem.demangleType(mangledName));
+}
+
+static bool isEnumNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isEnumNode(Node->getChild(0));
+  case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::BoundGenericEnum:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isEnum(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isEnumNode(Dem.demangleType(mangledName));
+}
+
+static bool isProtocolNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isProtocolNode(Node->getChild(0));
+  case Demangle::Node::Kind::Protocol:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isProtocolNode(Dem.demangleType(dropSwiftManglingPrefix(mangledName)));
+}
+
+static bool isStructNode(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isStructNode(Node->getChild(0));
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::BoundGenericStructure:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled node kind!");
+}
+
+bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
+  Demangle::Demangler Dem;
+  return isStructNode(Dem.demangleType(mangledName));
 }
 
 namespace swift {
@@ -431,9 +536,32 @@ NodePointer Demangler::demangleTypeMangling() {
   TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
+  
+NodePointer Demangler::demangleSymbolicReference(const void *at) {
+  // The symbolic reference is a 4-byte machine integer encoded in the following
+  // four bytes.
+  int32_t value;
+  memcpy(&value, Text.data() + Pos, 4);
+  Pos += 4;
+  
+  // Use the resolver, if any, to produce the demangling tree the symbolic
+  // reference represents.
+  NodePointer resolved = nullptr;
+  if (SymbolicReferenceResolver)
+    resolved = SymbolicReferenceResolver(value, at);
+  // With no resolver, or a resolver that failed, simply preserve the raw
+  // information in the node.
+  if (!resolved)
+    resolved = createNode(Node::Kind::UnresolvedSymbolicReference, value);
+  
+  // Register the result as a substitution.
+  addSubstitution(resolved);
+  return resolved;
+}
 
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
+    case '\1': return demangleSymbolicReference(Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
@@ -461,12 +589,16 @@ NodePointer Demangler::demangleOperator() {
     case 'c': return popFunctionType(Node::Kind::FunctionType);
     case 'd': return createNode(Node::Kind::VariadicMarker);
     case 'f': return demangleFunctionEntity();
+    case 'g': return demangleRetroactiveConformance();
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
+    case 'n':
+      return createType(
+          createWithChild(Node::Kind::Owned, popTypeAndGetChild()));
     case 'o': return demangleOperatorIdentifier();
     case 'p': return demangleProtocolListType();
     case 'q': return createType(demangleGenericParamIndex());
@@ -738,6 +870,14 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer discriminator = popNode(Node::Kind::Identifier);
     return createWithChild(Node::Kind::PrivateDeclName, discriminator);
   }
+  if ((peekChar() >= 'a' && peekChar() <= 'j') ||
+      (peekChar() >= 'A' && peekChar() <= 'J')) {
+    char relatedEntityKind = nextChar();
+    NodePointer name = popNode();
+    NodePointer result = createNode(Node::Kind::RelatedEntityDeclName,
+                                    StringRef(&relatedEntityKind, 1));
+    return addChild(result, name);
+  }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
   return createWithChildren(Node::Kind::LocalDeclName, discriminator, name);
@@ -930,7 +1070,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   if (FuncType->getKind() == Node::Kind::DependentGenericType)
     FuncType = FuncType->getChild(1)->getFirstChild();
 
-  if (FuncType->getKind() != Node::Kind::FunctionType)
+  if (FuncType->getKind() != Node::Kind::FunctionType &&
+      FuncType->getKind() != Node::Kind::NoEscapeFunctionType)
     return nullptr;
 
   auto ParameterType = FuncType->getFirstChild();
@@ -1054,7 +1195,27 @@ NodePointer Demangler::popProtocol() {
   return createType(Proto);
 }
 
+NodePointer Demangler::demangleRetroactiveConformance() {
+  NodePointer Index = demangleIndexAsNode();
+  NodePointer Conformance = popProtocolConformance();
+  if (!Index || !Conformance)
+    return nullptr;
+
+  return createWithChildren(Node::Kind::RetroactiveConformance,
+                            Index, Conformance);
+}
+
 NodePointer Demangler::demangleBoundGenericType() {
+  NodePointer RetroactiveConformances = nullptr;
+  while (auto RetroactiveConformance =
+         popNode(Node::Kind::RetroactiveConformance)) {
+    if (!RetroactiveConformances)
+      RetroactiveConformances = createNode(Node::Kind::TypeList);
+    RetroactiveConformances->addChild(RetroactiveConformance, *this);
+  }
+  if (RetroactiveConformances)
+    RetroactiveConformances->reverseChildren();
+
   Vector<NodePointer> TypeListList(*this, 4);
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
@@ -1070,7 +1231,10 @@ NodePointer Demangler::demangleBoundGenericType() {
       return nullptr;
   }
   NodePointer Nominal = popTypeAndGetAnyGeneric();
-  NodePointer NTy = createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
+  NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
+  if (RetroactiveConformances)
+    BoundNode->addChild(RetroactiveConformances, *this);
+  NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
   return NTy;
 }
@@ -1078,11 +1242,35 @@ NodePointer Demangler::demangleBoundGenericType() {
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx) {
-  if (!Nominal || Nominal->getNumChildren() < 2)
+  // TODO: This would be a lot easier if we represented bound generic args
+  // flatly in the demangling tree, since that's how they're mangled and also
+  // how the runtime generally wants to consume them.
+  
+  if (!Nominal)
     return nullptr;
 
   if (TypeListIdx >= TypeLists.size())
     return nullptr;
+
+  // Associate a symbolic reference with all remaining generic arguments.
+  if (Nominal->getKind() == Node::Kind::SymbolicReference
+      || Nominal->getKind() == Node::Kind::UnresolvedSymbolicReference) {
+    auto remainingTypeList = createNode(Node::Kind::TypeList);
+    for (unsigned i = TypeLists.size() - 1;
+         i >= TypeListIdx && i < TypeLists.size();
+         --i) {
+      auto list = TypeLists[i];
+      for (auto child : *list) {
+        remainingTypeList->addChild(child, *this);
+      }
+    }
+    return createWithChildren(Node::Kind::BoundGenericOtherNominalType,
+                              createType(Nominal), remainingTypeList);
+  }
+
+  if (Nominal->getNumChildren() < 2)
+    return nullptr;
+
   NodePointer args = TypeLists[TypeListIdx++];
 
   // Generic arguments for the outermost type come first.
@@ -1126,6 +1314,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
       break;
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
+      break;
+    case Node::Kind::OtherNominalType:
+      kind = Node::Kind::BoundGenericOtherNominalType;
       break;
     default:
       return nullptr;
@@ -1249,6 +1440,12 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'a':
       return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'I':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
+    case 'i':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
+    case 'r':
+      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1275,8 +1472,61 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
     }
+    case 'V':
+      return createWithChild(Node::Kind::PropertyDescriptor,
+                             popNode(isEntity));
+    case 'X':
+      return demanglePrivateContextDescriptor();
     default:
       return nullptr;
+  }
+}
+  
+NodePointer Demangler::demanglePrivateContextDescriptor() {
+  switch (nextChar()) {
+  case 'E': {
+    auto Extension = popContext();
+    if (!Extension)
+      return nullptr;
+    return createWithChild(Node::Kind::ExtensionDescriptor, Extension);
+  }
+  case 'M': {
+    auto Module = popModule();
+    if (!Module)
+      return nullptr;
+    return createWithChild(Node::Kind::ModuleDescriptor, Module);
+  }
+  case 'Y': {
+    auto Discriminator = popNode();
+    if (!Discriminator)
+      return nullptr;
+    auto Context = popContext();
+    if (!Context)
+      return nullptr;
+    
+    auto node = createNode(Node::Kind::AnonymousDescriptor);
+    node->addChild(Context, *this);
+    node->addChild(Discriminator, *this);
+    return node;
+  }
+  case 'X': {
+    auto Context = popContext();
+    if (!Context)
+      return nullptr;
+    return createWithChild(Node::Kind::AnonymousDescriptor, Context);
+  }
+  case 'A': {
+    auto path = popAssocTypePath();
+    if (!path)
+      return nullptr;
+    auto base = popNode(Node::Kind::Type);
+    if (!base)
+      return nullptr;
+    return createWithChildren(Node::Kind::AssociatedTypeGenericParamRef,
+                              base, path);
+  }
+  default:
+    return nullptr;
   }
 }
 
@@ -1361,6 +1611,20 @@ NodePointer Demangler::popAssocTypeName() {
   NodePointer AssocTy = changeKind(Id, Node::Kind::DependentAssociatedTypeRef);
   addChild(AssocTy, Proto);
   return AssocTy;
+}
+  
+NodePointer Demangler::popAssocTypePath() {
+  NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
+  bool firstElem = false;
+  do {
+    firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+    NodePointer AssocTyName = popNode(isDeclName);
+    if (!AssocTyName)
+      return nullptr;
+    AssocTypePath->addChild(AssocTyName, *this);
+  } while (!firstElem);
+  AssocTypePath->reverseChildren();
+  return AssocTypePath;
 }
 
 NodePointer Demangler::getDependentGenericParamType(int depth, int index) {
@@ -1631,8 +1895,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           return nullptr;
         StringRef Text = Name->getText();
         if (ParamKind ==
-              FunctionSigSpecializationParamKind::ConstantPropString &&
-            Text.size() > 0 && Text[0] == '_') {
+                FunctionSigSpecializationParamKind::ConstantPropString &&
+            !Text.empty() && Text[0] == '_') {
           // A '_' escapes a leading digit or '_' of a string constant.
           Text = Text.drop_front(1);
         }
@@ -1832,16 +2096,7 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
-      bool firstElem = false;
-      do {
-        firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
-        NodePointer AssocTyName = popNode(isDeclName);
-        if (!AssocTyName)
-          return nullptr;
-        AssocTypePath->addChild(AssocTyName, *this);
-      } while (!firstElem);
-      AssocTypePath->reverseChildren();
+      auto AssocTypePath = popAssocTypePath();
 
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
@@ -1896,6 +2151,10 @@ NodePointer Demangler::demangleWitness() {
 
 NodePointer Demangler::demangleSpecialType() {
   switch (auto specialChar = nextChar()) {
+    case 'E':
+      return popFunctionType(Node::Kind::NoEscapeFunctionType);
+    case 'A':
+      return popFunctionType(Node::Kind::EscapingAutoClosureType);
     case 'f':
       return popFunctionType(Node::Kind::ThinFunctionType);
     case 'K':
@@ -1987,6 +2246,18 @@ NodePointer Demangler::demangleSpecialType() {
         boxTy->addChild(genericArgs, *this);
       }
       return createType(boxTy);
+    }
+    case 'Y':
+      return demangleAnyGenericType(Node::Kind::OtherNominalType);
+    case 'Z': {
+      auto types = popTypeList();
+      auto name = popNode(Node::Kind::Identifier);
+      auto parent = popContext();
+      auto anon = createNode(Node::Kind::AnonymousContext);
+      anon = addChild(anon, name);
+      anon = addChild(anon, parent);
+      anon = addChild(anon, types);
+      return anon;
     }
     case 'e':
       return createType(createNode(Node::Kind::ErrorType));

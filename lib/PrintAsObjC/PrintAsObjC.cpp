@@ -309,7 +309,8 @@ private:
   getObjectTypeAndOptionality(const Decl *D, Type ty) {
     OptionalTypeKind kind;
     if (auto objTy =
-            ty->getReferenceStorageReferent()->getAnyOptionalObjectType(kind)) {
+            ty->getReferenceStorageReferent()->getOptionalObjectType()) {
+      kind = OTK_Optional;
       if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         kind = OTK_ImplicitlyUnwrappedOptional;
 
@@ -619,7 +620,7 @@ private:
       }
 
       // Zero-parameter methods.
-      if (params.size() == 0) {
+      if (params.empty()) {
         assert(paramIndex == 0);
         os << piece;
         paramIndex = 1;
@@ -962,7 +963,7 @@ private:
   }
 
   bool maybePrintIBOutletCollection(Type ty) {
-    if (auto unwrapped = ty->getAnyOptionalObjectType())
+    if (auto unwrapped = ty->getOptionalObjectType())
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
@@ -1022,7 +1023,7 @@ private:
     // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
-      auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
+      auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
       if ((innerClass &&
            innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
@@ -1035,8 +1036,8 @@ private:
       os << ", unsafe_unretained";
     } else {
       Type copyTy = ty;
-      OptionalTypeKind optionalType;
-      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
+      bool isOptional;
+      if (auto unwrappedTy = copyTy->getOptionalObjectType(isOptional))
         copyTy = unwrappedTy;
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
@@ -1053,8 +1054,8 @@ private:
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
             ty = boundTy->getGenericArgs().front();
-            if (optionalType != OTK_None)
-              ty = OptionalType::get(optionalType, ty);
+            if (isOptional)
+              ty = OptionalType::get(ty);
           }
         }
       } else if (auto fnTy = copyTy->getAs<FunctionType>()) {
@@ -1117,6 +1118,8 @@ private:
     }
 
     printSwift3ObjCDeprecatedInference(VD);
+
+    printAvailability(VD);
 
     os << ";";
     if (VD->isStatic()) {
@@ -1670,9 +1673,8 @@ private:
                               optionalKind))
       return;
 
-    OptionalTypeKind innerOptionalKind;
-    if (auto underlying = BGT->getAnyOptionalObjectType(innerOptionalKind)) {
-      visitPart(underlying, innerOptionalKind);
+    if (auto underlying = BGT->getOptionalObjectType()) {
+      visitPart(underlying, OTK_Optional);
     } else
       visitType(BGT, optionalKind);
   }
@@ -1911,7 +1913,7 @@ public:
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
     if (isFuncParam)
-      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+      if (auto fnTy = ty->lookThroughAllOptionalTypes()
                         ->getAs<AnyFunctionType>())
         if (fnTy->isNoEscape())
           os << "SWIFT_NOESCAPE ";
@@ -2017,7 +2019,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
       return true;
 
     auto conformsTo = sig->getConformsTo(paramTy);
-    return conformsTo.size() > 0;
+    return !conformsTo.empty();
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {

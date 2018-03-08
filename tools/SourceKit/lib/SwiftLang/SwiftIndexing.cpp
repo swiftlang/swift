@@ -253,13 +253,18 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   // response, and it can be expensive to do typo-correction when there are many
   // errors, which is common in indexing.
   SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-Xfrontend");
   Args.push_back("-disable-typo-correction");
 
   CompilerInvocation Invocation;
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       CI.getDiags(),
-                    /*PrimaryFile=*/IsModuleIndexing ? StringRef() : InputFile,
-                                                       Error);
+  bool Failed = true;
+  if (IsModuleIndexing) {
+    Failed = getASTManager().initCompilerInvocationNoInputs(
+        Invocation, Args, CI.getDiags(), Error);
+  } else {
+    Failed = getASTManager().initCompilerInvocation(
+        Invocation, Args, CI.getDiags(), InputFile, Error);
+  }
   if (Failed) {
     IdxConsumer.failed(Error);
     return;
@@ -279,7 +284,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
 
-  if (!Invocation.getFrontendOptions().Inputs.hasInputs()) {
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     IdxConsumer.failed("no input filenames specified");
     return;
   }

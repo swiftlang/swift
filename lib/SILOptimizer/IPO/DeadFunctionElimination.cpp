@@ -228,9 +228,9 @@ protected:
           break;
         }
 
-        if (auto equals = component.getComputedPropertyIndexEquals())
+        if (auto equals = component.getSubscriptIndexEquals())
           ensureAlive(equals);
-        if (auto hash = component.getComputedPropertyIndexHash())
+        if (auto hash = component.getSubscriptIndexHash())
           ensureAlive(hash);
 
         continue;
@@ -239,6 +239,7 @@ protected:
       case KeyPathPatternComponent::Kind::OptionalChain:
       case KeyPathPatternComponent::Kind::OptionalForce:
       case KeyPathPatternComponent::Kind::OptionalWrap:
+      case KeyPathPatternComponent::Kind::External:
         continue;
       }
     }

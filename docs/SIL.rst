@@ -3188,7 +3188,7 @@ executing the ``begin_apply``) were being "called" by the ``yield``:
 - The convention attributes are the same as the parameter convention
   attributes, interpreted as if the ``yield`` were the "call" and the
   ``begin_apply`` marked the entry to the "callee".  For example,
-  an ``@in Any`` yield transferrs ownership of the ``Any`` value
+  an ``@in Any`` yield transfers ownership of the ``Any`` value
   reference from the coroutine to the caller, which must destroy
   or move the value from that position before ending or aborting the
   coroutine.
@@ -3714,7 +3714,7 @@ destructure_struct
    // %0 must be a struct of type $S
    // %eltN must have the same type as the Nth field of $S
 
-Given a struct, split the struct into its constituant fields.
+Given a struct, split the struct into its constituent fields.
 
 object
 ``````
@@ -3729,7 +3729,7 @@ object
 
 Constructs a statically initialized object. This instruction can only appear
 as final instruction in a global variable static initializer list.
-  
+
 ref_element_addr
 ````````````````
 ::
@@ -4026,7 +4026,7 @@ container may use one of several representations:
   Said value might be replaced with one of the _addr instructions above
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
-  
+
   * `init_existential_value`_
   * `open_existential_value`_
   * `deinit_existential_value`_
@@ -4605,7 +4605,30 @@ in the following ways:
   subclass of the source type's corresponding tuple element.
 
 The function types may also differ in attributes, except that the
-``convention`` attribute cannot be changed.
+``convention`` attribute cannot be changed and the ``@noescape`` attribute must
+not change for functions with context.
+
+A ``convert_function`` cannot be used to change a thick type's ``@noescape``
+attribute (``@noescape`` function types with context are not ABI compatible with
+escaping function types with context) -- however, thin function types with and
+without ``@noescape`` are ABI compatible because they have no context. To
+convert from an escaping to a ``@noescape`` thick function type use
+``convert_escape_to_noescape``.
+
+convert_escape_to_noescape
+```````````````````````````
+::
+
+  sil-instruction ::= 'convert_escape_to_noescape' sil-operand 'to' sil-type
+  %1 = convert_escape_to_noescape %0 : $T -> U to $@noescape T' -> U'
+  // %0 must be of a function type $T -> U ABI-compatible with $T' -> U'
+  //   (see convert_function)
+  // %1 will be of the trivial type $@noescape T -> U
+
+Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
+function type. Something must guarantee the lifetime of the input ``%0`` for the
+duration of the use ``%1``.
+
 
 thin_function_to_pointer
 ````````````````````````

@@ -17,6 +17,10 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 
+namespace clang {
+class NamedDecl;
+}
+
 namespace swift {
 
 class AbstractClosureExpr;
@@ -42,6 +46,13 @@ protected:
   /// If disabled, it is an error to try to mangle such an entity.
   bool AllowNamelessEntities = false;
 
+  /// If nonnull, provides a callback to encode symbolic references to
+  /// type contexts.
+  std::function<bool (const DeclContext *Context)>
+    CanSymbolicReference;
+  
+  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+  
 public:
   enum class SymbolKind {
     Default,
@@ -147,6 +158,17 @@ public:
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
+  enum SpecialContext {
+    ObjCContext,
+    ClangImporterContext,
+  };
+  
+  static Optional<SpecialContext>
+  getSpecialManglingContext(const ValueDecl *decl);
+
+  static const clang::NamedDecl *
+  getClangDeclForMangling(const ValueDecl *decl);
+
 protected:
 
   void appendSymbolKind(SymbolKind SKind);
@@ -174,6 +196,9 @@ protected:
   }
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
+
+  /// Append any retroactive conformances.
+  void appendRetroactiveConformances(Type type);
 
   void appendImplFunctionType(SILFunctionType *fn);
 
@@ -213,7 +238,7 @@ protected:
 
   void appendRequirement(const Requirement &reqt);
 
-  void appendGenericSignatureParts(ArrayRef<GenericTypeParamType*> params,
+  void appendGenericSignatureParts(TypeArrayView<GenericTypeParamType> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 
@@ -257,7 +282,9 @@ protected:
   void appendProtocolConformance(const ProtocolConformance *conformance);
 
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
-
+  
+  void appendSymbolicReference(const DeclContext *context);
+  
   std::string mangleTypeWithoutPrefix(Type type) {
     appendType(type);
     return finalize();

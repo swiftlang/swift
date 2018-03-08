@@ -1513,7 +1513,7 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
-% for Kind in ['Array', 'ContiguousArray']:
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
 ArrayTestSuite.test("${Kind}/popLast") {
   // Empty
   do {
@@ -1524,12 +1524,12 @@ ArrayTestSuite.test("${Kind}/popLast") {
   }
 
   do {
-    var popped = [Int]()
-    var a: ${Kind}<Int> = [1010, 2020, 3030]
+    var popped = [LifetimeTracked]()
+    var a: ${Kind} = [LifetimeTracked(1010), LifetimeTracked(2020), LifetimeTracked(3030)]
     while let element = a.popLast() {
       popped.append(element)
     }
-    expectEqualSequence([1010, 2020, 3030], popped.reversed())
+    expectEqualSequence([1010, 2020, 3030], popped.reversed().lazy.map({ $0.value }))
     expectTrue(a.isEmpty)
   }
 }

@@ -303,7 +303,9 @@ public:
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
+  CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
+  FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
   SourceLoc EndTypeCheckLoc;
 
@@ -597,16 +599,7 @@ public:
       return nullptr;
     }
     
-    // If the sequence is an implicitly unwrapped optional, force it.
     Expr *sequence = S->getSequence();
-    if (auto objectTy
-          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
-      sequence = new (TC.Context) ForceValueExpr(sequence,
-                                                 sequence->getEndLoc());
-      sequence->setType(objectTy);
-      sequence->setImplicit();
-      S->setSequence(sequence);
-    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
@@ -818,9 +811,9 @@ public:
       TC.diagnose(S->getLoc(), diag::fallthrough_from_last_case);
       return nullptr;
     }
-    if (FallthroughDest->hasBoundDecls())
-      TC.diagnose(S->getLoc(), diag::fallthrough_into_case_with_var_binding);
+    S->setFallthroughSource(FallthroughSource);
     S->setFallthroughDest(FallthroughDest);
+    PreviousFallthrough = S;
     return S;
   }
   
@@ -838,11 +831,20 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto node : S->getRawCases()) {
+      if (!node.is<Decl*>()) continue;
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+    }
+
     auto cases = S->getCases();
+    CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
       auto *caseBlock = *i;
       // Fallthrough transfers control to the next case block. In the
       // final case block, it is invalid.
+      FallthroughSource = caseBlock;
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
@@ -868,12 +870,12 @@ public:
           // was in the first label item's pattern.
           auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
           if (pattern != firstPattern) {
-            SmallVector<VarDecl *, 4> Vars;
-            firstPattern->collectVariables(Vars);
+            SmallVector<VarDecl *, 4> vars;
+            firstPattern->collectVariables(vars);
             pattern->forEachVariable([&](VarDecl *VD) {
               if (!VD->hasName())
                 return;
-              for (auto expected : Vars) {
+              for (auto *expected : vars) {
                 if (expected->hasName() && expected->getName() == VD->getName()) {
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
@@ -887,18 +889,54 @@ public:
             });
           }
         }
-
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           hadError |= TC.typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
+        
+      // If the previous case fellthrough, similarly check that that case's bindings
+      // includes our first label item's pattern bindings and types.
+      if (PreviousFallthrough) {
+        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+        SmallVector<VarDecl *, 4> Vars;
+        firstPattern->collectVariables(Vars);
+
+        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
+          const Pattern *pattern = labelItem.getPattern();
+          SmallVector<VarDecl *, 4> PreviousVars;
+          pattern->collectVariables(PreviousVars);
+          for (auto expected : Vars) {
+            bool matched = false;
+            if (!expected->hasName())
+              continue;
+            for (auto previous: PreviousVars) {
+              if (previous->hasName() && expected->getName() == previous->getName()) {
+                if (!previous->getType()->isEqual(expected->getType())) {
+                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
+                              previous->getType(), expected->getType());
+                  previous->markInvalid();
+                  expected->markInvalid();
+                }
+                matched = true;
+                break;
+              }
+            }
+            if (!matched) {
+              TC.diagnose(PreviousFallthrough->getLoc(),
+                          diag::fallthrough_into_case_with_var_binding, expected->getName());
+            }
+          }
+        }
+      }
       
       // Type-check the body statements.
+      PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
       hadError |= typeCheckStmt(body);
       caseBlock->setBody(body);
+      previousBlock = caseBlock;
     }
 
     if (!S->isImplicit()) {
@@ -992,7 +1030,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
           type->isUninhabited() ||
-          type->lookThroughAllAnyOptionalTypes()->isVoid());
+          type->lookThroughAllOptionalTypes()->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(TypeChecker &TC, LiteralExpr *LE) {
@@ -1050,7 +1088,20 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->hasLValueType()) {
-    diagnose(E->getLoc(), diag::expression_unused_lvalue)
+    // This must stay in sync with diag::expression_unused_lvalue.
+    enum {
+        SK_Variable = 0,
+        SK_Property,
+        SK_Subscript
+    } storageKind = SK_Variable;
+    if (auto declRef = E->getReferencedDecl()) {
+      auto decl = declRef.getDecl();
+      if (isa<SubscriptDecl>(decl))
+        storageKind = SK_Subscript;
+      else if (decl->getDeclContext()->isTypeContext())
+        storageKind = SK_Property;
+    }
+    diagnose(E->getLoc(), diag::expression_unused_lvalue, storageKind)
       .highlight(E->getSourceRange());
     return;
   }
@@ -1364,14 +1415,15 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD->getBody())
     return false;
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
+
+  for (auto paramList : AFD->getParameterLists())
+    requestRequiredNominalTypeLayoutForParameters(paramList);
 
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;
@@ -1566,9 +1618,12 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     }
 
     // An inlinable constructor in a class must always be delegating,
-    // unless the class is formally '@_fixed_layout'.
-    if (!isDelegating &&
-        ClassD->isFormallyResilient() &&
+    // unless the class is '@_fixed_layout'.
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for classes in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

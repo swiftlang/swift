@@ -286,7 +286,7 @@ bool ObjectOutliner::optimizeObjectAllocation(
   ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
   SILType TailType;
   unsigned NumTailElems = 0;
-  if (TailCounts.size() > 0) {
+  if (!TailCounts.empty()) {
     // We only support a single tail allocated array.
     if (TailCounts.size() > 1)
       return false;
@@ -383,6 +383,13 @@ bool ObjectOutliner::optimizeObjectAllocation(
     auto *Use = Worklist.pop_back_val();
     SILInstruction *User = Use->getUser();
     switch (User->getKind()) {
+      case SILInstructionKind::SetDeallocatingInst:
+        // set_deallocating is a replacement for a strong_release. Therefore
+        // we have to insert a strong_release to balance the strong_retain which
+        // we inserted after the global_value instruction.
+        B.setInsertionPoint(User);
+        B.createStrongRelease(User->getLoc(), GVI, B.getDefaultAtomicity());
+        LLVM_FALLTHROUGH;
       case SILInstructionKind::DeallocRefInst:
         ToRemove.push_back(User);
         break;

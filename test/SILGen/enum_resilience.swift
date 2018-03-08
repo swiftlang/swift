@@ -31,6 +31,7 @@ import resilient_enum
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb5:
+// CHECK-NEXT:    builtin "int_trap"()
 // CHECK-NEXT:    unreachable
 // CHECK:       bb6:
 // CHECK-NEXT:    destroy_addr %0

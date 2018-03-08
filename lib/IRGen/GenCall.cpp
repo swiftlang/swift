@@ -1601,6 +1601,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
+  assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
   llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
@@ -1919,6 +1920,8 @@ void CallEmission::setFromCallee() {
 
     // Fill in the context pointer if necessary.
     if (!contextPtr) {
+      assert(!CurCallee.getOrigFunctionType()->getExtInfo().hasContext() &&
+             "Missing context?");
       contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
     }
   }
@@ -2917,7 +2920,7 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
 
 void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
                                      Explosion &result) {
-  if (result.size() == 0) {
+  if (result.empty()) {
     Builder.CreateRetVoid();
     return;
   }
@@ -3005,7 +3008,7 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
                                                 IRGenFunction &IGF,
                                                 Explosion &native,
                                                 SILType type) const {
-  if (native.size() == 0) {
+  if (native.empty()) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
   }
@@ -3139,7 +3142,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
                                                 Explosion &fromNonNative,
                                                 SILType type,
                                                 bool isOutlined) const {
-  if (fromNonNative.size() == 0) {
+  if (fromNonNative.empty()) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
   }
@@ -3272,7 +3275,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
 
 void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
                                      bool isSwiftCCReturn, bool isOutlined) {
-  if (result.size() == 0) {
+  if (result.empty()) {
     assert(IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM).empty() &&
            "Empty explosion must match the native calling convention");
 
@@ -3369,14 +3372,17 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
   return Callee(std::move(info), fn, blockPtr);
 }
 
-Callee irgen::getSwiftFunctionPointerCallee(IRGenFunction &IGF,
-                                            llvm::Value *fnPtr,
-                                            llvm::Value *dataPtr,
-                                            CalleeInfo &&calleeInfo) {
+Callee irgen::getSwiftFunctionPointerCallee(
+    IRGenFunction &IGF, llvm::Value *fnPtr, llvm::Value *dataPtr,
+    CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
 
   FunctionPointer fn(fnPtr, sig);
-
+  if (castOpaqueToRefcountedContext) {
+    assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
+           "Expecting trivial closure context");
+    dataPtr = IGF.Builder.CreateBitCast(dataPtr, IGF.IGM.RefCountedPtrTy);
+  }
   return Callee(std::move(calleeInfo), fn, dataPtr);
 }
 

@@ -90,17 +90,9 @@ public struct BenchmarkInfo {
   /// taken.
   public var tearDownFunction: (() -> ())?
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory]) {
-    self.name = name
-    self.runFunction = runFunction
-    self.tags = tags
-    self.setUpFunction = nil
-    self.tearDownFunction = nil
-  }
-
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
-              setUpFunction: (() -> ())?,
-              tearDownFunction: (() -> ())?) {
+              setUpFunction: (() -> ())? = nil,
+              tearDownFunction: (() -> ())? = nil) {
     self.name = name
     self.runFunction = runFunction
     self.tags = tags

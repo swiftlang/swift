@@ -10,11 +10,24 @@ func doesEscape(_ fn : @escaping () -> Int) {}
 func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-warning{{@noescape is the default and is deprecated}} {{47-57=}}
 
 
+func takesArray(_ fns: [() -> Int]) {
+  doesEscape(fns[0]) // Okay - array-of-function parameters are escaping
+}
+
+func takesVariadic(_ fns: () -> Int...) {
+  doesEscape(fns[0]) // Okay - variadic-of-function parameters are escaping
+}
+
 func takesNoEscapeClosure(_ fn : () -> Int) {
   // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-3{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-4{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-6{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-7{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-8{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-9{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -37,6 +50,13 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
+
+  _ = [fn] // expected-error {{non-escaping parameter 'fn' may only be called}}
+  _ = [doesEscape(fn)] // expected-error {{'(() -> Int) -> ()' is not convertible to '(@escaping () -> Int) -> ()'}}
+  _ = [1 : fn] // expected-error {{non-escaping parameter 'fn' may only be called}}
+  _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
 }
 
 class SomeClass {
@@ -340,4 +360,3 @@ func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error
 
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{45-55=}}
-

@@ -8,12 +8,12 @@ sil @error_user : $@convention(thin) (@owned Error) -> ()
 sil @retain_release_boxed_existential : $@convention(thin) (@owned Error) -> () {
 entry(%e : $Error):
   // CHECK-objc: @swift_errorRetain
-  // CHECK-native: @swift_rt_swift_retain
+  // CHECK-native: @swift_retain
   strong_retain %e : $Error
   %1 = function_ref @error_user : $@convention(thin) (@owned Error) -> ()
   apply %1(%e) : $@convention(thin) (@owned Error) -> ()
   // CHECK-objc: @swift_errorRelease
-  // CHECK-native: @swift_rt_swift_release
+  // CHECK-native: @swift_release
   strong_release %e : $Error
   return undef : $()
 }
@@ -105,7 +105,7 @@ entry(%b : $Error):
   %m = existential_metatype $@thick Error.Type, %b : $Error
 
   // CHECK-objc:   call void @swift_errorRelease(%swift.error* %0)
-  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%swift.error*)*)(%swift.error* %0)
+  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%swift.error*)*)(%swift.error* %0)
   strong_release %b : $Error
 
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0

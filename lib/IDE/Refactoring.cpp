@@ -313,6 +313,14 @@ public:
     bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
     bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
     bool IsKeywordBase = IsInit || IsSubscript;
+    
+    // Filter out non-semantic keyword basename locations with no labels.
+    // We've already filtered out those in active code, so these are
+    // any appearance of just 'init' or 'subscript' in strings, comments, and
+    // inactive code.
+    if (IsKeywordBase && (Config.Usage == NameUsage::Unknown &&
+                           Resolved.LabelType == LabelRangeType::None))
+      return RegionType::Unmatched;
 
     if (!Config.IsFunctionLike || !IsKeywordBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
@@ -352,7 +360,8 @@ public:
                         Resolved.LabelType == LabelRangeType::CallArg;
 
       if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
-        return RegionType::Mismatch;
+        return Config.Usage == NameUsage::Unknown ?
+            RegionType::Unmatched : RegionType::Mismatch;
     }
 
     return RegionKind;
@@ -1050,7 +1059,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   CompilerInvocation Invocation{};
 
-  Invocation.getFrontendOptions().Inputs.addInput(
+  Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
@@ -1684,16 +1693,25 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
 }
 
 static std::unique_ptr<llvm::SetVector<Expr*>>
-  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
-  if (Info.Kind != RangeKind::SingleExpression
-      && Info.Kind != RangeKind::PartOfExpression)
-    return nullptr;
+findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
+  Expr *E = nullptr;
 
-  // FIXME: We should always have a valid node.
-  if (Info.ContainedNodes.empty())
+  switch (Info.Kind) {
+  case RangeKind::SingleExpression:
+    // FIXME: the range info kind should imply non-empty list.
+    if (!Info.ContainedNodes.empty())
+      E = Info.ContainedNodes[0].get<Expr*>();
+    else
+      return nullptr;
+    break;
+  case RangeKind::PartOfExpression:
+    E = Info.CommonExprParent;
+    break;
+  default:
     return nullptr;
+  }
 
-  Expr *E = Info.ContainedNodes[0].get<Expr*>();
+  assert(E);
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
     std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
@@ -1875,8 +1893,11 @@ public:
   Binding(Binding) {}
 
   IfExpr *getIf() {
-    if (Binding && Binding->getNumPatternEntries() == 1)
-      return dyn_cast<IfExpr>(Binding->getInit(0));
+    if (Binding && Binding->getNumPatternEntries() == 1) {
+      if (auto *Init = Binding->getInit(0)) {
+        return dyn_cast<IfExpr>(Init);
+      }
+    }
 
     return nullptr;
   }
@@ -2088,7 +2109,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
       && Info.Kind != RangeKind::MultiStatement)
     return notFound;
 
-  if (Info.ContainedNodes.size() == 0)
+  if (Info.ContainedNodes.empty())
     return notFound;
 
   struct AssignExprFinder: public SourceEntityWalker {
@@ -2520,7 +2541,7 @@ static CharSourceRange
   ContextFinder Finder(*TheFile, Node, NodeChecker);
   Finder.resolve();
   auto Contexts = Finder.getContexts();
-  if (Contexts.size() == 0)
+  if (Contexts.empty())
     return CharSourceRange();
   auto TargetNode = Contexts.back();
   BraceStmt *BStmt = dyn_cast<BraceStmt>(TargetNode.dyn_cast<Stmt*>());
@@ -2883,6 +2904,8 @@ swift::ide::FindRenameRangesAnnotatingConsumer::~FindRenameRangesAnnotatingConsu
 void swift::ide::FindRenameRangesAnnotatingConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<RenameRangeDetail> Ranges) {
+  if (RegionType == RegionType::Mismatch || RegionType == RegionType::Unmatched)
+    return;
   for (const auto &Range : Ranges) {
     Impl.accept(SM, Range);
   }
@@ -2911,6 +2934,12 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
       return Scratch;
+    
+    // Disallow renaming init with no arguments.
+    if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+      if (!CD->getParameters()->size())
+        return Scratch;
+    }
   }
 
   // Always return local rename for parameters.

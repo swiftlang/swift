@@ -158,21 +158,7 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   TI->initializeWithTake(IGF, dest, src, T, isOutlined);
 }
 
-llvm::Constant *EnumImplStrategy::emitCaseNames() const {
-  // Build the list of case names, payload followed by no-payload.
-  llvm::SmallString<64> fieldNames;
-  for (auto &payloadCase : getElementsWithPayload()) {
-    fieldNames.append(payloadCase.decl->getName().str());
-    fieldNames.push_back('\0');
-  }
-  for (auto &noPayloadCase : getElementsWithNoPayload()) {
-    fieldNames.append(noPayloadCase.decl->getName().str());
-    fieldNames.push_back('\0');
-  }
-  // The final null terminator is provided by getAddrOfGlobalString.
-  return IGM.getAddrOfGlobalString(fieldNames,
-                                   /*willBeRelativelyAddressed*/ true);
-}
+bool EnumImplStrategy::isReflectable() const { return true; }
 
 unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
   llvm_unreachable("don't need payload size for this enum kind");
@@ -310,7 +296,7 @@ namespace {
       // - -1 -- if we have a payload
       // -  0 -- if there's no payload
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-          ElementsWithPayload.size() > 0 ? -1 : 0);
+                                    !ElementsWithPayload.empty() ? -1 : 0);
     }
 
     llvm::Value *
@@ -1109,11 +1095,11 @@ namespace {
       llvm_unreachable("no extra inhabitants");
     }
 
-    llvm::Constant *emitCaseNames() const override {
+    bool isReflectable() const override {
       // C enums have arbitrary values and we don't preserve the mapping
-      // between the case and raw value at runtime, so don't emit any
-      // case names at all so that reflection can give up in this case.
-      return nullptr;
+      // between the case and raw value at runtime, so don't mark it as
+      // reflectable.
+      return false;
     }
   };
   
@@ -3516,7 +3502,7 @@ namespace {
       
     found_empty_case:
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
-      if (CommonSpareBits.size() > 0) {
+      if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
           .emitCompare(IGF, APInt::getAllOnesValue(CommonSpareBits.size()),
                        payloadValue);
@@ -3605,7 +3591,7 @@ namespace {
         auto tagVal = llvm::ConstantInt::get(C, APInt(numTagBits, tagIndex));
         
         // If the payload is empty, there's only one case per tag.
-        if (CommonSpareBits.size() == 0) {
+        if (CommonSpareBits.empty()) {
           auto found = destMap.find(elti->decl);
           if (found != destMap.end())
             tagSwitch->addCase(tagVal, found->second);
@@ -3730,7 +3716,7 @@ namespace {
                              const LoadableTypeInfo &payloadTI,
                              Explosion &out) const {
       // If the payload is empty, so is the explosion.
-      if (CommonSpareBits.size() == 0)
+      if (CommonSpareBits.empty())
         return;
       
       // If we have spare bits, we have to mask out any set tag bits packed
@@ -3857,7 +3843,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGM, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = APInt(CommonSpareBits.size(), tagIndex);
       }
@@ -3900,9 +3886,15 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGF, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
+#if defined(__BIG_ENDIAN__) && defined(__LP64__)
+        // Code produced above are of type IGM.Int32Ty
+        // However, payload is IGM.SizeTy in 64bit
+        if (numCaseBits >= 64)
+          tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
+#endif
         // We know we won't use more than numCaseBits from tagIndex's value:
         // We made sure of this in the logic above.
         payload.insertValue(IGF, tagIndex, 0,
@@ -4763,8 +4755,8 @@ namespace {
 
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
       ClusteredBitVector bits;
-      
-      if (CommonSpareBits.size() > 0)
+
+      if (!CommonSpareBits.empty())
         bits = getBitVectorFromAPInt(payloadPart);
 
       unsigned totalSize
@@ -5251,7 +5243,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
-    assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
+    assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
            new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,

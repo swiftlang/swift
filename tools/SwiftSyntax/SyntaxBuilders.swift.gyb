@@ -71,7 +71,7 @@ extension ${node.name} {
   ///            incrementally build the structure of the node.
   /// - Returns: A `${node.name}` with all the fields populated in the builder
   ///            closure.
-  public convenience init(_ build: (inout ${Builder}) -> Void) {
+  public init(_ build: (inout ${Builder}) -> Void) {
     var builder = ${Builder}()
     build(&builder)
     let data = builder.buildData()

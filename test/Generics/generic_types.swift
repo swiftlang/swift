@@ -72,7 +72,7 @@ func getFirst<R : IteratorProtocol>(_ r: R) -> R.Element {
   return r.next()!
 }
 
-func testGetFirst(ir: CountableRange<Int>) {
+func testGetFirst(ir: Range<Int>) {
   _ = getFirst(ir.makeIterator()) as Int
 }
 

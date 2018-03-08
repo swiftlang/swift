@@ -24,6 +24,8 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -353,6 +355,10 @@ bool NormalProtocolConformance::isRetroactive() const {
   return true;
 }
 
+bool NormalProtocolConformance::isSynthesizedNonUnique() const {
+  return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
+}
+
 ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
 }
@@ -369,7 +375,7 @@ ProtocolConformanceRef::getConditionalRequirements() const {
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
-  assert(ConditionalRequirements.size() == 0 &&
+  assert(ConditionalRequirements.empty() &&
          "should not recompute conditional requirements");
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();
@@ -402,7 +408,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
   ConditionalRequirements =
-    ctxt.AllocateCopy(canExtensionSig->requirementsNotSatisfiedBy(canTypeSig));
+      ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig));
 }
 
 void NormalProtocolConformance::setSignatureConformances(
@@ -550,8 +556,9 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   if (Loader)
     resolveLazyInfo();
 
-  if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
-    return true;
+  auto found = TypeWitnesses.find(assocType);
+  if (found != TypeWitnesses.end()) {
+    return !found->getSecond().first.isNull();
   }
   if (resolver) {
     PrettyStackTraceRequirement trace("resolving", this, assocType);
@@ -576,24 +583,25 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
   if (known != TypeWitnesses.end())
     return known->second;
 
-  // If this conformance is in a state where it is inferring type witnesses,
-  // check tentative witnesses.
-  if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
-    // If there is a tentative-type-witness function, use it.
-    if (options.getTentativeTypeWitness) {
-     if (Type witnessType =
-           Type(options.getTentativeTypeWitness(this, assocType)))
-       return { witnessType, nullptr };
-    }
+  // If there is a tentative-type-witness function, use it.
+  if (options.getTentativeTypeWitness) {
+   if (Type witnessType =
+         Type(options.getTentativeTypeWitness(this, assocType)))
+     return { witnessType, nullptr };
+  }
 
-    // Otherwise, we fail; this is the only case in which we can return a
-    // null type.
+  // If this conformance is in a state where it is inferring type witnesses but
+  // we didn't find anything, fail.
+  if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
     return { Type(), nullptr };
   }
 
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
   assert(resolver && "Unable to resolve type witness");
+
+  // Block recursive resolution of this type witness.
+  TypeWitnesses[assocType] = { Type(), nullptr };
   resolver->resolveTypeWitness(this, assocType);
 
   known = TypeWitnesses.find(assocType);
@@ -606,7 +614,9 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
                                                TypeDecl *typeDecl) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
-  assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
+  assert((TypeWitnesses.count(assocType) == 0 ||
+          TypeWitnesses[assocType].first.isNull()) &&
+         "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
@@ -1357,4 +1367,40 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
   if (isAbstract())
     return *this;
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// ProtocolConformances, is defined here to avoid too much layering violation /
+// circular linkage dependency.
+
+struct ProtocolConformanceTraceFormatter
+    : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    C->printName(OS);
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    if (auto const *NPC = dyn_cast<NormalProtocolConformance>(C)) {
+      NPC->getLoc().print(OS, *SM);
+    } else if (auto const *DC = C->getDeclContext()) {
+      if (auto const *D = DC->getAsDeclOrDeclExtensionContext())
+        D->getLoc().print(OS, *SM);
+    }
+  }
+};
+
+static ProtocolConformanceTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>() {
+  return &TF;
 }

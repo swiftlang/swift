@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
 
@@ -90,8 +91,7 @@ struct GenericParamKey {
 
   /// Find the index that this key would have into an array of
   /// generic type parameters
-  unsigned findIndexIn(
-             llvm::ArrayRef<GenericTypeParamType *> genericParams) const;
+  unsigned findIndexIn(TypeArrayView<GenericTypeParamType> genericParams) const;
 };
 
 } // end namespace swift

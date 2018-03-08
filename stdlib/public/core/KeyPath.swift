@@ -1252,9 +1252,7 @@ internal struct RawKeyPathComponent {
                            argument?.data.count ?? 0))
 
     case .optionalChain:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       _sanityCheck(_isOptional(LeafValue.self),
                    "leaf result should be optional")
@@ -1267,16 +1265,12 @@ internal struct RawKeyPathComponent {
       }
 
     case .optionalForce:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       return .continue(unsafeBitCast(base, to: Optional<NewValue>.self)!)
 
     case .optionalWrap:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(NewValue.self == Optional<CurValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<CurValue>.self,
+      _sanityCheck(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
@@ -1365,9 +1359,7 @@ internal struct RawKeyPathComponent {
       return UnsafeRawPointer(Builtin.addressof(&writeback.value))
 
     case .optionalForce:
-      // TODO: ImplicitlyUnwrappedOptional should not be a first-class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping an optional value")
       // Optional's layout happens to always put the payload at the start
       // address of the Optional value itself, if a value is present at all.
@@ -1529,7 +1521,7 @@ internal struct KeyPathBuffer {
                      alignment: MemoryLayout<T>.alignment)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
     _memcpy(dest: resultBuf,
-            src: UnsafeMutableRawPointer(mutating: raw.baseAddress.unsafelyUnwrapped),
+            src: raw.baseAddress.unsafelyUnwrapped,
             size: UInt(MemoryLayout<T>.size))
     let result = resultBuf.pointee
     resultBuf.deallocate()
@@ -2035,12 +2027,12 @@ public func _appendingKeyPaths<
         let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
         let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
         _memcpy(dest: kvcStringBuffer,
-                src: UnsafeMutableRawPointer(mutating: rootPtr),
+                src: rootPtr,
                 size: UInt(rootKVCLength))
         kvcStringBuffer.advanced(by: rootKVCLength)
           .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
         _memcpy(dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
-                src: UnsafeMutableRawPointer(mutating: leafPtr),
+                src: leafPtr,
                 size: UInt(leafKVCLength))
         result._kvcKeyPathStringPtr =
           UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))

@@ -1221,7 +1221,8 @@ protected:
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = debugInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-    B.createDebugValueAddr(debugInst->getLoc(), srcAddr);
+    B.createDebugValueAddr(debugInst->getLoc(), srcAddr,
+                           *debugInst->getVarInfo());
     pass.markDead(debugInst);
   }
   

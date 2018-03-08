@@ -172,13 +172,13 @@ public class GenericBase<T> {
 
 public class GenericDerived<T> : GenericBase<T> {
   public override func method() {
-    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyFyycfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     {
       super.method()
     }()
-    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyFyycfU_'
+    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyFyyXEfU_'
 
     // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>

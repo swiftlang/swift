@@ -20,17 +20,8 @@ extension String {
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ substring: Substring) {
-    let x = substring._wholeString
-    let start = substring.startIndex
-    let end = substring.endIndex
-    let u16 = x._core[start.encodedOffset..<end.encodedOffset]
-    if start.samePosition(in: x.unicodeScalars) != nil
-    && end.samePosition(in: x.unicodeScalars) != nil {
-      self = String(_StringCore(u16))
-    }
-    else {
-      self = String(decoding: u16, as: UTF16.self)
-    }
+    let wholeGuts = substring._wholeString._guts
+    self.init(wholeGuts._extractSlice(substring._encodedOffsetRange))
   }
 }
 
@@ -121,7 +112,16 @@ public struct Substring : StringProtocol {
   internal init(_slice: Slice<String>) {
     self._slice = _slice
   }
-  
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
+    self.init(
+      _base: String(guts),
+      Index(encodedOffset: offsetRange.lowerBound) ..<
+        Index(encodedOffset: offsetRange.upperBound))
+  }
+
   /// Creates a substring with the specified bounds within the given string.
   ///
   /// - Parameters:
@@ -204,16 +204,12 @@ public struct Substring : StringProtocol {
     _slice.replaceSubrange(bounds, with: newElements)
   }
 
-% for Range in ['Range', 'ClosedRange']:
-
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: Substring
+    _ bounds: Range<Index>, with newElements: Substring
   ) {
     replaceSubrange(bounds, with: newElements._slice)
   }
-
-% end
 
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
@@ -274,12 +270,10 @@ public struct Substring : StringProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _wholeString._core._withCSubstringAndLength(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
-      encoding: UTF8.self) {
-      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
-        try body($0)
-      }
+    return try _wholeString._guts._withCSubstringAndLength(
+      in: _encodedOffsetRange,
+      encoding: UTF8.self) { p, length in
+      try p.withMemoryRebound(to: CChar.self, capacity: length, body)
     }
   }
 
@@ -304,9 +298,10 @@ public struct Substring : StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _wholeString._core._withCSubstring(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
-      encoding: targetEncoding, body)
+    return try _wholeString._guts._withCSubstring(
+      in: _encodedOffsetRange,
+      encoding: targetEncoding,
+      body)
   }
 }
 
@@ -314,45 +309,23 @@ extension Substring : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent: String {
-    let wholeCore = _wholeString._core
-    let native = wholeCore.nativeBuffer
-    if _fastPath(native != nil) {
-      let wholeString = String(wholeCore)
-      let n = native._unsafelyUnwrappedUnchecked
-      if _fastPath(
-        n.start == wholeCore._baseAddress
-        && n.usedCount == wholeCore.count
-        && _slice.startIndex == wholeString.startIndex
-        && _slice.endIndex == wholeString.endIndex
-      ) {
-        return wholeString
-      }
-    }
-    var r = String()
-    r._core.append(_ephemeralContent._core)
-    _sanityCheck(r._core._owner !== _ephemeralContent._core._owner)
-    return r
+    return String(self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var _ephemeralContent: String {
-    let wholeCore = _wholeString._core
-    let subCore : _StringCore = wholeCore[
-      startIndex.encodedOffset..<endIndex.encodedOffset]
-    // Check that we haven't allocated a new buffer for the result, if we have
-    // contiguous storage.
-    _sanityCheck(
-      subCore._owner === wholeCore._owner || !wholeCore.hasContiguousStorage)
-
-    return String(subCore)
+    return _persistentContent
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal
-  var _wholeString: String {
+  public var _wholeString: String {
     return _slice._base
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _encodedOffsetRange: Range<Int> {
+    return startIndex.encodedOffset..<endIndex.encodedOffset
   }
 }
 
@@ -365,6 +338,7 @@ extension Substring : CustomReflectable {
 
 extension Substring : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -391,46 +365,6 @@ extension Substring : LosslessStringConvertible {
   }
 }
 
-extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func ==<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._ephemeralString == rhs._ephemeralString
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func !=<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._ephemeralString != rhs._ephemeralString
-  }
-}
-
-extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._ephemeralString < rhs._ephemeralString
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return rhs < lhs
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return !(rhs < lhs)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return !(lhs < rhs)
-  }
-}
-
-extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue : Int {
-    return self._ephemeralString.hashValue
-  }
-}
 
 % for (property, ViewPrefix) in [
 %   ('utf8', 'UTF8'),
@@ -439,29 +373,32 @@ extension StringProtocol {
 %   ('characters', 'Character')
 % ]:
 %   View = ViewPrefix + 'View'
-%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
+%   _View = '_CharacterView' if property == 'characters' else View
+%   _property = '_characters' if property == 'characters' else property
+% 
 extension Substring {
   % if View == 'CharacterView':
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
+  public typealias CharacterView = _CharacterView
   % end
+
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct ${View} {
+  public struct ${_View} {
     @_versioned // FIXME(sil-serialize-all)
-    internal var _slice: Slice<String.${View}>
+    internal var _slice: Slice<String.${_View}>
   }
 }
 
-extension Substring.${View} : BidirectionalCollection {
+extension Substring.${_View} : BidirectionalCollection {
   public typealias Index = String.Index
-  public typealias SubSequence = Substring.${View}
 
   /// Creates an instance that slices `base` at `_bounds`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_ base: String.${View}, _bounds: Range<Index>) {
+  internal init(_ base: String.${_View}, _bounds: Range<Index>) {
     _slice = Slice(
-      base: String(base._core).${property},
+      base: String(base._guts).${_property},
       bounds: _bounds)
   }
 
@@ -469,7 +406,13 @@ extension Substring.${View} : BidirectionalCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _wholeString: String {
-    return String(_slice._base._core)
+    return String(_slice._base._guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _encodedOffsetRange: Range<Int> {
+    return startIndex.encodedOffset..<endIndex.encodedOffset
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -489,20 +432,37 @@ extension Substring.${View} : BidirectionalCollection {
     return _slice[i]
   }
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(r: Range<Index>) -> SubSequence {
-    return Substring.${View}(_wholeString.${property}, _bounds: r)
+  % if property == 'characters':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
+  public subscript(r: Range<Index>) -> Substring.${View} {
+    // FIXME(strings): tests.
+    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
+      "${View} index range out of bounds")
+    return Substring.${_View}(_wholeString.${_property}, _bounds: r)
   }
 }
 
 extension Substring {
   % if View == 'CharacterView':
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
-  % end
-  @_inlineable // FIXME(sil-serialize-all)
-  public var ${property}: ${View} {
+  public var characters: CharacterView {
     get {
-      return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
+      return _characters
+    }
+    set {
+      _characters = newValue
+    }
+  }
+  % end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var ${_property}: ${_View} {
+    get {
+      return ${_View}(_wholeString.${_property}, _bounds: startIndex..<endIndex)
     }
     set {
       self = Substring(newValue)
@@ -541,6 +501,10 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   @_inlineable // FIXME(sil-serialize-all)
+  % if property == 'characters':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
   public init(_ content: Substring.${View}) {
     self = String(Substring(content))
   }
@@ -583,29 +547,19 @@ extension Substring : RangeReplaceableCollection {
   where S.Element == Character {
     let e0 = elements as? _SwiftStringView
     if _fastPath(e0 != nil), let e = e0 {
-      self = e._ephemeralContent[...]
-    }
-    else {
-      self = String(elements)[...]
+      self.init(e._wholeString._guts, e._encodedOffsetRange)
+    } else {
+      self.init(String(elements))
     }
   }
   
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf elements: S)
   where S.Element == Character {
-    var c = self._ephemeralContent._core
-    self = Substring()
-    
-    let e0 = elements as? _SwiftStringView
-    if _fastPath(e0 != nil), let e1 = e0 {
-      c.append(contentsOf: e1._ephemeralContent.utf16)
-      self = String(c)[...]
-    }
-    else {
-      var s = String(c)
-      s.append(contentsOf: elements)
-      self = s[...]
-    }
+    var string = String(self)
+    self = Substring() // Keep unique storage if possible
+    string.append(contentsOf: elements)
+    self = Substring(string)
   }
 }
 
@@ -674,6 +628,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
+    _boundsCheck(r)
     return Substring(
       _slice: Slice(base: self, bounds: r))
   }
@@ -681,13 +636,17 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+    _boundsCheck(bounds)
+    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+    _boundsCheck(bounds)
+    return String(Substring(_slice: Slice(
+          base: self,
+          bounds: bounds.relative(to: self))))
   }
 }
 
@@ -701,13 +660,13 @@ extension Substring {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+    return String(Substring(_slice: _slice[bounds]))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+    return self[bounds.relative(to: self)]
   }
 }
 //===----------------------------------------------------------------------===//

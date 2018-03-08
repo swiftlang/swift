@@ -1,0 +1,36 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all -enforce-exclusivity=unchecked -diagnose-static-exclusivity %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+// REQUIRES: asserts
+
+// The test in this file is meant to fail during verification which currently
+// only runs in the diagnose-static-exclusivity pass, but will eventually run in
+// SIL verification.
+
+import Builtin
+import Swift
+
+// CHECK: Argument must be @noescape function type: %{{.*}} = partial_apply
+// CHECK: A partial_apply with @inout_aliasable may only be used as a @noescape function type argument.
+
+sil @takesEscapingClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+
+sil hidden @closureWithArgument : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%1 : $*Int):
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil @missingNoescape : $@convention(thin) (Int) ->() {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesEscapingClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureWithArgument : $@convention(thin) (@inout_aliasable Int) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %8 = apply %4(%6) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %9 = tuple ()
+  return %9 : $()
+}

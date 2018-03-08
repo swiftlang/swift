@@ -26,10 +26,10 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
-// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
+// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
@@ -133,9 +133,9 @@ func use_property_rvalue_get() -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
-// CHECK-NEXT: end_access [[READ]] : $*PropertyWithGetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]])
+// CHECK: end_access [[READ]] : $*PropertyWithGetter
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
@@ -416,6 +416,27 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:      apply [[CALLBACK]]<T>
 
+public struct Val {
+  public var x: Int = 0
+}
+
+public protocol Proto {
+  var val: Val { get nonmutating set}
+}
+
+public func test(_ p: Proto) {
+  p.val.x += 1
+}
+
+// CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in Proto) -> ()
+// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
+// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!materializeForSet
+// CHECK: [[BUF:%.*]] = apply [[MAT]]
+// CHECK: [[WB:%.*]] = pointer_to_thin_function
+// This use looks like it is mutating but really is not. We use to assert in the SIL verifier.
+// CHECK: apply [[WB]]{{.*}}({{.*}}[[OPEN]]
+// CHECK: return
+
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$S9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW
 // CHECK-NEXT: }
@@ -437,3 +458,15 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$S9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW
 // CHECK-NEXT: }
+
+//
+// rdar://problem/37031037
+//
+
+protocol MethodWithDefaultArgGenerator {}
+extension MethodWithDefaultArgGenerator {
+  mutating func foo(_ x: Int = 0) {}
+}
+func invokeMethodWithDefaultArg(x: inout MethodWithDefaultArgGenerator) {
+  x.foo()
+}

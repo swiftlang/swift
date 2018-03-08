@@ -1,4 +1,5 @@
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_OSX %s
+// RUN: not %swiftc_driver -driver-print-jobs -sanitize=fuzzer -target x86_64-apple-macosx10.9 -resource-dir %S/Inputs/nonexistent-resource-dir %s 2>&1 | %FileCheck -check-prefix=FUZZER_NONEXISTENT %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-ios7.1 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_IOSSIM %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target arm64-apple-ios7.1 %s  | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_IOS %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-apple-tvos9.0 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_tvOS_SIM %s
@@ -54,6 +55,7 @@
 // TSAN_tvOS: unsupported option '-sanitize=thread' for target 'arm64-apple-tvos9.0'
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
+// FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
 // TSAN_LINUX: swift/clang/lib/linux/libclang_rt.tsan-x86_64.a
 
 // TSAN: -rpath @executable_path

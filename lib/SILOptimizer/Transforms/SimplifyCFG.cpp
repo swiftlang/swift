@@ -2004,6 +2004,10 @@ static SILValue getActualCallee(SILValue Callee) {
       Callee = CFI->getConverted();
       continue;
     }
+    if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
+      Callee = Cvt->getConverted();
+      continue;
+    }
     if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTI->getConverted();
       continue;
@@ -2019,7 +2023,14 @@ static SILValue getActualCallee(SILValue Callee) {
 static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                               SILValue &Callee,
                                               SILType &CalleeType) {
-  auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
+  auto CalleeOperand = TAI->getCallee();
+
+  // Look through a @noescape conversion.
+  auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeOperand);
+  if (Cvt)
+    CalleeOperand = Cvt->getConverted();
+
+  auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
     return false;
   
@@ -3583,30 +3594,35 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
 
 namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
-  bool EnableJumpThread;
-
 public:
-  SimplifyCFGPass(bool EnableJumpThread)
-      : EnableJumpThread(EnableJumpThread) {}
-
-  /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
-                    EnableJumpThread)
+                    /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
-
 };
 } // end anonymous namespace
 
 
 SILTransform *swift::createSimplifyCFG() {
-  return new SimplifyCFGPass(false);
+  return new SimplifyCFGPass();
 }
 
+namespace {
+class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
+public:
+  void run() override {
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+                    /*EnableJumpThread=*/true)
+            .run())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
+};
+} // end anonymous namespace
+
 SILTransform *swift::createJumpThreadSimplifyCFG() {
-  return new SimplifyCFGPass(true);
+  return new JumpThreadSimplifyCFGPass();
 }
 
 //===----------------------------------------------------------------------===//

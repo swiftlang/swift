@@ -8,7 +8,6 @@ add_swift_library(swiftSema STATIC
   CSBindings.cpp
   CSDiag.cpp
   CSGen.cpp
-  CSPropagate.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp

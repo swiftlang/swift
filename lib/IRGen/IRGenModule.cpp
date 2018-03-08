@@ -35,6 +35,7 @@
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Frontend/CodeGenOptions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -124,14 +125,16 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName, StringRef OutputFilename)
+                         StringRef ModuleName, StringRef OutputFilename,
+                         StringRef MainInputFilenameForDebugInfo)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
-      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
-      OutputFilename(OutputFilename),
+      DataLayout(target->createDataLayout()),
+      Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
+      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
@@ -233,15 +236,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
-  // A metadata pattern is a structure from which generic type
-  // metadata are allocated.  We leave this struct type intentionally
-  // opaque, because the compiler basically never needs to access
-  // anything from one.
-  TypeMetadataPatternStructTy =
-    llvm::StructType::create(getLLVMContext(), "swift.type_pattern");
-  TypeMetadataPatternPtrTy =
-    TypeMetadataPatternStructTy->getPointerTo(DefaultAS);
-
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
 
@@ -283,6 +277,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
   OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
+  NoEscapeFunctionPairTy = createStructType(*this, "swift.noescape.function", {
+    FunctionPtrTy,
+    OpaquePtrTy,
+  });
 
   ProtocolRecordTy =
     createStructType(*this, "swift.protocolref", {
@@ -300,10 +298,31 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolConformanceDescriptorPtrTy
     = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
-  NominalTypeDescriptorTy
+  TypeContextDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
-  NominalTypeDescriptorPtrTy
-    = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+  TypeContextDescriptorPtrTy
+    = TypeContextDescriptorTy->getPointerTo(DefaultAS);
+
+  ClassContextDescriptorTy =
+        llvm::StructType::get(LLVMContext, {
+    Int32Ty, // context flags
+    Int32Ty, // parent
+    Int32Ty, // name
+    Int32Ty, // kind
+    Int32Ty, // accessor function
+    Int32Ty, // num fields
+    Int32Ty, // field offset vector
+    Int32Ty, // is_reflectable flag
+    Int32Ty, // (Generics Descriptor) argument offset
+    Int32Ty, // (Generics Descriptor) num params
+    Int32Ty, // (Generics Descriptor) num requirements
+    Int32Ty, // (Generics Descriptor) num key arguments
+    Int32Ty, // (Generics Descriptor) num extra arguments
+    Int32Ty, // (VTable Descriptor) offset
+    Int32Ty, // (VTable Descriptor) size
+    Int32Ty, // (Methods Descriptor) accessor
+    Int32Ty, // (Methods Descriptor) flags
+  }, /*packed=*/true);
 
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
@@ -321,6 +340,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   FieldDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.field_descriptor");
   FieldDescriptorPtrTy = FieldDescriptorTy->getPointerTo(DefaultAS);
+  FieldDescriptorPtrPtrTy = FieldDescriptorPtrTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
@@ -378,8 +398,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
 
   WitnessTablePtrPtrTy = WitnessTablePtrTy->getPointerTo(DefaultAS);
-  WitnessTableSliceTy = createStructType(*this, "swift.witness_table_slice",
-                                         {WitnessTablePtrPtrTy, SizeTy});
 
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
@@ -387,30 +405,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  DefaultCC = SWIFT_LLVM_CC(DefaultCC);
-  // If it is an interpreter, don't use try to use any
-  // advanced calling conventions and use instead a
-  // more conservative C calling convention. This
-  // makes sure that none of the registers eventually
-  // used by the dynamic linker are used by generated code.
-  // TODO: Check that the deployment target supports the new
-  // calling convention. Older versions of the runtime library
-  // may not contain the entries using the new calling convention.
-
-  // Only use the new calling conventions on platforms that support it.
-  auto Arch = Triple.getArch();
-  (void)Arch;
-  if (SWIFT_RT_USE_RegisterPreservingCC &&
-      Arch == llvm::Triple::ArchType::aarch64)
-    RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  else
-    RegisterPreservingCC = DefaultCC;
-
+  DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module, SF);
+                                                     Module,
+                                                 MainInputFilenameForDebugInfo);
 
   initClangTypeConverter();
 
@@ -513,127 +514,13 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   return cache;
 }
 
-llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
-                                    llvm::Constant *&cache,
-                                    char const *name,
-                                    char const *symbol,
-                                    llvm::CallingConv::ID cc,
-                                    llvm::ArrayRef<llvm::Type *> retTypes,
-                                    llvm::ArrayRef<llvm::Type *> argTypes,
-                                    ArrayRef<Attribute::AttrKind> attrs) {
-  assert(symbol && "Symbol name should be defined for a wrapper function");
-  // Wrapper names should have a prefix to distinguish them from the
-  // actual runtime functions.
-  llvm::SmallString<128> wrapperNameStr;
-  llvm::raw_svector_ostream buffer(wrapperNameStr);
-  buffer << SWIFT_WRAPPER_PREFIX;
-  buffer << name;
-  const char *wrapperName = wrapperNameStr.c_str();
-  auto fn = getRuntimeFn(Module, cache, wrapperName, cc,
-                         retTypes, argTypes, attrs);
-  auto *fun = dyn_cast<llvm::Function>(fn);
-  assert(fun && "Wrapper should be an llvm::Function");
-  // Do not inline wrappers, because this would result in a code size increase.
-  fun->addAttribute(llvm::AttributeList::FunctionIndex,
-                    llvm::Attribute::NoInline);
-  assert(fun->hasFnAttribute(llvm::Attribute::NoInline) &&
-         "Wrappers should not be inlined");
-  if (fun->empty()) {
-    // All wrappers should have ODR linkage so that a linker can detect them
-    // and leave only one copy.
-    fun->setLinkage(llvm::Function::LinkOnceODRLinkage);
-    fun->setVisibility(llvm::Function::HiddenVisibility);
-    fun->setDLLStorageClass(llvm::Function::DefaultStorageClass);
-    fun->setDoesNotThrow();
-
-    // Add the body of a wrapper.
-    // It simply invokes the actual implementation of the runtime entry
-    // by means of indirect call through a pointer stored in the
-    // global variable.
-    llvm::IRBuilder<> Builder(Module.getContext());
-    llvm::BasicBlock *bb =
-        llvm::BasicBlock::Create(Module.getContext(), "entry", fun);
-    Builder.SetInsertPoint(bb);
-    auto fnTy = fun->getFunctionType();
-    auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
-
-    auto *globalFnPtr = new llvm::GlobalVariable(
-        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
-        symbol);
-    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())))
-      globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-
-    // Forward all arguments.
-    llvm::SmallVector<llvm::Value *, 4> args;
-    for (auto &arg: fun->args()) {
-      args.push_back(&arg);
-    }
-
-
-    auto fnPtr = Builder.CreateLoad(globalFnPtr, "load");
-
-    auto call = Builder.CreateCall(fnPtr, args);
-    call->setCallingConv(cc);
-    call->setTailCall(true);
-    for (auto Attr : attrs)
-      if (isReturnedAttribute(Attr)) {
-        call->addParamAttr(0, llvm::Attribute::Returned);
-      }
-    auto VoidTy = llvm::Type::getVoidTy(Module.getContext());
-    if (retTypes.size() == 1 && *retTypes.begin() == VoidTy)
-      Builder.CreateRetVoid();
-    else
-      Builder.CreateRet(call);
-  }
-
-  return fn;
-}
-
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION_FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)             \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_SwiftCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)          \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS,    \
-                                               ATTRS)                          \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SWIFT_RT_ENTRY_REF(NAME), CC,     \
-                                   QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
 #define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
-  FUNCTION_FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS),            \
-                         QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_DefaultCC(ID, NAME, SYMBOL, CC,   \
-                                                       RETURNS, ARGS, ATTRS)   \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_SwiftCC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_RegisterPreservingCC(             \
-    ID, NAME, SYMBOL, CC, RETURNS, ARGS, ATTRS)                                \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
-                                   QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
-                                             RETURNS, ARGS, ATTRS)             \
-  FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_##CC(                                   \
-      ID, NAME, SYMBOL, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define RETURNS(...)                                                           \
-  { __VA_ARGS__ }
+#define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }
@@ -643,14 +530,6 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC, RETURNS, ARGS, ATTRS);      \
-  }
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL_NAME, CC, RETURNS,   \
-                                         ARGS, ATTRS)                          \
-  llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
-    using namespace RuntimeConstants;                                          \
-    return getWrapperFn(Module, ID##Fn, #NAME, STR(SYMBOL_NAME), CC, RETURNS,  \
-                        ARGS, ATTRS);                                          \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
@@ -970,19 +849,20 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
-    auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
+    auto ForceImportThunk =
+        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
     if (useDllStorage())
-      cast<llvm::GlobalVariable>(symbolAddr)
+      cast<llvm::GlobalValue>(ForceImportThunk)
           ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);
 
     if (!Module.getGlobalVariable(buf.str())) {
-      auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
+      auto ref = new llvm::GlobalVariable(Module, ForceImportThunk->getType(),
                                           /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
-                                          symbolAddr, buf.str());
+                                          ForceImportThunk, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
@@ -1072,13 +952,17 @@ void IRGenModule::emitAutolinkInfo() {
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
-    auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
-                                 llvm::GlobalValue::CommonLinkage,
-                                 llvm::Constant::getNullValue(Int1Ty),
-                                 buf.str());
+    auto ForceImportThunk =
+        llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
+                               llvm::GlobalValue::WeakODRLinkage, buf,
+                               &Module);
     if (useDllStorage())
-      symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+      ForceImportThunk
+          ->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+
+    auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
+    llvm::IRBuilder<> IRB(BB);
+    IRB.CreateRetVoid();
   }
 }
 
@@ -1232,4 +1116,11 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return IGM;
 
   return getPrimaryIGM();
+}
+
+llvm::Triple IRGenerator::getEffectiveClangTriple() {
+  auto CI = static_cast<ClangImporter *>(
+      &*SIL.getASTContext().getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }

@@ -29,8 +29,6 @@ public func run_NibbleSort(_ N: Int) {
 }
 
 struct NibbleCollection: RandomAccessCollection, MutableCollection {
-  typealias Indices = CountableRange<UInt64>
-
   var val: UInt64
   init(_ val: UInt64) { self.val = val }
 
@@ -38,8 +36,7 @@ struct NibbleCollection: RandomAccessCollection, MutableCollection {
   let startIndex: UInt64 = 0
   let endIndex: UInt64 = 16
 
-  subscript(bounds: Range<Index>)
-  -> MutableRandomAccessSlice<NibbleCollection> {
+  subscript(bounds: Range<Index>) -> Slice<NibbleCollection> {
     get {
       fatalError("Should not be called. Added here to please the type checker")
     }

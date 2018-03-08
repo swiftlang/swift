@@ -297,7 +297,6 @@ tests.test("_isOptional") {
   expectTrue(_isOptional(Optional<Int>.self))
   expectTrue(_isOptional(Optional<X>.self))
   expectTrue(_isOptional(Optional<P>.self))
-  expectTrue(_isOptional(ImplicitlyUnwrappedOptional<P>.self))
   expectFalse(_isOptional(Int.self))
   expectFalse(_isOptional(X.self))
   expectFalse(_isOptional(P.self))

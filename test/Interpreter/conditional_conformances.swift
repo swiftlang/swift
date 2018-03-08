@@ -20,7 +20,7 @@ double_generic_concrete(IsP2.self)
 double_concrete_concrete()
 
 assert(dynamicCastToP1(Single<IsP3>()) == nil)
-assert(dynamicCastToP1(Single<IsP2>()) == nil) // FIXME: incorrect result!
+assert(dynamicCastToP1(Single<IsP2>()) != nil)
 
 #elseif with_assoc
 generic_generic(IsAlsoP2.self, IsP3.self)

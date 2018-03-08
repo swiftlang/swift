@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -111,11 +112,13 @@ namespace {
 int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
-                      DiagnosticEngine &Diags,
+                      swift::DiagnosticEngine &Diags,
                       std::vector<std::pair<RC<syntax::RawSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
-  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID,
+                              /*Offset=*/0, /*EndOffset=*/0,
+                              &Diags);
+  return EXIT_SUCCESS;
 }
 
 
@@ -144,9 +147,9 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           StringRef InputFileName,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = true;
-  Invocation.getFrontendOptions().Inputs.addInputFile(InputFileName);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));
@@ -190,7 +193,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
     TokAndPos.first->print(llvm::outs(), {});
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doDumpRawTokenSyntax(const StringRef InputFilename) {
@@ -214,7 +217,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
     llvm::outs() << "\n";
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doFullParseRoundTrip(const char *MainExecutablePath,
@@ -232,7 +235,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
 
   auto Root = SF->getSyntaxRoot().getRaw();
   swift::json::Output out(llvm::outs());
-  out << Root;
+  out << *Root;
   llvm::outs() << "\n";
 
   return EXIT_SUCCESS;
@@ -264,7 +267,7 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
   auto BufferId = *SF->getBufferID();
   SyntaxPrintOptions Opts;
   auto Root = SF->getSyntaxRoot();
-  auto AbPos = Root.getEOFToken().getAbsolutePosition(Root);
+  auto AbPos = Root.getEOFToken().getAbsolutePosition();
 
   SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
   auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
@@ -281,6 +284,7 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
 }// end of anonymous namespace
 
 int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;

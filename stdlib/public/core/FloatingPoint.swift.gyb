@@ -1612,7 +1612,7 @@ extension FloatingPoint {
   /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
   @_inlineable // FIXME(sil-serialize-all)
   public static var ulpOfOne: Self {
-    return Self(1).ulp
+    return (1 as Self).ulp
   }
 
   /// Returns this value rounded to an integral value using the specified

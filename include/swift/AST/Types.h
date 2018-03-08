@@ -69,7 +69,6 @@ namespace swift {
   class ModuleDecl;
   class ModuleType;
   class ProtocolConformance;
-  enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
 
@@ -87,8 +86,6 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 10 };
-
   /// A single property.
   ///
   /// Note that the property polarities should be chosen so that 0 is
@@ -124,7 +121,10 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+
+    Last_Property = HasDependentMember
   };
+  enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
 private:
   unsigned Bits;
@@ -572,6 +572,12 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
+  /// \brief Determine whether this type can dynamically be an optional type.
+  ///
+  /// \param includeExistential Whether an existential type should be considered
+  /// such a type.
+  bool canDynamicallyBeOptionalType(bool includeExistential);
+
   /// Determine whether this type contains a type parameter somewhere in it.
   bool hasTypeParameter() {
     return getRecursiveProperties().hasTypeParameter();
@@ -696,6 +702,16 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
+  /// Determine whether this type satisfies a class layout constraint, written
+  /// `T: AnyObject` in the source.
+  ///
+  /// A class layout constraint is satisfied when we have a single retainable
+  /// pointer as the representation, which includes:
+  /// - @objc existentials
+  /// - class constrained archetypes
+  /// - classes
+  bool satisfiesClassConstraint();
+
   /// \brief Determine whether this type can be used as a base type for AST
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
@@ -763,7 +779,16 @@ public:
 
   /// \brief Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
-  bool matches(Type other, TypeMatchOptions matchOptions, LazyResolver *resolver);
+  bool matches(Type other, TypeMatchOptions matchOptions);
+
+  bool matchesParameter(Type other, TypeMatchOptions matchMode);
+
+  /// \brief Determines whether this function type is similar to \p
+  /// other as defined by \p matchOptions and the callback \p
+  /// paramsAndResultMatch which determines in a client-specific way
+  /// whether the parameters and result of the types match.
+  bool matchesFunctionType(Type other, TypeMatchOptions matchOptions,
+                           std::function<bool()> paramsAndResultMatch);
 
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
@@ -973,29 +998,22 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is ImplicitlyUnwrappedOptional<T>; otherwise, return
-  /// the null type.
-  Type getImplicitlyUnwrappedOptionalObjectType();
-
-  /// Return T if this type is Optional<T> or ImplicitlyUnwrappedOptional<T>;
-  /// otherwise, return the null type.
-  Type getAnyOptionalObjectType(OptionalTypeKind &kind);
-  Type getAnyOptionalObjectType() {
-    OptionalTypeKind ignored;
-    return getAnyOptionalObjectType(ignored);
-  }
+  /// Return T if this type is Optional<T>; otherwise, return the null
+  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
+  /// otherwise.
+  Type getOptionalObjectType(bool &isOptional);
 
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes();
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals);
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
@@ -1014,7 +1032,16 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
-  
+
+  /// Return the name of the type, adding parens in cases where
+  /// appending or prepending text to the result would cause that text
+  /// to be appended to only a portion of the returned type. For
+  /// example for a function type "Int -> Float", adding text after
+  /// the type would make it appear that it's appended to "Float" as
+  /// opposed to the entire type.
+  std::string
+  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
@@ -1553,8 +1580,9 @@ class ParameterTypeFlags {
     Escaping    = 1 << 2,
     InOut       = 1 << 3,
     Shared      = 1 << 4,
+    Owned       = 1 << 5,
 
-    NumBits = 5
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1567,17 +1595,17 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
-      : value((variadic ? Variadic : 0) |
-              (autoclosure ? AutoClosure : 0) |
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
+                     ValueOwnership ownership)
+      : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
-              (inOut ? InOut : 0) |
-              (shared ? Shared : 0)) {}
+              (ownership == ValueOwnership::InOut ? InOut : 0) |
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
 
   /// Create one from what's present in the parameter type
-  inline static ParameterTypeFlags fromParameterType(Type paramTy,
-                                                     bool isVariadic,
-                                                     bool isShared);
+  inline static ParameterTypeFlags
+  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1585,6 +1613,18 @@ public:
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
+
+    return ValueOwnership::Default;
+  }
 
   ParameterTypeFlags withVariadic(bool variadic) const {
     return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
@@ -1604,6 +1644,11 @@ public:
   ParameterTypeFlags withShared(bool isShared) const {
     return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
                                        : value - ParameterTypeFlags::Shared);
+  }
+
+  ParameterTypeFlags withOwned(bool isOwned) const {
+    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
+                                      : value - ParameterTypeFlags::Owned);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2495,6 +2540,9 @@ public:
     
     /// Whether the parameter is marked 'shared'
     bool isShared() const { return Flags.isShared(); }
+
+    /// Whether the parameter is marked 'owned'
+    bool isOwned() const { return Flags.isOwned(); }
   };
 
   class CanParam : public Param {
@@ -2881,7 +2929,7 @@ public:
   }
   
   /// Retrieve the generic parameters of this polymorphic function type.
-  ArrayRef<GenericTypeParamType *> getGenericParams() const;
+  TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
   /// Retrieve the requirements of this polymorphic function type.
   ArrayRef<Requirement> getRequirements() const;
@@ -3816,6 +3864,12 @@ public:
     return getExtInfo().isNoEscape();
   }
 
+  /// Thick swift noescape function types are trivial.
+  bool isTrivialNoEscape() const {
+    return isNoEscape() &&
+           getRepresentation() == SILFunctionTypeRepresentation::Thick;
+  }
+
   bool isNoReturnFunction(); // Defined in SILType.cpp
 
   class ABICompatibilityCheckResult {
@@ -3824,6 +3878,7 @@ public:
     enum innerty {
       None,
       DifferentFunctionRepresentations,
+      ABIEscapeToNoEscapeConversion,
       DifferentNumberOfResults,
       DifferentReturnValueConventions,
       ABIIncompatibleReturnValues,
@@ -3843,6 +3898,10 @@ public:
     ABICompatibilityCheckResult() = delete;
 
     bool isCompatible() const { return kind == innerty::None; }
+    bool isCompatibleUpToNoEscapeConversion() {
+      return kind == innerty::None ||
+             kind == innerty::ABIEscapeToNoEscapeConversion;
+    }
 
     bool hasPayload() const { return payload.hasValue(); }
     uintptr_t getPayload() const { return payload.getValue(); }
@@ -4064,36 +4123,9 @@ public:
   /// Return a uniqued optional type with the specified base type.
   static OptionalType *get(Type baseTy);
 
-  /// Build one of the optional type sugar kinds.
-  ///
-  /// It's a bit unnatural to have this on OptionalType, but we don't
-  /// have an abstract common class, and polluting TypeBase with it
-  /// would be unfortunate.  If we ever make an AnyOptionalType,
-  /// we can move it there.
-  ///
-  /// \param kind - can't be OTK_None
-  static Type get(OptionalTypeKind kind, Type baseTy);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;
-  }
-};
-
-/// The type T!, which is always sugar for a library type.
-class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
-  ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
-                        RecursiveTypeProperties properties)
-    : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
-                           properties) {}
-
-public:
-  /// Return a uniqued optional type with the specified base type.
-  static ImplicitlyUnwrappedOptionalType *get(Type baseTy);
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ImplicitlyUnwrappedOptional;
   }
 };
 
@@ -4741,15 +4773,18 @@ protected:
 private:
   Type Referent;
 public:
-  static ReferenceStorageType *get(Type referent, Ownership ownership,
+  static ReferenceStorageType *get(Type referent, ReferenceOwnership ownership,
                                    const ASTContext &C);
 
   Type getReferentType() const { return Referent; }
-  Ownership getOwnership() const {
+  ReferenceOwnership getOwnership() const {
     switch (getKind()) {
-    case TypeKind::WeakStorage: return Ownership::Weak;
-    case TypeKind::UnownedStorage: return Ownership::Unowned;
-    case TypeKind::UnmanagedStorage: return Ownership::Unmanaged;
+    case TypeKind::WeakStorage:
+      return ReferenceOwnership::Weak;
+    case TypeKind::UnownedStorage:
+      return ReferenceOwnership::Unowned;
+    case TypeKind::UnmanagedStorage:
+      return ReferenceOwnership::Unmanaged;
     default: llvm_unreachable("Unhandled reference storage type");
     }
   }
@@ -4761,10 +4796,10 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
-  static CanReferenceStorageType get(CanType referent, Ownership ownership) {
-    return CanReferenceStorageType(ReferenceStorageType::get(referent,
-                                                   ownership,
-                                                   referent->getASTContext()));
+static CanReferenceStorageType get(CanType referent,
+                                   ReferenceOwnership ownership) {
+  return CanReferenceStorageType(ReferenceStorageType::get(
+      referent, ownership, referent->getASTContext()));
   }
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
@@ -4778,8 +4813,8 @@ class UnownedStorageType : public ReferenceStorageType {
 
 public:
   static UnownedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnownedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unowned, C));
+    return static_cast<UnownedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unowned, C));
   }
 
   /// Is this unowned storage type known to be loadable within the given
@@ -4809,8 +4844,8 @@ class UnmanagedStorageType : public ReferenceStorageType {
 
 public:
   static UnmanagedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnmanagedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unmanaged, C));
+    return static_cast<UnmanagedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unmanaged, C));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4834,8 +4869,8 @@ class WeakStorageType : public ReferenceStorageType {
 
 public:
   static WeakStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<WeakStorageType*>(
-                    ReferenceStorageType::get(referent, Ownership::Weak, C));
+    return static_cast<WeakStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Weak, C));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4993,6 +5028,14 @@ inline bool TypeBase::isOpenedExistentialWithError() {
   return false;
 }
 
+inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
+  CanType T = getCanonicalType();
+  auto isArchetypeOrExistential = isa<ArchetypeType>(T) ||
+    (includeExistential && T.isExistentialType());
+
+  return isArchetypeOrExistential && !T.isAnyClassReferenceType();
+}
+
 inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   return getCanonicalType().getClassOrBoundGenericClass();
 }
@@ -5146,7 +5189,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShared) {
+ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      ValueOwnership ownership) {
   bool autoclosure = paramTy->is<AnyFunctionType>() &&
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
@@ -5155,8 +5199,12 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
   // ParameterTypeFlags::fromParameterType entirely.
-  bool inOut = paramTy->is<InOutType>();
-  return {isVariadic, autoclosure, escaping, inOut, isShared};
+  if (paramTy->is<InOutType>()) {
+    assert(ownership == ValueOwnership::Default ||
+           ownership == ValueOwnership::InOut);
+    ownership = ValueOwnership::InOut;
+  }
+  return {isVariadic, autoclosure, escaping, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

@@ -49,11 +49,11 @@ func testNullable(_ obj: Test) -> [Any]? {
   return obj.nullableArray
 } // CHECK: } // end sil function '$S20objc_bridged_results12testNullableySayypGSgSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$S20objc_bridged_results19testNullUnspecifiedySQySayypGGSo4TestCF
+// CHECK-LABEL: sil hidden @$S20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF
 func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]!, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
 
@@ -75,7 +75,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullUnspecifiedArray
-} // CHECK: } // end sil function '$S20objc_bridged_results19testNullUnspecifiedySQySayypGGSo4TestCF'
+} // CHECK: } // end sil function '$S20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF'
 
 
 // CHECK-LABEL: sil hidden @$S20objc_bridged_results21testNonnullDictionaryys0F0Vys11AnyHashableVypGSo4TestCF

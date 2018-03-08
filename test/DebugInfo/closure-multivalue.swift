@@ -39,4 +39,4 @@ demo()
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0: !DILocalVariable(name: "b", arg: 2{{.*}} line: 17,
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DISubprogram(linkageName: "$SS2SSbs5Error_pIgxxdzo_S2SSbsAA_pIgiidzo_TR",
+// CHECK-O0: !DISubprogram(linkageName: "$SS2SSbs5Error_pIgxxdzo_S2SSbsAA_pIegiidzo_TR",

@@ -25,10 +25,21 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 #define DEBUG_TYPE "Associated type inference"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumSolutionStates, "# of solution states visited");
+STATISTIC(NumSolutionStatesFailedCheck,
+          "# of solution states that failed constraints check");
+STATISTIC(NumConstrainedExtensionChecks,
+          "# of constrained extension checks");
+STATISTIC(NumConstrainedExtensionChecksFailed,
+          "# of constrained extension checks failed");
+STATISTIC(NumDuplicateSolutionStates,
+          "# of duplicate solution states ");
 
 using namespace swift;
 
@@ -818,7 +829,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
 
   if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
     // Record the failure, if we haven't seen one already.
-    if (!failedDefaultedAssocType) {
+    if (!failedDefaultedAssocType && !failed.isError()) {
       failedDefaultedAssocType = defaultedAssocType;
       failedDefaultedWitness = defaultType;
       failedDefaultedResult = failed;
@@ -1042,26 +1053,6 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
 bool AssociatedTypeInference::checkCurrentTypeWitnesses(
        const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
          &valueWitnesses) {
-  // Fold the dependent member types within this type.
-  for (auto assocType : proto->getAssociatedTypeMembers()) {
-    if (conformance->hasTypeWitness(assocType))
-      continue;
-
-    // If the type binding does not have a type parameter, there's nothing
-    // to do.
-    auto known = typeWitnesses.begin(assocType);
-    assert(known != typeWitnesses.end());
-    if (!known->first->hasTypeParameter() &&
-        !known->first->hasDependentMember())
-      continue;
-
-    Type replaced = substCurrentTypeWitnesses(known->first);
-    if (replaced.isNull())
-      return true;
-
-    known->first = replaced;
-  }
-
   // If we don't have a requirement signature for this protocol, bail out.
   // FIXME: We should never get to this point. Or we should always fail.
   if (!proto->isRequirementSignatureComputed()) return false;
@@ -1082,7 +1073,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto result =
     tc.checkGenericArguments(dc, SourceLoc(), SourceLoc(),
                              typeInContext,
-                             { proto->getProtocolSelfType() },
+                             { Type(proto->getProtocolSelfType()) },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(tc, dc),
@@ -1090,6 +1081,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   switch (result) {
   case RequirementCheckResult::Failure:
   case RequirementCheckResult::UnsatisfiedDependency:
+    ++NumSolutionStatesFailedCheck;
     return true;
 
   case RequirementCheckResult::Success:
@@ -1113,7 +1105,11 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
     if (!ext->isConstrainedExtension()) continue;
     if (!checkedExtensions.insert(ext).second) continue;
 
-    if (checkConstrainedExtension(ext)) return true;
+    ++NumConstrainedExtensionChecks;
+    if (checkConstrainedExtension(ext)) {
+      ++NumConstrainedExtensionChecksFailed;
+      return true;
+    }
   }
 
   return false;
@@ -1204,26 +1200,50 @@ void AssociatedTypeInference::findSolutionsRec(
       return;
     }
 
-    /// Check the current set of type witnesses.
-    bool invalid = checkCurrentTypeWitnesses(valueWitnesses);
+    ++NumSolutionStates;
 
-    // Determine whether there is already a solution with the same
-    // bindings.
-    for (const auto &solution : solutions) {
-      bool sameSolution = true;
+    // Fold the dependent member types within this type.
+    for (auto assocType : proto->getAssociatedTypeMembers()) {
+      if (conformance->hasTypeWitness(assocType))
+        continue;
+
+      // If the type binding does not have a type parameter, there's nothing
+      // to do.
+      auto known = typeWitnesses.begin(assocType);
+      assert(known != typeWitnesses.end());
+      if (!known->first->hasTypeParameter() &&
+          !known->first->hasDependentMember())
+        continue;
+
+      Type replaced = substCurrentTypeWitnesses(known->first);
+      if (replaced.isNull())
+        return;
+
+      known->first = replaced;
+    }
+
+    // Check whether our current solution matches the given solution.
+    auto matchesSolution =
+        [&](const InferredTypeWitnessesSolution &solution) {
       for (const auto &existingTypeWitness : solution.TypeWitnesses) {
         auto typeWitness = typeWitnesses.begin(existingTypeWitness.first);
-        if (!typeWitness->first->isEqual(existingTypeWitness.second.first)) {
-          sameSolution = false;
-          break;
-        }
+        if (!typeWitness->first->isEqual(existingTypeWitness.second.first))
+          return false;
       }
 
-      // We found the same solution. There is no point in recording
-      // a new one.
-      if (sameSolution)
-        return;
+      return true;
+    };
+
+    // If we've seen this solution already, bail out; there's no point in
+    // checking further.
+    if (llvm::any_of(solutions, matchesSolution) ||
+        llvm::any_of(nonViableSolutions, matchesSolution)) {
+      ++NumDuplicateSolutionStates;
+      return;
     }
+
+    /// Check the current set of type witnesses.
+    bool invalid = checkCurrentTypeWitnesses(valueWitnesses);
 
     auto &solutionList = invalid ? nonViableSolutions : solutions;
     solutionList.push_back(InferredTypeWitnessesSolution());
@@ -1680,6 +1700,9 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         diags.diagnose(assocType, diag::bad_associated_type_deduction,
                        assocType->getFullName(), proto->getFullName());
         for (const auto &failed : failedSet) {
+          if (failed.Result.isError())
+            continue;
+
           diags.diagnose(failed.Witness,
                          diag::associated_type_deduction_witness_failed,
                          failed.Requirement->getFullName(),

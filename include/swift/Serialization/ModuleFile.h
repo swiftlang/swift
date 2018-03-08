@@ -87,6 +87,11 @@ class ModuleFile
   /// The number of entities that are currently being deserialized.
   unsigned NumCurrentDeserializingEntities = 0;
 
+  /// Is this module file actually a .sib file? .sib files are serialized SIL at
+  /// arbitrary granularity and arbitrary stage; unlike serialized Swift
+  /// modules, which are assumed to contain canonical SIL for an entire module.
+  bool IsSIB = false;
+
   /// RAII class to be used when deserializing an entity.
   class DeserializingEntityRAII {
     ModuleFile &MF;

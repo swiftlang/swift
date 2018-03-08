@@ -382,22 +382,49 @@ public:
   }
 
   Pattern *convertBindingsToOptionalSome(Expr *E) {
-    auto *Bind = dyn_cast<BindOptionalExpr>(E->getSemanticsProvidingExpr());
-    if (!Bind) return getSubExprPattern(E);
+    auto *expr = E->getSemanticsProvidingExpr();
+    auto *bindExpr = dyn_cast<BindOptionalExpr>(expr);
+    if (!bindExpr) {
+      // Let's see if this expression prefixed with any number of '?'
+      // has any other disjoint 'BindOptionalExpr' inside of it, if so,
+      // we need to wrap such sub-expression into `OptionalEvaluationExpr`.
+      bool hasDisjointChaining = false;
+      expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+        // If there is `OptionalEvaluationExpr` in the AST
+        // it means that all of possible `BindOptionalExpr`
+        // which follow are covered by it.
+        if (isa<OptionalEvaluationExpr>(subExpr))
+          return nullptr;
 
-    auto sub = convertBindingsToOptionalSome(Bind->getSubExpr());
-    return new (TC.Context) OptionalSomePattern(sub, Bind->getQuestionLoc());
+        if (isa<BindOptionalExpr>(subExpr)) {
+          hasDisjointChaining = true;
+          return nullptr;
+        }
+
+        return subExpr;
+      });
+
+      if (hasDisjointChaining)
+        E = new (TC.Context) OptionalEvaluationExpr(E);
+
+      return getSubExprPattern(E);
+    }
+
+    auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
+    return new (TC.Context) OptionalSomePattern(subExpr,
+                                                bindExpr->getQuestionLoc());
   }
 
   // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
   // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
   Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    auto *subExpr = E->getSubExpr();
     // We only handle the case where one or more bind expressions are subexprs
     // of the optional evaluation.  Other cases are not simple postfix ?'s.
-    if (!isa<BindOptionalExpr>(E->getSubExpr()->getSemanticsProvidingExpr()))
+    if (!isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
       return nullptr;
 
-    return convertBindingsToOptionalSome(E->getSubExpr());
+    return convertBindingsToOptionalSome(subExpr);
   }
 
 
@@ -760,10 +787,8 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     // If the param is not a 'let' and it is not an 'inout'.
     // It must be a 'var'. Provide helpful diagnostics like a shadow copy
     // in the function body to fix the 'var' attribute.
-    if (!decl->isLet() &&
-        !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) &&
-        !hadError) {
+    if (!decl->isImmutable() && !decl->isImplicit() &&
+        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
       decl->setInvalid();
       hadError = true;
     }
@@ -773,6 +798,25 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     TL.setType(ErrorType::get(TC.Context), /*validated*/true);
 
   return hadError;
+}
+
+/// Request nominal layout for any types that could be sources of typemetadata
+/// or conformances.
+void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
+    ParameterList *PL) {
+  for (auto param : *PL) {
+    if (!param->hasType())
+      continue;
+
+    // Generic types are sources for typemetadata and conformances. If a
+    // parameter is of dependent type then the body of a function with said
+    // parameter could potentially require the generic type's layout to
+    // recover them.
+    if (auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
+            param->getType()->getAnyGeneric())) {
+      requestNominalLayout(nominalDecl);
+    }
+  }
 }
 
 /// Type check a parameter list.
@@ -820,6 +864,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
         param->setSpecifier(VarDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(typeRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
+      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
   }
@@ -1053,7 +1099,7 @@ recur:
       var->setInterfaceType(type->mapTypeOutOfContext());
 
     checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<OwnershipAttr>())
+    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
       type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
       type = var->getType();
@@ -1067,7 +1113,7 @@ recur:
     // case, they probably didn't mean to bind to a variable, or there is some
     // other bug.  We always tell them that they can silence the warning with an
     // explicit type annotation (and provide a fixit) as a note.
-    Type diagTy = type->getAnyOptionalObjectType();
+    Type diagTy = type->getOptionalObjectType();
     if (!diagTy) diagTy = type;
     
     bool shouldRequireType = false;
@@ -1190,11 +1236,10 @@ recur:
     }
 
     // case nil is equivalent to .none when switching on Optionals.
-    OptionalTypeKind Kind;
-    if (type->getAnyOptionalObjectType(Kind)) {
+    if (type->getOptionalObjectType()) {
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
-        auto *NoneEnumElement = Context.getOptionalNoneDecl(Kind);
+        auto *NoneEnumElement = Context.getOptionalNoneDecl();
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
                                              NLE->getLoc(), NLE->getLoc(),
                                              NoneEnumElement->getName(),
@@ -1221,9 +1266,9 @@ recur:
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
-    type->lookThroughAllAnyOptionalTypes(inputTypeOptionals);
+    type->lookThroughAllOptionalTypes(inputTypeOptionals);
     SmallVector<Type, 2> castTypeOptionals;
-    castType->lookThroughAllAnyOptionalTypes(castTypeOptionals);
+    castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
     // If we have extra optionals on the input type. Create ".Some" patterns
     // wrapping the isa pattern to balance out the optionals.
@@ -1482,8 +1527,7 @@ recur:
 
   case PatternKind::OptionalSome: {
     auto *OP = cast<OptionalSomePattern>(P);
-    OptionalTypeKind optionalKind;
-    Type elementType = type->getAnyOptionalObjectType(optionalKind);
+    Type elementType = type->getOptionalObjectType();
 
     if (elementType.isNull()) {
       auto diagID = diag::optional_element_pattern_not_valid_type;
@@ -1498,7 +1542,7 @@ recur:
       return true;
     }
 
-    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
+    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl();
     if (!elementDecl)
       return true;
 
@@ -1572,7 +1616,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isLet() || !ty->is<InOutType>());
+        assert(!param->isImmutable() || !ty->is<InOutType>());
         param->setType(ty->getInOutObjectType());
         param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
       }
@@ -1592,7 +1636,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isLet() || !ty->is<InOutType>());
+      assert(!param->isImmutable() || !ty->is<InOutType>());
       param->setType(ty->getInOutObjectType());
       param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
     }

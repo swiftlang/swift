@@ -68,8 +68,8 @@ private:
     : SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
       IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>") {
-    }
+          LLVMContext, "<fake module name>", "<fake output filename>",
+          "<fake main input filename>") {}
 
 public:
   static std::unique_ptr<IRGenContext>
@@ -138,7 +138,7 @@ public:
 
     return createNominalTypeDecl(node);
   }
-
+  
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
 
   ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
@@ -332,6 +332,10 @@ public:
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
                                           /*throws*/ flags.throws());
+    if (flags.isEscaping())
+      einfo = einfo.withNoEscape(false);
+    else
+      einfo = einfo.withNoEscape(true);
 
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();
@@ -346,9 +350,11 @@ public:
 
       auto label = Ctx.getIdentifier(param.getLabel());
       auto flags = param.getFlags();
+      auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(flags.isInOut())
-                                .withShared(flags.isShared())
+                                .withInOut(ownership == ValueOwnership::InOut)
+                                .withShared(ownership == ValueOwnership::Shared)
+                                .withOwned(ownership == ValueOwnership::Owned)
                                 .withVariadic(flags.isVariadic());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
@@ -421,9 +427,9 @@ public:
   }
 
   Type createObjCClassType(StringRef name) {
-    Identifier ident = Ctx.getIdentifier(name);
     auto typeDecl =
-        findForeignNominalTypeDecl(ident, ForeignModuleKind::Imported,
+        findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
+                                   ForeignModuleKind::Imported,
                                    Demangle::Node::Kind::Class);
     if (!typeDecl) return Type();
     return createNominalType(typeDecl, /*parent*/ Type());
@@ -480,7 +486,8 @@ private:
                                        Identifier name,
                                        Identifier privateDiscriminator,
                                        Demangle::Node::Kind kind);
-  NominalTypeDecl *findForeignNominalTypeDecl(Identifier name,
+  NominalTypeDecl *findForeignNominalTypeDecl(StringRef name,
+                                              StringRef relatedEntityKind,
                                               ForeignModuleKind lookupKind,
                                               Demangle::Node::Kind kind);
 
@@ -620,15 +627,22 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       return dyn_cast<DeclContext>(decl);
     }
 
-    Identifier name;
+    StringRef name;
+    StringRef relatedEntityKind;
     Identifier privateDiscriminator;
     if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
-      name = Ctx.getIdentifier(declNameNode->getText());
+      name = declNameNode->getText();
+
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::PrivateDeclName) {
-      name = Ctx.getIdentifier(declNameNode->getChild(1)->getText());
+      name = declNameNode->getChild(1)->getText();
       privateDiscriminator =
         Ctx.getIdentifier(declNameNode->getChild(0)->getText());
+
+    } else if (declNameNode->getKind() ==
+                 Demangle::Node::Kind::RelatedEntityDeclName) {
+      name = declNameNode->getChild(0)->getText();
+      relatedEntityKind = declNameNode->getText();
 
     // Ignore any other decl-name productions for now.
     } else {
@@ -640,14 +654,16 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       // Do some backup logic for foreign type declarations.
       if (privateDiscriminator.empty()) {
         if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
-          return findForeignNominalTypeDecl(name, foreignModuleKind.getValue(),
+          return findForeignNominalTypeDecl(name, relatedEntityKind,
+                                            foreignModuleKind.getValue(),
                                             node->getKind());
         }
       }
       return nullptr;
     }
 
-    return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
+    return findNominalTypeDecl(dc, Ctx.getIdentifier(name),
+                               privateDiscriminator, node->getKind());
   }
 
   case Demangle::Node::Kind::Global:
@@ -692,8 +708,26 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
   return result;
 }
 
+static Optional<ClangTypeKind>
+getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
+  switch (kind) {
+  case Demangle::Node::Kind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case Demangle::Node::Kind::Class:
+    return ClangTypeKind::ObjCClass;
+  case Demangle::Node::Kind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::Enum:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 NominalTypeDecl *
-RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
+RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
+                                                 StringRef relatedEntityKind,
                                                  ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
@@ -722,30 +756,26 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
 
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
-    importer->lookupValue(name, consumer);
+    if (!relatedEntityKind.empty()) {
+      Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
+      if (!lookupKind)
+        return nullptr;
+      importer->lookupRelatedEntity(name, lookupKind.getValue(),
+                                    relatedEntityKind, [&](TypeDecl *found) {
+        consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
+      });
+      break;
+    }
+    importer->lookupValue(Ctx.getIdentifier(name), consumer);
     if (consumer.Result)
       consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
     break;
   case ForeignModuleKind::Imported: {
-    ClangTypeKind lookupKind;
-    switch (kind) {
-    case Demangle::Node::Kind::Protocol:
-      lookupKind = ClangTypeKind::ObjCProtocol;
-      break;
-    case Demangle::Node::Kind::Class:
-      lookupKind = ClangTypeKind::ObjCClass;
-      break;
-    case Demangle::Node::Kind::TypeAlias:
-      lookupKind = ClangTypeKind::Typedef;
-      break;
-    case Demangle::Node::Kind::Structure:
-    case Demangle::Node::Kind::Enum:
-      lookupKind = ClangTypeKind::Tag;
-      break;
-    default:
+    Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
+    if (!lookupKind)
       return nullptr;
-    }
-    importer->lookupTypeDecl(name.str(), lookupKind, [&](TypeDecl *found) {
+    importer->lookupTypeDecl(name, lookupKind.getValue(),
+                             [&](TypeDecl *found) {
       consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
     });
   }
@@ -1083,8 +1113,8 @@ public:
   Result<MetadataKind>
   getKindForRemoteTypeMetadata(RemoteAddress metadata) override {
     auto result = Reader.readKindFromMetadata(metadata.getAddressData());
-    if (result.first)
-      return result.second;
+    if (result)
+      return *result;
     return getFailure<MetadataKind>();
   }
 
@@ -1121,7 +1151,7 @@ public:
   Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) override {
     auto result = Reader.readMetadataFromInstance(object.getAddressData());
-    if (result.first) return RemoteAddress(result.second);
+    if (result) return RemoteAddress(*result);
     return getFailure<RemoteAddress>();
   }
 };

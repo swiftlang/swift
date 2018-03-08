@@ -1753,7 +1753,7 @@ void SwiftEditorDocument::updateSemaInfo() {
 }
 
 void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
-                                SwiftLangSupport &Lang) {
+                                SwiftLangSupport &Lang, bool BuildSyntexTree) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   assert(Impl.SemanticInfo && "Impl.SemanticInfo must be set");
@@ -1766,13 +1766,14 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Impl.SemanticInfo->getInvocation()->applyTo(CompInv);
     Impl.SemanticInfo->getInvocation()->raw(Args, PrimaryFile);
   } else {
-    ArrayRef<const char *> Args;
+    SmallVector<const char *, 1> Args;
+    Args.push_back(Impl.FilePath.c_str()); // Input
     std::string Error;
     // Ignore possible error(s)
     Lang.getASTManager().
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
-
+  CompInv.getLangOptions().BuildSyntaxTree = BuildSyntexTree;
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
@@ -1799,7 +1800,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
     llvm::raw_string_ostream OS(SyntaxContent);
     json::Output JsonOut(OS);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
-    JsonOut << Root;
+    JsonOut << *Root;
     Consumer.handleSerializedSyntaxTree(OS.str());
   }
 
@@ -2094,12 +2095,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-
+  const bool BuildSyntaxTree = Consumer.syntaxTreeEnabled();
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
     if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
@@ -2112,7 +2113,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
   }
 
   if (Consumer.needsSemanticInfo()) {
@@ -2160,7 +2161,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
     assert(Snapshot);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     EditorDoc->readSyntaxInfo(Consumer);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();
