@@ -4605,7 +4605,15 @@ in the following ways:
   subclass of the source type's corresponding tuple element.
 
 The function types may also differ in attributes, except that the
-``convention`` attribute cannot be changed.
+``convention`` attribute cannot be changed and the ``@noescape`` attribute must
+not change for functions with context.
+
+A ``convert_function`` cannot be used to change a thick type's ``@noescape``
+attribute (``@noescape`` function types with context are not ABI compatible with
+escaping function types with context) -- however, thin function types with and
+without ``@noescape`` are ABI compatible because they have no context. To
+convert from an escaping to a ``@noescape`` thick function type use
+``convert_escape_to_noescape``.
 
 convert_escape_to_noescape
 ```````````````````````````
