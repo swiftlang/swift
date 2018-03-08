@@ -1374,9 +1374,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // Only link in libFuzzer for executables.
   if (job.getKind() == LinkKind::Executable &&
-      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)) {
     addLinkSanitizerLibArgsForDarwin(
         context.Args, Arguments, "fuzzer", *this, /*shared=*/false);
+    addLinkSanitizerLibArgsForDarwin(
+        context.Args, Arguments, "ubsan", *this, /*shared=*/true);
+  }
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
@@ -1731,10 +1734,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
 
-      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer) {
         addLinkRuntimeLibForLinux(context.Args, Arguments,
             getSanitizerRuntimeLibNameForLinux(
                 "fuzzer", this->getTriple()), *this);
+        addLinkRuntimeLibForLinux(context.Args, Arguments,
+            getSanitizerRuntimeLibNameForLinux(
+                "ubsan", this->getTriple()), *this);
+      }
     }
   }
 
