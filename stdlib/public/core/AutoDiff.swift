@@ -22,9 +22,17 @@
 
 /// A type that represents a valid argument for automatic differentiation.
 ///
-/// Types that conform to the `Differentiable` protocol can be
-/// differentiated with-respect-to in `#gradient` and `#valueAndGradient`
-/// expressions.
+/// Types that conform to the `Differentiable` protocol can be differentiated
+/// with-respect-to in `#gradient` and `#valueAndGradient` expressions.
+///
+/// You can rely on automatic synthesis of the `Differentiable` protocol's
+/// requirements for a custom type when you declare `Differentiable` conformance
+/// in the type's original declaration and your type meets these criteria:
+///
+/// - For a `struct`, all its stored properties must conform to
+///   `Differentiable`. The `DifferentiationCurrency` associated type for the
+///   `struct` is synthesized to be the currency type of the stored properties
+///   with least precision.
 ///
 /// Example:
 ///
