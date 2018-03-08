@@ -33,6 +33,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
       CompositeMath.swift
       DataTypes.swift
       Gradients.swift
+      HighLevel.swift
       Ops.swift
       RankedArray.swift.gyb
       RankedTensor.swift.gyb
