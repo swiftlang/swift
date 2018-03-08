@@ -1215,12 +1215,18 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
       /*AddRPath=*/ shared, TC);
 }
 
+/// \p linkExtra Whether lpthread, lrt, lm and ldl should be linked.
 static void
 addLinkSanitizerLibArgsForLinux(const ArgList &Args,
                                  ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
+                                 StringRef Sanitizer,
+                                 const ToolChain &TC,
+                                 bool linkExtra=true) {
   addLinkRuntimeLibForLinux(Args, Arguments,
       getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
+
+  if (!linkExtra)
+    return;
 
   // Code taken from
   // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
@@ -1363,20 +1369,33 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-application_extension");
   }
 
-  // Linking sanitizers will add rpaths, which might negatively interact when
-  // other rpaths are involved, so we should make sure we add the rpaths after
-  // all user-specified rpaths.
-  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
-
-  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+  bool needsUbsan = false;
 
   // Only link in libFuzzer for executables.
   if (job.getKind() == LinkKind::Executable &&
-      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)) {
     addLinkSanitizerLibArgsForDarwin(
         context.Args, Arguments, "fuzzer", *this, /*shared=*/false);
+    needsUbsan = true;
+  }
+
+  // Linking sanitizers will add rpaths, which might negatively interact when
+  // other rpaths are involved, so we should make sure we add the rpaths after
+  // all user-specified rpaths.
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address) {
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+    needsUbsan = false;
+  }
+
+  if (context.OI.SelectedSanitizers & SanitizerKind::Thread) {
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+    needsUbsan = false;
+  }
+
+  if (needsUbsan)
+    addLinkSanitizerLibArgsForDarwin(
+        context.Args, Arguments, "ubsan", *this, /*shared=*/true);
+
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
@@ -1723,18 +1742,29 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
 
   if (getTriple().getOS() == llvm::Triple::Linux) {
-    //Make sure we only add SanitizerLibs for executables
+    // Make sure we only add SanitizerLibs for executables.
     if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
+      bool needsUbsan = false;
+
+      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer) {
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "fuzzer", *this,
+                                        /*linkExtra=*/false);
+        needsUbsan = true;
+      }
+
+      if (context.OI.SelectedSanitizers & SanitizerKind::Address) {
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
+        needsUbsan = false;
+      }
 
-      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
+      if (context.OI.SelectedSanitizers & SanitizerKind::Thread) {
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+        needsUbsan = false;
+      }
 
-      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
-        addLinkRuntimeLibForLinux(context.Args, Arguments,
-            getSanitizerRuntimeLibNameForLinux(
-                "fuzzer", this->getTriple()), *this);
+      if (needsUbsan)
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
+
     }
   }
 
