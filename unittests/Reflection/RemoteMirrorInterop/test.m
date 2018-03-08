@@ -24,7 +24,7 @@
 
 
 void *Load(char *path) {
-  void *Handle = dlopen(path, RTLD_LAZY);
+  void *Handle = dlopen(path, RTLD_LOCAL);
   if (Handle == NULL) {
     fprintf(stderr, "loading %s: %s\n", path, dlerror());
     exit(1);
