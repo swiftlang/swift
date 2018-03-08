@@ -166,7 +166,9 @@ namespace {
     const ProtocolDescriptor *Proto;
 
     ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
-      : Type(type), Proto(proto) {}
+        : Type(type), Proto(proto) {
+      assert(type);
+    }
   };
 
   struct ConformanceCacheEntry {
@@ -331,6 +333,15 @@ struct ConformanceCacheResult {
   }
 };
 
+/// Retrieve the type key from the given metadata, to be used when looking
+/// into the conformance cache.
+static const void *getConformanceCacheTypeKey(const Metadata *type) {
+  if (auto description = type->getNominalTypeDescriptor())
+    return description;
+
+  return type;
+}
+
 /// Search for a witness table in the ConformanceCache.
 static
 ConformanceCacheResult
@@ -385,10 +396,10 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    const auto *description = type->getNominalTypeDescriptor();
+    auto typeKey = getConformanceCacheTypeKey(type);
 
     // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(description, protocol)) {
+    if (auto *Value = C.findCached(typeKey, protocol)) {
       if (Value->isSuccessful())
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
@@ -435,7 +446,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     if (!candidateIsMetadata) {
       const auto *description = type->getNominalTypeDescriptor();
       auto candidateDescription =
-      static_cast<const NominalTypeDescriptor *>(candidate);
+        static_cast<const NominalTypeDescriptor *>(candidate);
       if (description && description->isEqual(candidateDescription))
         return true;
     }
@@ -564,7 +575,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         case ProtocolConformanceReferenceKind::WitnessTable:
           // If the record provides a nondependent witness table for all
           // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(type->getNominalTypeDescriptor(), P,
+          C.cacheSuccess(getConformanceCacheTypeKey(type), P,
                          record.getStaticWitnessTable());
           break;
 
