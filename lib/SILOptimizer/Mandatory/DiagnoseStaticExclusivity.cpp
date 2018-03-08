@@ -1041,7 +1041,7 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
       continue;
     }
-    if (auto apply = isa<ApplySite>(user)) {
+    if (isa<ApplySite>(user)) {
       SILValue arg = oper->get();
       auto ArgumentFnType = getSILFunctionTypeForValue(arg);
       if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
