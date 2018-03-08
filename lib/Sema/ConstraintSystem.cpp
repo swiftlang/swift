@@ -1433,7 +1433,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     overloads.push_back(bindOverloadConstraint);
   }
   
-  for (auto choice : choices) {
+  for (auto &choice : choices) {
     if (favoredChoice && (favoredChoice == &choice))
       continue;
     
