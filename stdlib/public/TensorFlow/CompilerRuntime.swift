@@ -54,13 +54,7 @@ public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
   /// - Note: Set to true only for debugging purposes.
-  // TODO: asynchronous execution on Darwin platforms needs testing and is
-  // temporarily disabled. Synchronous execution works for demo purposes.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  static public var usesSynchronousExecution = true
-#else
   static public var usesSynchronousExecution = false
-#endif
 
   /// When true, uses the TF eager C API, and TF interpreter backend.
   /// Otherwise uses the TF C API, with execution mode set below.
@@ -172,10 +166,8 @@ public final class _ExecutionContext {
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
 
-#if os(Linux) || os(FreeBSD)
   /// The mutex for preventing potential concurrent access.
   private var mutex: pthread_mutex_t = pthread_mutex_t()
-#endif
 
   /// Initializes a new execution context by initializing available devices.
   private init() {
@@ -231,9 +223,7 @@ public final class _ExecutionContext {
     self.gpuDeviceName = deviceNames["GPU"]
 
     // Initialize the mutex.
-#if os(Linux) || os(FreeBSD)
     pthread_mutex_init(&mutex, nil)
-#endif
   }
 
   deinit {
@@ -245,9 +235,7 @@ public final class _ExecutionContext {
     TFE_DeleteContext(cContext, status)
     checkOk(status)
     TF_DeleteStatus(status)
-#if os(Linux) || os(FreeBSD)
     pthread_mutex_destroy(&mutex)
-#endif
   }
 }
 
@@ -275,7 +263,6 @@ internal extension _ExecutionContext {
   private func sync<Result>(
     execute body: () throws -> Result
   ) rethrows -> Result {
-#if os(Linux) || os(FreeBSD)
     let lockStatus = pthread_mutex_lock(&mutex)
     internalConsistencyCheck(lockStatus == 0)
     defer {
@@ -284,7 +271,6 @@ internal extension _ExecutionContext {
       // Create a cancellation point.
       pthread_testcancel()
     }
-#endif // Async mode does not support other platforms, so it's already sync.
     return try body()
   }
 
@@ -547,8 +533,8 @@ extension TFState {
       // so skipping is a valid optimization without changing behavior.
       //
       // This case usually only occurs in compiler-only unit tests, where the
-      //generated TF program does not produce any outputs to be consumed by
-      //Swift host code.
+      // generated TF program does not produce any outputs to be consumed by
+      // Swift host code.
       debugLog("Skipping calling TF_SessionRun since there are no outputs.")
     }
 
@@ -571,11 +557,11 @@ extension TFState {
 // - MARK: Tensor computation
 //===----------------------------------------------------------------------===//
 
-/// Tensor program.
+/// Tensor computation.
 ///
 /// - Note: The call sequence for the APIs below must be one of the two:
-///    init -> terminate()
-///    init -> finish()
+///     init -> terminate()
+///     init -> finish()
 ///   The finish/terminate APIs may only be called once.
 public final class _TensorComputation {
   /// The status for checking TensorFlow errors.
@@ -595,21 +581,11 @@ public final class _TensorComputation {
 
   /// The thread to run tensor computation in. The global config flag
   /// '_RuntimeConfig.usesSynchronousExecution' decides whether tensor
-  /// computation should be synchronous: if true, this property will be nil.
-  ///
-  /// - TODO(hongm): For pthread portability on Darwin and other OSes, see
-  ///   swift/stdlib/private/SwiftPrivatePthreadExtras/SwiftPrivatePthreadExtras.swift
-  ///   https://github.com/ketzusaka/Strand/blob/master/Sources/Strand.swift
-  ///   Also assess Windows portability (where pthread_create does not exist).
-#if os(Linux) || os(FreeBSD)
-  private var pthread: pthread_t? =
-    _RuntimeConfig.usesSynchronousExecution ? nil : pthread_t()
-#else
-  private var pthread: Int? =
-    _RuntimeConfig.usesSynchronousExecution ? nil : 1
-#endif
+  /// computation should be synchronous: if true, this property will always be
+  /// nil.
+  private var pthread: pthread_t?
 
-  /// Load the TF program from a binary TF FunctionDef proto given by
+  /// Loads the TF program from a binary TF FunctionDef proto given by
   /// 'programByteAddress' and 'programByteCount', and start the computation.
   ///
   /// - Parameters:
@@ -619,7 +595,7 @@ public final class _TensorComputation {
   ///     arguments as CTensorHandle.
   ///   - tensorArgumentCount: The number of tensor arguments to pass in.
   ///
-  /// - TODO(clattner): resultCount should go away when the runtime is
+  /// - TODO(clattner): `resultCount` should go away when the runtime is
   ///   implemented with an async design.
   @_versioned
   init(programByteAddress: UnsafeRawPointer,
@@ -718,30 +694,42 @@ public final class _TensorComputation {
 
     // If it's asynchronous, we start a pthread that calls execute().
     // NOTE: Currently, asynchronous execution is only supported on Linux.
-    if pthread != nil {
-#if os(Linux) || os(FreeBSD)
+    if !_RuntimeConfig.usesSynchronousExecution {
       // The function to launch in the parallel thread.
-      func threadBody(
-        _ arg: UnsafeMutableRawPointer?
-      ) -> UnsafeMutableRawPointer? {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
+#else
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+#endif
+      let body: ThreadBody = { arg in
         // Set the cancelability of the detached thread.
         pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
         // Execute the tensor computation.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+        let arg = arg
+#else
+        let arg = arg!
+#endif
         let computation: _TensorComputation =
-          Unmanaged.fromOpaque(arg!).takeRetainedValue()
+          Unmanaged.fromOpaque(arg).takeRetainedValue()
         computation.execute()
         checkOk(computation.status)
         return nil
       }
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      var newThread: pthread_t?
+#else
+      var newThread = pthread_t()
+#endif
       let creationStatus = pthread_create(
-        &self.pthread!, nil, threadBody,
+        &newThread, nil, body,
         Unmanaged.passRetained(self).toOpaque()
       )
+      self.pthread = newThread
       // TODO(hongm): do error handling.
       internalConsistencyCheck(creationStatus == 0)
-#else
-      fatalError("Asynchronous execution not supported on this host yet")
-#endif
     }
     // If it's asynchronous, we call execute() on the main thread directly.
     else {
@@ -759,7 +747,7 @@ public final class _TensorComputation {
 }
 
 private extension _TensorComputation {
-  /// Execute the computation using TensorFlow Eager.
+  /// Executes the computation using TensorFlow Eager.
   /// NOTE: This is to be called by the initializer. The computation gets
   /// executed on initialization, thus this method will not be exposed to users.
   private func execute() {
@@ -776,7 +764,6 @@ private extension _TensorComputation {
       debugLog("Done execution with eager.")
       return
     }
-
     // Non-eager based execution.
     internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
     guard let stateTF = stateTF else {
@@ -790,30 +777,26 @@ private extension _TensorComputation {
 }
 
 public extension _TensorComputation {
-  /// Terminate the computation, and clean up the state.
+  /// Terminates the computation, and clean up the state.
   func terminate() {
-#if os(Linux) || os(FreeBSD)
     if let pthread = pthread {
       // TODO(hongm): Assess TF's thread cancel support.
       let cancelStatus = pthread_cancel(pthread)
       internalConsistencyCheck(cancelStatus == 0)
       self.pthread = nil
     }
-#endif
   }
 
-  /// Wait for completion the computation as given by 'program', and returns
+  /// Waits for completion the computation as given by 'program', and returns
   /// output handles, whose underlying tensors may live on CPU or GPU.
   func finish() -> [CTensorHandle] {
     debugLog("Calling _TensorComputation.finish().")
-#if os(Linux) || os(FreeBSD)
     if let pthread = pthread {
       debugLog("Waiting for thread to join.")
       let joinStatus = pthread_join(pthread, nil)
       internalConsistencyCheck(joinStatus == 0)
       self.pthread = nil
     }
-#endif
     debugLog("Done executing TF graph.")
 
     // Now that all the elements have been filled in, remove a level of
@@ -831,7 +814,7 @@ public extension _TensorComputation {
 // user code, so they are generally just wrappers around the implementation
 // above.
 
-/// Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
+/// Loads the TF computation from a binary TF FunctionDef proto given by 'bytes'
 /// and 'size', start the computation, and return a _TensorComputation object as
 /// a unique identifier for that computation.
 ///
@@ -869,7 +852,7 @@ public func _TFCStartTensorComputation(
                             resultCount: resultCount)
 }
 
-/// Wait for completion the computation as given by 'program', and returns
+/// Waits for completion of the computation as given by `computation`, and returns
 /// results.
 ///
 /// - Parameters:
@@ -895,7 +878,7 @@ public func _TFCFinishTensorComputation(
   tensorResultAddress.initialize(from: results, count: tensorResultCount)
 }
 
-/// Terminate the computation as given by 'program', and clean up the state.
+/// Terminates the computation as given by 'program', and clean up the state.
 ///
 /// - Parameters:
 ///   - program: The tensor program to terminate.
@@ -906,7 +889,8 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
   computation.terminate()
 }
 
-/// Create a scalar CTensorHandle value for the given data type.
+/// Creates a scalar CTensorHandle value for the given data type.
+///
 /// - Parameters:
 ///   - value: The scalar value.
 ///   - dtype: The TF data type of the tensor handle to create.
