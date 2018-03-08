@@ -2438,7 +2438,9 @@ CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   SubstitutionList subs) {
   if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
+    assert(
+        (!isPolymorphic() || getGenericSignature()->areAllParamsConcrete()) &&
+        "no args for non-concrete polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
