@@ -1549,7 +1549,7 @@ public:
     interleave(OI->getBaseElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
-    if (OI->getTailElements().size() > 0) {
+    if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
       interleave(OI->getTailElements(),
                  [&](const SILValue &V) { *this << getIDAndType(V); },

@@ -117,7 +117,7 @@ class InlineTree {
     bool isTopLevel = false;
 
     const NodeList &getChildren() {
-      if (SortedChildren.empty() && UnsortedChildren.size() > 0)
+      if (SortedChildren.empty() && !UnsortedChildren.empty())
         sortNodes(UnsortedChildren, SortedChildren);
       return SortedChildren;
     }

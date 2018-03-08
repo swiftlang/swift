@@ -2019,7 +2019,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
       return true;
 
     auto conformsTo = sig->getConformsTo(paramTy);
-    return conformsTo.size() > 0;
+    return !conformsTo.empty();
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {

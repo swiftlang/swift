@@ -3363,8 +3363,7 @@ ClangImporter::Implementation::loadNamedMembers(
   // prohibitively complex (also they're not stored in by-name lookup, for
   // reasons unclear).
   if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-        return (table.lookupGlobalsAsMembers(
-                  effectiveClangContext).size() > 0);
+        return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
       }))
     return None;
 

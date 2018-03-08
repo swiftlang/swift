@@ -473,7 +473,7 @@ public:
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
   /// function.
-  bool hasSemanticsAttrs() const { return SemanticsAttrSet.size() > 0; }
+  bool hasSemanticsAttrs() const { return !SemanticsAttrSet.empty(); }
 
   /// \returns True if the function has a semantic attribute that starts with a
   /// specific string.
