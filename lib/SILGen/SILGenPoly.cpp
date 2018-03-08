@@ -1565,9 +1565,6 @@ class ResultPlanner {
       ///
       /// Valid: reabstraction info, InnerResult, OuterResult.
       ReabstractDirectToDirect,
-
-      /// Ignore the next direct inner result, since the outer is 'Void'.
-      IgnoreDirectResult,
     };
 
     Operation(Kind kind) : TheKind(kind) {}
@@ -1711,24 +1708,6 @@ private:
                                     SILValue innerResultAddr,
                                     SILResultInfo outerResult,
                                     SILValue optOuterResultAddr);
-
-  void planIgnoredResult(AbstractionPattern innerOrigType,
-                         CanType innerSubstType, PlanData &planData) {
-    if (innerOrigType.isTuple()) {
-      auto innerSubstTuple = cast<TupleType>(innerSubstType);
-      for (unsigned i = 0, n = innerSubstTuple->getNumElements(); i != n; ++i)
-        planIgnoredResult(innerOrigType.getTupleElementType(i),
-                          innerSubstTuple.getElementType(i), planData);
-      return;
-    }
-
-    auto innerResult = claimNextInnerResult(planData);
-    if (innerResult.isFormalIndirect() &&
-        SGF.silConv.isSILIndirect(innerResult))
-      (void)addInnerIndirectResultTemporary(planData, innerResult);
-    else
-      addIgnoreDirectResult();
-  }
 
   /// Claim the next inner result from the plan data.
   SILResultInfo claimNextInnerResult(PlanData &data) {
@@ -1879,10 +1858,6 @@ private:
     op.OuterOrigType = outerOrigType;
     op.OuterSubstType = outerSubstType;
   }
-
-  void addIgnoreDirectResult() {
-    (void)addOperation(Operation::IgnoreDirectResult);
-  }
 };
 
 } // end anonymous namespace
@@ -1893,13 +1868,6 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
                          AbstractionPattern outerOrigType,
                          CanType outerSubstType,
                          PlanData &planData) {
-  // Conversion from `() -> T` to `() -> Void` is allowed when
-  // the argument is a closure.
-  if (!innerSubstType->isVoid() && outerSubstType->isVoid()) {
-    planIgnoredResult(innerOrigType, innerSubstType, planData);
-    return;
-  }
-
   // The substituted types must match up in tuple-ness and arity.
   assert(isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
          (isa<TupleType>(innerSubstType) &&
@@ -2611,10 +2579,6 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::InjectOptionalIndirect:
       SGF.B.createInjectEnumAddr(Loc, op.OuterResultAddr, op.SomeDecl);
-      continue;
-
-    case Operation::IgnoreDirectResult:
-      (void)claimNext(innerDirectResults);
       continue;
     }
     llvm_unreachable("bad operation kind");
