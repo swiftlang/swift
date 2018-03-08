@@ -292,8 +292,28 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
-  if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
-    CommentLength = TokStart - LastCommentBlockStart;
+
+  if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    // Find first comment trivia.
+    auto PieceIter = LeadingTrivia.begin();
+    for (; PieceIter != LeadingTrivia.end(); PieceIter++) {
+      switch (PieceIter->getKind()) {
+      case syntax::TriviaKind::LineComment:
+      case syntax::TriviaKind::BlockComment:
+      case syntax::TriviaKind::DocLineComment:
+      case syntax::TriviaKind::DocBlockComment:
+        break;
+      default:
+        continue;
+      }
+      break;
+    }
+
+    // PieceIter is now first comment or end.
+    for (; PieceIter != LeadingTrivia.end(); PieceIter++) {
+      CommentLength += PieceIter->getTextLength();
+    }
+  }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
@@ -2197,10 +2217,6 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  // Remember where we started so that we can find the comment range.
-  LastCommentBlockStart = CurPtr;
-  SeenComment = false;
-
 Restart:
   lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
 
@@ -2294,14 +2310,12 @@ Restart:
       assert(isKeepingComments() &&
              "Non token comment should be eaten as LeadingTrivia");
       skipSlashSlashComment(/*EatNewline=*/true);
-      SeenComment = true;
       return formToken(tok::comment, TokStart);
     }
     if (CurPtr[0] == '*') { // "/*"
       assert(isKeepingComments() &&
              "Non token comment should be eaten as LeadingTrivia");
       skipSlashStarComment();
-      SeenComment = true;
       return formToken(tok::comment, TokStart);
     }
     return lexOperatorIdentifier();
@@ -2458,7 +2472,6 @@ Restart:
       break;
     } else if (*CurPtr == '/') {
       // '// ...' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
@@ -2468,7 +2481,6 @@ Restart:
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;
