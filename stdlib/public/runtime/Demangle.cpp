@@ -279,6 +279,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     description = structType->Description;
     break;
   }
+  case MetadataKind::ForeignClass: {
+    auto foreignType = static_cast<const ForeignClassMetadata *>(type);
+    description = foreignType->Description;
+    break;
+  }
   default:
     return nullptr;
   }
@@ -349,6 +354,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Enum:
   case MetadataKind::Optional:
   case MetadataKind::Struct:
+  case MetadataKind::ForeignClass:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -366,10 +372,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     assert(false && "no ObjC interop");
     return nullptr;
 #endif
-  }
-  case MetadataKind::ForeignClass: {
-    auto foreign = static_cast<const ForeignClassMetadata *>(type);
-    return Dem.demangleType(foreign->getName());
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);

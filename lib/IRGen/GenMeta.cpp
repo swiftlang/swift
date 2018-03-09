@@ -5509,9 +5509,6 @@ namespace {
     void layout() {
       if (asImpl().requiresInitializationFunction())
         asImpl().addInitializationFunction();
-      else
-        asImpl().addPaddingForInitializationFunction();
-      asImpl().addForeignName();
       asImpl().addForeignFlags();
       super::layout();
     }
@@ -5556,13 +5553,8 @@ namespace {
       IGF.Builder.CreateRetVoid();
 
       B.addRelativeAddress(fn);
-    }
-    
-    void addPaddingForInitializationFunction() {
-      // The initialization function field is placed at the least offset of the
-      // record so it can be omitted when not needed. However, the metadata
-      // record is still pointer-aligned, so on 64 bit platforms we need to
-      // occupy the space to keep the rest of the record with the right layout.
+      
+      // Keep pointer alignment on 64-bit platforms for further fields.
       switch (IGM.getPointerSize().getValue()) {
       case 4:
         break;
@@ -5573,7 +5565,7 @@ namespace {
         llvm_unreachable("unsupported word size");
       }
     }
-
+    
     void noteAddressPoint() {
       AddressPoint = B.getNextOffsetFromGlobal();
     }

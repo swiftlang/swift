@@ -1612,20 +1612,10 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// flag is set.
     RelativeDirectPointer<InitializationFunction_t> InitializationFunction;
     
-    /// The uniquing key for the metadata record. Metadata records with the
-    /// same Name string are considered equivalent by the runtime, and the
-    /// runtime will pick one to be canonical.
-    RelativeDirectPointer<const char> Name;
-
     mutable std::atomic<CacheValue> Cache;
   };
 
   struct HeaderType : HeaderPrefix, TargetTypeMetadataHeader<Runtime> {};
-
-  TargetPointer<Runtime, const char> getName() const {
-    return reinterpret_cast<TargetPointer<Runtime, const char>>(
-      asFullMetadata(this)->Name.get());
-  }
 
   CacheValue getCacheValue() const {
     /// NB: This can be a relaxed-order load if there is no initialization
