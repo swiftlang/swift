@@ -2106,6 +2106,25 @@ VisitNodeWeak(ASTContext *ast,
   }
 }
 
+static void
+VisitNodeGenericParam(ASTContext *ast,
+                      Demangle::NodePointer cur_node,
+                      VisitNodeResult &result) {
+  if (cur_node->getNumChildren() == 2) {
+    auto first = cur_node->getChild(0);
+    auto second = cur_node->getChild(1);
+    if (first->getKind() == Demangle::Node::Kind::Index &&
+        second->getKind() == Demangle::Node::Kind::Index) {
+      result._types.push_back(
+        GenericTypeParamType::get(first->getIndex(),
+                                  second->getIndex(), *ast));
+      return;
+    }
+  }
+
+  result._error = "bad generic param type";
+}
+
 static void VisitFirstChildNode(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2273,6 +2292,10 @@ static void VisitNode(
 
   case Demangle::Node::Kind::Weak:
     VisitNodeWeak(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::DependentGenericParamType:
+    VisitNodeGenericParam(ast, node, result);
     break;
 
   case Demangle::Node::Kind::LocalDeclName:
