@@ -519,18 +519,56 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
-ManagedValue SILGenBuilder::createFunctionArgument(SILType type,
-                                                   ValueDecl *decl) {
-  SILFunction &F = getFunction();
+static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
+                                                SILLocation loc,
+                                                ValueDecl *decl = nullptr) {
+  auto &SGF = B.getSILGenFunction();
+  SILFunction &F = B.getFunction();
+  assert((F.isBare() || decl) &&
+         "Function arguments of non-bare functions must have a decl");
+  auto *arg = F.begin()->createFunctionArgument(type, decl);
+  switch (arg->getArgumentConvention()) {
+  case SILArgumentConvention::Indirect_In_Guaranteed:
+  case SILArgumentConvention::Direct_Guaranteed:
+    // Guaranteed parameters are passed at +0.
+    return ManagedValue::forUnmanaged(arg);
+  case SILArgumentConvention::Direct_Unowned:
+    // Unowned parameters are only guaranteed at the instant of the call, so we
+    // must retain them even if we're in a context that can accept a +0 value.
+    return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
-  SILFunctionArgument *arg = F.begin()->createFunctionArgument(type, decl);
-  if (arg->getType().isObject()) {
-    if (arg->getOwnershipKind().isTrivialOr(ValueOwnershipKind::Owned))
-      return SGF.emitManagedRValueWithCleanup(arg);
-    return ManagedValue::forBorrowedRValue(arg);
+  case SILArgumentConvention::Direct_Owned:
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Indirect_In:
+    if (SGF.silConv.useLoweredAddresses())
+      return SGF.emitManagedBufferWithCleanup(arg);
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Indirect_Inout:
+  case SILArgumentConvention::Indirect_InoutAliasable:
+    // An inout parameter is +0 and guaranteed, but represents an lvalue.
+    return ManagedValue::forLValue(arg);
+  case SILArgumentConvention::Indirect_In_Constant:
+    llvm_unreachable("Convention not produced by SILGen");
+  case SILArgumentConvention::Direct_Deallocating:
+  case SILArgumentConvention::Indirect_Out:
+    llvm_unreachable("unsupported convention for API");
   }
+  llvm_unreachable("bad parameter convention");
+}
 
-  return SGF.emitManagedBufferWithCleanup(arg);
+ManagedValue SILGenBuilder::createInputFunctionArgument(SILType type,
+                                                        ValueDecl *decl) {
+  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl);
+}
+
+ManagedValue
+SILGenBuilder::createInputFunctionArgument(SILType type,
+                                           Optional<SILLocation> inputLoc) {
+  assert(inputLoc.hasValue() && "This optional is only for overload resolution "
+                                "purposes! Do not pass in None here!");
+  return ::createInputFunctionArgument(*this, type, *inputLoc);
 }
 
 ManagedValue

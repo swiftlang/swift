@@ -152,7 +152,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
     ->getInput();
   selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
   ManagedValue selfArg =
-      B.createFunctionArgument(getLoweredType(selfTy), nullptr);
+    B.createInputFunctionArgument(getLoweredType(selfTy), SILLocation(vd));
 
   // Forward substitutions.
   auto subs = F.getForwardingSubstitutions();
