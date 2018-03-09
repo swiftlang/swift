@@ -105,6 +105,9 @@ def _apply_default_arguments(args):
     if args.swift_stdlib_assertions is None:
         args.swift_stdlib_assertions = args.assertions
 
+    if args.llbuild_assertions is None:
+        args.llbuild_assertions = args.assertions
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
@@ -641,6 +644,13 @@ def create_argument_parser():
     option('--no-lldb-assertions', store('lldb_assertions'),
            const=False,
            help='disable assertions in LLDB')
+
+    option('--llbuild-assertions', store,
+           const=True,
+           help='enable assertions in llbuild')
+    option('--no-llbuild-assertions', store('llbuild_assertions'),
+           const=False,
+           help='disable assertions in llbuild')
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
