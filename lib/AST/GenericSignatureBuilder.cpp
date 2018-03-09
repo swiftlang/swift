@@ -4828,14 +4828,18 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
 }
 
 ConstraintResult
-GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
-       PotentialArchetype *OrigT1,
-       PotentialArchetype *OrigT2,
-       const RequirementSource *Source) 
+GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
+                                         ResolvedType type1, ResolvedType type2,
+                                         const RequirementSource *source)
 {
+  // Both sides are type parameters; equate them.
+  // FIXME: Realizes potential archetypes far too early.
+  auto OrigT1 = type1.realizePotentialArchetype(*this);
+  auto OrigT2 = type2.realizePotentialArchetype(*this);
+
   // Record the same-type constraint, and bail out if it was already known.
   if (!OrigT1->getOrCreateEquivalenceClass(*this)
-        ->recordSameTypeConstraint(OrigT1, OrigT2, Source))
+        ->recordSameTypeConstraint(OrigT1, OrigT2, source))
     return ConstraintResult::Resolved;
 
   // Operate on the representatives
@@ -4913,7 +4917,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (t2IsConcrete) {
     if (t1IsConcrete) {
       (void)addSameTypeRequirement(equivClass->concreteType,
-                                   equivClass2->concreteType, Source,
+                                   equivClass2->concreteType, source,
                                    UnresolvedHandlingKind::GenerateConstraints,
                                    SameTypeConflictCheckedLater());
     } else {
@@ -5158,15 +5162,9 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
                         source.getSource(*this, type1.getDependentType(*this)));
   }
 
-  // Both sides are type parameters; equate them.
-  // FIXME: Realizes potential archetypes far too early.
-  auto pa1 = type1.realizePotentialArchetype(*this);
-  auto pa2 = type2.realizePotentialArchetype(*this);
-
-  return addSameTypeRequirementBetweenArchetypes(
-                     pa1, pa2,
-                     source.getSource(*this,
-                                      type2.getDependentType(*this)));
+  return addSameTypeRequirementBetweenTypeParameters(
+                     type1, type2,
+                     source.getSource(*this, type2.getDependentType(*this)));
 }
 
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(

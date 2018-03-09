@@ -450,12 +450,11 @@ private:
   /// \returns true if a new rewrite rule was added, and false otherwise.
   bool addSameTypeRewriteRule(CanType type1, CanType type2);
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetypes are equivalent.
-  ConstraintResult addSameTypeRequirementBetweenArchetypes(
-                                               PotentialArchetype *T1,
-                                               PotentialArchetype *T2,
-                                               const RequirementSource *Source);
+  /// \brief Add a same-type requirement between two types that are known to
+  /// refer to type parameters.
+  ConstraintResult addSameTypeRequirementBetweenTypeParameters(
+                                         ResolvedType type1, ResolvedType type2,
+                                         const RequirementSource *source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
