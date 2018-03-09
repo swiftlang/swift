@@ -67,11 +67,6 @@
 using namespace swift;
 using namespace metadataimpl;
 
-template <class T>
-static int compareIntegers(T left, T right) {
-  return (left == right ? 0 : left < right ? -1 : 1);
-}
-
 static const size_t ValueTypeMetadataAddressPoint = sizeof(TypeMetadataHeader);
 
 static ClassMetadataBounds
@@ -161,40 +156,41 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
 }
 
 namespace {
-  struct GenericCacheEntry;
-
-  // The cache entries in a generic cache are laid out like this:
-  struct GenericCacheEntryHeader {
-    const Metadata *Value;
-    size_t NumArguments;
-  };
-
-  struct GenericCacheEntry
-      : CacheEntry<GenericCacheEntry, GenericCacheEntryHeader> {
+  struct GenericCacheEntry final
+      : MetadataCacheEntryBase<GenericCacheEntry, const Metadata *> {
 
     static const char *getName() { return "GenericCache"; }
 
-    GenericCacheEntry(unsigned numArguments) {
-      NumArguments = numArguments;
-    }
+    template <class... Args>
+    GenericCacheEntry(MetadataCacheKey key, Args &&...args)
+      : MetadataCacheEntryBase(key) {}
 
-    size_t getNumArguments() const { return NumArguments; }
+    // Note that we have to pass 'arguments' separately here instead of
+    // using the key data because there might be non-key arguments,
+    // like protocol conformances.
+    const Metadata *initialize(const TypeContextDescriptor *description,
+                               const void * const *arguments) {
+      // Find a pattern.  Currently we always use the default pattern.
+      auto &generics = description->getFullGenericContextHeader();
+      auto pattern = generics.DefaultInstantiationPattern.get();
 
-    static GenericCacheEntry *getFromMetadata(Metadata *metadata) {
-      char *bytes = (char*) metadata;
-      if (auto classType = dyn_cast<ClassMetadata>(metadata)) {
-        assert(classType->isTypeMetadata());
-        bytes -= classType->getClassAddressPoint();
-      } else {
-        bytes -= ValueTypeMetadataAddressPoint;
+      // Call the pattern's instantiation function.
+      auto metadata =
+        pattern->InstantiationFunction(description, arguments, pattern);
+
+      // Complete the metadata's instantiation.
+      if (!pattern->CompletionFunction.isNull()) {
+        MetadataCompletionContext context = {};
+        auto dep = pattern->CompletionFunction(metadata, &context, pattern);
+        assert(!dep && "completion dependencies not yet supported"); (void) dep;
       }
-      bytes -= sizeof(GenericCacheEntry);
-      return reinterpret_cast<GenericCacheEntry*>(bytes);
+
+      return metadata;
     }
   };
 } // end anonymous namespace
 
-using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
+using GenericMetadataCache = LockingConcurrentMap<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
@@ -265,6 +261,8 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   // Zero out the entire immediate-members section.
   // TODO: only memset the parts that aren't covered by the pattern.
   memset(immediateMembers, 0, description->getImmediateMembersSize());
+
+  // Copy in the immediate arguments.
 
   // Copy the immediate-members pattern.
   if (pattern->hasImmediateMembersPattern()) {
@@ -354,11 +352,8 @@ ClassMetadata *
 swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                           const void *arguments,
                                     const GenericClassMetadataPattern *pattern){
-  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   auto &generics = description->getFullGenericContextHeader();
   auto &cache = unsafeGetInitializedCache(generics);
-
-  size_t numGenericArguments = generics.Base.NumKeyArguments;
 
   // Compute the formal bounds of the metadata.
   auto bounds = description->getMetadataBounds();
@@ -371,18 +366,15 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
       extraDataPattern->OffsetInWords + extraDataPattern->SizeInWords;
   }
 
-  auto entry = GenericCacheEntry::allocate(cache.getAllocator(),
-                                           argumentsAsArray,
-                                           numGenericArguments,
-                                        allocationBounds.getTotalSizeInBytes());
+  auto bytes = (char*) 
+    cache.getAllocator().Allocate(allocationBounds.getTotalSizeInBytes(),
+                                  alignof(void*));
 
-  auto bytes = entry->getData<char>();
   auto addressPoint = bytes + allocationBounds.getAddressPointInBytes();
   auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
 
   initializeClassMetadataFromPattern(metadata, bounds, description, pattern);
 
-  assert(GenericCacheEntry::getFromMetadata(metadata) == entry);
   assert(metadata->isTypeMetadata());
 
   return metadata;
@@ -424,11 +416,8 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
                                           const void *arguments,
                                     const GenericValueMetadataPattern *pattern,
                                           size_t extraDataSize) {
-  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   auto &generics = description->getFullGenericContextHeader();
   auto &cache = unsafeGetInitializedCache(generics);
-
-  size_t numGenericArguments = generics.Base.NumKeyArguments;
 
   static_assert(sizeof(StructMetadata::HeaderType)
                   == sizeof(ValueMetadata::HeaderType),
@@ -443,18 +432,12 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
-  auto entry =
-    GenericCacheEntry::allocate(cache.getAllocator(),
-                                argumentsAsArray, numGenericArguments,
-                                totalSize);
+  auto bytes = (char*) cache.getAllocator().Allocate(totalSize, alignof(void*));
 
-  auto bytes = entry->getData<char>();
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
   initializeValueMetadataFromPattern(metadata, description, pattern);
-
-  assert(GenericCacheEntry::getFromMetadata(metadata) == entry);
 
   return metadata;
 }
@@ -467,30 +450,10 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto entry = getCache(generics).findOrAdd(genericArgs, numGenericArgs,
-    [&]() -> GenericCacheEntry* {
-      // Create new metadata to cache.
+  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  auto result = getCache(generics).getOrInsert(key, description, genericArgs);
 
-      // Find a pattern.  Currently we always use the default pattern.
-      auto pattern = generics.DefaultInstantiationPattern.get();
-
-      // Call the pattern's instantiation function.
-      auto metadata =
-        pattern->InstantiationFunction(description, arguments, pattern);
-
-      // Complete the metadata's instantiation.
-      if (!pattern->CompletionFunction.isNull()) {
-        MetadataCompletionContext context = {};
-        auto dep = pattern->CompletionFunction(metadata, &context, pattern);
-        assert(!dep && "completion dependencies not yet supported"); (void) dep;
-      }
-
-      auto entry = GenericCacheEntry::getFromMetadata(metadata);
-      entry->Value = metadata;
-      return entry;
-    });
-
-  return entry->Value;
+  return result.second;
 }
 
 /***************************************************************************/
@@ -3000,28 +2963,78 @@ template <> void Metadata::dump() const {
 /***************************************************************************/
 
 namespace {
-  class WitnessTableCacheEntry : public CacheEntry<WitnessTableCacheEntry> {
-  public:
-    static const char *getName() { return "WitnessTableCache"; }
 
-    WitnessTableCacheEntry(size_t numArguments) {
-      assert(numArguments == getNumArguments());
-    }
+/// A cache-entry type suitable for use with LockingConcurrentMap.
+class WitnessTableCacheEntry {
+  /// The type for which this table was instantiated.
+  const Metadata * const Type;
 
-    static constexpr size_t getNumArguments() {
-      return 1;
-    }
+  /// The generic table.  This is only kept around so that we can
+  /// compute the size of an entry correctly in case of a race to
+  /// allocate the entry.
+  GenericWitnessTable * const GenericTable;
 
-    /// Advance the address point to the end of the private storage area.
-    WitnessTable *get(GenericWitnessTable *genericTable) const {
-      return reinterpret_cast<WitnessTable *>(
-          const_cast<void **>(getData<void *>()) +
-          genericTable->WitnessTablePrivateSizeInWords);
-    }
-  };
+  /// The table.  When this is fully-initialized, we set it to the table.
+  std::atomic<WitnessTable*> Table;
+
+public:
+  /// We use a pointer to the allocated witness table directly as a
+  /// status value.  The witness table itself is actually allocated in the
+  /// tail storage of the entry.
+  using StatusType = WitnessTable*;
+
+  /// Do the structural initialization necessary for this entry to appear
+  /// in a concurrent map.
+  WitnessTableCacheEntry(const Metadata *type,
+                         GenericWitnessTable *genericTable,
+                         void ** const *instantiationArgs)
+    : Type(type), GenericTable(genericTable), Table(nullptr) {}
+
+  intptr_t getKeyIntValueForDump() const {
+    return reinterpret_cast<intptr_t>(Type);
+  }
+
+  /// The key value of the entry is just its type pointer.
+  int compareWithKey(const Metadata *type) const {
+    return comparePointers(Type, type);
+  }
+
+  static size_t getExtraAllocationSize(const Metadata *type,
+                                       GenericWitnessTable *genericTable,
+                                       void ** const *instantiationArgs) {
+    return getWitnessTableSize(genericTable);
+  }
+
+  size_t getExtraAllocationSize() const {
+    return getWitnessTableSize(GenericTable);
+  }
+
+  static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
+    auto protocol = genericTable->Protocol.get();
+    size_t numPrivateWords = genericTable->WitnessTablePrivateSizeInWords;
+    size_t numRequirementWords =
+      WitnessTableFirstRequirementOffset + protocol->NumRequirements;
+    return (numPrivateWords + numRequirementWords) * sizeof(void*);
+  }
+
+  WitnessTable *checkStatus(bool isLocked,
+                            GenericWitnessTable *genericTable,
+                            void ** const *instantiationArgs) {
+    return Table.load(std::memory_order_acquire);
+  }
+
+  WitnessTable *initialize(GenericWitnessTable *genericTable,
+                           void ** const *instantiationArgs);
+
+  void flagInitializedStatus(WitnessTable *table) {
+    Table.store(table, std::memory_order_release);
+  }
+};
+
 } // end anonymous namespace
 
-using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
+using GenericWitnessTableCache =
+  LockingConcurrentMap<WitnessTableCacheEntry, /*destructor*/ false>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.
@@ -3058,11 +3071,9 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
-static WitnessTableCacheEntry *
-allocateWitnessTable(GenericWitnessTable *genericTable,
-                     MetadataAllocator &allocator,
-                     const void *args[],
-                     size_t numGenericArgs) {
+WitnessTable *
+WitnessTableCacheEntry::initialize(GenericWitnessTable *genericTable,
+                                   void ** const *instantiationArgs) {
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
@@ -3079,26 +3090,18 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   assert(numPatternWitnesses <= numRequirements);
 
   // Number of bytes for any private storage used by the conformance itself.
-  size_t privateSize =
-    genericTable->WitnessTablePrivateSizeInWords * sizeof(void *);
+  size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;
 
-  // Number of bytes for the full witness table.
-  size_t expectedWitnessTableSize = numRequirements * sizeof(void *);
-
-  // Create a new entry for the cache.
-  auto entry = WitnessTableCacheEntry::allocate(
-      allocator, args, numGenericArgs,
-      (privateSize + expectedWitnessTableSize) * sizeof(void *));
-
-  char *fullTable = entry->getData<char>();
+  // Find the allocation.
+  void **fullTable = reinterpret_cast<void**>(this + 1);
 
   // Zero out the private storage area.
-  memset(fullTable, 0, privateSize * sizeof(void *));
+  memset(fullTable, 0, privateSizeInWords * sizeof(void*));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
-  auto table = (void **) entry->get(genericTable);
-  auto pattern = (void * const *) &*genericTable->Pattern;
+  auto table = fullTable + privateSizeInWords;
+  auto pattern = reinterpret_cast<void * const *>(&*genericTable->Pattern);
   auto requirements = protocol->Requirements.get();
 
   // Fill in the provided part of the requirements from the pattern.
@@ -3116,7 +3119,14 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
     table[i] = defaultImpl;
   }
 
-  return entry;
+  auto castTable = reinterpret_cast<WitnessTable*>(table);
+
+  // Call the instantiation function if present.
+  if (!genericTable->Instantiator.isNull()) {
+    genericTable->Instantiator(castTable, Type, instantiationArgs);
+  }
+
+  return castTable;
 }
 
 const WitnessTable *
@@ -3127,30 +3137,11 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
     return genericTable->Pattern;
   }
 
-  // If type is not nullptr, the witness table depends on the substituted
-  // conforming type, so use that are the key.
-  constexpr const size_t numGenericArgs = 1;
-  const void *args[] = { type };
-
   auto &cache = getCache(genericTable);
-  auto entry = cache.findOrAdd(args, numGenericArgs,
-    [&]() -> WitnessTableCacheEntry* {
-      // Allocate the witness table and fill it in.
-      auto entry = allocateWitnessTable(genericTable,
-                                        cache.getAllocator(),
-                                        args, numGenericArgs);
+  auto result = cache.getOrInsert(type, genericTable, instantiationArgs);
 
-      // Call the instantiation function to initialize
-      // dependent associated type metadata.
-      if (!genericTable->Instantiator.isNull()) {
-        genericTable->Instantiator(entry->get(genericTable),
-                                   type, instantiationArgs);
-      }
-
-      return entry;
-    });
-
-  return entry->get(genericTable);
+  // Our returned 'status' is the witness table itself.
+  return result.second;
 }
 
 /***************************************************************************/
