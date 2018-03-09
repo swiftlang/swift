@@ -505,6 +505,10 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // The empty tuple type has a singleton metadata.
   if (auto tuple = dyn_cast<TupleType>(type))
     return tuple->getNumElements() == 0;
+  
+  // Any and AnyObject have singleton metadata.
+  if (type->isAny() || type->isAnyObject())
+    return true;
 
   // The builtin types generally don't require metadata, but some of them
   // have nodes in the runtime anyway.
@@ -988,8 +992,24 @@ namespace {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto layout = type.getExistentialLayout();
+      // Any and AnyObject have singleton metadata in the runtime.
+      llvm::Constant *singletonMetadata = nullptr;
+      if (type->isAny())
+        singletonMetadata = IGF.IGM.getAnyExistentialMetadata();
+      if (type->isAnyObject())
+        singletonMetadata = IGF.IGM.getAnyObjectExistentialMetadata();
+      
+      if (singletonMetadata) {
+        llvm::Constant *indices[] = {
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
+        };
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(
+            /*Ty=*/nullptr, singletonMetadata, indices);
+      }
 
+      auto layout = type.getExistentialLayout();
+      
       auto protocols = layout.getProtocols();
 
       // Collect references to the protocol descriptors.

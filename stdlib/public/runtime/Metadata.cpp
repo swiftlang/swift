@@ -2296,6 +2296,36 @@ static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
+/// The standard metadata for Any.
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANY_MANGLING) = {
+  { &OpaqueExistentialValueWitnesses_0 }, // ValueWitnesses
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Any)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
+};
+
+/// The standard metadata for AnyObject.
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANYOBJECT_MANGLING) = {
+  {
+#if SWIFT_OBJC_INTEROP
+    &VALUE_WITNESS_SYM(BO)
+#else
+    &VALUE_WITNESS_SYM(Bo)
+#endif
+  },
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Class)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
+};
+
 /// The uniquing structure for opaque existential value witness tables.
 static SimpleGlobalCache<OpaqueExistentialValueWitnessTableCacheEntry>
 OpaqueExistentialValueWitnessTables;
@@ -2616,10 +2646,20 @@ swift::swift_getExistentialTypeMetadata(
                                   size_t numProtocols,
                                   const ProtocolDescriptor * const *protocols) {
 
+  // The empty compositions Any and AnyObject have fixed metadata.
+  if (numProtocols == 0 && !superclassConstraint) {
+    switch (classConstraint) {
+    case ProtocolClassConstraint::Any:
+      return &METADATA_SYM(ANY_MANGLING);
+    case ProtocolClassConstraint::Class:
+      return &METADATA_SYM(ANYOBJECT_MANGLING);
+    }
+  }
+
   // We entrust that the compiler emitting the call to
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
   // a globally stable ordering that's consistent across modules.
-
+  
   // Ensure that the "class constraint" bit is set whenever we have a
   // superclass or a one of the protocols is class-bound.
   assert(classConstraint == ProtocolClassConstraint::Class ||

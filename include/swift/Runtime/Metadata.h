@@ -1931,7 +1931,7 @@ const
   FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
 template <typename Runtime> struct TargetProtocolDescriptor;
-  
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -2121,6 +2121,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), Protocols() {}
   
+  explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
+    : TargetMetadata<Runtime>(MetadataKind::Existential),
+      Flags(Flags), Protocols() {}
+
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
   
@@ -2181,6 +2185,17 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
+
+/// The standard metadata for the empty protocol composition type, Any.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
+
+/// The standard metadata for the empty class-constrained protocol composition
+/// type, AnyObject.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANYOBJECT_MANGLING);
 
 /// The basic layout of an existential metatype type.
 template <typename Runtime>
