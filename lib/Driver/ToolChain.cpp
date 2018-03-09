@@ -287,14 +287,6 @@ std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
                              Compilation &C) const
 {
-#ifndef NDEBUG
-  // Verify that the equivalence relation on the jobs also holds pairwise.
-  for (auto *A : jobs) {
-    for (auto *B : jobs) {
-      assert(jobsAreBatchCombinable(C, A, B));
-    }
-  }
-#endif
   if (jobs.empty())
     return nullptr;
 
