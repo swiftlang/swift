@@ -309,7 +309,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
 #define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
-  for (auto Pair : *Node) {
+  for (auto &Pair : *Node) {
     switch(parseKeyKind(getScalarString(Pair.getKey()))) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME)                                       \
     case DiffItemKeyKind::KK_##NAME:                                          \
