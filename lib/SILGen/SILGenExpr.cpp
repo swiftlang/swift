@@ -3613,8 +3613,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes. There isn't a great hash combining
-    // interface in the standard library to do this yet.
+    // TODO: Combine hashes of the indexes using an inout _Hasher
     {
       auto &index = indexes[0];
       

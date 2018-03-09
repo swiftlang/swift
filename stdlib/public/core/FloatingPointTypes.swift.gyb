@@ -1524,26 +1524,25 @@ extension ${Self} : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to
       // finesse the hash value of -0.0 to match +0.0.
-      return 0
-    } else {
-    %if bits <= word_bits:
-      return Int(bitPattern: UInt(bitPattern))
-    %elif bits == 64: # Double -> 32-bit Int
-      return Int(truncatingIfNeeded: bitPattern &>> 32) ^
-             Int(truncatingIfNeeded: bitPattern)
-    %elif word_bits == 32: # Float80 -> 32-bit Int
-      return Int(truncatingIfNeeded: significandBitPattern &>> 32) ^
-             Int(truncatingIfNeeded: significandBitPattern) ^
-             Int(_representation.signAndExponent)
-    %else: # Float80 -> 64-bit Int
-      return Int(bitPattern: UInt(significandBitPattern)) ^
-             Int(_representation.signAndExponent)
-    %end
+      v = 0
     }
+  %if bits == 80:
+    hasher.append(v._representation.signAndExponent)
+    hasher.append(v.significandBitPattern)
+  %else:
+    hasher.append(v.bitPattern)
+  %end
   }
+
 }
 
 extension ${Self} {

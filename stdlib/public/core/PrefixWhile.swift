@@ -208,11 +208,15 @@ extension LazyPrefixWhileCollection.Index: Comparable {
 
 extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
   public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  public func _hash(into hasher: inout _Hasher) {
     switch _value {
     case .index(let value):
-      return value.hashValue
+      hasher.append(value)
     case .pastEnd:
-      return .max
+      hasher.append(Int.max)
     }
   }
 }
