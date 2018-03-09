@@ -1538,6 +1538,12 @@ public:
     return insert(new (getModule()) IsUniqueOrPinnedInst(
         getSILDebugLocation(Loc), value, Int1Ty));
   }
+  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+                                                 SILValue operand) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (getModule()) IsEscapingClosureInst(
+        getSILDebugLocation(Loc), operand, Int1Ty));
+  }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
     return insert(new (getModule())
@@ -1615,7 +1621,14 @@ public:
   // Runtime failure
   //===--------------------------------------------------------------------===//
 
-  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand) {
+  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
+                               bool Inverted = false) {
+    if (Inverted) {
+      SILType Ty = Operand->getType();
+      SILValue True(createIntegerLiteral(Loc, Ty, 1));
+      Operand =
+          createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
+    }
     return insert(new (getModule())
                       CondFailInst(getSILDebugLocation(Loc), Operand));
   }

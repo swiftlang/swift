@@ -6194,6 +6194,18 @@ class IsUniqueOrPinnedInst
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 
+/// Given an escaping closure return true iff it has a non-nil context and the
+/// context has a strong reference count greater than 1.
+class IsEscapingClosureInst
+    : public UnaryInstructionBase<SILInstructionKind::IsEscapingClosureInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
+                        SILType BoolTy)
+      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+};
+
 //===----------------------------------------------------------------------===//
 // DeallocationInsts
 //===----------------------------------------------------------------------===//
