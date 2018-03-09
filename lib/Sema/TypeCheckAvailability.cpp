@@ -1404,10 +1404,7 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 static bool
 someEnclosingDeclMatches(SourceRange ReferenceRange,
                          const DeclContext *ReferenceDC,
-                         TypeChecker &TC,
                          llvm::function_ref<bool(const Decl *)> Pred) {
-  ASTContext &Ctx = TC.Context;
-
   // Climb the DeclContext hierarchy to see if any of the containing
   // declarations matches the predicate.
   const DeclContext *DC = ReferenceDC;
@@ -1446,6 +1443,7 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   if (ReferenceRange.isInvalid())
     return false;
 
+  ASTContext &Ctx = ReferenceDC->getASTContext();
   const Decl *DeclToSearch =
       findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
 
@@ -1474,28 +1472,32 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   return false;
 }
 
-bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
-                                           const DeclContext *DC) {
+/// Returns true if the reference or any of its parents is an
+/// implicit function.
+static bool isInsideImplicitFunction(SourceRange ReferenceRange,
+                                     const DeclContext *DC) {
   auto IsInsideImplicitFunc = [](const Decl *D) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     return AFD && AFD->isImplicit();
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, DC, *this,
-                                  IsInsideImplicitFunc);
+  return someEnclosingDeclMatches(ReferenceRange, DC, IsInsideImplicitFunc);
 }
 
-bool TypeChecker::isInsideUnavailableDeclaration(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+/// Returns true if the reference or any of its parents is an
+/// unavailable (or obsoleted) declaration.
+static bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
+                                           const DeclContext *ReferenceDC) {
   auto IsUnavailable = [](const Decl *D) {
     return D->getAttrs().getUnavailable(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsUnavailable);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
 }
 
-bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
+/// Returns true if the reference or any of its parents is an
+/// unconditional unavailable declaration for the same platform.
+static bool isInsideCompatibleUnavailableDeclaration(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
     const AvailableAttr *attr) {
   if (!attr->isUnconditionallyUnavailable()) {
@@ -1512,18 +1514,18 @@ bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
     return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsUnavailable);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
 }
 
-bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                                const DeclContext *ReferenceDC){
+/// Returns true if the reference is lexically contained in a declaration
+/// that is deprecated on all deployment targets.
+static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                          const DeclContext *ReferenceDC){
   auto IsDeprecated = [](const Decl *D) {
     return D->getAttrs().getDeprecated(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsDeprecated);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);
 }
 
 static void fixItAvailableAttrRename(TypeChecker &TC,
