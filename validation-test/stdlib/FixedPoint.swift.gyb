@@ -242,7 +242,7 @@ FixedPoint.test("${Self}.hashValue") {
     let input = get${Self}(${input})
     let output = getInt(input.hashValue)
 
-    var hasher = _SipHash13()
+    var hasher = _SipHash13(key: _Hasher._secretKey)
 %     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
     hasher.append(${input} as ${"" if self_ty.is_signed else "U"}Int)
 %     else:

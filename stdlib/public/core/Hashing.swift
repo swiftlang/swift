@@ -216,7 +216,7 @@ internal struct _LegacyHasher {
 
 // NOT @_fixed_layout
 public struct _Hasher {
-  internal typealias Core = _LegacyHasher
+  internal typealias Core = _SipHash13
 
   // NOT @_versioned
   internal var _core: Core
