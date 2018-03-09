@@ -100,25 +100,7 @@ function(_add_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  # MSVC and clang-cl don't understand -target.
-  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
-  endif()
-
   is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
-    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
-    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  endif()
-
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
-      # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
-  endif()
-
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
@@ -134,7 +116,27 @@ function(_add_variant_c_compile_link_flags)
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
       set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
     endif()
+  endif()
 
+  # MSVC and clang-cl don't understand -target.
+  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
+  endif()
+
+  if(IS_DARWIN)
+    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
+    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  endif()
+
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result
+      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
+      # Use the linker included in the Android NDK.
+      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
+  endif()
+
+  if(IS_DARWIN)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
@@ -297,16 +299,19 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
   endif()
 
-  if(BUILD_STANDALONE)
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND result
-        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   else()
     list(APPEND result
-        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
-        "-resource-dir" "${SWIFTLIB_DIR}")
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
   endif()
 
-  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(NOT BUILD_STANDALONE)
+    list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
+  endif()
+
   if(IS_DARWIN)
     list(APPEND result
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
@@ -2002,7 +2007,7 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
+  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
