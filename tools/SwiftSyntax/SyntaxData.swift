@@ -38,6 +38,79 @@ final class SyntaxData: Equatable {
 
   let childCaches: [AtomicCache<SyntaxData>]
 
+  let positionCache: AtomicCache<AbsolutePosition>
+
+  let positionAfterSkippingLeadingTriviaCache: AtomicCache<AbsolutePosition>
+
+  let byteSizeCache: AtomicCache<ByteSize>
+
+  fileprivate func calculatePosition() -> AbsolutePosition {
+    guard let parent = parent else {
+      let message = "cannot find SourceFileSyntax as root"
+      switch raw {
+      case .node(let kind, _, _):
+        assert(kind == SyntaxKind.sourceFile, message)
+      default:
+        assert(false, message)
+      }
+      // If this node is SourceFileSyntax, its location is the start of the file.
+      return AbsolutePosition()
+    }
+
+    // If the node is the first child of its parent, the location is same with
+    // the parent's location.
+    guard indexInParent != 0 else { return parent.position }
+
+    // Otherwise, the location is same with the previous sibling's location
+    // adding the stride of the sibling.
+    for idx in (0..<indexInParent).reversed() {
+      if let sibling = parent.cachedChild(at: idx) {
+        let pos = sibling.position
+        sibling.raw.accumulateAbsolutePosition(pos)
+        return pos
+      }
+    }
+    return parent.position
+  }
+
+  var position: AbsolutePosition {
+    return positionCache.value { return calculatePosition() }
+  }
+
+  var positionAfterSkippingLeadingTrivia: AbsolutePosition {
+    return positionAfterSkippingLeadingTriviaCache.value {
+      _ = raw.accumulateLeadingTrivia(position)
+      return position
+    }
+  }
+
+  class ByteSize {
+    var size: Int
+    init(size: Int) {
+      self.size = size
+    }
+  }
+
+  var byteSizeWrapper: ByteSize {
+    return byteSizeCache.value {
+      switch raw {
+      case .node(_, let layout, _):
+        var result = 0
+        for i in 0..<layout.count {
+          guard let child = cachedChild(at: i) else { continue }
+          result += child.byteSizeWrapper.size
+        }
+        return ByteSize(size: result)
+      case .token:
+        let pos = AbsolutePosition()
+        raw.accumulateAbsolutePosition(pos)
+        return ByteSize(size: pos.offset)
+      }
+    }
+  }
+
+  var byteSize: Int { return byteSizeWrapper.size }
+
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
   /// provided index, in the provided parent.
   /// - Parameters:
@@ -51,6 +124,9 @@ final class SyntaxData: Equatable {
     self.indexInParent = indexInParent
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
+    self.positionCache = AtomicCache<AbsolutePosition>()
+    self.positionAfterSkippingLeadingTriviaCache = AtomicCache<AbsolutePosition>()
+    self.byteSizeCache = AtomicCache<ByteSize>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
@@ -196,5 +272,56 @@ final class SyntaxData: Equatable {
   /// - Returns: True if both datas are exactly the same.
   static func ==(lhs: SyntaxData, rhs: SyntaxData) -> Bool {
     return lhs === rhs
+  }
+}
+
+/// An absolute position in a source file as text - the absolute offset from
+/// the start, line, and column.
+public class AbsolutePosition {
+  public private(set) var offset: Int = 0
+  public private(set) var line: Int = 1
+  public private(set) var column: Int = 1
+
+  /// Add some number of columns to the position.
+  internal func add(columns: Int) {
+    column += columns
+    offset += columns
+  }
+
+  /// Add some number of newlines to the position, resetting the column.
+  /// Size is byte size of newline char.
+  /// '\n' and '\r' are 1, '\r\n' is 2.
+  internal func add(lines: Int, size: Int) {
+    line += lines
+    column = 1
+    offset += lines * size
+  }
+
+  /// Use some text as a reference for adding to the absolute position,
+  /// taking note of newlines, etc.
+  internal func add(text: String) {
+    guard let chars = text.cString(using: .ascii) else {
+      return
+    }
+    let cr: CChar = 13
+    let nl: CChar = 10
+    var idx = chars.startIndex
+    while chars[idx] != 0 {
+      let c = chars[idx]
+      idx += 1
+      switch c {
+      case cr:
+        if chars[idx] == nl {
+          add(lines: 1, size: 2)
+          idx += 1
+        } else {
+          add(lines: 1, size: 1)
+        }
+      case nl:
+        add(lines: 1, size: 1)
+      default:
+        add(columns: 1)
+      }
+    }
   }
 }

@@ -256,3 +256,22 @@ extension Trivia: ExpressibleByArrayLiteral {
 public func +(lhs: Trivia, rhs: Trivia) -> Trivia {
   return Trivia(pieces: lhs.pieces + rhs.pieces)
 }
+
+extension TriviaPiece {
+  func accumulateAbsolutePosition(_ pos: AbsolutePosition) {
+    switch self {
+% for trivia in TRIVIAS:
+%   if trivia.is_new_line:
+    case let .${trivia.lower_name}s(count):
+      pos.add(lines: count, size: ${trivia.characters_len()})
+%   elif trivia.is_collection():
+    case let .${trivia.lower_name}s(count):
+      pos.add(columns: count)
+%   else:
+    case let .${trivia.lower_name}(text):
+      pos.add(text: text)
+%   end
+% end
+  }
+  }
+}
