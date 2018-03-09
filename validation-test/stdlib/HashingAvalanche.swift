@@ -47,12 +47,12 @@ func avalancheTest(
 
 // White-box testing: assume that the other N-bit to N-bit mixing functions
 // just dispatch to these.  (Avalanche test is relatively expensive.)
-HashingTestSuite.test("_mixUInt64/avalanche") {
-  avalancheTest(64, _mixUInt64, 0.02)
+HashingTestSuite.test("_Hasher.append(UInt64)/avalanche") {
+  avalancheTest(64, { UInt64(truncatingIfNeeded: _hashValue(for: $0)) }, 0.02)
 }
 
-HashingTestSuite.test("_mixUInt32/avalanche") {
-  avalancheTest(32, { UInt64(_mixUInt32(UInt32($0 & 0xffff_ffff))) }, 0.02)
+HashingTestSuite.test("_Hasher.append(UInt32)/avalanche") {
+  avalancheTest(32, { UInt64(truncatingIfNeeded: _hashValue(for: $0)) }, 0.02)
 }
 
 runAllTests()

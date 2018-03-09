@@ -4,7 +4,7 @@
 // RUN:    | %FileCheck --check-prefix=CHECK-ACCEL %s
 // RUN: %llvm-dwarfdump --debug-info %t.o  \
 // RUN:    | %FileCheck --check-prefix=CHECK-DWARF %s
-// DISABLED <rdar://problem/28232630>: dwarfdump --verify %t.o
+// RUN: %llvm-dwarfdump --verify %t.o
 // REQUIRES: OS=macosx
 
 // Verify that the unmangles basenames end up in the accelerator table.

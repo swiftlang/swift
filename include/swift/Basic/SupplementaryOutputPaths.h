@@ -49,6 +49,9 @@ struct SupplementaryOutputPaths {
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
 
+  /// The path to which we should output fix-its as source edits.
+  std::string FixItsOutputPath;
+
   /// The path to which we should output a loaded module trace file.
   /// It is currently only used with WMO, but could be generalized.
   std::string LoadedModuleTracePath;

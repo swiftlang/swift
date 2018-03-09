@@ -117,9 +117,6 @@ bool ArgsToFrontendOptionsConverter::convert() {
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
-  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path))
-    Opts.FixitsOutputPath = A->getValue();
-
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
