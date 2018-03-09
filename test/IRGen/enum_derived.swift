@@ -5,8 +5,8 @@
 
 import def_enum
 
-// Check if the hashValue and == for an enum (without payload) are generated and
-// check if that functions are compiled in an optimal way.
+// Check if hashValue, _hash(into:) and == for an enum (without payload) are
+// generated and check that functions are compiled in an optimal way.
 
 enum E {
   case E0
@@ -22,12 +22,20 @@ enum E {
 // CHECK: %2 = icmp eq i8 %0, %1
 // CHECK: ret i1 %2
 
-// Check if the hashValue getter can be compiled to a simple zext instruction.
+// Check for the presence of the hashValue getter.
 
 // CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
 // CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
-// CHECK: [[R:%.*]] = zext i8 %0 to i{{.*}}
-// CHECK: ret i{{.*}} [[R]]
+// CHECK: ret i{{.*}}
+
+// Check if the _hash(into:) method can be compiled to a simple zext instruction
+// followed by a call to _Hasher.append(bits:).
+
+// CHECK-NORMAL-LABEL:define hidden swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
+// CHECK: [[V:%.*]] = zext i8 %1 to i{{.*}}
+// CHECK: tail call swiftcc i{{.*}} @"$Ss7_HasherV6append4bitsySu_tF"(i{{.*}} [[V]],
+// CHECK: ret void
 
 // Derived conformances from extensions
 // The actual enums are in Inputs/def_enum.swift

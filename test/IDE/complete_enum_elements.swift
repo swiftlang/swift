@@ -50,7 +50,7 @@
 // RUN: %FileCheck %s -check-prefix=QUX_ENUM_NO_DOT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_INVALID < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_2 > %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=BAR_ENUM_DOT < %t.enum.txt
@@ -86,12 +86,20 @@ enum FooEnum {
 // FOO_ENUM_NO_DOT: Begin completions
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
 // FOO_ENUM_NO_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT: Begin completions
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: _hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
 // FOO_ENUM_DOT-NEXT: End completions
+
+// FOO_ENUM_DOT_INVALID: Begin completions
+// FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: _hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
+// FOO_ENUM_DOT_INVALID-NEXT: End completions
 
 // FOO_ENUM_DOT_ELEMENTS: Begin completions, 2 items
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific: Foo1[#FooEnum#]{{; name=.+$}}
@@ -231,17 +239,19 @@ enum QuxEnum : Int {
 // QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
-// QUX_ENUM_NO_DOT: Begin completions, 4 items
+// QUX_ENUM_NO_DOT: Begin completions, 5 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: QuxEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(QuxEnum)
 // QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
-// QUX_ENUM_DOT: Begin completions, 4 items
+// QUX_ENUM_DOT: Begin completions, 5 items
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      RawValue[#Int#]{{; name=.+$}}
+// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: _hash({#self: QuxEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(QuxEnum)
 // QUX_ENUM_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: End completions
 

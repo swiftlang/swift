@@ -108,6 +108,20 @@ public protocol Hashable : Equatable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
+
+  /// Feed bits to be hashed into the hash function represented by `hasher`.
+  ///
+  /// If this requirement is not explicitly implemented, the compiler
+  /// automatically synthesizes an implementation for it.
+  func _hash(into hasher: inout _Hasher)
+}
+
+// Called by synthesized `hashValue` implementations.
+@inline(__always)
+public func _hashValue<H: Hashable>(for value: H) -> Int {
+  var hasher = _Hasher()
+  hasher.append(value)
+  return hasher.finalize()
 }
 
 // Called by the SwiftValue implementation.
@@ -126,4 +140,3 @@ internal func Hashable_hashValue_indirect<T : Hashable>(
 ) -> Int {
   return value.pointee.hashValue
 }
-
