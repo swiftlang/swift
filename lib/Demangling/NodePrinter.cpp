@@ -541,7 +541,8 @@ private:
   }
 
   void printFunctionType(NodePointer node) {
-    assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+    if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
+      return;
     unsigned startIndex = 0;
     bool throws = false;
     if (node->getNumChildren() == 3) {
@@ -1896,9 +1897,10 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   }
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = Entity->getChild(1);
-    if (type->getKind() != Node::Kind::Type)
+    if (type->getKind() != Node::Kind::Type && Entity->getNumChildren() >= 3)
       type = Entity->getChild(2);
-    assert(type->getKind() == Node::Kind::Type);
+    if (type->getKind() != Node::Kind::Type)
+      return nullptr;
     type = type->getChild(0);
     if (TypePr == TypePrinting::FunctionStyle) {
       // We expect to see a function type here, but if we don't, use the colon.

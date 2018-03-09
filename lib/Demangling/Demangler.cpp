@@ -1952,10 +1952,10 @@ NodePointer Demangler::demangleSubscript() {
   NodePointer Context = popContext();
 
   NodePointer Subscript = createNode(Node::Kind::Subscript);
-  Subscript->addChild(Context, *this);
-  Subscript->addChild(Type, *this);
+  Subscript = addChild(Subscript, Context);
+  Subscript = addChild(Subscript, Type);
   if (PrivateName)
-    Subscript->addChild(PrivateName, *this);
+    Subscript = addChild(Subscript, PrivateName);
 
   return demangleAccessor(Subscript);
 }
