@@ -1932,14 +1932,25 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     }
   }
 
-  DeclName Name = DeprecatedDecl->getFullName();
+  DeclName Name;
+  Optional<unsigned> rawAccessorKind;
+  if (auto *accessor = dyn_cast<AccessorDecl>(DeprecatedDecl)) {
+    Name = accessor->getStorage()->getFullName();
+    assert(accessor->isGetterOrSetter());
+    rawAccessorKind = static_cast<unsigned>(accessor->getAccessorKind());
+  } else {
+    Name = DeprecatedDecl->getFullName();
+  }
+
   StringRef Platform = Attr->prettyPlatformString();
   clang::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
     DeprecatedVersion = Attr->Deprecated.getValue();
 
+  static const unsigned NOT_ACCESSOR_INDEX = 2;
   if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion)
       .highlight(Attr->getRange());
@@ -1953,21 +1964,23 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   if (!Attr->Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion, EncodedMessage.Message)
       .highlight(Attr->getRange());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.getValueOr(ReplacementDeclKind::None));
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion, replacementDeclKind.hasValue(), rawReplaceKind,
              newName)
       .highlight(Attr->getRange());
   }
 
-  if (!Attr->Rename.empty()) {
+  if (!Attr->Rename.empty() && !rawAccessorKind.hasValue()) {
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
@@ -2234,9 +2247,11 @@ public:
       return std::make_pair(false, E);
     };
 
-    if (auto DR = dyn_cast<DeclRefExpr>(E))
+    if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagAvailability(DR->getDecl(), DR->getSourceRange(),
                        getEnclosingApplyExpr());
+      maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
+    }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
@@ -2252,8 +2267,10 @@ public:
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
-      if (S->hasDecl())
+      if (S->hasDecl()) {
         diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
+        maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
+      }
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
@@ -2336,6 +2353,8 @@ private:
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
     // Walk the base in a getter context.
+    // FIXME: We may need to look at the setter too, if we're going to do
+    // writeback. The AST should have this information.
     walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
     ValueDecl *D = E->getMember().getDecl();
@@ -2343,13 +2362,8 @@ private:
     if (diagAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
-    if (TC.getLangOpts().DisableAvailabilityChecking)
-      return;
-
-    if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      // Diagnose for appropriate accessors, given the access context.
-      diagStorageAccess(ASD, E->getSourceRange(), DC);
-    }
+    // Diagnose for appropriate accessors, given the access context.
+    maybeDiagStorageAccess(D, E->getSourceRange(), DC);
   }
   
   /// Walk an inout expression, checking for availability.
@@ -2367,9 +2381,16 @@ private:
 
   /// Emit diagnostics, if necessary, for accesses to storage where
   /// the accessor for the AccessContext is not available.
-  void diagStorageAccess(AbstractStorageDecl *D,
-                         SourceRange ReferenceRange,
-                         const DeclContext *ReferenceDC) const {
+  void maybeDiagStorageAccess(const ValueDecl *VD,
+                              SourceRange ReferenceRange,
+                              const DeclContext *ReferenceDC) const {
+    if (TC.getLangOpts().DisableAvailabilityChecking)
+      return;
+
+    auto *D = dyn_cast<AbstractStorageDecl>(VD);
+    if (!D)
+      return;
+
     if (!D->hasAccessorFunctions()) {
       return;
     }
@@ -2397,13 +2418,18 @@ private:
   }
 
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
-  /// Returns true if a diagnostic was emitted.
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 bool ForInout) const {
     if (!D) {
       return;
     }
+
+    // Make sure not to diagnose an accessor if we already complained about
+    // the property/subscript.
+    if (!TypeChecker::getDeprecated(D->getStorage()))
+      TC.diagnoseIfDeprecated(ReferenceRange, ReferenceDC, D, /*call*/nullptr);
+
     auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceRange.Start,
                                                         DC);
     if (MaybeUnavail.hasValue()) {
