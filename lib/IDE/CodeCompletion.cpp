@@ -4024,7 +4024,7 @@ public:
       }
 
       return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (auto *paren = dyn_cast<ParenExpr>(CallE->getArg())) {
+    } else if (isa<ParenExpr>(CallE->getArg())) {
       HasName = false;
       Position = 0;
       return true;
