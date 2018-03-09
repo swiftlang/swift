@@ -437,8 +437,8 @@ struct GenericSignatureBuilder::Implementation {
   /// Equivalence classes that are not currently being used.
   std::vector<void *> FreeEquivalenceClasses;
 
-  /// The roots of the rewrite tree, keyed on the canonical types of the
-  /// anchors.
+  /// The roots of the rewrite tree, keyed on the canonical, dependent
+  /// types.
   DenseMap<CanType, std::unique_ptr<RewriteTreeNode>> RewriteTreeRoots;
 
   /// The generation number for the term-rewriting system, which is
@@ -2291,7 +2291,7 @@ Type EquivalenceClass::getAnchor(
   for (auto member : members) {
     auto anchorType =
       builder.getCanonicalTypeParameter(
-                                      member->getDependentType(genericParams));
+                                    member->getDependentType(genericParams));
 
 #ifndef NDEBUG
     // Check that we get consistent results from all of the anchors.
@@ -3740,13 +3740,8 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
     GenericTypeParamType::get(initialPath.getBase()->Depth,
                               initialPath.getBase()->Index,
                               getASTContext());
-  auto initialEquivClass =
-    resolveEquivalenceClass(genericParamType,
-                            ArchetypeResolutionKind::WellFormed);
-  if (!initialEquivClass) return nullptr;
 
   unsigned startIndex = 0;
-  auto equivClass = initialEquivClass;
   Type currentType = genericParamType;
   SmallVector<AssociatedTypeDecl *, 4> path(initialPath.getPath().begin(),
                                             initialPath.getPath().end());
@@ -3783,17 +3778,12 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
           genericParamType =
             GenericTypeParamType::get(newBase->Depth, newBase->Index,
                                       getASTContext());
-          initialEquivClass =
-            resolveEquivalenceClass(genericParamType,
-                                    ArchetypeResolutionKind::WellFormed);
-          assert(initialEquivClass && "Must have an equivalence class");
         }
 
         // Move back to the beginning; we may have opened up other rewrites.
         simplified = true;
         startIndex = 0;
         currentType = genericParamType;
-        equivClass = initialEquivClass;
         continue;
       }
     }
@@ -3801,12 +3791,7 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
     // If we've hit the end of the path, we're done.
     if (startIndex >= path.size()) break;
 
-    // FIXME: It would be nice if there were a better way to get the equivalence
-    // class of a named nested type.
     currentType = DependentMemberType::get(currentType, path[startIndex++]);
-    equivClass =
-      resolveEquivalenceClass(currentType, ArchetypeResolutionKind::WellFormed);
-    if (!equivClass) break;
   } while (true);
 
   return formDependentType(genericParamType, path);
@@ -4914,21 +4899,21 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
                                    equivClass2->sameTypeConstraints.end());
+  }
 
-    // Combine the rewrite rules.
-    if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2)) {
-      if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1)) {
-        // Merge the second rewrite tree into the first.
-        if (rewriteRoot2->mergeInto(rewriteRoot1))
-          ++Impl->RewriteGeneration;
-        Impl->RewriteTreeRoots.erase(anchor2);
-      } else {
-        // Take the second rewrite tree and make it the first.
-        auto root2Entry = Impl->RewriteTreeRoots.find(anchor2);
-        auto root2Ptr = std::move(root2Entry->second);
-        Impl->RewriteTreeRoots.erase(root2Entry);
-        (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
-      }
+  // Combine the rewrite rules.
+  if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2)) {
+    if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1)) {
+      // Merge the second rewrite tree into the first.
+      if (rewriteRoot2->mergeInto(rewriteRoot1))
+        ++Impl->RewriteGeneration;
+      Impl->RewriteTreeRoots.erase(anchor2);
+    } else {
+      // Take the second rewrite tree and make it the first.
+      auto root2Entry = Impl->RewriteTreeRoots.find(anchor2);
+      auto root2Ptr = std::move(root2Entry->second);
+      Impl->RewriteTreeRoots.erase(root2Entry);
+      (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
     }
   }
 
