@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
 @_fixed_layout // FIXME(sil-serialize-all)
 @objc
