@@ -381,8 +381,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
   if let string = value as? String {
-    let mirror = Mirror(reflecting: string)
-    _adHocPrint_unlocked(string, mirror, &target, isDebugPrint: false)
+    target.write(string)
     return
   }
   // Optional has no representation suitable for display; therefore,
