@@ -478,11 +478,17 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
         continue;
       }
 
+      if (auto *vtboi = dyn_cast<ValueToBridgeObjectInst>(str)) {
+        str = vtboi->getOperand();
+        continue;
+      }
+
       // Look through the various operands that bit-mangle things into bridged
       // string representations.  This is gross, Swift should have higher level
       // operations for bridge values like this.
       if (auto *bi = dyn_cast<BuiltinInst>(str)) {
         switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::StringObjectOr:
         case BuiltinValueKind::And:
         case BuiltinValueKind::Or:
         case BuiltinValueKind::ZExtOrBitCast:
