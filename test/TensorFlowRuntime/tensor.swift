@@ -223,21 +223,18 @@ TensorTests.testAllBackends("ReductionToScalar") {
   // smart enough to avoid send/receive.
 }
 
-// TODO(tf-compiler): Re-enable the test below after fixing:
-//     error: attribute 'padding' requires a constant argument
-
-// TensorTests.testAllBackends("Convolution") {
-//   let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
-//   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
-//                              scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-//   let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
-//                         padding: .same)
-//   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
-//                           scalars: [0.5, 1.5, 0.5,
-//                                     0.5, 1.5, 0.5,
-//                                     0.5, 1.5, 0.5]),
-//               y.array)
-// }
+TensorTests.testAllBackends("Convolution") {
+  let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
+  let filter = Tensor<Float>(shape: [1, 1, 3, 3],
+                             scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
+  let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
+                        padding: .same)
+  expectEqual(ShapedArray(shape: [1, 1, 3, 3],
+                          scalars: [0.5, 1.5, 0.5,
+                                    0.5, 1.5, 0.5,
+                                    0.5, 1.5, 0.5]),
+              y.array)
+}
 
 TensorTests.testAllBackends("3Adds") {
   let a = Tensor<Float>([1])
