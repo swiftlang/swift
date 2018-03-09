@@ -166,17 +166,17 @@ public:
   ///
   /// \returns the path, or None if it contained unresolved dependent member
   /// types.
-  Optional<RewritePath> static createPath(Type type);
+  RewritePath static createPath(Type type);
 
   /// Decompose a type into a path.
   ///
   /// \param path Will be filled in with the components of the path, in
   /// reverse order.
   ///
-  /// \returns the generic parameter at the start of the path, or \c None if
-  ///
-  Optional<GenericParamKey>
-  static createPath(Type type, SmallVectorImpl<AssociatedTypeDecl *> &path);
+  /// \returns the generic parameter at the start of the path.
+  static GenericParamKey createPath(
+                                Type type,
+                                SmallVectorImpl<AssociatedTypeDecl *> &path);
 
   /// Compute the longer common prefix between this path and \c other.
   RewritePath commonPath(const RewritePath &other) const;
@@ -216,11 +216,11 @@ public:
                   EquivalenceClass &equivClass)
     : builder(builder), equivClass(equivClass) { }
 
-  Optional<RewritePath> getAnchorPath() {
-    if (anchorPath) return anchorPath;
+  const RewritePath &getAnchorPath() {
+    if (anchorPath) return *anchorPath;
 
     anchorPath = RewritePath::createPath(equivClass.getAnchor(builder, { }));
-    return anchorPath;
+    return *anchorPath;
   }
 };
 
@@ -2293,8 +2293,8 @@ Type EquivalenceClass::getAnchor(
   bool updatedAnchor = false;
   for (auto member : members) {
     auto anchorType =
-      builder.getCanonicalTypeParameter(member->getDependentType(genericParams));
-    if (!anchorType) continue;
+      builder.getCanonicalTypeParameter(
+                                      member->getDependentType(genericParams));
 
 #ifndef NDEBUG
     // Check that we get consistent results from all of the anchors.
@@ -3173,30 +3173,23 @@ RewritePath::RewritePath(Optional<GenericParamKey> base,
   }
 }
 
-Optional<RewritePath> RewritePath::createPath(Type type) {
+RewritePath RewritePath::createPath(Type type) {
   SmallVector<AssociatedTypeDecl *, 4> path;
-  if (auto genericParam = createPath(type, path)) {
-    return RewritePath(*genericParam, path, Reverse);
-  }
-
-  return None;
+  auto genericParam = createPath(type, path);
+  return RewritePath(genericParam, path, Reverse);
 }
 
-Optional<GenericParamKey>
-RewritePath::createPath(Type type,
-                        SmallVectorImpl<AssociatedTypeDecl *> &path) {
+GenericParamKey RewritePath::createPath(
+                                Type type,
+                                SmallVectorImpl<AssociatedTypeDecl *> &path) {
   while (auto depMemTy = type->getAs<DependentMemberType>()) {
     auto assocType = depMemTy->getAssocType();
-    if (!assocType) return None;
-
+    assert(assocType && "Unresolved dependent member type");
     path.push_back(assocType);
     type = depMemTy->getBase();
   }
 
-  auto genericParam = type->getAs<GenericTypeParamType>();
-  if (!genericParam) return None;
-
-  return GenericParamKey(genericParam);
+  return type->castTo<GenericTypeParamType>();
 }
 
 RewritePath RewritePath::commonPath(const RewritePath &other) const {
@@ -3244,15 +3237,14 @@ CanType RewritePath::formDependentType(
     return CanType(::formDependentType(ctx, *base, getPath()));
 
   assert(anchorPathCache && "Need an anchor path cache");
-  Optional<RewritePath> anchorPath = anchorPathCache->getAnchorPath();
-  if (!anchorPath) return CanType();
+  const RewritePath &anchorPath = anchorPathCache->getAnchorPath();
 
   // Add the relative path to the anchor path.
   SmallVector<AssociatedTypeDecl *, 4> absolutePath;
-  absolutePath.append(anchorPath->getPath().begin(),
-                      anchorPath->getPath().end());
+  absolutePath.append(anchorPath.getPath().begin(),
+                      anchorPath.getPath().end());
   absolutePath.append(getPath().begin(), getPath().end());
-  return CanType(::formDependentType(ctx, *anchorPath->getBase(),
+  return CanType(::formDependentType(ctx, *anchorPath.getBase(),
                                      absolutePath));
 
 }
@@ -3618,9 +3610,9 @@ void GenericSignatureBuilder::Implementation::minimizeRewriteTreeRhs(
       ++NumRewriteRhsSimplified;
 
       // Determine replacement path, which might be relative to the anchor.
-      auto canonicalRhsPath = *RewritePath::createPath(canonicalRhsType);
+      auto canonicalRhsPath = RewritePath::createPath(canonicalRhsType);
       auto anchorPath = anchorPathCache.getAnchorPath();
-      if (auto prefix = anchorPath->commonPath(canonicalRhsPath)) {
+      if (auto prefix = anchorPath.commonPath(canonicalRhsPath)) {
         unsigned prefixLength = prefix.getPath().size();
         RelativeRewritePath replacementRhsPath =
           canonicalRhsPath.getPath().slice(prefixLength);
@@ -3663,7 +3655,6 @@ void GenericSignatureBuilder::Implementation::removeRewriteTreeRedundancies(
 
       // Simplify the left-hand type.
       Type simplifiedLhsType = builder.getCanonicalTypeParameter(lhsType);
-      if (!simplifiedLhsType) return RewriteTreeNode::RuleAction::none();
 
       // Compute the type of the right-hand side.
       Type rhsType = rhs.formDependentType(ctx, &anchorPathCache);
@@ -3685,20 +3676,18 @@ bool GenericSignatureBuilder::addSameTypeRewriteRule(
                                                 PotentialArchetype *otherPA){
   // Simplify both sides in the hope of uncovering a common path.
   Type simplifiedType1 = equivClass->getAnchor(*this, { });
-  if (!simplifiedType1) return false;
 
   Type simplifiedType2;
   if (auto otherEquivClass = otherPA->getEquivalenceClassIfPresent())
     simplifiedType2 = otherEquivClass->getAnchor(*this, { });
   else
     simplifiedType2 = getCanonicalTypeParameter(otherPA->getDependentType({ }));
-  if (!simplifiedType2) return false;
 
   // We already effectively have this rewrite rule.
   if (simplifiedType1->isEqual(simplifiedType2)) return false;
 
-  auto path1 = *RewritePath::createPath(simplifiedType1);
-  auto path2 = *RewritePath::createPath(simplifiedType2);
+  auto path1 = RewritePath::createPath(simplifiedType1);
+  auto path2 = RewritePath::createPath(simplifiedType2);
 
   // Look for a common prefix. When we have one, form a rewrite rule using
   // relative paths.
@@ -3747,11 +3736,9 @@ bool GenericSignatureBuilder::addSameTypeRewriteRule(
 
 Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
   auto initialPath = RewritePath::createPath(type);
-  if (!initialPath) return nullptr;
-
   auto genericParamType =
-    GenericTypeParamType::get(initialPath->getBase()->Depth,
-                              initialPath->getBase()->Index,
+    GenericTypeParamType::get(initialPath.getBase()->Depth,
+                              initialPath.getBase()->Index,
                               getASTContext());
   auto initialEquivClass =
     resolveEquivalenceClass(genericParamType,
@@ -3761,8 +3748,8 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
   unsigned startIndex = 0;
   auto equivClass = initialEquivClass;
   Type currentType = genericParamType;
-  SmallVector<AssociatedTypeDecl *, 4> path(initialPath->getPath().begin(),
-                                            initialPath->getPath().end());
+  SmallVector<AssociatedTypeDecl *, 4> path(initialPath.getPath().begin(),
+                                            initialPath.getPath().end());
   bool simplified = false;
   do {
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(equivClass)) {
