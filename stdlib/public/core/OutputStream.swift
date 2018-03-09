@@ -380,6 +380,11 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
 internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
+  if let string = value as? String {
+    let mirror = Mirror(reflecting: string)
+    _adHocPrint_unlocked(string, mirror, &target, isDebugPrint: false)
+    return
+  }
   // Optional has no representation suitable for display; therefore,
   // values of optional type should be printed as a debug
   // string. Check for Optional first, before checking protocol
