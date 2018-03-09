@@ -827,7 +827,7 @@ message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
-if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
   message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
