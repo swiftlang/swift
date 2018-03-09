@@ -447,7 +447,9 @@ private:
 
   /// Add a rewrite rule that makes \c otherPA a part of the given equivalence
   /// class.
-  void addSameTypeRewriteRule(EquivalenceClass *equivClass,
+  ///
+  /// \returns true if a new rewrite rule was added, and false otherwise.
+  bool addSameTypeRewriteRule(EquivalenceClass *equivClass,
                               PotentialArchetype *otherPA);
 
   /// \brief Add a new conformance requirement specifying that the given
