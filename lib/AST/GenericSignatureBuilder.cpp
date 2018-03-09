@@ -113,12 +113,16 @@ STATISTIC(NumRewriteRhsSimplified,
           "# of rewrite rule right-hand sides simplified");
 STATISTIC(NumRewriteRhsSimplifiedToLhs,
           "# of rewrite rule right-hand sides simplified to lhs (and removed)");
+STATISTIC(NumRewriteRulesRedundant,
+          "# of rewrite rules that are redundant (and removed)");
 
 namespace  {
 
 /// A purely-relative rewrite path consisting of a (possibly empty)
 /// sequence of associated type references.
 using RelativeRewritePath = ArrayRef<AssociatedTypeDecl *>;
+
+class AnchorPathCache;
 
 /// Describes a rewrite path, which contains an optional base (generic
 /// parameter) followed by a sequence of associated type references.
@@ -179,8 +183,10 @@ public:
 
   /// Form a canonical, dependent type.
   ///
-  /// This requires that the rewrite path have a base.
-  CanType formDependentType(ASTContext &ctx) const;
+  /// This requires that either the rewrite path have a base, or the
+  /// \c baseEquivClass to be non-null (which substitutes in a base).
+  CanType formDependentType(ASTContext &ctx,
+                            AnchorPathCache *anchorPathCache = nullptr) const;
 
   /// Compare the given rewrite paths.
   int compare(const RewritePath &other) const;
@@ -195,6 +201,26 @@ public:
 
   friend bool operator==(const RewritePath &lhs, const RewritePath &rhs) {
     return lhs.getBase() == rhs.getBase() && lhs.getPath() == rhs.getPath();
+  }
+};
+
+/// A cache that lazily computes the anchor path for the given equivalence
+/// class.
+class AnchorPathCache {
+  GenericSignatureBuilder &builder;
+  EquivalenceClass &equivClass;
+  Optional<RewritePath> anchorPath;
+
+public:
+  AnchorPathCache(GenericSignatureBuilder &builder,
+                  EquivalenceClass &equivClass)
+    : builder(builder), equivClass(equivClass) { }
+
+  Optional<RewritePath> getAnchorPath() {
+    if (anchorPath) return anchorPath;
+
+    anchorPath = RewritePath::createPath(equivClass.getAnchor(builder, { }));
+    return anchorPath;
   }
 };
 
@@ -262,9 +288,15 @@ public:
   }
 
   /// Retrieve the path to which this node will be rewritten.
-  const RewritePath &getRewriteRule() const {
+  const RewritePath &getRewriteRule() const & {
     assert(hasRewriteRule());
     return rewrite;
+  }
+
+  /// Retrieve the path to which this node will be rewritten.
+  RewritePath &&getRewriteRule() && {
+    assert(hasRewriteRule());
+    return std::move(rewrite);
   }
 
   /// Add a new rewrite rule to this tree node.
@@ -359,9 +391,10 @@ public:
   /// right-hand sides of each rule.
   ///
   /// \returns true if the action function returned \c Stop at any point.
-  bool enumerateRules(llvm::function_ref<EnumerateCallback> fn) {
+  bool enumerateRules(llvm::function_ref<EnumerateCallback> fn,
+                      bool temporarilyDisableVisitedRule = false) {
     SmallVector<AssociatedTypeDecl *, 4> lhs;
-    return enumerateRulesRec(fn, lhs);
+    return enumerateRulesRec(fn, temporarilyDisableVisitedRule, lhs);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
@@ -376,6 +409,7 @@ private:
   ///
   /// \returns true if the action function returned \c Stop at any point.
   bool enumerateRulesRec(llvm::function_ref<EnumerateCallback> &fn,
+                         bool temporarilyDisableVisitedRule,
                          llvm::SmallVectorImpl<AssociatedTypeDecl *> &lhs);
 };
 }
@@ -459,7 +493,7 @@ struct GenericSignatureBuilder::Implementation {
                                         const EquivalenceClass *equivClass);
 
   /// Minimize the rewrite tree by minimizing the right-hand sides and
-  /// (TBD) removing redundant rules.
+  /// removing redundant rules.
   void minimizeRewriteTree(GenericSignatureBuilder &builder);
 
 private:
@@ -467,6 +501,11 @@ private:
   /// as far as possible and removing any changes that result in trivial
   /// rules.
   void minimizeRewriteTreeRhs(GenericSignatureBuilder &builder);
+
+  /// Minimize the right-hand sides of the rewrite tree, simplifying them
+  /// as far as possible and removing any changes that result in trivial
+  /// rules.
+  void removeRewriteTreeRedundancies(GenericSignatureBuilder &builder);
 };
 
 #pragma mark Memory management
@@ -2250,6 +2289,9 @@ Type EquivalenceClass::getAnchor(
     return substAnchor();
   }
 
+  // Always work with a minimized term-rewriting system.
+  builder.Impl->minimizeRewriteTree(builder);
+
   // Form the anchor.
   bool updatedAnchor = false;
   for (auto member : members) {
@@ -3198,9 +3240,24 @@ static Type formDependentType(ASTContext &ctx, GenericParamKey genericParam,
                            path);
 }
 
-CanType RewritePath::formDependentType(ASTContext &ctx) const {
-  assert(getBase());
-  return CanType(::formDependentType(ctx, *getBase(), getPath()));
+CanType RewritePath::formDependentType(
+                                     ASTContext &ctx,
+                                     AnchorPathCache *anchorPathCache) const {
+  if (auto base = getBase())
+    return CanType(::formDependentType(ctx, *base, getPath()));
+
+  assert(anchorPathCache && "Need an anchor path cache");
+  Optional<RewritePath> anchorPath = anchorPathCache->getAnchorPath();
+  if (!anchorPath) return CanType();
+
+  // Add the relative path to the anchor path.
+  SmallVector<AssociatedTypeDecl *, 4> absolutePath;
+  absolutePath.append(anchorPath->getPath().begin(),
+                      anchorPath->getPath().end());
+  absolutePath.append(getPath().begin(), getPath().end());
+  return CanType(::formDependentType(ctx, *anchorPath->getBase(),
+                                     absolutePath));
+
 }
 
 int RewritePath::compare(const RewritePath &other) const {
@@ -3391,6 +3448,7 @@ bool RewriteTreeNode::mergeInto(RewriteTreeNode *other) {
 
 bool RewriteTreeNode::enumerateRulesRec(
                             llvm::function_ref<EnumerateCallback> &fn,
+                            bool temporarilyDisableVisitedRule,
                             llvm::SmallVectorImpl<AssociatedTypeDecl *> &lhs) {
   if (auto assocType = getMatch())
     lhs.push_back(assocType);
@@ -3402,7 +3460,23 @@ bool RewriteTreeNode::enumerateRulesRec(
 
   // If there is a rewrite rule, invoke the callback.
   if (hasRewriteRule()) {
-    switch (RuleAction action = fn(lhs, getRewriteRule())) {
+    // If we're supposed to temporarily disabled the visited rule, do so
+    // now.
+    Optional<RewritePath> rewriteRule;
+    if (temporarilyDisableVisitedRule) {
+      rewriteRule = std::move(*this).getRewriteRule();
+      removeRewriteRule();
+    }
+
+    // Make sure that we put the rewrite rule back in place if we moved it
+    // aside.
+    SWIFT_DEFER {
+      if (temporarilyDisableVisitedRule && rewriteRule)
+        setRewriteRule(*std::move(rewriteRule));
+    };
+
+    switch (auto action =
+                fn(lhs, rewriteRule ? *rewriteRule : getRewriteRule())) {
     case RuleAction::None:
       break;
 
@@ -3410,19 +3484,26 @@ bool RewriteTreeNode::enumerateRulesRec(
       return true;
 
     case RuleAction::Remove:
-      removeRewriteRule();
+      if (temporarilyDisableVisitedRule)
+        rewriteRule = None;
+      else
+        removeRewriteRule();
       break;
 
     case RuleAction::Replace:
-      removeRewriteRule();
-      setRewriteRule(action.path);
+      if (temporarilyDisableVisitedRule) {
+        rewriteRule = std::move(action.path);
+      } else {
+        removeRewriteRule();
+        setRewriteRule(action.path);
+      }
       break;
     }
   }
 
   // Recurse into the child nodes.
   for (auto child : children) {
-    if (child->enumerateRulesRec(fn, lhs))
+    if (child->enumerateRulesRec(fn, temporarilyDisableVisitedRule, lhs))
       return true;
   }
 
@@ -3506,6 +3587,7 @@ void GenericSignatureBuilder::Implementation::minimizeRewriteTree(
   };
 
   minimizeRewriteTreeRhs(builder);
+  removeRewriteTreeRedundancies(builder);
 }
 
 void GenericSignatureBuilder::Implementation::minimizeRewriteTreeRhs(
@@ -3517,40 +3599,14 @@ void GenericSignatureBuilder::Implementation::minimizeRewriteTreeRhs(
     auto root = RewriteTreeRoots.find(&equivClass);
     if (root == RewriteTreeRoots.end()) continue;
 
-    // Stores the anchor base and path, when we've computed it.
-    Optional<RewritePath> anchorPath;
-
-    // Make sure that anchorBase/anchorPath are populated.
-    auto populateAnchor = [&] {
-      if (anchorPath) return false;
-
-      // Get the pieces of the path for the anchor.
-      anchorPath = RewritePath::createPath(equivClass.getAnchor(builder, { }));
-      if (!anchorPath) return true;
-
-      return false;
-    };
+    AnchorPathCache anchorPathCache(builder, equivClass);
 
     ASTContext &ctx = builder.getASTContext();
     root->second->enumerateRules([&](RelativeRewritePath lhs,
                                      const RewritePath &rhs) {
       // Compute the type of the right-hand side.
-      Type rhsType;
-      if (rhs.getBase()) {
-        rhsType = rhs.formDependentType(ctx);
-      } else {
-        // We need the anchor of this equivalence class.
-        if (populateAnchor())
-          return RewriteTreeNode::RuleAction::none();
-
-        // Add the right-hand side to the anchor path we have.
-        SmallVector<AssociatedTypeDecl *, 4> absoluteRhsPath;
-        absoluteRhsPath.append(anchorPath->getPath().begin(),
-                               anchorPath->getPath().end());
-        absoluteRhsPath.append(rhs.getPath().begin(), rhs.getPath().end());
-        rhsType = formDependentType(ctx, *anchorPath->getBase(),
-                                    absoluteRhsPath);
-      }
+      Type rhsType = rhs.formDependentType(ctx, &anchorPathCache);
+      if (!rhsType) return RewriteTreeNode::RuleAction::none();
 
       // Compute the canonical type for the right-hand side.
       Type canonicalRhsType = builder.getCanonicalTypeParameter(rhsType);
@@ -3566,7 +3622,7 @@ void GenericSignatureBuilder::Implementation::minimizeRewriteTreeRhs(
 
       // Determine replacement path, which might be relative to the anchor.
       auto canonicalRhsPath = *RewritePath::createPath(canonicalRhsType);
-      populateAnchor();
+      auto anchorPath = anchorPathCache.getAnchorPath();
       if (auto prefix = anchorPath->commonPath(canonicalRhsPath)) {
         unsigned prefixLength = prefix.getPath().size();
         RelativeRewritePath replacementRhsPath =
@@ -3586,6 +3642,44 @@ void GenericSignatureBuilder::Implementation::minimizeRewriteTreeRhs(
 
       return RewriteTreeNode::RuleAction::replace(canonicalRhsPath);
     });
+  }
+}
+
+void GenericSignatureBuilder::Implementation::removeRewriteTreeRedundancies(
+                                            GenericSignatureBuilder &builder) {
+  assert(MinimizingRewriteSystem);
+
+  // Minimize the right-hand sides of each rule in the tree.
+  for (auto &equivClass : EquivalenceClasses) {
+    auto root = RewriteTreeRoots.find(&equivClass);
+    if (root == RewriteTreeRoots.end()) continue;
+
+    AnchorPathCache anchorPathCache(builder, equivClass);
+
+    ASTContext &ctx = builder.getASTContext();
+    root->second->enumerateRules([&](RelativeRewritePath lhs,
+                                     const RewritePath &rhs) {
+      /// Left-hand side type.
+      Type lhsType = RewritePath(None, lhs, RewritePath::Forward)
+                       .formDependentType(ctx, &anchorPathCache);
+      if (!lhsType) return RewriteTreeNode::RuleAction::none();
+
+      // Simplify the left-hand type.
+      Type simplifiedLhsType = builder.getCanonicalTypeParameter(lhsType);
+      if (!simplifiedLhsType) return RewriteTreeNode::RuleAction::none();
+
+      // Compute the type of the right-hand side.
+      Type rhsType = rhs.formDependentType(ctx, &anchorPathCache);
+      if (!rhsType) return RewriteTreeNode::RuleAction::none();
+
+      if (simplifiedLhsType->isEqual(rhsType)) {
+        ++NumRewriteRulesRedundant;
+        return RewriteTreeNode::RuleAction::remove();
+      }
+
+      return RewriteTreeNode::RuleAction::none();
+    },
+    /*temporarilyDisableVisitedRule=*/true);
   }
 }
 
