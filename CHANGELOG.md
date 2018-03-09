@@ -114,17 +114,19 @@ Swift 4.1
 	recursive constraints. For example, the `SubSequence` associated type of
 	`Sequence` follows the enclosing protocol:
 
-        protocol Sequence {
-          associatedtype Element
-          associatedtype SubSequence: Sequence
-            where SubSequence.Element == Element,
-                  SubSequence.SubSequence == SubSequence
-          // ...
-        }
+  ```swift
+  protocol Sequence {
+    associatedtype Element
+    associatedtype SubSequence: Sequence
+      where SubSequence.Element == Element,
+            SubSequence.SubSequence == SubSequence
+    // ...
+  }
 
-        protocol Collection: Sequence where Self.SubSequence: Collection {
-          // ...
-        }
+  protocol Collection: Sequence where Self.SubSequence: Collection {
+    // ...
+  }
+  ```
 
   As a result, a number of new constraints have been introduced into the
 	standard library protocols:
