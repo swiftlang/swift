@@ -3674,23 +3674,13 @@ void GenericSignatureBuilder::Implementation::removeRewriteTreeRedundancies(
   }
 }
 
-bool GenericSignatureBuilder::addSameTypeRewriteRule(
-                                                EquivalenceClass *equivClass,
-                                                PotentialArchetype *otherPA){
-  // Simplify both sides in the hope of uncovering a common path.
-  Type simplifiedType1 = equivClass->getAnchor(*this, { });
-
-  Type simplifiedType2;
-  if (auto otherEquivClass = otherPA->getEquivalenceClassIfPresent())
-    simplifiedType2 = otherEquivClass->getAnchor(*this, { });
-  else
-    simplifiedType2 = getCanonicalTypeParameter(otherPA->getDependentType({ }));
-
+bool GenericSignatureBuilder::addSameTypeRewriteRule(CanType type1,
+                                                     CanType type2) {
   // We already effectively have this rewrite rule.
-  if (simplifiedType1->isEqual(simplifiedType2)) return false;
+  if (type1 == type2) return false;
 
-  auto path1 = RewritePath::createPath(simplifiedType1);
-  auto path2 = RewritePath::createPath(simplifiedType2);
+  auto path1 = RewritePath::createPath(type1);
+  auto path2 = RewritePath::createPath(type2);
 
   // Look for a common prefix. When we have one, form a rewrite rule using
   // relative paths.
@@ -3719,9 +3709,9 @@ bool GenericSignatureBuilder::addSameTypeRewriteRule(
   // Otherwise, form a rewrite rule with absolute paths.
 
   // Find the better path and make sure it's in path2.
-  if (compareDependentTypes(simplifiedType1, simplifiedType2) < 0) {
+  if (compareDependentTypes(type1, type2) < 0) {
     std::swap(path1, path2);
-    std::swap(simplifiedType1, simplifiedType2);
+    std::swap(type1, type2);
   }
 
   // Add the rewrite rule.
@@ -4872,10 +4862,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                  : getCanonicalTypeParameter(T2->getDependentType({ })))
       ->getCanonicalType();
 
-  // Add a rewrite rule to map T2 down to the anchor.
-  if (addSameTypeRewriteRule(equivClass, T2))
-    ++Impl->RewriteGeneration;
-
   // Merge the equivalence classes.
   equivClass->modified(*this);
   auto equivClass1Members = equivClass->members;
@@ -4916,6 +4902,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
     }
   }
+
+  // Add a rewrite rule to map the anchor of T2 down to the anchor of T1.
+  if (addSameTypeRewriteRule(anchor2, anchor1))
+    ++Impl->RewriteGeneration;
 
   // Same-type-to-concrete requirements.
   bool t1IsConcrete = !equivClass->concreteType.isNull();
