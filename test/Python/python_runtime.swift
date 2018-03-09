@@ -10,12 +10,12 @@ var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 
 PythonRuntimeTestSuite.test("check-version") {
   let sysModule = try! Python.import("sys")
-  let version = String(sysModule[member: "version"])!
+  let version = String(sysModule.version)!
   expectEqual("2.7.", version.prefix(4))
 }
 
 PythonRuntimeTestSuite.test("pylist") {
-  let list = PyVal([0, 1, 2])
+  let list: PyVal = [0, 1, 2]
   expectEqual("[0, 1, 2]", list.description)
   expectEqual(3, Python.len.call(with: list))
   expectEqual("[0, 1, 2]", Python.str.call(with: list))
@@ -33,7 +33,7 @@ PythonRuntimeTestSuite.test("pylist") {
 }
 
 PythonRuntimeTestSuite.test("pydict") {
-  let dict = ["a": 1, 1: 0.5] as PyVal
+  let dict: PyVal = ["a": 1, 1: 0.5]
   expectEqual(2, Python.len.call(with: dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
