@@ -1157,6 +1157,40 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
   return (in_matches && out_matches);
 }
 
+static void VisitNodePrivateDeclName(
+    ASTContext *ast,
+    Demangle::NodePointer parent_node,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
+
+  if (cur_node->getNumChildren() != 2) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
+  Demangle::NodePointer id_node(cur_node->getChild(1));
+
+  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
+                                  decl_kind, result,
+                                  priv_decl_id_node->getText().str())) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
+          id_node->getText().str().c_str(),
+          priv_decl_id_node->getText().str().c_str());
+  }
+}
+
 // VisitNodeFunction gets used for Function, Variable and Allocator:
 static void VisitNodeFunction(
     ASTContext *ast,
@@ -1190,6 +1224,25 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Extension:
       VisitNode(ast, *pos, decl_scope_result);
       break;
+
+    case Demangle::Node::Kind::PrivateDeclName: {
+      VisitNodePrivateDeclName(ast, cur_node, child, decl_scope_result);
+
+      // No results found, giving up.
+      if (decl_scope_result._decls.empty())
+        break;
+
+      std::copy(decl_scope_result._decls.begin(),
+                decl_scope_result._decls.end(),
+                back_inserter(identifier_result._decls));
+      std::copy(decl_scope_result._types.begin(),
+                decl_scope_result._types.end(),
+                back_inserter(identifier_result._types));
+      identifier_result._module = decl_scope_result._module;
+      if (decl_scope_result._decls.size() == 1)
+        found_univocous = true;
+      break;
+    }
 
     case Demangle::Node::Kind::LabelList: {
       for (const auto &label : **pos) {
@@ -1667,40 +1720,6 @@ static void VisitNodeLocalDeclName(
     result._decls.push_back(decl);
     auto type = decl->getDeclaredInterfaceType();
     result._types.push_back(type);
-  }
-}
-
-static void VisitNodePrivateDeclName(
-    ASTContext *ast,
-    Demangle::NodePointer parent_node,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
-
-  if (cur_node->getNumChildren() != 2) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
-  Demangle::NodePointer id_node(cur_node->getChild(1));
-
-  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
-                                  decl_kind, result,
-                                  priv_decl_id_node->getText().str())) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
-          id_node->getText().str().c_str(),
-          priv_decl_id_node->getText().str().c_str());
   }
 }
 
