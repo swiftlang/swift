@@ -2866,6 +2866,16 @@ private:
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
   Optional<PotentialBindings> determineBestBindings();
+  Optional<ConstraintSystem::PotentialBinding>
+  getPotentialBindingForRelationalConstraint(
+      PotentialBindings &result, Constraint *constraint,
+      bool &hasDependentMemberRelationalConstraints,
+      bool &hasNonDependentMemberRelationalConstraints,
+      bool &addOptionalSupertypeBindings);
+
+  Optional<PotentialBinding>
+  getPotentialBindingForRelationalConstraint(PotentialBindings &result,
+                                             Constraint *constraint);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
