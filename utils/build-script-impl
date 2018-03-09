@@ -3014,7 +3014,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     dry_run_command_output="$(${build_cmd[@]} -n -v ${test_target} | sed -e 's/[^]]*] //')"
                     echo "Test command: ${dry_run_command_output}"
 
-                    if [[ ! "${test_paths}" ]]; then
+                    if [[ ${test_target} = 'check-swift-linux-x86_64' ]]; then
+                        ${build_cmd[@]} ${test_target}
+                    elif [[ ! "${test_paths}" ]]; then
                         env bash -ex <(echo -e "${dry_run_command_output}")
                     else
                         env bash -ex <(echo -e "${dry_run_command_output}" "${test_paths[@]}")
