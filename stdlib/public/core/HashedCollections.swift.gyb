@@ -3985,7 +3985,7 @@ extension _Native${Self}Buffer
   @_versioned
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, bucketCount)
+    return _hashValue(for: k) & _bucketMask
   }
 
   @_inlineable // FIXME(sil-serialize-all)
