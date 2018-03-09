@@ -1576,6 +1576,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
+  UNARY_INSTRUCTION(IsEscapingClosure)
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
 #undef UNARY_INSTRUCTION

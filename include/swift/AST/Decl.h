@@ -543,12 +543,16 @@ protected:
     HasUnreferenceableStorage : 1
   );
   
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2,
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2+1,
     /// The stage of the raw type circularity check for this class.
     Circularity : 2,
 
     /// True if the enum has cases and at least one case has associated values.
-    HasAssociatedValues : 2
+    HasAssociatedValues : 2,
+    /// True if the enum has at least one case that has some availability
+    /// attribute.  A single bit because it's lazily computed along with the
+    /// HasAssociatedValues bit.
+    HasAnyUnavailableValues : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3219,6 +3223,11 @@ public:
   ///
   /// Note that this is true for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
+
+  /// True if any of the enum cases have availability annotations.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasPotentiallyUnavailableCaseValue() const;
 
   /// True if the enum has cases.
   bool hasCases() const {

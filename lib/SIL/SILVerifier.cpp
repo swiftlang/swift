@@ -4079,6 +4079,16 @@ public:
             "final component should match leaf value type of key path type");
   }
 
+  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnType && fnType->getExtInfo().hasContext() &&
+                !fnType->isNoEscape() &&
+                fnType->getExtInfo().getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+            "is_escaping_closure must have a thick "
+            "function operand");
+  }
+
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {

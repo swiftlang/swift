@@ -1232,6 +1232,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
