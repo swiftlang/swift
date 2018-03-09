@@ -55,8 +55,8 @@ bool ToolChain::JobContext::shouldUseInputFileList() const {
 }
 
 bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
-  // SingleCompile's must not return true because then all inputs erroniously
-  // end up in primary flielist.
+  // SingleCompile's must not return true because then all inputs erroneously
+  // end up in primary file list.
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   return InputActions.size() > TOO_MANY_FILES;
@@ -83,7 +83,7 @@ bool ToolChain::JobContext::shouldUseMainOutputFileList() const {
 bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
-  static const uint UpperBoundOnSupplementaryOutputFileTypes =
+  static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
       types::TY_INVALID;
   return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
          TOO_MANY_FILES;

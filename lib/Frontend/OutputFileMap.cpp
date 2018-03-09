@@ -102,20 +102,17 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
 
 void OutputFileMap::write(llvm::raw_ostream &os,
                           ArrayRef<StringRef> inputs) const {
-  auto printQuotedString = [&os](StringRef s) -> void {
-    os << "\"" << s << "\"";
-  };
   for (const auto input : inputs) {
     const TypeToPathMap *outputMap = getOutputMapForInput(input);
     if (!outputMap)
       continue;
-    printQuotedString(input);
+    os.write_escaped(input);
     os << " :\n";
     for (auto &typeAndOutputPath : *outputMap) {
       types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();
       os << "  " << types::getTypeName(type) << ": ";
-      printQuotedString(output);
+      os.write_escaped(output);
       os << "\n";
       }
     }

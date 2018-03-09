@@ -467,7 +467,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
   SupplementaryOutputPaths paths;
   if (!map)
     return paths;
-  static const std::vector<std::pair<types::ID, std::string &>> typesAndStrings{
+  const std::pair<types::ID, std::string &> typesAndStrings[] = {
       {types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
       {types::TY_SwiftModuleFile, paths.ModuleOutputPath},
       {types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
@@ -476,9 +476,13 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {types::TY_TBD, paths.TBDPath}};
-  for (auto typeAndString : typesAndStrings) {
-    auto const out = map->find(typeAndString.first);
-    typeAndString.second = out == map->end() ? "" : out->second;
+  for (const std::pair<types::ID, std::string &> *typeAndString =
+           typesAndStrings;
+       typeAndString <
+       &typesAndStrings[sizeof(typesAndStrings) / sizeof(typesAndStrings[0])];
+       ++typeAndString) {
+    auto const out = map->find(typeAndString->first);
+    typeAndString->second = out == map->end() ? "" : out->second;
   }
   return paths;
 }
@@ -500,9 +504,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         SourceLoc(),
         diag::
             error_cannot_have_supplementary_outputs_with_supplementary_ouputs_file_map,
-        A->getSpelling(),
-        opts->getOption(options::OPT_supplementary_output_filemap)
-            .getPrefixedName());
+        A->getSpelling(), "-supplementary-output-filemap");
     return None;
   }
   const StringRef supplementaryFileMapPath =
@@ -517,7 +519,6 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   OutputFileMap OFM;
   std::string error = OFM.loadFromBuffer(std::move(buffer.get()), "");
   if (!error.empty()) {
-    // TODO: emit diagnostic with error string
     Diags.diagnose(SourceLoc(),
                    diag::error_unable_to_load_supplementary_output_file_map,
                    supplementaryFileMapPath, error);

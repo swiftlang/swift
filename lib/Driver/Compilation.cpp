@@ -802,7 +802,7 @@ namespace driver {
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
 #ifndef NDEBUG
-          llvm::errs() << "Should have used a supplementary output file map.\n";
+          llvm::dbgs() << "Should have used a supplementary output file map.\n";
 #endif
           return true;
         }

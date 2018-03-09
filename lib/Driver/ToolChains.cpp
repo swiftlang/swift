@@ -101,10 +101,10 @@ addOutputsOfType(ArgStringList &Arguments,
 
 /// Handle arguments common to all invocations of the frontend (compilation,
 /// module-merging, LLDB's REPL, etc).
-static void
-addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
-                      const CommandOutput &output, const ArgList &inputArgs,
-                      ArgStringList &arguments) {
+static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
+                                  const CommandOutput &output,
+                                  const ArgList &inputArgs,
+                                  ArgStringList &arguments) {
   const llvm::Triple &Triple = TC.getTriple();
 
   // Only pass -target to the REPL or immediate modes if it was explicitly
@@ -366,44 +366,31 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   switch (Output.getPrimaryOutputType()) {
   case types::TY_Object:
     return "-c";
-    break;
   case types::TY_PCH:
     return "-emit-pch";
-    break;
   case types::TY_RawSIL:
     return "-emit-silgen";
-    break;
   case types::TY_SIL:
     return "-emit-sil";
-    break;
   case types::TY_RawSIB:
     return "-emit-sibgen";
-    break;
   case types::TY_SIB:
     return "-emit-sib";
-    break;
   case types::TY_LLVM_IR:
     return "-emit-ir";
-    break;
   case types::TY_LLVM_BC:
     return "-emit-bc";
-    break;
   case types::TY_Assembly:
     return "-S";
-    break;
   case types::TY_SwiftModuleFile:
     // Since this is our primary output, we need to specify the option here.
     return "-emit-module";
-    break;
   case types::TY_ImportedModules:
     return "-emit-imported-modules";
-    break;
   case types::TY_IndexData:
     return "-typecheck";
-    break;
   case types::TY_Remapping:
     return "-update-code";
-    break;
   case types::TY_Nothing:
     // We were told to output nothing, so get the last mode option and use that.
     if (const Arg *A = Args.getLastArg(options::OPT_modes_Group))
@@ -411,7 +398,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     else
       llvm_unreachable("We were told to perform a standard compile, "
                        "but no mode option was passed to the driver.");
-    break;
   case types::TY_Swift:
   case types::TY_dSYM:
   case types::TY_AutolinkFile:

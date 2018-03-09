@@ -7,9 +7,3 @@
 // RUN: %swiftc_driver -enable-batch-mode -driver-use-filelists -j2 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -o %t/file-01.o  -o %t/file-02.o  -o %t/file-03.o -### | %FileCheck %s -check-prefix=CHECK-SUPPLEMENTARY-OUTPUT-FILELIST
 //
 // CHECK-SUPPLEMENTARY-OUTPUT-FILELIST: -supplementary-output-filemap {{.*}}/supplementaryOutputs-
-//
-// RUN: %swiftc_driver -enable-batch-mode -driver-use-filelists -j2 %t/main.swift  %t/file-01.swift %t/file-02.swift %t/file-03.swift  -o %t/a.out
-// RUN: %t/a.out | %FileCheck %s -check-prefix=CHECK-HELLO-WORLD
-// CHECK-HELLO-WORLD: Hello, World!
-
-
