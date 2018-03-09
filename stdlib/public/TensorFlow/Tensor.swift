@@ -392,7 +392,7 @@ public extension Tensor where Scalar : FloatingPoint {
   ///
   @_inlineable @inline(__always)
   init(randomUniform shape: TensorShape, state: RandomState? = nil) {
-    self = Tensor<Scalar>(
+    self = Tensor(
       Tensor<Int32>(randomStandardUniform: shape, state: state)
     ) / 0xFFFFFFFF
   }
@@ -410,9 +410,10 @@ public extension Tensor where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
        state: RandomState? = nil) {
-    let uniform = Tensor<Scalar>(randomUniform: shape, state: state)
-    let boxMullerHelper = Tensor<Scalar>(randomUniform: shape, state: state)
-    let result = sqrt(-2 * log(uniform)) * cos(2 * .pi * boxMullerHelper)
+    let uniform = Tensor(randomUniform: shape, state: state)
+    let boxMullerHelper = Tensor(randomUniform: shape, state: state)
+    let two = Tensor(2)
+    let result = sqrt(-two * log(uniform)) * cos(two * .pi * boxMullerHelper)
     self = result * stddev + mean
   }
 }
