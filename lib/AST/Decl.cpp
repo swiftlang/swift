@@ -2689,6 +2689,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.EnumDecl.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
+  Bits.EnumDecl.HasAnyUnavailableValues
+    = false;
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -3041,6 +3043,17 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
   return nullptr;
 }
 
+bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
+  switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
+    case AssociatedValueCheck::Unchecked:
+      // Compute below
+      this->hasOnlyCasesWithoutAssociatedValues();
+      LLVM_FALLTHROUGH;
+    default:
+      return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
+  }
+}
+
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   // Check whether we already have a cached answer.
   switch (static_cast<AssociatedValueCheck>(
@@ -3056,6 +3069,15 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
       return false;
   }
   for (auto elt : getAllElements()) {
+    for (auto Attr : elt->getAttrs()) {
+      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+        if (!AvAttr->isInvalid()) {
+          const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAnyUnavailableValues
+            = true;
+        }
+      }
+    }
+
     if (elt->hasAssociatedValues()) {
       const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
         = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
