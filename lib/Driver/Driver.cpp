@@ -531,6 +531,8 @@ Driver::buildCompilation(const ToolChain &TC,
                      A->getAsString(*ArgList), A->getValue());
     }
   }
+  DriverForceOneBatchRepartition =
+      ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -695,19 +697,12 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, OI, Level,
-                                                 std::move(ArgList),
-                                                 std::move(TranslatedArgList),
-                                                 std::move(Inputs),
-                                                 ArgsHash, StartTime,
-                                                 NumberOfParallelCommands,
-                                                 Incremental,
-                                                 BatchMode,
-                                                 DriverBatchSeed,
-                                                 DriverSkipExecution,
-                                                 SaveTemps,
-                                                 ShowDriverTimeCompilation,
-                                                 std::move(StatsReporter)));
+  std::unique_ptr<Compilation> C(new Compilation(
+      Diags, TC, OI, Level, std::move(ArgList), std::move(TranslatedArgList),
+      std::move(Inputs), ArgsHash, StartTime, NumberOfParallelCommands,
+      Incremental, BatchMode, DriverBatchSeed, DriverForceOneBatchRepartition,
+      DriverSkipExecution, SaveTemps, ShowDriverTimeCompilation,
+      std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI, OFM.get(),
