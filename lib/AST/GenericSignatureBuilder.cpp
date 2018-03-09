@@ -2289,9 +2289,6 @@ Type EquivalenceClass::getAnchor(
     return substAnchor();
   }
 
-  // Always work with a minimized term-rewriting system.
-  builder.Impl->minimizeRewriteTree(builder);
-
   // Form the anchor.
   bool updatedAnchor = false;
   for (auto member : members) {
