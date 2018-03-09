@@ -1155,7 +1155,11 @@ void IRGenerator::emitLazyDefinitions() {
         // Make sure that all of the field type metadata is forced,
         // otherwise there might be a problem when fields are accessed
         // through reflection.
-        (void)irgen::getOrCreateTypeMetadataAccessFunction(IGM, fieldType);
+        // TODO: We really ony care about the side effect of forcing metadata
+        // here, not the accessor function (which is going to be unused if we
+        // didn't emit it already). We should have a type visitor for this case.
+#warning "todo"
+        //(void)irgen::getOrCreateTypeMetadataAccessFunction(IGM, fieldType);
       }
     }
 
