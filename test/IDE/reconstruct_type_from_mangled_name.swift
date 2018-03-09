@@ -270,3 +270,39 @@ fileprivate struct VeryPrivateData {}
 // FIXME
 // CHECK: decl: FAILURE for 'privateFunction'
 fileprivate func privateFunction(_ d: VeryPrivateData) {}
+
+struct HasSubscript {
+  // CHECK: decl: subscript(t: Int) -> Int { get set }
+  subscript(_ t: Int) -> Int {
+    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
+    get {
+      return t
+    }
+    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
+    set {}
+  }
+}
+
+// FIXME
+// CHECK: decl: FAILURE	for 'T' usr=s:14swift_ide_test19HasGenericSubscriptV1Txmfp
+struct HasGenericSubscript<T> {
+  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
+  // FIXME
+  // CHECK: decl: FAILURE	for 'U'
+  // FIXME
+  // CHECK: decl: FAILURE	for 't'
+  subscript<U>(_ t: T) -> U {
+
+    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
+    // FIXME
+    // CHECK: dref: FAILURE	for 't'
+    get {
+      return t as! U
+    }
+
+    // FIXME
+    // CHECK: dref: FAILURE	for 'U'
+    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
+    set {}
+  }
+}
