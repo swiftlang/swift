@@ -814,6 +814,25 @@ public:
   /// don't have associated types.
   Type getCanonicalTypeParameter(Type type);
 
+  /// For each requirement in \c sig, create a new signature without it and see
+  /// if the requirement is satisfied in it.
+  ///
+  /// Specifically, for each Requirement \c req in \c sig, create a new
+  /// signature incorporating all of those in \c baseSig (if not null) and the
+  /// other requirements from \c sig, and if \c req is satisfied in this new
+  /// signature add it to \c redundant, otherwise add it to \c nonRedundant.
+  ///
+  /// If \c includeRedundantRequirements is true, all requirements from \c sig
+  /// (other than \c req) are added; if it is false, requirements already found
+  /// to be redundant are also not added (i.e. the contents of \c redundant at
+  /// that point in time).
+  static void
+  dropAndCompareEachRequirement(ASTContext &context, GenericSignature *baseSig,
+                                GenericSignature *sig,
+                                bool includeRedundantRequirements,
+                                SmallVectorImpl<Requirement> &redundant,
+                                SmallVectorImpl<Requirement> &nonRedundant);
+
   /// Verify the correctness of the given generic signature.
   ///
   /// This routine will test that the given generic signature is both minimal
