@@ -283,13 +283,15 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
+  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !loadedModuleTrace || !TBD) {
+      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -304,6 +306,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
+    sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
 
@@ -356,6 +359,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
       "dia", "", defaultSupplementaryOutputPathExcludingExtension);
 
+  // There is no non-path form of -emit-fixits-path
+  auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
+
   auto objcHeaderOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath, "h", "",
       defaultSupplementaryOutputPathExcludingExtension);
@@ -391,6 +397,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
+  sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
   return sop;
