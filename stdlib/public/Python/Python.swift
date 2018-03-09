@@ -72,6 +72,7 @@ final class PyRef {
 /// This is the currency type for Python object references.  It is passed to and
 /// returned from Python calls and member references, and is overloaded to
 /// support the standard operations that Python supports.
+@dynamicMemberLookup
 public struct PyVal {
   /// This is the actual handle to a Python value that we represent.
   fileprivate var state: PyRef
@@ -319,7 +320,7 @@ public struct ThrowingPyVal {
     kwargs: [(String, PythonConvertible)] = []
   ) throws -> PyVal {
     // If the member lookup fails, reflect it as a Swift error.
-    guard let callee = state.checking[member: name] else {
+    guard let callee = state.checking[dynamicMember: name] else {
       throw PythonError.invalidMember(name)
     }
     return try callee.throwing.call(argArray: args, kwargs: kwargs)
@@ -377,6 +378,7 @@ public extension PyVal {
 /// This type temporarily wraps a PyVal when the user cares about turning an
 /// operation (like a member lookup or subscript) into a failable operation that
 /// returns an optional.
+@dynamicMemberLookup
 public struct CheckingPyVal {
   private var state: PyVal
 
@@ -384,12 +386,11 @@ public struct CheckingPyVal {
     state = value
   }
 
-  public subscript(member member: String) -> PyVal? {
+  public subscript(dynamicMember name: String) -> PyVal? {
     get {
       let selfObject = state.ownedPyObject
       defer { Py_DecRef(selfObject) }
-
-      guard let result = PyObject_GetAttrString(selfObject, member) else {
+      guard let result = PyObject_GetAttrString(selfObject, name) else {
         PyErr_Clear()
         return nil
       }
@@ -481,19 +482,20 @@ private func flattenedSubscriptIndices(_ index: [PythonConvertible]) -> OwnedPyO
 }
 
 public extension PyVal {
-  subscript(member member: String) -> PyVal {
-    return checking[member: member]!
-  }
+  subscript(dynamicMember member: String) -> PyVal {
+    get {
+      return checking[dynamicMember: member]!
+    }
+    set {
+      let selfObject = self.ownedPyObject
+      defer { Py_DecRef(selfObject) }
+      let valueObject = newValue.ownedPyObject
+      defer { Py_DecRef(valueObject) }
 
-  func updateMember(_ member: String, to value: PyVal) {
-    let selfObject = self.ownedPyObject
-    defer { Py_DecRef(selfObject) }
-    let valueObject = value.ownedPyObject
-    defer { Py_DecRef(valueObject) }
-
-    if PyObject_SetAttrString(selfObject, member, valueObject) == -1 {
-      try! throwPythonErrorIfPresent()
-      fatalError("setting an invalid Python member \(member)")
+      if PyObject_SetAttrString(selfObject, member, valueObject) == -1 {
+        try! throwPythonErrorIfPresent()
+        fatalError("setting an invalid Python member \(member)")
+      }
     }
   }
 
