@@ -21,13 +21,11 @@
 
 using namespace swift;
 
-bool swift::_swift_reportFatalErrorsToDebugger = true;
-
 static void logPrefixAndMessageToDebugger(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength
 ) {
-  if (!_swift_reportFatalErrorsToDebugger)
+  if (!_swift_shouldReportFatalErrorsToDebugger())
     return;
 
   char *debuggerMessage;
