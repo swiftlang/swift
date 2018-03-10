@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
@@ -39,26 +40,18 @@ public:
   ~OutputFileMap() = default;
 
   /// Loads an OutputFileMap from the given \p Path into the receiver, if
-  /// possible. Mutate the receiver in place in order to free the return value
-  /// to be used for an error string.
-  ///
-  /// When non-empty, \p workingDirectory is used to resolve relative paths in
-  /// the output file map.
-  ///
-  /// \return a non-empty error description on error.
-  std::string loadFromPath(StringRef Path, StringRef workingDirectory);
+  /// possible.
+  static llvm::Expected<OutputFileMap> loadFromPath(StringRef Path,
+                                                    StringRef workingDirectory);
 
-  std::string loadFromBuffer(StringRef Data, StringRef workingDirectory);
+  static llvm::Expected<OutputFileMap>
+  loadFromBuffer(StringRef Data, StringRef workingDirectory);
 
   /// Loads into the OutputFileMap receiver from the given \p Buffer, taking
   /// ownership of the buffer in the process.
-  ///
-  /// When non-empty, \p workingDirectory is used to resolve relative paths in
-  /// the output file map.
-  ///
-  /// \return a non-empty string with an error description if there's an error.
-  std::string loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                             StringRef workingDirectory);
+  static llvm::Expected<OutputFileMap>
+  loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                 StringRef workingDirectory);
 
   /// Get the map of outputs for the given \p Input, if present in the
   /// OutputFileMap. (If not present, returns nullptr.)
@@ -81,18 +74,13 @@ public:
   void write(llvm::raw_ostream &os, ArrayRef<StringRef> inputs) const;
 
 private:
-  /// \brief Parses the given \p Buffer into the OutputFileMap, taking ownership
-  /// of \p Buffer in the process.
-  ///
-  /// When non-empty, \p workingDirectory is used to resolve relative paths in
-  /// the output file map.
-  ///
-  /// \returns a helpful string on error, empty string on success
+  /// \brief Parses the given \p Buffer and returns either an OutputFileMap or
+  /// error string, taking ownership of \p Buffer in the process.
   ///
   /// FIXME: Make the returned error strings more specific by including some of
   /// the source.
-  std::string parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                    StringRef workingDirectory);
+  static llvm::Expected<OutputFileMap>
+  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);
 };
 
 } // end namespace swift

@@ -1700,14 +1700,13 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
     return nullptr;
 
   // TODO: perform some preflight checks to ensure the file exists.
-  std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
-  std::string error = OFM->loadFromPath(A->getValue(), workingDirectory);
-  if (!error.empty()) {
+  llvm::Expected<OutputFileMap> OFM =
+      OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
+  if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   error);
-    OFM.reset();
+                   llvm::toString(std::move(Err)));
   }
-  return OFM;
+  return llvm::make_unique<OutputFileMap>(*OFM);
 }
 
 void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,

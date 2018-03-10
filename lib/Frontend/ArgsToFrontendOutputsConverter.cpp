@@ -516,12 +516,12 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                    supplementaryFileMapPath, buffer.getError().message());
     return None;
   }
-  OutputFileMap OFM;
-  std::string error = OFM.loadFromBuffer(std::move(buffer.get()), "");
-  if (!error.empty()) {
+  llvm::Expected<OutputFileMap> OFM =
+      OutputFileMap::loadFromBuffer(std::move(buffer.get()), "");
+  if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_unable_to_load_supplementary_output_file_map,
-                   supplementaryFileMapPath, error);
+                   supplementaryFileMapPath, llvm::toString(std::move(Err)));
     return None;
   }
 
@@ -529,7 +529,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         const TypeToPathMap *mapForInput =
-            OFM.getOutputMapForInput(input.file());
+            OFM->getOutputMapForInput(input.file());
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));
         return false;
       });
