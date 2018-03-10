@@ -104,7 +104,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 
   swift_install_in_component(stdlib
     TARGETS swiftImageInspectionShared
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "${SWIFT_LIBDIR}/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
