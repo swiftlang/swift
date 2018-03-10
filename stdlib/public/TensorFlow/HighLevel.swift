@@ -188,6 +188,18 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   /// The padding algorithm for convolution.
   public var padding: Padding
 
+  /// Creates a new instance with the specified filter, strides, and padding.
+  // NOTE: Swift generates default memberwise initializers, but they have
+  // internal access, not public. Public initializers must be manually declared.
+  // TODO: Consider adding default argument values? (eg. strides = [1, 1, 1, 1])
+  // Default values might not work out of the box (send/receive errors).
+  @_inlineable @inline(__always)
+  public init(filter: Tensor<Scalar>, strides: [Int32], padding: Padding) {
+    self.filter = filter
+    self.strides = strides
+    self.padding = padding
+  }
+
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
@@ -204,6 +216,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     public var filter: Tensor<Scalar>
 
     // An initializer which sets the values for each parameter.
+    @_inlineable @inline(__always)
     public init(filter: Tensor<Scalar>) {
       self.filter = filter
     }
@@ -226,10 +239,13 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   }
 
   /// An instance of `Parameters`. This will be synthesized.
+  @_inlineable
   public var parameters: Parameters {
+    @inline(__always)
     get {
       return Parameters(filter: filter)
     }
+    @inline(__always)
     set {
       filter = newValue.filter
     }
@@ -246,7 +262,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
 
   /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
   /// input Tensor and the 4-D filter Tensor. This can be automatically computed
-  /// after more support for automatic differentiation is added.
+  /// after more compiler support for automatic differentiation is added.
   @_inlineable @inline(__always)
   public func gradient(
     for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
@@ -259,5 +275,112 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       seed: adjoint
     )
     return (dInput, Parameters(filter: dFilter))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//
+// Fully connected layer
+//
+//===----------------------------------------------------------------------===//
+
+/// A fully-connected layer with weight and bias tensors. Fully-connected layers
+/// apply a linear transformation to inputs.
+// TODO:
+// - Add initializers that take in input/output sizes and initialization
+//   strategies for weight/bias (ones, zeros, random uniform, etc).
+public struct FullyConnectedLayer<Scalar> : DifferentiableModule
+  where Scalar : FloatingPoint & AccelerableByTensorFlow {
+  /// The weight tensor.
+  // TODO: To be marked with @parameter.
+  public var weight: Tensor<Scalar>
+
+  /// The bias tensor.
+  // TODO: To be marked with @parameter.
+  public var bias: Tensor<Scalar>
+
+  /// Creates a new instance with the specified weight and bias.
+  // NOTE: Swift generates default memberwise initializers, but they have
+  // internal access, not public. Public initializers must be manually declared.
+  @_inlineable @inline(__always)
+  public init(weight: Tensor<Scalar>,
+              bias: Tensor<Scalar>) {
+    self.weight = weight
+    self.bias = bias
+  }
+
+  // TODO: The `Parameters` struct type and the `parameters` stored property
+  // will be compiler synthesized. Remove their explicit declarations when
+  // compiler synthesization is implemented.
+  public struct Parameters : Differentiable {
+    // The currency type of differentiation. This will be compiler synthesized
+    // to be the currency type of the stored properties with least precision.
+    // The currency type is important for initializing intermediate values
+    // during automatic differentiation, such as the initial adjoint/tangent and
+    // the seed.
+    public typealias DifferentiationCurrency = Scalar
+
+    // Synthesized properties. `weight` and `bias` will be synthesized in
+    // `Parameters` because they will be marked with `@parameter`.
+    public var weight: Tensor<Scalar>
+    public var bias: Tensor<Scalar>
+
+    // An initializer which sets the values for each parameter.
+    @_inlineable @inline(__always)
+    public init(weight: Tensor<Scalar>, bias: Tensor<Scalar>) {
+      self.weight = weight
+      self.bias = bias
+    }
+
+    // This initializer is a `Differentiable` requirement and will be
+    // compiler synthesized.
+    @_inlineable @inline(__always)
+    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
+      self.weight = Tensor<Scalar>(shape: other.weight.shape, repeating: value)
+      self.bias = Tensor<Scalar>(shape: other.bias.shape, repeating: value)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(
+        weight: lhs.weight + rhs.weight,
+        bias: lhs.bias + rhs.bias
+      )
+    }
+  }
+
+  /// An instance of `Parameters`. This will be synthesized.
+  @_inlineable
+  public var parameters: Parameters {
+    @inline(__always)
+    get {
+      return Parameters(weight: weight, bias: bias)
+    }
+    @inline(__always)
+    set {
+      weight = newValue.weight
+      bias = newValue.bias
+    }
+  }
+
+  /// Computes the operation `dot(input, weight) + bias`.
+  @_inlineable @inline(__always)
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+    return input.dot(weight) + bias
+  }
+
+  /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
+  /// input Tensor and the 4-D filter Tensor. This can be automatically computed
+  /// after more compiler support for automatic differentiation is added.
+  @_inlineable @inline(__always)
+  public func gradient(
+    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  ) -> (Tensor<Scalar>, Parameters) {
+    let dInput = weight.transposed() * adjoint
+    let dWeight = input.transposed() * adjoint
+    let dBias = adjoint
+    return (dInput, Parameters(weight: dWeight, bias: dBias))
   }
 }
