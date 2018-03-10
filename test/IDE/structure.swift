@@ -154,7 +154,7 @@ func rethrowFunc(_ f: () throws -> () = {}) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
-        #if os(OSX)
+        #if os(macOS)
           var a = 1
             #if USE_METAL
               var b = 2
