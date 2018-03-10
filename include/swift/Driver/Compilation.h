@@ -206,15 +206,19 @@ private:
 
 public:
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
-              OutputInfo const &OI, OutputLevel Level,
+              OutputInfo const &OI,
+              OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
-              InputFileList InputsWithTypes, StringRef ArgsHash,
-              llvm::sys::TimePoint<> StartTime,
+              InputFileList InputsWithTypes,
+              StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               unsigned NumberOfParallelCommands = 1,
-              bool EnableIncrementalBuild = false, bool EnableBatchMode = false,
-              unsigned BatchSeed = 0, bool ForceOneBatchRepartition = false,
-              bool SkipTaskExecution = false, bool SaveTemps = false,
+              bool EnableIncrementalBuild = false,
+              bool EnableBatchMode = false,
+              unsigned BatchSeed = 0,
+              bool ForceOneBatchRepartition = false,
+              bool SkipTaskExecution = false,
+              bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();

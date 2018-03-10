@@ -44,7 +44,6 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
-
 namespace driver {
   class Action;
   class CommandOutput;

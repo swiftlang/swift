@@ -38,55 +38,14 @@ ToolChain::JobContext::JobContext(Compilation &C,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+: C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
+OI(OI), Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
 }
 const char *ToolChain::JobContext::getAllSourcesPath() const {
   return C.getAllSourcesPath();
-}
-
-bool ToolChain::JobContext::shouldUseInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return getTopLevelInputFiles().size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
-  // SingleCompile's must not return true because then all inputs erroneously
-  // end up in primary file list.
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return InputActions.size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseMergeModuleInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Inputs.size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseLinkInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Inputs.size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseMainOutputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
-      types::TY_INVALID;
-  return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
-         TOO_MANY_FILES;
 }
 
 const char *

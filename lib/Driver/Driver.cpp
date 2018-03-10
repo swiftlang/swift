@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (!Args.empty()) {
+  if (Args.size() > 0) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
@@ -697,12 +697,20 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(
-      Diags, TC, OI, Level, std::move(ArgList), std::move(TranslatedArgList),
-      std::move(Inputs), ArgsHash, StartTime, NumberOfParallelCommands,
-      Incremental, BatchMode, DriverBatchSeed, DriverForceOneBatchRepartition,
-      DriverSkipExecution, SaveTemps, ShowDriverTimeCompilation,
-      std::move(StatsReporter)));
+  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, OI, Level,
+                                                 std::move(ArgList),
+                                                 std::move(TranslatedArgList),
+                                                 std::move(Inputs),
+                                                 ArgsHash, StartTime,
+                                                 NumberOfParallelCommands,
+                                                 Incremental,
+                                                 BatchMode,
+                                                 DriverBatchSeed,
+                                                 DriverForceOneBatchRepartition,
+                                                 DriverSkipExecution,
+                                                 SaveTemps,
+                                                 ShowDriverTimeCompilation,
+                                                 std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI, OFM.get(),

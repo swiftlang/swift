@@ -92,30 +92,41 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
   return os;
 }
 
-Compilation::Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
-                         OutputInfo const &OI, OutputLevel Level,
+
+Compilation::Compilation(DiagnosticEngine &Diags,
+                         const ToolChain &TC,
+                         OutputInfo const &OI,
+                         OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
-                         InputFileList InputsWithTypes, StringRef ArgsHash,
-                         llvm::sys::TimePoint<> StartTime,
+                         InputFileList InputsWithTypes,
+                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
-                         bool EnableIncrementalBuild, bool EnableBatchMode,
-                         unsigned BatchSeed, bool ForceOneBatchRepartition,
-                         bool SkipTaskExecution, bool SaveTemps,
+                         bool EnableIncrementalBuild,
+                         bool EnableBatchMode,
+                         unsigned BatchSeed,
+                         bool ForceOneBatchRepartition,
+                         bool SkipTaskExecution,
+                         bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
-    : Diags(Diags), TheToolChain(TC), TheOutputInfo(OI), Level(Level),
-      RawInputArgs(std::move(InputArgs)),
-      TranslatedArgs(std::move(TranslatedArgs)),
-      InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
-      BuildStartTime(StartTime),
-      NumberOfParallelCommands(NumberOfParallelCommands),
-      SkipTaskExecution(SkipTaskExecution),
-      EnableIncrementalBuild(EnableIncrementalBuild),
-      EnableBatchMode(EnableBatchMode), BatchSeed(BatchSeed),
-      ForceOneBatchRepartition(ForceOneBatchRepartition), SaveTemps(SaveTemps),
-      ShowDriverTimeCompilation(ShowDriverTimeCompilation),
-      Stats(std::move(StatsReporter)){};
+  : Diags(Diags), TheToolChain(TC),
+    TheOutputInfo(OI),
+    Level(Level),
+    RawInputArgs(std::move(InputArgs)),
+    TranslatedArgs(std::move(TranslatedArgs)),
+    InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
+    BuildStartTime(StartTime),
+    NumberOfParallelCommands(NumberOfParallelCommands),
+    SkipTaskExecution(SkipTaskExecution),
+    EnableIncrementalBuild(EnableIncrementalBuild),
+    EnableBatchMode(EnableBatchMode),
+    BatchSeed(BatchSeed),
+    ForceOneBatchRepartition(ForceOneBatchRepartition),
+    SaveTemps(SaveTemps),
+    ShowDriverTimeCompilation(ShowDriverTimeCompilation),
+    Stats(std::move(StatsReporter)) {
+};
 
 static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
 

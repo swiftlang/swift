@@ -17,6 +17,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
@@ -36,6 +37,47 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+
+bool ToolChain::JobContext::shouldUseInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return getTopLevelInputFiles().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
+  // SingleCompile's must not return true because then all inputs erroneously
+  // end up in primary file list.
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return InputActions.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseMergeModuleInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Inputs.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseLinkInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Inputs.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseMainOutputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
+  types::TY_INVALID;
+  return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
+  TOO_MANY_FILES;
+}
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
@@ -101,7 +143,8 @@ addOutputsOfType(ArgStringList &Arguments,
 
 /// Handle arguments common to all invocations of the frontend (compilation,
 /// module-merging, LLDB's REPL, etc).
-static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
+static void addCommonFrontendArgs(const ToolChain &TC,
+                                  const OutputInfo &OI,
                                   const CommandOutput &output,
                                   const ArgList &inputArgs,
                                   ArgStringList &arguments) {
