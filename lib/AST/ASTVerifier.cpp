@@ -2143,7 +2143,7 @@ public:
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter access is out of sync"
-                 " with the access actually on the setter";
+                 " with the access actually on the setter\n";
           abort();
         }
       }
@@ -2151,21 +2151,22 @@ public:
       if (auto getter = ASD->getGetter()) {
         if (getter->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                 " with whether the getter is actually mutating";
+                 " with whether the getter is actually mutating\n";
           abort();
         }
       }
       if (auto setter = ASD->getSetter()) {
         if (setter->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether the setter is actually mutating";
+                 " with whether the setter is actually mutating\n";
           abort();
         }
       }
       if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
-        if (materializeForSet->isMutating() != ASD->isSetterMutating()) {
-          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether materializeForSet is mutating";
+        if (materializeForSet->isMutating() !=
+            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
+          Out << "AbstractStorageDecl::is{Getter,Setter}Mutating is out of sync"
+                 " with whether materializeForSet is mutating\n";
           abort();
         }
       }
