@@ -224,6 +224,10 @@ void _swift_reportToDebugger(uintptr_t flags, const char *message,
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_reportFatalErrorsToDebugger;
 
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_shouldReportFatalErrorsToDebugger();
+
+
 LLVM_ATTRIBUTE_ALWAYS_INLINE
 inline static int swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
