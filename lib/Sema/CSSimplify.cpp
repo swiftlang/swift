@@ -1211,11 +1211,22 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (result.isFailure())
     return result;
 
+  auto resultLocator = ConstraintLocator::FunctionResult;
+  auto result1 = func1->getResult();
+  auto result2 = func2->getResult();
+
+  if (auto *typeVar = result1->getAs<TypeVariableType>()) {
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      auto path = locator->getPath();
+      if (!path.empty() &&
+          path.back().getKind() == ConstraintLocator::ClosureResult)
+        resultLocator = ConstraintLocator::ClosureResult;
+    }
+  }
+
   // Result type can be covariant (or equal).
-  return matchTypes(func1->getResult(), func2->getResult(), subKind,
-                     subflags,
-                     locator.withPathElement(
-                       ConstraintLocator::FunctionResult));
+  return matchTypes(result1, result2, subKind, subflags,
+                    locator.withPathElement(resultLocator));
 }
 
 ConstraintSystem::TypeMatchResult

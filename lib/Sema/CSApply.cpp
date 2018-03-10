@@ -1332,7 +1332,19 @@ namespace {
     /// \returns The coerced closure expression.
     ///
     ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
-    
+
+    /// \brief Coerce a closure expression with a some return type to a
+    /// contextual function type with some other return type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The closure expression to coerce.
+    ///
+    /// \returns The coerced closure expression.
+    ///
+    ClosureExpr *coerceClosureExprToType(ClosureExpr *expr,
+                                         FunctionType *toType);
+
     /// \brief Coerce the given expression to the given type.
     ///
     /// This operation cannot fail.
@@ -6068,6 +6080,33 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
   return closureExpr;
 }
 
+ClosureExpr *
+ExprRewriter::coerceClosureExprToType(ClosureExpr *closure,
+                                      FunctionType *toType) {
+  if (!closure || !closure->hasSingleExpressionBody())
+    return closure;
+
+  auto fromType = cs.getType(closure);
+  if (!fromType || !fromType->is<FunctionType>())
+    return closure;
+
+  auto fromResult = fromType->getAs<FunctionType>()->getResult();
+  auto toResult = toType->getResult();
+
+  if (fromResult->isEqual(toResult))
+    return closure;
+
+  // If this is a closure expr and conversion is from
+  // `() -> T` to `() -> Void` or `() -> Never` to `() -> T`
+  // let's coerce the this expression to required result type.
+  if (toResult->isVoid())
+    return coerceClosureExprToVoid(closure);
+  else if (fromResult->isUninhabited())
+    return coerceClosureExprFromNever(closure);
+
+  return closure;
+}
+
 // Look through sugar and DotSyntaxBaseIgnoredExprs.
 static Expr *
 getSemanticExprForDeclOrMemberRef(Expr *expr) {
@@ -6707,6 +6746,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+
+      if (auto *captureList = dyn_cast<CaptureListExpr>(expr)) {
+        auto *closure = captureList->getClosureBody();
+        captureList->setClosureBody(coerceClosureExprToType(closure, toFunc));
+      } else if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        expr = coerceClosureExprToType(closure, toFunc);
+      }
 
       return cs.cacheType(new (tc.Context)
                               FunctionConversionExpr(expr, toType));
