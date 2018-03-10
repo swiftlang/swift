@@ -144,7 +144,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
     return StringRef(PathStorage.data(), PathStorage.size());
   };
 
-  for (auto Pair : *Map) {
+  for (auto &Pair : *Map) {
     llvm::yaml::Node *Key = Pair.getKey();
     llvm::yaml::Node *Value = Pair.getValue();
 
@@ -165,7 +165,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
 
     TypeToPathMap OutputMap;
 
-    for (auto OutputPair : *OutputMapNode) {
+    for (auto &OutputPair : *OutputMapNode) {
       llvm::yaml::Node *Key = OutputPair.getKey();
       llvm::yaml::Node *Value = OutputPair.getValue();
 
