@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 open class A {

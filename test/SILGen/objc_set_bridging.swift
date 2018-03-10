@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 

@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 
 sil_stage canonical
