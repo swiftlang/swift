@@ -206,11 +206,24 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   ArtificialEOF = BufferStart + EndOffset;
   CurPtr = BufferStart + Offset;
 
-  assert(NextToken.is(tok::NUM_TOKENS));
-  lexImpl();
-  assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
-         "The token should be at the beginning of the line, "
-         "or we should be lexing from the middle of the buffer");
+  if (isWithTrivia()) {
+    assert(NextToken.is(tok::NUM_TOKENS));
+    lexImpl();
+    assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
+           "The token should be at the beginning of the line, "
+           "or we should be lexing from the middle of the buffer");
+  } else {
+    unsigned StartOffset = SourceMgr.getLocOffsetInBuffer(
+        SourceLoc(llvm::SMLoc::getFromPointer(CurPtr)), BufferID);
+    unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(
+        SourceLoc(llvm::SMLoc::getFromPointer(ArtificialEOF)), BufferID);
+
+    TriviaLexer = std::unique_ptr<Lexer>(new Lexer(
+        LangOpts, SourceMgr, BufferID, Diags, InSILMode, RetainComments,
+        TriviaRetentionMode::WithOnlyLeadingTrivia, StartOffset, EndOffset));
+    NextToken = TriviaLexer->NextToken;
+    CurPtr = TriviaLexer->CurPtr;
+  }
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
@@ -270,6 +283,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
+  assert(isWithTrivia() && "formToken is used by only trivia Lexer");
 
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
@@ -278,8 +292,28 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
-  if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
-    CommentLength = TokStart - LastCommentBlockStart;
+
+  if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    // Find first comment trivia.
+    auto PieceIter = LeadingTrivia.begin();
+    for (; PieceIter != LeadingTrivia.end(); PieceIter++) {
+      switch (PieceIter->getKind()) {
+      case syntax::TriviaKind::LineComment:
+      case syntax::TriviaKind::BlockComment:
+      case syntax::TriviaKind::DocLineComment:
+      case syntax::TriviaKind::DocBlockComment:
+        break;
+      default:
+        continue;
+      }
+      break;
+    }
+
+    // PieceIter is now first comment or end.
+    for (; PieceIter != LeadingTrivia.end(); PieceIter++) {
+      CommentLength += PieceIter->getTextLength();
+    }
+  }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
@@ -292,11 +326,13 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-    LeadingTrivia.push_back(TriviaPiece::backtick());
-    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-    TrailingTrivia.push_back(TriviaPiece::backtick());
-  }
+  assert(isWithTrivia() &&
+         "formEscapedIdentifierToken is used by only trivia Lexer");
+
+  LeadingTrivia.push_back(TriviaPiece::backtick());
+  assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
+  TrailingTrivia.push_back(TriviaPiece::backtick());
+
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
   // this as escaped-identifier in this case.
@@ -2156,31 +2192,30 @@ void Lexer::getStringLiteralSegments(
 //===----------------------------------------------------------------------===//
 
 void Lexer::lexImpl() {
+  if (!isWithTrivia()) {
+    lexImplByTriviaLexer();
+    return;
+  }
+
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
+  assert(isWithTrivia() && "lexImpl is used by only trivia Lexer");
 
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-    LeadingTrivia.clear();
-    TrailingTrivia.clear();
-  }
+  LeadingTrivia.clear();
+  TrailingTrivia.clear();
+
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-        // Add UTF-8 BOM to LeadingTrivia.
-        LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
-      }
+      // Add UTF-8 BOM to LeadingTrivia.
+      LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
   } else {
     NextToken.setAtStartOfLine(false);
   }
-
-  // Remember where we started so that we can find the comment range.
-  LastCommentBlockStart = CurPtr;
-  SeenComment = false;
 
 Restart:
   lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
@@ -2206,16 +2241,15 @@ Restart:
 
   case '\n':
   case '\r':
-    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
-           "newlines should be eaten by lexTrivia as LeadingTrivia");
-    NextToken.setAtStartOfLine(true);
-    goto Restart;  // Skip whitespace.
+    assert(false && "newlines should be eaten as LeadingTrivia");
+    abort();
 
   case ' ':
   case '\t':
   case '\f':
   case '\v':
-    goto Restart;  // Skip whitespace.
+    assert(false && "whitespaces should be eaten as LeadingTrivia");
+    abort();
 
   case -1:
   case -2:
@@ -2273,18 +2307,16 @@ Restart:
       // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten as LeadingTrivia");
       skipSlashSlashComment(/*EatNewline=*/true);
-      SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      return formToken(tok::comment, TokStart);
     }
     if (CurPtr[0] == '*') { // "/*"
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten as LeadingTrivia");
       skipSlashStarComment();
-      SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      return formToken(tok::comment, TokStart);
     }
     return lexOperatorIdentifier();
   case '%':
@@ -2353,6 +2385,15 @@ Restart:
   }
 }
 
+void Lexer::lexImplByTriviaLexer() {
+  TriviaLexer->Diags = Diags;
+  TriviaLexer->CurPtr = CurPtr;
+  TriviaLexer->InSILBody = InSILBody;
+  TriviaLexer->lexImpl();
+  NextToken = TriviaLexer->NextToken;
+  CurPtr = TriviaLexer->CurPtr;
+}
+
 Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
@@ -2378,8 +2419,18 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
 }
 
 void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
-  if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
-    return;
+  switch (TriviaRetention) {
+  case TriviaRetentionMode::WithOnlyLeadingTrivia:
+    if (IsForTrailingTrivia) {
+      return;
+    }
+    break;
+  case TriviaRetentionMode::WithTrivia:
+    break;
+  case TriviaRetentionMode::WithoutTrivia:
+    assert(false && "lexTrivia is used by only trivia Lexer");
+    abort();
+  }
 
 Restart:
   const char *TriviaStart = CurPtr;
@@ -2421,7 +2472,6 @@ Restart:
       break;
     } else if (*CurPtr == '/') {
       // '// ...' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
@@ -2431,7 +2481,6 @@ Restart:
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;
