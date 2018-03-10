@@ -3008,7 +3008,14 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (!storage->getDeclContext()->isTypeContext())
     return ManagedValue();
   
-  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  ManagedValue paramOrigValue;
+  
+  if (subSGF.SGM.M.getOptions().EnableGuaranteedNormalArguments) {
+    paramOrigValue =
+      ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
+  } else {
+    paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  }
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
@@ -3107,9 +3114,15 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                              propertyType);
   }
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 2> params;
   params.push_back({loweredBaseTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
+                    paramConvention});
   auto &C = SGM.getASTContext();
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
@@ -3224,15 +3237,21 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   auto &C = SGM.getASTContext();
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 3> params;
   // property value
   params.push_back({loweredPropTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
+                    paramConvention});
   // base
   params.push_back({loweredBaseTy.getSwiftRValueType(),
                     property->isSetterMutating()
                       ? ParameterConvention::Indirect_Inout
-                      : ParameterConvention::Indirect_In});
+                      : paramConvention});
   // indexes
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
@@ -3298,7 +3317,12 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                          indexes,
                                                          indexPtrArg);
   
-  auto valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
+  ManagedValue valueOrig;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    valueOrig = ManagedValue::forBorrowedRValue(valueArg)
+      .copy(subSGF, loc);
+  else
+    valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
