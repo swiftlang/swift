@@ -652,3 +652,38 @@ func rdar36054961() {
      str.replaceSubrange(range, with: str[range].reversed())
   }])
 }
+
+protocol P_37790062 {
+  associatedtype T
+  var elt: T { get }
+}
+
+func rdar37790062() {
+  struct S<T> {
+    init(_ a: () -> T, _ b: () -> T) {}
+  }
+
+  class C1 : P_37790062 {
+    typealias T = Int
+    var elt: T { return 42 }
+  }
+
+  class C2 : P_37790062 {
+    typealias T = (String, Int, Void)
+    var elt: T { return ("question", 42, ()) }
+  }
+
+  func foo() -> Int { return 42 }
+  func bar() -> Void {}
+  func baz() -> (String, Int) { return ("question", 42) }
+  func bzz<T>(_ a: T) -> T { return a }
+  func faz<T: P_37790062>(_ a: T) -> T.T { return a.elt }
+
+  _ = S({ foo() }, { bar() }) // expected-warning {{result of call to 'foo()' is unused}}
+  _ = S({ baz() }, { bar() }) // expected-warning {{result of call to 'baz()' is unused}}
+  _ = S({ bzz(("question", 42)) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(String.self) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(((), (()))) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(C1()) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ faz(C2()) }, { bar() }) // expected-warning {{result of call to 'faz' is unused}}
+}

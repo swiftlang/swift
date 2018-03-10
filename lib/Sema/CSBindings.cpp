@@ -376,8 +376,28 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
         break;
 
       auto type = binding->BindingType;
-      if (exactTypes.insert(type->getCanonicalType()).second)
+      if (exactTypes.insert(type->getCanonicalType()).second) {
         result.addPotentialBinding(*binding);
+
+        if (auto *locator = typeVar->getImpl().getLocator()) {
+          auto path = locator->getPath();
+          auto voidType = TupleType::getEmpty(getASTContext());
+
+          // If this is a type variable representing closure result,
+          // which is on the right-side of some relational constraint
+          // let's have it try `Void` as well because there is an
+          // implicit conversion `() -> T` to `() -> Void` and this
+          // helps to avoid creating a thunk to support it.
+          if (!path.empty() &&
+              path.back().getKind() == ConstraintLocator::ClosureResult &&
+              binding->Kind == AllowedBindingKind::Supertypes &&
+              exactTypes.insert(voidType->getCanonicalType()).second) {
+            result.addPotentialBinding(
+                {voidType, binding->Kind, constraint->getKind()},
+                /*allowJoinMeet=*/false);
+          }
+        }
+      }
       break;
     }
 
