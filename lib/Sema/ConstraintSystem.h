@@ -2872,10 +2872,6 @@ private:
       bool &hasDependentMemberRelationalConstraints,
       bool &hasNonDependentMemberRelationalConstraints,
       bool &addOptionalSupertypeBindings);
-
-  Optional<PotentialBinding>
-  getPotentialBindingForRelationalConstraint(PotentialBindings &result,
-                                             Constraint *constraint);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
