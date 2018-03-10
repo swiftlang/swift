@@ -450,8 +450,6 @@ public extension Tensor {
   /// Reshape to the specified Tensor representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
   @differentiable(
     withRespectTo: (self),
     gradient: _adjointReshaped(toShape:partial:seed:)
@@ -476,8 +474,6 @@ public extension Tensor {
   /// Returns a shape-expanded Tensor, with a dimension of 1 inserted at the
   /// specified shape index.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
   @differentiable(
     withRespectTo: (self),
     gradient: _adjointExpandingShape(at:partial:seed:)

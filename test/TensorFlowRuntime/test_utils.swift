@@ -3,13 +3,12 @@ import CTensorFlowTestClusterAPI
 import TensorFlow
 import StdlibUnittest
 
-
-// s has C type TF_Status*
+// Checks if an optional OpaquePointer representing a CTFStatus has value TF_OK.
 public func checkOk(_ s: OpaquePointer?, file: StaticString = #file,
-  line: UInt = #line) {
+                    line: UInt = #line) {
   assert(TF_GetCode(s) == TF_OK,
-    String(cString: TF_Message(s)),
-    file: file, line: line)
+         String(cString: TF_Message(s)),
+         file: file, line: line)
 }
 
 /// Determines if two floating point numbers are very nearly equal.

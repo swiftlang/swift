@@ -59,10 +59,10 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
     // Backward pass
     let dz2 = pred - y
     let dw2 = h1.transposed(withPermutations: [1, 0]).dot(dz2)
-    let db2 = dz2.sum(alongAxes: [0])
+    let db2 = dz2.sum(squeezingAxes: 0)
     let dz1 = dz2.dot(w2.transposed(withPermutations: [1, 0])) * h1 * (1 - h1)
     let dw1 = x.transposed(withPermutations: [1, 0]).dot(dz1)
-    let db1 = dz1.sum(alongAxes: [0])
+    let db1 = dz1.sum(squeezingAxes: 0)
 
     // Gradient descent
     w1 -= dw1 * learningRate
@@ -71,7 +71,7 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
     b2 -= db2 * learningRate
 
     // Update current loss
-    loss = dz2.squared().mean(alongAxes: [1, 0]).scalarized()
+    loss = dz2.squared().mean(squeezingAxes: 1, 0).scalarized()
 
     // Update iteration count
     i += 1
@@ -121,7 +121,7 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     func loss(of prediction: Tensor<Float>,
               from exampleOutput: Tensor<Float>) -> Float {
       return (prediction - exampleOutput).squared()
-        .mean(alongAxes: [0, 1]).scalarized()
+        .mean(squeezingAxes: 0, 1).scalarized()
     }
 
     mutating func train(inputBatch x: Tensor<Float>,
@@ -137,10 +137,10 @@ ModelTests.testAllBackends("XORClassifierTraining") {
 
         let dz2 = pred - y
         let dw2 = h1.transposed(withPermutations: [1, 0]) ⊗ dz2
-        let db2 = dz2.sum(alongAxes: [0])
+        let db2 = dz2.sum(squeezingAxes: 0)
         let dz1 = dz2 ⊗ w2.transposed(withPermutations: [1, 0]) * h1 * (1 - h1)
         let dw1 = x.transposed(withPermutations: [1, 0]) ⊗ dz1
-        let db1 = dz1.sum(alongAxes: [0])
+        let db1 = dz1.sum(squeezingAxes: 0)
 
         // Gradient descent
         w1 -= dw1 * learningRate
