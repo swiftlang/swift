@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift
 // RUN: llvm-bcanalyzer %t/def_func.swiftmodule | %FileCheck %s

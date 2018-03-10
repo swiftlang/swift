@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %swift -target armv7-apple-ios7.0 -module-name generic_metatypes -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s
 // RUN: %swift -target arm64-apple-ios7.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 // RUN: %swift -target armv7-apple-tvos9.0 -emit-ir -module-name generic_metatypes -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 %s

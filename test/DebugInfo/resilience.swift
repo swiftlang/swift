@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %empty-directory(%t)
 //
 // Compile the external swift module.

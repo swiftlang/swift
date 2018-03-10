@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -O -emit-ir %s | %FileCheck --check-prefix=OPT-CHECK %s
 

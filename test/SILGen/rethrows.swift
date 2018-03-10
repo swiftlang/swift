@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -verify %s | %FileCheck %s
 
 @discardableResult

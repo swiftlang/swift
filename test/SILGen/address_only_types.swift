@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -enable-sil-ownership -parse-as-library -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }

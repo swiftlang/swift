@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-sil -O -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop

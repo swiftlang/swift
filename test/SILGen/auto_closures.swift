@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 struct Bool {}
