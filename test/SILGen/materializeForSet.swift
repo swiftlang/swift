@@ -660,6 +660,25 @@ func testMaterializedSetter() {
   f.computed = f.computed
 }
 
+// Odd corner case -- mutating getter, non-mutating setter
+protocol BackwardMutationProtocol {
+  var value: Int {
+    mutating get
+    nonmutating set
+  }
+}
+
+struct BackwardMutation : BackwardMutationProtocol {
+  var value: Int {
+    mutating get { return 0 }
+    nonmutating set { }
+  }
+}
+
+func doBackwardMutation(m: inout BackwardMutationProtocol) {
+  m.value += 1
+}
+
 // CHECK-LABEL: sil_vtable DerivedForOverride {
 // CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : @$S17materializeForSet07DerivedB8OverrideC11valueStoredSivg
 // CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : @$S17materializeForSet07DerivedB8OverrideC11valueStoredSivs

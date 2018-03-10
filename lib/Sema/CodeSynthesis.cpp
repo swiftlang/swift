@@ -296,7 +296,9 @@ static void maybeMarkTransparent(FuncDecl *accessor,
 
 static AccessorDecl *
 createMaterializeForSetPrototype(AbstractStorageDecl *storage,
-                                 FuncDecl *setter, TypeChecker &TC) {
+                                 FuncDecl *getter,
+                                 FuncDecl *setter,
+                                 TypeChecker &TC) {
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
 
@@ -319,7 +321,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
 
   // The accessor returns (temporary: Builtin.RawPointer,
-  //                       callback: Builtin.RawPointer),
+  //                       callback: Optional<Builtin.RawPointer>),
   // where the first pointer is the materialized address and the
   // second is the address of an optional callback.
   TupleTypeElt retElts[] = {
@@ -349,10 +351,15 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // Open-code the setMutating() calculation since we might run before
   // the setter has been type checked.
   Type contextTy = DC->getDeclaredInterfaceType();
-  if (contextTy && !contextTy->hasReferenceSemantics() &&
+  if (contextTy && !contextTy->hasReferenceSemantics()) {
+    bool hasMutatingSetter =
       !setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
-      storage->isSetterMutating())
-    materializeForSet->setSelfAccessKind(SelfAccessKind::Mutating);
+      storage->isSetterMutating();
+    bool hasMutatingGetter =
+      getter->getAttrs().hasAttribute<MutatingAttr>();
+    if (hasMutatingSetter || hasMutatingGetter)
+      materializeForSet->setSelfAccessKind(SelfAccessKind::Mutating);
+  }
 
   materializeForSet->setStatic(storage->isStatic());
 
@@ -847,7 +854,7 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
   }
 
   auto materializeForSet = createMaterializeForSetPrototype(
-      storage, storage->getSetter(), TC);
+      storage, storage->getGetter(), storage->getSetter(), TC);
   addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
@@ -1815,7 +1822,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     AccessorDecl *materializeForSet = nullptr;
     if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
-      materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
+      materializeForSet = createMaterializeForSetPrototype(var,
+                                                           getter, setter,
+                                                           TC);
 
     var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
 
