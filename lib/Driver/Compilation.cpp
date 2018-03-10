@@ -43,6 +43,8 @@
 
 #include "CompilationRecord.h"
 
+#define DEBUG_TYPE "BATCH_MODE"
+
 // Batch-mode has a sub-mode for testing that randomizes batch partitions,
 // by user-provided seed. That is the only thing randomized here.
 #include <random>
@@ -801,9 +803,8 @@ namespace driver {
           // To avoid redoing the batch loop too many times, repartition pretty
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
-#ifndef NDEBUG
-          llvm::dbgs() << "Should have used a supplementary output file map.\n";
-#endif
+          DEBUG(llvm::dbgs()
+                << "Should have used a supplementary output file map.\n");
           return true;
         }
       }
