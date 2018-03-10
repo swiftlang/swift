@@ -755,7 +755,7 @@ class C : Abstractable {
 // CHECK-NOT: begin_access
 // CHECK:   store [[PA]] to [init] [[ADR]] : $*@callee_guaranteed () -> @out Int
 // CHECK:   [[PTR:%.*]] = address_to_pointer [[ADR]] : $*@callee_guaranteed () -> @out Int to $Builtin.RawPointer
-// CHECK:   [[FPTR:%.*]] = thin_function_to_pointer %{{.*}} : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout C, @thick C.Type) -> () to $Builtin.RawPointer
+// CHECK:   [[FPTR:%.*]] = thin_function_to_pointer %{{.*}} : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () to $Builtin.RawPointer
 // CHECK:   [[ENUM:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[FPTR]] : $Builtin.RawPointer
 // CHECK:   [[R:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[ENUM]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[R]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)

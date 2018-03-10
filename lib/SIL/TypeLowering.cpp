@@ -2071,25 +2071,28 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
   auto selfMetatypeType = MetatypeType::get(selfType,
                                             MetatypeRepresentation::Thick);
 
+  auto canSelfType = selfType->getCanonicalType(genericSig);
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
+  auto selfConvention = (storage->isSetterMutating()
+                         ? ParameterConvention::Indirect_Inout
+                         : ParameterConvention::Indirect_In_Guaranteed);
+
   {
     GenericContextScope scope(*this, genericSig);
 
     // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
     // selfMetatypeType.
-    if (auto metatype = selfType->getAs<MetatypeType>()) {
+    if (auto metatype = canSelfType->getAs<MetatypeType>()) {
       if (!metatype->hasRepresentation())
-        selfType = getLoweredType(metatype).getSwiftRValueType();
+        canSelfType = getLoweredType(metatype).getSwiftRValueType();
     }
   }
-
-  auto canSelfType = selfType->getCanonicalType(genericSig);
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
     { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
     { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { canSelfType, ParameterConvention::Indirect_Inout },
+    { canSelfType, selfConvention },
     { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
