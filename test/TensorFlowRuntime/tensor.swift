@@ -175,8 +175,8 @@ TensorTests.test("SliceIndexing") {
 TensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  let sum = x.sum(alongAxes: [0], keepingDimensions: true)
-  expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]), sum.array)
+  let sum = x.sum(squeezingAxes: 0)
+  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]), sum.array)
 }
 
 TensorTests.testAllBackends("Concatenation") {
@@ -287,11 +287,11 @@ TensorTests.testAllBackends("Transpose") {
 
 TensorTests.testAllBackends("SimpleCond") {
   func selectValue(_ pred: Bool) -> Tensor<Int32> {
-  let a = Tensor<Int32>(0)
-  let b = Tensor<Int32>(1)
-  if pred  {
-    return a
-  }
+    let a = Tensor<Int32>(0)
+    let b = Tensor<Int32>(1)
+    if pred {
+      return a
+    }
     return b
   }
 
@@ -334,10 +334,7 @@ TensorTests.testAllBackends("MLPClassifierStruct") {
     var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
                             [0.4, 0.3, 0.2, 0.1]])
     // 4 x 1
-    var w2 = Tensor<Float>([[0.4],
-                            [0.4],
-                            [0.3],
-                            [0.9]])
+    var w2 = Tensor<Float>([[0.4], [0.4], [0.3], [0.9]])
     var b1 = Tensor<Float>(zeros: [1, 4])
     var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -346,10 +343,10 @@ TensorTests.testAllBackends("MLPClassifierStruct") {
       return tanh(o1 ⊗ w2 + b2)
     }
   }
-  let predictFor = Tensor<Float>([[1, 0.5]])
+  let input = Tensor<Float>([[1, 0.5]])
   let classifier = MLPClassifier()
-  let _ = classifier.prediction(for: predictFor)
-  // TODO: Check result.
+  let prediction = classifier.prediction(for: input)
+  expectPointwiseNearlyEqual([0.816997], prediction.scalars)
 }
 
 TensorTests.testAllBackends("Reshape") {
@@ -454,4 +451,4 @@ TensorTests.testAllBackends("ShapeGetter4", testShapeGetter4)
 runAllTestsWithRemoteSession()
 #else
 runAllTests()
-#endif //  CPU && !CUDA
+#endif // CPU && !CUDA
