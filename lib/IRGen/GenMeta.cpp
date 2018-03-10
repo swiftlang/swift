@@ -2364,10 +2364,10 @@ namespace {
     void addGenericParametersHeader() {
       // Drop placeholders for the counts. We'll fill these in when we emit
       // the related sections.
-      GenericParamCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericRequirementCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericKeyArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericExtraArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
+      GenericParamCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericRequirementCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericKeyArgumentCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericExtraArgumentCount = B.addPlaceholderWithSize(IGM.Int16Ty);
     }
     
     void addGenericParameters() {
@@ -2389,7 +2389,9 @@ namespace {
         B.addInt(IGM.Int8Ty, 0);
       
       // Fill in the parameter count.
-      B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int32Ty,
+      assert(canSig->getGenericParams().size() <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int16Ty,
                                canSig->getGenericParams().size());
     }
     
@@ -2412,16 +2414,21 @@ namespace {
                             asImpl().getGenericSignature()->getRequirements());
 
       // Fill in the final requirement count.
-      B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int32Ty,
+      assert(metadata.NumRequirements <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int16Ty,
                                metadata.NumRequirements);
       NumGenericKeyArguments += metadata.NumGenericKeyArguments;
       NumGenericExtraArguments += metadata.NumGenericExtraArguments;
     }
 
     void finishGenericParameters() {
-      B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int32Ty,
+      assert(NumGenericKeyArguments <= UINT16_MAX
+             && NumGenericExtraArguments <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int16Ty,
                                NumGenericKeyArguments);
-      B.fillPlaceholderWithInt(*GenericExtraArgumentCount, IGM.Int32Ty,
+      B.fillPlaceholderWithInt(*GenericExtraArgumentCount, IGM.Int16Ty,
                                NumGenericExtraArguments);
     }
 

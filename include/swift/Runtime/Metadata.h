@@ -2659,7 +2659,7 @@ using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {
-  uint32_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+  uint16_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
   
   uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;
