@@ -9,12 +9,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
