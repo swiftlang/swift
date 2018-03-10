@@ -359,3 +359,14 @@ extension Tensor where Scalar : FloatingPoint {
                  strides: strides, padding: padding.cName)
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Composite math
+//===----------------------------------------------------------------------===//
+
+@_inlineable @_versioned
+func _adjointRelu<Scalar : FloatingPoint, T : TensorProtocol>(
+  _ x: T, partial: T, seed: T
+) -> T where T.Scalar == Scalar {
+  return T(x > 0)
+}

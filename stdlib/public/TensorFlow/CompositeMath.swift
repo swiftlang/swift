@@ -25,7 +25,8 @@ public func sigmoid<Scalar : BinaryFloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-public func relu<Scalar : Numeric & Comparable, T : TensorProtocol>(_ x: T) -> T
+@differentiable(gradient: _adjointRelu(_:partial:seed:))
+public func relu<Scalar : FloatingPoint, T : TensorProtocol>(_ x: T) -> T
   where T.Scalar == Scalar {
   return max(0, x)
 }
@@ -35,4 +36,13 @@ public func softmax<Scalar : FloatingPoint, T : TensorProtocol>(_ x: T) -> T
   where T.Scalar == Scalar {
   let expx = exp(x)
   return expx / expx.sum()
+}
+
+@_inlineable @inline(__always)
+public func softmax<Scalar : FloatingPoint, T : TensorProtocol>(
+  _ x: T, alongAxis axis: Int32
+) -> T
+  where T.Scalar == Scalar {
+  let expx = exp(x)
+  return expx / expx.sum(alongAxes: axis)
 }

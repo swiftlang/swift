@@ -463,26 +463,26 @@ public extension ${TensorXD} {
 // Reduction
 //===----------------------------------------------------------------------===//
 
-public extension ${TensorXD} where Scalar : Numeric {
 % if rank > 1:
+public extension ${TensorXD} where Scalar : Numeric {
   @_inlineable @inline(__always)
   func min(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.min(alongAxes: [axis]))
+    return ${ElementTensor}<Scalar>(base: base.min(alongAxes: axis))
   }
 
   @_inlineable @inline(__always)
   func max(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.max(alongAxes: [axis]))
+    return ${ElementTensor}<Scalar>(base: base.max(alongAxes: axis))
   }
 
   @_inlineable @inline(__always)
   func sum(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.sum(alongAxes: [axis]))
+    return ${ElementTensor}<Scalar>(base: base.sum(alongAxes: axis))
   }
 
   @_inlineable @inline(__always)
   func mean(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.mean(alongAxes: [axis]))
+    return ${ElementTensor}<Scalar>(base: base.mean(alongAxes: axis))
   }
 
   @_inlineable @inline(__always)
@@ -494,19 +494,8 @@ public extension ${TensorXD} where Scalar : Numeric {
   func argmin(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
     return ${ElementTensor}<Int32>(base: base.argmin(alongAxis: axis))
   }
-% end
-  @_inlineable @inline(__always)
-  func argmax() -> Int32 {
-    return _TFGetScalarOrDie(#tfop("ArgMax", flattened(), Tensor<Int32>(0),
-                                   output_type: Int32.self))
-  }
-
-  @_inlineable @inline(__always)
-  func argmin() -> Int32 {
-    return _TFGetScalarOrDie(#tfop("ArgMin", flattened(), Tensor<Int32>(0),
-                                   output_type: Int32.self))
-  }
 }
+% end
 
 public extension ${TensorXD} {
 % if rank < ranks[-1]:

@@ -717,33 +717,11 @@ public func pow<Scalar : FloatingPoint, T : TensorProtocol>(
 }
 
 @_inlineable @inline(__always)
-@differentiable(gradient: _adjointMin(_:_:partial:seed:))
-public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
-  _ lhs: T, _ rhs: T
-) -> T where T.Scalar == Scalar {
-  return #tfop("Min", lhs, rhs)
-}
-
-@_inlineable @inline(__always)
-public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
-  _ lhs: Scalar, _ rhs: T
-) -> T where T.Scalar == Scalar {
-  return min(T(handle: _TFMakeScalarTensor(lhs)), rhs)
-}
-
-@_inlineable @inline(__always)
-public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
-  _ lhs: T, _ rhs: Scalar
-) -> T where T.Scalar == Scalar {
-  return min(lhs, T(handle: _TFMakeScalarTensor(rhs)))
-}
-
-@_inlineable @inline(__always)
 @differentiable(gradient: _adjointMax(_:_:partial:seed:))
 public func max<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: T
 ) -> T where T.Scalar == Scalar {
-  return #tfop("Max", lhs, rhs)
+  return #tfop("Maximum", lhs, rhs)
 }
 
 @_inlineable @inline(__always)
@@ -758,6 +736,28 @@ public func max<Scalar : Numeric & Comparable, T : TensorProtocol>(
   _ lhs: T, _ rhs: Scalar
 ) -> T where T.Scalar == Scalar {
   return max(lhs, T(handle: _TFMakeScalarTensor(rhs)))
+}
+
+@_inlineable @inline(__always)
+@differentiable(gradient: _adjointMin(_:_:partial:seed:))
+public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: T
+) -> T where T.Scalar == Scalar {
+  return #tfop("Minimum", lhs, rhs)
+}
+
+@_inlineable @inline(__always)
+public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: Scalar, _ rhs: T
+) -> T where T.Scalar == Scalar {
+  return min(T(handle: _TFMakeScalarTensor(lhs)), rhs)
+}
+
+@_inlineable @inline(__always)
+public func min<Scalar : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: Scalar
+) -> T where T.Scalar == Scalar {
+  return min(lhs, T(handle: _TFMakeScalarTensor(rhs)))
 }
 
 public extension TensorProtocol {
@@ -797,9 +797,9 @@ public extension TensorProtocol where Scalar == Bool {
 
 public extension TensorProtocol {
   @_inlineable @inline(__always)
-  func mean() -> Scalar {
+  func max() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(#tfop("Mean", self, axes))
+    return _TFGetScalarOrDie(#tfop("Max", self, axes))
   }
 
   @_inlineable @inline(__always)
@@ -809,54 +809,79 @@ public extension TensorProtocol {
   }
 
   @_inlineable @inline(__always)
-  func max() -> Scalar {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(#tfop("Max", self, axes))
-  }
-
-  @_inlineable @inline(__always)
   func sum() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Sum", self, axes))
+  }
+
+  @_inlineable @inline(__always)
+  func mean() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Mean", self, axes))
+  }
+
+  @_inlineable @inline(__always)
+  func max(alongAxes axes: Int32...) -> Self {
+    return #tfop("Max", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func min(alongAxes axes: Int32...) -> Self {
+    return #tfop("Min", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func sum(alongAxes axes: Int32...) -> Self {
+    return #tfop("Sum", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func mean(alongAxes axes: Int32...) -> Self {
+    return #tfop("Mean", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func argmax() -> Int32 {
+    let flattened: Self = #tfop("Reshape", handle, Tensor<Int32>([-1]))
+    return _TFGetScalarOrDie(#tfop("ArgMax", flattened, Tensor<Int32>(0),
+                                   output_type: Int32.self))
+  }
+
+  @_inlineable @inline(__always)
+  func argmin() -> Int32 {
+    let flattened: Self = #tfop("Reshape", handle, Tensor<Int32>([-1]))
+    return _TFGetScalarOrDie(#tfop("ArgMin", flattened, Tensor<Int32>(0),
+                                   output_type: Int32.self))
   }
 }
 
 public extension Tensor {
   @_inlineable @inline(__always)
-  func mean(
-    alongAxes axes: [Int32],
-    keepingDimensions: Bool = false
-  ) -> Tensor {
-    return #tfop("Mean", handle, Tensor<Int32>(axes),
-                 keep_dims: keepingDimensions, Tidx: Int32.self)
+  func max(squeezingAxes axes: Int32...) -> Tensor {
+    return #tfop("Max", handle, Tensor<Int32>(axes), keep_dims: false,
+                 Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
-  func min(
-    alongAxes axes: [Int32],
-    keepingDimensions: Bool = false
-  ) -> Tensor {
-    return #tfop("Min", handle, Tensor<Int32>(axes),
-                 keep_dims: keepingDimensions, Tidx: Int32.self)
+  func min(squeezingAxes axes: Int32...) -> Tensor {
+    return #tfop("Min", handle, Tensor<Int32>(axes), keep_dims: false,
+                 Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
-  func max(
-    alongAxes axes: [Int32],
-    keepingDimensions: Bool = false
-  ) -> Tensor {
-    return Tensor<Scalar>(handle:
-      #tfop("Max", handle, Tensor<Int32>(axes),
-            keep_dims: keepingDimensions, Tidx: Int32.self))
+  func mean(squeezingAxes axes: Int32...) -> Tensor {
+    return #tfop("Mean", handle, Tensor<Int32>(axes), keep_dims: false,
+                 Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
-  func sum(
-    alongAxes axes: [Int32],
-    keepingDimensions: Bool = false
-  ) -> Tensor {
-    return #tfop("Sum", handle, Tensor<Int32>(axes),
-                 keep_dims: keepingDimensions, Tidx: Int32.self)
+  func sum(squeezingAxes axes: Int32...) -> Tensor {
+    return #tfop("Sum", handle, Tensor<Int32>(axes), keep_dims: false,
+                 Tidx: Int32.self)
   }
 
   @_inlineable @inline(__always)
@@ -867,18 +892,6 @@ public extension Tensor {
   @_inlineable @inline(__always)
   func argmin(alongAxis axis: Int32) -> Tensor<Int32> {
     return #tfop("ArgMin", handle, Tensor<Int32>(axis), output_type: Int32.self)
-  }
-
-  @_inlineable @inline(__always)
-  func argmax() -> Int32 {
-    return _TFGetScalarOrDie(#tfop("ArgMax", flattened(), Tensor<Int32>(0),
-                                   output_type: Int32.self))
-  }
-
-  @_inlineable @inline(__always)
-  func argmin() -> Int32 {
-    return _TFGetScalarOrDie(#tfop("ArgMin", flattened(), Tensor<Int32>(0),
-                                   output_type: Int32.self))
   }
 }
 
