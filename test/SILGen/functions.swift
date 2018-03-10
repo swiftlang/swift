@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional

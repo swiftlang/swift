@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt | %FileCheck %s
 
 protocol mmGeneratorType {

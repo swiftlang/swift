@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
 

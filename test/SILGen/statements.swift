@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 class MyClass { 

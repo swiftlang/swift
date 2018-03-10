@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$S15optional_lvalue07assign_a1_B0yySiSgz_SitF

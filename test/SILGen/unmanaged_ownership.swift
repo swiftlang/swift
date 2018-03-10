@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -module-name Swift -emit-silgen %s | %FileCheck %s
 
 class C {}

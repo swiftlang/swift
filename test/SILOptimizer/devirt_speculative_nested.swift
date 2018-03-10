@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil
 //

@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -primary-file %s -verify | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -primary-file %s
 

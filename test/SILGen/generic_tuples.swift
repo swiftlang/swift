@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 

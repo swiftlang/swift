@@ -1,3 +1,4 @@
+// REQUIRES: plus_one_runtime
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
