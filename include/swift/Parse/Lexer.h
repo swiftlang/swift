@@ -195,8 +195,10 @@ public:
   void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
            syntax::Trivia &TrailingTriviaResult) {
     Result = NextToken;
-    LeadingTriviaResult = {LeadingTrivia};
-    TrailingTriviaResult = {TrailingTrivia};
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+      LeadingTriviaResult = {LeadingTrivia};
+      TrailingTriviaResult = {TrailingTrivia};
+    }
     if (Result.isNot(tok::eof))
       lexImpl();
   }
