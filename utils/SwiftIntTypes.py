@@ -122,7 +122,7 @@ def all_integer_or_real_binary_operator_names():
 
 
 def all_integer_assignment_operator_names():
-    return ['%=', '<<=', '>>=', '&*=', '&=', '&+=', '&-=', '^=', '|=']
+    return ['%=', '<<=', '>>=', '&=', '^=', '|=']
 
 
 def all_integer_or_real_assignment_operator_names():

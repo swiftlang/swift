@@ -590,12 +590,13 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Stores the sum of the two given values in the left-hand-size variable, discarding any overflow.
+  /// Adds two values and stores the result in the left-hand-side variable, 
+  /// discarding any overflow.
   ///
-  /// The masking addition operator (`&+`) silently discards any overflow that
-  /// occurs during the operation. In the following example, the sum of `100`
-  /// and `121` is greater than the maximum representable `Int8` value, so the
-  /// result is the overflowed value:
+  /// The masking addition assignment operator (`&+=`) silently discards any 
+  /// overflow that occurs during the operation. In the following example, the 
+  /// sum of `100` and `121` is greater than the maximum representable `Int8` 
+  /// value, so the result is the overflowed value:
   ///
   ///     var x: Int8 = 10
   ///     x &+= 21
@@ -609,14 +610,15 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The second value to add.
 """,
         '&-': """\
-  /// Stores the difference of the two given values in the left-hand-size variable, discarding any overflow.
+  /// Subtracts the second value from the first and stores the difference in the
+  /// left-hand-side variable, discarding any overflow.
   ///
-  /// The masking subtraction operator (`&-`) silently discards any overflow
-  /// that occurs during the operation. In the following example, the
+  /// The masking subtraction assignment operator (`&-=`) silently discards any
+  /// overflow that occurs during the operation. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
   /// `UInt` value, so the result is the overflowed value:
   ///
-  ///     var x: Int8 = 21l
+  ///     var x: Int8 = 21
   ///     x &-= 10
   ///     // x == 11
   ///     var y: UInt8 = 10
@@ -628,12 +630,13 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '&*': """\
-  /// Stores the product of the two given values in the left-hand-size variable, discarding any overflow.
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable, discarding any overflow.
   ///
-  /// The masking multiplication operator (`&*`) silently discards any overflow
-  /// that occurs during the operation. In the following example, the product
-  /// of `10` and `50` is greater than the maximum representable `Int8` value,
-  /// so the result is the overflowed value:
+  /// The masking multiplication assignment operator (`&*=`) silently discards 
+  /// any overflow that occurs during the operation. In the following example, 
+  /// the product of `10` and `50` is greater than the maximum representable 
+  /// `Int8` value, so the result is the overflowed value:
   ///
   ///     var x: Int8 = 10
   ///     x &*= 5
@@ -2797,18 +2800,15 @@ ${unsafeOperationComment(x.operator)}
 ${operatorComment('&' + x.operator, True)}
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func &${x.operator}(lhs: Self, rhs: Self) -> Self {
-    var lhs = lhs
-    lhs &${x.operator}= rhs
-    return lhs
+  public static func &${x.operator} (lhs: Self, rhs: Self) -> Self {
+    return lhs.${x.name}ReportingOverflow(${callLabel}rhs).partialValue
   }
 
 ${assignmentOperatorComment('&' + x.operator, True)}
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func &${x.operator}=(lhs: inout Self, rhs: Self) {
-    let result = lhs.${x.name}ReportingOverflow(${callLabel}rhs).partialValue
-    lhs = result
+  public static func &${x.operator}= (lhs: inout Self, rhs: Self) {
+    lhs = lhs &${x.operator} rhs
   }
 %   end
 % end
