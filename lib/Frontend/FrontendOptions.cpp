@@ -108,7 +108,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
 }
 
 void FrontendOptions::forAllOutputPaths(
-    const InputFile &input, std::function<void(const std::string &)> fn) const {
+    const InputFile &input, std::function<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
     if (InputsAndOutputs.isWholeModule())
@@ -116,28 +116,15 @@ void FrontendOptions::forAllOutputPaths(
     else
       fn(input.outputFilename());
   }
-  const std::string *outputs[] = {
-      &InputsAndOutputs.supplementaryOutputs().ModuleOutputPath,
-      &InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath,
-      &InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath};
+  const SupplementaryOutputPaths &outs =
+      input.getPrimarySpecificPaths().SupplementaryOutputs;
+  const std::string *outputs[] = {&outs.ModuleOutputPath,
+                                  &outs.ModuleDocOutputPath,
+                                  &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
   }
-}
-
-
-StringRef FrontendOptions::originalPath() const {
-  if (InputsAndOutputs.hasNamedOutputFile())
-    // Put the serialized diagnostics file next to the output file.
-    return InputsAndOutputs.getSingleOutputFilename();
-
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  const auto input = InputsAndOutputs.getUniquePrimaryInput();
-  return input ? llvm::sys::path::filename(input->file())
-               : StringRef(ModuleName);
 }
 
 const char *
@@ -387,12 +374,12 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   }
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
 }

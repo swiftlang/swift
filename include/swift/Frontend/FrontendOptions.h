@@ -39,7 +39,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(const std::string &)> fn) const;
+                         std::function<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -54,9 +54,6 @@ public:
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
-
-  /// The path to which we should output fixits as source edits.
-  std::string FixitsOutputPath;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -273,8 +270,6 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath() const;
-
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
@@ -282,8 +277,10 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
 private:
   static bool canActionEmitDependencies(ActionType);

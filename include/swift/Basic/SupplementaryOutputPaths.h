@@ -21,28 +21,43 @@
 namespace swift {
 struct SupplementaryOutputPaths {
   /// The path to which we should emit an Objective-C header for the module.
+  /// Currently only makes sense when the compiler has whole module knowledge.
+  /// The modes for which it makes sense incuide both WMO and the "merge
+  /// modules" job that happens after the normal compilation jobs. That's where
+  /// the header is emitted in single-file mode, since it needs whole-module
+  /// information.
+
   std::string ObjCHeaderOutputPath;
 
   /// The path to which we should emit a serialized module.
+  /// It is valid whenever there are any inputs.
   std::string ModuleOutputPath;
 
   /// The path to which we should emit a module documentation file.
+  /// It is valid whenever there are any inputs.
   std::string ModuleDocOutputPath;
 
   /// The path to which we should output a Make-style dependencies file.
+  /// It is valid whenever there are any inputs.
   std::string DependenciesFilePath;
 
   /// The path to which we should output a Swift reference dependencies file.
+  /// It is valid whenever there are any inputs.
   std::string ReferenceDependenciesFilePath;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
 
+  /// The path to which we should output fix-its as source edits.
+  std::string FixItsOutputPath;
+
   /// The path to which we should output a loaded module trace file.
+  /// It is currently only used with WMO, but could be generalized.
   std::string LoadedModuleTracePath;
 
   /// The path to which we should output a TBD file.
+  /// It is currently only used with WMO, but could be generalized.
   std::string TBDPath;
 
   SupplementaryOutputPaths() = default;

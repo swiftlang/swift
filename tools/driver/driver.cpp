@@ -71,7 +71,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
                                   SmallVectorImpl<const char *> &Args) {
-  assert(Args.size() > 0);
+  assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
   // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
@@ -110,7 +110,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
-  INITIALIZE_LLVM(argc_, argv_);
+  PROGRAM_START(argc_, argv_);
 
   SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;

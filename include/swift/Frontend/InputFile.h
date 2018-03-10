@@ -13,6 +13,8 @@
 #ifndef SWIFT_FRONTEND_INPUTFILE_H
 #define SWIFT_FRONTEND_INPUTFILE_H
 
+#include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <string>
 #include <vector>
@@ -37,10 +39,12 @@ class InputFile {
   /// none.
   llvm::MemoryBuffer *Buffer;
 
-  /// Contains the name of the main output file, that is, the .o file for this
-  /// input. If there is no such file, contains an empty string. If the output
-  /// is to be written to stdout, contains "-".
-  std::string OutputFilename;
+  /// If there are explicit primary inputs (i.e. designated with -primary-input
+  /// or -primary-filelist), the paths specific to those inputs (other than the
+  /// input file path itself) are kept here. If there are no explicit primary
+  /// inputs (for instance for whole module optimization), the corresponding
+  /// paths are kept in the first input file.
+  PrimarySpecificPaths PSPs;
 
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
@@ -50,13 +54,13 @@ public:
             StringRef outputFilename = StringRef())
       : Filename(
             convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
-        IsPrimary(isPrimary), Buffer(buffer), OutputFilename(outputFilename) {
+        IsPrimary(isPrimary), Buffer(buffer), PSPs(PrimarySpecificPaths()) {
     assert(!name.empty());
   }
 
   bool isPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const {
+  const std::string &file() const {
     assert(!Filename.empty());
     return Filename;
   }
@@ -68,13 +72,33 @@ public:
     return filename.equals("<stdin>") ? "-" : filename;
   }
 
-  const std::string &outputFilename() const { return OutputFilename; }
+  std::string outputFilename() const { return PSPs.OutputFilename; }
 
-  void setOutputFilename(StringRef outputFilename) {
-    OutputFilename = outputFilename;
+  const PrimarySpecificPaths &getPrimarySpecificPaths() const { return PSPs; }
+
+  void setPrimarySpecificPaths(const PrimarySpecificPaths &PSPs) {
+    this->PSPs = PSPs;
+  }
+
+  // The next set of functions provides access to those primary-specific paths
+  // accessed directly from an InputFile, as opposed to via
+  // FrontendInputsAndOutputs. They merely make the call sites
+  // a bit shorter. Add more forwarding methods as needed.
+
+  std::string dependenciesFilePath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.DependenciesFilePath;
+  }
+  std::string loadedModuleTracePath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
+  }
+  std::string serializedDiagnosticsPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs
+        .SerializedDiagnosticsPath;
+  }
+  std::string fixItsOutputPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;
   }
 };
-
 } // namespace swift
 
 #endif /* SWIFT_FRONTEND_INPUTFILE_H */

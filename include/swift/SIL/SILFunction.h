@@ -349,7 +349,9 @@ public:
   /// SIL). If so, diagnostics should not be reapplied.
   bool wasDeserializedCanonical() const { return WasDeserializedCanonical; }
 
-  void setWasDeserializedCanonical() { WasDeserializedCanonical = true; }
+  void setWasDeserializedCanonical(bool val = true) {
+    WasDeserializedCanonical = val;
+  }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -471,7 +473,7 @@ public:
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
   /// function.
-  bool hasSemanticsAttrs() const { return SemanticsAttrSet.size() > 0; }
+  bool hasSemanticsAttrs() const { return !SemanticsAttrSet.empty(); }
 
   /// \returns True if the function has a semantic attribute that starts with a
   /// specific string.

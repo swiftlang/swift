@@ -1,9 +1,17 @@
 // RUN: %empty-directory(%t)
+//
+// Compile the external swift module.
 // RUN: %target-swift-frontend -g -emit-module -enable-resilience \
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-resilience %s \
-// RUN:   | %FileCheck %s
+//
+// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-resilience %s  -o - \
+// RUN:  | %FileCheck %s
+//
+// RUN: %target-swift-frontend -g -I %t -emit-sil -enable-resilience %s -o - \
+// RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -g -I %t -emit-sil -enable-resilience %s -o - \
+// RUN:    -debugger-support | %FileCheck %s --check-prefix=CHECK-LLDB
 import resilient_struct
 
 func use<T>(_ t: T) {}
@@ -23,3 +31,9 @@ public func f() {
   // FIXME-NOT: size:
   // CHECK: =
 }
+
+// CHECK-SIL: // f()
+// CHECK-LLDB: // f()
+// CHECK-SIL: %0 = alloc_stack $Size, let, name "s1"
+// CHECK-LLDB: %0 = metatype $@thin Size.Type
+// CHECK-LLDB: debug_value %{{.*}} : $Size, let, name "s1"

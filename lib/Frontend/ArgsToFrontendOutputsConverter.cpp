@@ -33,7 +33,7 @@ using namespace llvm::opt;
 
 bool ArgsToFrontendOutputsConverter::convert(
     std::vector<std::string> &mainOutputs,
-    SupplementaryOutputPaths &supplementaryOutputs) {
+    std::vector<SupplementaryOutputPaths> &supplementaryOutputs) {
 
   Optional<OutputFilesComputer> ofc =
       OutputFilesComputer::create(Args, Diags, InputsAndOutputs);
@@ -51,10 +51,7 @@ bool ArgsToFrontendOutputsConverter::convert(
     return true;
 
   mainOutputs = std::move(*mains);
-  assert(supplementaries->size() <= 1 &&
-         "Have not implemented multiple primaries yet");
-  if (!supplementaries->empty())
-    supplementaryOutputs = std::move(supplementaries->front());
+  supplementaryOutputs = std::move(*supplementaries);
   return false;
 }
 
@@ -103,9 +100,10 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
   ArrayRef<std::string> outputFileArguments =
       outputDirectoryArgument.empty() ? ArrayRef<std::string>(*outputArguments)
                                       : ArrayRef<std::string>();
-  const StringRef firstInput = inputsAndOutputs.hasSingleInput()
-                                   ? inputsAndOutputs.getFilenameOfFirstInput()
-                                   : StringRef();
+  const StringRef firstInput =
+      inputsAndOutputs.hasSingleInput()
+          ? StringRef(inputsAndOutputs.getFilenameOfFirstInput())
+          : StringRef();
   const FrontendOptions::ActionType requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(args);
 
@@ -143,21 +141,19 @@ OutputFilesComputer::OutputFilesComputer(
 Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
-  bool hadError = false;
   unsigned i = 0;
-  InputsAndOutputs.forEachInputProducingAMainOutputFile(
-      [&](const InputFile &input) -> void {
+  bool hadError = InputsAndOutputs.forEachInputProducingAMainOutputFile(
+      [&](const InputFile &input) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
                                   : StringRef(OutputFileArguments[i++]);
 
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
-        if (!outputFile) {
-          hadError = true;
-          return;
-        }
+        if (!outputFile)
+          return true;
         outputFiles.push_back(*outputFile);
+        return false;
       });
   return hadError ? None : Optional<std::vector<std::string>>(outputFiles);
 }
@@ -208,7 +204,7 @@ Optional<std::string> OutputFilesComputer::deriveOutputFileForDirectory(
 
 std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
-  StringRef nameToStem =
+  std::string nameToStem =
       input.isPrimary()
           ? input.file()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
@@ -256,15 +252,15 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
 
   std::vector<SupplementaryOutputPaths> outputPaths;
   unsigned i = 0;
-  bool hadError = false;
-  InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &input) -> void {
+  bool hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> bool {
         if (auto suppPaths = computeOutputPathsForOneInput(
-                OutputFiles[i], (*pathsFromUser)[i], input))
+                OutputFiles[i], (*pathsFromUser)[i], input)) {
+          ++i;
           outputPaths.push_back(*suppPaths);
-        else
-          hadError = true;
-        ++i;
+          return false;
+        }
+        return true;
       });
   if (hadError)
     return None;
@@ -287,13 +283,15 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
+  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !loadedModuleTrace || !TBD) {
+      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -308,6 +306,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
+    sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
 
@@ -329,7 +328,7 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
   if (paths.size() == N)
     return paths;
 
-  if (paths.size() == 0)
+  if (paths.empty())
     return std::vector<std::string>(N, std::string());
 
   Diags.diagnose(SourceLoc(), diag::error_wrong_number_of_arguments,
@@ -359,6 +358,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
       OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
       "dia", "", defaultSupplementaryOutputPathExcludingExtension);
+
+  // There is no non-path form of -emit-fixits-path
+  auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
 
   auto objcHeaderOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath, "h", "",
@@ -395,6 +397,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
+  sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
   return sop;

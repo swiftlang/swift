@@ -67,50 +67,130 @@
 using namespace swift;
 using namespace metadataimpl;
 
-template <class T>
-static int compareIntegers(T left, T right) {
-  return (left == right ? 0 : left < right ? -1 : 1);
-}
-
 static const size_t ValueTypeMetadataAddressPoint = sizeof(TypeMetadataHeader);
 
+static ClassMetadataBounds
+computeMetadataBoundsForSuperclass(const void *ref,
+                                   TypeMetadataRecordKind refKind) {
+  switch (refKind) {
+  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+    auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
+    if (!description) {
+      swift::fatalError(0, "instantiating class metadata for class with "
+                           "missing weak-linked ancestor");
+    }
+    return description->getMetadataBounds();
+  }
+
+  case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+    auto description = reinterpret_cast<const ClassDescriptor *>(ref);
+    return description->getMetadataBounds();
+  }
+
+  case TypeMetadataRecordKind::IndirectObjCClass:
+#if SWIFT_OBJC_INTEROP
+    {
+      auto cls = *reinterpret_cast<const Class *>(ref);
+      cls = swift_getInitializedObjCClass(cls);
+      auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
+      return metadata->getClassBoundsAsSwiftSuperclass();
+    }
+#else
+    // fallthrough
+#endif
+
+  case TypeMetadataRecordKind::Reserved:
+    break;
+  }
+  swift_runtime_unreachable("unsupported superclass reference kind");
+}
+
+static ClassMetadataBounds computeMetadataBoundsFromSuperclass(
+                                      const ClassDescriptor *description,
+                                      StoredClassMetadataBounds &storedBounds) {
+  ClassMetadataBounds bounds;
+
+  // Compute the bounds for the superclass, extending it to the minimum
+  // bounds of a Swift class.
+  if (const void *superRef = description->Superclass.get()) {
+    bounds = computeMetadataBoundsForSuperclass(superRef,
+                                     description->getSuperclassReferenceKind());
+  } else {
+    bounds = ClassMetadataBounds::forSwiftRootClass();
+  }
+
+  // Add the subclass's immediate members.
+  bounds.adjustForSubclass(description->areImmediateMembersNegative(),
+                           description->NumImmediateMembers);
+
+  // Cache before returning.
+  storedBounds.initialize(bounds);
+  return bounds;
+}
+
+ClassMetadataBounds
+swift::getResilientMetadataBounds(const ClassDescriptor *description) {
+  assert(description->hasResilientSuperclass());
+  auto &storedBounds = *description->ResilientMetadataBounds.get();
+
+  ClassMetadataBounds bounds;
+  if (storedBounds.tryGet(bounds)) {
+    return bounds;
+  }
+
+  return computeMetadataBoundsFromSuperclass(description, storedBounds);
+}
+
+int32_t
+swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
+  assert(description->hasResilientSuperclass());
+  auto &storedBounds = *description->ResilientMetadataBounds.get();
+
+  ptrdiff_t result;
+  if (storedBounds.tryGetImmediateMembersOffset(result)) {
+    return result / sizeof(void*);
+  }
+
+  auto bounds = computeMetadataBoundsFromSuperclass(description, storedBounds);
+  return bounds.ImmediateMembersOffset / sizeof(void*);
+}
+
 namespace {
-  struct GenericCacheEntry;
-
-  // The cache entries in a generic cache are laid out like this:
-  struct GenericCacheEntryHeader {
-    const Metadata *Value;
-    size_t NumArguments;
-  };
-
-  struct GenericCacheEntry
-      : CacheEntry<GenericCacheEntry, GenericCacheEntryHeader> {
+  struct GenericCacheEntry final
+      : MetadataCacheEntryBase<GenericCacheEntry, const Metadata *> {
 
     static const char *getName() { return "GenericCache"; }
 
-    GenericCacheEntry(unsigned numArguments) {
-      NumArguments = numArguments;
-    }
+    template <class... Args>
+    GenericCacheEntry(MetadataCacheKey key, Args &&...args)
+      : MetadataCacheEntryBase(key) {}
 
-    size_t getNumArguments() const { return NumArguments; }
+    // Note that we have to pass 'arguments' separately here instead of
+    // using the key data because there might be non-key arguments,
+    // like protocol conformances.
+    const Metadata *initialize(const TypeContextDescriptor *description,
+                               const void * const *arguments) {
+      // Find a pattern.  Currently we always use the default pattern.
+      auto &generics = description->getFullGenericContextHeader();
+      auto pattern = generics.DefaultInstantiationPattern.get();
 
-    static GenericCacheEntry *getFromMetadata(
-                            const TypeGenericContextDescriptorHeader &generics,
-                                              Metadata *metadata) {
-      char *bytes = (char*) metadata;
-      if (auto classType = dyn_cast<ClassMetadata>(metadata)) {
-        assert(classType->isTypeMetadata());
-        bytes -= classType->getClassAddressPoint();
-      } else {
-        bytes -= ValueTypeMetadataAddressPoint;
+      // Call the pattern's instantiation function.
+      auto metadata =
+        pattern->InstantiationFunction(description, arguments, pattern);
+
+      // Complete the metadata's instantiation.
+      if (!pattern->CompletionFunction.isNull()) {
+        MetadataCompletionContext context = {};
+        auto dep = pattern->CompletionFunction(metadata, &context, pattern);
+        assert(!dep && "completion dependencies not yet supported"); (void) dep;
       }
-      bytes -= sizeof(GenericCacheEntry);
-      return reinterpret_cast<GenericCacheEntry*>(bytes);
+
+      return metadata;
     }
   };
 } // end anonymous namespace
 
-using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
+using GenericMetadataCache = LockingConcurrentMap<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
@@ -142,90 +222,223 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
+#if SWIFT_OBJC_INTEROP
+extern "C" void *_objc_empty_cache;
+#endif
+
+static void copyMetadataPattern(void **section,
+                                const GenericMetadataPartialPattern *pattern) {
+  memcpy(section + pattern->OffsetInWords,
+         pattern->Pattern.get(),
+         size_t(pattern->SizeInWords) * sizeof(void*));
+}
+
+static void
+initializeClassMetadataFromPattern(ClassMetadata *metadata,
+                                   ClassMetadataBounds bounds,
+                                   const ClassDescriptor *description,
+                                   const GenericClassMetadataPattern *pattern) {
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
+
+  // Install the extra-data pattern.
+  void **metadataExtraData =
+    reinterpret_cast<void**>(rawMetadata) + bounds.PositiveSizeInWords;
+  if (pattern->hasExtraDataPattern()) {
+    auto extraDataPattern = pattern->getExtraDataPattern();
+
+    // Zero memory up to the offset.
+    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+
+    // Copy the pattern into the rest of the extra data.
+    copyMetadataPattern(metadataExtraData, extraDataPattern);
+  }
+
+  // Install the immediate members pattern:
+  void **immediateMembers =
+    reinterpret_cast<void**>(rawMetadata + bounds.ImmediateMembersOffset);
+
+  // Zero out the entire immediate-members section.
+  // TODO: only memset the parts that aren't covered by the pattern.
+  memset(immediateMembers, 0, description->getImmediateMembersSize());
+
+  // Copy in the immediate arguments.
+
+  // Copy the immediate-members pattern.
+  if (pattern->hasImmediateMembersPattern()) {
+    auto immediateMembersPattern = pattern->getImmediateMembersPattern();
+    copyMetadataPattern(immediateMembers, immediateMembersPattern);
+  }
+
+  // Initialize the header:
+
+  // Heap destructor.
+  fullMetadata->destroy = pattern->Destroy;
+
+  // Value witness table.
+#if SWIFT_OBJC_INTEROP
+  fullMetadata->ValueWitnesses =
+    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
+       ? &VALUE_WITNESS_SYM(Bo)
+       : &VALUE_WITNESS_SYM(BO);
+#else
+  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+
+#if SWIFT_OBJC_INTEROP
+  // Install the metaclass's RO-data pointer.
+  auto metaclass = reinterpret_cast<AnyClassMetadata *>(
+      metadataExtraData + pattern->MetaclassObjectOffset);
+  auto metaclassRO = metadataExtraData + pattern->MetaclassRODataOffset;
+  metaclass->Data = reinterpret_cast<uintptr_t>(metaclassRO);
+#endif
+
+  // MetadataKind / isa.
+#if SWIFT_OBJC_INTEROP
+  metadata->setClassISA(metaclass);
+#else
+  metadata->setKind(MetadataKind::Class);
+#endif
+
+  // Superclass.
+  metadata->Superclass = nullptr;
+#if SWIFT_OBJC_INTEROP
+  // If the class doesn't have a formal superclass, automatically set
+  // it to SwiftObject.
+  if (!description->hasSuperclass()) {
+    metadata->Superclass = getRootSuperclass();
+  }
+#endif
+
+#if SWIFT_OBJC_INTEROP
+  // Cache data.  Install the same initializer that the compiler is
+  // required to use.  We don't need to do this in non-ObjC-interop modes.
+  metadata->CacheData[0] = &_objc_empty_cache;
+  metadata->CacheData[1] = nullptr;
+#endif
+
+  // RO-data pointer.
+#if SWIFT_OBJC_INTEROP
+  auto classRO = metadataExtraData + pattern->ClassRODataOffset;
+  metadata->Data =
+    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
+#else
+  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
+#endif
+
+  // Class flags.
+  metadata->Flags = pattern->Flags;
+
+  // Instance layout.
+  metadata->InstanceAddressPoint = 0;
+  metadata->InstanceSize = 0;
+  metadata->InstanceAlignMask = 0;
+
+  // Reserved.
+  metadata->Reserved = 0;
+
+  // Class metadata layout.
+  metadata->ClassSize = bounds.getTotalSizeInBytes();
+  metadata->ClassAddressPoint = bounds.getAddressPointInBytes();
+
+  // Class descriptor.
+  metadata->setDescription(description);
+
+  // I-var destroyer.
+  metadata->IVarDestroyer = pattern->IVarDestroyer;
+}
+
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
-                                          const void *metadataTemplate,
-                                          size_t templateSize,
-                                          size_t templateAddressPoint,
                                           const void *arguments,
-                                          ClassMetadata *superclass,
-                                          size_t numImmediateMembers) {
-  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
+                                    const GenericClassMetadataPattern *pattern){
   auto &generics = description->getFullGenericContextHeader();
-  size_t numGenericArguments = generics.Base.NumKeyArguments;
-
-  size_t metadataSize;
-  if (superclass && superclass->isTypeMetadata()) {
-    assert(superclass->getClassAddressPoint() <= templateAddressPoint);
-
-    metadataSize = (superclass->getClassSize() -
-                    superclass->getClassAddressPoint() +
-                    templateAddressPoint +
-                    numImmediateMembers * sizeof(void *));
-    assert(templateSize <= metadataSize);
-  } else {
-    metadataSize = (templateSize +
-                    numImmediateMembers * sizeof(void *));
-  }
-
   auto &cache = unsafeGetInitializedCache(generics);
-  char *bytes = GenericCacheEntry::allocate(cache.getAllocator(),
-                                            argumentsAsArray,
-                                            numGenericArguments,
-                                            metadataSize)->getData<char>();
 
-  // Copy in the metadata template.
-  memcpy(bytes, metadataTemplate, templateSize);
+  // Compute the formal bounds of the metadata.
+  auto bounds = description->getMetadataBounds();
 
-  // Zero out the rest of the metadata.
-  memset(bytes + templateSize, 0, metadataSize - templateSize);
-
-  // Okay, move to the address point.
-  ClassMetadata *metadata =
-    reinterpret_cast<ClassMetadata *>(bytes + templateAddressPoint);
-  auto patternBytes =
-    reinterpret_cast<const char*>(metadataTemplate) +
-    templateAddressPoint;
-  auto patternMetadata = reinterpret_cast<const ClassMetadata*>(patternBytes);
-  assert(metadata->isTypeMetadata());
-
-  // Overwrite the superclass field.
-  metadata->SuperClass = superclass;
-  // Adjust the relative reference to the nominal type descriptor.
-  if (!metadata->isArtificialSubclass()) {
-    metadata->setDescription(patternMetadata->getDescription());
+  // Augment that with any required extra data from the pattern.
+  auto allocationBounds = bounds;
+  if (pattern->hasExtraDataPattern()) {
+    auto extraDataPattern = pattern->getExtraDataPattern();
+    allocationBounds.PositiveSizeInWords +=
+      extraDataPattern->OffsetInWords + extraDataPattern->SizeInWords;
   }
 
-  // The pattern might have private prefix matter prior to the start
-  // of metadata.
-  assert(metadata->getClassAddressPoint() <= templateAddressPoint);
-  metadata->setClassSize(metadataSize);
+  auto bytes = (char*) 
+    cache.getAllocator().Allocate(allocationBounds.getTotalSizeInBytes(),
+                                  alignof(void*));
+
+  auto addressPoint = bytes + allocationBounds.getAddressPointInBytes();
+  auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
+
+  initializeClassMetadataFromPattern(metadata, bounds, description, pattern);
+
+  assert(metadata->isTypeMetadata());
 
   return metadata;
 }
 
+static void
+initializeValueMetadataFromPattern(ValueMetadata *metadata,
+                                   const ValueTypeDescriptor *description,
+                                   const GenericValueMetadataPattern *pattern) {
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
+
+  if (pattern->hasExtraDataPattern()) {
+    void **metadataExtraData =
+      reinterpret_cast<void**>(rawMetadata + sizeof(ValueMetadata));
+    auto extraDataPattern = pattern->getExtraDataPattern();
+
+    // Zero memory up to the offset.
+    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+
+    // Copy the pattern into the rest of the extra data.
+    copyMetadataPattern(metadataExtraData, extraDataPattern);
+  }
+
+  // Put the VWT pattern in place as if it was the real VWT.
+  // The various initialization functions will instantiate this as
+  // necessary.
+  fullMetadata->setValueWitnesses(pattern->getValueWitnessesPattern());
+
+  // Set the metadata kind.
+  metadata->setKind(pattern->getMetadataKind());
+
+  // Set the type descriptor.
+  metadata->Description = description;
+}
+
 ValueMetadata *
 swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
-                                          const void *metadataTemplate,
-                                          size_t templateSize,
-                                          const void *arguments) {
-  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
+                                          const void *arguments,
+                                    const GenericValueMetadataPattern *pattern,
+                                          size_t extraDataSize) {
   auto &generics = description->getFullGenericContextHeader();
-  size_t numGenericArguments = generics.Base.NumKeyArguments;
-
   auto &cache = unsafeGetInitializedCache(generics);
-  char *bytes =
-    GenericCacheEntry::allocate(cache.getAllocator(),
-                                argumentsAsArray, numGenericArguments,
-                                templateSize)->getData<char>();
 
-  // Copy in the metadata template.
-  memcpy(bytes, metadataTemplate, templateSize);
+  static_assert(sizeof(StructMetadata::HeaderType)
+                  == sizeof(ValueMetadata::HeaderType),
+                "struct metadata header unexpectedly has extra members");
+  static_assert(sizeof(StructMetadata) == sizeof(ValueMetadata),
+                "struct metadata unexpectedly has extra members");
+  static_assert(sizeof(EnumMetadata::HeaderType)
+                  == sizeof(ValueMetadata::HeaderType),
+                "enum metadata header unexpectedly has extra members");
+  static_assert(sizeof(EnumMetadata) == sizeof(ValueMetadata),
+                "enum metadata unexpectedly has extra members");
 
-  // Okay, move to the address point.
-  bytes += ValueTypeMetadataAddressPoint;
-  auto *metadata = reinterpret_cast<ValueMetadata*>(bytes);
-  
+  size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
+
+  auto bytes = (char*) cache.getAllocator().Allocate(totalSize, alignof(void*));
+
+  auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
+  auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
+
+  initializeValueMetadataFromPattern(metadata, description, pattern);
+
   return metadata;
 }
 
@@ -237,16 +450,10 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto entry = getCache(generics).findOrAdd(genericArgs, numGenericArgs,
-    [&]() -> GenericCacheEntry* {
-      // Create new metadata to cache.
-      auto metadata = generics.InstantiationFunction(description, arguments);
-      auto entry = GenericCacheEntry::getFromMetadata(generics, metadata);
-      entry->Value = metadata;
-      return entry;
-    });
+  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  auto result = getCache(generics).getOrInsert(key, description, genericArgs);
 
-  return entry->Value;
+  return result.second;
 }
 
 /***************************************************************************/
@@ -1475,7 +1682,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     _swift_initGenericClassObjCName(theClass);
 #endif
 
-  const ClassMetadata *theSuperclass = theClass->SuperClass;
+  const ClassMetadata *theSuperclass = theClass->Superclass;
 
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
@@ -1509,8 +1716,8 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     // Copy the generic requirements.
     if (description->isGeneric()
         && description->getGenericContextHeader().hasArguments()) {
-      memcpy(classWords + description->getGenericArgumentOffset(ancestor),
-             superWords + description->getGenericArgumentOffset(ancestor),
+      memcpy(classWords + description->getGenericArgumentOffset(),
+             superWords + description->getGenericArgumentOffset(),
              description->getGenericContextHeader().getNumArguments() *
                sizeof(uintptr_t));
     }
@@ -1531,7 +1738,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
              superWords + fieldOffsetVector,
              description->NumFields * sizeof(uintptr_t));
     }
-    ancestor = ancestor->SuperClass;
+    ancestor = ancestor->Superclass;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -1540,7 +1747,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
   auto theSuperMetaclass
     = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
-  theMetaclass->SuperClass = theSuperMetaclass;
+  theMetaclass->Superclass = theSuperMetaclass;
 #endif
 }
 
@@ -1556,7 +1763,10 @@ ClassMetadata *
 swift::swift_relocateClassMetadata(ClassMetadata *self,
                                    size_t templateSize,
                                    size_t numImmediateMembers) {
-  const ClassMetadata *superclass = self->SuperClass;
+  // Force the initialization of the metadata layout.
+  (void) self->getDescription()->getMetadataBounds();
+
+  const ClassMetadata *superclass = self->Superclass;
 
   size_t metadataSize;
   if (superclass && superclass->isTypeMetadata()) {
@@ -1608,7 +1818,7 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // If we have a superclass, start from its size and alignment instead.
   if (classHasSuperclass(self)) {
-    const ClassMetadata *super = self->SuperClass;
+    const ClassMetadata *super = self->Superclass;
 
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
@@ -2753,28 +2963,78 @@ template <> void Metadata::dump() const {
 /***************************************************************************/
 
 namespace {
-  class WitnessTableCacheEntry : public CacheEntry<WitnessTableCacheEntry> {
-  public:
-    static const char *getName() { return "WitnessTableCache"; }
 
-    WitnessTableCacheEntry(size_t numArguments) {
-      assert(numArguments == getNumArguments());
-    }
+/// A cache-entry type suitable for use with LockingConcurrentMap.
+class WitnessTableCacheEntry {
+  /// The type for which this table was instantiated.
+  const Metadata * const Type;
 
-    static constexpr size_t getNumArguments() {
-      return 1;
-    }
+  /// The generic table.  This is only kept around so that we can
+  /// compute the size of an entry correctly in case of a race to
+  /// allocate the entry.
+  GenericWitnessTable * const GenericTable;
 
-    /// Advance the address point to the end of the private storage area.
-    WitnessTable *get(GenericWitnessTable *genericTable) const {
-      return reinterpret_cast<WitnessTable *>(
-          const_cast<void **>(getData<void *>()) +
-          genericTable->WitnessTablePrivateSizeInWords);
-    }
-  };
+  /// The table.  When this is fully-initialized, we set it to the table.
+  std::atomic<WitnessTable*> Table;
+
+public:
+  /// We use a pointer to the allocated witness table directly as a
+  /// status value.  The witness table itself is actually allocated in the
+  /// tail storage of the entry.
+  using StatusType = WitnessTable*;
+
+  /// Do the structural initialization necessary for this entry to appear
+  /// in a concurrent map.
+  WitnessTableCacheEntry(const Metadata *type,
+                         GenericWitnessTable *genericTable,
+                         void ** const *instantiationArgs)
+    : Type(type), GenericTable(genericTable), Table(nullptr) {}
+
+  intptr_t getKeyIntValueForDump() const {
+    return reinterpret_cast<intptr_t>(Type);
+  }
+
+  /// The key value of the entry is just its type pointer.
+  int compareWithKey(const Metadata *type) const {
+    return comparePointers(Type, type);
+  }
+
+  static size_t getExtraAllocationSize(const Metadata *type,
+                                       GenericWitnessTable *genericTable,
+                                       void ** const *instantiationArgs) {
+    return getWitnessTableSize(genericTable);
+  }
+
+  size_t getExtraAllocationSize() const {
+    return getWitnessTableSize(GenericTable);
+  }
+
+  static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
+    auto protocol = genericTable->Protocol.get();
+    size_t numPrivateWords = genericTable->WitnessTablePrivateSizeInWords;
+    size_t numRequirementWords =
+      WitnessTableFirstRequirementOffset + protocol->NumRequirements;
+    return (numPrivateWords + numRequirementWords) * sizeof(void*);
+  }
+
+  WitnessTable *checkStatus(bool isLocked,
+                            GenericWitnessTable *genericTable,
+                            void ** const *instantiationArgs) {
+    return Table.load(std::memory_order_acquire);
+  }
+
+  WitnessTable *initialize(GenericWitnessTable *genericTable,
+                           void ** const *instantiationArgs);
+
+  void flagInitializedStatus(WitnessTable *table) {
+    Table.store(table, std::memory_order_release);
+  }
+};
+
 } // end anonymous namespace
 
-using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
+using GenericWitnessTableCache =
+  LockingConcurrentMap<WitnessTableCacheEntry, /*destructor*/ false>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.
@@ -2811,11 +3071,9 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
-static WitnessTableCacheEntry *
-allocateWitnessTable(GenericWitnessTable *genericTable,
-                     MetadataAllocator &allocator,
-                     const void *args[],
-                     size_t numGenericArgs) {
+WitnessTable *
+WitnessTableCacheEntry::initialize(GenericWitnessTable *genericTable,
+                                   void ** const *instantiationArgs) {
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
@@ -2832,26 +3090,18 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   assert(numPatternWitnesses <= numRequirements);
 
   // Number of bytes for any private storage used by the conformance itself.
-  size_t privateSize =
-    genericTable->WitnessTablePrivateSizeInWords * sizeof(void *);
+  size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;
 
-  // Number of bytes for the full witness table.
-  size_t expectedWitnessTableSize = numRequirements * sizeof(void *);
-
-  // Create a new entry for the cache.
-  auto entry = WitnessTableCacheEntry::allocate(
-      allocator, args, numGenericArgs,
-      (privateSize + expectedWitnessTableSize) * sizeof(void *));
-
-  char *fullTable = entry->getData<char>();
+  // Find the allocation.
+  void **fullTable = reinterpret_cast<void**>(this + 1);
 
   // Zero out the private storage area.
-  memset(fullTable, 0, privateSize * sizeof(void *));
+  memset(fullTable, 0, privateSizeInWords * sizeof(void*));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
-  auto table = (void **) entry->get(genericTable);
-  auto pattern = (void * const *) &*genericTable->Pattern;
+  auto table = fullTable + privateSizeInWords;
+  auto pattern = reinterpret_cast<void * const *>(&*genericTable->Pattern);
   auto requirements = protocol->Requirements.get();
 
   // Fill in the provided part of the requirements from the pattern.
@@ -2869,40 +3119,29 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
     table[i] = defaultImpl;
   }
 
-  return entry;
+  auto castTable = reinterpret_cast<WitnessTable*>(table);
+
+  // Call the instantiation function if present.
+  if (!genericTable->Instantiator.isNull()) {
+    genericTable->Instantiator(castTable, Type, instantiationArgs);
+  }
+
+  return castTable;
 }
 
-const WitnessTable *swift::swift_getGenericWitnessTable(
-    GenericWitnessTable *genericTable, const Metadata *type,
-    void *const *instantiationArgs) {
+const WitnessTable *
+swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
+                                    const Metadata *type,
+                                    void **const *instantiationArgs) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }
 
-  // If type is not nullptr, the witness table depends on the substituted
-  // conforming type, so use that are the key.
-  constexpr const size_t numGenericArgs = 1;
-  const void *args[] = { type };
-
   auto &cache = getCache(genericTable);
-  auto entry = cache.findOrAdd(args, numGenericArgs,
-    [&]() -> WitnessTableCacheEntry* {
-      // Allocate the witness table and fill it in.
-      auto entry = allocateWitnessTable(genericTable,
-                                        cache.getAllocator(),
-                                        args, numGenericArgs);
+  auto result = cache.getOrInsert(type, genericTable, instantiationArgs);
 
-      // Call the instantiation function to initialize
-      // dependent associated type metadata.
-      if (!genericTable->Instantiator.isNull()) {
-        genericTable->Instantiator(entry->get(genericTable),
-                                   type, instantiationArgs);
-      }
-
-      return entry;
-    });
-
-  return entry->get(genericTable);
+  // Our returned 'status' is the witness table itself.
+  return result.second;
 }
 
 /***************************************************************************/

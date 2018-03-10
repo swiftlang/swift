@@ -197,12 +197,16 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 
   @_inlineable
   public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
+    // NOTE: In release mode, this method is a no-op for performance reasons.
+    _debugPrecondition(index >= bounds.lowerBound)
+    _debugPrecondition(index < bounds.upperBound)
   }
 
   @_inlineable
   public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
+    // NOTE: In release mode, this method is a no-op for performance reasons.
+    _debugPrecondition(range.lowerBound >= bounds.lowerBound)
+    _debugPrecondition(range.upperBound <= bounds.upperBound)
   }
 
   @_inlineable
@@ -275,6 +279,43 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 %end
   }
 
+  /// Accesses a contiguous subrange of the buffer's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original buffer uses. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice from a buffer of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original buffer.
+  ///
+%if Mutable:
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     streets.withUnsafeMutableBufferPointer { buffer in
+  ///         let streetSlice = buffer[2..<buffer.endIndex]
+  ///         print(Array(streetSlice))
+  ///         // Prints "["Channing", "Douglas", "Evarts"]"
+  ///         let index = streetSlice.index(of: "Evarts")    // 4
+  ///         buffer[index!] = "Eustace"
+  ///     }
+  ///     print(streets.last!)
+  ///     // Prints "Eustace"
+%else:
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     streets.withUnsafeBufferPointer { buffer in
+  ///         let streetSlice = buffer[2..<buffer.endIndex]
+  ///         print(Array(streetSlice))
+  ///         // Prints "["Channing", "Douglas", "Evarts"]"
+  ///         let index = streetSlice.index(of: "Evarts")    // 4
+  ///         print(buffer[index!])
+  ///         // Prints "Evarts"
+  ///     }
+%end
+  ///
+  /// - Note: Bounds checks for `bounds` are performed only in debug mode.
+  ///
+  /// - Parameter bounds: A range of the buffer's indices. The bounds of
+  ///   the range must be valid indices of the buffer.
   @_inlineable
   public subscript(bounds: Range<Int>)
     -> Slice<Unsafe${Mutable}BufferPointer<Element>>
@@ -286,11 +327,17 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
         base: self, bounds: bounds)
     }
 %  if Mutable:
-    set {
+    nonmutating set {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(bounds.count == newValue.count)
+
       // FIXME: swift-3-indexing-model: tests.
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+      if !newValue.isEmpty {
+        (_position! + bounds.lowerBound).assign(
+          from: newValue.base._position! + newValue.startIndex,
+          count: newValue.count)
+      }
     }
 %  end
   }

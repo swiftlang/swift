@@ -1110,14 +1110,12 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionList substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1125,7 +1123,6 @@ public:
                        RValue &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 SubstitutionList substitutions,
@@ -1142,8 +1139,6 @@ public:
                                        SubstitutionList witnessSubs);
   void emitMaterializeForSet(AccessorDecl *decl);
 
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionList substitutions,
@@ -1684,6 +1679,10 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 

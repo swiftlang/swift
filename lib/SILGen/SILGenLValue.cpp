@@ -581,7 +581,9 @@ namespace {
       : PhysicalPathComponent(typeData, RefElementKind),
         Field(field), SubstFieldType(substFieldType),
         IsNonAccessing(options.IsNonAccessing) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base.getType().isObject() &&
@@ -616,7 +618,9 @@ namespace {
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
       : PhysicalPathComponent(typeData, TupleElementKind),
         ElementIndex(elementIndex) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -640,7 +644,9 @@ namespace {
                            LValueTypeData typeData)
       : PhysicalPathComponent(typeData, StructElementKind),
         Field(field), SubstFieldType(substFieldType) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -683,6 +689,8 @@ namespace {
       : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind) {
       assert(getSubstFormalType() == openedArchetype);
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
@@ -731,6 +739,8 @@ namespace {
                                       LValueTypeData typeData)
       : LogicalPathComponent(typeData, OpenNonOpaqueExistentialKind),
         OpenedArchetype(openedArchetype) {}
+
+    virtual bool isLoadingPure() const override { return true; }
 
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
@@ -831,6 +841,8 @@ namespace {
       IsRValue(isRValue) {
         assert(IsRValue || value.getType().isAddress());
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
@@ -1088,15 +1100,15 @@ namespace {
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
       if (accessKind == AccessKind::Read) {
-        return SGF.getGetterDeclRef(decl);
+        return SGF.SGM.getGetterDeclRef(decl);
       } else {
-        return SGF.getSetterDeclRef(decl);
+        return SGF.SGM.getSetterDeclRef(decl);
       }
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl);
+      SILDeclRef setter = SGF.SGM.getSetterDeclRef(decl);
 
       // Pull everything out of this that we'll need, because we're
       // about to modify the LValue and delete this component.
@@ -1139,7 +1151,7 @@ namespace {
 
     void set(SILGenFunction &SGF, SILLocation loc,
              ArgumentSource &&value, ManagedValue base) && override {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl);
+      SILDeclRef setter = SGF.SGM.getSetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
       // Pass in just the setter.
@@ -1248,7 +1260,7 @@ namespace {
                                          optSubscripts);
       }());
 
-      SILDeclRef materializeForSet = SGF.getMaterializeForSetDeclRef(decl);
+      SILDeclRef materializeForSet = SGF.SGM.getMaterializeForSetDeclRef(decl);
 
       MaterializedLValue materialized;
       {
@@ -1409,7 +1421,7 @@ namespace {
     
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
-      SILDeclRef getter = SGF.getGetterDeclRef(decl);
+      SILDeclRef getter = SGF.SGM.getGetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
 
@@ -1566,7 +1578,7 @@ namespace {
 
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
-      return SGF.getAddressorDeclRef(decl, accessKind);
+      return SGF.SGM.getAddressorDeclRef(decl, accessKind);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -1574,7 +1586,7 @@ namespace {
       assert(SGF.InFormalEvaluationScope &&
              "offsetting l-value for modification without writeback scope");
 
-      SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind);
+      SILDeclRef addressor = SGF.SGM.getAddressorDeclRef(decl, accessKind);
       std::pair<ManagedValue, ManagedValue> result;
       {
         FormalEvaluationScope scope(SGF);
@@ -1821,6 +1833,8 @@ namespace {
         OrigType(origType)
     {}
 
+    virtual bool isLoadingPure() const override { return true; }
+
     RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                        RValue &&rv, SGFContext c) && override {
       return SGF.emitSubstToOrigValue(loc, std::move(rv), OrigType,
@@ -1860,6 +1874,8 @@ namespace {
                              SubstToOrigKind)
     {}
 
+    virtual bool isLoadingPure() const override { return true; }
+
     RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                        RValue &&rv, SGFContext c) && override {
       return SGF.emitOrigToSubstValue(loc, std::move(rv), getOrigFormalType(),
@@ -1894,6 +1910,8 @@ namespace {
     OwnershipComponent(LValueTypeData typeData)
       : LogicalPathComponent(typeData, OwnershipKind) {
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
@@ -2908,12 +2926,12 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     // Weak storage types are handled with their underlying type.
     llvm_unreachable("weak pointers are always the right optional types");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to generate a strong retain and
     // strip the unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
@@ -2922,7 +2940,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
 
     return B.createCopyUnownedValue(loc, src);
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to strip the unmanaged box
     // and then do an (unsafe) retain.
     auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
@@ -2939,16 +2957,16 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   auto swiftStorageType = src.getType().castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     // Weak storage types are handled with their underlying type.
     llvm_unreachable("weak pointers are always the right optional types");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned:
+  case ReferenceOwnership::Unowned:
     // For @unowned(safe) types, we need to generate a strong retain and
     // strip the unowned box.
     return B.createCopyUnownedValue(loc, src);
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Unmanaged:
     // For @unowned(unsafe) types, we need to strip the unmanaged box
     // and then do an (unsafe) retain.
     return B.createUnsafeCopyUnownedValue(loc, src);
@@ -2967,12 +2985,12 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak: {
+  case ReferenceOwnership::Weak: {
     // For @weak types, we need to create an Optional<T>.
     // Optional<T> is currently loadable, but it probably won't be forever.
     return SGF.B.createLoadWeak(loc, src, isTake);
   }
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to strip the unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
     if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
@@ -2994,7 +3012,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.createDestroyValue(loc, unownedValue);
     return strongValue;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to strip the unmanaged box.
     auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
     auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);
@@ -3003,7 +3021,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     // SEMANTIC ARC TODO: Does this need a cleanup?
     return SGF.B.createCopyValue(loc, result);
   }
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
   }
 }
@@ -3021,7 +3039,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak: {
+  case ReferenceOwnership::Weak: {
     // For @weak types, we need to break down an Optional<T> and then
     // emit the storeWeak ourselves.
     SGF.B.createStoreWeak(loc, value, dest, isInit);
@@ -3030,7 +3048,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to enter the unowned box by
     // turning the strong retain into an unowned retain.
     auto unownedType = storageType.castTo<UnownedStorageType>();
@@ -3050,7 +3068,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to enter the unmanaged box and
     // release the strong retain.
     auto unmanagedValue =
@@ -3059,7 +3077,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
   }
 }
@@ -3141,11 +3159,11 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     llvm_unreachable("weak types are never loadable");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned types, place into an unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
@@ -3156,7 +3174,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unmanaged types, place into an unmanaged box.
     SILValue unmanaged =
       B.createRefToUnmanaged(loc, semanticValue, storageType);

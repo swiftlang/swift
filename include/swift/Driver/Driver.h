@@ -357,9 +357,6 @@ public:
   /// Print the list of Actions in a Compilation.
   void printActions(const Compilation &C) const;
 
-  /// Print the list of Jobs in a Compilation.
-  void printJobs(const Compilation &C) const;
-
   /// Print the driver version.
   void printVersion(const ToolChain &TC, raw_ostream &OS) const;
 

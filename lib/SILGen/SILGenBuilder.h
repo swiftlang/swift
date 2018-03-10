@@ -255,7 +255,20 @@ public:
   ManagedValue createLoadCopy(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
 
-  ManagedValue createFunctionArgument(SILType type, ValueDecl *decl);
+  /// Create a SILArgument for an input parameter. Asserts if used to create a
+  /// function argument for an out parameter.
+  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl);
+
+  /// Create a SILArgument for an input parameter. Uses \p loc to create any
+  /// copies necessary. Asserts if used to create a function argument for an out
+  /// parameter.
+  ///
+  /// *NOTE* This API purposely used an Optional<SILLocation> to distinguish
+  /// this API from the ValueDecl * API in C++. This is necessary since
+  /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
+  /// user to be explicit that they want to use this API.
+  ManagedValue createInputFunctionArgument(SILType type,
+                                           Optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,

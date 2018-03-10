@@ -128,6 +128,7 @@ namespace swift {
   std::vector<Token> tokenize(const LangOptions &LangOpts,
                               const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
+                              DiagnosticEngine *Diags = nullptr,
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());

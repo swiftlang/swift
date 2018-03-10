@@ -1549,7 +1549,7 @@ public:
     interleave(OI->getBaseElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
-    if (OI->getTailElements().size() > 0) {
+    if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
       interleave(OI->getTailElements(),
                  [&](const SILValue &V) { *this << getIDAndType(V); },
@@ -1793,6 +1793,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
+    *this << getIDAndType(CUI->getOperand());
+  }
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
@@ -2307,8 +2310,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsKind() == EffectsKind::ReadWrite)
+  else if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
+  else if (getEffectsKind() == EffectsKind::ReleaseNone)
+    OS << "[releasenone] ";
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
@@ -2323,6 +2328,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     printValueDecl(getClangNodeOwner(), OS);
     OS << "] ";
   }
+
+  // Handle functions that are deserialized from canonical SIL. Normally, we
+  // should emit SIL with the correct SIL stage, so preserving this attribute
+  // won't be necessary. But consider serializing raw SIL (either textual SIL or
+  // SIB) after importing canonical SIL from another module. If the imported
+  // functions are reserialized (e.g. shared linkage), then we must preserve
+  // this attribute.
+  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+    OS << "[canonical] ";
 
   printName(OS);
   OS << " : $";
@@ -2625,7 +2639,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+     << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
   // current file).

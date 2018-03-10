@@ -187,7 +187,6 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        auto flags = type->Flags.getKindSpecificFlags();
         switch (node->getKind()) {
         // If the mangled name doesn't indicate a type kind, accept anything.
         // Otherwise, try to match them up.
@@ -195,7 +194,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
           break;
         case Demangle::Node::Kind::Structure:
           if (type->getKind() != ContextDescriptorKind::Struct
-              && !(flags & (uint16_t)TypeContextDescriptorFlags::IsCTag))
+              && !type->getTypeContextDescriptorFlags().isCTag())
             return false;
           break;
         case Demangle::Node::Kind::Class:
@@ -207,7 +206,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
             return false;
           break;
         case Demangle::Node::Kind::TypeAlias:
-          if (!(flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef))
+          if (!type->getTypeContextDescriptorFlags().isCTypedef())
             return false;
           break;
 
@@ -658,7 +657,7 @@ private:
   LookupDependentMemberFn lookupDependentMember;
 
   /// Ownership information related to the metadata we are trying to lookup.
-  TypeOwnership Ownership;
+  TypeReferenceOwnership ReferenceOwnership;
 
 public:
   DecodedMetadataBuilder(Demangler &demangler,
@@ -941,17 +940,17 @@ public:
   }
 
   BuiltType createUnownedStorageType(BuiltType base) {
-    Ownership.setUnowned();
+    ReferenceOwnership.setUnowned();
     return base;
   }
 
   BuiltType createUnmanagedStorageType(BuiltType base) {
-    Ownership.setUnmanaged();
+    ReferenceOwnership.setUnmanaged();
     return base;
   }
 
   BuiltType createWeakStorageType(BuiltType base) {
-    Ownership.setWeak();
+    ReferenceOwnership.setWeak();
     return base;
   }
 
@@ -960,7 +959,9 @@ public:
     return BuiltType();
   }
 
-  TypeOwnership getOwnership() const { return Ownership; }
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 }
@@ -1021,7 +1022,7 @@ swift::_getTypeByMangledName(StringRef typeName,
     });
 
   auto type = Demangle::decodeMangledType(builder, node);
-  return {type, builder.getOwnership()};
+  return {type, builder.getReferenceOwnership()};
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

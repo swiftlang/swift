@@ -596,6 +596,9 @@ NodePointer Demangler::demangleOperator() {
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
+    case 'n':
+      return createType(
+          createWithChild(Node::Kind::Owned, popTypeAndGetChild()));
     case 'o': return demangleOperatorIdentifier();
     case 'p': return demangleProtocolListType();
     case 'q': return createType(demangleGenericParamIndex());
@@ -873,8 +876,7 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer name = popNode();
     NodePointer result = createNode(Node::Kind::RelatedEntityDeclName,
                                     StringRef(&relatedEntityKind, 1));
-    result->addChild(name, *this);
-    return result;
+    return addChild(result, name);
   }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
@@ -1442,6 +1444,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
     case 'i':
       return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
+    case 'r':
+      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1891,8 +1895,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           return nullptr;
         StringRef Text = Name->getText();
         if (ParamKind ==
-              FunctionSigSpecializationParamKind::ConstantPropString &&
-            Text.size() > 0 && Text[0] == '_') {
+                FunctionSigSpecializationParamKind::ConstantPropString &&
+            !Text.empty() && Text[0] == '_') {
           // A '_' escapes a leading digit or '_' of a string constant.
           Text = Text.drop_front(1);
         }
@@ -2250,9 +2254,9 @@ NodePointer Demangler::demangleSpecialType() {
       auto name = popNode(Node::Kind::Identifier);
       auto parent = popContext();
       auto anon = createNode(Node::Kind::AnonymousContext);
-      anon->addChild(name, *this);
-      anon->addChild(parent, *this);
-      anon->addChild(types, *this);
+      anon = addChild(anon, name);
+      anon = addChild(anon, parent);
+      anon = addChild(anon, types);
       return anon;
     }
     case 'e':

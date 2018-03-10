@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 400; // Last change: sil_property
+const uint16_t VERSION_MINOR = 402; // Last change: effects(releasenone)
 
 using DeclIDField = BCFixed<31>;
 
@@ -210,9 +210,10 @@ enum class VarDeclSpecifier : uint8_t {
   Var,
   InOut,
   Shared,
+  Owned,
 };
-using VarDeclSpecifierField = BCFixed<2>;
-  
+using VarDeclSpecifierField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
@@ -311,13 +312,23 @@ using AssociativityField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum Ownership : uint8_t {
+enum ReferenceOwnership : uint8_t {
   Strong = 0,
   Weak,
   Unowned,
   Unmanaged,
 };
-using OwnershipField = BCFixed<2>;
+using ReferenceOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum ValueOwnership : uint8_t {
+  Default = 0,
+  InOut,
+  Shared,
+  Owned
+};
+using ValueOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -656,8 +667,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -671,8 +681,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
@@ -800,8 +809,8 @@ namespace decls_block {
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,
-    OwnershipField,  // ownership
-    TypeIDField      // implementation type
+    ReferenceOwnershipField, // ownership
+    TypeIDField              // implementation type
   >;
 
   using UnboundGenericTypeLayout = BCRecordLayout<
@@ -1410,7 +1419,8 @@ namespace decls_block {
   >;
 
   // Stub layouts, unused.
-  using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
+  using ReferenceOwnershipDeclAttrLayout
+    = BCRecordLayout<ReferenceOwnership_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
   using AccessControlDeclAttrLayout = BCRecordLayout<AccessControl_DECL_ATTR>;
   using SetterAccessDeclAttrLayout = BCRecordLayout<SetterAccess_DECL_ATTR>;

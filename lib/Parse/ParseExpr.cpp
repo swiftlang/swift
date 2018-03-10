@@ -290,7 +290,7 @@ parse_operator:
           CodeCompletion->completeAssignmentRHS(assign);
         }
         consumeToken();
-        if (SequencedExprs.size() > 0 && (SequencedExprs.size() & 1) == 0) {
+        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
           // Make sure we have odd number of sequence exprs.
           SequencedExprs.pop_back();
         }
@@ -2498,20 +2498,21 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
-      Ownership ownershipKind = Ownership::Strong;
+      auto ownershipKind = ReferenceOwnership::Strong;
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Weak;
+        ownershipKind = ReferenceOwnership::Weak;
       } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
-        ownershipKind = Ownership::Unowned;
+        ownershipKind = ReferenceOwnership::Unowned;
 
         // Skip over "safe" and "unsafe" if present.
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
-            ownershipKind = Ownership::Unowned; // FIXME: No "safe" variant.
+            ownershipKind =
+                ReferenceOwnership::Unowned; // FIXME: No "safe" variant.
           else if (Tok.getText() == "unsafe")
-            ownershipKind = Ownership::Unmanaged;
+            ownershipKind = ReferenceOwnership::Unmanaged;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
           consumeIf(tok::identifier);
@@ -2570,17 +2571,17 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Create the VarDecl and the PatternBindingDecl for the captured
       // expression.  This uses the parent declcontext (not the closure) since
       // the initializer expression is evaluated before the closure is formed.
-      auto specifierKind = (ownershipKind != Ownership::Weak)
-                         ? VarDecl::Specifier::Let
-                         : VarDecl::Specifier::Var;
+      auto specifierKind = (ownershipKind != ReferenceOwnership::Weak)
+                               ? VarDecl::Specifier::Let
+                               : VarDecl::Specifier::Var;
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        specifierKind,
                                        /*isCaptureList*/true,
                                        nameLoc, name, Type(), CurDeclContext);
 
       // Attributes.
-      if (ownershipKind != Ownership::Strong)
-        VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));
+      if (ownershipKind != ReferenceOwnership::Strong)
+        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(ownershipKind));
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
@@ -2627,9 +2628,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
         Identifier name = Tok.is(tok::identifier) ?
             Context.getIdentifier(Tok.getText()) : Identifier();
-        auto var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                           SourceLoc(), Identifier(),
-                                           Tok.getLoc(), name, Type(), nullptr);
+        auto var = new (Context)
+            ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                      Identifier(), Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
 
@@ -2928,9 +2929,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),SourceLoc(),
-                                        Identifier(), varLoc, ident, Type(),
-                                        closure);
+    auto *var = new (Context)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), varLoc, ident, Type(), closure);
     var->setImplicit();
     decls.push_back(var);
   }
@@ -3188,7 +3189,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
 
     // Try and construct a FixIt for the argument label.
-    if (argLabelLocs.size() > 0 && !argLabels[0].empty()) {
+    if (!argLabelLocs.empty() && !argLabels[0].empty()) {
       auto ArgLoc = argLabelLocs[0];
       auto FirstElementName = argLabels[0];
             

@@ -329,9 +329,48 @@ public:
       delete Dominance;
   }
 
+  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // stages. However, the optimizer currently breaks the invariant in three
+  // places:
+  // 1. Normal Simplify CFG during conditional branch simplification
+  //    (sneaky jump threading).
+  // 2. Simplify CFG via Jump Threading.
+  // 3. Loop Rotation.
+  //
+  //
+  bool prohibitAddressBlockArgs() {
+    // If this function was deserialized from canonical SIL, this invariant may
+    // already have been violated regardless of this module's SIL stage or
+    // exclusivity enforcement level. Presumably, access markers were already
+    // removed prior to serialization.
+    if (F.wasDeserializedCanonical())
+      return false;
+
+    SILModule &M = F.getModule();
+    return M.getStage() == SILStage::Raw;
+  }
+
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
+
+    if (isa<SILPHIArgument>(arg) && prohibitAddressBlockArgs()) {
+      // As a structural SIL property, we disallow address-type block
+      // arguments. Supporting them would prevent reliably reasoning about the
+      // underlying storage of memory access. This reasoning is important for
+      // diagnosing violations of memory access rules and supporting future
+      // optimizations such as bitfield packing. Address-type block arguments
+      // also create unnecessary complexity for SIL optimization passes that
+      // need to reason about memory aliasing.
+      //
+      // Note: We could allow non-phi block arguments to be addresses, because
+      // the address source would still be uniquely recoverable. But then
+      // we would need to separately ensure that something like begin_access is
+      // never passed as a block argument before being used by end_access. For
+      // now, it simpler to have a strict prohibition.
+      require(!arg->getType().isAddress(),
+              "Block arguments cannot be addresses");
+    }
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -3443,7 +3482,7 @@ public:
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
         } else {
-          require(dest->getArguments().size() == 0 ||
+          require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 0 or 1 "
                   "arguments");
@@ -3463,7 +3502,7 @@ public:
         }
 
       } else {
-        require(dest->getArguments().size() == 0,
+        require(dest->getArguments().empty(),
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
@@ -3521,7 +3560,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The destination BB must not have BB arguments.
-      require(dest->getArguments().size() == 0,
+      require(dest->getArguments().empty(),
               "switch_enum_addr destination must take no BB args");
     }
 
@@ -3810,7 +3849,13 @@ public:
         case KeyPathPatternComponent::Kind::SettableProperty: {
           bool hasIndices = !component.getSubscriptIndices().empty();
         
-          // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
+          ParameterConvention normalArgConvention;
+          if (F.getModule().getOptions().EnableGuaranteedNormalArguments)
+            normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
+          else
+            normalArgConvention = ParameterConvention::Indirect_In;
+        
+          // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
           {
             auto getter = component.getComputedPropertyGetter();
             auto substGetterType = getter->getLoweredFunctionType()
@@ -3822,9 +3867,8 @@ public:
             require(substGetterType->getNumParameters() == 1 + hasIndices,
                     "getter should have one parameter");
             auto baseParam = substGetterType->getParameters()[0];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "getter base parameter should be @in");
+            require(baseParam.getConvention() == normalArgConvention,
+                    "getter base parameter should have normal arg convention");
             require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
                     "getter base parameter should match base of component");
             
@@ -3850,7 +3894,7 @@ public:
           
           if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
             // Setter should be
-            // <Sig...> @convention(thin) (@in Result, @in Base) -> ()
+            // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
             
             auto setter = component.getComputedPropertySetter();
             auto substSetterType = setter->getLoweredFunctionType()
@@ -3864,16 +3908,17 @@ public:
                     "setter should have two parameters");
 
             auto newValueParam = substSetterType->getParameters()[0];
-            require(newValueParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "setter value parameter should be @in");
+            // TODO: This should probably be unconditionally +1 when we
+            // can represent that.
+            require(newValueParam.getConvention() == normalArgConvention,
+                    "setter value parameter should havee normal arg convention");
 
             auto baseParam = substSetterType->getParameters()[1];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In
+            require(baseParam.getConvention() == normalArgConvention
                     || baseParam.getConvention() ==
                         ParameterConvention::Indirect_Inout,
-                    "setter base parameter should be @in or @inout");
+                    "setter base parameter should be normal arg convention "
+                    "or @inout");
             
             if (hasIndices) {
               auto indicesParam = substSetterType->getParameters()[2];
@@ -4041,6 +4086,16 @@ public:
     }
     require(CanType(baseTy) == CanType(leafTy),
             "final component should match leaf value type of key path type");
+  }
+
+  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnType && fnType->getExtInfo().hasContext() &&
+                !fnType->isNoEscape() &&
+                fnType->getExtInfo().getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+            "is_escaping_closure must have a thick "
+            "function operand");
   }
 
   // This verifies that the entry block of a SIL function doesn't have
@@ -4665,7 +4720,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
     return;
 #endif
   if (isDeclaration())
-    assert(getEntries().size() == 0 &&
+    assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
   auto *protocol = getConformance()->getProtocol();

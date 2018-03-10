@@ -150,7 +150,7 @@ SILBasicBlock *GeneralizedUser::getParent() const {
 
 namespace llvm {
 
-template <> class PointerLikeTypeTraits<GeneralizedUser> {
+template <> struct PointerLikeTypeTraits<GeneralizedUser> {
 
 public:
   static void *getAsVoidPointer(GeneralizedUser v) {
@@ -450,6 +450,7 @@ NO_OPERAND_INST(Unwind)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
   }
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)

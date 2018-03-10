@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %utils/chex.py < %s > %t/cf.sil
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil
 
@@ -28,7 +28,7 @@
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
 // -- is imported C typedef, is class, is nonunique
-// CHECK-64-SAME: <i32 0x1000_0010>
+// CHECK-64-SAME: <i32 0x0006_0010>
 // CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{

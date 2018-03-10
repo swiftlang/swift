@@ -884,8 +884,8 @@ def overflowOperationComment(operator):
 # operator:
 #     +   unsafeAdding(_:)
 #     -   unsafeSubtracting(_:)
-#     *   unsafeMultiplying(_:)
-#     /   unsafeDividing(by:)
+#     *   unsafeMultiplied(by:)
+#     /   unsafeDivided(by:)
 def unsafeOperationComment(operator):
     comments = {
         '+': """\
@@ -3610,21 +3610,28 @@ extension ${Self} : Hashable {
   public var hashValue: Int {
     @inline(__always)
     get {
-% if bits <= word_bits and signed:
-      // Sign extend the value.
-      return Int(self)
-% elif bits <= word_bits and not signed:
-      // Sign extend the value.
-      return Int(${OtherSelf}(bitPattern: self))
-% elif bits == word_bits * 2:
-      // We have twice as many bits as we need to return.
-      return
-        Int(truncatingIfNeeded: self) ^
-        Int(truncatingIfNeeded: self &>> 32)
-% else:
-      _Unimplemented()
-% end
+      return _hashValue(for: self)
     }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
+    // `AnyHashable`-boxed integers, all integer values are currently required
+    // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
+    // this, we should introduce a custom AnyHashable box for integer values
+    // that sign-extends values to 64 bits.
+    % if bits <= word_bits:
+    hasher.append(bits: _lowWord)
+    % elif bits == 2 * word_bits:
+    if let word = ${"" if signed else "U"}Int(exactly: self) {
+      hasher.append(bits: word._lowWord)
+    } else {
+      hasher.append(bits: UInt64(_value))
+    }
+    % else:
+    fatalError("Unsupported integer width")
+    % end
   }
 }
 

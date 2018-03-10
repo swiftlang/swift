@@ -1513,7 +1513,7 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
-% for Kind in ['Array', 'ContiguousArray']:
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
 ArrayTestSuite.test("${Kind}/popLast") {
   // Empty
   do {

@@ -1,17 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown
 
-enum Foo {
+enum Foo: CaseIterable {
   case A, B
 }
 
 if Foo.A == .B { }
 var aHash: Int = Foo.A.hashValue
+_ = Foo.allCases
 
 Foo.A == Foo.B // expected-warning {{result of operator '==' is unused}}
 
-enum Generic<T> {
+enum Generic<T>: CaseIterable {
   case A, B
 
   static func method() -> Int {
@@ -23,6 +24,7 @@ enum Generic<T> {
 
 if Generic<Foo>.A == .B { }
 var gaHash: Int = Generic<Foo>.A.hashValue
+_ = Generic<Foo>.allCases
 
 func localEnum() -> Bool {
   enum Local {
@@ -80,8 +82,7 @@ func overloadFromOtherFile() -> YetAnotherFromOtherFile { return .A }
 func overloadFromOtherFile() -> Bool { return false }
 if .A == overloadFromOtherFile() {}
 
-
-// Complex enums are not implicitly Equatable or Hashable.
+// Complex enums are not automatically Equatable, Hashable, or CaseIterable.
 enum Complex {
   case A(Int)
   case B
@@ -181,12 +182,15 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 3 {{non-
 // No explicit conformance; it could be derived, but we don't support extensions
 // yet.
 extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
+extension Complex : CaseIterable {}  // expected-error {{type 'Complex' does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension}} expected-error {{does not conform to protocol 'CaseIterable'}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
   case A(NotHashable)
 }
 extension NotExplicitlyHashableAndCannotDerive : Hashable {} // expected-error 2 {{does not conform}}
+extension NotExplicitlyHashableAndCannotDerive : CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
@@ -198,6 +202,7 @@ extension OtherFileNonconforming: Hashable {
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
 // are conformant.

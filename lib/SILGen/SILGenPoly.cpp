@@ -82,6 +82,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
@@ -785,40 +786,6 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   return SGF.emitManagedRValueWithCleanup(outputTuple, outputTL);
 }
 
-static ManagedValue manageParam(SILGenFunction &SGF,
-                                SILLocation loc,
-                                SILValue paramValue,
-                                SILParameterInfo info) {
-  switch (info.getConvention()) {
-  case ParameterConvention::Indirect_In_Guaranteed:
-    if (SGF.silConv.useLoweredAddresses())
-      return ManagedValue::forUnmanaged(paramValue);
-    LLVM_FALLTHROUGH;
-  case ParameterConvention::Direct_Guaranteed:
-    return SGF.emitManagedBeginBorrow(loc, paramValue);
-  // Unowned parameters are only guaranteed at the instant of the call, so we
-  // must retain them even if we're in a context that can accept a +0 value.
-  case ParameterConvention::Direct_Unowned:
-    paramValue = SGF.getTypeLowering(paramValue->getType())
-        .emitCopyValue(SGF.B, loc, paramValue);
-    LLVM_FALLTHROUGH;
-  case ParameterConvention::Direct_Owned:
-    return SGF.emitManagedRValueWithCleanup(paramValue);
-
-  case ParameterConvention::Indirect_In:
-    if (SGF.silConv.useLoweredAddresses())
-      return SGF.emitManagedBufferWithCleanup(paramValue);
-    return SGF.emitManagedRValueWithCleanup(paramValue);
-
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-    return ManagedValue::forLValue(paramValue);
-  case ParameterConvention::Indirect_In_Constant:
-    break;
-  }
-  llvm_unreachable("bad parameter convention");
-}
-
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
     SmallVectorImpl<SILArgument *> *indirectResults) {
@@ -834,9 +801,7 @@ void SILGenFunction::collectThunkParams(
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(F.getConventions().getSILType(param));
-    auto paramValue = F.begin()->createFunctionArgument(paramTy);
-    auto paramMV = manageParam(*this, loc, paramValue, param);
-    params.push_back(paramMV);
+    params.push_back(B.createInputFunctionArgument(paramTy, loc));
   }
 }
 
@@ -3111,7 +3076,8 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
   SGF.B.createReturn(loc, result);
 }
 
-ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
+ManagedValue
+SILGenFunction::createWithoutActuallyEscapingClosure(
     SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
 
   auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
@@ -3153,7 +3119,6 @@ ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnType), subs,
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
-
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we rerpresent these captures by the same value the following works.
   thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);

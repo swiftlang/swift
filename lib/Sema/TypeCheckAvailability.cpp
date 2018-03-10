@@ -433,7 +433,7 @@ private:
       // If this query expression has no queries, we will not introduce a new
       // refinement context. We do not diagnose here: a diagnostic will already
       // have been emitted by the parser.
-      if (Query->getQueries().size() == 0)
+      if (Query->getQueries().empty())
         continue;
 
       AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);
@@ -928,7 +928,7 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // PatternBindingDecl are added to all of the VarDecls for the pattern
     // binding.
     ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
-    if (Entries.size() > 0) {
+    if (!Entries.empty()) {
       VarDecl *VD = Entries.front().getPattern()->getSingleVar();
       if (VD)
         return VD;
@@ -937,7 +937,7 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // Similar to the PatternBindingDecl case above, we return the
     // first EnumElementDecl.
     ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
-    if (Elems.size() > 0) {
+    if (!Elems.empty()) {
       return Elems.front();
     }
   }

@@ -158,7 +158,7 @@ foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}")
+    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
 
     # A directory where to put the xUnit-style XML test results.
@@ -236,8 +236,8 @@ foreach(SDK ${SWIFT_SDKS})
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.
-              "${SWIFT_ANDROID_ICU_UC}"
-              "${SWIFT_ANDROID_ICU_I18N}")
+              "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
+              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}")
     endif()
     add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
         ${command_upload_stdlib}

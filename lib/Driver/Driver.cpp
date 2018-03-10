@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (Args.size() > 0) {
+  if (!Args.empty()) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
@@ -191,6 +191,9 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (name.find('=') != StringRef::npos)
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
+                     name);
+    else if (name.startswith("-D"))
+      diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
     else if (!Lexer::isIdentifier(name))
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
@@ -515,9 +518,9 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution);
+    ArgList->hasArg(options::OPT_driver_skip_execution,
+                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -679,9 +682,12 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   OutputLevel Level = OutputLevel::Normal;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_v,
-                                         options::OPT_parseable_output)) {
-    if (A->getOption().matches(options::OPT_v))
+  if (const Arg *A =
+          ArgList->getLastArg(options::OPT_driver_print_jobs, options::OPT_v,
+                              options::OPT_parseable_output)) {
+    if (A->getOption().matches(options::OPT_driver_print_jobs))
+      Level = OutputLevel::PrintJobs;
+    else if (A->getOption().matches(options::OPT_v))
       Level = OutputLevel::Verbose;
     else if (A->getOption().matches(options::OPT_parseable_output))
       Level = OutputLevel::Parseable;
@@ -753,11 +759,6 @@ Driver::buildCompilation(const ToolChain &TC,
 
   if (DriverPrintBindings)
     return nullptr;
-
-  if (DriverPrintJobs) {
-    printJobs(*C);
-    return nullptr;
-  }
 
   return C;
 }
@@ -1356,8 +1357,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
     OI.SelectedSanitizers = parseSanitizerArgValues(
         Args, A, TC.getTriple(), Diags,
-        [&](StringRef sanitizerName) {
-          return TC.sanitizerRuntimeLibExists(Args, sanitizerName);
+        [&](StringRef sanitizerName, bool shared) {
+          return TC.sanitizerRuntimeLibExists(Args, sanitizerName, shared);
         });
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
@@ -1966,7 +1967,16 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
   } else if (!outputPath.empty()) {
     output.setAdditionalOutputForType(outputType, outputPath);
   } else {
-    // Put the auxiliary output file next to the primary output file.
+    // Put the auxiliary output file next to "the" primary output file.
+    //
+    // FIXME: when we're in WMO and have multiple primary outputs, we derive the
+    // additional filename here from the _first_ primary output name, which
+    // means that in the derived OFM (in Job.cpp) the additional output will
+    // have a possibly-surprising name. But that's only half the problem: it
+    // also get associated with the first primary _input_, even when there are
+    // multiple primary inputs; really it should be associated with the build as
+    // a whole -- derived OFM input "" -- but that's a more general thing to
+    // fix.
     llvm::SmallString<128> path;
     if (output.getPrimaryOutputType() != types::TY_Nothing)
       path = output.getPrimaryOutputFilenames()[0];
@@ -1976,6 +1986,7 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
       formFilenameFromBaseAndExt(OI.ModuleName, /*newExt=*/"", workingDirectory,
                                  path);
     }
+    assert(!path.empty());
 
     bool isTempFile = C.isTemporaryFile(path);
     llvm::sys::path::replace_extension(path,
@@ -2290,7 +2301,7 @@ void Driver::computeMainOutput(
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, workingDirectory,
                                      TC.getTriple(), C.getArgs(), AtTopLevel,
                                      Base, Primary, Diags, Buf);
-      Output->addPrimaryOutput(CommandInputPair{Base, Primary},
+      Output->addPrimaryOutput(CommandInputPair(Base, Primary),
                                OutputFile);
     };
     // Add an output file for each input action.
@@ -2312,9 +2323,8 @@ void Driver::computeMainOutput(
     OutputFile = getOutputFilename(C, JA, OI, OutputMap, workingDirectory,
                                    TC.getTriple(), C.getArgs(), AtTopLevel,
                                    BaseInput, PrimaryInput, Diags, Buf);
-    Output->addPrimaryOutput(
-        CommandInputPair{BaseInput, PrimaryInput},
-        OutputFile);
+    Output->addPrimaryOutput(CommandInputPair(BaseInput, PrimaryInput),
+                             OutputFile);
   }
 }
 
@@ -2369,10 +2379,11 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
       Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
     }
-  } else {
+  } else if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     // We're only generating the module as an intermediate, so put it next
     // to the primary output of the compile command.
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+    assert(!Path.empty());
     bool isTempFile = C.isTemporaryFile(Path);
     llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
     Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
@@ -2399,7 +2410,7 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
     // Prefer a path from the OutputMap.
     Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
                                        OFMModuleDocOutputPath);
-  } else {
+  } else if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     // Otherwise, put it next to the swiftmodule file.
     llvm::SmallString<128> Path(
         Output->getAnyOutputForType(types::TY_SwiftModuleFile));
@@ -2610,11 +2621,6 @@ void Driver::printActions(const Compilation &C) const {
   for (const Action *A : C.getActions()) {
     ::printActions(A, Ids);
   }
-}
-
-void Driver::printJobs(const Compilation &C) const {
-  for (const Job *J : C.getJobs())
-    J->printCommandLineAndEnvironment(llvm::outs());
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {

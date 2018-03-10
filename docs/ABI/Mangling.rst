@@ -53,6 +53,7 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
+  global ::= nominal-type 'Mr'           // generic type completion function
   global ::= nominal-type 'Mi'           // generic type instantiation function
   global ::= nominal-type 'MI'           // generic type instantiation cache
   global ::= nominal-type 'Mm'           // class metaclass
@@ -395,7 +396,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'z'? 'h'? 'd'?   // type with optional label, inout convention, shared convention, and variadic specifier
+  list-type ::= type identifier? 'z'? 'h'? 'n'? 'd'?   // type with optional label, inout convention, shared convention, owned convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

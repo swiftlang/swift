@@ -537,7 +537,7 @@ FindClosureResult swift::findClosureForAppliedArg(SILValue V) {
   if (auto *bbi = dyn_cast<BeginBorrowInst>(V))
     V = bbi->getOperand();
 
-  if (auto optionalObjTy = V->getType().getOptionalObjectType())
+  if (V->getType().getOptionalObjectType())
     V = cast<EnumInst>(V)->getOperand();
 
   auto fnType = V->getType().getAs<SILFunctionType>();
@@ -753,6 +753,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::OpenExistentialBoxInst:

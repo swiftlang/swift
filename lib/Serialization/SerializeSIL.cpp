@@ -339,7 +339,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
 }
 
 void SILSerializer::processSILFunctionWorklist() {
-  while (Worklist.size() > 0) {
+  while (!Worklist.empty()) {
     const SILFunction *F = Worklist.back();
     Worklist.pop_back();
     assert(F != nullptr);
@@ -1230,6 +1230,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:

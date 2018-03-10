@@ -1580,8 +1580,9 @@ class ParameterTypeFlags {
     Escaping    = 1 << 2,
     InOut       = 1 << 3,
     Shared      = 1 << 4,
+    Owned       = 1 << 5,
 
-    NumBits = 5
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1594,17 +1595,17 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
-      : value((variadic ? Variadic : 0) |
-              (autoclosure ? AutoClosure : 0) |
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
+                     ValueOwnership ownership)
+      : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
-              (inOut ? InOut : 0) |
-              (shared ? Shared : 0)) {}
+              (ownership == ValueOwnership::InOut ? InOut : 0) |
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
 
   /// Create one from what's present in the parameter type
-  inline static ParameterTypeFlags fromParameterType(Type paramTy,
-                                                     bool isVariadic,
-                                                     bool isShared);
+  inline static ParameterTypeFlags
+  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1612,6 +1613,18 @@ public:
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
+
+    return ValueOwnership::Default;
+  }
 
   ParameterTypeFlags withVariadic(bool variadic) const {
     return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
@@ -1631,6 +1644,11 @@ public:
   ParameterTypeFlags withShared(bool isShared) const {
     return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
                                        : value - ParameterTypeFlags::Shared);
+  }
+
+  ParameterTypeFlags withOwned(bool isOwned) const {
+    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
+                                      : value - ParameterTypeFlags::Owned);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2522,6 +2540,9 @@ public:
     
     /// Whether the parameter is marked 'shared'
     bool isShared() const { return Flags.isShared(); }
+
+    /// Whether the parameter is marked 'owned'
+    bool isOwned() const { return Flags.isOwned(); }
   };
 
   class CanParam : public Param {
@@ -4752,15 +4773,18 @@ protected:
 private:
   Type Referent;
 public:
-  static ReferenceStorageType *get(Type referent, Ownership ownership,
+  static ReferenceStorageType *get(Type referent, ReferenceOwnership ownership,
                                    const ASTContext &C);
 
   Type getReferentType() const { return Referent; }
-  Ownership getOwnership() const {
+  ReferenceOwnership getOwnership() const {
     switch (getKind()) {
-    case TypeKind::WeakStorage: return Ownership::Weak;
-    case TypeKind::UnownedStorage: return Ownership::Unowned;
-    case TypeKind::UnmanagedStorage: return Ownership::Unmanaged;
+    case TypeKind::WeakStorage:
+      return ReferenceOwnership::Weak;
+    case TypeKind::UnownedStorage:
+      return ReferenceOwnership::Unowned;
+    case TypeKind::UnmanagedStorage:
+      return ReferenceOwnership::Unmanaged;
     default: llvm_unreachable("Unhandled reference storage type");
     }
   }
@@ -4772,10 +4796,10 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
-  static CanReferenceStorageType get(CanType referent, Ownership ownership) {
-    return CanReferenceStorageType(ReferenceStorageType::get(referent,
-                                                   ownership,
-                                                   referent->getASTContext()));
+static CanReferenceStorageType get(CanType referent,
+                                   ReferenceOwnership ownership) {
+  return CanReferenceStorageType(ReferenceStorageType::get(
+      referent, ownership, referent->getASTContext()));
   }
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
@@ -4789,8 +4813,8 @@ class UnownedStorageType : public ReferenceStorageType {
 
 public:
   static UnownedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnownedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unowned, C));
+    return static_cast<UnownedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unowned, C));
   }
 
   /// Is this unowned storage type known to be loadable within the given
@@ -4820,8 +4844,8 @@ class UnmanagedStorageType : public ReferenceStorageType {
 
 public:
   static UnmanagedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnmanagedStorageType*>(
-                 ReferenceStorageType::get(referent, Ownership::Unmanaged, C));
+    return static_cast<UnmanagedStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Unmanaged, C));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4845,8 +4869,8 @@ class WeakStorageType : public ReferenceStorageType {
 
 public:
   static WeakStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<WeakStorageType*>(
-                    ReferenceStorageType::get(referent, Ownership::Weak, C));
+    return static_cast<WeakStorageType *>(
+        ReferenceStorageType::get(referent, ReferenceOwnership::Weak, C));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5165,7 +5189,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShared) {
+ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      ValueOwnership ownership) {
   bool autoclosure = paramTy->is<AnyFunctionType>() &&
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
@@ -5174,8 +5199,12 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
   // ParameterTypeFlags::fromParameterType entirely.
-  bool inOut = paramTy->is<InOutType>();
-  return {isVariadic, autoclosure, escaping, inOut, isShared};
+  if (paramTy->is<InOutType>()) {
+    assert(ownership == ValueOwnership::Default ||
+           ownership == ValueOwnership::InOut);
+    ownership = ValueOwnership::InOut;
+  }
+  return {isVariadic, autoclosure, escaping, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

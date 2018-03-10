@@ -189,8 +189,8 @@ public:
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
-  void visitOwnershipAttr(OwnershipAttr *attr) {
-    TC.checkOwnershipAttr(cast<VarDecl>(D), attr);
+  void visitReferenceOwnershipAttr(ReferenceOwnershipAttr *attr) {
+    TC.checkReferenceOwnershipAttr(cast<VarDecl>(D), attr);
   }
 
   void visitFinalAttr(FinalAttr *attr) {
@@ -693,7 +693,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isLet())
+    else if (cast<VarDecl>(storage)->isImmutable())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;
@@ -821,8 +821,8 @@ public:
     IGNORED_ATTR(ObjCRuntimeName)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Override)
-    IGNORED_ATTR(Ownership)
     IGNORED_ATTR(RawDocComment)
+    IGNORED_ATTR(ReferenceOwnership)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(RestatedObjCConformance)
     IGNORED_ATTR(Semantics)
@@ -2106,11 +2106,12 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
   if (!var->hasType())
     return;
 
-  if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>())
-    checkOwnershipAttr(var, attr);
+  if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+    checkReferenceOwnershipAttr(var, attr);
 }
 
-void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
+void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
+                                              ReferenceOwnershipAttr *attr) {
   // Don't check ownership attribute if the declaration is already marked invalid.
   if (var->isInvalid())
     return;
@@ -2127,12 +2128,12 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   // A weak variable must have type R? or R! for some ownership-capable type R.
   Type underlyingType = type;
   switch (ownershipKind) {
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
-  case Ownership::Unowned:
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
     break;
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
       attr->setInvalid();

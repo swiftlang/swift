@@ -42,9 +42,8 @@ class InProcessMemoryReader final : public MemoryReader {
     return true;
   }
 
-  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
-    std::memcpy(dest, address.getLocalPointer<void>(), (size_t) size);
-    return true;
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
+    return ReadBytesResult(address.getLocalPointer<void>(), [](const void *) {});
   }
 };
  

@@ -20,21 +20,21 @@ import Builtin
 
 // Check that all functions are defined/declared appropriately.
 // NEG-CHECK-NOT: sil [serialized] @public_external_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @public_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil hidden [serialized] @hidden_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_shared_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_hidden_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_private_function : $@convention(thin) () -> ()
-// CHECK-DAG: sil [serialized] @references_public_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_shared_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_hidden_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @references_private_global : $@convention(thin) () -> ()
-// CHECK-DAG: sil hidden_external [serialized] @hidden_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil [serialized] @public_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] @public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil hidden [serialized] @hidden_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil shared_external [serialized] @shared_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden [serialized] [canonical] @hidden_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_shared_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_private_function : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] @references_public_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_shared_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_private_global : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden_external [serialized] [canonical] @hidden_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] @public_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil hidden [serialized] [canonical] @hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil shared_external [serialized] [canonical] @shared_external_function_test : $@convention(thin) () -> ()
 
 sil_global private [serialized] @private_global : $Builtin.Word
 sil_global [serialized] @public_global : $Builtin.Word
