@@ -34,6 +34,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+// The functions in SwiftRT-ELF.cpp are only called via the ELF .init constructor
+// and none of the functions are linked directly, so include the code inline as the
+// linker wont link to it in a static executable.
+#include "SwiftRT-ELF.cpp"
+
 using namespace std;
 using namespace llvm;
 
@@ -60,6 +65,19 @@ typedef Elf32_Section Elf_Section;
 #endif
 
 extern const Elf_Ehdr elfHeader asm("__ehdr_start");
+
+// Create strong linkage to pthread_self, pthread_once and pthread_key_create
+// as they are normally weak-linked and used to detect the presence of pthreads.
+// Without this the calls just jump to 0x0.
+__attribute__((__visibility__("hidden")))
+ pthread_t (*__strong_pthread_self)(void) = pthread_self;
+
+__attribute__((__visibility__("hidden")))
+int (*__strong_pthread_once)(pthread_once_t *, void (*)(void)) = pthread_once;
+
+__attribute__((__visibility__("hidden")))
+int (*__strong_pthread_key_create)(pthread_key_t *, void (*)(void *)) = pthread_key_create;
+
 
 class StaticBinaryELF {
 
@@ -202,26 +220,30 @@ private:
       StringRef deleted = StringRef("(deleted)");
 
       while (getdelim(&line, &size, '\n', fp) != -1) {
-        StringRef entry = StringRef(line).rsplit('\n').first;
-        auto addrRange = entry.split(' ').first.split('-');
-        unsigned long long low = strtoull(addrRange.first.str().c_str(),
+        StringRef entry = StringRef(line).drop_back();
+
+        auto indexOfDash = entry.find('-');
+        auto indexOfSpace = entry.find(' ');
+        auto addrLow = entry.substr(0, indexOfDash);
+        auto addrHigh = entry.substr(indexOfDash + 1, indexOfSpace);
+        unsigned long long low = strtoull(addrLow.str().c_str(),
                                           nullptr, 16);
         if (low == 0 || low > UINTPTR_MAX || address < (uintptr_t)low) {
           continue;
         }
 
-        unsigned long long high = strtoull(addrRange.second.str().c_str(),
+        unsigned long long high = strtoull(addrHigh.str().c_str(),
                                            nullptr, 16);
         if (high == 0 || high > UINTPTR_MAX || address > (uintptr_t)high) {
           continue;
         }
 
-        auto fname = entry.split('/').second;
+        auto fname = entry.substr(entry.find('/'));
         if (fname.empty() || fname.endswith(deleted)) {
           continue;
         }
 
-        fullPathName = "/" + fname.str();
+        fullPathName = fname.str();
         break;
       }
       if (line) {

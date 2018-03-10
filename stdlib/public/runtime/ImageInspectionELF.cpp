@@ -22,7 +22,10 @@
 
 #include "ImageInspection.h"
 #include "ImageInspectionELF.h"
+
+#ifndef ELF_STATIC_LIB
 #include <dlfcn.h>
+#endif
 
 using namespace swift;
 
@@ -56,6 +59,7 @@ void swift::initializeProtocolLookup() {
     sections = sections->next;
   }
 }
+
 void swift::initializeProtocolConformanceLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
@@ -89,10 +93,10 @@ void swift::initializeTypeMetadataRecordLookup() {
 void swift::initializeDynamicReplacementLookup() {
 }
 
-// As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
-// addNewDSOImage() with an address in the image that can later be used via
-// dladdr() to dlopen() the image after the appropriate initialize*Lookup()
-// function has been called.
+// As ELF images are loaded, SwiftRT-ELF:swift_image_constructor() will call
+// addNewDSOImage() with a pointer to the MetadataSections in the image. This
+// functionality is not required for static executables which are linked with
+// swiftImageInspectionStatic.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =
@@ -131,6 +135,10 @@ void swift_addNewDSOImage(const void *addr) {
   }
 }
 
+#ifndef ELF_STATIC_LIB
+
+// For shared executables only, static executables use the version defined in
+// StaticBinaryELF.cpp
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
@@ -143,6 +151,8 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }
+
+#endif
 
 // This is only used for backward deployment hooks, which we currently only support for
 // MachO. Add a stub here to make sure it still compiles.

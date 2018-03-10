@@ -149,6 +149,17 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 #endif
   }
 
+  bool staticExecutable = false;
+  bool staticStdlib = false;
+
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                           options::OPT_no_static_executable, false)) {
+    staticExecutable = true;
+  } else if (context.Args.hasFlag(options::OPT_static_stdlib,
+                                  options::OPT_no_static_stdlib, false)) {
+    staticStdlib = true;
+  }
+
   // Configure the toolchain.
   // By default, use the system clang++ to link.
   const char *Clang = "clang++";
@@ -167,7 +178,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   if (getTriple().getOS() == llvm::Triple::Linux &&
-      job.getKind() == LinkKind::Executable) {
+      job.getKind() == LinkKind::Executable && !staticExecutable) {
     Arguments.push_back("-pie");
   }
 
@@ -175,17 +186,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (!Target.empty()) {
     Arguments.push_back("-target");
     Arguments.push_back(context.Args.MakeArgString(Target));
-  }
-
-  bool staticExecutable = false;
-  bool staticStdlib = false;
-
-  if (context.Args.hasFlag(options::OPT_static_executable,
-                           options::OPT_no_static_executable, false)) {
-    staticExecutable = true;
-  } else if (context.Args.hasFlag(options::OPT_static_stdlib,
-                                  options::OPT_no_static_stdlib, false)) {
-    staticStdlib = true;
   }
 
   SmallString<128> SharedRuntimeLibPath;
@@ -205,11 +205,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  if (!staticExecutable) {
+    SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
