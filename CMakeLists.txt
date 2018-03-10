@@ -822,20 +822,23 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
 endif()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
-message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
+message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  +0 Normal Args: ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
 message(STATUS "")
 
 if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  +0 Normal Args:   ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "  +0 Normal Args:                     ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
 else()
