@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// FIXME: <https://bugs.swift.org/browse/SR-7146> 2 tests are failing on linux in optimized mode
-// UNSUPPORTED: OS=linux-gnu
-
 //
 // Tests for error handling in standard library APIs.
 //
