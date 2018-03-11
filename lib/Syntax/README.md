@@ -11,7 +11,7 @@ representation of source, and facilities for *structured editing*.
 What is structured editing? It's an editing strategy that is keenly aware of the
 *structure* of source code, not necessarily its *representation* (i.e.
 characters or bytes). This can be achieved at different granularities: replacing
-an identifier, changing a call to global function to a method call, or indenting
+an identifier, changing a global function call to a method call, or indenting
 and formatting an entire source file based on declarative rules. These kinds of
 diverse operations are critical to the Swift Migrator, which is the immediate
 client for this library, now developed in the open. Along with that, the library
@@ -163,8 +163,8 @@ struct YourStruct {}
 At any point in the building process, you can call `build()` and get a
 reasonably formed Syntax node (i.e. with no raw `nullptr`s) using what you've
 provided to the builder so far. Anything that you haven't supplied is marked as
-*missing*. This is essentially what the parser does so, looking forward to
-future adoption, the builders are designed with the parser in mind, with the
+*missing*. This is essentially what the parser does, so looking forward to
+future adoption the builders are designed with the parser in mind, with the
 hope that we can better specify recovery behavior and incremental (re-)parsing.
 
 **Example**
@@ -175,7 +175,7 @@ StructDeclSyntaxBuilder Builder;
 // We previously parsed a struct keyword, let's tell the builder to use it.
 Builder.useStructKeyword(StructKeyword);
 
-// Hm, we didn't see an identifier, but saw a left brace. Let's keep going.
+// Hmm, we didn't see an identifier, but saw a left brace. Let's keep going.
 Builder.useLeftBrace(ParsedLeftBrace)
 
 // No members of the struct; we saw a right brace.
@@ -387,7 +387,8 @@ Beyond this, `SyntaxData` nodes have *no significant public API*.
 
 - `SyntaxData` are immutable.
    However, they may mutate themselves in order to implement lazy instantiation
-   of children and caching. That caching operation transparent and thread-safe.
+   of children and caching. That caching operation is transparent and
+   thread-safe.
 - `SyntaxData` have identity, i.e. they can be compared with "pointer equality".
 - `SyntaxData` are implementation detail have no public API.
 
@@ -428,7 +429,7 @@ auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
-auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+auto RightBrace = SyntaxFactory::makeRightBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
   .addStmt(Return);
