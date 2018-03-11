@@ -644,15 +644,6 @@ void Lexer::lexHash() {
      ++CurPtr;
      return formToken(tok::r_square_lit, TokStart);
   }
-  
-  // Allow a hashbang #! line at the beginning of the file.
-  if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
-    --CurPtr;
-    if (BufferID != SourceMgr.getHashbangBufferID())
-      diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-    skipHashbang(/*EatNewline=*/true);
-    return lexImpl();
-  }
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
