@@ -428,7 +428,7 @@ public struct ${Self}<Pointee>: _Pointer {
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
   @_inlineable
-  static public func allocate(capacity count: Int)
+  public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
     let rawPtr =
