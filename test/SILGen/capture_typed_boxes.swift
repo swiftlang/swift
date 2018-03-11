@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name capture_typed_boxes -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func foo(_ x: Int) -> () -> Int {
   var x = x
