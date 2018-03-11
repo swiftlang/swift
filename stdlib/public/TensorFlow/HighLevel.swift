@@ -183,10 +183,10 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   /// The strides of the sliding window for each dimension of a 4-D input.
   /// `strides.count` must equal 4 and `strides[0]` and `strides[3]` must equal
   /// 1.
-  public var strides: [Int32]
+  public let strides: [Int32]
 
   /// The padding algorithm for convolution.
-  public var padding: Padding
+  public let padding: Padding
 
   /// Creates a new instance with the specified filter, strides, and padding.
   // NOTE: Swift generates default memberwise initializers, but they have
@@ -267,12 +267,13 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   public func gradient(
     for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
+    let partial = applied(to: input)
     let (dInput, dFilter) = input._adjointConvolved2D(
       filter: filter,
       strides: strides,
       padding: padding,
-      partial: applied(to: input),
-      seed: adjoint
+      partial: partial,
+      seed: adjoint.broadcast(to: partial)
     )
     return (dInput, Parameters(filter: dFilter))
   }
@@ -378,9 +379,14 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   public func gradient(
     for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
-    let dInput = weight.transposed() * adjoint
-    let dWeight = input.transposed() * adjoint
-    let dBias = adjoint
+    // Broadcast adjoint to correct shape. AD should do this automatically when
+    // implemented.
+    // NOTE: proper AD would require an `unbroadcast` op for _adjointAdd. There
+    // is a manually workaround here.
+    let dot = input.dot(weight) + bias
+    let dBias = adjoint.broadcast(to: bias)
+    let dDot = adjoint.broadcast(to: dot)
+    let (dInput, dWeight) = input._adjointDot(weight, partial: dot, seed: dDot)
     return (dInput, Parameters(weight: dWeight, bias: dBias))
   }
 }
