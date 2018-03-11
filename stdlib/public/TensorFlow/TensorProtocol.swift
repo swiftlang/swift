@@ -57,3 +57,9 @@ public extension TensorProtocol where Scalar : Numeric {
     self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
   }
 }
+
+public protocol ParameterAggregate {
+  associatedtype Parameter : TensorProtocol
+  mutating func update(with gradient: Self,
+                       by updateParameter: (inout Parameter, Parameter) -> Void)
+}

@@ -203,13 +203,15 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
-  public struct Parameters : Differentiable {
+  public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
     public typealias DifferentiationCurrency = Scalar
+
+    public typealias Parameter = Tensor<Scalar>
 
     // Synthesized property. `filter` will be synthesized in `Parameters`
     // because it will be marked with `@parameter`.
@@ -235,6 +237,13 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       return Parameters(
         filter: lhs.filter + rhs.filter
       )
+    }
+
+    public mutating func update(
+      with gradient: Parameters,
+      by updateParameter: (inout Parameter, Parameter) -> Void
+    ) {
+      updateParameter(&filter, gradient.filter)
     }
   }
 
