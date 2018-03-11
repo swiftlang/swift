@@ -181,6 +181,18 @@ SILValue swift::stripClassCasts(SILValue V) {
   }
 }
 
+SILValue swift::stripAddressAccess(SILValue V) {
+  while (true) {
+    switch (V->getKind()) {
+    default:
+      return V;
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::BeginAccessInst:
+      return stripAddressAccess(cast<SingleValueInstruction>(V)->getOperand(0));
+    }
+  }
+}
+
 SILValue swift::stripAddressProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
