@@ -7,6 +7,8 @@ add_swift_library(swiftLLVMPasses STATIC
   LLVMMergeFunctions.cpp
 
   LLVM_COMPONENT_DEPENDS
-  analysis
+    core
+    support
+    analysis
   )
 

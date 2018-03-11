@@ -104,7 +104,10 @@ add_swift_library(swiftBasic STATIC
   LINK_LIBRARIES
     swiftDemangling
     ${UUID_LIBRARIES}
-  LLVM_COMPONENT_DEPENDS support)
+  LLVM_COMPONENT_DEPENDS
+    core
+    support
+  )
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

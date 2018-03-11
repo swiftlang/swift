@@ -3,6 +3,10 @@ add_swift_library(swiftMarkup STATIC
   LineList.cpp
   Markup.cpp
   
+  LLVM_COMPONENT_DEPENDS
+    support
+
   LINK_LIBRARIES
+    swiftBasic
     libcmark_static)
 

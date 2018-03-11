@@ -15,4 +15,8 @@ add_swift_library(swiftSyntax STATIC
   Syntax.cpp
   SyntaxArena.cpp
   SyntaxData.cpp
-  UnknownSyntax.cpp)
+  UnknownSyntax.cpp
+
+  LLVM_COMPONENT_DEPENDS
+    support
+  )
