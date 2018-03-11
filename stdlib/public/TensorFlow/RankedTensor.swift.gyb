@@ -48,7 +48,9 @@ infix operator ⊗ : MultiplicationPrecedence
 
 /// A ${rankName(rank)}-dimensional tensor.
 @_fixed_layout
-public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
+public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
+  public typealias BoolTensor = ${TensorXD}<Bool>
+
   /// The underlying Tensor of the ${TensorXD}.
   @_versioned
   internal var base: Tensor<Scalar>
@@ -174,6 +176,18 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> {
     #tfop("Assert", condition, [rankTensor, shapeTensor]) as Void
 #endif
     self.init(base: Tensor(shape: shape, repeating: repeatedValue))
+  }
+}
+
+extension ${TensorXD} : Equatable where Scalar : Equatable {
+  @_inlineable @inline(__always)
+  public static func == (lhs: ${TensorXD}, rhs: ${TensorXD}) -> Bool {
+    return lhs.elementsEqual(rhs).all()
+  }
+
+  @_inlineable @inline(__always)
+  public static func != (lhs: ${TensorXD}, rhs: ${TensorXD}) -> Bool {
+    return lhs.elementsNotEqual(rhs).any()
   }
 }
 
@@ -466,23 +480,25 @@ public extension ${TensorXD} {
 % if rank > 1:
 public extension ${TensorXD} where Scalar : Numeric {
   @_inlineable @inline(__always)
-  func min(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.min(alongAxes: axis))
-  }
-
-  @_inlineable @inline(__always)
-  func max(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.max(alongAxes: axis))
-  }
-
-  @_inlineable @inline(__always)
   func sum(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.sum(alongAxes: axis))
+    return ${ElementTensor}<Scalar>(base: base.sum(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
   func mean(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
-    return ${ElementTensor}<Scalar>(base: base.mean(alongAxes: axis))
+    return ${ElementTensor}<Scalar>(base: base.mean(squeezingAxes: axis))
+  }
+}
+
+public extension ${TensorXD} where Scalar : Numeric & Comparable {
+  @_inlineable @inline(__always)
+  func min(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+    return ${ElementTensor}<Scalar>(base: base.min(squeezingAxes: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func max(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+    return ${ElementTensor}<Scalar>(base: base.max(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
@@ -493,6 +509,18 @@ public extension ${TensorXD} where Scalar : Numeric {
   @_inlineable @inline(__always)
   func argmin(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
     return ${ElementTensor}<Int32>(base: base.argmin(alongAxis: axis))
+  }
+}
+
+public extension ${TensorXD} where Scalar == Bool {
+  @_inlineable @inline(__always)
+  func all(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+    return ${ElementTensor}<Scalar>(base: base.all(squeezingAxes: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func any(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+    return ${ElementTensor}<Scalar>(base: base.any(squeezingAxes: axis))
   }
 }
 % end
