@@ -36,6 +36,8 @@
 // TODO:
 // - Add gradients for more ops ('sum', 'mean', etc).
 // - Fix gradients for broadcasting ops (need to perform reduction).
+// - Implement unbroadcasting, which is necessary to calculate adjoints for many
+//   binary ops.
 // FIXME:
 // - Handle scalar broadcasting.
 //
