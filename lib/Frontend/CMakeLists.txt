@@ -13,7 +13,6 @@ add_swift_library(swiftFrontend STATIC
     SwiftOptions
   LINK_LIBRARIES
     swiftSIL
-    swiftMigrator
     swiftOption
     swiftParseSIL
     swiftSema
