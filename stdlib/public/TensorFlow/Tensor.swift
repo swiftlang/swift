@@ -28,7 +28,9 @@ import CTensorFlow
 //===----------------------------------------------------------------------===//
 
 @_fixed_layout
-public struct Tensor<Scalar : AccelerableByTensorFlow> {
+public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
+  public typealias BoolTensor = Tensor<Bool>
+
   /// A tensor just contains a TensorHandle under the covers.  This is public to
   /// allow user defined ops, but shouldn't normally be used otherwise.
   public let handle: TensorHandle<Scalar>
@@ -566,6 +568,22 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   public init(numericallyBroadcasting value: Scalar, to other: Tensor) {
     self.init(handle: #tfop("Fill", other.shapeTensor, value))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Equality
+//===----------------------------------------------------------------------===//
+
+extension Tensor : Equatable where Scalar : Equatable {
+  @_inlineable @inline(__always)
+  public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsEqual(rhs).all()
+  }
+
+  @_inlineable @inline(__always)
+  public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsNotEqual(rhs).any()
   }
 }
 

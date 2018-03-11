@@ -134,8 +134,8 @@ public func testEagerLoop() -> Int32 { // expected-note 5 {{value used here}}
   var a = Tensor<Int32>(6)
   // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
   var count = Tensor<Int32>(0)  // expected-warning 7 {{value implicitly copied to the host}}
-  while (a != 1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
-    if (a % 2 == 0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
+  while a.elementsEqual(1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
+    if (a % 2).elementsEqual(0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
       a = a / 2
     } else {
       a = 3 * a + 1
