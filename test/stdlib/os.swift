@@ -17,6 +17,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     os_log("test2: %@", "test")
   }
 
+  /* FIXME: currently disabled: rdar://problem/38354907
   osAPI.test("logData") {
     let data = "hello logging world".data(using: .utf8)!
 
@@ -26,6 +27,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
       os_log("%.*P", OpaquePointer(bytes))
     }
   }
+  */
   osAPI.test("newLog") {
     let newLog = OSLog(subsystem: "com.apple.Swift", category: "Test")
     os_log("test", log: newLog)
