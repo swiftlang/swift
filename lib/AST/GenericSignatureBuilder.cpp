@@ -7438,31 +7438,57 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
 
 #pragma mark Generic signature verification
 
-void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
-                                                     GenericSignature *sig) {
-  llvm::errs() << "Validating generic signature: ";
-  sig->print(llvm::errs());
-  llvm::errs() << "\n";
+void GenericSignatureBuilder::dropAndCompareEachRequirement(
+    ASTContext &context, GenericSignature *baseSig, GenericSignature *sig,
+    bool includeRedundantRequirements, SmallVectorImpl<Requirement> &redundant,
+    SmallVectorImpl<Requirement> &nonRedundant) {
+#ifndef NDEBUG
+  // `baseSig`'s params should be a subset of `sig`, meaning <A where ...>, <A,
+  // B where ...> (respectively) is okay, but the reverse is not.
+  if (baseSig) {
+    auto canSigParams = sig->getCanonicalSignature()->getGenericParams();
+    for (auto baseParam :
+         baseSig->getCanonicalSignature()->getGenericParams()) {
+      assert(llvm::is_contained(canSigParams, baseParam) &&
+             "baseSig params aren't a subset of sig");
+    }
+  }
+#endif
 
-  // Try removing each requirement in turn.
   auto genericParams = sig->getGenericParams();
   auto requirements = sig->getRequirements();
   for (unsigned victimIndex : indices(requirements)) {
-    PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
+    PrettyStackTraceGenericSignature debugStack("dropping & comparing", sig,
+                                                victimIndex);
 
     // Form a new generic signature builder.
     GenericSignatureBuilder builder(context);
 
-    // Add the generic parameters.
+    // Add the generic parameters, and specifically those from the main
+    // signature, since it may have more
     for (auto gp : genericParams)
       builder.addGenericParameter(gp);
 
-    // Add the requirements *except* the victim.
+    // Add the appropriate requirements
     auto source = FloatingRequirementSource::forAbstract();
-    for (unsigned i : indices(requirements)) {
-      if (i != victimIndex)
-        builder.addRequirement(requirements[i], source, nullptr);
+    // First, the universal requirements from the base
+    if (baseSig) {
+      for (auto req : baseSig->getRequirements())
+        builder.addRequirement(req, source, nullptr);
     }
+
+    // Next, the requirements from the interesting signature.  Sometimes we have
+    // to add all of the leading ones, and others times only those that we've
+    // already decided aren't redundant:
+    auto leadingReqs = includeRedundantRequirements
+                           ? requirements.slice(0, victimIndex)
+                           : nonRedundant;
+    // We definitely have to add all of the remaining trailing ones:
+    auto trailingReqs = requirements.slice(victimIndex + 1);
+
+    for (auto reqs : {leadingReqs, trailingReqs})
+      for (auto req : reqs)
+        builder.addRequirement(req, source, nullptr);
 
     // Finalize the generic signature. If there were any errors, we formed
     // an invalid signature, so just continue.
@@ -7475,20 +7501,37 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
                                       /*allowConcreteGenericParams=*/true,
                                       /*allowBuilderToMove=*/true);
 
-    // If the removed requirement is satisfied by the new generic signature,
-    // it is redundant. Complain.
-    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
-      SmallString<32> reqString;
-      {
-        llvm::raw_svector_ostream out(reqString);
-        requirements[victimIndex].print(out, PrintOptions());
-      }
-      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
-                             reqString, sig->getAsString());
-    }
+    auto req = requirements[victimIndex];
+    if (newSig->isRequirementSatisfied(req))
+      redundant.push_back(req);
+    else
+      nonRedundant.push_back(req);
 
     // Canonicalize the signature to check that it is canonical.
     (void)newSig->getCanonicalSignature();
+  }
+}
+
+void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
+                                                     GenericSignature *sig) {
+  llvm::errs() << "Validating generic signature: ";
+  sig->print(llvm::errs());
+  llvm::errs() << "\n";
+
+  SmallVector<Requirement, 4> redundant;
+  SmallVector<Requirement, 4> _nonRedundant;
+  dropAndCompareEachRequirement(context, /*baseSig=*/nullptr, sig,
+                                /*includeRedundantRequirements=*/true,
+                                redundant, _nonRedundant);
+  for (auto req : redundant) {
+    // Oops, the signature wasn't minimal: complain.
+    SmallString<32> reqString;
+    {
+      llvm::raw_svector_ostream out(reqString);
+      req.print(out, PrintOptions());
+    }
+    context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
+                           reqString, sig->getAsString());
   }
 }
 
