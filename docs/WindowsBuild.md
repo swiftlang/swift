@@ -121,8 +121,6 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
   two hours depending on your system.
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
-- While the commands here use MSVC to build, using `clang-cl` is recommended (see
-  the **Clang-cl** section below).
 ```cmd
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
