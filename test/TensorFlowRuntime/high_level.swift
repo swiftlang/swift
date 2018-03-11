@@ -25,7 +25,8 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
   // FIXME: uncommenting `convLayer.gradient` below generates send.
-  // let (dInput, dParameters) = convLayer.gradient(for: input, backpropagating: 1)
+  // let (dInput, dParameters) = convLayer.gradient(for: input,
+  //                                                backpropagating: 1)
   // let dFilter = dParameters.filter
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
@@ -44,12 +45,21 @@ HighLevelTests.testAllBackends("FullyConnectedRelu") {
   // 1 x 2
   let input = Tensor<Float>([[-0.5, 0.5]])
   let output = relu(denseLayer.applied(to: input))
-  // FIXME: uncommenting `denseLayer.gradient` below generates send.
-  // let (dInput, dParameters) = denseLayer.gradient(for: input, backpropagating: 1)
-  // let dWeight = dParameters.weight
-  // let dBias = dParameters.bias
-  expectEqual([1, 4], output.shape)
-  expectEqual([0, 0.5, 0, 1.5], output.scalars)
+  let (dInput, dParameters) = denseLayer.gradient(for: input,
+                                                  backpropagating: 1)
+  let dWeight = dParameters.weight
+  let dBias = dParameters.bias
+  expectEqual(ShapedArray(shape: [1, 4], scalars: [0, 0.5, 0, 1.5]),
+              output.array)
+  expectEqual(ShapedArray(shape: [1, 2],
+                          scalars: [0.0, 0.0]),
+              dInput.array)
+  expectEqual(ShapedArray(shape: [2, 4],
+                          scalars: [-0.5, -0.5, -0.5, -0.5,
+                                    0.5, 0.5, 0.5, 0.5]),
+              dWeight.array)
+  expectEqual(ShapedArray(shape: [1, 4], scalars: [1, 1, 1, 1]),
+              dBias.array)
 }
 
 #if CPU && !CUDA

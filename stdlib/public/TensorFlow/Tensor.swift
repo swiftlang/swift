@@ -431,12 +431,24 @@ public extension AccelerableByTensorFlow {
   }
 }
 
-public extension Tensor {
+public extension Tensor where Scalar : Numeric {
   /// Broadcast to the same shape as the specified Tensor.
-  /// - Precondition: The number of scalars matches the shape of the specified
-  ///   Tensor.
+  /// - Precondition: The specified shape must be compatible for broadcasting.
+  // TODO: This is a temporary workaround for supporting broadcast on numeric
+  // tensors. Remove this function once a general working broadcast is
+  // implemented.
   @_inlineable @inline(__always)
   func broadcast(to other: Tensor) -> Tensor {
+    let zeros: Tensor = #tfop("Fill", other.shapeTensor, Tensor(0))
+    return self + zeros
+  }
+}
+
+public extension Tensor {
+  /// Reshape to the shape of the specified Tensor.
+  /// - Precondition: The number of scalars matches the new shape.
+  @_inlineable @inline(__always)
+  func reshaped<T>(like other: Tensor<T>) -> Tensor {
     return reshaped(toShape: other.shapeTensor)
   }
 
