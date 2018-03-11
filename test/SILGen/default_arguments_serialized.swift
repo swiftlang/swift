@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/default_arguments_other.swiftmodule -emit-module -swift-version 4 -primary-file %S/Inputs/default_arguments_other.swift
 

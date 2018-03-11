@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-sil -verify %s -swift-version 4 | %FileCheck %s
 
 let arr = ["A", "B", "C"]

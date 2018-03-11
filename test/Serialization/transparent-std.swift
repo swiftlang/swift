@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/def_transparent_std.swift
 // RUN: llvm-bcanalyzer %t/def_transparent_std.swiftmodule | %FileCheck %s

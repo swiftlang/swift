@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
 
 protocol FirstChild {}
