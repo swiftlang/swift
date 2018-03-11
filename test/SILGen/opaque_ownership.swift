@@ -171,7 +171,7 @@ public enum FloatingPointSign: Int64 {
   case minus
 }
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
@@ -196,7 +196,7 @@ public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 
 public protocol Error {}
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil @$Ss3foo1eys5Error_pSg_tF : $@convention(thin) (@owned Optional<Error>) -> () {
