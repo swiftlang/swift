@@ -76,12 +76,12 @@ extension Syntax {
 
   /// Whether or not this node it marked as `present`.
   public var isPresent: Bool {
-    return raw.presence == .present
+    return raw.isPresent
   }
 
   /// Whether or not this node it marked as `missing`.
   public var isMissing: Bool {
-    return raw.presence == .missing
+    return raw.isMissing
   }
 
   /// Whether or not this node represents an Expression.
