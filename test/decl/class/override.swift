@@ -101,11 +101,11 @@ class B : A {
 }
 
 class C<T> {
-  func ret_T() -> T {} 
+  func ret_T() -> T {}
 }
 
 class D<T> : C<[T]> {
-  override func ret_T() -> [T] {} 
+  override func ret_T() -> [T] {}
 }
 
 class E {
@@ -120,6 +120,10 @@ class E {
   var var_class_uoptional_rev: E { get { return self } set {} } // expected-note{{attempt to override property here}}
   var var_class_optional_uoptional: F? { get { return .none } set {} }
   var var_class_optional_uoptional_rev: E! { get { return self } set {} }
+  var var_nonclass_nested_optional: Int?? { get { return .none } set {} } // expected-note{{attempt to override property here}}
+  var var_nonclass_nested_optional_rev: Int { get { return 0 } set {} } // expected-note{{attempt to override property here}}
+  var var_class_nested_optional: E?? { get { return .none } set {} } // expected-note{{attempt to override property here}}
+  var var_class_nested_optional_rev: F { get { return F() } set {} } // expected-note{{attempt to override property here}}
 
   var ro_sametype: Int { return 0 }
   var ro_subclass: E { return self }
@@ -132,6 +136,10 @@ class E {
   var ro_class_uoptional_rev: E { return self } // expected-note{{attempt to override property here}}
   var ro_class_optional_uoptional: F? { return .none }
   var ro_class_optional_uoptional_rev: E! { return self }
+  var ro_nonclass_nested_optional: Int?? { return 0 }
+  var ro_nonclass_nested_optional_rev: Int { return 0 } // expected-note{{attempt to override property here}}
+  var ro_class_nested_optional: E?? { return .none }
+  var ro_class_nested_optional_rev: F { return F() } // expected-note{{attempt to override property here}}
 }
 
 class F : E {
@@ -146,6 +154,11 @@ class F : E {
   override var var_class_uoptional_rev: E! { get { return self }  set {} } // expected-error{{property 'var_class_uoptional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var var_class_optional_uoptional: F! { get { return .none } set {} }
   override var var_class_optional_uoptional_rev: E? { get { return self } set {} }
+  override var var_nonclass_nested_optional: Int { get { return 0 } set {} } // expected-error{{cannot override mutable property 'var_nonclass_nested_optional' of type 'Int??' with covariant type 'Int'}}
+  override var var_nonclass_nested_optional_rev: Int?? { get { return 0 } set {} } // expected-error{{property 'var_nonclass_nested_optional_rev' with type 'Int??' cannot override a property with type 'Int'}}
+  override var var_class_nested_optional: F { get { return self } set {} } // expected-error{{cannot override mutable property 'var_class_nested_optional' of type 'E??' with covariant type 'F'}}
+  override var var_class_nested_optional_rev: E?? { get { return self } set {} } // expected-error{{property 'var_class_nested_optional_rev' with type 'E??' cannot override a property with type 'F'}}
+
 
   override var ro_sametype: Int { return 0 }
   override var ro_subclass: E { return self }
@@ -158,6 +171,10 @@ class F : E {
   override var ro_class_uoptional_rev: E! { return self } // expected-error{{property 'ro_class_uoptional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var ro_class_optional_uoptional: F! { return .none }
   override var ro_class_optional_uoptional_rev: E? { return self }
+  override var ro_nonclass_nested_optional: Int { return 0 }
+  override var ro_nonclass_nested_optional_rev: Int?? { return 0 } // expected-error{{property 'ro_nonclass_nested_optional_rev' with type 'Int??' cannot override a property with type 'Int'}}
+  override var ro_class_nested_optional: F { return self }
+  override var ro_class_nested_optional_rev: E?? { return .none } // expected-error{{property 'ro_class_nested_optional_rev' with type 'E??' cannot override a property with type 'F'}}
 }
 
 
@@ -243,7 +260,7 @@ class IUOTestSubclass : IUOTestBaseClass {
   // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
   override func manyB(_ a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
-  // expected-note@-1 2 {{remove '!' to make the parameter required}} 
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
 
   override func result() -> AnyObject! { return nil } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject?'}}
