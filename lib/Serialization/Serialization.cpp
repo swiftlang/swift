@@ -4354,7 +4354,7 @@ class YamlGroupInputParser {
     if (!MapNode) {
       return true;
     }
-    for (auto Pair : *MapNode) {
+    for (auto &Pair : *MapNode) {
       auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
       auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
 
