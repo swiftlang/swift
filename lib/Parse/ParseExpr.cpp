@@ -883,14 +883,6 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                              /*Implicit=*/false));
   }
 
-  // NOTE: l_square_lit is for migrating the old object literal syntax.
-  // Eventually this block can be removed.
-  if (Tok.is(tok::l_square_lit) && !Tok.isAtStartOfLine() &&
-      isCollectionLiteralStartingWithLSquareLit()) {
-    assert(Tok.getLength() == 1);
-    Tok.setKind(tok::l_square);
-  }
-
   if (Tok.isFollowingLSquare()) {
     // super[expr]
     SourceLoc lSquareLoc, rSquareLoc;
@@ -1238,14 +1230,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Result = parseExprCallSuffix(Result, isExprBasic);
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       continue;
-    }
-
-    // NOTE: l_square_lit is for migrating the old object literal syntax.
-    // Eventually this block can be removed.
-    if (Tok.is(tok::l_square_lit) && !Tok.isAtStartOfLine() &&
-        isCollectionLiteralStartingWithLSquareLit()) {
-      assert(Tok.getLength() == 1);
-      Tok.setKind(tok::l_square);
     }
 
     // Check for a [expr] suffix.
@@ -1804,48 +1788,6 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     break;
   }
 
-  // NOTE: This is for migrating the old object literal syntax.
-  // Eventually this block can be removed.
-  case tok::l_square_lit: {// [#Color(...)#], [#Image(...)#]
-    // If this is actually a collection literal starting with '[#', handle it
-    // as such.
-    if (isCollectionLiteralStartingWithLSquareLit()) {
-      // Split the token into two.
-      SourceLoc LSquareLoc =
-          consumeStartingCharacterOfCurrentToken(tok::l_square);
-      // Consume the '[' token.
-      Result = parseExprCollection(LSquareLoc);
-      break;
-    }     
-
-    auto LSquareLoc = Tok.getLoc();
-    auto LSquareTokRange = Tok.getRange();
-    (void)consumeToken(tok::l_square_lit);
-    
-    if (Tok.is(tok::pound)) {
-      consumeToken();
-      if (!Tok.is(tok::identifier))
-        diagnose(LSquareLoc, diag::expected_object_literal_identifier);
-      skipUntil(tok::r_square_lit);
-      Result = makeParserError();
-    }
-    else {
-      Result = parseExprPostfix(ID, isExprBasic);
-    }
-
-    // This should be an invariant based on the check in
-    // isCollectionLiteralStartingWithLSquareLit().
-    auto RSquareTokRange = Tok.getRange();
-    (void)consumeToken(tok::r_square_lit);
-
-    // Issue a diagnostic for the legacy syntax and provide a fixit
-    // to strip away the '[#' and '#]'
-    diagnose(LSquareLoc, diag::legacy_object_literal_syntax)
-      .fixItRemoveChars(LSquareTokRange.getStart(), LSquareTokRange.getEnd())
-      .fixItRemoveChars(RSquareTokRange.getStart(), RSquareTokRange.getEnd());
-    
-    break;
-  }
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:  \
   Result = parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic); \
@@ -3117,32 +3059,6 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
 
   return closure;
 }
-
-// NOTE: this is to detect the old object literal syntax.
-// This will be removed in the future.
-bool Parser::isCollectionLiteralStartingWithLSquareLit() {
-   BacktrackingScope backtracking(*this);
-   (void)consumeToken(tok::l_square_lit);
-   switch (Tok.getKind()) {
-     // Handle both degenerate '#' and '# identifier'.
-     case tok::pound:
-      (void) consumeToken();
-      if (Tok.is(tok::identifier)) skipSingle();
-      break;
-#define POUND_OBJECT_LITERAL(kw, desc, proto)\
-     case tok::pound_##kw: (void)consumeToken(); break;
-#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
-     case tok::pound_##kw: (void)consumeToken(); break;
-#include "swift/Syntax/TokenKinds.def"
-     default:
-       return true;
-   }
-
-   // Skip over a parenthesized argument, if present.
-   if (Tok.is(tok::l_paren)) skipSingle();
- 
-   return Tok.isNot(tok::r_square_lit);
- }
  
 /// \brief Parse an object literal expression.
 ///
@@ -3327,6 +3243,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
   bool ParseDict;
   {
     BacktrackingScope Scope(*this);
+
     auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
     ParserResult<Expr> FirstExpr
