@@ -969,9 +969,11 @@ void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
   llvm::StringMap<StringRef> SourceFileNames;
+  llvm::StringSet<> IndexFileNames;
 
   for (Arg *A : Args) {
-    if (A->getOption().getKind() == Option::InputClass) {
+    if (A->getOption().getKind() == Option::InputClass ||
+        A->getOption().getID() == options::OPT_index_file_path) {
       StringRef Value = A->getValue();
       types::ID Ty = types::TY_INVALID;
 
@@ -988,6 +990,17 @@ void Driver::buildInputs(const ToolChain &TC,
           // extension that isn't recognized, as object files.
           Ty = types::TY_Object;
         }
+      }
+
+      // Apparently the convention is that the index file path is repeated.
+      // Don't try to add it in twice.
+      {
+        const bool IsIndexFilePath =
+            A->getOption().getID() == options::OPT_index_file_path;
+        if (!IsIndexFilePath && IndexFileNames.count(Value))
+          continue;
+        if (IsIndexFilePath)
+          IndexFileNames.insert(Value);
       }
 
       if (checkInputExistence(*this, Args, Diags, Value))
@@ -1105,7 +1118,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   } else { // DriverKind::Batch
     OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization))
+    if (Args.hasArg(options::OPT_whole_module_optimization,
+                    options::OPT_index_file))
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
     OI.CompilerOutputType = types::TY_Object;
   }
@@ -2655,13 +2669,14 @@ void Driver::printHelp(bool ShowHidden) const {
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
 }
 
-bool OutputInfo::mightHaveExplicitPrimaryInputs() const {
+bool OutputInfo::mightHaveExplicitPrimaryInputs(
+    const CommandOutput &Output) const {
   switch (CompilerMode) {
   case Mode::StandardCompile:
   case Mode::BatchModeCompile:
     return true;
   case Mode::SingleCompile:
-    return false;
+    return Output.getPrimaryOutputType() == types::TY_IndexData;
   case Mode::Immediate:
   case Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");

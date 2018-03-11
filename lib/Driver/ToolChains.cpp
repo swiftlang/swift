@@ -477,7 +477,7 @@ void ToolChain::JobContext::addCompileArgumentsEitherOnCommandLineOrInFilelists(
   }
 
   const bool UseFileList = shouldUseInputFileList();
-  const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs();
+  const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs(Output);
   const bool UsePrimaryFileList =
       MayHavePrimaryInputs && shouldUsePrimaryInputFileList();
   const bool UseSupplementaryOutputFileList =
@@ -513,10 +513,15 @@ void ToolChain::JobContext::addInputArguments(const bool mayHavePrimaryInputs,
                                               const bool usePrimaryFileList,
                                               ArgStringList &arguments) const {
   llvm::StringSet<> primaries;
+
   if (mayHavePrimaryInputs)
     for (const Action *A : InputActions) {
       const auto *IA = cast<InputAction>(A);
-      primaries.insert(IA->getInputArg().getValue());
+      const llvm::opt::Arg &InArg = IA->getInputArg();
+      // For an index data job,
+      // only make the index-file-path ones primary
+      if (ToolChain::canCompileInputArgumentBePrimary(Output, InArg))
+        primaries.insert(InArg.getValue());
     }
   for (auto inputPair : getTopLevelInputFiles()) {
     if (!types::isPartOfSwiftCompilation(inputPair.first))
@@ -533,6 +538,12 @@ void ToolChain::JobContext::addInputArguments(const bool mayHavePrimaryInputs,
       }
     }
   }
+}
+
+bool ToolChain::canCompileInputArgumentBePrimary(const CommandOutput &Output,
+                                                 const llvm::opt::Arg &A) {
+  return Output.getPrimaryOutputType() != types::TY_IndexData ||
+         A.getOption().getID() == options::OPT_index_file_path;
 }
 
 void ToolChain::JobContext::addSupplementaryOutputArguments(

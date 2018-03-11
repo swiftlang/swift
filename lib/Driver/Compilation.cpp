@@ -1134,7 +1134,10 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
     case FilelistInfo::WhichFiles::PrimaryInputs:
       for (const Action *A : job->getSource().getInputs()) {
         const auto *IA = cast<InputAction>(A);
-        out << IA->getInputArg().getValue() << "\n";
+        const llvm::opt::Arg &InArg = IA->getInputArg();
+        if (ToolChain::canCompileInputArgumentBePrimary(job->getOutput(),
+                                                        InArg))
+          out << IA->getInputArg().getValue() << "\n";
       }
       break;
     case FilelistInfo::WhichFiles::Output: {

@@ -122,7 +122,7 @@ public:
   /// nothing in a (preferably non-existent) -primary-filelist. Left to its own
   /// devices, the driver would forget to omit the primary input files, so
   /// return a flag here.
-  bool mightHaveExplicitPrimaryInputs() const;
+  bool mightHaveExplicitPrimaryInputs(const CommandOutput &Output) const;
 };
 
 class Driver {
