@@ -82,6 +82,16 @@ extension DefaultIndices: Collection {
   public var indices: Indices {
     return self
   }
+  
+  public func contains(_ element: Element) -> Bool {
+    guard element < endIndex else { return false }
+    for index in self {
+      if !(index < element) {
+        return index == element
+      }
+    }
+    return false
+  }
 }
 
 extension DefaultIndices: BidirectionalCollection
