@@ -48,6 +48,11 @@ SILValue stripUpCasts(SILValue V);
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
 
+/// Return the underlying SILValue after stripping off non-projection address
+/// casts. The result will still be an address--this does not look through
+/// pointer-to-address.
+SILValue stripAddressAccess(SILValue V);
+
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
