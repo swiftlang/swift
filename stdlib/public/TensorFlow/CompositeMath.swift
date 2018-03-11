@@ -17,32 +17,31 @@
 //===----------------------------------------------------------------------===//
 
 @_inlineable @inline(__always)
-public func sigmoid<Scalar : BinaryFloatingPoint, T : TensorProtocol>(
-  _ x: T
-) -> T where T.Scalar == Scalar {
+public func sigmoid<T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar : BinaryFloatingPoint {
   let expx = exp(-x)
   return 1.0 / (1.0 + expx)
 }
 
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointRelu(_:partial:seed:))
-public func relu<Scalar : FloatingPoint, T : TensorProtocol>(_ x: T) -> T
-  where T.Scalar == Scalar {
+public func relu<T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar : FloatingPoint {
   return max(0, x)
 }
 
 @_inlineable @inline(__always)
-public func softmax<Scalar : FloatingPoint, T : TensorProtocol>(_ x: T) -> T
-  where T.Scalar == Scalar {
+public func softmax<T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar : FloatingPoint {
   let expx = exp(x)
   return expx / expx.sum()
 }
 
 @_inlineable @inline(__always)
-public func softmax<Scalar : FloatingPoint, T : TensorProtocol>(
+public func softmax<T : TensorProtocol>(
   _ x: T, alongAxis axis: Int32
 ) -> T
-  where T.Scalar == Scalar {
+  where T.Scalar : FloatingPoint {
   let expx = exp(x)
   return expx / expx.sum(alongAxes: axis)
 }

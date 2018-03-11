@@ -38,6 +38,10 @@
 // - Fix gradients for broadcasting ops (need to perform reduction).
 // - Implement unbroadcasting, which is necessary to calculate adjoints for many
 //   binary ops.
+// - When the trailing 'where' clause in @differentiable is properly
+//   type-checked, define constraints on FloatingPoint in primal declarations
+//   and define adjoints on FloatingPoint.
+//
 // FIXME:
 // - Handle scalar broadcasting.
 //
@@ -59,7 +63,7 @@ extension TensorProtocol where Scalar : Numeric {
   static func _adjointSubtract(
     _: Self, _: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed, -seed)
+    return (seed, 0-seed)
   }
 
   @_inlineable @_versioned
@@ -73,34 +77,34 @@ extension TensorProtocol where Scalar : Numeric {
   static func _adjointDivide(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed / y, -x / y.squared() * seed)
+    return (seed / y, (0-x) / y.squared() * seed)
   }
 }
 
 @_inlineable @_versioned
-func _adjointMin<Scalar : Numeric & Comparable, T : TensorProtocol>(
+func _adjointMin<T : TensorProtocol>(
   _ lhs: T, _ rhs: T, partial: T, seed: T
-) -> (T, T) where T.Scalar == Scalar {
-  let denom = 1 + T(lhs == rhs)
-  let dfdx = seed * T(rhs == partial) / denom
-  let dfdy = seed * T(lhs == partial) / denom
+) -> (T, T) where T.Scalar : Numeric & Comparable {
+  let denom = 1 + T(lhs.elementsEqual(rhs))
+  let dfdx = seed * T(rhs.elementsEqual(partial)) / denom
+  let dfdy = seed * T(lhs.elementsEqual(partial)) / denom
   return (dfdx, dfdy)
 }
 
 @_inlineable @_versioned
-func _adjointMax<Scalar : Numeric & Comparable, T : TensorProtocol>(
+func _adjointMax<T : TensorProtocol>(
   _ lhs: T, _ rhs: T, partial: T, seed: T
-) -> (T, T) where T.Scalar == Scalar {
-  let denom = 1 + T(lhs == rhs)
-  let dfdx = seed * T(lhs == partial) / denom
-  let dfdy = seed * T(rhs == partial) / denom
+) -> (T, T) where T.Scalar : Numeric & Comparable {
+  let denom = 1 + T(lhs.elementsEqual(rhs))
+  let dfdx = seed * T(lhs.elementsEqual(partial)) / denom
+  let dfdy = seed * T(rhs.elementsEqual(partial)) / denom
   return (dfdx, dfdy)
 }
 
 @_inlineable @_versioned
-func _adjointPow<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointPow<T : TensorProtocol>(
   _ x: T, _ y: T, partial: T, seed: T
-) -> (T, T) where T.Scalar == Scalar {
+) -> (T, T) where T.Scalar : FloatingPoint {
   return (seed * y * pow(x, y-1), seed * log(x) * partial)
 }
 
@@ -108,7 +112,7 @@ func _adjointPow<Scalar : FloatingPoint, T : TensorProtocol>(
 // Elementwise unary
 //===----------------------------------------------------------------------===//
 
-extension TensorProtocol where Scalar : Numeric {
+extension TensorProtocol where Scalar : SignedNumeric {
   @_inlineable @_versioned
   static func _adjointNegate(_ x: Self, partial: Self, seed: Self) -> Self {
     return -seed
@@ -116,72 +120,72 @@ extension TensorProtocol where Scalar : Numeric {
 }
 
 @_inlineable @_versioned
-func _adjointLog<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointLog<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed / x
 }
 
 @_inlineable @_versioned
-func _adjointSin<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointSin<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed * cos(x)
 }
 
 @_inlineable @_versioned
-func _adjointCos<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointCos<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return -seed * cos(x)
 }
 
 @_inlineable @_versioned
-func _adjointTan<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointTan<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed / (1 + partial.squared())
 }
 
 @_inlineable @_versioned
-func _adjointSinh<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointSinh<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed * cosh(x)
 }
 
 @_inlineable @_versioned
-func _adjointCosh<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointCosh<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed * sinh(x)
 }
 
 @_inlineable @_versioned
-func _adjointTanh<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointTanh<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed * (1 - partial.squared())
 }
 
 @_inlineable @_versioned
-func _adjointExp<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointExp<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed
 }
 
 @_inlineable @_versioned
-func _adjointSqrt<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointSqrt<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return seed / (2 * partial)
 }
 
 @_inlineable @_versioned
-func _adjointSquared<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointSquared<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return 2 * x * seed
 }
 
@@ -367,8 +371,8 @@ extension Tensor where Scalar : FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @_inlineable @_versioned
-func _adjointRelu<Scalar : FloatingPoint, T : TensorProtocol>(
+func _adjointRelu<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
-) -> T where T.Scalar == Scalar {
+) -> T where T.Scalar : FloatingPoint {
   return T(x > 0)
 }
