@@ -74,12 +74,12 @@ extension Syntax {
     return data.childCaches.count
   }
 
-  /// Whether or not this node it marked as `present`.
+  /// Whether or not this node is marked as `present`.
   public var isPresent: Bool {
     return raw.presence == .present
   }
 
-  /// Whether or not this node it marked as `missing`.
+  /// Whether or not this node is marked as `missing`.
   public var isMissing: Bool {
     return raw.presence == .missing
   }
@@ -185,7 +185,9 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
   public var text: String {
     return tokenKind.text
   }
-
+  
+  /// Returns a new TokenSyntax with its kind replaced
+  /// by the provided token kind.
   public func withKind(_ tokenKind: TokenKind) -> TokenSyntax {
     guard case let .token(_, leadingTrivia, trailingTrivia, presence) = raw else {
       fatalError("TokenSyntax must have token as its raw")
