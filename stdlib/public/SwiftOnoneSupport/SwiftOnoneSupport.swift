@@ -25,7 +25,7 @@ internal enum _Prespecialize {
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
-      let _ =  a[0]
+      _ = a[0]
 
       // Set array elements
       for j in 1..<a.count {
@@ -42,7 +42,7 @@ internal enum _Prespecialize {
       a[0] = sampleValue
 
       // Get count and capacity
-      let _ = a.count + a.capacity
+      _ = a.count + a.capacity
 
       // Iterate over array
       for e in a {
@@ -63,7 +63,7 @@ internal enum _Prespecialize {
       a.reserveCapacity(100)
 
       // Sort array
-      let _ = a.sorted { (a: Element, b: Element) in a < b }
+      _ = a.sorted { (a: Element, b: Element) in a < b }
       a.sort { (a: Element, b: Element) in a < b }
 
       // force specialization of append.
@@ -80,7 +80,7 @@ internal enum _Prespecialize {
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
-      let _ =  a[0]
+      _ = a[0]
 
       // Set array elements
       for j in 0..<a.count {
@@ -96,7 +96,7 @@ internal enum _Prespecialize {
       a[0] = sampleValue
 
       // Get length and capacity
-      let _ = a.count + a.capacity
+      _ = a.count + a.capacity
 
       // Iterate over array
       for e in a {
