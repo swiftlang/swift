@@ -380,12 +380,23 @@ TensorTests.testAllBackends("ReshapeToScalar") {
   expectEqual([], z.shape)
 }
 
-TensorTests.testAllBackends("BroadcastTensor") {
+TensorTests.testAllBackends("ReshapeTensor") {
   // 2 x 3 -> 1 x 3 x 1 x 2 x 1
   let x = Tensor<Float>(shape: [2, 3], repeating: 0.0)
   let y = Tensor<Float>(shape: [1, 3, 1, 2, 1], repeating: 0.0)
-  let result = x.broadcast(to: y)
+  let result = x.reshaped(like: y)
   expectEqual([1, 3, 1, 2, 1], result.shape)
+}
+
+TensorTests.testAllBackends("BroadcastTensor") {
+  // NOTE: TensorFlow lacks an explicit broadcasting op. `broadcast(to:)`
+  // currently works only for numeric tensors, using a workaround.
+  // 1 -> 2 x 3 x 4
+  let one = Tensor<Float>(1)
+  let target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
+  let broadcasted = one.broadcast(to: target)
+  expectEqual([2, 3, 4], broadcasted.shape)
+  expectEqual(Array(repeating: 1, count: 24), broadcasted.scalars)
 }
 
 // TODO: Merge all rank/shape getter tests into one when we support code motion
