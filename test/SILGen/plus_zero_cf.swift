@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name cf -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 

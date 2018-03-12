@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 

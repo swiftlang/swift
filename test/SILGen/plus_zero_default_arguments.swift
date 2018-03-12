@@ -1,8 +1,5 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
-
 // RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
 

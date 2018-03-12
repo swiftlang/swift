@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: %target-swift-frontend -module-name witness_tables -emit-silgen -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
 // RUN: %FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: %FileCheck -check-prefix=SYMBOL %s < %t.sil
 
