@@ -16,12 +16,8 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
-  internal func hashASCII() -> Int {
-    return Int(Int64(bitPattern:
-      _SipHash13Context.hash(
-        data: start, dataByteCount: count, key: _Hashing.secretKey
-      )
-    ))
+  internal func hashASCII(into hasher: inout _Hasher) {
+    hasher.append(start, byteCount: count)
   }
 }
 
@@ -35,60 +31,13 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
-  internal static func hashUTF16(
-    _ string: UnsafeBufferPointer<UInt8>,
+  internal func hashUTF16(into hasher: inout _Hasher) {
     var buffer = _FixedArray16<UInt8>(allZeros: ())
     var bufferIndex = 0
 
     var i = startIndex
-
-    for (i, cu) in self.enumerated() {
-      let cuIsASCII = cu <= 0x7F
-  ) {
+    for cu in self {
       defer { i = index(after: i) }
-      guard cuIsASCII && isSingleSegmentScalar else {
-        if idx != 0 {
-          let ptr = _castASCIIBuffer(&buf)
-          hasher.append(ptr, byteCount: idx)
-        }
-
-        let codeUnitSequence = IteratorSequence(
-          _NormalizedCodeUnitIterator(self[i...])
-        )
-        for element in codeUnitSequence {
-          hasher.append(HashType(element))
-        }
-        break
-      }
-
-      buf[idx] = HashType(cu)
-      idx += 1
-
-      if idx >= buf.capacity {
-        let ptr = _castASCIIBuffer(&buf)
-        hasher.append(ptr, byteCount: buf.capacity)
-        idx = 0
-      }
-
-      hasher.append(HashType(cu))
-    }
-  }
-}
-
-extension _UnmanagedOpaqueString {
-  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
-  // @_inlineable // FIXME(sil-serialize-all)
-  // @_versioned // FIXME(sil-serialize-all)
-  internal static func hashUTF16(
-    _ string: UnsafeBufferPointer<UInt16>,
-
-    var buf = _FixedArray16<HashType>(allZeros: ())
-    var idx = 0
-
-    into hasher: inout _Hasher
-  ) {
-    for (i, cu) in self.enumerated() {
-
       let cuIsASCII = cu <= 0x7F
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
@@ -105,7 +54,7 @@ extension _UnmanagedOpaqueString {
         for element in codeUnitSequence {
           hasher.append(UInt(element))
         }
-        break
+        return
       }
 
       buffer[bufferIndex] = UInt8(truncatingIfNeeded: cu)
@@ -123,29 +72,33 @@ extension _UnmanagedOpaqueString {
       hasher.append(ptr, byteCount: bufferIndex)
       bufferIndex = 0
     }
-
-    return hasher._finalizeAndReturnIntHash()
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   @_versioned
   internal func computeHashValue() -> Int {
-    return self.hashASCII()
+    var hasher = _Hasher()
+    self.hashASCII(into: &hasher)
+    return Int(truncatingIfNeeded: hasher.finalize())
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
   @_versioned
   internal func computeHashValue() -> Int {
-    return self.hashUTF16()
+    var hasher = _Hasher()
+    self.hashUTF16(into: &hasher)
+    return Int(truncatingIfNeeded: hasher.finalize())
   }
 }
 
 extension _UnmanagedOpaqueString {
   @_versioned
   internal func computeHashValue() -> Int {
-    return self.hashUTF16()
+    var hasher = _Hasher()
+    self.hashUTF16(into: &hasher)
+    return Int(truncatingIfNeeded: hasher.finalize())
   }
 }
 
