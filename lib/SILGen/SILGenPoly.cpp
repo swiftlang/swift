@@ -415,12 +415,9 @@ ManagedValue Transform::transform(ManagedValue v,
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {
-      SILValue result = v.getValue();
       if (v.getType().isAddress())
-        result = SGF.B.createUncheckedAddrCast(Loc, result, loweredResultTy);
-      else
-        result = SGF.B.createUncheckedBitCast(Loc, result, loweredResultTy);
-      return ManagedValue(result, v.getCleanup());
+        return SGF.B.createUncheckedAddrCast(Loc, v, loweredResultTy);
+      return SGF.B.createUncheckedBitCast(Loc, v, loweredResultTy);
     }
 
     auto transformOptionalPayload =
