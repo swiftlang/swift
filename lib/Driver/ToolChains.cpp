@@ -289,8 +289,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(FrontendModeOption);
   }
 
-  context.addCompileArgumentsEitherOnCommandLineOrInFilelists(Arguments,
-                                                              II.FilelistInfos);
+  context.addFrontendInputAndOutputArguments(Arguments, II.FilelistInfos);
 
   // Forward migrator flags.
   if (auto DataPath = context.Args.getLastArg(options::
@@ -460,7 +459,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   }
 }
 
-void ToolChain::JobContext::addCompileArgumentsEitherOnCommandLineOrInFilelists(
+void ToolChain::JobContext::addFrontendInputAndOutputArguments(
     ArgStringList &Arguments, std::vector<FilelistInfo> &FilelistInfos) const {
 
   switch (OI.CompilerMode) {
@@ -494,8 +493,8 @@ void ToolChain::JobContext::addCompileArgumentsEitherOnCommandLineOrInFilelists(
                              FilelistInfo::WhichFiles::PrimaryInputs});
   }
   if (!UseFileList || !UsePrimaryFileList) {
-    addInputArguments(MayHavePrimaryInputs, UseFileList, UsePrimaryFileList,
-                      Arguments);
+    addFrontendInputArguments(MayHavePrimaryInputs, UseFileList,
+                              UsePrimaryFileList, Arguments);
   }
 
   if (UseSupplementaryOutputFileList) {
@@ -504,14 +503,13 @@ void ToolChain::JobContext::addCompileArgumentsEitherOnCommandLineOrInFilelists(
     FilelistInfos.push_back({Arguments.back(), types::TY_INVALID,
                              FilelistInfo::WhichFiles::SupplementaryOutput});
   } else {
-    addSupplementaryOutputArguments(Arguments);
+    addFrontendSupplementaryOutputArguments(Arguments);
   }
 }
 
-void ToolChain::JobContext::addInputArguments(const bool mayHavePrimaryInputs,
-                                              const bool useFileList,
-                                              const bool usePrimaryFileList,
-                                              ArgStringList &arguments) const {
+void ToolChain::JobContext::addFrontendInputArguments(
+    const bool mayHavePrimaryInputs, const bool useFileList,
+    const bool usePrimaryFileList, ArgStringList &arguments) const {
   llvm::StringSet<> primaries;
 
   if (mayHavePrimaryInputs)
@@ -520,8 +518,10 @@ void ToolChain::JobContext::addInputArguments(const bool mayHavePrimaryInputs,
       const llvm::opt::Arg &InArg = IA->getInputArg();
       // For an index data job,
       // only make the index-file-path ones primary
-      if (ToolChain::canCompileInputArgumentBePrimary(Output, InArg))
-        primaries.insert(InArg.getValue());
+      But the action
+          isn't marked! if (ToolChain::canCompileInputArgumentBePrimary(Output,
+                                                                        InArg))
+              primaries.insert(InArg.getValue());
     }
   for (auto inputPair : getTopLevelInputFiles()) {
     if (!types::isPartOfSwiftCompilation(inputPair.first))
@@ -546,7 +546,7 @@ bool ToolChain::canCompileInputArgumentBePrimary(const CommandOutput &Output,
          A.getOption().getID() == options::OPT_index_file_path;
 }
 
-void ToolChain::JobContext::addSupplementaryOutputArguments(
+void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
     ArgStringList &arguments) const {
   // FIXME: get these and other argument strings from the same place for both
   // driver and frontend

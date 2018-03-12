@@ -110,8 +110,7 @@ protected:
 
     const char *computeFrontendModeForCompile() const;
 
-    void addFrontendInputAndOutputArguments
-    addCompileArgumentsEitherOnCommandLineOrInFilelists(
+    void addFrontendInputAndOutputArguments(
         llvm::opt::ArgStringList &Arguments,
         std::vector<FilelistInfo> &FilelistInfos) const;
 
