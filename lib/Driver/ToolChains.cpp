@@ -74,7 +74,7 @@ bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
-  types::TY_INVALID;
+      types::TY_INVALID;
   return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
   TOO_MANY_FILES;
 }
@@ -499,7 +499,7 @@ void ToolChain::JobContext::addCompileArgumentsEitherOnCommandLineOrInFilelists(
   }
 
   if (UseSupplementaryOutputFileList) {
-    Arguments.push_back("-supplementary-output-filemap");
+    Arguments.push_back("-supplementary-output-file-map");
     Arguments.push_back(getTemporaryFilePath("supplementaryOutputs", ""));
     FilelistInfos.push_back({Arguments.back(), types::TY_INVALID,
                              FilelistInfo::WhichFiles::SupplementaryOutput});

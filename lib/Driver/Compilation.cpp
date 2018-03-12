@@ -43,7 +43,7 @@
 
 #include "CompilationRecord.h"
 
-#define DEBUG_TYPE "BATCH_MODE"
+#define DEBUG_TYPE "batch-mode"
 
 // Batch-mode has a sub-mode for testing that randomizes batch partitions,
 // by user-provided seed. That is the only thing randomized here.

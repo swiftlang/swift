@@ -234,7 +234,7 @@ SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
 Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::computeOutputPaths() const {
   Optional<std::vector<SupplementaryOutputPaths>> pathsFromUser =
-      Args.hasArg(options::OPT_supplementary_output_filemap)
+      Args.hasArg(options::OPT_supplementary_output_file_map)
           ? readSupplementaryOutputFileMap()
           : getSupplementaryOutputPathsFromArguments();
   if (!pathsFromUser)
@@ -476,13 +476,10 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {types::TY_TBD, paths.TBDPath}};
-  for (const std::pair<types::ID, std::string &> *typeAndString =
-           typesAndStrings;
-       typeAndString <
-       &typesAndStrings[sizeof(typesAndStrings) / sizeof(typesAndStrings[0])];
-       ++typeAndString) {
-    auto const out = map->find(typeAndString->first);
-    typeAndString->second = out == map->end() ? "" : out->second;
+  for (const std::pair<types::ID, std::string &> &typeAndString :
+       typesAndStrings) {
+    auto const out = map->find(typeAndString.first);
+    typeAndString.second = out == map->end() ? "" : out->second;
   }
   return paths;
 }
@@ -501,11 +498,11 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         SourceLoc(),
         diag::
             error_cannot_have_supplementary_outputs_with_supplementary_ouputs_file_map,
-        A->getSpelling(), "-supplementary-output-filemap");
+        A->getSpelling(), "-supplementary-output-file-map");
     return None;
   }
   const StringRef supplementaryFileMapPath =
-      Args.getLastArgValue(options::OPT_supplementary_output_filemap);
+      Args.getLastArgValue(options::OPT_supplementary_output_file_map);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
       llvm::MemoryBuffer::getFile(supplementaryFileMapPath);
   if (!buffer) {

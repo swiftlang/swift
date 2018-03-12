@@ -112,7 +112,7 @@
 // CHECK: Forming batch job from 500 constituents
 // CHECK: Forming batch job from 500 constituents
 //
-// Try it without the force; supplementary output filemaps should obviate the repartition:
+// Try it without the force; supplementary output file maps should obviate the repartition:
 // RUN: %swiftc_driver -driver-show-job-lifecycle -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out2.txt 2>&1
 // RUN: %FileCheck %s <%t/out2.txt -check-prefix=NO-REPARTITION
 // CHECK-NOT: unable to execute command

@@ -114,7 +114,9 @@ void OutputFileMap::write(llvm::raw_ostream &os,
       types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();
       os << "  " << types::getTypeName(type) << ": ";
+      os << "\"";
       os.write_escaped(output);
+      os << "\"";
       os << "\n";
       }
     }
@@ -128,6 +130,8 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
     return llvm::make_error<llvm::StringError>(errorString,
                                                llvm::inconvertibleErrorCode());
   };
+  /// FIXME: Make the returned error strings more specific by including some of
+  /// the source.
   llvm::SourceMgr SM;
   llvm::yaml::Stream YAMLStream(Buffer->getMemBufferRef(), SM);
   auto I = YAMLStream.begin();

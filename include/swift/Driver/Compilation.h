@@ -169,8 +169,8 @@ private:
   unsigned BatchSeed;
 
   /// In order to test repartitioning, set to true if
-  /// -force-one-batch-repartition is present. This is cleared after the forced
-  /// repartition happens.
+  /// -driver-force-one-batch-repartition is present. This is cleared after the
+  /// forced repartition happens.
   bool ForceOneBatchRepartition = false;
 
   /// True if temporary files should not be deleted.

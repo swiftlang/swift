@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (Args.size() > 0) {
+  if (!Args.empty()) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
@@ -992,8 +992,10 @@ void Driver::buildInputs(const ToolChain &TC,
         }
       }
 
-      // Apparently the convention is that the index file path is repeated.
-      // Don't try to add it in twice.
+      // Apparently the convention is that the index file path is specified
+      // redundantly with the inputs. Don't try to add it in twice. But,
+      // according to the tests, it needs to be the first input.
+      // FIXME: this many not implement the right semantics.
       {
         const bool IsIndexFilePath =
             A->getOption().getID() == options::OPT_index_file_path;

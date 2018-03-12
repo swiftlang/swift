@@ -110,17 +110,18 @@ protected:
 
     const char *computeFrontendModeForCompile() const;
 
-    void addCompileArgumentsEitherOnCommandLineOrInFilelists(
+    void addFrontendInputAndOutputArguments
+    addCompileArgumentsEitherOnCommandLineOrInFilelists(
         llvm::opt::ArgStringList &Arguments,
         std::vector<FilelistInfo> &FilelistInfos) const;
 
   private:
-    void addInputArguments(const bool mayHavePrimaryInputs,
-                           const bool useFileList,
-                           const bool usePrimaryFileList,
-                           llvm::opt::ArgStringList &arguments) const;
-    void
-    addSupplementaryOutputArguments(llvm::opt::ArgStringList &arguments) const;
+    void addFrontendInputArguments(const bool mayHavePrimaryInputs,
+                                   const bool useFileList,
+                                   const bool usePrimaryFileList,
+                                   llvm::opt::ArgStringList &arguments) const;
+    void addFrontendSupplementaryOutputArguments(
+        llvm::opt::ArgStringList &arguments) const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.

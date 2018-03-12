@@ -47,11 +47,11 @@ public:
   static llvm::Expected<OutputFileMap>
   loadFromBuffer(StringRef Data, StringRef workingDirectory);
 
-    /// Loads an OutputFileMap from the given \p Buffer, taking ownership
-    /// of the buffer in the process.
-    ///
-    /// When non-empty, \p workingDirectory is used to resolve relative paths in
-    /// the output file map.
+  /// Loads an OutputFileMap from the given \p Buffer, taking ownership
+  /// of the buffer in the process.
+  ///
+  /// When non-empty, \p workingDirectory is used to resolve relative paths in
+  /// the output file map.
   static llvm::Expected<OutputFileMap>
   loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
                  StringRef workingDirectory);
@@ -78,10 +78,7 @@ public:
 
 private:
   /// \brief Parses the given \p Buffer and returns either an OutputFileMap or
-  /// error string, taking ownership of \p Buffer in the process.
-  ///
-  /// FIXME: Make the returned error strings more specific by including some of
-  /// the source.
+  /// error, taking ownership of \p Buffer in the process.
   static llvm::Expected<OutputFileMap>
   parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);
 };
