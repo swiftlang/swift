@@ -505,6 +505,10 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // The empty tuple type has a singleton metadata.
   if (auto tuple = dyn_cast<TupleType>(type))
     return tuple->getNumElements() == 0;
+  
+  // Any and AnyObject have singleton metadata.
+  if (type->isAny() || type->isAnyObject())
+    return true;
 
   // The builtin types generally don't require metadata, but some of them
   // have nodes in the runtime anyway.
@@ -988,8 +992,24 @@ namespace {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto layout = type.getExistentialLayout();
+      // Any and AnyObject have singleton metadata in the runtime.
+      llvm::Constant *singletonMetadata = nullptr;
+      if (type->isAny())
+        singletonMetadata = IGF.IGM.getAnyExistentialMetadata();
+      if (type->isAnyObject())
+        singletonMetadata = IGF.IGM.getAnyObjectExistentialMetadata();
+      
+      if (singletonMetadata) {
+        llvm::Constant *indices[] = {
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
+        };
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(
+            /*Ty=*/nullptr, singletonMetadata, indices);
+      }
 
+      auto layout = type.getExistentialLayout();
+      
       auto protocols = layout.getProtocols();
 
       // Collect references to the protocol descriptors.
@@ -2344,10 +2364,10 @@ namespace {
     void addGenericParametersHeader() {
       // Drop placeholders for the counts. We'll fill these in when we emit
       // the related sections.
-      GenericParamCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericRequirementCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericKeyArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericExtraArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
+      GenericParamCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericRequirementCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericKeyArgumentCount = B.addPlaceholderWithSize(IGM.Int16Ty);
+      GenericExtraArgumentCount = B.addPlaceholderWithSize(IGM.Int16Ty);
     }
     
     void addGenericParameters() {
@@ -2369,7 +2389,9 @@ namespace {
         B.addInt(IGM.Int8Ty, 0);
       
       // Fill in the parameter count.
-      B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int32Ty,
+      assert(canSig->getGenericParams().size() <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int16Ty,
                                canSig->getGenericParams().size());
     }
     
@@ -2392,16 +2414,21 @@ namespace {
                             asImpl().getGenericSignature()->getRequirements());
 
       // Fill in the final requirement count.
-      B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int32Ty,
+      assert(metadata.NumRequirements <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int16Ty,
                                metadata.NumRequirements);
       NumGenericKeyArguments += metadata.NumGenericKeyArguments;
       NumGenericExtraArguments += metadata.NumGenericExtraArguments;
     }
 
     void finishGenericParameters() {
-      B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int32Ty,
+      assert(NumGenericKeyArguments <= UINT16_MAX
+             && NumGenericExtraArguments <= UINT16_MAX
+             && "way too generic");
+      B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int16Ty,
                                NumGenericKeyArguments);
-      B.fillPlaceholderWithInt(*GenericExtraArgumentCount, IGM.Int32Ty,
+      B.fillPlaceholderWithInt(*GenericExtraArgumentCount, IGM.Int16Ty,
                                NumGenericExtraArguments);
     }
 
@@ -5509,9 +5536,6 @@ namespace {
     void layout() {
       if (asImpl().requiresInitializationFunction())
         asImpl().addInitializationFunction();
-      else
-        asImpl().addPaddingForInitializationFunction();
-      asImpl().addForeignName();
       asImpl().addForeignFlags();
       super::layout();
     }
@@ -5556,13 +5580,8 @@ namespace {
       IGF.Builder.CreateRetVoid();
 
       B.addRelativeAddress(fn);
-    }
-    
-    void addPaddingForInitializationFunction() {
-      // The initialization function field is placed at the least offset of the
-      // record so it can be omitted when not needed. However, the metadata
-      // record is still pointer-aligned, so on 64 bit platforms we need to
-      // occupy the space to keep the rest of the record with the right layout.
+      
+      // Keep pointer alignment on 64-bit platforms for further fields.
       switch (IGM.getPointerSize().getValue()) {
       case 4:
         break;
@@ -5573,7 +5592,7 @@ namespace {
         llvm_unreachable("unsupported word size");
       }
     }
-
+    
     void noteAddressPoint() {
       AddressPoint = B.getNextOffsetFromGlobal();
     }

@@ -26,6 +26,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
@@ -1552,6 +1553,12 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
+  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
+  if (auto dc = f->getDeclContext()) {
+    if (auto sf = dc->getParentSourceFile()) {
+      CurSourceFile = sf;
+    }
+  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 

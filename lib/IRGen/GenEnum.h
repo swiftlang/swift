@@ -436,6 +436,11 @@ public:
       llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
       SILType T) const = 0;
 
+  virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                         ReferenceCounting *rc) const {
+    return false;
+  }
+  
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;
