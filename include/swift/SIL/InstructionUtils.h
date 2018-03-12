@@ -92,6 +92,10 @@ SILValue stripBorrow(SILValue V);
 /// type may be changed by a cast.
 SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
 
+/// Return true if this instruction terminates a SIL-level scope. Scope end
+/// instructions do not produce a result.
+bool isEndOfScopeMarker(SILInstruction *user);
+
 /// Return true if the given instruction has no effect on it's operand values
 /// and produces no result. These are typically end-of scope markers.
 ///
