@@ -38,6 +38,64 @@ final class SyntaxData: Equatable {
 
   let childCaches: [AtomicCache<SyntaxData>]
 
+  let positionCache: AtomicCache<AbsolutePosition>
+
+  fileprivate func calculatePosition() -> AbsolutePosition {
+    guard let parent = parent else {
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
+      // If this node is SourceFileSyntax, its location is the start of the file.
+      return AbsolutePosition()
+    }
+
+    // If the node is the first child of its parent, the location is same with
+    // the parent's location.
+    guard indexInParent != 0 else { return parent.position }
+
+    // Otherwise, the location is same with the previous sibling's location
+    // adding the stride of the sibling.
+    for idx in (0..<indexInParent).reversed() {
+      if let sibling = parent.cachedChild(at: idx) {
+        let pos = sibling.position.copy()
+        sibling.raw.accumulateAbsolutePosition(pos)
+        return pos
+      }
+    }
+    return parent.position
+  }
+
+  var position: AbsolutePosition {
+    return positionCache.value { return calculatePosition() }
+  }
+
+  var positionAfterSkippingLeadingTrivia: AbsolutePosition {
+    let result = position.copy()
+    _ = raw.accumulateLeadingTrivia(result)
+    return result
+  }
+
+  fileprivate func getNextSiblingPos() -> AbsolutePosition {
+    // If this node is root, the position of the next sibling is the end of
+    // this node.
+    guard let parent = parent else {
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
+      let result = self.position.copy()
+      raw.accumulateAbsolutePosition(result)
+      return result
+    }
+
+    // Find the first valid sibling and return its position.
+    for i in indexInParent+1..<parent.raw.layout.count {
+      guard let sibling = parent.cachedChild(at: i) else { continue }
+      return sibling.position
+    }
+    // Otherwise, use the parent's sibling instead.
+    return parent.getNextSiblingPos()
+  }
+
+  var byteSize: Int {
+    return getNextSiblingPos().byteOffset - self.position.byteOffset
+  }
+
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
   /// provided index, in the provided parent.
   /// - Parameters:
@@ -51,6 +109,7 @@ final class SyntaxData: Equatable {
     self.indexInParent = indexInParent
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
+    self.positionCache = AtomicCache<AbsolutePosition>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
@@ -196,5 +255,64 @@ final class SyntaxData: Equatable {
   /// - Returns: True if both datas are exactly the same.
   static func ==(lhs: SyntaxData, rhs: SyntaxData) -> Bool {
     return lhs === rhs
+  }
+}
+
+/// An absolute position in a source file as text - the absolute byteOffset from
+/// the start, line, and column.
+public class AbsolutePosition {
+  public private(set) var byteOffset: Int = 0
+  public private(set) var line: Int = 1
+  public private(set) var column: Int = 1
+
+  internal func copy() -> AbsolutePosition {
+    let result = AbsolutePosition()
+    result.byteOffset = byteOffset
+    result.line = line
+    result.column = column
+    return result
+  }
+
+  /// Add some number of columns to the position.
+  internal func add(columns: Int) {
+    column += columns
+    byteOffset += columns
+  }
+
+  /// Add some number of newlines to the position, resetting the column.
+  /// Size is byte size of newline char.
+  /// '\n' and '\r' are 1, '\r\n' is 2.
+  internal func add(lines: Int, size: Int) {
+    line += lines
+    column = 1
+    byteOffset += lines * size
+  }
+
+  /// Use some text as a reference for adding to the absolute position,
+  /// taking note of newlines, etc.
+  internal func add(text: String) {
+    guard let chars = text.cString(using: .utf8) else {
+      return
+    }
+    let cr: CChar = 13
+    let nl: CChar = 10
+    var idx = chars.startIndex
+    while chars[idx] != 0 {
+      let c = chars[idx]
+      idx += 1
+      switch c {
+      case cr:
+        if chars[idx] == nl {
+          add(lines: 1, size: 2)
+          idx += 1
+        } else {
+          add(lines: 1, size: 1)
+        }
+      case nl:
+        add(lines: 1, size: 1)
+      default:
+        add(columns: 1)
+      }
+    }
   }
 }

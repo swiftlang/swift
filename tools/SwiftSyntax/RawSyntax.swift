@@ -193,3 +193,52 @@ extension RawSyntax: TextOutputStreamable {
     }
   }
 }
+
+extension RawSyntax {
+  func accumulateAbsolutePosition(_ pos: AbsolutePosition) {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout {
+        guard let child = child else { continue }
+        child.accumulateAbsolutePosition(pos)
+      }
+    case let .token(kind, leadingTrivia, trailingTrivia, presence):
+      guard case .present = presence else { return }
+      for piece in leadingTrivia {
+        piece.accumulateAbsolutePosition(pos)
+      }
+      pos.add(text: kind.text)
+      for piece in trailingTrivia {
+        piece.accumulateAbsolutePosition(pos)
+      }
+    }
+  }
+
+  func accumulateLeadingTrivia(_ pos: AbsolutePosition) -> Bool {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout {
+        guard let child = child else { continue }
+        if child.accumulateLeadingTrivia(pos) {
+          return true
+        }
+      }
+      return false
+    case let .token(_, leadingTrivia, _, presence):
+      guard case .present = presence else { return false }
+      for piece in leadingTrivia {
+        piece.accumulateAbsolutePosition(pos)
+      }
+      return true
+    }
+  }
+
+  var isSourceFile: Bool {
+    switch self {
+    case .node(let kind, _, _):
+      return kind == SyntaxKind.sourceFile
+    default:
+      return false
+    }
+  }
+}
