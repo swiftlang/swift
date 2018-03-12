@@ -290,7 +290,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 5 };
+  enum { NumFlagBits = 8 };
   SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
