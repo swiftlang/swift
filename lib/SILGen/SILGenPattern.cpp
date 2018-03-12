@@ -421,6 +421,13 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
+  Optional<SILLocation> getSubjectLocationOverride(SILLocation loc) const {
+    if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
+      if (!Switch->isImplicit())
+        return SILLocation(Switch->getSubjectExpr());
+    return None;
+  }
+
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
@@ -1144,6 +1151,7 @@ void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
 void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
                                            ConsumableManagedValue value,
                                            const FailureHandler &failure) {
+  DebugLocOverrideRAII LocOverride{SGF.B, getSubjectLocationOverride(pattern)};
   FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
