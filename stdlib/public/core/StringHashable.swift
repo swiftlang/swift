@@ -12,19 +12,43 @@
 
 import SwiftShims
 
+
+extension _FixedArray8 where T == UInt8 {
+  func combinedUInt64() -> UInt64 {
+    var buffer = self
+    while buffer.count < buffer.capacity {
+      buffer.append(0xFF)
+    }
+    var combined: UInt64 = 0
+    for value in buffer {
+      combined = (combined << 8) | UInt64(value)
+    }
+    return combined
+  }
+}
+
 extension _UnmanagedString where CodeUnit == UInt8 {
   // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
+  @effects(releasenone)
   internal func hashASCII(into hasher: inout _Hasher) {
-    hasher.append(start, byteCount: count)
-  }
-}
+    var buffer = _FixedArray8<UInt8>()
+    for c in self {
+      if buffer.count < buffer.capacity {
+        buffer.append(UInt8(truncatingIfNeeded: c))
+      }
 
-internal func _castASCIIBuffer(
-  _ ptr: UnsafePointer<_FixedArray16<UInt8>>
-) -> UnsafeRawPointer {
-  return UnsafeRawPointer(ptr)
+      if buffer.count == buffer.capacity {
+        hasher.append(buffer.combinedUInt64())
+        buffer.count = 0
+      }
+    }
+
+    if buffer.count > 0 {
+      hasher.append(buffer.combinedUInt64())
+    }
+  }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
@@ -32,8 +56,7 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // @_inlineable // FIXME(sil-serialize-all)
   // @_versioned // FIXME(sil-serialize-all)
   internal func hashUTF16(into hasher: inout _Hasher) {
-    var buffer = _FixedArray16<UInt8>(allZeros: ())
-    var bufferIndex = 0
+    var buffer = _FixedArray8<UInt8>()
 
     var i = startIndex
     for cu in self {
@@ -42,10 +65,10 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       guard cuIsASCII && isSingleSegmentScalar else {
-        if bufferIndex != 0 {
-          let ptr = _castASCIIBuffer(&buffer)
-          hasher.append(ptr, byteCount: bufferIndex)
-          bufferIndex = 0
+        if buffer.count != 0 {
+          let combined = buffer.combinedUInt64()
+          hasher.append(combined)
+          buffer.count = 0
         }
 
         let codeUnitSequence = IteratorSequence(
@@ -57,20 +80,19 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
         return
       }
 
-      buffer[bufferIndex] = UInt8(truncatingIfNeeded: cu)
-      bufferIndex += 1
+      buffer.append(UInt8(truncatingIfNeeded: cu))
 
-      if bufferIndex >= buffer.capacity {
-        let ptr = _castASCIIBuffer(&buffer)
-        hasher.append(ptr, byteCount: buffer.capacity)
-        bufferIndex = 0
+      if buffer.count >= buffer.capacity {
+        let combined = buffer.combinedUInt64()
+        hasher.append(combined)
+        buffer.count = 0
       }
     }
 
-    if bufferIndex != 0 {
-      let ptr = _castASCIIBuffer(&buffer)
-      hasher.append(ptr, byteCount: bufferIndex)
-      bufferIndex = 0
+    if buffer.count > 0 {
+      let combined = buffer.combinedUInt64()
+      hasher.append(combined)
+      buffer.count = 0
     }
   }
 }
@@ -80,7 +102,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   internal func computeHashValue() -> Int {
     var hasher = _Hasher()
     self.hashASCII(into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
+    return hasher.finalize()
   }
 }
 
@@ -89,7 +111,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   internal func computeHashValue() -> Int {
     var hasher = _Hasher()
     self.hashUTF16(into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
+    return hasher.finalize()
   }
 }
 
@@ -98,7 +120,7 @@ extension _UnmanagedOpaqueString {
   internal func computeHashValue() -> Int {
     var hasher = _Hasher()
     self.hashUTF16(into: &hasher)
-    return Int(truncatingIfNeeded: hasher.finalize())
+    return hasher.finalize())
   }
 }
 
