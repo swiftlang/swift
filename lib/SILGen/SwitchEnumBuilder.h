@@ -121,6 +121,38 @@ public:
     caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
   }
 
+  void addOptionalSomeCase(SILBasicBlock *caseBlock) {
+    auto *decl = getSGF().getASTContext().getOptionalSomeDecl();
+    caseDataArray.emplace_back(
+        decl, caseBlock, nullptr,
+        [](ManagedValue mv, SwitchCaseFullExpr &expr) { expr.exit(); },
+        ProfileCounter());
+  }
+
+  void addOptionalNoneCase(SILBasicBlock *caseBlock) {
+    auto *decl = getSGF().getASTContext().getOptionalNoneDecl();
+    caseDataArray.emplace_back(
+        decl, caseBlock, nullptr,
+        [](ManagedValue mv, SwitchCaseFullExpr &expr) { expr.exit(); },
+        ProfileCounter());
+  }
+
+  void addOptionalSomeCase(SILBasicBlock *caseBlock,
+                           NullablePtr<SILBasicBlock> contBlock,
+                           NormalCaseHandler handle,
+                           ProfileCounter count = ProfileCounter()) {
+    auto *decl = getSGF().getASTContext().getOptionalSomeDecl();
+    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
+  }
+
+  void addOptionalNoneCase(SILBasicBlock *caseBlock,
+                           NullablePtr<SILBasicBlock> contBlock,
+                           NormalCaseHandler handle,
+                           ProfileCounter count = ProfileCounter()) {
+    auto *decl = getSGF().getASTContext().getOptionalNoneDecl();
+    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
+  }
+
   void emit() &&;
 
 private:
