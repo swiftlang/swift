@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name auto_closures  -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
