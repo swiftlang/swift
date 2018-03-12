@@ -497,9 +497,6 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_serialize_diagnostics_path,
                                options::OPT_emit_loaded_module_trace_path,
                                options::OPT_emit_tbd_path)) {
-    // Since the table is only used for a diagnostic, spend the time to recreate
-    // it and save the complexity of passing it in.
-    std::unique_ptr<llvm::opt::OptTable> opts(createSwiftOptTable());
     Diags.diagnose(
         SourceLoc(),
         diag::
