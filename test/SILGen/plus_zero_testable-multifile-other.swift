@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // This test is paired with testable-multifile.swift.
 
 // RUN: %empty-directory(%t)

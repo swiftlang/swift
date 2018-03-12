@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 // CHECK-NOT: generic specialization <Swift.AnyObject, Self> of specialize_self.cast <A, B>(A) -> Swift.Optional<B>

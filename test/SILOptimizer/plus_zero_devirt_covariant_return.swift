@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
