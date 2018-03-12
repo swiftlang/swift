@@ -88,6 +88,7 @@ Globals
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
+  global ::= entity 'WC' // resilient enum tag index
 
   global ::= type 'Wy' // Outlined Copy Function Type
   global ::= type 'We' // Outlined Consume Function Type

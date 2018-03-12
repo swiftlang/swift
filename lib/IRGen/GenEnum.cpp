@@ -107,6 +107,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -237,6 +238,25 @@ irgen::EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
 int
 irgen::EnumImplStrategy::getResilientTagIndex(EnumElementDecl *Case) const {
   return getTagIndex(Case) - ElementsWithPayload.size();
+}
+
+static void emitResilientTagIndex(IRGenModule &IGM,
+                                  const EnumImplStrategy *strategy,
+                                  EnumElementDecl *Case) {
+  auto resilientIdx = strategy->getResilientTagIndex(Case);
+  auto global = IGM.getAddrOfEnumCase(Case, ForDefinition);
+  cast<llvm::GlobalVariable>(global.getAddress())
+      ->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+}
+
+void
+irgen::EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
+  for (auto &payload : ElementsWithPayload) {
+    emitResilientTagIndex(IGM, this, payload.decl);
+  }
+  for (auto &noPayload : ElementsWithNoPayload) {
+    emitResilientTagIndex(IGM, this, noPayload.decl);
+  }
 }
 
 namespace {
@@ -4863,6 +4883,17 @@ namespace {
                          std::move(WithNoPayload))
     { }
 
+    int getResilientTagIndex(EnumElementDecl *) const override {
+      // Resilient enum's should load the tag index from a global.
+      llvm_unreachable("Use loadResilientTagIndex instead");
+    }
+
+    llvm::Value *loadResilientTagIndex(IRGenFunction &IGF,
+                                       EnumElementDecl *Case) const {
+      auto address = IGF.IGM.getAddrOfEnumCase(Case, NotForDefinition);
+      return IGF.Builder.CreateLoad(address);
+    }
+
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                      SILType Type,
                                      EnumDecl *theEnum,
@@ -4878,8 +4909,7 @@ namespace {
                   SILType T,
                   Address enumAddr,
                   EnumElementDecl *Case) const override {
-      emitDestructiveInjectEnumTagCall(IGF, T,
-                                       getResilientTagIndex(Case),
+      emitDestructiveInjectEnumTagCall(IGF, T, loadResilientTagIndex(IGF, Case),
                                        enumAddr);
     }
 
@@ -4888,9 +4918,7 @@ namespace {
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
-      llvm::Value *expectedTag =
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                 getResilientTagIndex(Case));
+      llvm::Value *expectedTag = loadResilientTagIndex(IGF, Case);
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
     }
 
@@ -4916,20 +4944,27 @@ namespace {
       if (!defaultDest)
         defaultDest = unreachableBB;
 
-      auto tagSwitch = SwitchBuilder::create(IGF, tag,
-                                             SwitchDefaultDest(defaultDest,
-                                               defaultDest == unreachableBB
-                                                 ? IsUnreachable
-                                                 : IsNotUnreachable),
-                                             dests.size());
+      llvm::BasicBlock *continuationBB = nullptr;
+
+      unsigned numCasesEmitted = 0;
 
       auto emitCase = [&](Element elt) {
-        auto tagVal =
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                   getResilientTagIndex(elt.decl));
         auto found = destMap.find(elt.decl);
-        if (found != destMap.end())
-          tagSwitch->addCase(tagVal, found->second);
+        if (found != destMap.end()) {
+          if (continuationBB)
+            IGF.Builder.emitBlock(continuationBB);
+
+          auto tagVal = loadResilientTagIndex(IGF, elt.decl);
+          auto matchesTag = IGF.Builder.CreateICmpEQ(tag, tagVal);
+
+          // If we are not the last block create a continuation block.
+          if (++numCasesEmitted < dests.size())
+            continuationBB = llvm::BasicBlock::Create(C);
+          // Otherwise, our continuation is the default destination.
+          else
+            continuationBB = defaultDest;
+          IGF.Builder.CreateCondBr(matchesTag, found->second, continuationBB);
+        }
       };
 
       for (auto &elt : ElementsWithPayload)
@@ -4937,6 +4972,11 @@ namespace {
 
       for (auto &elt : ElementsWithNoPayload)
         emitCase(elt);
+
+      // If we have not emitted any cases jump to the default destination.
+      if (numCasesEmitted == 0) {
+        IGF.Builder.CreateBr(defaultDest);
+      }
 
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
@@ -6107,6 +6147,15 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   }
 
   emitFieldMetadataRecord(theEnum);
+
+  if (isResilient(theEnum, ResilienceExpansion::Maximal))
+    return;
+
+  // Emit resilient tag indices.
+  auto &strategy = getEnumImplStrategy(
+      *this,
+      theEnum->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
+  strategy.emitResilientTagIndices(*this);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

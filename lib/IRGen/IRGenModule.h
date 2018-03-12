@@ -1121,7 +1121,8 @@ public:
                                          ForDefinition_t forDefinition);
 
   llvm::Function *emitDispatchThunk(SILDeclRef declRef);
-
+  Address getAddrOfEnumCase(EnumElementDecl *Case,
+                            ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,

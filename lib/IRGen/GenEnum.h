@@ -214,7 +214,7 @@ public:
 
   /// Return a tag index in the range
   /// [-ElementsWithPayload..ElementsWithNoPayload-1].
-  int getResilientTagIndex(EnumElementDecl *Case) const;
+  virtual int getResilientTagIndex(EnumElementDecl *Case) const;
 
   /// Map the given element to the appropriate index in the
   /// discriminator type.
@@ -440,7 +440,9 @@ public:
                                          ReferenceCounting *rc) const {
     return false;
   }
-  
+
+  void emitResilientTagIndices(IRGenModule &IGM) const;
+
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;

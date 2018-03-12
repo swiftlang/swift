@@ -811,6 +811,11 @@ void Remangler::mangleFieldOffset(Node *node) {
   mangleChildNodes(node); // directness, entity
 }
 
+void Remangler::mangleEnumCase(Node *node) {
+  Out << "WC";
+  mangleSingleChildNode(node); // enum case
+}
+
 void Remangler::mangleProtocolWitnessTable(Node *node) {
   Out << "WP";
   mangleSingleChildNode(node); // protocol conformance

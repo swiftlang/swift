@@ -849,13 +849,11 @@ void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
 /// The type must be dynamically known to have enum witnesses.
 void irgen::emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
                                              SILType T,
-                                             unsigned tag,
+                                             llvm::Value *tagValue,
                                              Address srcObject) {
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
                                       ValueWitness::DestructiveInjectEnumTag);
-  llvm::Value *tagValue =
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, tag);
   IGF.Builder.CreateCall(fn, {srcObject.getAddress(), tagValue, metadata});
 }
 

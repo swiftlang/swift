@@ -116,6 +116,9 @@ class LinkEntity {
     /// ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
+    /// A resilient enum tag index. The pointer is a EnumElementDecl*.
+    EnumCase,
+
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -431,6 +434,12 @@ public:
   static LinkEntity forFieldOffset(VarDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::FieldOffset, decl);
+    return entity;
+  }
+
+  static LinkEntity forEnumCase(EnumElementDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::EnumCase, decl);
     return entity;
   }
 

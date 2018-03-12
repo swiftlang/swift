@@ -333,6 +333,7 @@ private:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
+    case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
@@ -1394,6 +1395,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0)); // directness
     Printer << "field offset for ";
     auto entity = Node->getChild(1);
+    print(entity, /*asContext*/ false);
+    return nullptr;
+  }
+  case Node::Kind::EnumCase: {
+    Printer << "enum case for ";
+    auto entity = Node->getChild(0);
     print(entity, /*asContext*/ false);
     return nullptr;
   }
