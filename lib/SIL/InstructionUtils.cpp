@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -261,17 +262,21 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   }
 }
 
-bool swift::isIncidentalUse(SILInstruction *user) {
+// Does this instruction terminate a SIL-level scope?
+bool swift::isEndOfScopeMarker(SILInstruction *user) {
   switch (user->getKind()) {
   default:
     return false;
-  case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndLifetimeInst:
-  case SILInstructionKind::FixLifetimeInst:
     return true;
   }
+}
+
+bool swift::isIncidentalUse(SILInstruction *user) {
+  return isEndOfScopeMarker(user) || isDebugInst(user)
+         || isa<FixLifetimeInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
