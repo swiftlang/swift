@@ -2296,6 +2296,36 @@ static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
+/// The standard metadata for Any.
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANY_MANGLING) = {
+  { &OpaqueExistentialValueWitnesses_0 }, // ValueWitnesses
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Any)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
+};
+
+/// The standard metadata for AnyObject.
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANYOBJECT_MANGLING) = {
+  {
+#if SWIFT_OBJC_INTEROP
+    &VALUE_WITNESS_SYM(BO)
+#else
+    &VALUE_WITNESS_SYM(Bo)
+#endif
+  },
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Class)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
+};
+
 /// The uniquing structure for opaque existential value witness tables.
 static SimpleGlobalCache<OpaqueExistentialValueWitnessTableCacheEntry>
 OpaqueExistentialValueWitnessTables;
@@ -2616,10 +2646,20 @@ swift::swift_getExistentialTypeMetadata(
                                   size_t numProtocols,
                                   const ProtocolDescriptor * const *protocols) {
 
+  // The empty compositions Any and AnyObject have fixed metadata.
+  if (numProtocols == 0 && !superclassConstraint) {
+    switch (classConstraint) {
+    case ProtocolClassConstraint::Any:
+      return &METADATA_SYM(ANY_MANGLING);
+    case ProtocolClassConstraint::Class:
+      return &METADATA_SYM(ANYOBJECT_MANGLING);
+    }
+  }
+
   // We entrust that the compiler emitting the call to
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
   // a globally stable ordering that's consistent across modules.
-
+  
   // Ensure that the "class constraint" bit is set whenever we have a
   // superclass or a one of the protocols is class-bound.
   assert(classConstraint == ProtocolClassConstraint::Class ||
@@ -2709,28 +2749,42 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
 /***************************************************************************/
 
 namespace {
-  /// A string whose data is globally-allocated.
-  struct GlobalString {
-    StringRef Data;
-    /*implicit*/ GlobalString(StringRef data) : Data(data) {}
+  /// A reference to a context descriptor, used as a uniquing key.
+  struct ContextDescriptorKey {
+    const TypeContextDescriptor *Data;
   };
 } // end anonymous namespace
 
 template <>
-struct llvm::DenseMapInfo<GlobalString> {
-  static GlobalString getEmptyKey() {
-    return StringRef((const char*) 0, 0);
+struct llvm::DenseMapInfo<ContextDescriptorKey> {
+  static ContextDescriptorKey getEmptyKey() {
+    return ContextDescriptorKey{(const TypeContextDescriptor*) 0};
   }
-  static GlobalString getTombstoneKey() {
-    return StringRef((const char*) 1, 0);
+  static ContextDescriptorKey getTombstoneKey() {
+    return ContextDescriptorKey{(const TypeContextDescriptor*) 1};
   }
-  static unsigned getHashValue(const GlobalString &val) {
+  static unsigned getHashValue(ContextDescriptorKey val) {
+    if ((uintptr_t)val.Data <= 1) {
+      return llvm::hash_value(val.Data);
+    }
+
+    // Hash by name.
+    // In full generality, we'd get a better hash by walking up the entire
+    // descriptor tree and hashing names all along the way, and we'd be faster
+    // if we special cased unique keys by hashing pointers. In practice, this
+    // is only used to unique foreign metadata records, which only ever appear
+    // in the "C" or "ObjC" special context, and are never unique.
+    
     // llvm::hash_value(StringRef) is, unfortunately, defined out of
     // line in a library we otherwise would not need to link against.
-    return llvm::hash_combine_range(val.Data.begin(), val.Data.end());
+    StringRef name(val.Data->Name.get());
+    return llvm::hash_combine_range(name.begin(), name.end());
   }
-  static bool isEqual(const GlobalString &lhs, const GlobalString &rhs) {
-    return lhs.Data == rhs.Data;
+  static bool isEqual(ContextDescriptorKey lhs, ContextDescriptorKey rhs) {
+    if ((uintptr_t)lhs.Data <= 1 || (uintptr_t)rhs.Data <= 1) {
+      return lhs.Data == rhs.Data;
+    }
+    return equalContexts(lhs.Data, rhs.Data);
   }
 };
 
@@ -2740,7 +2794,7 @@ namespace {
 struct ForeignTypeState {
   Mutex Lock;
   ConditionVariable InitializationWaiters;
-  llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
+  llvm::DenseMap<ContextDescriptorKey, const ForeignTypeMetadata *> Types;
 };
 } // end anonymous namespace
 
@@ -2756,7 +2810,9 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
   // Okay, check the global map.
   auto &foreignTypes = ForeignTypes.get();
-  GlobalString key(nonUnique->getName());
+  ContextDescriptorKey key{nonUnique->getTypeContextDescriptor()};
+  assert(key.Data
+         && "all foreign metadata should have a type context descriptor");
   bool hasInit = cache.hasInitializationFunction();
 
   const ForeignTypeMetadata *uniqueMetadata;

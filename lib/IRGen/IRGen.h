@@ -295,11 +295,11 @@ class Alignment {
 public:
   typedef uint32_t int_type;
 
-  Alignment() : Value(0) {}
-  explicit Alignment(int_type Value) : Value(Value) {}
+  constexpr Alignment() : Value(0) {}
+  constexpr explicit Alignment(int_type Value) : Value(Value) {}
 
-  int_type getValue() const { return Value; }
-  int_type getMaskValue() const { return Value - 1; }
+  constexpr int_type getValue() const { return Value; }
+  constexpr int_type getMaskValue() const { return Value - 1; }
 
   bool isOne() const { return Value == 1; }
   bool isZero() const { return Value == 0; }
@@ -349,7 +349,7 @@ public:
   /// Is this the "invalid" size value?
   bool isInvalid() const { return *this == Size::invalid(); }
 
-  int_type getValue() const { return Value; }
+  constexpr int_type getValue() const { return Value; }
   
   int_type getValueInBits() const { return Value * 8; }
 

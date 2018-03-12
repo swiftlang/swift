@@ -262,6 +262,14 @@ namespace {
       field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
                                           field.getType(IGF.IGM, structType));
     }
+       
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      auto fields = asImpl().getFields();
+      if (fields.size() != 1)
+        return false;
+      return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
+    }
     
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
