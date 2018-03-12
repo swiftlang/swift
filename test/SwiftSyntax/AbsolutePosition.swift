@@ -31,8 +31,10 @@ PositionTests.test("Visitor") {
     let content = try SwiftLang.parse(getInput("visitor.swift"))
     let source = try String(contentsOf: getInput("visitor.swift"))
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
-    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.offset,
+    expectEqual(parsed.position.byteOffset, 0)
+    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
                 source.count)
+    expectEqual(parsed.position.byteOffset, 0)
     expectEqual(parsed.byteSize, source.count)
   })
 }
@@ -42,8 +44,9 @@ PositionTests.test("Closure") {
     let content = try SwiftLang.parse(getInput("closure.swift"))
     let source = try String(contentsOf: getInput("closure.swift"))
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
-    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.offset,
+    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
                 source.count)
+    expectEqual(parsed.position.byteOffset, 0)
     expectEqual(parsed.byteSize, source.count)
   })
 }
@@ -51,11 +54,10 @@ PositionTests.test("Closure") {
 PositionTests.test("Rename") {
   expectDoesNotThrow({
     let content = try SwiftLang.parse(getInput("visitor.swift"))
-    let source = try String(contentsOf: getInput("visitor.swift"))
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
     let renamed = FuncRenamer().visit(parsed) as! SourceFileSyntax
     let renamedSource = renamed.description
-    expectEqual(renamed.eofToken.positionAfterSkippingLeadingTrivia.offset,
+    expectEqual(renamed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
                 renamedSource.count)
     expectEqual(renamed.byteSize, renamedSource.count)
   })
@@ -73,6 +75,25 @@ PositionTests.test("CurrentFile") {
       }
     }
     Visitor().visit(parsed)
+  })
+}
+
+PositionTests.test("Recursion") {
+  expectDoesNotThrow({
+    var l = [CodeBlockItemSyntax]()
+    let idx = 2000
+    for _ in 0...idx {
+      l.append(SyntaxFactory.makeCodeBlockItem(
+        item: SyntaxFactory.makeReturnStmt(
+          returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
+            .withTrailingTrivia(.newlines(1)), expression: nil), semicolon: nil))
+    }
+    let root = SyntaxFactory.makeSourceFile(
+      statements: SyntaxFactory.makeCodeBlockItemList(l),
+      eofToken: SyntaxFactory.makeToken(.eof, presence: .present))
+    _ = root.statements[idx].position
+    _ = root.statements[idx].byteSize
+    _ = root.statements[idx].positionAfterSkippingLeadingTrivia
   })
 }
 

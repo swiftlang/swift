@@ -232,4 +232,13 @@ extension RawSyntax {
       return true
     }
   }
+
+  var isSourceFile: Bool {
+    switch self {
+    case .node(let kind, _, _):
+      return kind == SyntaxKind.sourceFile
+    default:
+      return false
+    }
+  }
 }

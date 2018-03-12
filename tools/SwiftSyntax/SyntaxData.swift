@@ -40,19 +40,9 @@ final class SyntaxData: Equatable {
 
   let positionCache: AtomicCache<AbsolutePosition>
 
-  let positionAfterSkippingLeadingTriviaCache: AtomicCache<AbsolutePosition>
-
-  let byteSizeCache: AtomicCache<ByteSize>
-
   fileprivate func calculatePosition() -> AbsolutePosition {
     guard let parent = parent else {
-      let message = "cannot find SourceFileSyntax as root"
-      switch raw {
-      case .node(let kind, _, _):
-        assert(kind == SyntaxKind.sourceFile, message)
-      default:
-        assert(false, message)
-      }
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
       // If this node is SourceFileSyntax, its location is the start of the file.
       return AbsolutePosition()
     }
@@ -65,7 +55,7 @@ final class SyntaxData: Equatable {
     // adding the stride of the sibling.
     for idx in (0..<indexInParent).reversed() {
       if let sibling = parent.cachedChild(at: idx) {
-        let pos = sibling.position
+        let pos = sibling.position.copy()
         sibling.raw.accumulateAbsolutePosition(pos)
         return pos
       }
@@ -78,38 +68,33 @@ final class SyntaxData: Equatable {
   }
 
   var positionAfterSkippingLeadingTrivia: AbsolutePosition {
-    return positionAfterSkippingLeadingTriviaCache.value {
-      _ = raw.accumulateLeadingTrivia(position)
-      return position
-    }
+    let result = position.copy()
+    _ = raw.accumulateLeadingTrivia(result)
+    return result
   }
 
-  class ByteSize {
-    var size: Int
-    init(size: Int) {
-      self.size = size
+  fileprivate func getNextSiblingPos() -> AbsolutePosition {
+    // If this node is root, the position of the next sibling is the end of
+    // this node.
+    guard let parent = parent else {
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
+      let result = self.position.copy()
+      raw.accumulateAbsolutePosition(result)
+      return result
     }
+
+    // Find the first valid sibling and return its position.
+    for i in indexInParent+1..<parent.raw.layout.count {
+      guard let sibling = parent.cachedChild(at: i) else { continue }
+      return sibling.position
+    }
+    // Otherwise, use the parent's sibling instead.
+    return parent.getNextSiblingPos()
   }
 
-  var byteSizeWrapper: ByteSize {
-    return byteSizeCache.value {
-      switch raw {
-      case .node(_, let layout, _):
-        var result = 0
-        for i in 0..<layout.count {
-          guard let child = cachedChild(at: i) else { continue }
-          result += child.byteSizeWrapper.size
-        }
-        return ByteSize(size: result)
-      case .token:
-        let pos = AbsolutePosition()
-        raw.accumulateAbsolutePosition(pos)
-        return ByteSize(size: pos.offset)
-      }
-    }
+  var byteSize: Int {
+    return getNextSiblingPos().byteOffset - self.position.byteOffset
   }
-
-  var byteSize: Int { return byteSizeWrapper.size }
 
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
   /// provided index, in the provided parent.
@@ -125,8 +110,6 @@ final class SyntaxData: Equatable {
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
     self.positionCache = AtomicCache<AbsolutePosition>()
-    self.positionAfterSkippingLeadingTriviaCache = AtomicCache<AbsolutePosition>()
-    self.byteSizeCache = AtomicCache<ByteSize>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
@@ -275,17 +258,25 @@ final class SyntaxData: Equatable {
   }
 }
 
-/// An absolute position in a source file as text - the absolute offset from
+/// An absolute position in a source file as text - the absolute byteOffset from
 /// the start, line, and column.
 public class AbsolutePosition {
-  public private(set) var offset: Int = 0
+  public private(set) var byteOffset: Int = 0
   public private(set) var line: Int = 1
   public private(set) var column: Int = 1
+
+  internal func copy() -> AbsolutePosition {
+    let result = AbsolutePosition()
+    result.byteOffset = byteOffset
+    result.line = line
+    result.column = column
+    return result
+  }
 
   /// Add some number of columns to the position.
   internal func add(columns: Int) {
     column += columns
-    offset += columns
+    byteOffset += columns
   }
 
   /// Add some number of newlines to the position, resetting the column.
@@ -294,13 +285,13 @@ public class AbsolutePosition {
   internal func add(lines: Int, size: Int) {
     line += lines
     column = 1
-    offset += lines * size
+    byteOffset += lines * size
   }
 
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
   internal func add(text: String) {
-    guard let chars = text.cString(using: .ascii) else {
+    guard let chars = text.cString(using: .utf8) else {
       return
     }
     let cr: CChar = 13
