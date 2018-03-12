@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -enable-sil-ownership -emit-silgen -o - %s | %FileCheck %s
 
 // REQUIRES: objc_interop

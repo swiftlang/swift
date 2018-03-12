@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -O %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-ir %s -disable-objc-attr-requires-foundation-module

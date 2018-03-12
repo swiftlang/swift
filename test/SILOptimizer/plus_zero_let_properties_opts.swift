@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
 // RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s
 

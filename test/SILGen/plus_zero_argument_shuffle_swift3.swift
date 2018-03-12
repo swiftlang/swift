@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
 
 func fn(_: Any) {}

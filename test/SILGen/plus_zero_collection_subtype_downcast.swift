@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }

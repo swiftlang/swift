@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-sil-ownership -enable-source-import -emit-silgen -verify | %FileCheck %s
 
 import Foundation
