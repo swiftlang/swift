@@ -106,7 +106,7 @@ void SwitchEnumBuilder::emit() && {
       input = builder.createOwnedPHIArgument(optional.getType());
     }
     handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    builder.clearInsertionPoint();
   }
 
   for (NormalCaseData &caseData : caseDataArray) {
@@ -133,7 +133,7 @@ void SwitchEnumBuilder::emit() && {
       }
     }
     handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    builder.clearInsertionPoint();
   }
 
   // If we are asked to create a default block and it is specified that the
@@ -154,6 +154,6 @@ void SwitchEnumBuilder::emit() && {
       input = builder.createOwnedPHIArgument(optional.getType());
     }
     handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    builder.clearInsertionPoint();
   }
 }
