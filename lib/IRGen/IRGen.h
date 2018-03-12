@@ -78,10 +78,10 @@ inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t 
 }
 
 /// The kind of reference counting implementation a heap object uses.
-enum class ReferenceCounting : unsigned char {
+enum class ReferenceCounting : uint8_t {
   /// The object uses native Swift reference counting.
   Native,
-  
+
   /// The object uses ObjC reference counting.
   ///
   /// When ObjC interop is enabled, native Swift class objects are also ObjC
@@ -90,20 +90,20 @@ enum class ReferenceCounting : unsigned char {
   ///
   /// Blocks are always ObjC reference counting compatible.
   ObjC,
-  
+
   /// The object uses _Block_copy/_Block_release reference counting.
   ///
   /// This is a strict subset of ObjC; all blocks are also ObjC reference
   /// counting compatible. The block is assumed to have already been moved to
   /// the heap so that _Block_copy returns the same object back.
   Block,
-  
+
   /// The object has an unknown reference counting implementation.
   ///
   /// This uses maximally-compatible reference counting entry points in the
   /// runtime.
   Unknown,
-  
+
   /// Cases prior to this one are binary-compatible with Unknown reference
   /// counting.
   LastUnknownCompatible = Unknown,
@@ -115,7 +115,7 @@ enum class ReferenceCounting : unsigned char {
   /// runtime, with a masking layer on top. A bit inside the pointer is used
   /// to signal native Swift refcounting.
   Bridge,
-  
+
   /// The object uses ErrorType's reference counting entry points.
   Error,
 };
@@ -135,16 +135,16 @@ enum OnHeap_t : unsigned char {
 };
 
 /// Whether a function requires extra data.
-enum class ExtraData : unsigned char {
+enum class ExtraData : uint8_t {
   /// The function requires no extra data.
   None,
 
   /// The function requires a retainable object pointer of extra data.
   Retainable,
-  
+
   /// The function takes its block object as extra data.
   Block,
-  
+
   Last_ExtraData = Block
 };
 
@@ -159,7 +159,7 @@ enum IsExact_t : bool {
 ///
 /// See the comment in RelativePointer.h.
 
-enum class SymbolReferenceKind : unsigned char {
+enum class SymbolReferenceKind : uint8_t {
   /// An absolute reference to the object, i.e. an ordinary pointer.
   ///
   /// Generally well-suited for when C compatibility is a must, dynamic
