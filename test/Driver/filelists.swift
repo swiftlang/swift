@@ -5,15 +5,28 @@
 
 // CHECK-NOT: Handled
 // CHECK: Handled a.swift
+// CHECK-NEXT: Supplementary a.swift:
+// CHECK-NEXT: Supplementary a.swiftdoc
+// CHECK-NEXT: Supplementary a.swiftmodule
 // CHECK-NEXT: Handled b.swift
+// CHECK-NEXT: Supplementary b.swift:
+// CHECK-NEXT: Supplementary b.swiftdoc
+// CHECK-NEXT: Supplementary b.swiftmodule
 // CHECK-NEXT: Handled c.swift
+// CHECK-NEXT: Supplementary c.swift:
+// CHECK-NEXT: Supplementary c.swiftdoc
+// CHECK-NEXT: Supplementary c.swiftmodule
 // CHECK-NEXT: Handled modules
 // CHECK-NOT: Handled
+
+
 
 // RUN: %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -c %t/a.swift %t/b.swift %t/c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -force-single-frontend-invocation 2>&1 | %FileCheck -check-prefix=CHECK-WMO %s
 
 // CHECK-WMO-NOT: Handled
 // CHECK-WMO: Handled all
+// CHECK-WMO: Supplementary a.swift:
+// CHECK-WMO: Supplementary   object: main.o
 // CHECK-WMO-NOT: output
 // CHECK-WMO-NOT: Handled
 
@@ -29,6 +42,12 @@
 
 // CHECK-WMO-THREADED-NOT: Handled
 // CHECK-WMO-THREADED: Handled all
+// CHECK-WMO-THREADED-NEXT: Supplementary a.swift:
+// CHECK-WMO-THREADED-NEXT: Supplementary a.{{o|bc}}
+// CHECK-WMO-THREADED-NEXT: Supplementary b.swift:
+// CHECK-WMO-THREADED-NEXT: Supplementary b.{{o|bc}}
+// CHECK-WMO-THREADED-NEXT: Supplementary c.swift:
+// CHECK-WMO-THREADED-NEXT: Supplementary c.{{o|bc}}
 // CHECK-WMO-THREADED-NEXT: ...with output!
 // CHECK-WMO-THREADED-NOT: Handled
 
