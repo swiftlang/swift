@@ -2666,7 +2666,7 @@ public:
 
 private:
   /// The kind of bindings that are permitted.
-  enum class AllowedBindingKind : unsigned char {
+  enum class AllowedBindingKind : uint8_t {
     /// Only the exact type.
     Exact,
     /// Supertypes of the specified type.
@@ -2676,7 +2676,7 @@ private:
   };
 
   /// The kind of literal binding found.
-  enum class LiteralBindingKind : unsigned char {
+  enum class LiteralBindingKind : uint8_t {
     None,
     Collection,
     Float,
