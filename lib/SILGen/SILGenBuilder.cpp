@@ -702,7 +702,30 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast = createUncheckedBitCast(loc, value.forward(SGF), type);
+  SILValue cast = createUncheckedBitCast(loc, value.getValue(), type);
+
+  // Currently SILBuilder::createUncheckedBitCast only produces these
+  // instructions. We assert here to make sure if this changes, this code is
+  // updated.
+  assert((isa<UncheckedTrivialBitCastInst>(cast) ||
+          isa<UncheckedRefCastInst>(cast) ||
+          isa<UncheckedBitwiseCastInst>(cast)) &&
+         "SILGenBuilder is out of sync with SILBuilder.");
+
+  // If we have a trivial inst, just return early.
+  if (isa<UncheckedTrivialBitCastInst>(cast))
+    return ManagedValue::forUnmanaged(cast);
+
+  // If we perform an unchecked bitwise case, then we are producing a new RC
+  // identity implying that we need a copy of the casted value to be returned so
+  // that the inputs/outputs of the case have separate ownership.
+  if (isa<UncheckedBitwiseCastInst>(cast)) {
+    return ManagedValue::forUnmanaged(cast).copy(SGF, loc);
+  }
+
+  // Otherwise, we forward the cleanup of the input value and place the cleanup
+  // on the cast value since unchecked_ref_cast is "forwarding".
+  value.forward(SGF);
   return cloner.clone(cast);
 }
 
@@ -870,4 +893,11 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
               return mv.forward(getSILGenFunction());
             });
   return cloner.clone(createTuple(loc, type, forwardedValues));
+}
+
+ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValue op,
+                                                    SILType resultTy) {
+  CleanupCloner cloner(*this, op);
+  SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
+  return cloner.clone(cast);
 }
