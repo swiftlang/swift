@@ -600,24 +600,16 @@ bool Lexer::isOperator(StringRef string) {
 
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
-  tok Kind = llvm::StringSwitch<tok>(Str)
-#define KEYWORD(kw) \
-    .Case(#kw, tok::kw_##kw)
+#define SIL_KEYWORD(kw)
+#define KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-    .Default(tok::identifier);
 
   // SIL keywords are only active in SIL mode.
-  switch (Kind) {
-#define SIL_KEYWORD(kw) \
-    case tok::kw_##kw:
+  if (InSILMode) {
+#define SIL_KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-      if (!InSILMode)
-        Kind = tok::identifier;
-      break;
-    default:
-      break;
   }
-  return Kind;
+  return tok::identifier;
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
