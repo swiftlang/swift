@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
 sil_stage canonical
 

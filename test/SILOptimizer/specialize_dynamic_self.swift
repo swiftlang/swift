@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sil -O -primary-file %s | %FileCheck %s
 
 protocol P {}

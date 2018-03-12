@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // Verify that reabstraction happens when forming container literals.

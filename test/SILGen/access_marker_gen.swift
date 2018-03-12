@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}

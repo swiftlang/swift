@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class TestClass {

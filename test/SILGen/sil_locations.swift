@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
@@ -77,7 +78,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @$S13sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":78
+  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":79
 }
 
 func foo(_ x: Int) -> Int {
