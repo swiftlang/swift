@@ -518,10 +518,8 @@ void ToolChain::JobContext::addFrontendInputArguments(
       const llvm::opt::Arg &InArg = IA->getInputArg();
       // For an index data job,
       // only make the index-file-path ones primary
-      But the action
-          isn't marked! if (ToolChain::canCompileInputArgumentBePrimary(Output,
-                                                                        InArg))
-              primaries.insert(InArg.getValue());
+      if (ToolChain::canCompileInputArgumentBePrimary(Output, InArg))
+        primaries.insert(InArg.getValue());
     }
   for (auto inputPair : getTopLevelInputFiles()) {
     if (!types::isPartOfSwiftCompilation(inputPair.first))
