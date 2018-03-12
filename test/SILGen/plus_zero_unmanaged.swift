@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-sil %s | %FileCheck %s
 
 class C {}

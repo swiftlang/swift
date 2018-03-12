@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 
 enum E {

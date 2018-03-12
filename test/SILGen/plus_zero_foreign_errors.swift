@@ -1,7 +1,8 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name foreign_errors -emit-silgen -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

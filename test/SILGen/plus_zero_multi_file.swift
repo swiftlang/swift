@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}

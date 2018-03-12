@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift

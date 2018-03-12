@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -verify %s | %FileCheck %s
 
 // SR-3090:

@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %target-swift-frontend -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
 
 indirect enum TreeA<T> {

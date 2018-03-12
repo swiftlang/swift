@@ -1,12 +1,13 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/default_arguments_other.swiftmodule -emit-module -swift-version 4 -primary-file %S/Inputs/default_arguments_other.swift
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=SWIFT3 --check-prefix=CHECK
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=SWIFT4 --check-prefix=CHECK
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=SWIFT3 --check-prefix=CHECK
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=SWIFT4 --check-prefix=CHECK
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=OPT
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
 
 // Check that default arguments are serialized in Swift 4 mode.
 

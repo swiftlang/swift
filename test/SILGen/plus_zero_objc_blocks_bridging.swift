@@ -1,8 +1,9 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 

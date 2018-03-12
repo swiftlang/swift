@@ -1,4 +1,5 @@
 // REQUIRES: plus_zero_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_checked_cast -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
