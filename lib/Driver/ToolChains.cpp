@@ -1038,6 +1038,14 @@ void ToolChain::getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                           getPlatformNameForTriple(getTriple()));
 }
 
+void ToolChain::getRuntimeLibraryPathWithArch(
+    SmallVectorImpl<char> &runtimeLibPath, const llvm::opt::ArgList &args,
+    bool shared) const {
+  getRuntimeLibraryPath(runtimeLibPath, args, shared);
+  llvm::sys::path::append(runtimeLibPath,
+                          swift::getMajorArchitectureName(getTriple()));
+}
+
 bool ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
                                           StringRef sanitizerName,
                                           bool shared) const {

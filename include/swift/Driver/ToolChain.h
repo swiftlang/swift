@@ -195,6 +195,9 @@ protected:
   /// relative to the compiler.
   void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                              const llvm::opt::ArgList &args, bool shared) const;
+  void getRuntimeLibraryPathWithArch(SmallVectorImpl<char> &runtimeLibPath,
+                                     const llvm::opt::ArgList &args,
+                                     bool shared) const;
 
   void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
                                           const char *name,

@@ -157,7 +157,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   foreach(arch IN LISTS SWIFT_SDK_LINUX_ARCHITECTURES)
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
   endforeach()
-  add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
 
   add_swift_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
     ImageInspectionELF.cpp
