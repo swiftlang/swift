@@ -47,11 +47,15 @@ extension PastEndIndex: Comparable where Bound: Comparable {
 
 extension PastEndIndex: Hashable where Bound: Hashable {
   public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  public func _hash(into hasher: inout _Hasher) {
     switch self {
     case .inRange(let value):
-      return value.hashValue
+      return hasher.append(value)
     case .pastEnd:
-      return .max
+      return hasher.append(Int.max)
     }
   }
 }

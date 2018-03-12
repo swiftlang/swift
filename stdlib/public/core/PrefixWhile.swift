@@ -138,95 +138,12 @@ extension LazyPrefixWhileCollection: Sequence {
   }
 }
 
-extension LazyPrefixWhileCollection {
-  /// A position in the base collection of a `LazyPrefixWhileCollection` or the
-  /// end of that collection.
-  @_frozen // FIXME(sil-serialize-all)
-  @usableFromInline
-  internal enum _IndexRepresentation {
-    case index(Base.Index)
-    case pastEnd
-  }
-  
-  /// A position in a `LazyPrefixWhileCollection` or
-  /// `LazyPrefixWhileBidirectionalCollection` instance.
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index {
-    /// The position corresponding to `self` in the underlying collection.
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal let _value: _IndexRepresentation
-
-    /// Creates a new index wrapper for `i`.
-    @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal init(_ i: Base.Index) {
-      self._value = .index(i)
-    }
-
-    /// Creates a new index that can represent the `endIndex` of a
-    /// `LazyPrefixWhileCollection<Base>`. This is not the same as a wrapper
-    /// around `Base.endIndex`.
-    @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal init(endOf: Base) {
-      self._value = .pastEnd
-    }
-  }
-}
-
-extension LazyPrefixWhileCollection.Index: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
-  public static func == (
-    lhs: LazyPrefixWhileCollection<Base>.Index, 
-    rhs: LazyPrefixWhileCollection<Base>.Index
-  ) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case let (.index(l), .index(r)):
-      return l == r
-    case (.pastEnd, .pastEnd):
-      return true
-    case (.pastEnd, .index), (.index, .pastEnd):
-      return false
-    }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public static func < (
-    lhs: LazyPrefixWhileCollection<Base>.Index, 
-    rhs: LazyPrefixWhileCollection<Base>.Index
-  ) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case let (.index(l), .index(r)):
-      return l < r
-    case (.index, .pastEnd):
-      return true
-    case (.pastEnd, _):
-      return false
-    }
-  }
-}
-
-extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    switch _value {
-    case .index(let value):
-      hasher.append(value)
-    case .pastEnd:
-      hasher.append(Int.max)
-    }
-  }
-}
-
 extension LazyPrefixWhileCollection: Collection {
+  public typealias Index = PastEndIndex<Base.Index>
+
   @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
-    return Index(_base.startIndex)
+    return .inRange(_base.startIndex)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -234,7 +151,7 @@ extension LazyPrefixWhileCollection: Collection {
     // If the first element of `_base` satisfies the predicate, there is at
     // least one element in the lazy collection: Use the explicit `.pastEnd` index.
     if let first = _base.first, _predicate(first) {
-      return Index(endOf: _base)
+      return .pastEnd
     }
 
     // `_base` is either empty or `_predicate(_base.first!) == false`. In either
@@ -245,20 +162,20 @@ extension LazyPrefixWhileCollection: Collection {
   @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     _precondition(i != endIndex, "Can't advance past endIndex")
-    guard case .index(let i) = i._value else {
+    guard case .inRange(let i) = i else {
       _preconditionFailure("Invalid index passed to index(after:)")
     }
     let nextIndex = _base.index(after: i)
     guard nextIndex != _base.endIndex && _predicate(_base[nextIndex]) else {
-      return Index(endOf: _base)
+      return .pastEnd
     }
-    return Index(nextIndex)
+    return .inRange(nextIndex)
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
-    switch position._value {
-    case .index(let i):
+    switch position {
+    case .inRange(let i):
       return _base[i]
     case .pastEnd:
       _preconditionFailure("Index out of range")
@@ -270,10 +187,10 @@ extension LazyPrefixWhileCollection: BidirectionalCollection
 where Base: BidirectionalCollection {
   @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
-    switch i._value {
-    case .index(let i):
+    switch i {
+    case .inRange(let i):
       _precondition(i != _base.startIndex, "Can't move before startIndex")
-      return Index(_base.index(before: i))
+      return .inRange(_base.index(before: i))
     case .pastEnd:
       // Look for the position of the last element in a non-empty
       // prefix(while:) collection by searching forward for a predicate
@@ -291,7 +208,7 @@ where Base: BidirectionalCollection {
         }
         result = next
       }
-      return Index(result)
+      return .inRange(result)
     }
   }
 }
