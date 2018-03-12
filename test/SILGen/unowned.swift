@@ -146,10 +146,9 @@ class TestUnownedMember {
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FIELDPTR:%.*]] = ref_element_addr [[BORROWED_SELF]] : $TestUnownedMember, #TestUnownedMember.member
-// CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:   [[INVAL:%.*]] = ref_to_unowned [[ARG1_COPY]] : $C to $@sil_unowned C
 // CHECK:   [[INVAL_COPY:%.*]] = copy_value [[INVAL]] : $@sil_unowned C
-// CHECK:   assign [[INVAL_COPY]] to [[WRITE]] : $*@sil_unowned C
+// CHECK:   assign [[INVAL_COPY]] to [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:   destroy_value [[ARG1_COPY]] : $C
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
