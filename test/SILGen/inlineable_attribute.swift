@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name inlineable_attribute -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] @$S20inlineable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @_inlineable public func fragileFunction() {

@@ -1,8 +1,8 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O -primary-file %s > /dev/null
-// RUN: %target-swift-frontend -emit-ir -primary-file %s > /dev/null
+// RUN: %target-swift-frontend -module-name constrained_extensions -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name constrained_extensions -emit-sil -O -primary-file %s > /dev/null
+// RUN: %target-swift-frontend -module-name constrained_extensions -emit-ir -primary-file %s > /dev/null
 
 extension Array where Element == Int {
   // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE1xSaySiGyt_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>

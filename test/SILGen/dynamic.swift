@@ -3,8 +3,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
 
 // REQUIRES: objc_interop
 

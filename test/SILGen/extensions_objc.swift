@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend -module-name extensions_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
 //
 // REQUIRES: objc_interop
 
