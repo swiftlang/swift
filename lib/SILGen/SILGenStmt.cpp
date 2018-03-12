@@ -816,9 +816,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   SILBasicBlock *failExitingBlock = createBasicBlock();
   SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
 
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
-      loopDest.getBlock(),
+  switchEnumBuilder.addOptionalSomeCase(
+      createBasicBlock(), loopDest.getBlock(),
       [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         SGF.emitProfilerIncrement(S->getBody());
 
@@ -881,9 +880,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
   // contBlock.
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
-      failExitingBlock,
+  switchEnumBuilder.addOptionalNoneCase(
+      createBasicBlock(), failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);

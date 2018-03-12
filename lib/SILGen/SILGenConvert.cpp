@@ -391,9 +391,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
     finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+  SEBuilder.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         // If we have an address only type, we want to match the old behavior of
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
@@ -420,8 +419,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         return scope.exitAndBranch(loc);
       });
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
+  SEBuilder.addOptionalNoneCase(
+      isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =

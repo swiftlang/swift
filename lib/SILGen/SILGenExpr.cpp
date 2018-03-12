@@ -4253,23 +4253,23 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SwitchEnumBuilder SEB(SGF.B, loc, optVal);
 
-  auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-  SEB.addCase(someDecl, isPresentBB, contBB, [&](ManagedValue input,
-                                                 SwitchCaseFullExpr &&scope) {
-    if (resultTL.isAddressOnly()) {
-      SILValue addr =
-          addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
-      input = SGF.B.createUncheckedTakeEnumDataAddr(
-          loc, input, someDecl, input.getType().getOptionalObjectType());
-      SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
-                           IsInitialization);
-      scope.exitAndBranch(loc);
-      return;
-    }
-    scope.exitAndBranch(loc, input.forward(SGF));
-  });
-  SEB.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
+  SEB.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+        if (resultTL.isAddressOnly()) {
+          SILValue addr =
+              addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+          auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
+          input = SGF.B.createUncheckedTakeEnumDataAddr(
+              loc, input, someDecl, input.getType().getOptionalObjectType());
+          SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
+                               IsInitialization);
+          scope.exitAndBranch(loc);
+          return;
+        }
+        scope.exitAndBranch(loc, input.forward(SGF));
+      });
+  SEB.addOptionalNoneCase(
+      isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (resultTL.isAddressOnly()) {
           SILValue addr =
