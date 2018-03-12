@@ -319,7 +319,9 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
   } </CodeBlock></CatchClause><CatchClause>catch <CodeBlock>{
   }</CodeBlock></CatchClause></DoStmt><RepeatWhileStmt>
   repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>true</BooleanLiteralExpr></RepeatWhileStmt><RepeatWhileStmt>
-  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><DoStmt>
+  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><WhileStmt>
+  while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><WhileStmt>
+  LABEL: while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><DoStmt>
   LABEL: do <CodeBlock>{}</CodeBlock></DoStmt>
   LABEL: switch <IdentifierExpr>foo </IdentifierExpr>{
     case <ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>:<FallthroughStmt>
