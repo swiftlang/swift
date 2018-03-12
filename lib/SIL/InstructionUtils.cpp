@@ -188,7 +188,7 @@ SILValue swift::stripAddressAccess(SILValue V) {
       return V;
     case ValueKind::BeginBorrowInst:
     case ValueKind::BeginAccessInst:
-      return stripAddressAccess(cast<SingleValueInstruction>(V)->getOperand(0));
+      V = cast<SingleValueInstruction>(V)->getOperand(0);
     }
   }
 }
