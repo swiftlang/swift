@@ -445,19 +445,16 @@ private:
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
 
-  /// Add a rewrite rule that makes \c otherPA a part of the given equivalence
-  /// class.
+  /// Add a rewrite rule from that makes the two types equivalent.
   ///
   /// \returns true if a new rewrite rule was added, and false otherwise.
-  bool addSameTypeRewriteRule(EquivalenceClass *equivClass,
-                              PotentialArchetype *otherPA);
+  bool addSameTypeRewriteRule(CanType type1, CanType type2);
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetypes are equivalent.
-  ConstraintResult addSameTypeRequirementBetweenArchetypes(
-                                               PotentialArchetype *T1,
-                                               PotentialArchetype *T2,
-                                               const RequirementSource *Source);
+  /// \brief Add a same-type requirement between two types that are known to
+  /// refer to type parameters.
+  ConstraintResult addSameTypeRequirementBetweenTypeParameters(
+                                         ResolvedType type1, ResolvedType type2,
+                                         const RequirementSource *source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
@@ -811,9 +808,6 @@ public:
   bool areInSameEquivalenceClass(Type type1, Type type2);
 
   /// Simplify the given dependent type down to its canonical representation.
-  ///
-  /// \returns null if the type involved dependent member types that
-  /// don't have associated types.
   Type getCanonicalTypeParameter(Type type);
 
   /// For each requirement in \c sig, create a new signature without it and see
