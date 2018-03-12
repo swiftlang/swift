@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension

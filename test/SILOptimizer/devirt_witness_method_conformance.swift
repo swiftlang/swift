@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -O -emit-ir  -primary-file %s | %FileCheck %s
 // This is a swift file because the crash doesn't reproduce with SIL.
 @inline(never)

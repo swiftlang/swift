@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_generic_marker.swift
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -linker -I %t %s | %FileCheck %s

@@ -1,4 +1,5 @@
 // REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
 
