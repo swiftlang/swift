@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name property_abstraction -enable-sil-ownership -emit-silgen %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}

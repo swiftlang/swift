@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name partial_apply_generic -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol Panda {
   associatedtype Cuddles : Foo

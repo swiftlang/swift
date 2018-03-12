@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name rethrows -enable-sil-ownership -emit-sil -verify %s | %FileCheck %s
 
 @discardableResult
 func rethrower(_ fn: () throws -> Int) rethrows -> Int {

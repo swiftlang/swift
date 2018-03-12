@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name borrow -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 import Swift
 

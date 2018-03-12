@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -module-name argument_shuffle_swift3 -emit-silgen -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
 
 func fn(_: Any) {}
 
