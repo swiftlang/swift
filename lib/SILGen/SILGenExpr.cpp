@@ -4255,7 +4255,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
   SEB.addCase(someDecl, isPresentBB, contBB, [&](ManagedValue input,
-                                                 SwitchCaseFullExpr &scope) {
+                                                 SwitchCaseFullExpr &&scope) {
     if (resultTL.isAddressOnly()) {
       SILValue addr =
           addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
@@ -4270,7 +4270,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   });
   SEB.addCase(
       SGF.getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (resultTL.isAddressOnly()) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);

@@ -58,9 +58,9 @@ public:
 class SwitchEnumBuilder {
 public:
   using NormalCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+      std::function<void(ManagedValue, SwitchCaseFullExpr &&)>;
   using DefaultCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+      std::function<void(ManagedValue, SwitchCaseFullExpr &&)>;
 
   enum class DefaultDispatchTime { BeforeNormalCases, AfterNormalCases };
 

@@ -393,7 +393,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
   SEBuilder.addCase(
       getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         // If we have an address only type, we want to match the old behavior of
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
@@ -422,7 +422,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
   SEBuilder.addCase(
       getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);

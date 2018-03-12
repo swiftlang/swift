@@ -819,7 +819,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   switchEnumBuilder.addCase(
       SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
       loopDest.getBlock(),
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         SGF.emitProfilerIncrement(S->getBody());
 
         // Emit the loop body.
@@ -884,7 +884,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   switchEnumBuilder.addCase(
       SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
       failExitingBlock,
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
       },

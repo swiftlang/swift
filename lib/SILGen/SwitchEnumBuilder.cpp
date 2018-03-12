@@ -105,7 +105,7 @@ void SwitchEnumBuilder::emit() && {
     if (!isAddressOnly) {
       input = builder.createOwnedPHIArgument(optional.getType());
     }
-    handler(input, presentScope);
+    handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
   }
 
@@ -132,7 +132,7 @@ void SwitchEnumBuilder::emit() && {
         input = builder.createOwnedPHIArgument(inputType);
       }
     }
-    handler(input, presentScope);
+    handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
   }
 
@@ -153,7 +153,7 @@ void SwitchEnumBuilder::emit() && {
     if (!isAddressOnly) {
       input = builder.createOwnedPHIArgument(optional.getType());
     }
-    handler(input, presentScope);
+    handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
   }
 }
