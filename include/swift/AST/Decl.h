@@ -3879,7 +3879,7 @@ enum class AccessorKind {
 };
 
 /// The safety semantics of this addressor.
-enum class AddressorKind : unsigned char {
+enum class AddressorKind : uint8_t {
   /// \brief This is not an addressor.
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
@@ -3896,7 +3896,7 @@ enum class AddressorKind : unsigned char {
 };
 
 /// Whether an access to storage is for reading, writing, or both.
-enum class AccessKind : unsigned char {
+enum class AccessKind : uint8_t {
   /// The access is just to read the current value.
   Read,
 
@@ -3908,11 +3908,11 @@ enum class AccessKind : unsigned char {
 };
 
 /// The way to actually evaluate an access to storage.
-enum class AccessStrategy : unsigned char {
+enum class AccessStrategy : uint8_t {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
-  
+
   /// The decl is a VarDecl with storage defined by a property behavior;
   /// this access may initialize or reassign the storage based on dataflow.
   BehaviorStorage,
