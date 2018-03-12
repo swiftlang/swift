@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name existential_erasure -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self

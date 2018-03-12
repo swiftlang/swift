@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/globals.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name retaining_globals -import-objc-header %S/Inputs/globals.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 

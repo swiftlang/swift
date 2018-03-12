@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name scalar_to_tuple_args -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
 func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}

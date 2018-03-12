@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name array_literal_abstraction -emit-silgen %s | %FileCheck %s
 
 // Verify that reabstraction happens when forming container literals.
 // <rdar://problem/16039286>

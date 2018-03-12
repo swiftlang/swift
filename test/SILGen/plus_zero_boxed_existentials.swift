@@ -1,7 +1,7 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend -module-name boxed_existentials -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name boxed_existentials -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(_ x: Error) { }
 // CHECK-LABEL: sil hidden @$S18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
