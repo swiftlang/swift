@@ -540,15 +540,15 @@ namespace {
   /// A node in the equivalence class, used for visualization.
   struct EquivalenceClassVizNode {
     const EquivalenceClass *first;
-    PotentialArchetype *second;
+    Type second;
 
-    operator const void *() const { return second; }
+    operator const void *() const { return second.getPointer(); }
   };
 
   /// Iterator through the adjacent nodes in an equivalence class, for
   /// visualization.
   class EquivalenceClassVizIterator {
-    using BaseIterator = const Constraint<PotentialArchetype *> *;
+    using BaseIterator = const Constraint<Type> *;
 
     EquivalenceClassVizNode node;
     BaseIterator base;
@@ -611,7 +611,7 @@ namespace llvm {
     using NodeRef = EquivalenceClassVizNode;
 
     static NodeRef getEntryNode(const EquivalenceClass *equivClass) {
-      return { equivClass, equivClass->members.front() };
+      return { equivClass, equivClass->members.front()->getDependentType({ }) };
     }
 
     class nodes_iterator {
@@ -634,7 +634,7 @@ namespace llvm {
       const BaseIterator &getBase() const { return base; }
 
       reference operator*() const {
-        return { equivClass, *getBase() };
+        return { equivClass, (*getBase())->getDependentType({ }) };
       }
 
       nodes_iterator& operator++() {
@@ -699,7 +699,7 @@ namespace llvm {
 
     std::string getNodeLabel(EquivalenceClassVizNode node,
                              const EquivalenceClass *equivClass) const {
-      return node.second->getDebugName();
+      return node.second.getString();
     }
 
     static std::string getEdgeAttributes(EquivalenceClassVizNode node,
@@ -1850,6 +1850,8 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
 }
 
 void EquivalenceClass::addMember(PotentialArchetype *pa) {
+  assert(find(members, pa) == members.end() &&
+         "Already have this potential archetype!");
   members.push_back(pa);
   if (members.back()->getNestingDepth() < members.front()->getNestingDepth()) {
     MutableArrayRef<PotentialArchetype *> mutMembers = members;
@@ -1923,6 +1925,15 @@ public:
              ->getOrCreateEquivalenceClass(builder);
   }
 
+  /// Retrieve the equivalence class into which a resolved type refers.
+  EquivalenceClass *getEquivalenceClassIfPresent() const {
+    assert(*this && "Only for resolved types");
+    if (equivClass) return equivClass;
+
+    // Create the equivalence class now.
+    return type.get<PotentialArchetype *>()->getEquivalenceClassIfPresent();
+  }
+
   /// Retrieve the unresolved result.
   EquivalenceClass *getUnresolvedEquivClass() const {
     assert(!*this);
@@ -1970,16 +1981,6 @@ bool EquivalenceClass::recordConformanceConstraint(
   return inserted;
 }
 
-bool EquivalenceClass::recordSameTypeConstraint(
-                              PotentialArchetype *type1,
-                              PotentialArchetype *type2,
-                              const RequirementSource *source) {
-  sameTypeConstraints.push_back({type1, type2, source});
-  ++NumSameTypeConstraints;
-  return type1->getEquivalenceClassIfPresent() !=
-    type2->getEquivalenceClassIfPresent();
-}
-
 template<typename T>
 Type Constraint<T>::getSubjectDependentType(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
@@ -1990,21 +1991,17 @@ Type Constraint<T>::getSubjectDependentType(
 }
 
 template<typename T>
-bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
-  if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>())
-    return subjectPA == pa;
+bool Constraint<T>::isSubjectEqualTo(Type type) const {
+  return getSubjectDependentType({ })->isEqual(type);
+}
 
+template<typename T>
+bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
   return getSubjectDependentType({ })->isEqual(pa->getDependentType({ }));
 }
 
 template<typename T>
 bool Constraint<T>::hasSameSubjectAs(const Constraint<T> &other) const {
-  if (auto subjectPA = subject.dyn_cast<PotentialArchetype *>()) {
-    if (auto otherSubjectPA =
-          other.subject.template dyn_cast<PotentialArchetype *>())
-      return subjectPA == otherSubjectPA;
-  }
-
   return getSubjectDependentType({ })
     ->isEqual(other.getSubjectDependentType({ }));
 }
@@ -2463,9 +2460,9 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
              [&] { out << ", "; });
   out << "\nSame-type constraints:";
   interleave(sameTypeConstraints,
-             [&](const Constraint<PotentialArchetype *> &constraint) {
+             [&](const Constraint<Type> &constraint) {
                out << "\n  " << constraint.getSubjectDependentType({ })
-                   << " == " << constraint.value->getDebugName();
+                   << " == " << constraint.value;
 
                if (constraint.source->isDerivedRequirement())
                  out << " [derived]";
@@ -4832,15 +4829,37 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
                                          ResolvedType type1, ResolvedType type2,
                                          const RequirementSource *source)
 {
+  ++NumSameTypeConstraints;
+
+  Type depType1 = type1.getDependentType(*this);
+  Type depType2 = type2.getDependentType(*this);
+
+  // Record the same-type constraint, and bail out if it was already known.
+  auto equivClass = type1.getEquivalenceClassIfPresent();
+  auto equivClass2 = type2.getEquivalenceClassIfPresent();
+  if (depType1->isEqual(depType2) ||
+      ((equivClass || equivClass2) && equivClass == equivClass2)) {
+    // Make sure we have an equivalence class in which we can record the
+    // same-type constraint.
+    if (!equivClass) {
+      if (equivClass2) {
+        equivClass = equivClass2;
+      } else {
+        auto pa1 = type1.realizePotentialArchetype(*this);
+        equivClass = pa1->getOrCreateEquivalenceClass(*this);
+      }
+    }
+
+    // FIXME: We could determine equivalence based on both sides canonicalizing
+    // to the same type. 
+    equivClass->sameTypeConstraints.push_back({depType1, depType2, source});
+    return ConstraintResult::Resolved;
+  }
+
   // Both sides are type parameters; equate them.
   // FIXME: Realizes potential archetypes far too early.
   auto OrigT1 = type1.realizePotentialArchetype(*this);
   auto OrigT2 = type2.realizePotentialArchetype(*this);
-
-  // Record the same-type constraint, and bail out if it was already known.
-  if (!OrigT1->getOrCreateEquivalenceClass(*this)
-        ->recordSameTypeConstraint(OrigT1, OrigT2, source))
-    return ConstraintResult::Resolved;
 
   // Operate on the representatives
   auto T1 = OrigT1->getRepresentative();
@@ -4854,10 +4873,16 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
+    std::swap(equivClass, equivClass2);
   }
 
-  auto equivClass = T1->getOrCreateEquivalenceClass(*this);
-  auto equivClass2 = T2->getEquivalenceClassIfPresent();
+  // T1 must have an equivalence class; create one if we don't already have
+  // one.
+  if (!equivClass)
+    equivClass = T1->getOrCreateEquivalenceClass(*this);
+
+  // Record this same-type constraint.
+  equivClass->sameTypeConstraints.push_back({depType1, depType2, source});
 
   // Determine the anchor types of the two equivalence classes.
   CanType anchor1 = equivClass->getAnchor(*this, { })->getCanonicalType();
@@ -5791,22 +5816,22 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
         // Try to find an exact constraint that matches 'other'.
         auto repConstraint =
-          findRepresentativeConstraint<PotentialArchetype *>(
+          findRepresentativeConstraint<Type>(
             equivClass->sameTypeConstraints,
-            [pa, other](const Constraint<PotentialArchetype *> &constraint) {
+            [pa, other](const Constraint<Type> &constraint) {
               return (constraint.isSubjectEqualTo(pa) &&
-                      constraint.value == other) ||
+                      constraint.value->isEqual(other->getDependentType({ }))) ||
                 (constraint.isSubjectEqualTo(other) &&
-                 constraint.value == pa);
+                 constraint.value->isEqual(pa->getDependentType({ })));
             });
 
 
          // Otherwise, just take any old constraint.
         if (!repConstraint) {
           repConstraint =
-            findRepresentativeConstraint<PotentialArchetype *>(
+            findRepresentativeConstraint<Type>(
               equivClass->sameTypeConstraints,
-              [](const Constraint<PotentialArchetype *> &constraint) {
+              [](const Constraint<Type> &constraint) {
                 return true;
               });
         }
@@ -6336,8 +6361,7 @@ static void computeDerivedSameTypeComponents(
 
     CanType source =
       constraint.getSubjectDependentType({ })->getCanonicalType();
-    CanType target =
-      constraint.value->getDependentType({ })->getCanonicalType();
+    CanType target = constraint.value->getCanonicalType();
 
     assert(parentIndices.count(source) == 1 && "Missing source");
     assert(parentIndices.count(target) == 1 && "Missing target");
@@ -6412,11 +6436,11 @@ namespace {
   struct IntercomponentEdge {
     unsigned source;
     unsigned target;
-    Constraint<PotentialArchetype *> constraint;
+    Constraint<Type> constraint;
     bool isSelfDerived = false;
 
     IntercomponentEdge(unsigned source, unsigned target,
-                       const Constraint<PotentialArchetype *> &constraint)
+                       const Constraint<Type> &constraint)
       : source(source), target(target), constraint(constraint)
     {
       assert(source != target && "Not an intercomponent edge");
@@ -6446,7 +6470,7 @@ namespace {
 
 void IntercomponentEdge::dump() const {
   llvm::errs() << constraint.getSubjectDependentType({ }).getString() << " -- "
-    << constraint.value->getDebugName() << ": ";
+    << constraint.value << ": ";
   constraint.source->print(llvm::errs(), nullptr);
   llvm::errs() << "\n";
 }
@@ -6496,6 +6520,15 @@ static bool removalDisconnectsEquivalenceClass(
       findRepresentative(parents, toComponentIndex);
 }
 
+static AssociatedTypeDecl *takeMemberOfDependentMemberType(Type &type) {
+  if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    type = depMemTy->getBase();
+    return depMemTy->getAssocType();
+  }
+
+  return nullptr;
+}
+
 static bool isSelfDerivedNestedTypeNameMatchEdge(
               GenericSignatureBuilder &builder,
               EquivalenceClass *equivClass,
@@ -6505,16 +6538,20 @@ static bool isSelfDerivedNestedTypeNameMatchEdge(
   const auto &edge = sameTypeEdges[edgeIndex];
   auto genericParams = builder.getGenericParams();
   Type sourceType = edge.constraint.getSubjectDependentType(genericParams);
-  PotentialArchetype *target = edge.constraint.value;
+  Type target = edge.constraint.value;
 
   DependentMemberType *sourceDepMemTy;
   while ((sourceDepMemTy = sourceType->getAs<DependentMemberType>()) &&
-         target->getParent() &&
-         sourceDepMemTy->getAssocType() == target->getResolvedType()) {
+         sourceDepMemTy->getAssocType() ==
+           takeMemberOfDependentMemberType(target)) {
     sourceType = sourceDepMemTy->getBase();
-    target = target->getParent();
 
-    if (target->getEquivalenceClassIfPresent() == equivClass &&
+    auto targetEquivClass =
+      builder.maybeResolveEquivalenceClass(target,
+                                           ArchetypeResolutionKind::WellFormed,
+                                           false)
+        .getEquivalenceClassIfPresent();
+    if (targetEquivClass == equivClass &&
         builder.maybeResolveEquivalenceClass(
                                      sourceType,
                                      ArchetypeResolutionKind::WellFormed,
@@ -6523,8 +6560,7 @@ static bool isSelfDerivedNestedTypeNameMatchEdge(
         !removalDisconnectsEquivalenceClass(equivClass, componentOf,
                                             sameTypeEdges, edgeIndex,
                                             sourceType->getCanonicalType(),
-                                            target->getDependentType({ })
-                                              ->getCanonicalType()))
+                                            target->getCanonicalType()))
       return true;
   }
 
@@ -6632,14 +6668,14 @@ static void collapseSameTypeComponents(
       auto &constraints = equivClass->sameTypeConstraints;
       auto known =
         std::find_if(constraints.begin(), constraints.end(),
-                     [&](const Constraint<PotentialArchetype *> &existing) {
+                     [&](const Constraint<Type> &existing) {
                        // Check the requirement source, first.
                        if (existing.source != edge.constraint.source)
                          return false;
 
                        return
                          (existing.hasSameSubjectAs(edge.constraint) &&
-                          existing.value == edge.constraint.value) ||
+                          existing.value->isEqual(edge.constraint.value)) ||
                          (existing.isSubjectEqualTo(edge.constraint.value) &&
                           edge.constraint.isSubjectEqualTo(existing.value));
                      });
@@ -6742,9 +6778,9 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // Intra-component edges are stored per-component, so we can perform
   // diagnostics within each component.
   unsigned numComponents = equivClass->derivedSameTypeComponents.size();
-  std::vector<std::vector<Constraint<PotentialArchetype *>>>
+  std::vector<std::vector<Constraint<Type>>>
     intracomponentEdges(numComponents,
-                        std::vector<Constraint<PotentialArchetype *>>());
+                        std::vector<Constraint<Type>>());
 
   // Intercomponent edges are stored as one big list, which tracks the
   // source/target components.
@@ -6757,7 +6793,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         Diags.diagnose(constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
                        constraint.getSubjectDependentType(genericParams),
-                       constraint.value->getDependentType(genericParams));
+                       constraint.value);
       }
 
       continue;
@@ -6769,11 +6805,10 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     assert(componentOf.count(subjectType) > 0 &&
            "unknown potential archetype?");
     unsigned firstComponentIdx = componentOf[subjectType];
-    assert(componentOf.count(
-             constraint.value->getDependentType({ })->getCanonicalType()) > 0 &&
+    assert(componentOf.count(constraint.value->getCanonicalType()) > 0 &&
            "unknown potential archetype?");
     unsigned secondComponentIdx =
-      componentOf[constraint.value->getDependentType({ })->getCanonicalType()];
+      componentOf[constraint.value->getCanonicalType()];
 
     // Separately track nested-type-name-match constraints.
     if (constraint.source->getRoot()->kind ==
@@ -6819,10 +6854,10 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   for (auto &constraints : intracomponentEdges) {
     if (constraints.empty()) continue;
 
-    checkConstraintList<PotentialArchetype *, Type>(
+    checkConstraintList<Type, Type>(
       genericParams, constraints,
-      [](const Constraint<PotentialArchetype *> &) { return true; },
-      [](const Constraint<PotentialArchetype *> &constraint) {
+      [](const Constraint<Type> &) { return true; },
+      [](const Constraint<Type> &constraint) {
         // Ignore nested-type-name-match constraints.
         if (constraint.source->getRoot()->kind ==
               RequirementSource::NestedTypeNameMatch)
@@ -6833,8 +6868,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       None,
       diag::redundant_same_type_constraint,
       diag::previous_same_type_constraint,
-      [&](PotentialArchetype *pa) {
-        return pa->getDependentType(genericParams);
+      [&](Type type) {
+        return type;
       },
       /*removeSelfDerived=*/false);
   }
@@ -6863,12 +6898,12 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         Diags.diagnose(lhs.constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
                        lhs.constraint.getSubjectDependentType(genericParams),
-                       lhs.constraint.value->getDependentType(genericParams));
+                       lhs.constraint.value);
         Diags.diagnose(rhs.constraint.source->getLoc(),
                        diag::previous_same_type_constraint,
                        rhs.constraint.source->classifyDiagKind(),
                        rhs.constraint.getSubjectDependentType(genericParams),
-                       rhs.constraint.value->getDependentType(genericParams));
+                       rhs.constraint.value);
         return true;
       }),
     intercomponentEdges.end());
@@ -6890,16 +6925,14 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
                          diag::redundant_same_type_constraint,
                          edge.constraint.getSubjectDependentType(
                                                           genericParams),
-                         edge.constraint.value->getDependentType(
-                                                          genericParams));
+                         edge.constraint.value);
 
           Diags.diagnose(firstEdge.constraint.source->getLoc(),
                          diag::previous_same_type_constraint,
                          firstEdge.constraint.source->classifyDiagKind(),
                          firstEdge.constraint.getSubjectDependentType(
                                                           genericParams),
-                         firstEdge.constraint.value->getDependentType(
-                                                          genericParams));
+                         firstEdge.constraint.value);
         }
 
         continue;

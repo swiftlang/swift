@@ -124,7 +124,7 @@ public:
       conformsTo;
 
     /// Same-type constraints within this equivalence class.
-    std::vector<Constraint<PotentialArchetype *>> sameTypeConstraints;
+    std::vector<Constraint<Type>> sameTypeConstraints;
 
     /// Concrete type to which this equivalence class is equal.
     ///
@@ -212,15 +212,6 @@ public:
                                      ResolvedType type,
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
-
-    /// Record a same-type constraint between \c type1 and \c type2 determined
-    /// via the given source.
-    ///
-    /// \returns true if this same-type constraint merges two equivalence
-    /// classes, and false otherwise.
-    bool recordSameTypeConstraint(PotentialArchetype *type1,
-                                  PotentialArchetype *type2,
-                                  const RequirementSource *source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -1505,8 +1496,10 @@ struct GenericSignatureBuilder::Constraint {
   Type getSubjectDependentType(
                        TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  /// Determine whether the subject is equivalence to the given potential
-  /// archetype.
+  /// Determine whether the subject is equivalence to the given type.
+  bool isSubjectEqualTo(Type type) const;
+
+  /// Determine whether the subject is equivalence to the given type.
   bool isSubjectEqualTo(const PotentialArchetype *pa) const;
 
   /// Determine whether this constraint has the same subject as the
