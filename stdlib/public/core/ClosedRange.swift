@@ -126,66 +126,6 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
 }
 
-extension ClosedRange {
-  @_frozen // FIXME(resilience)
-  public enum Index {
-    case pastEnd
-    case inRange(Bound)
-  }
-}
-
-extension ClosedRange.Index: Equatable where Bound: Equatable {
-  @inlinable
-  public static func == (
-    lhs: ClosedRange<Bound>.Index,
-    rhs: ClosedRange<Bound>.Index
-  ) -> Bool {
-    switch (lhs, rhs) {
-    case (.inRange(let l), .inRange(let r)):
-      return l == r
-    case (.pastEnd, .pastEnd):
-      return true
-    default:
-      return false
-    }
-  }
-}
-
-extension ClosedRange.Index: Comparable where Bound: Comparable {
-  @inlinable
-  public static func < (
-    lhs: ClosedRange<Bound>.Index,
-    rhs: ClosedRange<Bound>.Index
-  ) -> Bool {
-    switch (lhs, rhs) {
-    case (.inRange(let l), .inRange(let r)):
-      return l < r
-    case (.inRange(_), .pastEnd):
-      return true
-    default:
-      return false
-    }
-  }
-}
-
-extension ClosedRange.Index: Hashable where Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    switch self {
-    case .inRange(let value):
-      hasher.append(0 as Int8)
-      hasher.append(value)
-    case .pastEnd:
-      hasher.append(1 as Int8)
-    }
-  }
-}
-
 // FIXME: this should only be conformance to RandomAccessCollection but
 // the compiler balks without all 3
 extension ClosedRange: Collection, BidirectionalCollection, RandomAccessCollection
@@ -193,6 +133,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger {
   // while a ClosedRange can't be empty, a _slice_ of a ClosedRange can,
   // so ClosedRange can't be its own self-slice unlike Range
   public typealias SubSequence = Slice<ClosedRange<Bound>>
+  public typealias Index = PastEndIndex<Bound>
 
   /// The position of the first element in the range.
   @inlinable

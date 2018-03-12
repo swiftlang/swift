@@ -92,6 +92,7 @@ set(SWIFTLIB_ESSENTIAL
   Optional.swift
   OptionSet.swift
   OutputStream.swift
+  PastEndIndex.swift
   Pointer.swift
   Policy.swift
   PrefixWhile.swift
