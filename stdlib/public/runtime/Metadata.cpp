@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <cctype>
 #include <condition_variable>
-#include <iostream>
 #include <new>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
