@@ -16,6 +16,10 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+  class MemoryBuffer;
+}
+
 namespace swift {
 
 /// A PrettyStackTraceEntry for performing an action involving a StringRef.
@@ -28,6 +32,15 @@ class PrettyStackTraceStringAction : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceStringAction(const char *action, llvm::StringRef string)
     : Action(action), TheString(string) {}
+  void print(llvm::raw_ostream &OS) const override;
+};
+
+/// A PrettyStackTraceEntry to dump the contents of a file.
+class PrettyStackTraceFileContents : public llvm::PrettyStackTraceEntry {
+  const llvm::MemoryBuffer &Buffer;
+public:
+  explicit PrettyStackTraceFileContents(const llvm::MemoryBuffer &buffer)
+    : Buffer(buffer) {}
   void print(llvm::raw_ostream &OS) const override;
 };
 
