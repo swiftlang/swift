@@ -347,7 +347,8 @@ public:
                               SubstitutionList subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy);
+                              CanType baseTy,
+                              bool forPropertyDescriptor);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
