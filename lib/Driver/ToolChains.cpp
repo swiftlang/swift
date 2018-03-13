@@ -52,6 +52,12 @@ bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
   return InputActions.size() > TOO_MANY_FILES;
 }
 
+bool ToolChain::JobContext::shouldFilterInputsByType() const {
+  // SingleCompile's must not filter inputs by type in order for the
+  // playground (test) to work.
+  return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
+}
+
 bool ToolChain::JobContext::shouldUseMergeModuleInputFileList() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
@@ -479,6 +485,7 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs(Output);
   const bool UsePrimaryFileList =
       MayHavePrimaryInputs && shouldUsePrimaryInputFileList();
+  const bool FilterInputsByType = shouldFilterInputsByType();
   const bool UseSupplementaryOutputFileList =
       shouldUseSupplementaryOutputFileList();
 
@@ -494,7 +501,8 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   }
   if (!UseFileList || !UsePrimaryFileList) {
     addFrontendInputArguments(MayHavePrimaryInputs, UseFileList,
-                              UsePrimaryFileList, Arguments);
+                              UsePrimaryFileList, FilterInputsByType,
+                              Arguments);
   }
 
   if (UseSupplementaryOutputFileList) {
@@ -509,7 +517,8 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
 
 void ToolChain::JobContext::addFrontendInputArguments(
     const bool mayHavePrimaryInputs, const bool useFileList,
-    const bool usePrimaryFileList, ArgStringList &arguments) const {
+    const bool usePrimaryFileList, const bool filterByType,
+    ArgStringList &arguments) const {
   llvm::StringSet<> primaries;
 
   if (mayHavePrimaryInputs)
@@ -522,7 +531,7 @@ void ToolChain::JobContext::addFrontendInputArguments(
         primaries.insert(InArg.getValue());
     }
   for (auto inputPair : getTopLevelInputFiles()) {
-    if (!types::isPartOfSwiftCompilation(inputPair.first))
+    if (filterByType && !types::isPartOfSwiftCompilation(inputPair.first))
       continue;
     const char *inputName = inputPair.second->getValue();
     if (primaries.count(inputName)) {

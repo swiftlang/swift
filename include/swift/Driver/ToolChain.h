@@ -94,6 +94,9 @@ protected:
     /// needed.
     bool shouldUsePrimaryInputFileList() const;
 
+    /// Does this invocation need to filter out non-Swift, -SIL, or -SIB inputs?
+    bool shouldFilterInputsByType() const;
+
     /// Returns true if merge module input file list is needed.
     bool shouldUseMergeModuleInputFileList() const;
 
@@ -118,6 +121,7 @@ protected:
     void addFrontendInputArguments(const bool mayHavePrimaryInputs,
                                    const bool useFileList,
                                    const bool usePrimaryFileList,
+                                   const bool filterByType,
                                    llvm::opt::ArgStringList &arguments) const;
     void addFrontendSupplementaryOutputArguments(
         llvm::opt::ArgStringList &arguments) const;
