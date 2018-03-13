@@ -1,5 +1,4 @@
 include(SwiftUtils)
-include(SwiftLocalJobPool)
 
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
@@ -434,7 +433,6 @@ function(_compile_swift_files
       COMMAND ""
       OUTPUT ${obj_dirs}
       COMMENT "Generating obj dirs for ${first_output}")
-  add_target_to_local_jobpool(${obj_dirs_dependency_target})
 
   # Generate the api notes if we need them.
   if (apinotes_outputs)
@@ -451,7 +449,6 @@ function(_compile_swift_files
           ${depends_create_apinotes}
           ${obj_dirs_dependency_target}
         COMMENT "Generating API notes ${first_output}")
-    add_target_to_local_jobpool(${api_notes_dependency_target})
   endif()
 
   # Then we can compile both the object files and the swiftmodule files
@@ -479,7 +476,6 @@ function(_compile_swift_files
         ${swift_ide_test_dependency} ${api_notes_dependency_target}
         ${obj_dirs_dependency_target}
       COMMENT "Compiling ${first_output}")
-  add_target_to_local_jobpool(${dependency_target})
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
   # This is the target to generate:
@@ -515,7 +511,6 @@ function(_compile_swift_files
           ${swift_ide_test_dependency} ${api_notes_dependency_target}
           ${obj_dirs_dependency_target}
         COMMENT "Generating ${module_file}")
-    add_target_to_local_jobpool(${module_dependency_target})
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
 
     # This is the target to generate the .sib files. It is not built by default.
@@ -533,7 +528,6 @@ function(_compile_swift_files
           ${obj_dirs_dependency_target}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
-    add_target_to_local_jobpool(${sib_dependency_target})
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
 
     add_custom_command_target(
@@ -550,7 +544,6 @@ function(_compile_swift_files
           ${obj_dirs_dependency_target}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
-    add_target_to_local_jobpool(${sibopt_dependency_target})
     set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
 
     # This is the target to generate the .sibgen files. It is not built by default.
@@ -568,7 +561,6 @@ function(_compile_swift_files
           ${obj_dirs_dependency_target}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)
-    add_target_to_local_jobpool(${sibgen_dependency_target})
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)
   endif()
 
