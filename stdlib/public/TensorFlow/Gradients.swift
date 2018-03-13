@@ -262,7 +262,7 @@ extension Tensor where Scalar : FloatingPoint {
     padding: Padding
   ) -> Tensor {
     return #tfop("Conv2DBackpropInput", shape, filter, backpropOutput,
-      strides: strides, padding: padding)
+      strides: strides, padding: padding.cName)
   }
 
   /// TensorFlow builtin conv2d gradient helper for the filter.
