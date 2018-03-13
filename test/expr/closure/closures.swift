@@ -259,7 +259,6 @@ func rdar19179412() -> (Int) -> Int {
 func takesVoidFunc(_ f: () -> ()) {}
 var i: Int = 1
 
-// expected-warning @+1 {{expression of type 'Int' is unused}}
 takesVoidFunc({i})
 // expected-warning @+1 {{expression of type 'Int' is unused}}
 var f1: () -> () = {i}

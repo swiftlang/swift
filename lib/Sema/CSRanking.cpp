@@ -1027,13 +1027,31 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Compare the type variable bindings.
   auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
-    // If the type variable isn't one for which we should be looking at the
-    // bindings, don't.
-    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
-      continue;
-
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
+
+    auto &impl = binding.typeVar->getImpl();
+
+    if (auto *locator = impl.getLocator()) {
+      auto path = locator->getPath();
+      if (!path.empty() &&
+          path.back().getKind() == ConstraintLocator::ClosureResult) {
+        // Since we support `() -> T` to `() -> Void` and
+        // `() -> Never` to `() -> T` conversions, it's always
+        // preferable to pick `T` rather than `Never` with
+        // all else being equal.
+        if (type2->isUninhabited())
+          ++score1;
+
+        if (type1->isUninhabited())
+          ++score2;
+      }
+    }
+
+    // If the type variable isn't one for which we should be looking at the
+    // bindings, don't.
+    if (!impl.prefersSubtypeBinding())
+      continue;
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
