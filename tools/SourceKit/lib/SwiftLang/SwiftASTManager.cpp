@@ -459,6 +459,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // SwiftONoneSupport module.
   FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
 
+  // We don't care about LLVMArgs
+  FrontendOpts.LLVMArgs.clear();
+
   return false;
 }
 
