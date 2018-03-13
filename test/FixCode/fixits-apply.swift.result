@@ -238,13 +238,13 @@ func testGenericSig(x: Empty<Int>) -> Empty<String> {}
 class NonObjC {}
 protocol NonObjCProtocol {}
 @objc class IBIssues {
-  @IBOutlet static private var ibout1: IBIssues!
+  @IBOutlet private static var ibout1: IBIssues!
   @IBOutlet private var ibout2: NonObjC!
   @IBOutlet private var ibout3: NonObjCProtocol!
   @IBOutlet private let ibout4: IBIssues!
   @IBOutlet private var ibout5: [[IBIssues]]!
   @IBOutlet private var ibout6: [String: String]!
-  @IBInspectable static private var ibinspect1: IBIssues!
+  @IBInspectable private static var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
 }
 
