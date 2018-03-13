@@ -36,10 +36,8 @@ public protocol StringProtocol
   var utf16: UTF16View { get }
   var unicodeScalars: UnicodeScalarView { get }
 
-#if _runtime(_ObjC)
   func hasPrefix(_ prefix: String) -> Bool
   func hasSuffix(_ prefix: String) -> Bool
-#endif
 
   func lowercased() -> String
   func uppercased() -> String
