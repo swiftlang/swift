@@ -1034,12 +1034,14 @@ public enum Padding {
 }
 
 internal extension Padding {
-  @_inlineable
-  @_versioned
+  @_versioned @_inlineable
   var cName: String {
-    switch self {
-    case .same: return "SAME"
-    case .valid: return "VALID"
+    @inline(__always)
+    get {
+      switch self {
+      case .same: return "SAME"
+      case .valid: return "VALID"
+      }
     }
   }
 }
