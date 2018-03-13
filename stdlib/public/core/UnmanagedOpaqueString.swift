@@ -340,6 +340,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @_versioned // FIXME(sil-serialize-all)
+  @_fixed_layout // FIXME(resilience)
   internal struct UnicodeScalarIterator : IteratorProtocol {
     var _base: _UnmanagedOpaqueString.Iterator
     var _peek: UTF16.CodeUnit?
