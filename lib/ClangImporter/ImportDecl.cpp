@@ -312,9 +312,10 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 
   case MappedCTypeKind::VaList:
 
-    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy)){
-       if(ClangCtx.getTargetInfo().getBuiltinVaListKind() != clang::TargetInfo::AArch64ABIBuiltinVaList)
-         return std::make_pair(Type(), "");
+    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy)) {
+      if (ClangCtx.getTargetInfo().getBuiltinVaListKind() !=
+          clang::TargetInfo::AArch64ABIBuiltinVaList)
+        return std::make_pair(Type(), "");
     }
 
     break;

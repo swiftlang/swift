@@ -86,14 +86,15 @@ internal let _countGPRegisters = 16
 @_versioned
 internal let _registerSaveWords = _countGPRegisters
 
-#elseif arch(arm64)
+#elseif arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
 
-// ARM IHI 0055B
-// va_list may refer to any paramenter may be in one of three memory locations:
+// ARM Procedure Call Standard for aarch64. (IHI0055B)
+// The va_list type may refer to any parameter in a parameter list may be in one
+// of three memory locations depending on its type and position in the argument 
+// list :
 // 1. GP register save area x0 - x7
 // 2. FP/SIMD register save area q0 - q7
 // 3. Stack argument area
-//
 
 @_versioned
 internal let _countGPRegisters = 8
@@ -101,13 +102,13 @@ internal let _countGPRegisters = 8
 @_versioned
 internal let _countFPRegisters = 8
 
-//128bit, 2 64bit word
 @_versioned
-internal let _fpRegisterWords = 2
+internal let _fpRegisterWords = 
+  MemoryLayout<Double>.size / MemoryLayout<Int>.size
 
 @_versioned
-internal let _registerSaveWords = _countGPRegisters + (_countFPRegisters * _fpRegisterWords)
-
+internal let _registerSaveWords = 
+  _countGPRegisters + (_countFPRegisters * _fpRegisterWords)
 
 #endif
 
@@ -491,20 +492,18 @@ final internal class _VaListBuilder {
   internal var storage: ContiguousArray<Int>
 }
 
-#elseif arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-
+#elseif arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _VaListBuilder {
-
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {
-    // prepare the register save area
+    // Prepare the register save area.
     allocated = _registerSaveWords
     storage = allocStorage(wordCount: allocated)
-    // append stack arguments after register save area
+    // Append stack arguments after register save area.
     count = allocated
   }
 
@@ -523,21 +522,21 @@ final internal class _VaListBuilder {
 
     if arg is _CVarArgPassedAsDouble
       && fpRegistersUsed < _countFPRegisters {
-        var startIndex = (fpRegistersUsed * _fpRegisterWords)
-          for w in encoded {
-            storage[startIndex] = w
-            startIndex += 1
-          }
-          fpRegistersUsed += 1
-    }else if encoded.count == 1
-        && !(arg is _CVarArgPassedAsDouble)
-        && gpRegistersUsed < _countGPRegisters {
-        var startIndex = ( _fpRegisterWords * _countFPRegisters) + gpRegistersUsed
-        storage[startIndex] = encoded[0]
-        gpRegistersUsed += 1
-    }else{
-        //arguments in stack slot
-        appendWords(encoded)
+      var startIndex = (fpRegistersUsed * _fpRegisterWords)
+      for w in encoded {
+        storage[startIndex] = w
+        startIndex += 1
+      }
+      fpRegistersUsed += 1
+    } else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _countGPRegisters {
+      var startIndex = ( _fpRegisterWords * _countFPRegisters) + gpRegistersUsed
+      storage[startIndex] = encoded[0]
+      gpRegistersUsed += 1
+    } else {
+      // Arguments in stack slot.
+      appendWords(encoded)
     }
   }
 
@@ -563,7 +562,7 @@ final internal class _VaListBuilder {
       allocated = max(newCount, allocated * 2)
       let newStorage = allocStorage(wordCount: allocated)
       storage = newStorage
-      // count is updated below
+      // Count is updated below.
 
       if let allocatedOldStorage = oldStorage {
         newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)

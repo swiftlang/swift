@@ -227,8 +227,7 @@ extension UInt {
   }
 }
 
-#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-
+#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
 @_fixed_layout
 public struct CVaListPointer {
   @_versioned // FIXME(sil-serialize-all)
@@ -270,7 +269,6 @@ extension CVaListPointer : CustomDebugStringConvertible {
     return value.debugDescription
   }
 }
-
 #endif
 
 @_versioned
