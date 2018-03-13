@@ -24,10 +24,9 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
     padding: .same)
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
-  // FIXME: uncommenting `convLayer.gradient` below generates send.
-  // let (dInput, dParameters) = convLayer.gradient(for: input,
-  //                                                backpropagating: 1)
-  // let dFilter = dParameters.filter
+  let (dInput, dParameters) = convLayer.gradient(for: input,
+                                                 backpropagating: 1)
+  let dFilter = dParameters.filter
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5,
