@@ -25,6 +25,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
@@ -44,6 +45,7 @@ enum class ActionType {
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
+  DeserializeRawTree,
   ParseOnly,
   ParserGen,
   EOFPos,
@@ -79,6 +81,10 @@ Action(llvm::cl::desc("Action (required):"),
                    "serialize-raw-tree",
                    "Parse the source file and serialize the raw tree"
                    "to JSON"),
+        clEnumValN(ActionType::DeserializeRawTree,
+                   "deserialize-raw-tree",
+                   "Parse the JSON file from the serialized raw tree"
+                   "to the original"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -88,6 +94,10 @@ Action(llvm::cl::desc("Action (required):"),
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
                     llvm::cl::desc("Path to the input .swift file"));
+
+static llvm::cl::opt<std::string>
+OutputFilename("output-filename",
+               llvm::cl::desc("Path to the output file"));
 
 static llvm::cl::opt<bool>
 PrintNodeKind("print-node-kind",
@@ -247,6 +257,20 @@ int doSerializeRawTree(const char *MainExecutablePath,
   return EXIT_SUCCESS;
 }
 
+int doDeserializeRawTree(const char *MainExecutablePath,
+                         const StringRef InputFileName,
+                         const StringRef OutputFileName) {
+
+  auto Buffer = llvm::MemoryBuffer::getFile(InputFileName);
+  std::error_code errorCode;
+  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+              OutputFileName, errorCode, llvm::sys::fs::F_None);
+  swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
+  swift::SyntaxPrintOptions opt;
+  deserializer.getSourceFileSyntax()->print(*os);
+  return EXIT_SUCCESS;
+}
+
 int doParseOnly(const char *MainExecutablePath,
                   const StringRef InputFileName) {
   CompilerInstance Instance;
@@ -317,6 +341,9 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::SerializeRawTree:
     ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
+    break;
+  case ActionType::DeserializeRawTree:
+    ExitCode = doDeserializeRawTree(argv[0], options::InputSourceFilename, options::OutputFilename);
     break;
   case ActionType::ParseOnly:
     ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
