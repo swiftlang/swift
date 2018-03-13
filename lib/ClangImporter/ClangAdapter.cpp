@@ -53,9 +53,9 @@ importer::getNonNullArgs(const clang::Decl *decl,
     if (result.empty())
       result.resize(params.size(), false);
 
-    for (unsigned idx : nonnull->args()) {
-      if (idx < result.size())
-        result.set(idx);
+    for (const clang::ParamIdx &idx : nonnull->args()) {
+      if (idx.getASTIndex() < result.size())
+        result.set(idx.getASTIndex());
     }
   }
 
