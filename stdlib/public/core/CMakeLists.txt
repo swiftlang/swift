@@ -127,6 +127,7 @@ set(SWIFTLIB_ESSENTIAL
   StringGuts.swift
   StringGutsVisitor.swift
   StringObject.swift
+  StringProtocol.swift
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift

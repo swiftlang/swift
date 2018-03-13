@@ -26,6 +26,7 @@
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringNormalization.swift",
+    "StringProtocol.swift",
     "StringRangeReplaceableCollection.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
