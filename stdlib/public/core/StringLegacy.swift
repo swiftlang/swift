@@ -84,35 +84,36 @@ extension String {
   }
 }
 
-#if _runtime(_ObjC)
-/// Determines if `theString` starts with `prefix` comparing the strings under
-/// canonical equivalence.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-internal func _stdlib_NSStringHasPrefixNFD(
-  _ theString: AnyObject, _ prefix: AnyObject) -> Bool
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
-internal func _stdlib_NSStringHasPrefixNFDPointer(
-  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
+// TODO: since this is generally useful, make public via evolution proposal.
+extension BidirectionalCollection {
+  @_inlineable
+  @_versioned
+  internal func _ends<Suffix: BidirectionalCollection>(
+    with suffix: Suffix, by areEquivalent: (Element,Element) -> Bool
+  ) -> Bool where Suffix.Element == Element {
+    var (i,j) = (self.endIndex,suffix.endIndex)
+    while i != self.startIndex, j != suffix.startIndex {
+      self.formIndex(before: &i)
+      suffix.formIndex(before: &j)
+      if !areEquivalent(self[i],suffix[j]) { return false }
+    } 
+    return j == suffix.startIndex
+  }
+}
 
-/// Determines if `theString` ends with `suffix` comparing the strings under
-/// canonical equivalence.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-internal func _stdlib_NSStringHasSuffixNFD(
-  _ theString: AnyObject, _ suffix: AnyObject) -> Bool
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
-internal func _stdlib_NSStringHasSuffixNFDPointer(
-  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
+extension BidirectionalCollection where Element: Equatable {
+  @_inlineable
+  @_versioned
+  internal func _ends<Suffix: BidirectionalCollection>(
+    with suffix: Suffix
+  ) -> Bool where Suffix.Element == Element {
+      return _ends(with: suffix, by: ==)
+  }
+}
 
-extension String {
+
+extension StringProtocol {
   /// Returns a Boolean value indicating whether the string begins with the
   /// specified prefix.
   ///
@@ -142,40 +143,9 @@ extension String {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasPrefix(_ prefix: String) -> Bool {
-    let prefixCount = prefix._guts.count
-    if prefixCount == 0 {
-      return true
-    }
-    if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
-      let result: Bool
-      if self._guts.isASCII && prefix._guts.isASCII {
-        let selfASCII = self._guts._unmanagedASCIIView
-        let prefixASCII = prefix._guts._unmanagedASCIIView
-        if prefixASCII.count > selfASCII.count {
-          // Prefix is longer than self.
-          result = false
-        } else {
-          result = (0 as CInt) == _stdlib_memcmp(
-            selfASCII.rawStart,
-            prefixASCII.rawStart,
-            prefixASCII.count)
-        }
-      } else {
-        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
-        let rhsStr = _NSContiguousString(_unmanaged: prefix._guts)
-        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-          return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
-        }
-      }
-      _fixLifetime(self)
-      _fixLifetime(prefix)
-      return result
-    }
-    return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(),
-      prefix._bridgeToObjectiveCImpl())
+  @_inlineable
+  public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
+    return self.starts(with: prefix)
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -207,15 +177,52 @@ extension String {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
+  @_inlineable
+  public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
+    return self._ends(with: suffix)
+  }
+}
+
+extension String {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func hasPrefix(_ prefix: String) -> Bool {
+    let prefixCount = prefix._guts.count
+    if prefixCount == 0 { return true }
+
+    if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
+      if self._guts.isASCII && prefix._guts.isASCII {
+        let result: Bool
+        let selfASCII = self._guts._unmanagedASCIIView
+        let prefixASCII = prefix._guts._unmanagedASCIIView
+        if prefixASCII.count > selfASCII.count {
+          // Prefix is longer than self.
+          result = false
+        } else {
+          result = (0 as CInt) == _stdlib_memcmp(
+            selfASCII.rawStart,
+            prefixASCII.rawStart,
+            prefixASCII.count)
+        }
+        _fixLifetime(self)
+        _fixLifetime(prefix)
+        return result
+      }
+      else {
+        
+      }
+    }
+
+    return self.starts(with: prefix)
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let suffixCount = suffix._guts.count
-    if suffixCount == 0 {
-      return true
-    }
+    if suffixCount == 0 { return true }
+
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
-      let result: Bool
       if self._guts.isASCII && suffix._guts.isASCII {
+        let result: Bool
         let selfASCII = self._guts._unmanagedASCIIView
         let suffixASCII = suffix._guts._unmanagedASCIIView
         if suffixASCII.count > self._guts.count {
@@ -227,26 +234,15 @@ extension String {
             suffixASCII.rawStart,
             suffixASCII.count)
         }
-      } else {
-        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
-        let rhsStr = _NSContiguousString(_unmanaged: suffix._guts)
-        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-          return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
-        }
+        _fixLifetime(self)
+        _fixLifetime(suffix)
+        return result
       }
-      _fixLifetime(self)
-      _fixLifetime(suffix)
-      return result
     }
-    return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(),
-      suffix._bridgeToObjectiveCImpl())
+
+    return self._ends(with: suffix)
   }
 }
-#else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
-#endif
 
 // Conversions to string from other types.
 extension String {
