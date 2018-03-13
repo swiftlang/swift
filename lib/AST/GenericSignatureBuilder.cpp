@@ -4973,8 +4973,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Recursively merge the associated types of T2 into T1.
   auto dependentT1 = T1->getDependentType(getGenericParams());
+  SmallPtrSet<Identifier, 4> visited;
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
+      // Only visit each name once.
+      if (!visited.insert(T2Nested.first).second) continue;
+
       // If T1 is concrete but T2 is not, concretize the nested types of T2.
       if (t1IsConcrete && !t2IsConcrete) {
         concretizeNestedTypeFromConcreteParent(T1, T2Nested.second.front(),
@@ -5003,9 +5007,13 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   }
 
   // If T2 is concrete but T1 was not, concretize the nested types of T1.
+  visited.clear();
   if (t2IsConcrete && !t1IsConcrete) {
     for (auto equivT1 : equivClass1Members) {
       for (auto T1Nested : equivT1->NestedTypes) {
+        // Only visit each name once.
+        if (!visited.insert(T1Nested.first).second) continue;
+
         concretizeNestedTypeFromConcreteParent(T2, T1Nested.second.front(),
                                                *this);
       }
