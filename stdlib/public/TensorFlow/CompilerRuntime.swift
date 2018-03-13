@@ -752,9 +752,9 @@ private extension _TensorComputation {
   /// executed on initialization, thus this method will not be exposed to users.
   private func execute() {
     debugLog("Executing TF function \(entryFuncName).")
-    var returnValueCount = Int32.max
     if let stateTFE = stateTFE {
       internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
+      var returnValueCount = Int32(returnValues.count)
       TFE_Execute(stateTFE.op, &returnValues, &returnValueCount, status)
       debugLog("""
         returnValues.count=\(returnValues.count), \
@@ -832,8 +832,6 @@ public func _TFCStartTensorComputation(
   _ entryFunctionNameAddress: UnsafePointer<Int8>,
   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   _ tensorArgumentCount: Int,
-  // TODO(clattner): resultCount should go away when the runtime is implemented
-  // with an async design.
   _ resultCount: Int
 ) -> _TensorComputation {
 
