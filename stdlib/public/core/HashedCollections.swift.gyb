@@ -3986,11 +3986,24 @@ extension _Native${Self}Buffer
     return bucketCount &- 1
   }
 
+  @_inlineable
+  @_versioned
+  internal func _localHasher() -> _Hasher {
+    let seed = _Hasher._seed
+    let perturbation = (_Hasher._isDeterministic
+      ? bucketCount
+      : unsafeBitCast(_storage, to: Int.self))
+    return _Hasher(
+      seed: (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1))
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _hashValue(for: k) & _bucketMask
+    var hasher = _localHasher()
+    hasher.append(k)
+    return hasher.finalize() & _bucketMask
   }
 
   @_inlineable // FIXME(sil-serialize-all)
