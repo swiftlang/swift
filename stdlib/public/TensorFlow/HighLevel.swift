@@ -388,14 +388,150 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   public func gradient(
     for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
-    // Broadcast adjoint to correct shape. AD should do this automatically when
-    // implemented.
     // NOTE: proper AD would require an `unbroadcast` op for _adjointAdd. There
-    // is a manually workaround here.
+    // is a manual workaround here.
     let dot = input.dot(weight) + bias
     let dBias = adjoint.broadcast(to: bias)
     let dDot = adjoint.broadcast(to: dot)
     let (dInput, dWeight) = input._adjointDot(weight, partial: dot, seed: dDot)
     return (dInput, Parameters(weight: dWeight, bias: dBias))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//
+// Normalization layers
+//
+//===----------------------------------------------------------------------===//
+
+/// A batch normalization layer that transforms inputs to have a mean close to 0
+/// and standard deviation close to 1. Batch normalization layers have a running
+/// mean, a running variance, and a momentum. They may optionally have an
+/// offset, a scale, and a variance epsilon.
+// TODO: Handle running mean/variance.
+public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
+  where Scalar : BinaryFloatingPoint & AccelerableByTensorFlow {
+  /// The axis for batch normalization.
+  public let axis: Int32
+
+  /// The momentum for the running mean and running variance.
+  public let momentum: Tensor<Scalar>
+
+  /// The offset value.
+  // TODO: To be marked with @parameter.
+  public var offset: Tensor<Scalar>
+
+  /// The scale value.
+  // TODO: To be marked with @parameter.
+  public var scale: Tensor<Scalar>
+
+  /// The variance epsilon value.
+  public let epsilon: Tensor<Scalar>
+
+  /// The running mean.
+  public var runningMean: Tensor<Scalar>
+
+  /// The running variance.
+  public var runningVariance: Tensor<Scalar>
+
+  /// Creates a new instance with the specified weight and bias.
+  // NOTE: Swift generates default memberwise initializers, but they have
+  // internal access, not public. Public initializers must be manually declared.
+  @_inlineable @inline(__always)
+  public init(axis: Int32,
+              momentum: Tensor<Scalar> = Tensor(0.99),
+              offset: Tensor<Scalar> = Tensor(0),
+              scale: Tensor<Scalar> = Tensor(0),
+              epsilon: Tensor<Scalar> = Tensor(0.001)) {
+    self.axis = axis
+    self.momentum = momentum
+    self.offset = offset
+    self.scale = scale
+    self.epsilon = epsilon
+    /// Initialize running mean and variance with dummy values.
+    self.runningMean = Tensor(0)
+    self.runningVariance = Tensor(1)
+  }
+
+  // TODO: The `Parameters` struct type and the `parameters` stored property
+  // will be compiler synthesized. Remove their explicit declarations when
+  // compiler synthesization is implemented.
+  public struct Parameters : Differentiable {
+    // The currency type of differentiation. This will be compiler synthesized
+    // to be the currency type of the stored properties with least precision.
+    // The currency type is important for initializing intermediate values
+    // during automatic differentiation, such as the initial adjoint/tangent and
+    // the seed.
+    public typealias DifferentiationCurrency = Scalar
+
+    // Synthesized properties. `offset` and `scale` will be synthesized in
+    // `Parameters` because they will be marked with `@parameter`.
+    public var offset: Tensor<Scalar>
+    public var scale: Tensor<Scalar>
+
+    // An initializer which sets the values for each parameter.
+    @_inlineable @inline(__always)
+    public init(offset: Tensor<Scalar>, scale: Tensor<Scalar>) {
+      self.offset = offset
+      self.scale = scale
+    }
+
+    // This initializer is a `Differentiable` requirement and will be
+    // compiler synthesized.
+    @_inlineable @inline(__always)
+    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
+      self.offset = Tensor<Scalar>(shape: other.offset.shape, repeating: value)
+      self.scale = Tensor<Scalar>(shape: other.scale.shape, repeating: value)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(
+        offset: lhs.offset + rhs.offset,
+        scale: lhs.scale + rhs.scale
+      )
+    }
+  }
+
+  /// An instance of `Parameters`. This will be synthesized.
+  @_inlineable
+  public var parameters: Parameters {
+    @inline(__always)
+    get {
+      return Parameters(offset: offset, scale: scale)
+    }
+    @inline(__always)
+    set {
+      offset = newValue.offset
+      scale = newValue.scale
+    }
+  }
+
+  /// Computes the batch normalization operation.
+  // TODO: Handle running mean/variance.
+  @_inlineable @inline(__always)
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+    return input.batchNormalized(alongAxis: axis, offset: offset, scale: scale,
+                                 epsilon: epsilon)
+  }
+
+  /// Computes the gradient of the batch normalization operation. This can be
+  /// automatically computed after more compiler support for automatic
+  /// differentiation is added.
+  @_inlineable @inline(__always)
+  public func gradient(
+    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  ) -> (Tensor<Scalar>, Parameters) {
+    // NOTE: Adjoint is manually broadcasted to correct shape. AD should do this
+    // automatically when implemented.
+    let partial = applied(to: input)
+    let adjoint = adjoint.broadcast(to: partial)
+    let (dInput, dOffset, dScale) = input._adjointBatchNormalized(
+      alongAxis: axis, offset: offset, scale: scale, epsilon: epsilon,
+      partial: partial, seed: adjoint
+    )
+    return (dInput, Parameters(offset: dOffset, scale: dScale))
   }
 }

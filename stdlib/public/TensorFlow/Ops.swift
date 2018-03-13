@@ -662,6 +662,14 @@ public func sqrt<T : TensorProtocol>(_ x: T) -> T
 }
 
 @_inlineable @inline(__always)
+@differentiable(gradient: _adjointRsqrt(_:partial:seed:))
+public func rsqrt<T : TensorProtocol>(
+  _ x: T
+) -> T where T.Scalar : FloatingPoint {
+  return #tfop("Rsqrt", x)
+}
+
+@_inlineable @inline(__always)
 @differentiable(gradient: _adjointExp(_:partial:seed:))
 public func exp<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : FloatingPoint {
@@ -1023,6 +1031,34 @@ public extension Tensor {
   // TODO: Add strided slices? (increment by something different than 1)
   // Ideas for strided slice API: it could be another subscript method, or it
   // be a top level `stride` function like Swift's `stride(from:to:by:)`.
+}
+
+//===----------------------------------------------------------------------===//
+// Normalization
+//===----------------------------------------------------------------------===//
+
+public extension Tensor where Scalar : BinaryFloatingPoint {
+  // NOTE: It is not possible to provide a floating point initial value for
+  // arguments (like `epsilon`) because FloatingPoint is not
+  // ExpressibleByFloatLiteral.
+  @_inlineable @inline(__always)
+  @differentiable(
+    withRespectTo: (self, .1, .2),
+    gradient:
+      _adjointBatchNormalized(alongAxis:offset:scale:epsilon:partial:seed:)
+  )
+  func batchNormalized(
+    alongAxis axis: Int32,
+    offset: Tensor = Tensor(0),
+    scale: Tensor = Tensor(1),
+    epsilon: Tensor = Tensor(0.001)
+  ) -> Tensor {
+    let mean = self.mean(alongAxes: axis)
+    let squaredDiff: Tensor = #tfop("SquaredDifference", self, mean)
+    let variance = squaredDiff.mean(alongAxes: axis)
+    let inv = rsqrt(variance + epsilon) * scale
+    return self * inv + (offset - mean * inv)
+  }
 }
 
 //===----------------------------------------------------------------------===//

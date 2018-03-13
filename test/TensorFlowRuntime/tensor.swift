@@ -222,6 +222,17 @@ TensorTests.testAllBackends("ReductionToScalar") {
   // smart enough to avoid send/receive.
 }
 
+TensorTests.testAllBackends("BatchNormalization") {
+  let x = Tensor<Float>(shape: [2, 4],
+                        scalars: [0, 0, 0, 0, 0.5, -0.05, 0.3, -0.02])
+  let normalized = x.batchNormalized(alongAxis: 0, epsilon: 0.001)
+  expectEqual([2, 4], normalized.shape)
+  expectPointwiseNearlyEqual(
+    [-0.99209, 0.62017,  -0.97849,  0.30151,
+     0.99209, -0.62017, 0.97849, -0.30151],
+    normalized.scalars, byError: 0.0001)
+}
+
 TensorTests.testAllBackends("Convolution") {
   let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
