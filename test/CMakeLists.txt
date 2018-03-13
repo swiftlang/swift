@@ -146,6 +146,7 @@ set(TEST_SUBSETS
     all
     only_validation
     only_long
+    only_stress
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -271,12 +272,14 @@ foreach(SDK ${SWIFT_SDKS})
         if((test_subset STREQUAL "primary") OR
            (test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${test_bin_dir}")
         endif()
         if((test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${validation_test_bin_dir}")
           list(APPEND dependencies ${validation_test_dependencies})
