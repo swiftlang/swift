@@ -23,16 +23,9 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/Statistic.h"
 #include <functional>
 
 using namespace swift;
-
-#define DEBUG_TYPE "Generic signature"
-STATISTIC(NumRedundantRequirements,
-          "# of redundant requirements found in signature differencing");
-STATISTIC(NumNonRedundantRequirements,
-          "# of non-redundant requirements found in signature differencing");
 
 void ConformanceAccessPath::print(raw_ostream &out) const {
   interleave(begin(), end(),
@@ -777,7 +770,6 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
 
 SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
                                                  GenericSignature *otherSig) {
-  auto &ctxt = getASTContext();
   SmallVector<Requirement, 4> result;
 
   // If the signatures are the same, all requirements are satisfied.
@@ -791,52 +783,10 @@ SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
   }
 
   // Find the requirements that aren't satisfied.
-  //
-  // This is unfortunately quadratic in the size of getRequirements(), but some
-  // arrangements of signatures result in different canonicalizations that mean
-  // a requirement in `this` is satisfied by `otherSig`, but not in
-  // isolation. Specifically, consider:
-  //
-  // otherSig == <T, U where U: P1>
-  // this == <T, U where T: P1, T == U>`
-  //
-  // `T: P1` is implied by `U: P1` and `T == U` together, but just checking T:
-  // P1 in `otherSig` won't find this, because it misses the T == U
-  // connection. We don't currently know of a great way to handle this in
-  // general, and instead have to do a brute-force search.
-
-  SmallVector<Requirement, 4> redundant;
-  GenericSignatureBuilder::dropAndCompareEachRequirement(
-      ctxt, otherSig, this,
-      /*includeRedundantRequirements=*/false, redundant, result);
-
-  NumNonRedundantRequirements += result.size();
-  NumRedundantRequirements += redundant.size();
-
-#ifndef NDEBUG
-  // `otherSig + result` should be `this`, so let's check it.
-  GenericSignatureBuilder builder(ctxt);
-
-  // otherSig may have fewer generic parameters, so we can't use
-  // addGenericSignature directly.
-
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  for (auto gp : getGenericParams())
-    builder.addGenericParameter(gp);
-  for (auto req : otherSig->getRequirements())
-    builder.addRequirement(req, source, nullptr);
-  for (auto req : result)
-    builder.addRequirement(req, source, nullptr);
-
-  auto newSig = std::move(builder).computeGenericSignature(
-      SourceLoc(),
-      /*allowConcreteGenericParams=*/true,
-      /*allowBuilderToMove=*/true);
-
-  assert(newSig->getCanonicalSignature() == getCanonicalSignature() &&
-         "signature differencing removed too many requirements");
-#endif
+  for (const auto &req : getRequirements()) {
+    if (!otherSig->isRequirementSatisfied(req))
+      result.push_back(req);
+  }
 
   return result;
 }
