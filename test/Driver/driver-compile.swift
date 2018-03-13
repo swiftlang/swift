@@ -109,7 +109,7 @@
 // FILELIST-NEXT: bin/swift
 // FILELIST: -filelist [[SOURCES]]
 // FILELIST: -primary-filelist  {{(["][^"]+|[^ ]+)primaryInputs([^"]+["]|[^ ]+)}}
-// FILELIST: -supplementary-output-file- map {{(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)}}
+// FILELIST: -supplementary-output-file-map {{(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
 
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift

@@ -45,7 +45,7 @@ if '-primary-filelist' in sys.argv:
     with open(primaryFilelistFile, 'r') as f:
         lines = f.readlines()
         assert(len(lines) == 1)
-        print("Handled",  os.path.basename(lines[0]).rstrip())
+        print("Handled", os.path.basename(lines[0]).rstrip())
 elif lines[0].endswith(".swiftmodule\n"):
     print("Handled modules")
 else:
@@ -53,7 +53,8 @@ else:
 
 
 if '-supplementary-output-file-map' in sys.argv:
-    supplementaryOutputMapFile = sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
+    supplementaryOutputMapFile = \
+      sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
     with open(supplementaryOutputMapFile, 'r') as f:
         lines = f.readlines()
         for line in lines:
