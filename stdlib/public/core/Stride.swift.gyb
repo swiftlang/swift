@@ -542,43 +542,46 @@ extension StrideTo: CustomStringConvertible {
   }
 }
 
-extension StrideTo {
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index {
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _value: Element
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _stride: Element.Stride
+@_fixed_layout // FIXME(sil-serialize-all)
+public struct _StridedIndex<Stride, Payload> {
+  @_versioned // FIXME(sil-serialize-all)
+  internal let _stride: Stride
+  @_versioned // FIXME(sil-serialize-all)
+  internal let _value: Payload
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(_ value: Element, _ stride: Element.Stride) {
-      self._value = value
-      self._stride = stride
-    }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_stride: Stride, value: Payload) {
+    self._stride = _stride
+    self._value = value
   }
 }
 
-extension StrideTo.Index: Equatable {
+extension _StridedIndex: Equatable
+where Stride: Equatable, Payload: Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  public static func == (lhs: StrideTo.Index, rhs: StrideTo.Index) -> Bool {
+  public static func == (lhs: _StridedIndex, rhs: _StridedIndex) -> Bool {
     _precondition(lhs._stride == rhs._stride, "Incompatible indices")
     return lhs._value == rhs._value
   }
 }
 
-extension StrideTo.Index: Comparable {
+extension _StridedIndex: Comparable
+where Stride: Comparable & ExpressibleByIntegerLiteral, Payload: Comparable {
   @_inlineable // FIXME(sil-serialize-all)
-  public static func < (lhs: StrideTo.Index, rhs: StrideTo.Index) -> Bool {
+  public static func < (lhs: _StridedIndex, rhs: _StridedIndex) -> Bool {
     _precondition(lhs._stride == rhs._stride, "Incompatible indices")
-    return lhs._stride < (0 as Element.Stride)
+    return lhs._stride < 0
       ? rhs._value < lhs._value
       : lhs._value < rhs._value
   }
 }
 
+
 extension StrideTo: Collection
 where Element.Stride: BinaryInteger {
+  public typealias Index = _StridedIndex<Element.Stride, Element>
+
   @_inlineable
   public var startIndex: Index { return _index(_start) }
 
@@ -618,7 +621,7 @@ where Element.Stride: BinaryInteger {
   @_inlineable
   @_versioned
   internal func _index(_ value: Element) -> Index {
-    return Index(value, _stride)
+    return Index(_stride: _stride, value: value)
   }
 }
 
@@ -986,50 +989,11 @@ extension StrideThrough: CustomStringConvertible {
   }
 }
 
-extension StrideThrough {
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index {
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _position: ClosedRange<Element>.Index
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _stride: Element.Stride
-
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(
-      _ position: ClosedRange<Element>.Index,
-      _ stride: Element.Stride
-    ) {
-      self._position = position
-      self._stride = stride
-    }
-  }
-}
-
-extension StrideThrough.Index: Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func == (
-    lhs: StrideThrough.Index, rhs: StrideThrough.Index
-  ) -> Bool {
-    _precondition(lhs._stride == rhs._stride, "Incompatible indices")
-    return lhs._position == rhs._position
-  }
-}
-
-extension StrideThrough.Index: Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func < (
-    lhs: StrideThrough.Index, rhs: StrideThrough.Index
-  ) -> Bool {
-    _precondition(lhs._stride == rhs._stride, "Incompatible indices")
-    return lhs._stride < (0 as Element.Stride)
-      ? rhs._position < lhs._position
-      : lhs._position < rhs._position
-  }
-}
-
 extension StrideThrough: Collection
 where Element.Stride: BinaryInteger {
+  public typealias Index =
+    _StridedIndex<Element.Stride, ClosedRange<Element>.Index>
+
   @_inlineable
   public var startIndex: Index {
     if (_start.distance(to: _end) < 0) != (_stride < 0) {
@@ -1052,7 +1016,7 @@ where Element.Stride: BinaryInteger {
   }
 
   public subscript(position: Index) -> Element {
-    switch position._position {
+    switch position._value {
     case .inRange(let element):
       return element
     case .pastEnd:
@@ -1063,7 +1027,7 @@ where Element.Stride: BinaryInteger {
   public subscript(bounds: Range<Index>) -> StrideThrough {
     _precondition(bounds.lowerBound._stride == bounds.upperBound._stride,
       "Incompatible indices")
-    switch (bounds.lowerBound._position, bounds.upperBound._position) {
+    switch (bounds.lowerBound._value, bounds.upperBound._value) {
     // FIXME: should we support the (.pastEnd, .pastEnd) case?
     // It is correct, just not clear what to return. Any empty StrideThrough
     // value with the same _stride would do
@@ -1080,7 +1044,7 @@ where Element.Stride: BinaryInteger {
 
   @_inlineable
   public func index(after i: Index) -> Index {
-    switch i._position {
+    switch i._value {
     case .inRange(let element):
       let nextIsPastEnd = _isOutOfRange(
         element, advancedBy: _stride, comparedTo: _end, using: >)
@@ -1095,7 +1059,7 @@ where Element.Stride: BinaryInteger {
   @_inlineable
   @_versioned
   internal func _index(_ position: ClosedRange<Element>.Index) -> Index {
-    return Index(position, _stride)
+    return Index(_stride: _stride, value: position)
   }
 
   // We need to check whether element.advanced(by: someStride) > _end or
@@ -1122,7 +1086,7 @@ extension StrideThrough: BidirectionalCollection
 where Element.Stride: BinaryInteger {
   @_inlineable
   public func index(before i: Index) -> Index {
-    switch i._position {
+    switch i._value {
     case .inRange(let element):
       let nextIsPastStart = _isOutOfRange(
         element, advancedBy: -_stride, comparedTo: _start, using: <)
