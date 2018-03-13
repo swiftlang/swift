@@ -2351,7 +2351,13 @@ public:
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
-  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
+  ///
+  /// \param DC The declaration context.
+  ///
+  /// \param base If querying for a MemberRefExpr, this is its base expression.
+  ///             Otherwise, \c nullptr.
+  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
+                                                Expr *base) const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;

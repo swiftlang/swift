@@ -248,7 +248,7 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   }
 
   // If the value is always directly accessed from this context, do it.
-  return member->getAccessSemanticsFromContext(DC);
+  return member->getAccessSemanticsFromContext(DC, base);
 }
 
 void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,

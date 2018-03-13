@@ -1296,20 +1296,34 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
-ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
+ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
+                                         Expr *base) const {
   // If we're inside a @_transparent function, use the most conservative
   // access pattern, since we may be inlined from a different resilience
   // domain.
   ResilienceExpansion expansion = UseDC->getResilienceExpansion();
 
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
-    // Observing member are accessed directly from within their didSet/willSet
-    // specifiers.  This prevents assignments from becoming infinite loops.
-    if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
+    // Prevent variable mutations from within their own didSet/willSet
+    // specifiers from becoming infinite loops by accessing directly.
+    if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC)) {
       if (var->hasStorage() && var->hasAccessorFunctions() &&
-          UseFD->getStorage() == var)
-        return AccessSemantics::DirectToStorage;
-    
+          UseFD->getStorage() == var) {
+        // A plain variable access from within its own observer is direct.
+        if (!base)
+          return AccessSemantics::DirectToStorage;
+
+        // A member access on the implicit 'self' declaration within its own
+        // observer is direct. If the base is some other expression, we want
+        // to call the setter, as we might be accessing the member on a
+        // *different* instance.
+        base = base->getValueProvidingExpr();
+        if (auto baseDRE = dyn_cast<DeclRefExpr>(base))
+          if (baseDRE->getDecl() == UseFD->getImplicitSelfDecl())
+            return AccessSemantics::DirectToStorage;
+      }
+    }
+
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
     // thing as the getter/setter (i.e., it can't be overridden), then just do a
