@@ -1369,7 +1369,7 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         break;
       }
       case XREF_INITIALIZER_PATH_PIECE:
-        result = getContext().Id_init;
+        result = DeclBaseName::createConstructor();
         break;
 
       case XREF_EXTENSION_PATH_PIECE:
@@ -1499,7 +1499,7 @@ giveUpFastPath:
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
                                                    kind);
-        memberName = getContext().Id_init;
+        memberName = DeclBaseName::createConstructor();
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
@@ -2797,7 +2797,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     SmallVector<Identifier, 2> argNames;
     for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
       argNames.push_back(getIdentifier(argNameID));
-    DeclName name(ctx, ctx.Id_init, argNames);
+    DeclName name(ctx, DeclBaseName::createConstructor(), argNames);
 
     Optional<swift::CtorInitializerKind> initKind =
         getActualCtorInitializerKind(storedInitKind);
@@ -4872,7 +4872,7 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
     if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
       containingClass->setHasMissingVTableEntries();
 
-    if (error.getName().getBaseName() == context.Id_init) {
+    if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
       suppliedMissingMember = MissingMemberDecl::forInitializer(
           context, containingClass, error.getName(), error.needsVTableEntry(),
           error.needsAllocatingVTableEntry());
@@ -4901,7 +4901,7 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
         if (error.needsVTableEntry())
           containingProto->setHasMissingRequirements(true);
 
-        if (error.getName().getBaseName() == context.Id_init) {
+        if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
           suppliedMissingMember = MissingMemberDecl::forInitializer(
               context, containingProto, error.getName(),
               error.needsVTableEntry(), error.needsAllocatingVTableEntry());

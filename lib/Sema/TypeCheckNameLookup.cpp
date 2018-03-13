@@ -472,7 +472,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
 LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
                                              NameLookupOptions options) {
-  return lookupMember(dc, type, Context.Id_init, options);
+  return lookupMember(dc, type, DeclBaseName::createConstructor(), options);
 }
 
 enum : unsigned {

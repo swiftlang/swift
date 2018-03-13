@@ -961,7 +961,8 @@ static void maybeSuggestNoArgSelfInit(SILModule &module, SILLocation loc,
     return;
 
   ASTContext &ctx = module.getASTContext();
-  DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
+  DeclName noArgInit(ctx, DeclBaseName::createConstructor(),
+                     ArrayRef<Identifier>());
 
   auto lookupResults = theStruct->lookupDirect(noArgInit);
   if (lookupResults.size() != 1)

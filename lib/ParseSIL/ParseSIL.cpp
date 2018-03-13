@@ -450,11 +450,9 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   }
   case tok::oper_binary_unspaced:  // fixme?
   case tok::oper_binary_spaced:
-    // A binary operator can be part of a SILDeclRef.
-    Result = P.Context.getIdentifier(P.Tok.getText());
-    break;
   case tok::kw_init:
-    Result = P.Context.Id_init;
+    // A binary operator or `init` can be part of a SILDeclRef.
+    Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   default:
     // If it's some other keyword, grab an identifier for it.
@@ -1183,6 +1181,10 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
     case tok::kw_subscript:
       P.consumeToken();
       FullName.push_back(DeclBaseName::createSubscript());
+      break;
+    case tok::kw_init:
+      P.consumeToken();
+      FullName.push_back(DeclBaseName::createConstructor());
       break;
     case tok::kw_deinit:
       P.consumeToken();

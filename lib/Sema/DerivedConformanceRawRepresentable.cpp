@@ -299,7 +299,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
   
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
@@ -417,7 +417,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (requirement->getBaseName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
 
-  if (requirement->getBaseName() == tc.Context.Id_init)
+  if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
   
   tc.diagnose(requirement->getLoc(),
