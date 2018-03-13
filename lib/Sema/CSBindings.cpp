@@ -381,7 +381,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
         if (auto *locator = typeVar->getImpl().getLocator()) {
           auto path = locator->getPath();
-          auto voidType = TupleType::getEmpty(getASTContext());
+          auto voidType = getASTContext().TheEmptyTupleType;
 
           // If this is a type variable representing closure result,
           // which is on the right-side of some relational constraint
@@ -391,7 +391,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
           if (!path.empty() &&
               path.back().getKind() == ConstraintLocator::ClosureResult &&
               binding->Kind == AllowedBindingKind::Supertypes &&
-              exactTypes.insert(voidType->getCanonicalType()).second) {
+              exactTypes.insert(voidType).second) {
             result.addPotentialBinding(
                 {voidType, binding->Kind, constraint->getKind()},
                 /*allowJoinMeet=*/false);
