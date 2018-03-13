@@ -465,6 +465,13 @@ if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
       OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
+# 'build-script' sets LLVM_ENABLE_LIBCXX=TRUE and you probably should too.
+# Otherwise different interpretations of the C++ standard can cause problems.
+# For example, std::shuffle can behave differently.
+if(NOT LLVM_ENABLE_LIBCXX)
+  message(WARNING "Untested configuration: LLVM_ENABLE_LIBCXX=FALSE")
+endif()
+
 include(SwiftSharedCMakeConfig)
 
 # Support building Swift as a standalone project, using LLVM as an
