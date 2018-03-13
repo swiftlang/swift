@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name unmanaged -enable-sil-ownership -emit-sil %s | %FileCheck %s
 
 class C {}
 

@@ -11,18 +11,14 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-# Make a job pool for things that can't yet be distributed
-cmake_host_system_information(
-  RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
-set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
-# Put linking in that category
-set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
-
 ENABLE_LANGUAGE(C)
 
 # First include general CMake utilities.
+include(SwiftLocalJobPool)
 include(SwiftUtils)
 include(CheckSymbolExists)
+
+initialize_local_jobpool()
 
 #
 # User-configurable options that control the inclusion and default build
@@ -822,20 +818,23 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
 endif()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
-message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
+message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  +0 Normal Args: ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
 message(STATUS "")
 
-if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  +0 Normal Args:   ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "  +0 Normal Args:                     ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
 else()

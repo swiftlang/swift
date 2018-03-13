@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -primary-file %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -primary-file %s | %FileCheck %s
 
 struct Buh<T> {
   var x: Int {
@@ -389,7 +391,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
   // CHECK: [[MARKED_ADDR:%.*]] = mark_dependence [[ADDR]] : $*Aleph on [[R2]]
   // CHECK: {{.*}}([[CALLBACK_ADDR:%.*]] : 
-  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout RefWithProp, @thick RefWithProp.Type) -> ()
+  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed RefWithProp, @thick RefWithProp.Type) -> ()
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
   // CHECK: store [[R2]] to [init] [[TEMP]]
   // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]], [[TEMP]], {{%.*}})

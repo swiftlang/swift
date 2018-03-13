@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // Test module for the specialize_cg_update_crash.sil test.
 
 sil_stage canonical

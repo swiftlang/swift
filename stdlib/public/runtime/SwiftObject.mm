@@ -33,6 +33,7 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
+#include "../SwiftShims/AssertionReporting.h"
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
@@ -1380,6 +1381,34 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
 bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object){
   return object != nullptr &&
          swift_isUniquelyReferencedOrPinned_nonNull_native(object);
+}
+
+// Given a non-@objc object reference, return true iff the
+// object is non-nil and has a strong reference count greather than 1
+bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
+                                                  const unsigned char *filename,
+                                                  int32_t filenameLength,
+                                                  int32_t line) {
+  bool isEscaping =
+      object != nullptr && !object->refCounts.isUniquelyReferenced();
+
+  // Print a message if the closure escaped.
+  if (isEscaping) {
+    auto *message = "Fatal error: closure argument was escaped in "
+                              "withoutActuallyEscaping block";
+    auto messageLength = strlen(message);
+
+    if (_swift_shouldReportFatalErrorsToDebugger())
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, message);
+
+    char *log;
+    swift_asprintf(&log, "%.*s: file %.*s, line %" PRIu32 "\n", messageLength,
+                   message, filenameLength, filename, line);
+
+    swift_reportError(RuntimeErrorFlagFatal, log);
+    free(log);
+  }
+  return isEscaping;
 }
 
 /// Given a non-nil native swift object reference, return true if

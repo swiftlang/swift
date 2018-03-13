@@ -6,7 +6,7 @@
 import Foundation
 import StdlibUnittest
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 #endif
 

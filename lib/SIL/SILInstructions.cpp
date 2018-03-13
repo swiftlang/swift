@@ -1762,6 +1762,8 @@ OpenExistentialAddrInst::OpenExistentialAddrInst(
 OpenExistentialRefInst::OpenExistentialRefInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+  assert(Operand->getType().isObject() && "Operand must be an object.");
+  assert(Ty.isObject() && "Result type must be an object type.");
 }
 
 OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(

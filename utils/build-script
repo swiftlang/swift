@@ -488,6 +488,8 @@ class BuildScriptInvocation(object):
                 args.swift_stdlib_assertions).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
+            "--llbuild-enable-assertions", str(
+                args.llbuild_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
             "--build-jobs", str(args.build_jobs),
             "--libdir-suffix=%s" % args.libdir_suffix,

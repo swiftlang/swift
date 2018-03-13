@@ -63,7 +63,7 @@ public typealias CFloat = Float
 public typealias CDouble = Double
 
 /// The C 'long double' type.
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
@@ -182,7 +182,12 @@ extension OpaquePointer: Hashable {
   /// program runs.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 

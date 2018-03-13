@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -O -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop
 

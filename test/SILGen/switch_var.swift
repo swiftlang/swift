@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name switch_var -emit-silgen %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>

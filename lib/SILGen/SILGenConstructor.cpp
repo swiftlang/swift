@@ -598,7 +598,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                               ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  ManagedValue selfArg = B.createFunctionArgument(selfTy, selfDecl);
+  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);

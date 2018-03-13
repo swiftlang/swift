@@ -124,7 +124,7 @@ public:
       conformsTo;
 
     /// Same-type constraints within this equivalence class.
-    std::vector<Constraint<PotentialArchetype *>> sameTypeConstraints;
+    std::vector<Constraint<Type>> sameTypeConstraints;
 
     /// Concrete type to which this equivalence class is equal.
     ///
@@ -212,15 +212,6 @@ public:
                                      ResolvedType type,
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
-
-    /// Record a same-type constraint between \c type1 and \c type2 determined
-    /// via the given source.
-    ///
-    /// \returns true if this same-type constraint merges two equivalence
-    /// classes, and false otherwise.
-    bool recordSameTypeConstraint(PotentialArchetype *type1,
-                                  PotentialArchetype *type2,
-                                  const RequirementSource *source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -445,17 +436,16 @@ private:
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
 
-  /// Add a rewrite rule that makes \c otherPA a part of the given equivalence
-  /// class.
-  void addSameTypeRewriteRule(EquivalenceClass *equivClass,
-                              PotentialArchetype *otherPA);
+  /// Add a rewrite rule from that makes the two types equivalent.
+  ///
+  /// \returns true if a new rewrite rule was added, and false otherwise.
+  bool addSameTypeRewriteRule(CanType type1, CanType type2);
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetypes are equivalent.
-  ConstraintResult addSameTypeRequirementBetweenArchetypes(
-                                               PotentialArchetype *T1,
-                                               PotentialArchetype *T2,
-                                               const RequirementSource *Source);
+  /// \brief Add a same-type requirement between two types that are known to
+  /// refer to type parameters.
+  ConstraintResult addSameTypeRequirementBetweenTypeParameters(
+                                         ResolvedType type1, ResolvedType type2,
+                                         const RequirementSource *source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
@@ -809,9 +799,6 @@ public:
   bool areInSameEquivalenceClass(Type type1, Type type2);
 
   /// Simplify the given dependent type down to its canonical representation.
-  ///
-  /// \returns null if the type involved dependent member types that
-  /// don't have associated types.
   Type getCanonicalTypeParameter(Type type);
 
   /// Verify the correctness of the given generic signature.
@@ -1490,8 +1477,10 @@ struct GenericSignatureBuilder::Constraint {
   Type getSubjectDependentType(
                        TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  /// Determine whether the subject is equivalence to the given potential
-  /// archetype.
+  /// Determine whether the subject is equivalence to the given type.
+  bool isSubjectEqualTo(Type type) const;
+
+  /// Determine whether the subject is equivalence to the given type.
   bool isSubjectEqualTo(const PotentialArchetype *pa) const;
 
   /// Determine whether this constraint has the same subject as the

@@ -23,6 +23,19 @@ CHANGELOG
 Swift 4.2
 ---------
 
+* [SE-0196][]
+  
+  Custom compile-time warnings or error messages can be emitted using the
+  `#warning(_:)` and `#error(_:)` directives.
+
+  ```swift
+  #warning("this is incomplete")
+
+  #if MY_BUILD_CONFIG && MY_OTHER_BUILD_CONFIG
+    #error("MY_BUILD_CONFIG and MY_OTHER_BUILD_CONFIG cannot both be set")
+  #endif
+  ```
+
 * Public classes may now have internal `required` initializers. The rule for
   `required` initializers is that they must be available everywhere the class
   can be subclassed, but previously we said that `required` initializers on
@@ -114,17 +127,19 @@ Swift 4.1
 	recursive constraints. For example, the `SubSequence` associated type of
 	`Sequence` follows the enclosing protocol:
 
-        protocol Sequence {
-          associatedtype Element
-          associatedtype SubSequence: Sequence
-            where SubSequence.Element == Element,
-                  SubSequence.SubSequence == SubSequence
-          // ...
-        }
+  ```swift
+  protocol Sequence {
+    associatedtype Element
+    associatedtype SubSequence: Sequence
+      where SubSequence.Element == Element,
+            SubSequence.SubSequence == SubSequence
+    // ...
+  }
 
-        protocol Collection: Sequence where Self.SubSequence: Collection {
-          // ...
-        }
+  protocol Collection: Sequence where Self.SubSequence: Collection {
+    // ...
+  }
+  ```
 
   As a result, a number of new constraints have been introduced into the
 	standard library protocols:

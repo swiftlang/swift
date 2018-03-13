@@ -951,6 +951,15 @@ static void VisitNodeDestructor(
   }
 }
 
+static Demangle::NodePointer DropGenericSignature(
+    Demangle::NodePointer cur_node) {
+  if (cur_node->getKind() != Demangle::Node::Kind::DependentGenericType)
+    return nullptr;
+  if (cur_node->getChild(0) == nullptr)
+    return nullptr;
+  return cur_node->getFirstChild();
+}
+
 static void VisitNodeDeclContext(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -979,14 +988,10 @@ static void VisitNodeDeclContext(
     if (generics->getChild(0) == nullptr)
       break;
     generics = generics->getFirstChild();
-    if (generics->getKind() != Demangle::Node::Kind::DependentGenericType)
+    generics = DropGenericSignature(generics);
+    if (generics == nullptr)
       break;
-    if (generics->getChild(0) == nullptr)
-      break;
-    generics = generics->getFirstChild();
-    //                        if (generics->getKind() !=
-    //                        Demangle::Node::Kind::ArchetypeList)
-    //                            break;
+
     AbstractFunctionDecl *func_decl = nullptr;
     for (Decl *decl : found_decls._decls) {
       func_decl = dyn_cast<AbstractFunctionDecl>(decl);
@@ -1152,6 +1157,40 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
   return (in_matches && out_matches);
 }
 
+static void VisitNodePrivateDeclName(
+    ASTContext *ast,
+    Demangle::NodePointer parent_node,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
+
+  if (cur_node->getNumChildren() != 2) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
+  Demangle::NodePointer id_node(cur_node->getChild(1));
+
+  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
+                                  decl_kind, result,
+                                  priv_decl_id_node->getText().str())) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
+          id_node->getText().str().c_str(),
+          priv_decl_id_node->getText().str().c_str());
+  }
+}
+
 // VisitNodeFunction gets used for Function, Variable and Allocator:
 static void VisitNodeFunction(
     ASTContext *ast,
@@ -1185,6 +1224,25 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Extension:
       VisitNode(ast, *pos, decl_scope_result);
       break;
+
+    case Demangle::Node::Kind::PrivateDeclName: {
+      VisitNodePrivateDeclName(ast, cur_node, child, decl_scope_result);
+
+      // No results found, giving up.
+      if (decl_scope_result._decls.empty())
+        break;
+
+      std::copy(decl_scope_result._decls.begin(),
+                decl_scope_result._decls.end(),
+                back_inserter(identifier_result._decls));
+      std::copy(decl_scope_result._types.begin(),
+                decl_scope_result._types.end(),
+                back_inserter(identifier_result._types));
+      identifier_result._module = decl_scope_result._module;
+      if (decl_scope_result._decls.size() == 1)
+        found_univocous = true;
+      break;
+    }
 
     case Demangle::Node::Kind::LabelList: {
       for (const auto &label : **pos) {
@@ -1253,6 +1311,28 @@ static void VisitNodeFunction(
       break;
     }
   }
+
+  do {
+    if (cur_node->getKind() == Demangle::Node::Kind::Subscript) {
+      FindNamedDecls(ast, DeclBaseName::createSubscript(),
+                     decl_scope_result);
+      if (decl_scope_result._decls.empty()) {
+        result._error = stringWithFormat(
+          "subscript identifier could not be found by name lookup");
+        break;
+      }
+      std::copy(decl_scope_result._decls.begin(),
+                decl_scope_result._decls.end(),
+                back_inserter(identifier_result._decls));
+      std::copy(decl_scope_result._types.begin(),
+                decl_scope_result._types.end(),
+                back_inserter(identifier_result._types));
+      identifier_result._module = decl_scope_result._module;
+      if (decl_scope_result._decls.size() == 1)
+        found_univocous = true;
+      break;
+    }
+  } while (0);
 
   //                    if (node_kind == Demangle::Node::Kind::Allocator)
   //                    {
@@ -1416,6 +1496,8 @@ static void VisitNodeSetterGetter(
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
   VisitNodeResult decl_ctx_result;
   std::string identifier;
+  std::vector<StringRef> labels;
+
   VisitNodeResult type_result;
 
   assert(cur_node->getNumChildren() == 1 &&
@@ -1440,15 +1522,34 @@ static void VisitNodeSetterGetter(
     case Demangle::Node::Kind::Identifier:
       identifier.assign((*pos)->getText());
       break;
-    case Demangle::Node::Kind::Type:
-      VisitNode(ast, *pos, type_result);
+    case Demangle::Node::Kind::Type: {
+      auto type = (*pos)->getFirstChild();
+      if (DropGenericSignature(type))
+        type = type->getChild(1);
+      VisitNode(ast, type, type_result);
       break;
+    }
+    case Demangle::Node::Kind::LabelList: {
+      for (const auto &label : **pos) {
+        if (label->getKind() == Demangle::Node::Kind::FirstElementMarker)
+          labels.push_back(StringRef());
+        else {
+          labels.push_back(label->getText());
+        }
+      }
+      break;
+    }
     default:
       result._error =
           stringWithFormat("%s encountered in generic type children",
                       Demangle::getNodeKindString(child_node_kind));
       break;
     }
+  }
+
+  if (!type_result.HasSingleType()) {
+    result._error = "bad type";
+    return;
   }
 
   if (referenced_node->getKind() == Demangle::Node::Kind::Subscript) {
@@ -1466,9 +1567,6 @@ static void VisitNodeSetterGetter(
     SubscriptDecl *subscript_decl;
     const AnyFunctionType *type_func =
         type_result._types.front()->getAs<AnyFunctionType>();
-
-    Type type_result_type = type_func->getResult();
-    Type type_input_type = type_func->getInput();
 
     FuncDecl *identifier_func = nullptr;
 
@@ -1494,24 +1592,24 @@ static void VisitNodeSetterGetter(
           break;
         }
 
-        if (identifier_func && identifier_func->getInterfaceType()) {
-          const AnyFunctionType *identifier_func_type =
-              identifier_func->getInterfaceType()->getAs<AnyFunctionType>();
-          if (identifier_func_type) {
+        if (identifier_func &&
+            subscript_decl->getGetter() &&
+            subscript_decl->getGetter()->getInterfaceType()) {
+          auto subscript_type =
+            subscript_decl->getGetter()->getInterfaceType()->getAs<AnyFunctionType>();
+
+          if (subscript_type) {
             // Swift function types are formally functions that take the class
             // and return the method,
             // we have to strip off the first level of function call to compare
             // against the type
             // from the demangled name.
-            const AnyFunctionType *identifier_uncurried_result =
-                identifier_func_type->getResult()->getAs<AnyFunctionType>();
-            if (identifier_uncurried_result) {
-              Type identifier_result_type =
-                  identifier_uncurried_result->getResult();
-              Type identifier_input_type =
-                  identifier_uncurried_result->getInput();
-              if (identifier_result_type->isEqual(type_result_type) &&
-                  identifier_input_type->isEqual(type_input_type)) {
+            auto subscript_uncurried_result =
+                subscript_type->getResult()->getAs<AnyFunctionType>();
+            if (subscript_uncurried_result) {
+              if (CompareFunctionTypes(type_func,
+                                       subscript_uncurried_result,
+                                       labels)) {
                 break;
               }
             }
@@ -1622,40 +1720,6 @@ static void VisitNodeLocalDeclName(
     result._decls.push_back(decl);
     auto type = decl->getDeclaredInterfaceType();
     result._types.push_back(type);
-  }
-}
-
-static void VisitNodePrivateDeclName(
-    ASTContext *ast,
-    Demangle::NodePointer parent_node,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
-
-  if (cur_node->getNumChildren() != 2) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
-  Demangle::NodePointer id_node(cur_node->getChild(1));
-
-  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
-                                  decl_kind, result,
-                                  priv_decl_id_node->getText().str())) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
-          id_node->getText().str().c_str(),
-          priv_decl_id_node->getText().str().c_str());
   }
 }
 
@@ -2061,6 +2125,25 @@ VisitNodeWeak(ASTContext *ast,
   }
 }
 
+static void
+VisitNodeGenericParam(ASTContext *ast,
+                      Demangle::NodePointer cur_node,
+                      VisitNodeResult &result) {
+  if (cur_node->getNumChildren() == 2) {
+    auto first = cur_node->getChild(0);
+    auto second = cur_node->getChild(1);
+    if (first->getKind() == Demangle::Node::Kind::Index &&
+        second->getKind() == Demangle::Node::Kind::Index) {
+      result._types.push_back(
+        GenericTypeParamType::get(first->getIndex(),
+                                  second->getIndex(), *ast));
+      return;
+    }
+  }
+
+  result._error = "bad generic param type";
+}
+
 static void VisitFirstChildNode(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2159,7 +2242,8 @@ static void VisitNode(
 
   case Demangle::Node::Kind::Function:
   case Demangle::Node::Kind::Allocator:
-  case Demangle::Node::Kind::Variable: // Out of order on purpose
+  case Demangle::Node::Kind::Variable:
+  case Demangle::Node::Kind::Subscript: // Out of order on purpose
     VisitNodeFunction(ast, node, result);
     break;
 
@@ -2227,6 +2311,10 @@ static void VisitNode(
 
   case Demangle::Node::Kind::Weak:
     VisitNodeWeak(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::DependentGenericParamType:
+    VisitNodeGenericParam(ast, node, result);
     break;
 
   case Demangle::Node::Kind::LocalDeclName:

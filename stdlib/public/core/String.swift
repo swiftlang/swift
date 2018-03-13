@@ -36,10 +36,8 @@ public protocol StringProtocol
   var utf16: UTF16View { get }
   var unicodeScalars: UnicodeScalarView { get }
 
-#if _runtime(_ObjC)
   func hasPrefix(_ prefix: String) -> Bool
   func hasSuffix(_ prefix: String) -> Bool
-#endif
 
   func lowercased() -> String
   func uppercased() -> String
@@ -1337,7 +1335,7 @@ extension String {
       var guts = _guts
       guts.withMutableASCIIStorage(unusedCapacity: 0) { storage in
         for i in 0..<storage._value.count {
-          // See the comment above in lowercaseString.
+          // See the comment above in lowercased.
           let value = storage._value.start[i]
           let isLower =
             _asciiLowerCaseTable &>>

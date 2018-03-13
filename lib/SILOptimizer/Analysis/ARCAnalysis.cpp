@@ -70,7 +70,8 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User);
+  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User) ||
+         isa<IsEscapingClosureInst>(User);
 }
 
 //===----------------------------------------------------------------------===//

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name force_cast_chained_optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name indirect_enum -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
 
 indirect enum TreeA<T> {
   case Nil

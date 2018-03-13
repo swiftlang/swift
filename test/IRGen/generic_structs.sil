@@ -50,7 +50,7 @@ import Builtin
 // CHECK-SAME:   [{{[0-9]+}} x i8*]* @"$S15generic_structs13SingleDynamicVMI"
 // CHECK-SAME:   @"$S15generic_structs13SingleDynamicVMP"
 // --       generic params, requirements, key args, extra args
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
+// CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       generic parameters
 // CHECK-SAME:   <i8 0x80>
 // CHECK-SAME: }>
@@ -73,7 +73,7 @@ import Builtin
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
 // --       generic params, requirements, key args, extra args
-// CHECK-SAME: i32 2, i32 2, i32 2, i32 2,
+// CHECK-SAME: i16 2, i16 2, i16 2, i16 2,
 // --       generic parameters
 // CHECK-SAME: <i8 0x80>, <i8 0x80>,
 // --       generic requirement

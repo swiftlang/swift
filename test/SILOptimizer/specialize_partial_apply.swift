@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // First check the SIL.
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil -primary-file %s | %FileCheck %s
 

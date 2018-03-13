@@ -3,5 +3,6 @@ add_swift_unittest(SwiftDriverTests
 )
 
 target_link_libraries(SwiftDriverTests
+   PRIVATE
    swiftDriver
 )

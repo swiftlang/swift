@@ -172,9 +172,8 @@ public:
 class StatsProfiler {
   struct Node {
     int64_t SelfCount;
-    typedef std::tuple<StringRef,
-                       const void*,
-                       const UnifiedStatsReporter::TraceFormatter*> Key;
+    using Key = std::tuple<StringRef, const void *,
+                           const UnifiedStatsReporter::TraceFormatter *>;
     Node *Parent;
     DenseMap<Key, std::unique_ptr<Node>> Children;
 

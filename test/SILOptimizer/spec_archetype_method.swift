@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -disable-arc-opts -emit-sil -primary-file %s | %FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -724,31 +725,31 @@ namespace driver {
         Batches.push_back(Comp.addJob(std::move(J)));
     }
 
-    /// Inspect current batch \p i of the \p Partition currently being built
-    /// and, if that batch is "full" (in the sense of holding an evenly-divided
-    /// portion of NumJobs) then advance \p i to the next batch index in the
-    /// partition.
-    void maybeAdvanceToNextPartition(size_t &i,
-                                     BatchPartition const &Partition,
-                                     size_t NumJobs) {
-      assert(i < Partition.size());
-      size_t Remainder = NumJobs % Partition.size();
-      size_t TargetSize = NumJobs / Partition.size();
-      // Spread remainder evenly across partitions by adding 1 to the target
-      // size of the first Remainder of them.
-      if (i < Remainder)
-        TargetSize++;
-      if (Partition[i].size() >= TargetSize)
-        ++i;
-      assert(i < Partition.size());
-    }
-
-    /// Shuffle \p Batchable if -driver-batch-seed is nonzero.
-    void maybeShuffleBatchable(std::vector<const Job *> &Batchable) {
+    /// Build a vector of partition indices, one per Job: the i'th index says
+    /// which batch of the partition the i'th Job will be assigned to. If we are
+    /// shuffling due to -driver-batch-seed, the returned indices will not be
+    /// arranged in contiguous runs. We shuffle partition-indices here, not
+    /// elements themselves, to preserve the invariant that each batch is a
+    /// subsequence of the full set of inputs, not just a subset.
+    std::vector<size_t>
+    assignJobsToPartitions(size_t PartitionSize,
+                           size_t NumJobs) {
+      size_t Remainder = NumJobs % PartitionSize;
+      size_t TargetSize = NumJobs / PartitionSize;
+      std::vector<size_t> PartitionIndex;
+      PartitionIndex.reserve(NumJobs);
+      for (size_t P = 0; P < PartitionSize; ++P) {
+        // Spread remainder evenly across partitions by adding 1 to the target
+        // size of the first Remainder of them.
+        size_t FillCount = TargetSize + ((P < Remainder) ? 1 : 0);
+        std::fill_n(std::back_inserter(PartitionIndex), FillCount, P);
+      }
       if (Comp.BatchSeed != 0) {
         std::minstd_rand gen(Comp.BatchSeed);
-        std::shuffle(Batchable.begin(), Batchable.end(), gen);
+        std::shuffle(PartitionIndex.begin(), PartitionIndex.end(), gen);
       }
+      assert(PartitionIndex.size() == NumJobs);
+      return PartitionIndex;
     }
 
     /// Create \c NumberOfParallelCommands batches and assign each job to a
@@ -762,28 +763,28 @@ namespace driver {
       }
 
       assert(!Partition.empty());
-      maybeShuffleBatchable(Batchable);
-
-      size_t i = 0;
+      auto PartitionIndex = assignJobsToPartitions(Partition.size(),
+                                                   Batchable.size());
+      assert(PartitionIndex.size() == Batchable.size());
       auto const &TC = Comp.getToolChain();
-      for (const Job *Cmd : Batchable) {
-        maybeAdvanceToNextPartition(i, Partition, Batchable.size());
-        std::vector<const Job*> &P = Partition[i];
-        if (P.empty() || TC.jobsAreBatchCombinable(Comp, P[0], Cmd)) {
-          if (Comp.ShowJobLifecycle)
-            llvm::outs() << "Adding " << LogJob(Cmd)
-                         << " to batch " << i << '\n';
-          P.push_back(Cmd);
-        } else {
-          // Strange but theoretically possible that we have a batchable job
-          // that's not combinable with others; tack a new batch on for it.
-          if (Comp.ShowJobLifecycle)
-            llvm::outs() << "Adding " << LogJob(Cmd)
-                         << " to new batch " << Partition.size() << '\n';
-          Partition.push_back(std::vector<const Job*>());
-          Partition.back().push_back(Cmd);
-        }
-      }
+      for_each(Batchable, PartitionIndex, [&](const Job *Cmd, size_t Idx) {
+          assert(Idx < Partition.size());
+          std::vector<const Job*> &P = Partition[Idx];
+          if (P.empty() || TC.jobsAreBatchCombinable(Comp, P[0], Cmd)) {
+            if (Comp.ShowJobLifecycle)
+              llvm::outs() << "Adding " << LogJob(Cmd)
+                           << " to batch " << Idx << '\n';
+            P.push_back(Cmd);
+          } else {
+            // Strange but theoretically possible that we have a batchable job
+            // that's not combinable with others; tack a new batch on for it.
+            if (Comp.ShowJobLifecycle)
+              llvm::outs() << "Adding " << LogJob(Cmd)
+                           << " to new batch " << Partition.size() << '\n';
+            Partition.push_back(std::vector<const Job*>());
+            Partition.back().push_back(Cmd);
+          }
+        });
     }
 
     // FIXME: at the moment we're not passing OutputFileMaps to frontends, so

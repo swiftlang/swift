@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
@@ -21,16 +20,18 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "ResultPlan.h"
+#include "SILGen.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
+#include "SwitchEnumBuilder.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -2412,10 +2413,28 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       return RValue::forInContext();
     }
   }
-    
+
+  llvm::SmallVector<RValue, 8> tupleElts;
+  bool hasAtleastOnePlusOneValue = false;
+  for (Expr *elt : E->getElements()) {
+    RValue RV = SGF.emitRValue(elt);
+    hasAtleastOnePlusOneValue |= RV.isPlusOne(SGF);
+    tupleElts.emplace_back(std::move(RV));
+  }
+
+  // Once we have found if we have any plus one arguments, add each element of
+  // tuple elts into result, making sure each value is at plus 1.
   RValue result(type);
-  for (Expr *elt : E->getElements())
-    result.addElement(SGF.emitRValue(elt));
+  if (hasAtleastOnePlusOneValue) {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]).ensurePlusOne(SGF, E));
+    }
+  } else {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]));
+    }
+  }
+
   return result;
 }
 
@@ -2756,7 +2775,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
            shuffleIndex != TupleShuffleExpr::Variadic &&
            "Only argument tuples can have default initializers & varargs");
 
-    result.addElement(std::move(elements[shuffleIndex]));
+    result.addElement(std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
     return result;
   }
 
@@ -2777,7 +2796,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // separately.
     if (shuffleIndex != TupleShuffleExpr::Variadic) {
       // Map from a different tuple element.
-      result.addElement(std::move(elements[shuffleIndex]));
+      result.addElement(
+          std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
       continue;
     }
 
@@ -2799,8 +2819,9 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     ManagedValue varargs = emitVarargs(SGF, E, field.getVarargBaseTy(),
                                        variadicValues,
                                        E->getVarargsArrayType());
-    result.addElement(RValue(SGF, E, field.getType()->getCanonicalType(),
-                             varargs));
+    result.addElement(
+        RValue(SGF, E, field.getType()->getCanonicalType(), varargs)
+            .ensurePlusOne(SGF, E));
     break;
   }
   
@@ -2988,7 +3009,14 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (!storage->getDeclContext()->isTypeContext())
     return ManagedValue();
   
-  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  ManagedValue paramOrigValue;
+  
+  if (subSGF.SGM.M.getOptions().EnableGuaranteedNormalArguments) {
+    paramOrigValue =
+      ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
+  } else {
+    paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  }
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
@@ -3087,9 +3115,15 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                              propertyType);
   }
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 2> params;
   params.push_back({loweredBaseTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
+                    paramConvention});
   auto &C = SGM.getASTContext();
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
@@ -3204,15 +3238,21 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   auto &C = SGM.getASTContext();
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 3> params;
   // property value
   params.push_back({loweredPropTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
+                    paramConvention});
   // base
   params.push_back({loweredBaseTy.getSwiftRValueType(),
                     property->isSetterMutating()
                       ? ParameterConvention::Indirect_Inout
-                      : ParameterConvention::Indirect_In});
+                      : paramConvention});
   // indexes
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
@@ -3278,7 +3318,12 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                          indexes,
                                                          indexPtrArg);
   
-  auto valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
+  ManagedValue valueOrig;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    valueOrig = ManagedValue::forBorrowedRValue(valueArg)
+      .copy(subSGF, loc);
+  else
+    valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
@@ -3593,8 +3638,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes. There isn't a great hash combining
-    // interface in the standard library to do this yet.
+    // TODO: Combine hashes of the indexes using an inout _Hasher
     {
       auto &index = indexes[0];
       
@@ -4159,6 +4203,9 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 /// Flattens one level of optional from a nested optional value.
 static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue optVal) {
+  // This code assumes that we have a +1 value.
+  assert(optVal.isPlusOne(SGF));
+
   // FIXME: Largely copied from SILGenFunction::emitOptionalToOptional.
   auto contBB = SGF.createBasicBlock();
   auto isNotPresentBB = SGF.createBasicBlock();
@@ -4169,57 +4216,54 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   assert(resultTy.getSwiftRValueType().getOptionalObjectType() &&
          "input was not a nested optional value");
 
-  // If the result is address-only, we need to return something in memory,
-  // otherwise the result is the BBArgument in the merge point.
-  SILValue result;
-  if (resultTL.isAddressOnly())
-    result = SGF.emitTemporaryAllocation(loc, resultTy);
-  else
-    result = contBB->createPHIArgument(resultTy, ValueOwnershipKind::Owned);
-
-  // Branch on whether the input is optional, this doesn't consume the value.
-  auto isPresent = SGF.emitDoesOptionalHaveValue(loc, optVal.getValue());
-  SGF.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
-
-  // If it's present, apply the recursive transformation to the value.
-  SGF.B.emitBlock(isPresentBB);
-  SILValue branchArg;
-  {
-    // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(SGF.Cleanups, CleanupLocation::get(loc));
-
-    // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = SGF.getTypeLowering(optVal.getType());
-    auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(loc, optVal,
-                                                             inputTL);
-
-    // Inject that into the result type if the result is address-only.
-    if (resultTL.isAddressOnly())
-      resultValue.forwardInto(SGF, loc, result);
-    else
-      branchArg = resultValue.forward(SGF);
-  }
-  if (branchArg)
-    SGF.B.createBranch(loc, contBB, branchArg);
-  else
-    SGF.B.createBranch(loc, contBB);
-
-  // If it's not present, inject 'nothing' into the result.
-  SGF.B.emitBlock(isNotPresentBB);
+  SILValue contBBArg;
+  TemporaryInitializationPtr addrOnlyResultBuf;
   if (resultTL.isAddressOnly()) {
-    SGF.emitInjectOptionalNothingInto(loc, result, resultTL);
-    SGF.B.createBranch(loc, contBB);
+    addrOnlyResultBuf = SGF.emitTemporary(loc, resultTL);
   } else {
-    branchArg = SGF.getOptionalNoneValue(loc, resultTL);
-    SGF.B.createBranch(loc, contBB, branchArg);
+    contBBArg = contBB->createPHIArgument(resultTy, ValueOwnershipKind::Owned);
   }
+
+  SwitchEnumBuilder SEB(SGF.B, loc, optVal);
+
+  auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
+  SEB.addCase(someDecl, isPresentBB, contBB, [&](ManagedValue input,
+                                                 SwitchCaseFullExpr &scope) {
+    if (resultTL.isAddressOnly()) {
+      SILValue addr =
+          addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+      input = SGF.B.createUncheckedTakeEnumDataAddr(
+          loc, input, someDecl, input.getType().getOptionalObjectType());
+      SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
+                           IsInitialization);
+      scope.exitAndBranch(loc);
+      return;
+    }
+    scope.exitAndBranch(loc, input.forward(SGF));
+  });
+  SEB.addCase(
+      SGF.getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+        if (resultTL.isAddressOnly()) {
+          SILValue addr =
+              addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+          SGF.emitInjectOptionalNothingInto(loc, addr, resultTL);
+          scope.exitAndBranch(loc);
+          return;
+        }
+
+        auto mv = SGF.B.createManagedOptionalNone(loc, resultTy).forward(SGF);
+        scope.exitAndBranch(loc, mv);
+      });
+  std::move(SEB).emit();
 
   // Continue.
   SGF.B.emitBlock(contBB);
-  if (resultTL.isAddressOnly())
-    return SGF.emitManagedBufferWithCleanup(result, resultTL);
-
-  return SGF.emitManagedRValueWithCleanup(result, resultTL);
+  if (resultTL.isAddressOnly()) {
+    addrOnlyResultBuf->finishInitialization(SGF);
+    return addrOnlyResultBuf->getManagedAddress();
+  }
+  return SGF.emitManagedRValueWithCleanup(contBBArg, resultTL);
 }
 
 static ManagedValue
@@ -5332,8 +5376,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
 }
 
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
-    MakeTemporarilyEscapableExpr *E,
-    SGFContext C) {
+    MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
   auto functionValue =
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
@@ -5341,20 +5384,33 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
 
   // Convert it to an escaping function value.
-  functionValue =
+  auto escapingClosure =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
 
-  // Bind the opaque value to the escaping function.
-  SILGenFunction::OpaqueValueState opaqueValue{
-    functionValue,
-    /*consumable*/ true,
-    /*hasBeenConsumed*/ false,
-  };
-  SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
-                                                  opaqueValue);
+  RValue rvalue;
+  auto loc = SILLocation(E);
+  auto borrowedClosure = escapingClosure.borrow(SGF, loc);
+  {
+    // Bind the opaque value to the escaping function.
+    SILGenFunction::OpaqueValueState opaqueValue{
+        borrowedClosure,
+        /*consumable*/ false,
+        /*hasBeenConsumed*/ false,
+    };
+    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
+                                                    opaqueValue);
 
-  // Emit the guarded expression.
-  return visit(E->getSubExpr(), C);
+    // Emit the guarded expression.
+    rvalue = visit(E->getSubExpr(), C);
+  }
+
+  // Now create the verification of the withoutActuallyEscaping operand.
+  // Either we fail the uniquenes check (which means the closure has escaped)
+  // and abort or we continue and destroy the ultimate reference.
+  auto isEscaping =
+      SGF.B.createIsEscapingClosure(loc, borrowedClosure.getValue());
+  SGF.B.createCondFail(loc, isEscaping);
+  return rvalue;
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

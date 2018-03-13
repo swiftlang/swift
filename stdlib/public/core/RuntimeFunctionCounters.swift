@@ -115,10 +115,10 @@ struct _RuntimeFunctionCounters {
   /// Get the names of all runtime functions whose calls are being
   /// tracked.
   @_silgen_name("_swift_getRuntimeFunctionNames")
-  static public func _getRuntimeFunctionNames() ->
+  public static func _getRuntimeFunctionNames() ->
     UnsafePointer<UnsafePointer<CChar>>
 
-  static public func getRuntimeFunctionNames() -> [String] {
+  public static func getRuntimeFunctionNames() -> [String] {
     let names = _RuntimeFunctionCounters._getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
       _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
@@ -134,26 +134,26 @@ struct _RuntimeFunctionCounters {
   /// Get the offsets of the collected runtime function counters inside
   /// the state.
   @_silgen_name("_swift_getRuntimeFunctionCountersOffsets")
-  static public func getRuntimeFunctionCountersOffsets() ->
+  public static func getRuntimeFunctionCountersOffsets() ->
     UnsafePointer<UInt16>
 
   /// Get the number of different runtime functions whose calls are being
   /// tracked.
   @_silgen_name("_swift_getNumRuntimeFunctionCounters")
-  static public func getNumRuntimeFunctionCounters() -> Int
+  public static func getNumRuntimeFunctionCounters() -> Int
 
   /// Dump all per-object runtime function counters.
   @_silgen_name("_swift_dumpObjectsRuntimeFunctionPointers")
-  static public func dumpObjectsRuntimeFunctionPointers()
+  public static func dumpObjectsRuntimeFunctionPointers()
 
   @discardableResult
   @_silgen_name("_swift_setGlobalRuntimeFunctionCountersUpdateHandler")
-  static public func setGlobalRuntimeFunctionCountersUpdateHandler(
+  public static func setGlobalRuntimeFunctionCountersUpdateHandler(
     handler: RuntimeFunctionCountersUpdateHandler?
   ) -> RuntimeFunctionCountersUpdateHandler?
 
   /// Collect all references inside the object using Mirrors.
-  static public func collectAllReferencesInsideObject(_ value: Any) ->
+  public static func collectAllReferencesInsideObject(_ value: Any) ->
     [UnsafeRawPointer] {
     var visited : [ObjectIdentifier : Int] = [:]
     var references: [UnsafeRawPointer] = []

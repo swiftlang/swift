@@ -170,6 +170,8 @@ public:
     }
   }
 
+  bool isComment() const;
+
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
   
   /// Try to compose this and Next to one TriviaPiece.

@@ -166,7 +166,7 @@ public:
   reverse_range getReversedValues() const;
 
   using type_range = llvm::iterator_range<
-      llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>>>;
+    llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>, SILType>>;
   type_range getTypes() const;
 
   bool operator==(const SILInstructionResultArray &rhs);
@@ -6191,6 +6191,18 @@ class IsUniqueOrPinnedInst
 
   IsUniqueOrPinnedInst(SILDebugLocation DebugLoc, SILValue Operand,
                        SILType BoolTy)
+      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+};
+
+/// Given an escaping closure return true iff it has a non-nil context and the
+/// context has a strong reference count greater than 1.
+class IsEscapingClosureInst
+    : public UnaryInstructionBase<SILInstructionKind::IsEscapingClosureInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
+                        SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 

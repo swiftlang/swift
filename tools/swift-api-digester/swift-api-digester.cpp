@@ -939,7 +939,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
 
-  for (auto Pair : *Node) {
+  for (auto &Pair : *Node) {
     switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
     case KeyKind::KK_kind:
       Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));

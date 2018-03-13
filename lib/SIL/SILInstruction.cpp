@@ -1068,6 +1068,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:

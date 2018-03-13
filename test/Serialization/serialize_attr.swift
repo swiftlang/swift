@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %s
 // RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER

@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
 class C {}

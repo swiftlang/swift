@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 

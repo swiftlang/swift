@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -O -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s --check-prefix=OPT
 
