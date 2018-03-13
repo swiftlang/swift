@@ -43,13 +43,14 @@ public func testCopy(_ size: Int) {
 
 @inline(never)
 public func run_DictionaryCopy(_ N: Int) {
-  // We run the test at a spread of sizes on a logarithmic scale between 100%
-  // and 200%, because the quadratic behavior only happens at certain load
-  // factors.
-  testCopy(100_000)
-  testCopy(118_920)
-  testCopy(141_421)
-  testCopy(168_179)
+  for _ in 0 ..< N {
+    // We run the test at a spread of sizes between 1*x and 2*x, because the
+    // quadratic behavior only happens at certain load factors.
+    testCopy(100_000)
+    testCopy(125_000)
+    testCopy(150_000)
+    testCopy(175_000)
+  }
 }
 
 @inline(never)
@@ -62,19 +63,20 @@ public func testFilter(_ size: Int) {
   }
   CheckResults(dict1.count == size)
 
-  // Filter with a predicate returning mostly true is essentially the same loop
-  // as the one in testCopy above.
+  // Filter with a predicate returning true is essentially the same loop as the
+  // one in testCopy above.
   let dict2 = dict1.filter { _ in true }
   CheckResults(dict2.count == size)
 }
 
 @inline(never)
 public func run_DictionaryFilter(_ N: Int) {
-  // We run the test at a spread of sizes on a logarithmic scale between 100%
-  // and 200%, because the quadratic behavior only happens at certain load
-  // factors.
-  testFilter(100_000)
-  testFilter(118_920)
-  testFilter(141_421)
-  testFilter(168_179)
+  for _ in 0 ..< N {
+    // We run the test at a spread of sizes between 1*x and 2*x, because the
+    // quadratic behavior only happens at certain load factors.
+    testFilter(100_000)
+    testFilter(125_000)
+    testFilter(150_000)
+    testFilter(175_000)
+  }
 }
