@@ -52,12 +52,12 @@ else:
     print("Handled all")
 
 
-if '-supplementary-output-filemap' in sys.argv:
-    supplementaryOutputMapFile = sys.argv[sys.argv.index('-supplementary-output-filemap') + 1]
+if '-supplementary-output-file-map' in sys.argv:
+    supplementaryOutputMapFile = sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
     with open(supplementaryOutputMapFile, 'r') as f:
         lines = f.readlines()
         for line in lines:
-            print("Supplementary", os.path.basename(line).rstrip())
+            print("Supplementary", line.rstrip())
 
 if '-num-threads' in sys.argv:
     outputListFile = sys.argv[sys.argv.index('-output-filelist') + 1]
