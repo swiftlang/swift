@@ -183,6 +183,12 @@ func _adjointSqrt<T : TensorProtocol>(
 }
 
 @_inlineable @_versioned
+func _adjointRsqrt<T : TensorProtocol>(
+  _ x: T, partial: T, seed: T
+) -> T where T.Scalar : FloatingPoint {
+  return -seed / 2 * pow(partial, 3)
+}
+
 func _adjointSquared<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
@@ -242,6 +248,45 @@ extension Tensor {
 //===----------------------------------------------------------------------===//
 // Reduction
 //===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Normalization
+//===----------------------------------------------------------------------===//
+
+extension Tensor where Scalar : BinaryFloatingPoint {
+  // TODO: Verify that these calculations are correct.
+  @_inlineable @_versioned
+  func _adjointBatchNormalized(
+    alongAxis axis: Int32,
+    offset: Tensor = Tensor(0),
+    scale: Tensor = Tensor(1),
+    epsilon: Tensor = Tensor(0.001),
+    partial: Tensor,
+    seed: Tensor
+  ) -> (Tensor, Tensor, Tensor) {
+    let mean = self.mean(alongAxes: axis)
+    let squaredDiff: Tensor = #tfop("SquaredDifference", self, mean)
+    let variance = squaredDiff.mean(alongAxes: axis)
+
+    let diff = self - mean
+    let inv = rsqrt(variance + epsilon)
+    let norm = diff * inv
+
+    let dNorm = seed * scale
+    let dVariance = -(dNorm * diff).sum(alongAxes: axis) / 2 * pow(inv, -3)
+    let dMean = (-dNorm * inv).sum(alongAxes: axis) +
+      dVariance * (-diff * 2).mean(alongAxes: axis)
+    let dOffset = seed.sum(alongAxes: axis)
+    let dScale = (norm * seed).sum(alongAxes: axis)
+    let dim = Tensor(Tensor<Int32>(self.shape[axis]))
+    // NOTE: a temporary variable is necessary here to help the type checker.
+    // Otherwise, the following error occurs: "the compiler is unable to
+    // type-check this expression in reasonable time".
+    let tmp = (dNorm * inv) + (dVariance * 2 * dMean / dim)
+    let dSelf = tmp + (dMean / dim)
+    return (dSelf, dOffset, dScale)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Convolution and pooling
@@ -328,11 +373,11 @@ extension Tensor where Scalar : FloatingPoint {
   ) -> (Tensor, Tensor) {
     return (
       _TFConv2DBackpropInput(shape: shapeTensor, filter: filter,
-        backpropOutput: seed, strides: strides,
-        padding: padding),
+                             backpropOutput: seed, strides: strides,
+                             padding: padding),
       _TFConv2DBackpropFilter(input: self, filterSizes: filter.shapeTensor,
-        backpropOutput: seed, strides: strides,
-        padding: padding
+                              backpropOutput: seed, strides: strides,
+                              padding: padding
       )
     )
   }
