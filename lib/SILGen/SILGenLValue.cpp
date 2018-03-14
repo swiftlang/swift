@@ -597,7 +597,9 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
-      if (!IsNonAccessing) {
+      // Avoid emitting access markers completely for non-accesses or immutable
+      // declarations. Access marker verification is aware of these cases.
+      if (!IsNonAccessing && !Field->isLet()) {
         if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
           result = enterAccessScope(SGF, loc, result, getTypeData(),
                                     accessKind, *enforcement);
