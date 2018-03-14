@@ -699,6 +699,12 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
         return;
       }
 
+  // If we are running this in the context of an expression run in the REPL or
+  // playgrounds, or script mode, then we should never emit a warning: we know
+  // we're going to be implicitly copying things in as warnings all the time.
+  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+    return;
+
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
 
@@ -782,6 +788,12 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
         explicitCopyMarkers.insert(apply);
         return false;
       }
+
+  // If we are running this in the context of an expression run in the REPL or
+  // playgrounds, or script mode, then we should never emit a warning: we know
+  // we're going to be implicitly copying things in as warnings all the time.
+  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+    return false;
 
   auto &ctx = fn.getModule().getASTContext();
 
