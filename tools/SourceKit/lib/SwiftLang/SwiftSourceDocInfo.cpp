@@ -1097,7 +1097,7 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
     DeclName Name = Importer->importName(Named, ObjCName);
     NameTranslatingInfo Result;
     Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-    Result.BaseName = Name.getBaseIdentifier().str();
+    Result.BaseName = Name.getBaseName().userFacingName();
     std::transform(Name.getArgumentNames().begin(),
                    Name.getArgumentNames().end(),
                    std::back_inserter(Result.ArgNames),

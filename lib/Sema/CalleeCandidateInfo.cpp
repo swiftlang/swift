@@ -663,7 +663,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseIdentifier().str();
+    declName = UDE->getName().getBaseName().userFacingName();
     uncurryLevel = 1;
     
     // If we actually resolved the member to use, return it.

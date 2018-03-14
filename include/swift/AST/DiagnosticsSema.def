@@ -631,7 +631,7 @@ ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
-      (Identifier, unsigned))
+      (DeclName, unsigned))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
