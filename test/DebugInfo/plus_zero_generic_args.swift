@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name generic_args -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

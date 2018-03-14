@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt | %FileCheck %s
+// RUN: %target-swift-frontend -module-name generic_signature_with_depth %s -emit-silgen | %target-sil-opt | %FileCheck %s
 
 protocol mmGeneratorType {
   associatedtype Element

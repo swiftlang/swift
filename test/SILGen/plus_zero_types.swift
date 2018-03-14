@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name types -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   var member: Int = 0
