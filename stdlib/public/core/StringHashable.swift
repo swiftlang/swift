@@ -28,9 +28,7 @@ extension _FixedArray8 where T == UInt8 {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
-  // @_inlineable // FIXME(sil-serialize-all)
-  // @_versioned // FIXME(sil-serialize-all)
+  // NOT @_versioned
   @effects(releasenone)
   internal func hashASCII(into hasher: inout _Hasher) {
     var buffer = _FixedArray8<UInt8>()
@@ -52,9 +50,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  // FIXME: cannot be marked @_versioned. See <rdar://problem/34438258>
-  // @_inlineable // FIXME(sil-serialize-all)
-  // @_versioned // FIXME(sil-serialize-all)
+  // NOT @_versioned
   internal func hashUTF16(into hasher: inout _Hasher) {
     var buffer = _FixedArray8<UInt8>()
 
@@ -98,29 +94,25 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
+  @effects(releasenone)
   @_versioned
-  internal func computeHashValue() -> Int {
-    var hasher = _Hasher()
+  internal func hash(into hasher: inout _Hasher) {
     self.hashASCII(into: &hasher)
-    return hasher.finalize()
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
+  @effects(releasenone)
   @_versioned
-  internal func computeHashValue() -> Int {
-    var hasher = _Hasher()
+  internal func hash(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
-    return hasher.finalize()
   }
 }
 
 extension _UnmanagedOpaqueString {
   @_versioned
-  internal func computeHashValue() -> Int {
-    var hasher = _Hasher()
+  internal func hash(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
-    return hasher.finalize())
   }
 }
 
@@ -129,38 +121,45 @@ extension _StringGuts {
   // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
   //
   @_versioned
-  @effects(readonly)
+  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   @inline(never) // Hide the CF dependency
-  internal static func _computeHashValue(
-    _unsafeBitPattern: _RawBitPattern
-  ) -> Int {
-    return _StringGuts(rawBits: _unsafeBitPattern)._computeHashValue()
+  internal static func _hash(
+    _unsafeBitPattern: _RawBitPattern,
+    into hasher: inout _Hasher
+  ) {
+    _StringGuts(rawBits: _unsafeBitPattern)._hash(into: &hasher)
   }
 
   @_versioned
   // TODO: After removing above hack: @inline(never) // Hide the CF dependency
-  internal func _computeHashValue() -> Int {
+  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
+  internal func _hash(into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      return _asOpaque().computeHashValue()
+      _asOpaque().hash(into: &hasher)
+      return
     }
     if isASCII {
-      return _unmanagedASCIIView.computeHashValue()
+      _unmanagedASCIIView.hash(into: &hasher)
+      return
     }
-    return _unmanagedUTF16View.computeHashValue()
+    _unmanagedUTF16View.hash(into: &hasher)
   }
 
   @_versioned
   // TODO: After removing above hack: @inline(never) // Hide the CF dependency
-  internal func _computeHashValue(_ range: Range<Int>) -> Int {
+  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
+  internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      return _asOpaque()[range].computeHashValue()
+      _asOpaque()[range].hash(into: &hasher)
+      return
     }
     if isASCII {
-      return _unmanagedASCIIView[range].computeHashValue()
+      _unmanagedASCIIView[range].hash(into: &hasher)
+      return
     }
-    return _unmanagedUTF16View[range].computeHashValue()
+    _unmanagedUTF16View[range].hash(into: &hasher)
   }
 }
 
@@ -169,27 +168,27 @@ extension String : Hashable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
-  @_inlineable // FIXME(sil-serialize-all)
+  @_inlineable
   public var hashValue: Int {
-    defer { _fixLifetime(self) }
-    let gutsBits = _guts.rawBits
-    return _StringGuts._computeHashValue(_unsafeBitPattern: gutsBits)
+    return _hashValue(for: self)
   }
 
   @_inlineable
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(self.hashValue)
+    defer { _fixLifetime(self) }
+    let gutsBits = _guts.rawBits
+    _StringGuts._hash(_unsafeBitPattern: gutsBits, into: &hasher)
   }
 }
 
 extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
+  @_inlineable
   public var hashValue : Int {
-    return _wholeString._guts._computeHashValue(_encodedOffsetRange)
+    return _hashValue(for: self)
   }
 
   @_inlineable
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(self.hashValue)
+    _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
   }
 }
