@@ -24,14 +24,14 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
     padding: .same)
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
-  let (dInput, dParameters) = convLayer.gradient(for: input,
-                                                 backpropagating: 1)
-  let dFilter = dParameters.filter
+  let (_, dParameters) = convLayer.gradient(for: input,
+                                            backpropagating: 1)
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5]),
               output.array)
+  // FIXME: Check other gradients.
 }
 
 HighLevelTests.testAllBackends("FullyConnectedRelu") {
