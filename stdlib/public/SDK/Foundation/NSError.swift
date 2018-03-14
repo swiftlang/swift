@@ -205,7 +205,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
 
   // If the OS supports user info value providers, use those
   // to lazily populate the user-info dictionary for this domain.
-  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+  if #available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
     // Note: the Cocoa error domain specifically excluded from
     // user-info value providers.
     let domain = error._domain

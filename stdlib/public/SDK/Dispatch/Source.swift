@@ -17,7 +17,7 @@ public extension DispatchSourceProtocol {
 	typealias DispatchSourceHandler = @convention(block) () -> Void
 
 	public func setEventHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
@@ -33,7 +33,7 @@ public extension DispatchSourceProtocol {
 	}
 
 	public func setCancelHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
@@ -49,7 +49,7 @@ public extension DispatchSourceProtocol {
 	}
 
 	public func setRegistrationHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
