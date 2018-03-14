@@ -169,7 +169,8 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
 // SWIFT_ENABLE_TENSORFLOW
 public protocol FloatingPoint
-  : SignedNumeric, Strideable, Hashable, Differentiable {
+  : SignedNumeric, Strideable, Hashable, Differentiable
+  where DifferentiationCurrency == Self {
 
   // For the minimumMagnitude and maximumMagnitude methods
   /// A type that can represent the absolute value of any possible value of the

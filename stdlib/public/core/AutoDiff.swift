@@ -75,9 +75,6 @@ public protocol Differentiable {
 }
 
 public extension FloatingPoint {
-  /// The currency type in the mathematical model of differentiation.
-  typealias DifferentiationCurrency = Self
-
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   init(numericallyBroadcasting value: Self, to other: Self) {
