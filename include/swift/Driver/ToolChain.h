@@ -87,29 +87,19 @@ protected:
     const char *getTemporaryFilePath(const llvm::Twine &name,
                                      StringRef suffix = "") const;
 
-    /// Test the number of files to see if an input file list is needed.
+    /// For frontend, merge-module, and link invocations.
     bool shouldUseInputFileList() const;
 
-    /// Test the number of primary files to see if a primary file list is
-    /// needed.
-    bool shouldUsePrimaryInputFileList() const;
+    bool shouldUsePrimaryInputFileListInFrontendInvocation() const;
 
-    /// Does this invocation need to filter out non-Swift, -SIL, or -SIB inputs?
-    bool shouldFilterInputsByType() const;
+    bool shouldUseMainOutputFileListInCompilerInvocation() const;
 
-    /// Returns true if merge module input file list is needed.
-    bool shouldUseMergeModuleInputFileList() const;
+    bool shouldUseSupplementaryOutputFileListInCompilerInvocation() const;
 
-    /// Returns true if link input file list is needed.
-    bool shouldUseLinkInputFileList() const;
-
-    /// Return true if a file list is needed for the main outputs.
-    bool shouldUseMainOutputFileList() const;
-
-    /// Test the number of files to see if the command line would be too long
-    /// without using a file list for the supplementary outputs. Can only be
-    /// true for batch jobs.
-    bool shouldUseSupplementaryOutputFileList() const;
+    /// Reify the existing behavior that SingleCompile compile actions do not
+    /// filter, but batch-mode and single-file compilations do. Would be nice to
+    /// eliminate this distinction someday.
+    bool shouldFilterCompilerInputsByType() const;
 
     const char *computeFrontendModeForCompile() const;
 

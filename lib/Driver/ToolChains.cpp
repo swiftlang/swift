@@ -44,7 +44,8 @@ bool ToolChain::JobContext::shouldUseInputFileList() const {
   return getTopLevelInputFiles().size() > TOO_MANY_FILES;
 }
 
-bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
+bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
+    const {
   // SingleCompile's must not return true because then all inputs erroneously
   // end up in primary file list.
   if (Args.hasArg(options::OPT_driver_use_filelists))
@@ -52,37 +53,27 @@ bool ToolChain::JobContext::shouldUsePrimaryInputFileList() const {
   return InputActions.size() > TOO_MANY_FILES;
 }
 
-bool ToolChain::JobContext::shouldFilterInputsByType() const {
-  // SingleCompile's must not filter inputs by type in order for the
-  // playground (test) to work.
-  return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
-}
-
-bool ToolChain::JobContext::shouldUseMergeModuleInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Inputs.size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseLinkInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Inputs.size() > TOO_MANY_FILES;
-}
-
-bool ToolChain::JobContext::shouldUseMainOutputFileList() const {
+bool ToolChain::JobContext::shouldUseMainOutputFileListInCompilerInvocation()
+    const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
 }
 
-bool ToolChain::JobContext::shouldUseSupplementaryOutputFileList() const {
+bool ToolChain::JobContext::
+    shouldUseSupplementaryOutputFileListInCompilerInvocation() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
       types::TY_INVALID;
   return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
   TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldFilterCompilerInputsByType() const {
+  // SingleCompile's must not filter inputs by type in order for the
+  // playground (test) to work.
+  return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
 }
 
 static void addInputsOfType(ArgStringList &Arguments,
@@ -376,7 +367,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    if (context.shouldUseMainOutputFileList()) {
+    if (context.shouldUseMainOutputFileListInCompilerInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
@@ -484,10 +475,11 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   const bool UseFileList = shouldUseInputFileList();
   const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs(Output);
   const bool UsePrimaryFileList =
-      MayHavePrimaryInputs && shouldUsePrimaryInputFileList();
-  const bool FilterInputsByType = shouldFilterInputsByType();
+      MayHavePrimaryInputs &&
+      shouldUsePrimaryInputFileListInFrontendInvocation();
+  const bool FilterInputsByType = shouldFilterCompilerInputsByType();
   const bool UseSupplementaryOutputFileList =
-      shouldUseSupplementaryOutputFileList();
+      shouldUseSupplementaryOutputFileListInCompilerInvocation();
 
   if (UseFileList) {
     Arguments.push_back("-filelist");
@@ -765,7 +757,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
-  if (context.shouldUseMergeModuleInputFileList()) {
+  if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
     II.FilelistInfos.push_back({Arguments.back(), types::TY_SwiftModuleFile,
@@ -1326,7 +1318,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   InvocationInfo II = {LD};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.shouldUseLinkInputFileList()) {
+  if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(
