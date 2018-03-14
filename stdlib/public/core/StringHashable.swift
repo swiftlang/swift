@@ -117,21 +117,7 @@ extension _UnmanagedOpaqueString {
 }
 
 extension _StringGuts {
-  //
-  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
-  //
   @_versioned
-  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
-  @inline(never) // Hide the CF dependency
-  internal static func _hash(
-    _unsafeBitPattern: _RawBitPattern,
-    into hasher: inout _Hasher
-  ) {
-    _StringGuts(rawBits: _unsafeBitPattern)._hash(into: &hasher)
-  }
-
-  @_versioned
-  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
@@ -147,7 +133,6 @@ extension _StringGuts {
   }
 
   @_versioned
-  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
@@ -175,9 +160,7 @@ extension String : Hashable {
 
   @_inlineable
   public func _hash(into hasher: inout _Hasher) {
-    defer { _fixLifetime(self) }
-    let gutsBits = _guts.rawBits
-    _StringGuts._hash(_unsafeBitPattern: gutsBits, into: &hasher)
+    _guts._hash(into: &hasher)
   }
 }
 
