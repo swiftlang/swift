@@ -95,11 +95,9 @@ extension _UIKitNumericRawRepresentable {
   }
 }
 
-@available(swift 4)
 extension UIFont.Weight : _UIKitNumericRawRepresentable {}
 
 #if !os(watchOS)
-@available(swift 4)
 extension UILayoutPriority : _UIKitNumericRawRepresentable {}
 #endif
 
