@@ -1299,7 +1299,7 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
     }
   }
 
-  if (!ds->Loc.isNull())
+  if (ds->Loc.getSourceLoc().isValid())
     return SILDebugLocation(ds->Loc, ds);
 
   return loc;
