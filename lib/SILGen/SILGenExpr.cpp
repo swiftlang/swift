@@ -3019,7 +3019,8 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
     // generates instructions. (We don't want any instructions but
     // `autodiff_reverse`!)
     for (auto &arg : gradTy->getParameters())
-      gradSGF.B.createFunctionArgument(arg.getSILStorageType(), nullptr);
+      gradSGF.B.createInputFunctionArgument(arg.getSILStorageType(),
+                                            primalDecl);
     gradSGF.B.createAutoDiffReverse(SILLocation(E), &primalFn,
                                     loweredArgIndices, config.seedable,
                                     config.preservingResult);
