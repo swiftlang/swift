@@ -167,6 +167,23 @@ extension String {
     let prefixCount = prefix._guts.count
     if prefixCount == 0 { return true }
 
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && prefix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let prefixSmall = prefix._guts._smallUTF8String
+      if selfSmall.isASCII && prefixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return prefixSmall.withUnmanagedASCII { prefixASCII in
+            if prefixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart,
+                prefixASCII.rawStart,
+                prefixASCII.count)
+          }
+        }
+      }
+    }
+
     if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
       if self._guts.isASCII && prefix._guts.isASCII {
         let result: Bool
@@ -198,12 +215,29 @@ extension String {
     let suffixCount = suffix._guts.count
     if suffixCount == 0 { return true }
 
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && suffix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let suffixSmall = suffix._guts._smallUTF8String
+      if selfSmall.isASCII && suffixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return suffixSmall.withUnmanagedASCII { suffixASCII in
+            if suffixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
+                suffixASCII.rawStart,
+                suffixASCII.count)
+          }
+        }
+      }
+    }
+
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
       if self._guts.isASCII && suffix._guts.isASCII {
         let result: Bool
         let selfASCII = self._guts._unmanagedASCIIView
         let suffixASCII = suffix._guts._unmanagedASCIIView
-        if suffixASCII.count > self._guts.count {
+        if suffixASCII.count > selfASCII.count {
           // Suffix is longer than self.
           result = false
         } else {
