@@ -680,7 +680,7 @@ extension UnicodeScalar {
     return impl(&inBuffer, count: inLength, into: outputBuffer)
   }
 
-  static internal let maxValue = 0x0010_FFFF
+  internal static let maxValue = 0x0010_FFFF
 }
 
 private struct _UnicodeScalarExceptions {
