@@ -173,9 +173,9 @@ MathTests.test("Other functions") {
   expectEqual(lgamma(gx).1, 1)
   expectEqualWithAccuracy(lgamma(dx).0, lgamma(fx).0, lgamma(gx).0, 2.2527126517342055, ulps: 1)
 
-  expectEqual(remquo(dz, dy).1, 1)
-  expectEqual(remquo(fz, fy).1, 1)
-  expectEqual(remquo(gz, gy).1, 1)
+  expectEqual(remquo(dz, dy).1 & 7, 1)
+  expectEqual(remquo(fz, fy).1 & 7, 1)
+  expectEqual(remquo(gz, gy).1 & 7, 1)
   expectEqualWithAccuracy(remquo(dz, dy).0, remquo(fz, fy).0, remquo(gz, gy).0, 1.0999999999999996, ulps: 1)
 
   expectEqualWithAccuracy(nan("12345"), nan("12345"), nan("12345"), Double.nan, ulps: 0)
