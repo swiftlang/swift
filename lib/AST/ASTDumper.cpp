@@ -525,7 +525,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
-      printCommon(P, "optional_some_element");
+      printCommon(P, "pattern_optional_some");
       OS << '\n';
       printRec(P->getSubPattern());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
