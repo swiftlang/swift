@@ -39,7 +39,7 @@ public extension DispatchQueue {
 			if self.contains(.concurrent) {
 				attr = _swift_dispatch_queue_concurrent()
 			}
-			if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
+			if #available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
 				if self.contains(.initiallyInactive) {
 					attr = __dispatch_queue_attr_make_initially_inactive(attr)
 				}
@@ -93,7 +93,7 @@ public extension DispatchQueue {
 		case never
 
 		internal func _attr(attr: __OS_dispatch_queue_attr?) -> __OS_dispatch_queue_attr? {
-			if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
+			if #available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
 				switch self {
 				case .inherit:
 					// DISPATCH_AUTORELEASE_FREQUENCY_INHERIT
@@ -154,11 +154,11 @@ public extension DispatchQueue {
 		if autoreleaseFrequency != .inherit {
 			attr = autoreleaseFrequency._attr(attr: attr)
 		}
-		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified {
+		if #available(macOS 10.10, iOS 8.0, *), qos != .unspecified {
 			attr = __dispatch_queue_attr_make_with_qos_class(attr, qos.qosClass.rawValue, Int32(qos.relativePriority))
 		}
 
-		if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
+		if #available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
 			self.init(__label: label, attr: attr, queue: target)
 		} else {
 			self.init(__label: label, attr: attr)
@@ -209,7 +209,7 @@ public extension DispatchQueue {
 		}
 
 		var block: @convention(block) () -> Void = work
-		if #available(OSX 10.10, iOS 8.0, *), (qos != .unspecified || !flags.isEmpty) {
+		if #available(macOS 10.10, iOS 8.0, *), (qos != .unspecified || !flags.isEmpty) {
 			let workItem = DispatchWorkItem(qos: qos, flags: flags, block: work)
 			block = workItem._block
 		}
@@ -279,7 +279,7 @@ public extension DispatchQueue {
 	public func sync<T>(flags: DispatchWorkItemFlags, execute work: () throws -> T) rethrows -> T {
 		if flags == .barrier {
 			return try self._syncHelper(fn: _syncBarrier, execute: work, rescue: { throw $0 })
-		} else if #available(OSX 10.10, iOS 8.0, *), !flags.isEmpty {
+		} else if #available(macOS 10.10, iOS 8.0, *), !flags.isEmpty {
 			return try self._syncHelper(fn: sync, flags: flags, execute: work, rescue: { throw $0 })
 		} else {
 			return try self._syncHelper(fn: sync, execute: work, rescue: { throw $0 })
@@ -292,7 +292,7 @@ public extension DispatchQueue {
 		flags: DispatchWorkItemFlags = [],
 		execute work: @escaping @convention(block) () -> Void)
 	{
-		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
+		if #available(macOS 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
 			_swift_dispatch_after(deadline.rawValue, self, item._block)
 		} else {
@@ -306,7 +306,7 @@ public extension DispatchQueue {
 		flags: DispatchWorkItemFlags = [],
 		execute work: @escaping @convention(block) () -> Void)
 	{
-		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
+		if #available(macOS 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
 			_swift_dispatch_after(wallDeadline.rawValue, self, item._block)
 		} else {
