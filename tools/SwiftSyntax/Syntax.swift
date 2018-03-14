@@ -120,7 +120,7 @@ extension Syntax {
     return data.indexInParent
   }
 
-  /// The absolute position of the starting point this node. If the first token
+  /// The absolute position of the starting point of this node. If the first token
   /// is with leading trivia, the position points to the start of the leading
   /// trivia.
   public var position: AbsolutePosition {
