@@ -49,6 +49,7 @@ import DictTest2
 import DictTest3
 import DictTest4
 import DictionaryBridge
+import DictionaryCopy
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
@@ -198,6 +199,7 @@ registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
