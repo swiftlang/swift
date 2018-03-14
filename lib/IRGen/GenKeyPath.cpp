@@ -842,22 +842,30 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       // instantiation more likely to avoid needing an allocation.
       unsigned argSize = descriptorArgs.size();
       if (isInstantiableInPlace) {
-        argSize = std::max(argSize, 5u);
+        argSize = std::max(argSize, 3u);
       }
       
       fields.addInt32(argSize);
       fields.add(getAddrOfPropertyDescriptor(component.getExternalDecl()));
       
       // Add an initializer function that copies generic arguments out of the
-      // pattern argument buffer into the instantiated object, or null if there
-      // are no arguments.
-      if (component.getSubscriptIndices().empty())
+      // pattern argument buffer into the instantiated object, along with the
+      // index equality/hash operations we have from our perspective, or null
+      // if there are no arguments.
+      if (component.getSubscriptIndices().empty()) {
         fields.addInt(IntPtrTy, 0);
-      else
+        fields.addInt(IntPtrTy, 0);
+        fields.addInt(IntPtrTy, 0);
+      } else {
         fields.add(getInitializerForComputedComponent(*this, component,
                                                       operands,
                                                       genericEnv,
                                                       requirements));
+        fields.add(getAddrOfSILFunction(component.getSubscriptIndexEquals(),
+                                        NotForDefinition));
+        fields.add(getAddrOfSILFunction(component.getSubscriptIndexHash(),
+                                        NotForDefinition));
+      }
       
       // Add the generic arguments for the external context.
       for (auto arg : descriptorArgs)
