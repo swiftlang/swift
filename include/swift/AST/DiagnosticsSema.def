@@ -3647,6 +3647,10 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
+WARNING(availability_extension_platform_agnostic, none,
+        "'@available' without an OS is ignored on extensions; "
+        "apply the attribute to each member instead", ())
+
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
