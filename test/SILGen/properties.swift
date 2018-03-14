@@ -947,8 +947,7 @@ func genericProps(_ x: GenericClass<String>) {
   let _ = x.y
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
-  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[Z]] : $*String
-  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[READ]] : $*String
+  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[Z]] : $*String
   // CHECK:   destroy_value [[LOADED_Z]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   destroy_value [[ARG]]
@@ -960,8 +959,7 @@ func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<U>, #GenericClass.z
-  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[Z]] : $*U
-  // CHECK:   copy_addr [[READ]] {{.*}} : $*U
+  // CHECK:   copy_addr [[Z]] {{.*}} : $*U
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.z
 }
@@ -978,9 +976,7 @@ class ClassWithLetProperty {
 // CHECK:       bb0([[ARG:%.*]] : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
-// CHECK-NEXT:    [[READ:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*Int
-// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[READ]] : $*Int
-// CHECK-NEXT:    end_access [[READ]] : $*Int
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -1008,8 +1004,7 @@ class r19254812Derived: r19254812Base{
 // Initialization of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[PIPTR]] : $*Double
-// CHECK-NEXT:  assign {{.*}} to [[WRITE]] : $*Double
+// CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
 
 // CHECK-NOT: destroy_value
 // CHECK-NOT: copy_value
@@ -1017,9 +1012,7 @@ class r19254812Derived: r19254812Base{
 // Load of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [dynamic] [[PIPTR]] : $*Double
-// CHECK-NEXT:  {{.*}} = load [trivial] [[READ]] : $*Double
-// CHECK-NEXT:  end_access [[READ]] : $*Double
+// CHECK-NEXT:  {{.*}} = load [trivial] [[PIPTR]] : $*Double
 // CHECK: return
 }
 
