@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 
 import TensorFlow
 
@@ -51,3 +51,13 @@ public func f() {
   _ = x.c+x.b+x.w  // expected-warning 3 {{properties in classes always cause a copy to the accelerator}}
 
 }
+
+public enum X {
+  case A, B
+}
+
+public func invalidAttributeArg() -> TensorHandle<Int32> {
+  // expected-error@+1 {{attribute 'someAttr' requires a constant argument}}
+  return #tfop("bar", someAttr: X.A)
+}
+
