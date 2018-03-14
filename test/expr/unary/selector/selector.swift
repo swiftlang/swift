@@ -86,6 +86,7 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
 
   let dict: [Selector: Int] = [:]
   let _: Int? = dict[#selector(c1.method1)]
+  let _ = [#selector(c1.method1)]
 }
 
 func testAmbiguity() {

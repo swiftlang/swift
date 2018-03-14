@@ -1187,14 +1187,15 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_object_literal_identifier,none,
-      "expected identifier after '#' in object literal expression", ())
-ERROR(expected_arg_list_in_object_literal,none,
+ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(object_literal_legacy_name,none,
-      "'%0' has been renamed to '%1", (StringRef, StringRef))
-ERROR(legacy_object_literal_syntax,none,
-       "object literal syntax no longer uses '[# ... #]'", ())
+ERROR(legacy_object_literal,none,
+      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
+      (bool, StringRef, StringRef))
+
+// Unknown pound expression.
+ERROR(unknown_pound_expr,none,
+      "use of unknown directive '#%0'", (StringRef))
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
