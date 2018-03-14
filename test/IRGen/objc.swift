@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop

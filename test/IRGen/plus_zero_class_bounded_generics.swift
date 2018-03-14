@@ -1,6 +1,6 @@
 // REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -module-name class_bounded_generics -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
