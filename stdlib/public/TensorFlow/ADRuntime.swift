@@ -19,6 +19,7 @@ class _ADTape<Element> {
   private var elements: [Element] = []
 
   @inline(never)
+  @_semantics("autodiff.create_tape")
   @_silgen_name("_swift_autodiff_CreateTape")
   init() {}
 }
@@ -26,6 +27,7 @@ class _ADTape<Element> {
 extension _ADTape {
   var count: Int {
     @inline(never)
+    @_semantics("autodiff.tape_element_count")
     @_silgen_name("_swift_autodiff_TapeElementCount")
     get {
       return elements.count
@@ -33,12 +35,14 @@ extension _ADTape {
   }
 
   @inline(never)
+  @_semantics("autodiff.push_to_tape")
   @_silgen_name("_swift_autodiff_PushToTape")
   func push(_ value: Element) {
     elements.append(value)
   }
 
   @inline(never)
+  @_semantics("autodiff.pop_from_tape")
   @_silgen_name("_swift_autodiff_PopFromTape")
   func pop() -> Element {
     guard let popped = elements.popLast() else {
