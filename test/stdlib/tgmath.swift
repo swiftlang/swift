@@ -134,13 +134,12 @@ MathTests.test("Binary functions") {
     expectEqualWithAccuracy(remainder(dx, dy), remainder(fx, fy), remainder(gx, gy), 0.1, ulps: 0)
     expectEqualWithAccuracy(copysign(dx, dy), copysign(fx, fy), copysign(gx, gy), 0.1, ulps: 0)
 
-    expectEqual(nextafter(dx, dy), 0.10000000000000002)
-    expectEqual(nextafter(fx, fy), 0.10000001)
-#if arch(i386) || arch(arm)
-    expectEqual(nextafter(gx, gy), CGFloat(0.10000001))
-#else
-    expectEqual(nextafter(gx, gy), CGFloat(0.10000000000000002))
-#endif
+    expectEqual(nextafter(dx, dy), dx.nextUp)
+    expectEqual(nextafter(fx, fy), fx.nextUp)
+    expectEqual(nextafter(gx, gy), gx.nextUp)
+    expectEqual(nextafter(dx, dx - 1.0), dx.nextDown)
+    expectEqual(nextafter(fx, fx - Float(1.0)), fx.nextDown)
+    expectEqual(nextafter(gx, gx - CGFloat(1.0)), gx.nextDown)
 
     expectEqualWithAccuracy(fdim(dx, dy), fdim(fx, fy), fdim(gx, gy), 0.0, ulps: 0)
     expectEqualWithAccuracy(fmax(dx, dy), fmax(fx, fy), fmax(gx, gy), 2.2, ulps: 0)
