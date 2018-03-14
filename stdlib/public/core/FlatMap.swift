@@ -390,6 +390,7 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyCompactMapSequence<Elements, ElementOfResult> {
@@ -406,7 +407,29 @@ extension LazySequenceProtocol {
   ///   as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @inline(__always)
+  @_inlineable
+  @available(swift, obsoleted: 5, message: "Use the version that returns a LazyCompactMapSequence")
+  public func compactMap<ElementOfResult>(
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
+  ) -> LazyMapSequence<
+    LazyFilterSequence<
+      LazyMapSequence<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
+  }
+
+  /// Returns the non-`nil` results of mapping the given transformation over
+  /// this sequence.
+  ///
+  /// Use this method to receive a sequence of nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this sequence
+  ///   as its argument and returns an optional value.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
   @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
@@ -432,10 +455,33 @@ extension LazyCollectionProtocol {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyCompactMapCollection<Elements, ElementOfResult> {
     return LazyCompactMapCollection(_base: self.elements, transform: transform)
+  }
+
+  /// Returns the non-`nil` results of mapping the given transformation over
+  /// this collection.
+  ///
+  /// Use this method to receive a collection of nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  ///   collection as its argument and returns an optional value.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 5, message: "Use the version that returns a LazyCompactMapCollection")
+  public func compactMap<ElementOfResult>(
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
+  ) -> LazyMapCollection<
+    LazyFilterCollection<
+      LazyMapCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 
   /// Returns the non-`nil` results of mapping the given transformation over
@@ -464,6 +510,7 @@ extension LazyCollectionProtocol {
 
 extension LazyMapSequence {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Element) -> ElementOfResult?
   ) -> LazyCompactMapSequence<Base, ElementOfResult> {
@@ -475,6 +522,7 @@ extension LazyMapSequence {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyCompactMapSequence<Base, Element> {
@@ -491,6 +539,7 @@ extension LazyMapSequence {
 
 extension LazyMapCollection {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Element) -> ElementOfResult?
   ) -> LazyCompactMapCollection<Base, ElementOfResult> {
@@ -502,6 +551,7 @@ extension LazyMapCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyCompactMapCollection<Base, Element> {
@@ -518,6 +568,7 @@ extension LazyMapCollection {
 
 extension LazyFilterSequence {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Base.Element) -> ElementOfResult?
   ) -> LazyCompactMapSequence<Base, ElementOfResult> {
@@ -529,6 +580,7 @@ extension LazyFilterSequence {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func map<ElementOfResult>(
     _ transform: @escaping (Base.Element) -> ElementOfResult
   ) -> LazyCompactMapSequence<Base, ElementOfResult> {
@@ -542,6 +594,7 @@ extension LazyFilterSequence {
 
 extension LazyFilterCollection {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Base.Element) -> ElementOfResult?
   ) -> LazyCompactMapCollection<Base, ElementOfResult> {
@@ -553,6 +606,7 @@ extension LazyFilterCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, introduced: 5)
   public func map<ElementOfResult>(
     _ transform: @escaping (Base.Element) -> ElementOfResult
   ) -> LazyCompactMapCollection<Base, ElementOfResult> {

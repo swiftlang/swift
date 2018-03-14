@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %target-build-swift %s -o %t/a.out -swift-version 5 && %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -82,60 +83,6 @@ CompactMapTests.test("Single Count") {
   )
   _ = Array(f1)
   expectEqual(30, count)
-}
-
-CompactMapTests.test("Combined CompactMap Type/Sequence") {
-  func foldingLevels<S: Sequence>(_ xs: S) {
-    var result0 = xs.lazy.filter({ _ in true }).map({ $0 })
-    var result1 = xs.lazy.map({ $0 }).filter({ _ in true })
-    var result2 = xs.lazy.compactMap({ $0 as S.Element? })
-      .filter({ _ in true }).map({ $0 })
-    var result3 = xs.lazy.map({ $0 }).filter({ _ in true })
-      .compactMap({ $0 as S.Element? })
-    typealias ExpectedType = LazyCompactMapSequence<S, S.Element>
-    expectType(ExpectedType.self, &result0)
-    expectType(ExpectedType.self, &result1)
-    expectType(ExpectedType.self, &result2)
-    expectType(ExpectedType.self, &result3)
-  }
-  foldingLevels(Array(0..<10))
-
-  func backwardCompatible<S: Sequence>(_ xs: S) {
-    typealias ExpectedType0 = LazyMapSequence<LazyFilterSequence<S>, S.Element>
-    typealias ExpectedType1 = LazyFilterSequence<LazyMapSequence<S, S.Element>>
-    var result0: ExpectedType0 = xs.lazy.filter({ _ in true }).map({ $0 })
-    var result1: ExpectedType1 = xs.lazy.map({ $0 }).filter({ _ in true })
-    expectType(ExpectedType0.self, &result0)
-    expectType(ExpectedType1.self, &result1)
-  }
-  foldingLevels(Array(0..<10))
-}
-
-CompactMapTests.test("Combined CompactMap Type/Collection") {
-  func foldingLevels<C: Collection>(_ xs: C) {
-    var result0 = xs.lazy.filter({ _ in true }).map({ $0 })
-    var result1 = xs.lazy.map({ $0 }).filter({ _ in true })
-    var result2 = xs.lazy.compactMap({ $0 as C.Element? })
-      .filter({ _ in true }).map({ $0 })
-    var result3 = xs.lazy.map({ $0 }).filter({ _ in true })
-      .compactMap({ $0 as C.Element? })
-    typealias ExpectedType = LazyCompactMapCollection<C, C.Element>
-    expectType(ExpectedType.self, &result0)
-    expectType(ExpectedType.self, &result1)
-    expectType(ExpectedType.self, &result2)
-    expectType(ExpectedType.self, &result3)
-  }
-  foldingLevels(Array(0..<10))
-
-  func backwardCompatible<C: Collection>(_ xs: C) {
-    typealias ExpectedType0 = LazyMapCollection<LazyFilterCollection<C>, C.Element>
-    typealias ExpectedType1 = LazyFilterCollection<LazyMapCollection<C, C.Element>>
-    var result0: ExpectedType0 = xs.lazy.filter({ _ in true }).map({ $0 })
-    var result1: ExpectedType1 = xs.lazy.map({ $0 }).filter({ _ in true })
-    expectType(ExpectedType0.self, &result0)
-    expectType(ExpectedType1.self, &result1)
-  }
-  foldingLevels(Array(0..<10))
 }
 
 CompactMapTests.test("CompactMap Combiner Correctness/Sequence") {
