@@ -12,39 +12,32 @@
 
 import SwiftShims
 
-
-extension _FixedArray8 where T == UInt8 {
-  func combinedUInt64() -> UInt64 {
-    var buffer = self
-    while buffer.count < buffer.capacity {
-      buffer.append(0xFF)
-    }
-    var combined: UInt64 = 0
-    for value in buffer {
-      combined = (combined << 8) | UInt64(value)
-    }
-    return combined
-  }
+func _emptyASCIIHashBuffer() -> _UIntBuffer<UInt64, UInt8> {
+  var buffer = _UIntBuffer<UInt64, UInt8>()
+  // null terminated strings need to hash differently than non-null terminated
+  // ones. A partially filled ascii buffer should have 1s in the leftover space
+  buffer._storage = UInt64.max
+  return buffer
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   // NOT @_versioned
   @effects(releasenone)
   internal func hashASCII(into hasher: inout _Hasher) {
-    var buffer = _FixedArray8<UInt8>()
+    var buffer = _emptyASCIIHashBuffer()
     for c in self {
       if buffer.count < buffer.capacity {
         buffer.append(UInt8(truncatingIfNeeded: c))
       }
 
       if buffer.count == buffer.capacity {
-        hasher.append(buffer.combinedUInt64())
-        buffer.count = 0
+        hasher.append(buffer._storage)
+        buffer = _emptyASCIIHashBuffer()
       }
     }
 
     if buffer.count > 0 {
-      hasher.append(buffer.combinedUInt64())
+      hasher.append(buffer._storage)
     }
   }
 }
@@ -52,7 +45,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // NOT @_versioned
   internal func hashUTF16(into hasher: inout _Hasher) {
-    var buffer = _FixedArray8<UInt8>()
+    var buffer = _emptyASCIIHashBuffer()
 
     var i = startIndex
     for cu in self {
@@ -62,9 +55,8 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 
       guard cuIsASCII && isSingleSegmentScalar else {
         if buffer.count != 0 {
-          let combined = buffer.combinedUInt64()
-          hasher.append(combined)
-          buffer.count = 0
+          hasher.append(buffer._storage)
+          buffer = _emptyASCIIHashBuffer()
         }
 
         let codeUnitSequence = IteratorSequence(
@@ -79,16 +71,14 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
       buffer.append(UInt8(truncatingIfNeeded: cu))
 
       if buffer.count >= buffer.capacity {
-        let combined = buffer.combinedUInt64()
-        hasher.append(combined)
-        buffer.count = 0
+        hasher.append(buffer._storage)
+        buffer = _emptyASCIIHashBuffer()
       }
     }
 
     if buffer.count > 0 {
-      let combined = buffer.combinedUInt64()
-      hasher.append(combined)
-      buffer.count = 0
+      hasher.append(buffer._storage)
+      buffer = _emptyASCIIHashBuffer()
     }
   }
 }
