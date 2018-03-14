@@ -93,25 +93,8 @@ template<>
 struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
-    switch (value.Kind) {
-      case tok::contextual_keyword:
-      case tok::integer_literal:
-      case tok::floating_literal:
-      case tok::string_literal:
-      case tok::unknown:
-      case tok::code_complete:
-      case tok::identifier:
-      case tok::oper_binary_unspaced:
-      case tok::oper_binary_spaced:
-      case tok::oper_postfix:
-      case tok::oper_prefix:
-      case tok::dollarident:
-      case tok::comment:
-      case tok::string_segment:
-        out.mapRequired("text", value.Text);
-        break;
-      default:
-        break;
+    if (!isTokenTextDetermined(value.Kind)) {
+      out.mapRequired("text", value.Text);
     }
   }
 };
