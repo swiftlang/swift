@@ -517,9 +517,6 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
     }
   }
 
-  // Simplify scalar operands in general.
-  if (!v) return nullptr;
-
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
     return fli;

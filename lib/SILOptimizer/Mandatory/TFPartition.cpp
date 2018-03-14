@@ -1445,6 +1445,7 @@ bool TFFunctionPartition::markFunction() {
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
   SmallVector<SILInstruction*, 32> tensorOps;
+  bool invalidOpFound = false;
   for (auto *BB : llvm::depth_first(&fn)) {
     for (auto I = BB->begin(), E = BB->end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -1471,6 +1472,7 @@ bool TFFunctionPartition::markFunction() {
         diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
                  diag::tf_op_misuse, error)
           .highlight(loc.getSourceRange());
+        invalidOpFound = true;
         continue;
       }
 
@@ -1480,7 +1482,7 @@ bool TFFunctionPartition::markFunction() {
       // this form on input, but want to canonicalize this away so the
       // partitioning pass and data flow analysis code doesn't have to reason
       // about it.
-      // TODO(clattner): Remove this when deabstraction exists.
+      // TODO(clattner): Remove this when deabstraction subsumes it.
       inst = opInfo->canonicalizeOperands();
 
       tensorOps.push_back(inst);
@@ -1488,8 +1490,9 @@ bool TFFunctionPartition::markFunction() {
     }
   }
 
-  // If there is nothing to do, don't touch this function.
-  if (tensorOps.empty())
+  // If there is nothing to do, or the ops in this function are malformed,
+  // don't touch this function.
+  if (tensorOps.empty() || invalidOpFound)
     return false;
 
   // Compute the blocksReachingTensorCode set.
