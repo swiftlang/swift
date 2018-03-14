@@ -34,9 +34,9 @@ namespace driver {
 
 class Action {
 public:
-  typedef ArrayRef<const Action *>::size_type size_type;
-  typedef ArrayRef<const Action *>::iterator iterator;
-  typedef ArrayRef<const Action *>::const_iterator const_iterator;
+  using size_type = ArrayRef<const Action *>::size_type;
+  using iterator = ArrayRef<const Action *>::iterator;
+  using const_iterator = ArrayRef<const Action *>::const_iterator;
 
   enum ActionClass {
     Input = 0,
