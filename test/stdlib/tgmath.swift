@@ -138,8 +138,8 @@ MathTests.test("Binary functions") {
     expectEqual(nextafter(fx, fy), fx.nextUp)
     expectEqual(nextafter(gx, gy), gx.nextUp)
     expectEqual(nextafter(dx, dx - 1.0), dx.nextDown)
-    expectEqual(nextafter(fx, fx - Float(1.0)), fx.nextDown)
-    expectEqual(nextafter(gx, gx - CGFloat(1.0)), gx.nextDown)
+    expectEqual(nextafter(fx, fx - 1.0), fx.nextDown)
+    expectEqual(nextafter(gx, gx - 1.0), gx.nextDown)
 
     expectEqualWithAccuracy(fdim(dx, dy), fdim(fx, fy), fdim(gx, gy), 0.0, ulps: 0)
     expectEqualWithAccuracy(fmax(dx, dy), fmax(fx, fy), fmax(gx, gy), 2.2, ulps: 0)
@@ -173,6 +173,7 @@ MathTests.test("Other functions") {
   expectEqual(lgamma(gx).1, 1)
   expectEqualWithAccuracy(lgamma(dx).0, lgamma(fx).0, lgamma(gx).0, 2.2527126517342055, ulps: 1)
 
+  // ISO C only requires the last 3 bits to be correct
   expectEqual(remquo(dz, dy).1 & 7, 1)
   expectEqual(remquo(fz, fy).1 & 7, 1)
   expectEqual(remquo(gz, gy).1 & 7, 1)
