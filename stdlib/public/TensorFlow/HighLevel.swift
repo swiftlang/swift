@@ -35,6 +35,7 @@ public protocol Parameterized {
   /// The type representing all parameters, synthesized from stored properties
   /// marked with `@parameter`.
   associatedtype Parameters
+
   /// A synthesized instance of Parameters.
   var parameters: Parameters { get set }
 }
@@ -77,11 +78,31 @@ public protocol DifferentiableModule : Module
   where Input : Differentiable,
         Output : Differentiable,
         Parameters : Differentiable {
+  associatedtype DifferentiationPrimalValues
+
+  func primal(for input: Input) -> (result: Output,
+                                    primalValues: DifferentiationPrimalValues)
+  func adjoint(for input: Input,
+               with primalValues: DifferentiationPrimalValues,
+               backpropagating seed: Output) -> (Input, Parameters)
+}
+
+public extension DifferentiableModule {
+  @_inlineable @inline(__always)
+  func applied(to input: Input) -> Output {
+    return primal(for: input).result
+  }
+
   /// Returns the gradient with respect to an input and the instance's
   /// parameters, backpropagating an adjoint value.
+  @_inlineable @inline(__always)
   func gradient(
     for input: Input, backpropagating adjoint: Output
-  ) -> (Input, Parameters)
+  ) -> (Input, Parameters) {
+    return self.adjoint(for: input,
+                        with: primal(for: input).primalValues,
+                        backpropagating: adjoint)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -168,14 +189,16 @@ public protocol Optimizer : AnyObject {
 }
 
 //===----------------------------------------------------------------------===//
-//
 // Convolution layer
-//
 //===----------------------------------------------------------------------===//
 
 /// A layer with a 4-D kernel that computes 2-D convolutions given 4-D inputs.
 public struct Convolution2DLayer<Scalar> : DifferentiableModule
   where Scalar : FloatingPoint & AccelerableByTensorFlow {
+
+  public typealias Input = Tensor<Scalar>
+  public typealias Output = Tensor<Scalar>
+
   /// A 4-D filter tensor.
   // TODO: To be marked with @parameter.
   public var filter: Tensor<Scalar>
@@ -198,6 +221,13 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     self.filter = filter
     self.strides = strides
     self.padding = padding
+  }
+
+  @_inlineable @inline(__always)
+  public init(filterShape: TensorShape, strides: [Int32], padding: Padding) {
+    self.init(filter: Tensor(randomNormal: filterShape),
+              strides: strides,
+              padding: padding)
   }
 
   // TODO: The `Parameters` struct type and the `parameters` stored property
@@ -260,38 +290,49 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     }
   }
 
+  public struct DifferentiationPrimalValues {
+    @_versioned let result: Tensor<Scalar>
+    @_versioned @_inlineable
+    init(result: Tensor<Scalar>) {
+      self.result = result
+    }
+  }
+
   /// Computes a 2-D convolution Tensor given a 4-D input Tensor, using the 4-D
   /// filter Tensor.
   @_inlineable @inline(__always)
-  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
-    return input.convolved2D(
+  public func primal(
+    for input: Tensor<Scalar>
+  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+    let result = input.convolved2D(
       withFilter: filter, strides: strides, padding: padding
     )
+    return (result: result,
+            primalValues: DifferentiationPrimalValues(result: result))
   }
 
   /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
   /// input Tensor and the 4-D filter Tensor. This can be automatically computed
   /// after more compiler support for automatic differentiation is added.
   @_inlineable @inline(__always)
-  public func gradient(
-    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  public func adjoint(
+    for input: Tensor<Scalar>,
+    with primalValues: DifferentiationPrimalValues,
+    backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
-    let partial = applied(to: input)
     let (dInput, dFilter) = input._adjointConvolved2D(
       filter: filter,
       strides: strides,
       padding: padding,
-      partial: partial,
-      seed: adjoint.broadcast(to: partial)
+      partial: primalValues.result,
+      seed: adjoint.broadcast(to: primalValues.result)
     )
     return (dInput, Parameters(filter: dFilter))
   }
 }
 
 //===----------------------------------------------------------------------===//
-//
 // Fully connected layer
-//
 //===----------------------------------------------------------------------===//
 
 /// A fully-connected layer with weight and bias tensors. Fully-connected layers
@@ -301,6 +342,10 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
 //   strategies for weight/bias (ones, zeros, random uniform, etc).
 public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   where Scalar : FloatingPoint & AccelerableByTensorFlow {
+
+  public typealias Input = Tensor<Scalar>
+  public typealias Output = Tensor<Scalar>
+
   /// The weight tensor.
   // TODO: To be marked with @parameter.
   public var weight: Tensor<Scalar>
@@ -375,22 +420,39 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     }
   }
 
+  public struct DifferentiationPrimalValues {
+    @_versioned let dot: Tensor<Scalar>
+    @_versioned let add: Tensor<Scalar>
+    @_versioned @_inlineable
+    init(dot: Tensor<Scalar>, add: Tensor<Scalar>) {
+      self.dot = dot
+      self.add = add
+    }
+  }
+
   /// Computes the operation `dot(input, weight) + bias`.
   @_inlineable @inline(__always)
-  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
-    return input.dot(weight) + bias
+  public func primal(
+    for input: Tensor<Scalar>
+  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+    let dot = input.dot(weight)
+    let add = dot + bias
+    return (result: add,
+            primalValues: DifferentiationPrimalValues(dot: dot, add: add))
   }
 
   /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
   /// input Tensor and the 4-D filter Tensor. This can be automatically computed
   /// after more compiler support for automatic differentiation is added.
   @_inlineable @inline(__always)
-  public func gradient(
-    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  public func adjoint(
+    for input: Tensor<Scalar>,
+    with primalValues: DifferentiationPrimalValues,
+    backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
     // NOTE: proper AD would require an `unbroadcast` op for _adjointAdd. There
     // is a manual workaround here.
-    let dot = input.dot(weight) + bias
+    let dot = primalValues.dot
     let dBias = adjoint.broadcast(to: bias)
     let dDot = adjoint.broadcast(to: dot)
     let (dInput, dWeight) = input._adjointDot(weight, partial: dot, seed: dDot)
@@ -399,9 +461,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
 }
 
 //===----------------------------------------------------------------------===//
-//
 // Normalization layers
-//
 //===----------------------------------------------------------------------===//
 
 /// A batch normalization layer that transforms inputs to have a mean close to 0
@@ -411,6 +471,10 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
 // TODO: Handle running mean/variance.
 public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   where Scalar : BinaryFloatingPoint & AccelerableByTensorFlow {
+
+  public typealias Input = Tensor<Scalar>
+  public typealias Output = Tensor<Scalar>
+
   /// The axis for batch normalization.
   public let axis: Int32
 
@@ -509,28 +573,41 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     }
   }
 
+  public struct DifferentiationPrimalValues {
+    @_versioned let result: Tensor<Scalar>
+    @_versioned @_inlineable
+    init(result: Tensor<Scalar>) {
+      self.result = result
+    }
+  }
+
   /// Computes the batch normalization operation.
   // TODO: Handle running mean/variance.
   @_inlineable @inline(__always)
-  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
-    return input.batchNormalized(alongAxis: axis, offset: offset, scale: scale,
-                                 epsilon: epsilon)
+  public func primal(
+    for input: Tensor<Scalar>
+  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+    let result = input.batchNormalized(alongAxis: axis, offset: offset,
+                                       scale: scale, epsilon: epsilon)
+    return (result: result,
+            primalValues: DifferentiationPrimalValues(result: result))
   }
 
   /// Computes the gradient of the batch normalization operation. This can be
   /// automatically computed after more compiler support for automatic
   /// differentiation is added.
   @_inlineable @inline(__always)
-  public func gradient(
-    for input: Tensor<Scalar>, backpropagating adjoint: Tensor<Scalar>
+  public func adjoint(
+    for input: Tensor<Scalar>,
+    with primalValues: DifferentiationPrimalValues,
+    backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
     // NOTE: Adjoint is manually broadcasted to correct shape. AD should do this
     // automatically when implemented.
-    let partial = applied(to: input)
-    let adjoint = adjoint.broadcast(to: partial)
+    let adjoint = adjoint.broadcast(to: primalValues.result)
     let (dInput, dOffset, dScale) = input._adjointBatchNormalized(
       alongAxis: axis, offset: offset, scale: scale, epsilon: epsilon,
-      partial: partial, seed: adjoint
+      partial: primalValues.result, seed: adjoint
     )
     return (dInput, Parameters(offset: dOffset, scale: dScale))
   }
