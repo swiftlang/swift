@@ -82,7 +82,7 @@ inline unsigned getNumTagBytes(size_t size, unsigned emptyCases,
           numTags < 65536 ? 2 : 4);
 }
 
-inline int getEnumTagSinglePayloadImpl(
+inline unsigned getEnumTagSinglePayloadImpl(
     const OpaqueValue *enumAddr, unsigned emptyCases, const Metadata *payload,
     size_t payloadSize, size_t payloadNumExtraInhabitants,
     int (*getExtraInhabitantIndex)(const OpaqueValue *, const Metadata *)) {
@@ -124,22 +124,24 @@ inline int getEnumTagSinglePayloadImpl(
         small_memcpy(&caseIndexFromValue, valueAddr,
                      numPayloadTagBytes, true);
 #endif
-      return (caseIndexFromExtraTagBits | caseIndexFromValue) +
-             payloadNumExtraInhabitants;
+      unsigned noPayloadIndex =
+          (caseIndexFromExtraTagBits | caseIndexFromValue) +
+          payloadNumExtraInhabitants;
+      return noPayloadIndex + 1;
     }
   }
 
   // If there are extra inhabitants, see whether the payload is valid.
   if (payloadNumExtraInhabitants > 0) {
-    return getExtraInhabitantIndex(enumAddr, payload);
+    return getExtraInhabitantIndex(enumAddr, payload) + 1;
   }
 
   // Otherwise, we have always have a valid payload.
-  return -1;
+  return 0;
 }
 
 inline void storeEnumTagSinglePayloadImpl(
-    OpaqueValue *value, int whichCase, unsigned emptyCases,
+    OpaqueValue *value, unsigned whichCase, unsigned emptyCases,
     const Metadata *payload, size_t payloadSize,
     size_t payloadNumExtraInhabitants,
     void (*storeExtraInhabitant)(OpaqueValue *, int whichCase,
@@ -155,21 +157,23 @@ inline void storeEnumTagSinglePayloadImpl(
 
   // For payload or extra inhabitant cases, zero-initialize the extra tag bits,
   // if any.
-  if (whichCase < (int)payloadNumExtraInhabitants) {
+  if (whichCase <= payloadNumExtraInhabitants) {
     if (numExtraTagBytes != 0)
       small_memset(extraTagBitAddr, 0, numExtraTagBytes);
 
     // If this is the payload case, we're done.
-    if (whichCase == -1)
+    if (whichCase == 0)
       return;
 
     // Store the extra inhabitant.
-    storeExtraInhabitant(value, whichCase, payload);
+    unsigned noPayloadIndex = whichCase - 1;
+    storeExtraInhabitant(value, noPayloadIndex, payload);
     return;
   }
 
   // Factor the case index into payload and extra tag parts.
-  unsigned caseIndex = whichCase - payloadNumExtraInhabitants;
+  unsigned noPayloadIndex = whichCase - 1;
+  unsigned caseIndex = noPayloadIndex - payloadNumExtraInhabitants;
   unsigned payloadIndex, extraTagIndex;
   if (payloadSize >= 4) {
     extraTagIndex = 1;

@@ -842,7 +842,7 @@ public:
     getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
   }
 
-  int vw_getEnumTag(const OpaqueValue *value) const {
+  unsigned vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
