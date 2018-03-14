@@ -111,31 +111,11 @@ func sampleData(_ type: SampleKind) -> Data {
     
 }
 
-func benchmark_Subscript(_ N: Int, _ data: Data, _ index: Data.Index) {
-    for _ in 1...N {
-        _ = data[index]
-    }
-}
-
-func benchmark_Count(_ N: Int, _ data: Data) {
-    for _ in 1...10000*N {
-        _ = data.count
-    }
-}
-
-func benchmark_SetCount(_ N: Int, _ data_: Data, _ count: Int) {
-    var data = data_
-    let orig = data.count
-    for _ in 1...10000*N {
-        data.count = count
-        data.count = orig
-    }
-}
-
 func benchmark_AccessBytes(_ N: Int, _ data: Data) {
     for _ in 1...10000*N {
         data.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
-            // do nothing here
+            // Ensure that the compiler does not optimize away this call
+            blackHole(ptr.pointee)
         }
     }
 }
@@ -218,22 +198,33 @@ func benchmark_AppendData(_ N: Int, _ lhs: Data, _ rhs: Data) {
 
 @inline(never)
 public func run_Subscript(_ N: Int) {
-    let data = sampleData(.veryLarge)
+    let data = sampleData(.medium)
     let index = 521
-    benchmark_Subscript(N, data, index)
+    for _ in 1...10000*N {
+        // Ensure that the compiler does not optimize away this call
+        blackHole(data[index])
+    }
 }
 
 @inline(never)
 public func run_Count(_ N: Int) {
     let data = sampleData(.medium)
-    benchmark_Count(N, data)
+    for _ in 1...10000*N {
+        // Ensure that the compiler does not optimize away this call
+        blackHole(data.count)
+    }
 }
 
 @inline(never)
 public func run_SetCount(_ N: Int) {
     let data = sampleData(.medium)
     let count = data.count + 100
-    benchmark_SetCount(N, data, count)
+    var otherData = data
+    let orig = data.count
+    for _ in 1...10000*N {
+        otherData.count = count
+        otherData.count = orig
+    }
 }
 
 @inline(never)
