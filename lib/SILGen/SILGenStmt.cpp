@@ -867,8 +867,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
         // If we emitted an unreachable in the body, we will not have a valid
         // insertion point. Just return early.
-        if (!SGF.B.hasValidInsertionPoint())
+        if (!SGF.B.hasValidInsertionPoint()) {
+          scope.unreachableExit();
           return;
+        }
 
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
