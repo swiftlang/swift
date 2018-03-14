@@ -4945,35 +4945,16 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
   // If the parameter is indirect, we need to drop the value into
   // temporary memory.
   if (SGF.silConv.isSILIndirect(selfParam)) {
-    // It's usually a really bad idea to materialize when we're
-    // about to pass a value to an inout argument, because it's a
-    // really easy way to silently drop modifications (e.g. from a
-    // mutating getter in a writeback pair).  Our caller should
-    // always take responsibility for that decision (by doing the
-    // materialization itself).
-    //
-    // However, when the base is a reference type and the target is
-    // a non-class protocol, this is innocuous.
-#ifndef NDEBUG
-    auto isNonClassProtocolMember = [](Decl *d) {
-      auto p = d->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      return (p && !p->requiresClass());
-    };
-#endif
-    assert((!selfParam.isIndirectMutating() ||
-            (baseFormalType->isAnyClassReferenceType() &&
-             isNonClassProtocolMember(accessor.getDecl()))) &&
+    // It's a really bad idea to materialize when we're about to
+    // pass a value to an inout argument, because it's a really easy
+    // way to silently drop modifications (e.g. from a mutating
+    // getter in a writeback pair).  Our caller should always take
+    // responsibility for that decision (by doing the materialization
+    // itself).
+    assert(!selfParam.isIndirectMutating() &&
            "passing unmaterialized r-value as inout argument");
 
     base = base.materialize(SGF, loc);
-    if (selfParam.isIndirectInOut()) {
-      // Drop the cleanup if we have one.
-      auto baseLV = ManagedValue::forLValue(base.getValue());
-      return ArgumentSource(
-          loc, LValue::forAddress(baseLV, None,
-                                  AbstractionPattern(baseFormalType),
-                                  baseFormalType));
-    }
   }
 
   return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
