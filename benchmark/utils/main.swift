@@ -42,6 +42,7 @@ import CharacterProperties
 import Chars
 import ClassArrayGetter
 import Combos
+import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
 import DictTest
@@ -191,6 +192,7 @@ registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
 registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
+registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
