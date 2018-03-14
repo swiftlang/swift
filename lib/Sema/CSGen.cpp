@@ -1456,10 +1456,9 @@ namespace {
         // The result type of the function must be convertible to the base type.
         // TODO: we definitely want this to include ImplicitlyUnwrappedOptional; does it
         // need to include everything else in the world?
-        auto outputTy
-          = CS.createTypeVariable(
-              CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction),
-              TVO_CanBindToInOut);
+        auto outputTy = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            TVO_CanBindToInOut);
         CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
@@ -2419,9 +2418,8 @@ namespace {
       // variables T1 and T2.
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(
-                     CS.getConstraintLocator(expr,
-                                             ConstraintLocator::ApplyFunction),
-                                             TVO_CanBindToInOut);
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            TVO_CanBindToInOut);
       } else {
         // Since we know what the output type is, we can set it as the favored
         // type of this expression.
