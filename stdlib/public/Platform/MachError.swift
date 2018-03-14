@@ -203,4 +203,4 @@ public enum MachErrorCode : Int32 {
   /// The requested property cannot be changed at this time.
   case policyStatic             = 51
 }
-#endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
