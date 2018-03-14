@@ -105,7 +105,7 @@ def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
-def driver_force_one_batch_repartition : Separate<["-"], "driver-force-one-batch-repartition">,
+def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
 

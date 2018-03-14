@@ -800,7 +800,11 @@ namespace driver {
     // happen, but keep this as insurance, because the decision to pass output
     // file maps cannot know the exact length of the command line, so may
     // possibly fail to use the OutputFileMap.
+    //
+    // In order to be able to exercise as much of the code paths as possible,
+    // take a flag to force a retry, but only once.
     bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
+                                       bool &PretendTheCommandLineIsTooLongOnce,
                                        size_t &NumPartitions) {
 
       // Stop rebatching if we can't subdivide batches any further.
@@ -810,7 +814,8 @@ namespace driver {
       for (auto const *B : Batches) {
         if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
                                                           B->getArguments()) ||
-            Comp.getAndClearForceOneBatchRepartition()) {
+            PretendTheCommandLineIsTooLongOnce) {
+          PretendTheCommandLineIsTooLongOnce = false;
           // To avoid redoing the batch loop too many times, repartition pretty
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
@@ -838,6 +843,8 @@ namespace driver {
       size_t NumPartitions = Comp.NumberOfParallelCommands;
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
+      bool PretendTheCommandLineIsTooLongOnce =
+          Comp.getForceOneBatchRepartition();
       do {
         // We might be restarting loop; clear these before proceeding.
         Batchable.clear();
@@ -856,7 +863,8 @@ namespace driver {
           formBatchJobFromPartitionBatch(Batches, Batch);
         }
 
-      } while (shouldRetryWithMorePartitions(Batches, NumPartitions));
+      } while (shouldRetryWithMorePartitions(
+          Batches, PretendTheCommandLineIsTooLongOnce, NumPartitions));
       PendingExecution.clear();
 
       // Save batches so we can locate and decompose them on task-exit.

@@ -279,11 +279,7 @@ public:
     return EnableBatchMode;
   }
 
-  bool getAndClearForceOneBatchRepartition() {
-    bool r = ForceOneBatchRepartition;
-    ForceOneBatchRepartition = false;
-    return r;
-  }
+  bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
