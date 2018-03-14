@@ -62,6 +62,14 @@ public protocol Module : Parameterized {
 }
 
 //===----------------------------------------------------------------------===//
+// Differentiation tape protocol (to be removed when AD is implemented)
+//===----------------------------------------------------------------------===//
+public protocol DifferentiationTapeProtocol {
+  associatedtype DifferentiationTapeResult
+  var result: DifferentiationTapeResult { get }
+}
+
+//===----------------------------------------------------------------------===//
 // DifferentiableModule
 //===----------------------------------------------------------------------===//
 
@@ -78,10 +86,10 @@ public protocol DifferentiableModule : Module
   where Input : Differentiable,
         Output : Differentiable,
         Parameters : Differentiable {
-  associatedtype DifferentiationPrimalValues
+  associatedtype DifferentiationPrimalValues : DifferentiationTapeProtocol
+    where DifferentiationPrimalValues.DifferentiationTapeResult == Output
 
-  func primal(for input: Input) -> (result: Output,
-                                    primalValues: DifferentiationPrimalValues)
+  func primal(for input: Input) -> DifferentiationPrimalValues
   func adjoint(for input: Input,
                with primalValues: DifferentiationPrimalValues,
                backpropagating seed: Output) -> (Input, Parameters)
@@ -100,7 +108,7 @@ public extension DifferentiableModule {
     for input: Input, backpropagating adjoint: Output
   ) -> (Input, Parameters) {
     return self.adjoint(for: input,
-                        with: primal(for: input).primalValues,
+                        with: primal(for: input),
                         backpropagating: adjoint)
   }
 }
@@ -290,8 +298,8 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     }
   }
 
-  public struct DifferentiationPrimalValues {
-    @_versioned let result: Tensor<Scalar>
+  public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
+    public let result: Tensor<Scalar>
     @_versioned @_inlineable
     init(result: Tensor<Scalar>) {
       self.result = result
@@ -303,12 +311,11 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   @_inlineable @inline(__always)
   public func primal(
     for input: Tensor<Scalar>
-  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+  ) -> DifferentiationPrimalValues {
     let result = input.convolved2D(
       withFilter: filter, strides: strides, padding: padding
     )
-    return (result: result,
-            primalValues: DifferentiationPrimalValues(result: result))
+    return DifferentiationPrimalValues(result: result)
   }
 
   /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
@@ -420,25 +427,22 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     }
   }
 
-  public struct DifferentiationPrimalValues {
+  public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
     @_versioned let dot: Tensor<Scalar>
-    @_versioned let add: Tensor<Scalar>
+    public let result: Tensor<Scalar>
     @_versioned @_inlineable
-    init(dot: Tensor<Scalar>, add: Tensor<Scalar>) {
+    init(dot: Tensor<Scalar>, result: Tensor<Scalar>) {
       self.dot = dot
-      self.add = add
+      self.result = result
     }
   }
 
   /// Computes the operation `dot(input, weight) + bias`.
   @_inlineable @inline(__always)
-  public func primal(
-    for input: Tensor<Scalar>
-  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+  public func primal(for input: Tensor<Scalar>) -> DifferentiationPrimalValues {
     let dot = input.dot(weight)
     let add = dot + bias
-    return (result: add,
-            primalValues: DifferentiationPrimalValues(dot: dot, add: add))
+    return DifferentiationPrimalValues(dot: dot, result: add)
   }
 
   /// Computes the gradient of a 2-D convolution Tensor with respect to a 4-D
@@ -573,8 +577,8 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     }
   }
 
-  public struct DifferentiationPrimalValues {
-    @_versioned let result: Tensor<Scalar>
+  public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
+    public let result: Tensor<Scalar>
     @_versioned @_inlineable
     init(result: Tensor<Scalar>) {
       self.result = result
@@ -586,11 +590,10 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   @_inlineable @inline(__always)
   public func primal(
     for input: Tensor<Scalar>
-  ) -> (result: Tensor<Scalar>, primalValues: DifferentiationPrimalValues) {
+  ) -> DifferentiationPrimalValues {
     let result = input.batchNormalized(alongAxis: axis, offset: offset,
                                        scale: scale, epsilon: epsilon)
-    return (result: result,
-            primalValues: DifferentiationPrimalValues(result: result))
+    return DifferentiationPrimalValues(result: result)
   }
 
   /// Computes the gradient of the batch normalization operation. This can be
