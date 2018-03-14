@@ -604,7 +604,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
-  ///     // Prints "Hi ho, Silver!")
+  ///     // Prints "Hi ho, Silver!"
   ///
   /// - Complexity: O(1)
   var isEmpty: Bool { get }
