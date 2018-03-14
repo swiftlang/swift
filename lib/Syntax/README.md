@@ -163,8 +163,8 @@ struct YourStruct {}
 At any point in the building process, you can call `build()` and get a
 reasonably formed Syntax node (i.e. with no raw `nullptr`s) using what you've
 provided to the builder so far. Anything that you haven't supplied is marked as
-*missing*. This is essentially what the parser does, so looking forward to
-future adoption the builders are designed with the parser in mind, with the
+*missing*. This is essentially what the parser does, so—looking forward to
+future adoption—the builders are designed with the parser in mind, with the
 hope that we can better specify recovery behavior and incremental (re-)parsing.
 
 **Example**
@@ -175,7 +175,7 @@ StructDeclSyntaxBuilder Builder;
 // We previously parsed a struct keyword, let's tell the builder to use it.
 Builder.useStructKeyword(StructKeyword);
 
-// Hmm, we didn't see an identifier, but saw a left brace. Let's keep going.
+// Hm, we didn't see an identifier, but saw a left brace. Let's keep going.
 Builder.useLeftBrace(ParsedLeftBrace)
 
 // No members of the struct; we saw a right brace.
