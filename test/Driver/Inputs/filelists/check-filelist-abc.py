@@ -54,7 +54,7 @@ else:
 
 if '-supplementary-output-file-map' in sys.argv:
     supplementaryOutputMapFile = \
-      sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
+        sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
     with open(supplementaryOutputMapFile, 'r') as f:
         lines = f.readlines()
         for line in lines:
