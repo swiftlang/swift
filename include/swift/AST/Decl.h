@@ -5917,8 +5917,6 @@ public:
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
