@@ -1,7 +1,7 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -O -emit-ir %s | %FileCheck --check-prefix=OPT-CHECK %s
+// RUN: %target-swift-frontend -module-name runtime_calling_conventions -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name runtime_calling_conventions -assume-parsing-unqualified-ownership-sil -parse-as-library -O -emit-ir %s | %FileCheck --check-prefix=OPT-CHECK %s
 
 // Test that runtime functions are invoked using the new calling convention.
 
