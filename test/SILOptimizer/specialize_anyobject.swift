@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_anyobject -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 // rdar://problem/20338028
 protocol PA: class { }
