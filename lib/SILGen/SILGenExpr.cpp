@@ -4896,24 +4896,32 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-void SILGenFunction::emitBindOptional(SILLocation loc,
-                                      ManagedValue optionalAddrOrValue,
+void SILGenFunction::emitBindOptional(SILLocation loc, ManagedValue optValue,
                                       unsigned depth) {
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
 
-  // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  auto hasValue =
-      emitDoesOptionalHaveValue(loc, optionalAddrOrValue.getValue());
+  SILBasicBlock *hasNoValueBB = createBasicBlock();
 
+  // We make a copy to ensure that we pass the value into the
+  // switch_enum at plus 1. This is important since emitBindOptional
+  // does not consume its argument. Additionally, we need to make sure
+  // to create the switch enum builder /after/ emitting the block for
+  // cleanups lest we emit an extra destroy in the .none block.
+  SwitchEnumBuilder SEB(B, loc, optValue.copy(*this, loc));
+  SEB.addOptionalSomeCase(hasValueBB);
   // If not, thread out through a bunch of cleanups.
-  SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
-  
-  // If so, continue.
-  B.emitBlock(hasValueBB);
+  SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
+                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                            expr.exitAndBranch(loc);
+                          });
+  std::move(SEB).emit();
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  B.setInsertionPoint(hasValueBB);
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
