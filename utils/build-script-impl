@@ -2790,7 +2790,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 # Handle test subdirectory clause
-                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
                     LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
