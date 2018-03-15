@@ -16,17 +16,26 @@ var TensorTests = TestSuite("Tensor")
 TensorTests.testAllBackends("Initializers") {
   let scalar: Tensor<Float> = 1.0
   let matrix: Tensor<Float> = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
-  let broadcastedScalar = Tensor<Float>(broadcasting: 10, rank: 3)
+  let broadcastScalar = Tensor<Float>(broadcasting: 10, rank: 3)
   expectEqual(ShapedArray(shape: [], scalars: [1]), scalar.array)
   expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
               matrix.array)
   expectEqual(ShapedArray(shape: [1, 1, 1], scalars: [10]),
-              broadcastedScalar.array)
+              broadcastScalar.array)
 }
 
 TensorTests.testAllBackends("FactoryInitializers") {
   let x = Tensor<Float>(ones: [1, 10])
   expectEqual(ShapedArray(shape: [1, 10], repeating: 1), x.array)
+}
+
+TensorTests.testAllBackends("NumericInitializers") {
+  let x = Tensor<Float>(oneHotAtIndices: [0, 2, -1, 1], depth: 3)
+  expectEqual(ShapedArray(shape: [4, 3], scalars: [1, 0, 0,
+                                                   0, 0, 1,
+                                                   0, 0, 0,
+                                                   0, 1, 0]),
+              x.array)
 }
 
 TensorTests.testAllBackends("RandomInitializer") {
