@@ -35,18 +35,21 @@ SRC_DIR=$PWD
 # Set defaults
 DRY_RUN=
 BUNDLE_PREFIX=
-case $(uname -s) in
-  Darwin)
-    SWIFT_PACKAGE=buildbot_osx_package,no_test
-  ;;
-  Linux)
-    SWIFT_PACKAGE=buildbot_linux,no_test
-  ;;
-  *)
-    echo "Unrecognised platform $(uname -s)"
-    exit 1
-  ;;
-esac
+# SWIFT_ENABLE_TENSORFLOW
+if [[ -z ${SWIFT_PACKAGE} ]]; then
+  case $(uname -s) in
+    Darwin)
+      SWIFT_PACKAGE=buildbot_osx_package,no_test
+    ;;
+    Linux)
+      SWIFT_PACKAGE=buildbot_linux,no_test
+    ;;
+    *)
+      echo "Unrecognised platform $(uname -s)"
+      exit 1
+    ;;
+  esac
+fi
 
 # Process command line arguments
 FIRST_ARG_PROCESSED=0
@@ -105,18 +108,6 @@ SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
 SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
-
-if [[ -z ${SWIFT_PACKAGE} ]]; then
-  if [[ "$(uname -s)" == "Darwin" ]] ; then
-      SWIFT_PACKAGE=buildbot_osx_package
-  else
-      if [[ "$2" == "-t" || "$2" == "--test" ]] ; then
-          SWIFT_PACKAGE=buildbot_linux
-      else
-          SWIFT_PACKAGE=buildbot_linux,no_test
-      fi
-  fi
-fi
 
 ./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
