@@ -254,22 +254,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back("-color-diagnostics");
 }
 
-static void addModuleDocPathArgIfNecessary(const CommandOutput &output,
-                                           const ArgList &inputArgs,
-                                           ArgStringList &arguments) {
-  addOutputsOfType(arguments, output, inputArgs, types::TY_SwiftModuleDocFile,
-                   "-emit-module-doc-path");
-}
-
-static void
-addSerializeDiagnosticsPathArgIfNecessary(const CommandOutput &output,
-                                          const ArgList &inputArgs,
-                                          ArgStringList &arguments) {
-  addOutputsOfType(arguments, output, inputArgs,
-                   types::TY_SerializedDiagnostics,
-                   "-serialize-diagnostics-path");
-}
-
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
@@ -553,9 +537,11 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args, types::ID::TY_SwiftModuleFile,
                    "-emit-module-path");
 
-  addModuleDocPathArgIfNecessary(Output, Args, arguments);
+  addOutputsOfType(arguments, Output, Args, types::TY_SwiftModuleDocFile,
+                   "-emit-module-doc-path");
 
-  addSerializeDiagnosticsPathArgIfNecessary(Output, Args, arguments);
+  addOutputsOfType(arguments, Output, Args, types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
 
   if (addOutputsOfType(arguments, Output, Args, types::ID::TY_ObjCHeader,
                        "-emit-objc-header-path")) {
@@ -793,9 +779,13 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
-  addModuleDocPathArgIfNecessary(context.Output, context.Args, Arguments);
-  addSerializeDiagnosticsPathArgIfNecessary(context.Output, context.Args,
-                                            Arguments);
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_ObjCHeader);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
@@ -805,13 +795,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
 
-  auto ObjCHeaderOutputPath =
-    context.Output.getAdditionalOutputForType(types::TY_ObjCHeader);
-  if (!ObjCHeaderOutputPath.empty()) {
-    Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(
-        context.Args.MakeArgString(ObjCHeaderOutputPath));
-  }
 
   Arguments.push_back("-o");
   Arguments.push_back(context.Args.MakeArgString(
@@ -949,8 +932,9 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
-  addSerializeDiagnosticsPathArgIfNecessary(context.Output, context.Args,
-                                            Arguments);
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
 
   addInputsOfType(Arguments, context.InputActions, types::TY_ObjCHeader);
   context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
