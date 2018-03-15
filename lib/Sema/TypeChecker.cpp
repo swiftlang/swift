@@ -404,7 +404,10 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
+static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC,
+                                               SourceFile &sourceFile) {
+  TC.completeUsedProtocolConformances(sourceFile);
+
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   do {
@@ -425,6 +428,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.typeCheckAbstractFunctionBody(AFD);
 
       AFD->setBodyTypeCheckedIfPresent();
+
+      TC.completeUsedProtocolConformances(sourceFile, AFD);
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();
@@ -480,20 +485,10 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.checkConformanceRequirements(conformance);
     }
     TC.PartiallyCheckedConformances.clear();
-
-    // Complete any conformances that we used.
-    for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
-      auto conformance = TC.UsedConformances[i];
-      if (conformance->isIncomplete())
-        TC.checkConformance(conformance);
-    }
-    TC.UsedConformances.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
-           !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -539,7 +534,7 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   assert(SF.ASTStage == SourceFile::TypeChecked);
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
-  typeCheckFunctionsAndExternalDecls(TC);
+  typeCheckFunctionsAndExternalDecls(TC, SF);
 }
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
@@ -654,7 +649,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
-    typeCheckFunctionsAndExternalDecls(TC);
+    typeCheckFunctionsAndExternalDecls(TC, SF);
   }
 
   // Checking that benefits from having the whole module available.

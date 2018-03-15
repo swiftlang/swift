@@ -599,18 +599,9 @@ Type TypeChecker::applyUnboundGenericArguments(
   }
 
   // Apply the substitution map to the interface type of the declaration.
-  resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(*this, dc),
-                                SubstFlags::UseErrorType);
-
-  if (isa<NominalTypeDecl>(decl) && resultType) {
-    if (useObjectiveCBridgeableConformancesOfArgs(
-          dc, resultType->castTo<BoundGenericType>(),
-          unsatisfiedDependency))
-      return Type();
-  }
-
-  return resultType;
+  return resultType.subst(QueryTypeSubstitutionMap{subs},
+                          LookUpConformance(*this, dc),
+                          SubstFlags::UseErrorType);
 }
 
 /// \brief Diagnose a use of an unbound generic type.
@@ -2695,9 +2686,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
-  // Check for _ObjectiveCBridgeable conformances in the element type.
-  TC.useObjectiveCBridgeableConformances(DC, baseTy);
-
   return sliceTy;
 }
 
@@ -2725,11 +2713,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
             options, Resolver, UnsatisfiedDependency)) {
       return nullptr;
     }
-
-    // Check for _ObjectiveCBridgeable conformances in the key and value
-    // types.
-    TC.useObjectiveCBridgeableConformances(DC, keyTy);
-    TC.useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }

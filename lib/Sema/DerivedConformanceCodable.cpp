@@ -96,9 +96,8 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
                                  false, proto);
 
-  return tc.conformsToProtocol(target, proto, context,
-                               ConformanceCheckFlags::Used) ? Conforms
-                                                            : DoesNotConform;
+  return tc.conformsToProtocol(target, proto, context, None) ? Conforms
+                                                             : DoesNotConform;
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -298,8 +297,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(TypeChecker &tc,
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
-                             target->getDeclContext(),
-                             ConformanceCheckFlags::Used)) {
+                             target->getDeclContext(), None)) {
     tc.diagnose(codingKeysTypeDecl->getLoc(),
                 diag::codable_codingkeys_type_does_not_conform_here,
                 proto->getDeclaredType());
@@ -1152,8 +1150,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (tc.conformsToProtocol(superType, proto, superclassDecl,
-                                ConformanceCheckFlags::Used)) {
+      if (tc.conformsToProtocol(superType, proto, superclassDecl, None)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getFullName();
       } else {

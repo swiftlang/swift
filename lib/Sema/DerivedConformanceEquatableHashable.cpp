@@ -54,7 +54,7 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
       // (labeled or unlabeled) are tuple types.
       for (auto tupleElementType : tupleType->getElementTypes()) {
         if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
-                                   ConformanceCheckFlags::Used)) {
+                                   None)) {
           return false;
         }
       }
@@ -62,7 +62,7 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
       // One associated value with no label is represented as a paren type.
       auto actualType = argumentType->getWithoutParens();
       if (!tc.conformsToProtocol(actualType, protocol, declContext,
-                                 ConformanceCheckFlags::Used)) {
+                                 None)) {
         return false;
       }
     }
@@ -88,7 +88,7 @@ bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
 
     if (!propertyDecl->hasType() ||
         !tc.conformsToProtocol(propertyDecl->getType(), protocol, declContext,
-                               ConformanceCheckFlags::Used)) {
+                               None)) {
       return false;
     }
   }

@@ -2804,8 +2804,6 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   // Make sure we have the appropriate bridging operations.
   if (!isa<DestructorDecl>(D))
     checkBridgedFunctions(TC);
-  TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                         D->getInterfaceType());
 
   // Record the name of this Objective-C method in its class.
   if (auto classDecl
@@ -3241,8 +3239,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     }
 
     auto inherited = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
-                                           ConformanceCheckFlags::Used,
-                                           blameLoc);
+                                           None, blameLoc);
     if (!inherited || !inherited->isConcrete()) {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
@@ -3287,8 +3284,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     auto propTy = decl->getType();
     SmallVector<ProtocolConformanceRef, 4> valueConformances;
     for (auto proto : assocTy->getConformingProtocols()) {
-      auto valueConformance = TC.conformsToProtocol(propTy, proto, dc,
-                                                    ConformanceCheckFlags::Used,
+      auto valueConformance = TC.conformsToProtocol(propTy, proto, dc, None,
                                                     decl->getLoc());
       if (!valueConformance) {
         conformance->setInvalid();
@@ -8967,9 +8963,8 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
                         targetType, protocol, target,
-                        (ConformanceCheckFlags::Used|
-                         ConformanceCheckFlags::SkipConditionalRequirements),
-                         SourceLoc())) {
+                        ConformanceCheckFlags::SkipConditionalRequirements,
+                        SourceLoc())) {
       if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
         if (conformance->isIncomplete()) {
           // Check conformance, forcing synthesis.

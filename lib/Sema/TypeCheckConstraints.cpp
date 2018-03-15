@@ -3872,14 +3872,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Context.LangOpts.EnableObjCInterop) {
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (conformsToProtocol(toType, errorTypeProto, dc,
-                             (ConformanceCheckFlags::InExpression|
-                              ConformanceCheckFlags::Used)))
-        if (auto NSErrorTy = getNSErrorType(dc))
+                             ConformanceCheckFlags::InExpression)) {
+        if (auto NSErrorTy = getNSErrorType(dc)) {
           if (isSubtypeOf(fromType, NSErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
-              && !isSubtypeOf(fromType, toType, dc))
+              && !isSubtypeOf(fromType, toType, dc)) {
             return CheckedCastKind::ValueCast;
+          }
+        }
+      }
     }
   }
 

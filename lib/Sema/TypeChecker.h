@@ -655,10 +655,6 @@ static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
   InExpression = 0x01,
-  /// Whether we will be using the conformance in the AST.
-  ///
-  /// This implies that the conformance will have to be complete.
-  Used = 0x02,
   /// Whether to suppress dependency tracking entirely.
   ///
   /// FIXME: This deals with some oddities with the
@@ -707,10 +703,6 @@ public:
 
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
-
-  /// The list of protocol conformances that were "used" and will need to be
-  /// completed before type checking is considered complete.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
   /// The list of protocol conformances whose requirements could not be
   /// fully checked and, therefore, should be checked again at the top
@@ -1502,7 +1494,7 @@ public:
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
       UnsatisfiedDependency *unsatisfiedDependency,
-      ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
+      ConformanceCheckOptions conformanceOptions = None,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
@@ -2013,11 +2005,6 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
-  /// Mark the given protocol conformance as "used" from the given declaration
-  /// context.
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override final;
-
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
   /// type checker.
@@ -2057,21 +2044,17 @@ public:
                                      const ValueDecl *witness,
                                      bool anySingleRequirement = false);
 
-  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  bool useObjectiveCBridgeableConformances(
-                        DeclContext *dc, Type type,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
-
-  /// If this bound-generic type is bridged, mark any
-  /// _ObjectiveCBridgeable conformances in the generic arguments of
-  /// the given type as "used".
-  bool useObjectiveCBridgeableConformancesOfArgs(
-                        DeclContext *dc, BoundGenericType *bound,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
-
-  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
-  /// conformances in the given type as "used".
-  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+  /// Find any uses of protocol conformances within the given source file,
+  /// completing those conformances so that later stages in the compilation
+  /// pipeline (SILGen, SIL optimizers, IR generation) can rely on them.
+  ///
+  /// \param sourceFile The source file into which used protocol conformances
+  /// will be recorded.
+  /// \param specificDecl The specific declaration that will be visited to
+  /// find used protocol conformances. If NULL, this function will walk the
+  /// entire \c sourceFile to find all used protocol conformances.
+  void completeUsedProtocolConformances(SourceFile &sourceFile,
+                                        Decl *specificDecl = nullptr);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.

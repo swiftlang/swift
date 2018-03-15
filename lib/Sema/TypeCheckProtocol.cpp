@@ -1382,8 +1382,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     auto InheritedConformance =
     TC.conformsToProtocol(
                         T, InheritedProto, DC,
-                        (ConformanceCheckFlags::Used|
-                         ConformanceCheckFlags::SkipConditionalRequirements),
+                        ConformanceCheckFlags::SkipConditionalRequirements,
                         ComplainLoc);
     if (!InheritedConformance || !InheritedConformance->isConcrete()) {
       // Recursive call already diagnosed this problem, but tack on a note
@@ -2882,32 +2881,6 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::addUsedConformances(
-    ProtocolConformance *conformance,
-    llvm::SmallPtrSetImpl<ProtocolConformance *> &visited) {
-  // This deduplication cannot be implemented by just checking UsedConformance,
-  // because conformances can be added to UsedConformances outside this
-  // function, meaning their type witness conformances may not be tracked.
-  if (!visited.insert(conformance).second)
-    return;
-
-  auto normalConf = conformance->getRootNormalConformance();
-
-  if (normalConf->isIncomplete())
-    TC.UsedConformances.insert(normalConf);
-
-  // Mark each conformance in the signature as used.
-  for (auto sigConformance : normalConf->getSignatureConformances()) {
-    if (sigConformance.isConcrete())
-      addUsedConformances(sigConformance.getConcrete(), visited);
-  }
-}
-
-void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
-  llvm::SmallPtrSet<ProtocolConformance *, 8> visited;
-  addUsedConformances(conformance, visited);
-}
-
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
@@ -3012,7 +2985,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(TC, DC),
       nullptr,
-      ConformanceCheckFlags::Used, &listener);
+      None, &listener);
 
   switch (result) {
   case RequirementCheckResult::Success:
@@ -3088,9 +3061,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing value witnesses later.
   SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
-
-  // Ensure the associated type conformances are used.
-  addUsedConformances(Conformance);
 
   // Check non-type requirements.
   for (auto member : Proto->getMembers()) {
@@ -3456,11 +3426,6 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     recordDependency();
   }
 
-  // If we're using this conformance, note that.
-  if (options.contains(ConformanceCheckFlags::Used)) {
-    markConformanceUsed(*lookupResult, DC);
-  }
-
   // If we have a concrete conformance with conditional requirements that
   // we need to check, do so now.
   if (lookupResult->isConcrete() &&
@@ -3557,24 +3522,6 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                      : ConformsToProtocolResult::failure();
 }
 
-void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
-                                      DeclContext *dc) {
-  if (conformance.isAbstract()) return;
-
-  auto normalConformance =
-    conformance.getConcrete()->getRootNormalConformance();
-
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
-  }
-}
-
 Optional<ProtocolConformanceRef>
 TypeChecker::LookUpConformance::operator()(
                                        CanType dependentType,
@@ -3587,171 +3534,8 @@ TypeChecker::LookUpConformance::operator()(
                          conformingReplacementType,
                          conformedProtocol->getDecl(),
                          dc,
-                         (ConformanceCheckFlags::Used|
-                          ConformanceCheckFlags::InExpression|
+                         (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
-}
-
-/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-///
-/// These conformances might not appear in any substitution lists produced
-/// by Sema, since bridging is done at the SILGen level, so we have to
-/// force them here to ensure SILGen can find them.
-bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
-                                                      Type type,
-                                 UnsatisfiedDependency *unsatisfiedDependency) {
-  class Walker : public TypeWalker {
-    TypeChecker &TC;
-    DeclContext *DC;
-    ProtocolDecl *Proto;
-    UnsatisfiedDependency *Callback;
-
-  public:
-    bool WasUnsatisfied;
-
-    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto,
-           UnsatisfiedDependency *unsatisfiedDependency)
-      : TC(tc), DC(dc), Proto(proto),
-        Callback(unsatisfiedDependency),
-        WasUnsatisfied(false) { }
-
-    Action walkToTypePre(Type ty) override {
-      ConformanceCheckOptions options =
-          (ConformanceCheckFlags::InExpression |
-           ConformanceCheckFlags::Used |
-           ConformanceCheckFlags::SuppressDependencyTracking);
-
-      // If we have a nominal type, "use" its conformance to
-      // _ObjectiveCBridgeable if it has one.
-      if (auto *nominalDecl = ty->getAnyNominal()) {
-        if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
-          return Action::Continue;
-        auto result = TC.conformsToProtocol(ty, Proto, DC, options,
-                                            /*ComplainLoc=*/SourceLoc(),
-                                            Callback);
-
-        WasUnsatisfied |= result.hasUnsatisfiedDependency();
-        if (WasUnsatisfied)
-          return Action::Stop;
-        if (result.getStatus() == RequirementCheckResult::Success)
-
-        // Set and Dictionary bridging also requires the conformance
-        // of the key type to Hashable.
-        if (nominalDecl == TC.Context.getSetDecl() ||
-            nominalDecl == TC.Context.getDictionaryDecl()) {
-          if (auto boundGeneric = ty->getAs<BoundGenericType>()) {
-            auto args = boundGeneric->getGenericArgs();
-            if (!args.empty()) {
-              auto keyType = args[0];
-              auto *hashableProto =
-                TC.Context.getProtocol(KnownProtocolKind::Hashable);
-              if (!hashableProto)
-                return Action::Stop;
-
-              auto result = TC.conformsToProtocol(
-                  keyType, hashableProto, DC, options,
-                  /*ComplainLoc=*/SourceLoc(), Callback);
-
-              WasUnsatisfied |= result.hasUnsatisfiedDependency();
-              if (WasUnsatisfied)
-                return Action::Stop;
-            }
-          }
-        }
-      }
-
-      return Action::Continue;
-    }
-  };
-
-  auto proto = getProtocol(SourceLoc(),
-                           KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return false;
-
-  Walker walker(*this, dc, proto, unsatisfiedDependency);
-  type.walk(walker);
-  assert(!walker.WasUnsatisfied || unsatisfiedDependency);
-  return walker.WasUnsatisfied;
-}
-
-bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
-       DeclContext *dc, BoundGenericType *bound,
-       UnsatisfiedDependency *unsatisfiedDependency) {
-  auto proto = getProtocol(SourceLoc(),
-                           KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return false;
-
-  // Check whether the bound generic type itself is bridged to
-  // Objective-C.
-  ConformanceCheckOptions options =
-    (ConformanceCheckFlags::InExpression |
-     ConformanceCheckFlags::SuppressDependencyTracking);
-  auto result = conformsToProtocol(
-      bound->getDecl()->getDeclaredType(), proto, dc,
-      options, /*ComplainLoc=*/SourceLoc(),
-      unsatisfiedDependency);
-
-  switch (result.getStatus()) {
-  case RequirementCheckResult::UnsatisfiedDependency:
-    return true;
-  case RequirementCheckResult::Failure:
-  case RequirementCheckResult::SubstitutionFailure:
-    return false;
-  case RequirementCheckResult::Success: {
-    bool anyUnsatisfied = false;
-
-    // Mark the conformances within the arguments.
-    for (auto arg : bound->getGenericArgs()) {
-      anyUnsatisfied |=
-          useObjectiveCBridgeableConformances(dc, arg, unsatisfiedDependency);
-    }
-
-    return anyUnsatisfied;
-  }
-  }
-
-  llvm_unreachable("Unhandled RequirementCheckResult in switch.");
-}
-
-void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
-  auto bridgedStoredNSError = Context.getProtocol(
-                                    KnownProtocolKind::BridgedStoredNSError);
-  auto errorCodeProto = Context.getProtocol(
-                              KnownProtocolKind::ErrorCodeProtocol);
-  auto rawProto = Context.getProtocol(
-                        KnownProtocolKind::RawRepresentable);
-
-  if (!bridgedStoredNSError || !errorCodeProto || !rawProto)
-    return;
-
-  // _BridgedStoredNSError.
-  auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
-                                        ConformanceCheckFlags::Used);
-  if (conformance && conformance->isConcrete()) {
-    // Hack: If we've used a conformance to the _BridgedStoredNSError
-    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
-    // conformances on the Code associated type witness.
-    if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
-                          type, *conformance, Context.Id_Code, this)) {
-      (void)conformsToProtocol(codeType, errorCodeProto, dc,
-                               ConformanceCheckFlags::Used);
-      (void)conformsToProtocol(codeType, rawProto, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
-
-  // _ErrorCodeProtocol.
-  conformance =
-  conformsToProtocol(type, errorCodeProto, dc,
-                     (ConformanceCheckFlags::SuppressDependencyTracking|
-                      ConformanceCheckFlags::Used));
-  if (conformance && conformance->isConcrete()) {
-    if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
-          type, *conformance, Context.Id_ErrorType, this)) {
-      (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -4875,3 +4659,261 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
 
   return (!ty || ty->hasError()) ? Type() : ty;
 }
+
+void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
+                                                   Decl *specificDecl) {
+  ASTContext &ctx = sourceFile.getASTContext();
+  FrontendStatsTracer statsTracer(ctx.Stats, "used-conformances");
+
+  // Queue containing protocol conformances that still need to be completed.
+  // Entrance to this queue is guarded by the source file's list of "used"
+  // conformances, so it will not contain duplicates.
+  std::vector<NormalProtocolConformance *> conformanceQueue;
+  class ProtocolReferenceWalker : public ASTWalker {
+    TypeChecker &tc;
+    SourceFile &sourceFile;
+    std::vector<NormalProtocolConformance *> &conformanceQueue;
+    ASTContext &ctx;
+
+    /// _ObjectiveCBridgeable
+    Optional<ProtocolDecl *> objCBridgeableProto;
+
+    /// _BridgedStoredNSError
+    Optional<ProtocolDecl *> bridgedStoredNSErrorProto;
+
+    /// _ErrorCodeProtocol
+    Optional<ProtocolDecl *> errorCodeProto;
+
+    /// Look for a nominal generic type.
+    void visitTypeForBoundGenerics(Type type) {
+      auto nominal = type->getAnyNominal();
+      if (!nominal) return;
+
+      auto genericSig = nominal->getGenericSignature();
+      if (!genericSig) return;
+
+      // We cannot look into any type containing an unbound generic type.
+      if (type->hasUnboundGenericType()) return;
+
+      // Dig out the substitutions.
+      auto subMap =
+        type->getContextSubstitutionMap(sourceFile.getParentModule(),
+                                        nominal);
+      if (subMap.empty()) return;
+
+      // Visit all of the conformances.
+      for (const auto &req: genericSig->getRequirements()) {
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+
+        auto proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+
+        if (auto conformance =
+              subMap.lookupConformance(req.getFirstType()->getCanonicalType(),
+                                       proto))
+          visitConformanceRef(*conformance);
+      }
+    }
+
+    /// Look for _ObjectiveCBridgeable conformances on the given type.
+    void visitTypeForObjectiveCBridgeable(Type type) {
+      // Dig out the Objective-C bridgeable protocol, if we haven't looked
+      // before.
+      if (!objCBridgeableProto) {
+        objCBridgeableProto =
+          ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+      }
+
+      // If there isn't an _ObjectiveCBridgeable protocol, do nothing.
+      if (!*objCBridgeableProto) return;
+
+      // If we have a type, "use" its conformance to
+      // _ObjectiveCBridgeable if it has one.
+      auto *nominalDecl = type->getAnyNominal();
+      if (!nominalDecl) return;
+
+      // Classes and protocols cannot conform to _ObjectiveCBridgeable.
+      if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
+        return;
+
+      // If this type conforms to _ObjectiveCBridgeable, visit the conformance.
+      ConformanceCheckOptions options =
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SuppressDependencyTracking);
+
+      if (auto conformance =
+            tc.conformsToProtocol(type, *objCBridgeableProto, &sourceFile,
+                                  options, /*ComplainLoc=*/SourceLoc()))
+        visitConformanceRef(*conformance);
+    }
+
+    /// Look for Error-bridging-related conformances on the given type.
+    void visitTypeForErrorBridging(Type type) {
+      // Dig out the protocols we need, if we haven't looked before.
+      if (!bridgedStoredNSErrorProto) {
+        bridgedStoredNSErrorProto =
+          ctx.getProtocol(KnownProtocolKind::BridgedStoredNSError);
+        errorCodeProto = ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol);
+      }
+
+      // If any of the named protocols are unavailable, we're done.
+      if (!*bridgedStoredNSErrorProto || !*errorCodeProto)
+        return;
+
+      // Only nominal types can conform to these protocols.
+      if (!type->getAnyNominal()) return;
+
+      ConformanceCheckOptions options =
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SuppressDependencyTracking);
+
+      // _BridgedStoredNSError.
+      if (auto conformance =
+            tc.conformsToProtocol(type, *bridgedStoredNSErrorProto, &sourceFile,
+                                  options))
+        visitConformanceRef(*conformance);
+
+      // _ErrorCodeProtocol.
+      if (auto conformance =
+            tc.conformsToProtocol(type, *errorCodeProto, &sourceFile,
+                                  options))
+        visitConformanceRef(*conformance);
+    }
+
+  public:
+    ProtocolReferenceWalker(
+                  TypeChecker &tc, SourceFile &sourceFile,
+                  std::vector<NormalProtocolConformance *> &conformanceQueue)
+      : tc(tc), sourceFile(sourceFile), conformanceQueue(conformanceQueue),
+        ctx(sourceFile.getASTContext())
+    {
+    }
+
+    void visitConcreteDeclRef(ConcreteDeclRef declRef){
+      visitSubstitutionList(declRef.getSubstitutions());
+    }
+
+    /// Note that we have referenced a conformance.
+    void visitConformanceRef(ProtocolConformanceRef conformanceRef) {
+      if (conformanceRef.isAbstract()) return;
+
+      auto conformance = conformanceRef.getConcrete();
+      while (true) {
+        switch (conformance->getKind()) {
+        case ProtocolConformanceKind::Normal: {
+          // Record the normal conformance as "used" in the source file. If
+          // we haven't seen it before, enqueue it.
+          auto normal = cast<NormalProtocolConformance>(conformance);
+          if (sourceFile.addUsedConformance(normal))
+            conformanceQueue.push_back(normal);
+
+          return;
+        }
+
+        case ProtocolConformanceKind::Inherited: {
+          auto inherited = cast<InheritedProtocolConformance>(conformance);
+          conformance = inherited->getInheritedConformance();
+          continue;
+        }
+
+        case ProtocolConformanceKind::Specialized: {
+          auto specialized = cast<SpecializedProtocolConformance>(conformance);
+          visitSubstitutionList(specialized->getGenericSubstitutions());
+          conformance = specialized->getGenericConformance();
+          continue;
+        }
+        }
+      }
+    }
+
+    void visitSubstitution(const Substitution &substitution) {
+      visitType(substitution.getReplacement());
+      for (const auto &conformance : substitution.getConformances())
+        visitConformanceRef(conformance);
+    }
+
+    void visitSubstitutionList(const SubstitutionList &substitutions) {
+      for (const auto &substitution : substitutions) {
+        visitSubstitution(substitution);
+      }
+    }
+
+    void visitType(Type type){
+      if (!type) return;
+
+      type.visit([&](Type type) {
+        // If we have a nominal type, check whether there are substitutions
+        // that need to be considered.
+        visitTypeForBoundGenerics(type);
+
+        if (ctx.LangOpts.EnableObjCInterop) {
+          visitTypeForObjectiveCBridgeable(type);
+          visitTypeForErrorBridging(type);
+        }
+      });
+    }
+
+    bool shouldWalkIntoGenericParams() override { return true; }
+
+    bool walkToTypeLocPost(TypeLoc &TL) override {
+      visitType(TL.getType());
+      return true;
+    }
+
+    Pattern *walkToPatternPost(Pattern *P) override {
+      if (!isa<TypedPattern>(P) && P->hasType()) {
+        visitType(P->getType());
+      }
+
+      return P;
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      visitType(E->getType());
+
+      if (auto declRef = E->getReferencedDecl())
+        visitConcreteDeclRef(declRef);
+
+      return E;
+    }
+
+    bool walkToDeclPost(Decl *D) override {
+      if (auto dc = dyn_cast<DeclContext>(D)) {
+        for (auto conformance : dc->getLocalConformances())
+          visitConformanceRef(ProtocolConformanceRef(conformance));
+      }
+
+      return true;
+    }
+
+  } walker(*this, sourceFile, conformanceQueue);
+
+  // Walk the specific declaration (if given), or the source file (if no
+  // specific declaration was specified) to uncover "used" conformances.
+  if (specificDecl)
+    specificDecl->walk(walker);
+  else
+    sourceFile.walk(walker);
+
+  // Complete all of the conformances we've discovered along the way.
+  for (unsigned i = 0; i != conformanceQueue.size(); ++i) {
+    // Check this conformance.
+    auto normal = conformanceQueue[i];
+    checkConformance(normal);
+
+    // Visit the conformances that satisfy the constraints in the requirement
+    // signature.
+    llvm::for_each(normal->getSignatureConformances(),
+                   [&](ProtocolConformanceRef conformance) {
+                     walker.visitConformanceRef(conformance);
+                   });
+
+    // Visit the value witness references themselves.
+    normal->forEachValueWitness(
+      nullptr,
+      [&](ValueDecl *req, const Witness &witness) {
+        walker.visitConcreteDeclRef(witness.getDeclRef());
+      });
+  }
+}
+
