@@ -148,14 +148,14 @@ public:
 
     // The docs say "not all sections may be present." We'll succeed if ANY of
     // them are present. Not sure if that's the right thing to do.
-    auto FieldMd = findSection<FieldSection>(Header, "__swift5_fieldmd");
+    auto FieldMd = findSection<FieldSection>(Header, "__swift4_fieldmd");
     auto AssocTyMd =
-        findSection<AssociatedTypeSection>(Header, "__swift5_assocty");
+        findSection<AssociatedTypeSection>(Header, "__swift4_assocty");
     auto BuiltinTyMd =
-        findSection<BuiltinTypeSection>(Header, "__swift5_builtin");
-    auto CaptureMd = findSection<CaptureSection>(Header, "__swift5_capture");
-    auto TyperefMd = findSection<GenericSection>(Header, "__swift5_typeref");
-    auto ReflStrMd = findSection<GenericSection>(Header, "__swift5_reflstr");
+        findSection<BuiltinTypeSection>(Header, "__swift4_builtin");
+    auto CaptureMd = findSection<CaptureSection>(Header, "__swift4_capture");
+    auto TyperefMd = findSection<GenericSection>(Header, "__swift4_typeref");
+    auto ReflStrMd = findSection<GenericSection>(Header, "__swift4_reflstr");
 
     bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
                    CaptureMd.second || TyperefMd.second || ReflStrMd.second;

@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
 // RUN: %utils/chex.py < %s > %t/keypaths.sil
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os
+// RUN: %target-swift-frontend -module-name keypaths -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os
 
 sil_stage canonical
 import Swift
@@ -418,13 +418,19 @@ entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
 
   %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
     root $G<Y>;
-    external #G.subscript<Y, X> [%$0 : $X : $*X] : $Y
+    external #G.subscript<Y, X> [%$0 : $X : $*X] : $Y,
+      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
   ) <B, A> (%1)
 
   %v = keypath $KeyPath<G<G<B>>, B>, <X: Hashable, Y: Hashable> (
     root $G<G<X>>;
-    external #G.subscript<G<X>, Y> [%$1 : $Y : $*Y] : $G<X>;
-    external #G.subscript<X, X> [%$0 : $X : $*X] : $X
+    external #G.subscript<G<X>, Y> [%$1 : $Y : $*Y] : $G<X>,
+      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int;
+    external #G.subscript<X, X> [%$0 : $X : $*X] : $X,
+      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
   ) <B, A> (%3, %4)
 
   return undef : $()

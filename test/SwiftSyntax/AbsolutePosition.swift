@@ -73,6 +73,10 @@ PositionTests.test("CurrentFile") {
         _ = node.byteSize
         _ = node.positionAfterSkippingLeadingTrivia
       }
+      override func visit(_ node: TokenSyntax) {
+        expectEqual(node.position.byteOffset + node.leadingTrivia.byteSize,
+                    node.positionAfterSkippingLeadingTrivia.byteOffset)
+      }
     }
     Visitor().visit(parsed)
   })

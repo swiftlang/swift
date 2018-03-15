@@ -163,7 +163,7 @@ struct _RuntimeFunctionCounters {
   }
 
   /// Build a map from counter name to counter index inside the state struct.
-  static internal func getRuntimeFunctionNameToIndex() -> [String : Int] {
+  internal static func getRuntimeFunctionNameToIndex() -> [String : Int] {
     let runtimeFunctionNames = _RuntimeFunctionCounters.getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
       _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
@@ -317,19 +317,19 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 
 extension _RuntimeFunctionCounters {
   @_silgen_name("_swift_getObjectRuntimeFunctionCounters")
-  static internal func getObjectRuntimeFunctionCounters(
+  internal static func getObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer, _ result: inout _RuntimeFunctionCountersState)
 
   @_silgen_name("_swift_getGlobalRuntimeFunctionCounters")
-  static internal func getGlobalRuntimeFunctionCounters(
+  internal static func getGlobalRuntimeFunctionCounters(
     _ result: inout _RuntimeFunctionCountersState)
 
   @_silgen_name("_swift_setGlobalRuntimeFunctionCounters")
-  static internal func setGlobalRuntimeFunctionCounters(
+  internal static func setGlobalRuntimeFunctionCounters(
     _ state: inout _RuntimeFunctionCountersState)
 
   @_silgen_name("_swift_setObjectRuntimeFunctionCounters")
-  static internal func setObjectRuntimeFunctionCounters(
+  internal static func setObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer,
     _ state: inout _RuntimeFunctionCountersState)
 

@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -emit-ir
+// RUN: not %target-typecheck-verify-swift -solver-expression-time-threshold=1
 protocol A.{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{let f&(a=a?Int){{{{{{{{{{{{{{{{{{{{{{{{{{{(_
 }
 }func b(UInt=1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{(_{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{

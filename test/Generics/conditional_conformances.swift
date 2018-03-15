@@ -307,7 +307,11 @@ extension TwoDisjointConformances: P2 where T == String {}
 // expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
 
 
-// rdar://problem/34944318
+// FIXME: these cases should be equivalent (and both with the same output as the
+// first), but the second one choses T as the representative of the
+// equivalence class containing both T and U in the extension's generic
+// signature, meaning the stored conditional requirement is T: P1, which isn't
+// true in the original type's generic signature.
 struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, T>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
@@ -316,6 +320,7 @@ extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, T>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, U> protocol=P2
+// CHECK-NEXT:   conforms_to: T P1
 // CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceBad: P2 where T: P1, T == U {}
 

@@ -242,6 +242,15 @@ extension Trivia: Collection {
   public subscript(_ index: Int) -> TriviaPiece {
     return pieces[index]
   }
+
+  /// Get the byteSize of this trivia
+  public var byteSize: Int {
+    let pos = AbsolutePosition()
+    for piece in pieces {
+      piece.accumulateAbsolutePosition(pos)
+    }
+    return pos.byteOffset
+  }
 }
 
 

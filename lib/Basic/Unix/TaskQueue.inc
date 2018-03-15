@@ -308,7 +308,7 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
 
 bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
                         TaskSignalledCallback Signalled) {
-  typedef llvm::DenseMap<pid_t, std::unique_ptr<Task>> PidToTaskMap;
+  using PidToTaskMap = llvm::DenseMap<pid_t, std::unique_ptr<Task>>;
 
   // Stores the current executing Tasks, organized by pid.
   PidToTaskMap ExecutingTasks;

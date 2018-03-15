@@ -124,7 +124,7 @@ public:
       conformsTo;
 
     /// Same-type constraints within this equivalence class.
-    std::vector<Constraint<PotentialArchetype *>> sameTypeConstraints;
+    std::vector<Constraint<Type>> sameTypeConstraints;
 
     /// Concrete type to which this equivalence class is equal.
     ///
@@ -212,15 +212,6 @@ public:
                                      ResolvedType type,
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
-
-    /// Record a same-type constraint between \c type1 and \c type2 determined
-    /// via the given source.
-    ///
-    /// \returns true if this same-type constraint merges two equivalence
-    /// classes, and false otherwise.
-    bool recordSameTypeConstraint(PotentialArchetype *type1,
-                                  PotentialArchetype *type2,
-                                  const RequirementSource *source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -809,25 +800,6 @@ public:
 
   /// Simplify the given dependent type down to its canonical representation.
   Type getCanonicalTypeParameter(Type type);
-
-  /// For each requirement in \c sig, create a new signature without it and see
-  /// if the requirement is satisfied in it.
-  ///
-  /// Specifically, for each Requirement \c req in \c sig, create a new
-  /// signature incorporating all of those in \c baseSig (if not null) and the
-  /// other requirements from \c sig, and if \c req is satisfied in this new
-  /// signature add it to \c redundant, otherwise add it to \c nonRedundant.
-  ///
-  /// If \c includeRedundantRequirements is true, all requirements from \c sig
-  /// (other than \c req) are added; if it is false, requirements already found
-  /// to be redundant are also not added (i.e. the contents of \c redundant at
-  /// that point in time).
-  static void
-  dropAndCompareEachRequirement(ASTContext &context, GenericSignature *baseSig,
-                                GenericSignature *sig,
-                                bool includeRedundantRequirements,
-                                SmallVectorImpl<Requirement> &redundant,
-                                SmallVectorImpl<Requirement> &nonRedundant);
 
   /// Verify the correctness of the given generic signature.
   ///
@@ -1505,8 +1477,10 @@ struct GenericSignatureBuilder::Constraint {
   Type getSubjectDependentType(
                        TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  /// Determine whether the subject is equivalence to the given potential
-  /// archetype.
+  /// Determine whether the subject is equivalence to the given type.
+  bool isSubjectEqualTo(Type type) const;
+
+  /// Determine whether the subject is equivalence to the given type.
   bool isSubjectEqualTo(const PotentialArchetype *pa) const;
 
   /// Determine whether this constraint has the same subject as the

@@ -18,7 +18,7 @@ import Swift
 internal enum _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
-  static internal func _specializeArrays() {
+  internal static func _specializeArrays() {
     func _createArrayUser<Element : Comparable>(_ sampleValue: Element) {
       // Initializers.
       let _: [Element] = [sampleValue]
@@ -158,7 +158,7 @@ internal enum _Prespecialize {
 
   // Force pre-specialization of Range<Int>
   @discardableResult
-  static internal func _specializeRanges() -> Int {
+  internal static func _specializeRanges() -> Int {
     let a = [Int](repeating: 1, count: 10)
     var count = 0
     // Specialize Range for integers
