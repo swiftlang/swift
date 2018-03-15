@@ -2091,8 +2091,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
 
     diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
     attr->setInvalid();
-  } else if (dyn_cast<ProtocolDecl>(var->getDeclContext())) {
-    // Ownership does not make sense in protocols.
+  } else if (isa<ProtocolDecl>(var->getDeclContext()) &&
+             !cast<ProtocolDecl>(var->getDeclContext())->isObjC()) {
+    // Ownership does not make sense in protocols, except for "weak" on
+    // properties of Objective-C protocols.
     if (Context.isSwiftVersionAtLeast(5))
       diagnose(attr->getLocation(),
         diag::ownership_invalid_in_protocols,
