@@ -39,18 +39,21 @@ cd "$(dirname $0)/.." || exit
 DISTCC_FLAG=
 DRY_RUN=
 BUNDLE_PREFIX=
-case $(uname -s) in
-  Darwin)
-    SWIFT_PACKAGE=buildbot_osx_package,no_test
-  ;;
-  Linux)
-    SWIFT_PACKAGE=buildbot_linux,no_test
-  ;;
-  *)
-    echo "Unrecognised platform $(uname -s)"
-    exit 1
-  ;;
-esac
+# SWIFT_ENABLE_TENSORFLOW
+if [[ -z ${SWIFT_PACKAGE} ]]; then
+  case $(uname -s) in
+    Darwin)
+      SWIFT_PACKAGE=buildbot_osx_package,no_test
+    ;;
+    Linux)
+      SWIFT_PACKAGE=buildbot_linux,no_test
+    ;;
+    *)
+      echo "Unrecognised platform $(uname -s)"
+      exit 1
+    ;;
+  esac
+fi
 
 # Process command line arguments
 FIRST_ARG_PROCESSED=0
