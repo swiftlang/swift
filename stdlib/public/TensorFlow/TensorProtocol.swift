@@ -60,6 +60,8 @@ public extension TensorProtocol where Scalar : Numeric {
 
 public protocol ParameterAggregate {
   associatedtype Parameter : TensorProtocol
+    where Parameter.Scalar : FloatingPoint
+  typealias Scalar = Parameter.Scalar
   mutating func update(with other: Self,
                        by updateParameter: (inout Parameter, Parameter) -> Void)
 }
