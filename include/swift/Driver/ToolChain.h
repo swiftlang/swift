@@ -94,11 +94,12 @@ protected:
 
     bool shouldUseMainOutputFileListInCompilerInvocation() const;
 
-    bool shouldUseSupplementaryOutputFileListInCompilerInvocation() const;
+    bool shouldUseSupplementaryOutputFileMapInCompilerInvocation() const;
 
     /// Reify the existing behavior that SingleCompile compile actions do not
-    /// filter, but batch-mode and single-file compilations do. Would be nice to
-    /// eliminate this distinction someday.
+    /// filter, but batch-mode and single-file compilations do. Some clients are
+    /// relying on this (i.e., they pass inputs that don't have ".swift" as an
+    /// extension.) It would be nice to eliminate this distinction someday.
     bool shouldFilterCompilerInputsByType() const;
 
     const char *computeFrontendModeForCompile() const;

@@ -166,7 +166,7 @@ ERROR(error_cannot_have_input_files_with_file_list,none,
 ERROR(error_cannot_have_primary_files_with_primary_file_list,none,
 "cannot have primary input files with primary file list", ())
 
-ERROR(error_cannot_have_supplementary_outputs_with_supplementary_ouputs_file_map,none,
+ERROR(error_cannot_have_supplementary_outputs,none,
 "cannot have '%0' with '%1'", (StringRef, StringRef))
 
 ERROR(error_duplicate_input_file,none,

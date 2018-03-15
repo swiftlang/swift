@@ -494,11 +494,9 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_serialize_diagnostics_path,
                                options::OPT_emit_loaded_module_trace_path,
                                options::OPT_emit_tbd_path)) {
-    Diags.diagnose(
-        SourceLoc(),
-        diag::
-            error_cannot_have_supplementary_outputs_with_supplementary_ouputs_file_map,
-        A->getSpelling(), "-supplementary-output-file-map");
+    Diags.diagnose(SourceLoc(),
+                   diag::error_cannot_have_supplementary_outputs_map,
+                   A->getSpelling(), "-supplementary-output-file-map");
     return None;
   }
   const StringRef supplementaryFileMapPath =

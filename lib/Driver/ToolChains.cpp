@@ -61,7 +61,7 @@ bool ToolChain::JobContext::shouldUseMainOutputFileListInCompilerInvocation()
 }
 
 bool ToolChain::JobContext::
-    shouldUseSupplementaryOutputFileListInCompilerInvocation() const {
+    shouldUseSupplementaryOutputFileMapInCompilerInvocation() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
@@ -479,7 +479,7 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
       shouldUsePrimaryInputFileListInFrontendInvocation();
   const bool FilterInputsByType = shouldFilterCompilerInputsByType();
   const bool UseSupplementaryOutputFileList =
-      shouldUseSupplementaryOutputFileListInCompilerInvocation();
+      shouldUseSupplementaryOutputFileMapInCompilerInvocation();
 
   if (UseFileList) {
     Arguments.push_back("-filelist");
@@ -513,7 +513,7 @@ void ToolChain::JobContext::addFrontendInputArguments(
     ArgStringList &arguments) const {
   llvm::StringSet<> primaries;
 
-  if (mayHavePrimaryInputs)
+  if (mayHavePrimaryInputs) {
     for (const Action *A : InputActions) {
       const auto *IA = cast<InputAction>(A);
       const llvm::opt::Arg &InArg = IA->getInputArg();
@@ -522,6 +522,7 @@ void ToolChain::JobContext::addFrontendInputArguments(
       if (ToolChain::canCompileInputArgumentBePrimary(Output, InArg))
         primaries.insert(InArg.getValue());
     }
+  }
   for (auto inputPair : getTopLevelInputFiles()) {
     if (filterByType && !types::isPartOfSwiftCompilation(inputPair.first))
       continue;
@@ -547,8 +548,8 @@ bool ToolChain::canCompileInputArgumentBePrimary(const CommandOutput &Output,
 
 void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
     ArgStringList &arguments) const {
-  // FIXME: get these and other argument strings from the same place for both
-  // driver and frontend
+  // FIXME: Get these and other argument strings from the same place for both
+  // driver and frontend.
   addOutputsOfType(arguments, Output, Args, types::ID::TY_SwiftModuleFile,
                    "-emit-module-path");
 
