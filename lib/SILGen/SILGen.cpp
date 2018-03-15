@@ -60,10 +60,6 @@ SILGenModule::~SILGenModule() {
   M.verify();
 }
 
-EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
-  return elt;
-}
-
 static SILDeclRef
 getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,

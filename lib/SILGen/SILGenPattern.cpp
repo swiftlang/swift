@@ -1730,23 +1730,22 @@ static void generateEnumCaseBlocks(
       formalElt = osp->getElementDecl();
       subPattern = osp->getSubPattern();
     }
-    auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
-    assert(elt->getParentEnum() == enumDecl);
+    assert(formalElt->getParentEnum() == enumDecl);
 
     unsigned index = caseInfos.size();
-    auto insertionResult = caseToIndex.insert({elt, index});
+    auto insertionResult = caseToIndex.insert({formalElt, index});
     if (!insertionResult.second) {
       index = insertionResult.first->second;
     } else {
       curBB = SGF.createBasicBlock(curBB);
-      caseBBs.push_back({elt, curBB});
+      caseBBs.push_back({formalElt, curBB});
       caseInfos.push_back(CaseInfo());
       caseInfos.back().FormalElement = formalElt;
       caseInfos.back().FirstMatcher = row.Pattern;
       caseCounts.push_back(row.Count);
     }
-    assert(caseToIndex[elt] == index);
-    assert(caseBBs[index].first == elt);
+    assert(caseToIndex[formalElt] == index);
+    assert(caseBBs[index].first == formalElt);
 
     auto &info = caseInfos[index];
     info.Irrefutable = (info.Irrefutable || row.Irrefutable);

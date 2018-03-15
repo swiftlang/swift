@@ -4322,8 +4322,6 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
                                             SILType enumTy,
                                             EnumElementDecl *element,
                                             SGFContext C) {
-  element = SGM.getLoweredEnumElementDecl(element);
-
   // Easy case -- no payload
   if (!payload) {
     if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
