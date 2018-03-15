@@ -154,9 +154,8 @@ extension Syntax {
 
   /// The textual byte length of this node exluding leading and trailing trivia.
   public var byteSizeAfterTrimmingTrivia: Int {
-    return data.byteSize -
-      (leadingTrivia == nil ? 0 : leadingTrivia!.byteSize) -
-      (trailingTrivia == nil ? 0 : trailingTrivia!.byteSize)
+    return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
+      (trailingTrivia?.byteSize ?? 0)
   }
 
   /// The root of the tree in which this node resides.
