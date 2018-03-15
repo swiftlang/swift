@@ -198,8 +198,8 @@ TensorTests.testAllBackends("Concatenation") {
 TensorTests.testAllBackends("ArgMax") {
   // 2 x 3
   let x = Tensor<Float>([[0, 1, 2], [3, 4, 5]])
-  let argmax0 = x.argmax(alongAxis: 0)
-  let argmax1 = x.argmax(alongAxis: 1)
+  let argmax0 = x.argmax(squeezingAxis: 0)
+  let argmax1 = x.argmax(squeezingAxis: 1)
   let scalarsArgmax = x.argmax()
   expectEqual(ShapedArray(shape: [3], scalars: [1, 1, 1]), argmax0.array)
   expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), argmax1.array)

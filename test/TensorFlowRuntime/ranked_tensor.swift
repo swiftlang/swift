@@ -142,7 +142,7 @@ RankedTensorTests.test("SliceIndexing") {
 RankedTensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  let sum = x.sum(alongAxis: 0)
+  let sum = x.sum(squeezingAxis: 0)
   expectEqual([2, 4, 6, 8, 10], sum.array)
 }
 
@@ -166,8 +166,8 @@ RankedTensorTests.testAllBackends("Concatenation") {
 RankedTensorTests.testAllBackends("ArgMax") {
   // 2 x 3
   let x = Tensor2D<Float>([[0, 1, 2], [3, 4, 5]])
-  let argmax0 = x.argmax(alongAxis: 0)
-  let argmax1 = x.argmax(alongAxis: 1)
+  let argmax0 = x.argmax(squeezingAxis: 0)
+  let argmax1 = x.argmax(squeezingAxis: 1)
   let scalarsArgmax = x.argmax()
   expectEqual([1, 1, 1], argmax0.array)
   expectEqual([2, 2], argmax1.array)
