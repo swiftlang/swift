@@ -843,9 +843,37 @@ public extension TensorProtocol where Scalar == Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Any", self, axes))
   }
+
+  @_inlineable @inline(__always)
+  func all(alongAxes axes: Int32...) -> Self {
+    return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func any(alongAxes axes: Int32...) -> Self {
+    return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
 }
 
 public extension Tensor where Scalar == Bool {
+  // NOTE: This overload is necessary, otherwise `all()` would refer
+  // to the variadic method `all(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func all() -> Bool {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("All", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `any()` would refer
+  // to the variadic method `any(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func any() -> Bool {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Any", self, axes))
+  }
+
   @_inlineable @inline(__always)
   func all(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: false,
@@ -857,21 +885,25 @@ public extension Tensor where Scalar == Bool {
     return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
-
-  @_inlineable @inline(__always)
-  func all(alongAxes axes: Int32...) -> Tensor {
-    return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: true,
-                 Tidx: Int32.self)
-  }
-
-  @_inlineable @inline(__always)
-  func any(alongAxes axes: Int32...) -> Tensor {
-    return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: true,
-                 Tidx: Int32.self)
-  }
 }
 
 public extension Tensor where Scalar : Numeric & Comparable {
+  // NOTE: This overload is necessary, otherwise `min()` would refer
+  // to the variadic method `min(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func min() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Min", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `max()` would refer
+  // to the variadic method `max(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func max() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Max", self, axes))
+  }
+
   @_inlineable @inline(__always)
   func max(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Max", handle, Tensor<Int32>(axes), keep_dims: false,
@@ -896,6 +928,22 @@ public extension Tensor where Scalar : Numeric & Comparable {
 }
 
 public extension Tensor where Scalar : Numeric {
+  // NOTE: This overload is necessary, otherwise `mean()` would refer
+  // to the variadic method `mean(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func mean() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Mean", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `sum()` would refer
+  // to the variadic method `sum(squeezingAxes:)` with zero indices.
+  @_inlineable @inline(__always)
+  func sum() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Sum", self, axes))
+  }
+
   @_inlineable @inline(__always)
   func mean(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Mean", handle, Tensor<Int32>(axes), keep_dims: false,
