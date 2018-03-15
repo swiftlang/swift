@@ -480,47 +480,83 @@ public extension ${TensorXD} {
 % if rank > 1:
 public extension ${TensorXD} where Scalar : Numeric {
   @_inlineable @inline(__always)
-  func sum(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func sum(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.sum(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
-  func mean(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func mean(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.mean(squeezingAxes: axis))
   }
 }
 
 public extension ${TensorXD} where Scalar : Numeric & Comparable {
   @_inlineable @inline(__always)
-  func min(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func min(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.min(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
-  func max(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func max(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.max(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
-  func argmax(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
-    return ${ElementTensor}<Int32>(base: base.argmax(alongAxis: axis))
+  func argmax(squeezingAxis axis: Int32) -> ${ElementTensor}<Int32> {
+    return ${ElementTensor}<Int32>(base: base.argmax(squeezingAxis: axis))
   }
 
   @_inlineable @inline(__always)
-  func argmin(alongAxis axis: Int32) -> ${ElementTensor}<Int32> {
-    return ${ElementTensor}<Int32>(base: base.argmin(alongAxis: axis))
+  func argmin(squeezingAxis axis: Int32) -> ${ElementTensor}<Int32> {
+    return ${ElementTensor}<Int32>(base: base.argmin(squeezingAxis: axis))
   }
 }
 
 public extension ${TensorXD} where Scalar == Bool {
   @_inlineable @inline(__always)
-  func all(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func all(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.all(squeezingAxes: axis))
   }
 
   @_inlineable @inline(__always)
-  func any(alongAxis axis: Int32) -> ${ElementTensor}<Scalar> {
+  func any(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.any(squeezingAxes: axis))
+  }
+}
+
+public extension ${TensorXD} where Scalar : Numeric {
+  @_inlineable @inline(__always)
+  func sum(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.sum(alongAxes: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func mean(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.mean(alongAxes: axis))
+  }
+}
+
+public extension ${TensorXD} where Scalar : Numeric & Comparable {
+  @_inlineable @inline(__always)
+  func min(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.min(alongAxes: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func max(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.max(alongAxes: axis))
+  }
+}
+
+public extension ${TensorXD} where Scalar == Bool {
+  @_inlineable @inline(__always)
+  func all(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.all(alongAxes: axis))
+  }
+
+  @_inlineable @inline(__always)
+  func any(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
+    return ${TensorXD}<Scalar>(base: base.any(alongAxes: axis))
   }
 }
 % end
