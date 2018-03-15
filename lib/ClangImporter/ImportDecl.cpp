@@ -5358,8 +5358,37 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // implementation in the standard library.
   transferKnown(KnownProtocolKind::Equatable);
   transferKnown(KnownProtocolKind::Hashable);
-  bool transferredObjCBridgeable =
-    transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+  bool hasObjCBridgeable =
+      transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+  bool wantsObjCBridgeableTypealias = hasObjCBridgeable && isBridged;
+
+  // Wrappers around ObjC classes and protocols are also bridgeable.
+  if (!hasObjCBridgeable) {
+    if (isBridged) {
+      if (auto *proto = dyn_cast_or_null<ProtocolDecl>(computedNominal))
+        if (proto->getKnownProtocolKind() == KnownProtocolKind::Error)
+          hasObjCBridgeable = true;
+    } else {
+      if (auto *objcClass = dyn_cast_or_null<ClassDecl>(computedNominal)) {
+        switch (objcClass->getForeignClassKind()) {
+        case ClassDecl::ForeignKind::Normal:
+        case ClassDecl::ForeignKind::RuntimeOnly:
+          if (objcClass->hasClangNode())
+            hasObjCBridgeable = true;
+          break;
+        case ClassDecl::ForeignKind::CFType:
+          break;
+        }
+      } else if (storedUnderlyingType->isObjCExistentialType()) {
+        hasObjCBridgeable = true;
+      }
+    }
+
+    if (hasObjCBridgeable) {
+      addKnown(KnownProtocolKind::ObjectiveCBridgeable);
+      wantsObjCBridgeableTypealias = true;
+    }
+  }
 
   if (!isBridged) {
     // Simple, our stored type is equivalent to our computed
@@ -5377,10 +5406,11 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                   computedPropertyUnderlyingType,
                                   synthesizedProtocols,
                                   /*makeUnlabeledValueInit=*/unlabeledCtor);
+  }
 
-    if (transferredObjCBridgeable)
-      addSynthesizedTypealias(structDecl, ctx.Id_ObjectiveCType,
-                              storedUnderlyingType);
+  if (wantsObjCBridgeableTypealias) {
+    addSynthesizedTypealias(structDecl, ctx.Id_ObjectiveCType,
+                            storedUnderlyingType);
   }
 
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
