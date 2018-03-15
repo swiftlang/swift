@@ -261,7 +261,7 @@ public:
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  std::unique_ptr<OutputFileMap>
+  Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 

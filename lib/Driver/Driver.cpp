@@ -623,7 +623,7 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  std::unique_ptr<OutputFileMap> OFM =
+  Optional<OutputFileMap> OFM =
       buildOutputFileMap(*TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError())
@@ -1715,12 +1715,12 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-std::unique_ptr<OutputFileMap>
+Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                            StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
-    return nullptr;
+    return None;
 
   // TODO: perform some preflight checks to ensure the file exists.
   llvm::Expected<OutputFileMap> OFM =
@@ -1729,7 +1729,7 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
                    llvm::toString(std::move(Err)));
   }
-  return llvm::make_unique<OutputFileMap>(*OFM);
+  return *OFM;
 }
 
 void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
