@@ -419,5 +419,5 @@ extension Tensor where Scalar : FloatingPoint {
 func _adjointRelu<T : TensorProtocol>(
   _ x: T, partial: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return T(x > 0)
+  return T(x > 0) * seed
 }
