@@ -57,10 +57,4 @@ HashingTestSuite.test("_Hasher/DefaultKey") {
   expectEqual(customHasher.finalize(), defaultHash)
 }
 
-HashingTestSuite.test("_Hasher/determinism") {
-  // By defaults, tests are configured to run with deterministic hashing.
-  expectTrue(_Hasher._isDeterministic)
-  expectEqual((0, 0), _Hasher._seed)
-}
-
 runAllTests()
