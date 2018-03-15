@@ -308,6 +308,9 @@ public:
     return ExtraEnvironment;
   }
 
+  /// Write a file map naming the outputs for each primary input.
+  void writeOutputFileMap(llvm::raw_ostream &out) const;
+
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;

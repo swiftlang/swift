@@ -314,6 +314,15 @@ CommandOutput::dump() const {
   llvm::errs() << '\n';
 }
 
+void Job::writeOutputFileMap(llvm::raw_ostream &out) const {
+  std::vector<StringRef> inputs;
+  for (const Action *A : getSource().getInputs()) {
+    const auto *IA = cast<InputAction>(A);
+    inputs.push_back(IA->getInputArg().getValue());
+  }
+  getOutput().getDerivedOutputMap().write(out, inputs);
+}
+
 Job::~Job() = default;
 
 void Job::printArguments(raw_ostream &os,

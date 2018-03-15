@@ -1156,12 +1156,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
       break;
     }
     case FilelistInfo::WhichFiles::SupplementaryOutput: {
-      std::vector<StringRef> inputs;
-      for (const Action *A : job->getSource().getInputs()) {
-        const auto *IA = cast<InputAction>(A);
-        inputs.push_back(IA->getInputArg().getValue());
-      }
-      job->getOutput().getDerivedOutputMap().write(out, inputs);
+      job->writeOutputFileMap(out);
       break;
     }
     }
