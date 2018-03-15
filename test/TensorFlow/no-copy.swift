@@ -101,7 +101,7 @@ public func testMeanMax(x: Tensor<Float>) -> Float {
   let y = x.toDevice()
   let a = y.mean()
   let b = y.max()
-  return a+b
+  return (a+b).scalar!
 }
 
 public func testZeros() -> Tensor<Float> {
@@ -115,7 +115,7 @@ public func testZeros() -> Tensor<Float> {
 // this whole mess in graph without leaving anything on the host that will cause
 // a send/receive.
 public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
-  let scalar = a.toDevice().mean()
+  let scalar = a.toDevice().mean().scalar!
   let b = Tensor(scalar)
   return (b+b).toHost()
 }
