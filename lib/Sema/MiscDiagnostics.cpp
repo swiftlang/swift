@@ -3910,7 +3910,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseIdentifier().str();
+  StringRef baseNameStr = name.getBaseName().userFacingName();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())

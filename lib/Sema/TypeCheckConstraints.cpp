@@ -553,7 +553,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
       diagnose(Loc, diag::use_nonmatching_operator,
-               Name.getBaseName().getIdentifier(),
+               Name,
                UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
                UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (Context) ErrorExpr(UDRE->getSourceRange());

@@ -4773,15 +4773,15 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
 
   auto &ctx = getASTContext();
 
-  Identifier baseName;
+  StringRef baseNameStr;
   if (isa<DestructorDecl>(this)) {
     // Deinitializers are always called "dealloc".
     return ObjCSelector(ctx, 0, ctx.Id_dealloc);
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
-    baseName = func->getName();
+    baseNameStr = func->getName().str();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    baseName = ctor->getName();
+    baseNameStr = "init";
   } else {
     llvm_unreachable("Unknown subclass of AbstractFunctionDecl");
   }
@@ -4794,9 +4794,11 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
     if (argNames.size() != preferredName.getArgumentNames().size()) {
       return ObjCSelector();
     }
-    baseName = preferredName.getBaseIdentifier();
+    baseNameStr = preferredName.getBaseName().userFacingName();
     argNames = preferredName.getArgumentNames();
   }
+
+  auto baseName = ctx.getIdentifier(baseNameStr);
 
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     // For a getter or setter, go through the variable or subscript decl.
