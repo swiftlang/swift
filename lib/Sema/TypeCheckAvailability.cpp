@@ -1890,14 +1890,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
     name << parsed.ContextName << '.';
 
   if (parsed.IsFunctionName) {
-    // FIXME: duplicated from above.
-    SmallVector<Identifier, 4> argumentLabelIDs;
-    std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
-                   std::back_inserter(argumentLabelIDs),
-                   [&ctx](StringRef labelStr) -> Identifier {
-      return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
-    });
-    name << DeclName(ctx, ctx.getIdentifier(parsed.BaseName), argumentLabelIDs);
+    name << parsed.formDeclName(ctx);
   } else {
     name << parsed.BaseName;
   }

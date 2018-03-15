@@ -3938,12 +3938,14 @@ namespace {
 
       // Normal case applies when we're importing an older name, or when we're
       // not an init
-      if (!isActiveSwiftVersion() || !isFactoryInit(importedName)) {
+      if (!isFactoryInit(importedName)) {
         auto result = importNonInitObjCMethodDecl(decl, dc, importedName,
                                                   selector, forceClassMethod,
                                                   accessorInfo);
+
         if (!isActiveSwiftVersion() && result)
           markAsVariant(result, *correctSwiftName);
+
         return result;
       }
 
@@ -3962,6 +3964,9 @@ namespace {
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
+
+      if (!isActiveSwiftVersion() && result)
+        markAsVariant(result, *correctSwiftName);
 
       return result;
     }

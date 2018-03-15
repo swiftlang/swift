@@ -5340,6 +5340,8 @@ protected:
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenOrBehaviorParamDecl(),
       Operator(nullptr) {
+    assert(!Name.getBaseName().isSpecial());
+
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
@@ -5914,8 +5916,6 @@ public:
                   ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
-
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 

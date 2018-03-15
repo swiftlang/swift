@@ -499,8 +499,8 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   }
   assert(argName.getBaseName().getKind() == DeclBaseName::Kind::Normal);
 
-  StringRef argBase = argName.getBaseIdentifier().str();
-  StringRef paramBase = paramName.getBaseIdentifier().str();
+  StringRef argBase = argName.getBaseName().userFacingName();
+  StringRef paramBase = paramName.getBaseName().userFacingName();
 
   unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
 
@@ -644,12 +644,12 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
                         "member");
 
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getBaseName().getIdentifier().str(), kind);
+                         decl->getBaseName().userFacingName(), kind);
     }
   }
 
   return tc.diagnose(decl, diag::note_typo_candidate,
-                     decl->getBaseName().getIdentifier().str());
+                     decl->getBaseName().userFacingName());
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
@@ -660,7 +660,7 @@ void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
 
   if (writtenName.getBaseName() != declName.getBaseName())
     diagnostic.fixItReplace(loc.getBaseNameLoc(),
-                            declName.getBaseIdentifier().str());
+                            declName.getBaseName().userFacingName());
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.
