@@ -4574,6 +4574,37 @@ DictionaryTestSuite.test("removeAt") {
   }
 }
 
+DictionaryTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between dictionaries
+  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // dictionaries with different sizes.
+  //
+  // Verify this works by copying the 1% of elements near the beginning of a
+  // large Dictionary into a smaller one. If the elements end up in the same
+  // order in the smaller Dictionary, then that indicates we do not use
+  // size-dependent seeding.
+  let count = 100_000
+  var large = [Int: Int](minimumCapacity: count)
+  for i in 1 ..< count {
+    large[i] = 2 * i
+  }
+
+  // Take the second 1% of elements. The hash table may begin with collided
+  // elements wrapped over from the end -- we need to skip over these, as they
+  // would be sorted into irregular slots in the smaller table.
+  let slice = large.prefix(2 * count / 100).dropFirst(count / 100)
+  var small = [Int: Int](minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for (key, value) in slice {
+    small[key] = value
+  }
+  // If this test fails, there is a problem with local hash seeding.
+  expectFalse(small.map{$0.key}.elementsEqual(slice.map{$0.key}))
+}
+
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
 #if _runtime(_ObjC)

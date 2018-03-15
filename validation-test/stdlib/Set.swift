@@ -4258,4 +4258,34 @@ SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
   expectOptionalEqual(1010, member2)
 }
 
+SetTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between sets can become
+  // quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // dictionaries with different sizes.
+  //
+  // Verify this works by copying the 1% of elements near the beginning of a
+  // large Set into a smaller one. If the elements end up in the same order in
+  // the smaller Set, then that indicates we do not use size-dependent seeding.
+  let count = 100_000
+  var large = Set<Int>(minimumCapacity: count)
+  for i in 1 ..< count {
+    large.insert(i)
+  }
+
+  // Take the second 1% of elements. The hash table may begin with collided
+  // elements wrapped over from the end -- we need to skip over these, as they
+  // would be sorted into irregular slots in the smaller table.
+  let slice = large.prefix(2 * count / 100).dropFirst(count / 100)
+  var small = Set<Int>(minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for key in slice {
+    small.insert(key)
+  }
+  // If this test fails, there a problem with local hash seeding.
+  expectFalse(small.elementsEqual(slice))
+}
+
 runAllTests()
