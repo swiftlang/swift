@@ -1454,7 +1454,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    SyntaxContext->setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)
                                 IntegerLiteralExpr(Text, Loc,
                                                    /*Implicit=*/false));
@@ -1462,7 +1462,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    SyntaxContext->setCreateSyntax(SyntaxKind::FloatLiteralExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
     return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
   }
@@ -1482,15 +1482,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return parseExprStringLiteral();
   
   case tok::kw_nil: {
-    SyntaxParsingContext NilContext(SyntaxContext, SyntaxKind::NilLiteralExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
     return makeParserResult(new (Context)
                                 NilLiteralExpr(consumeToken(tok::kw_nil)));
   }
 
   case tok::kw_true:
   case tok::kw_false: {
-    SyntaxParsingContext BoolContext(SyntaxContext,
-                                     SyntaxKind::BooleanLiteralExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::BooleanLiteralExpr);
     bool isTrue = Tok.is(tok::kw_true);
     return makeParserResult(new (Context)
                                 BooleanLiteralExpr(isTrue, consumeToken()));
@@ -1531,7 +1530,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     case tok::pound_dsohandle: SKind = SyntaxKind::PoundDsohandleExpr; break;
     default: break;
     }
-    SyntaxParsingContext MagicIdCtx(SyntaxContext, SKind);
+    ExprContext.setCreateSyntax(SKind);
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
@@ -1587,7 +1586,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::kw_Any: { // Any
-    SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::TypeExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
     auto TyR = parseAnyType();
     return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
   }
@@ -1597,8 +1596,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     // If the next token is '_', parse a discard expression.
   case tok::kw__: {
-    SyntaxParsingContext DAContext(SyntaxContext,
-                                   SyntaxKind::DiscardAssignmentExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
     return makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
   }
@@ -1741,7 +1739,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // only one element without label. However, libSyntax tree doesn't have this
     // differentiation. A tuple expression node in libSyntax can have a single
     // element without label.
-    SyntaxParsingContext TupleContext(SyntaxContext, SyntaxKind::TupleExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
     return parseExprList(tok::l_paren, tok::r_paren,
                          SyntaxKind::TupleElementList);
   }
