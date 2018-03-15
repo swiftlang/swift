@@ -479,6 +479,23 @@ public extension ${TensorXD} {
 
 % if rank > 1:
 public extension ${TensorXD} where Scalar : Numeric {
+  // NOTE: This overload is necessary, otherwise `sum()` would refer
+  // to the variadic method `sum(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func sum() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Sum", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `mean()` would refer
+  // to the variadic method `mean(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func mean() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Mean", self, axes))
+  }
+
+
   @_inlineable @inline(__always)
   func sum(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.sum(squeezingAxes: axis))
@@ -491,6 +508,22 @@ public extension ${TensorXD} where Scalar : Numeric {
 }
 
 public extension ${TensorXD} where Scalar : Numeric & Comparable {
+  // NOTE: This overload is necessary, otherwise `min()` would refer
+  // to the variadic method `min(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func min() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Min", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `max()` would refer
+  // to the variadic method `max(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func max() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Max", self, axes))
+  }
+
   @_inlineable @inline(__always)
   func min(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.min(squeezingAxes: axis))
@@ -513,6 +546,22 @@ public extension ${TensorXD} where Scalar : Numeric & Comparable {
 }
 
 public extension ${TensorXD} where Scalar == Bool {
+  // NOTE: This overload is necessary, otherwise `all()` would refer
+  // to the variadic method `all(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func all() -> Bool {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("All", self, axes))
+  }
+
+  // NOTE: This overload is necessary, otherwise `any()` would refer
+  // to the variadic method `any(squeezingAxis:)` with zero indices.
+  @_inlineable @inline(__always)
+  func any() -> Bool {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(#tfop("Any", self, axes))
+  }
+
   @_inlineable @inline(__always)
   func all(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.all(squeezingAxes: axis))
@@ -521,42 +570,6 @@ public extension ${TensorXD} where Scalar == Bool {
   @_inlineable @inline(__always)
   func any(squeezingAxis axis: Int32) -> ${ElementTensor}<Scalar> {
     return ${ElementTensor}<Scalar>(base: base.any(squeezingAxes: axis))
-  }
-}
-
-public extension ${TensorXD} where Scalar : Numeric {
-  @_inlineable @inline(__always)
-  func sum(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.sum(alongAxes: axis))
-  }
-
-  @_inlineable @inline(__always)
-  func mean(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.mean(alongAxes: axis))
-  }
-}
-
-public extension ${TensorXD} where Scalar : Numeric & Comparable {
-  @_inlineable @inline(__always)
-  func min(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.min(alongAxes: axis))
-  }
-
-  @_inlineable @inline(__always)
-  func max(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.max(alongAxes: axis))
-  }
-}
-
-public extension ${TensorXD} where Scalar == Bool {
-  @_inlineable @inline(__always)
-  func all(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.all(alongAxes: axis))
-  }
-
-  @_inlineable @inline(__always)
-  func any(alongAxis axis: Int32) -> ${TensorXD}<Scalar> {
-    return ${TensorXD}<Scalar>(base: base.any(alongAxes: axis))
   }
 }
 % end
