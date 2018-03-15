@@ -526,6 +526,38 @@ extension _BridgedStoredNSError {
   }
 }
 
+extension _SwiftNewtypeWrapper where Self.RawValue == Error {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _bridgeToObjectiveC() -> NSError {
+    return rawValue as NSError
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _forceBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) {
+    result = Self(rawValue: source)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) -> Bool {
+    result = Self(rawValue: source)
+    return result != nil
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSError?
+  ) -> Self {
+    return Self(rawValue: _convertNSErrorToError(source))!
+  }
+}
+
+
 @available(*, unavailable, renamed: "CocoaError")
 public typealias NSCocoaError = CocoaError
 
@@ -3219,6 +3251,7 @@ extension MachError {
 }
 
 public struct ErrorUserInfoKey : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
+  public typealias _ObjectiveCType = NSString
   public init(rawValue: String) { self.rawValue = rawValue }
   public var rawValue: String
 }
