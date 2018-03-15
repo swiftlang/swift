@@ -108,29 +108,14 @@ public enum _RuntimeConfig {
 }
 
 private func configureRuntimeFromEnvironment() {
-  do {
-    let rawValue = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS")
-    guard let value = rawValue else { return }
-    let grpcAddress = String(cString: value)
-    guard grpcAddress.prefix(7) == "grpc://" else {
-      fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
-    }
-    _RuntimeConfig.session = .remote(grpcAddress: grpcAddress)
-    debugLog("Setting TF server address to \(grpcAddress) from env.")
-  }
-
-  do {
-    let rawValue = getenv("SWIFT_TENSORFLOW_ENABLE_DEBUG_LOGGING")
-    guard let value = rawValue else { return }
+  if let value = getenv("SWIFT_TENSORFLOW_ENABLE_DEBUG_LOGGING") {
     if String(cString: value).lowercased() == "true" {
       _RuntimeConfig.printsDebugLog = true
-      debugLog("Turning ond debug logging from env.")
+      debugLog("Turning on debug logging from env.")
     }
   }
 
-  do {
-    let rawValue = getenv("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL")
-    guard let value = rawValue else { return }
+  if let value = getenv("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL") {
     guard var verboseLevel = Int32(String(cString: value)) else {
       fatalError("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL must take an int value.")
     }
@@ -139,6 +124,22 @@ private func configureRuntimeFromEnvironment() {
     }
     _RuntimeConfig.tensorflowVerboseLogLevel = verboseLevel
     debugLog("Setting TF logging verbose level to \(verboseLevel) from env.")
+  }
+
+  if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION") {
+    if String(cString: value).lowercased() == "true" {
+      _RuntimeConfig.usesSynchronousExecution = true
+      debugLog("Using sync execution from env.")
+    }
+  }
+
+  if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
+    let grpcAddress = String(cString: value)
+    guard grpcAddress.prefix(7) == "grpc://" else {
+      fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
+    }
+    _RuntimeConfig.session = .remote(grpcAddress: grpcAddress)
+    debugLog("Setting TF server address to \(grpcAddress) from env.")
   }
 }
 
@@ -501,18 +502,18 @@ extension TFState {
     }
     var outputTensors: [CTensor?] = Array(repeating: nil,
                                           count: returnValues.count)
-
     if returnValues.count > 0 {
+      var shutdownNode = TF_Output(oper: nil, index: -1)
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
       if _RuntimeConfig.executionMode == .tpu {
         debugLog("Enable TPU execution.")
         var tpuRewrittenSpecs: [TF_Output] = Array(
           repeating: TF_Output(oper: nil, index: -1),
           count: returnValues.count)
-        TF_SetupTPUExecution(cSession,
-                              Int32(inputNodeSpecs.count), inputNodeSpecs,
-                              Int32(outputNodeSpecs.count), outputNodeSpecs,
-                              &tpuRewrittenSpecs, status)
+        shutdownNode = TF_SetupTPUExecution(
+          cSession, Int32(inputNodeSpecs.count), inputNodeSpecs,
+          Int32(outputNodeSpecs.count), outputNodeSpecs,
+          &tpuRewrittenSpecs, status)
         checkOk(status)
         outputNodeSpecs = tpuRewrittenSpecs
       }
@@ -526,6 +527,10 @@ extension TFState {
         /*run_metadata*/nil, status
       )
       checkOk(status)
+      if _RuntimeConfig.executionMode == .tpu {
+        TF_ShutdownTPUExecution(cSession, shutdownNode, status)
+        checkOk(status)
+      }
       debugLog("Done calling TF_SessionRun.")
     } else {
       // TF_SessionRun() does not support execution that involves no
