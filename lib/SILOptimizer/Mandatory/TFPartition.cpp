@@ -408,7 +408,7 @@ public:
 
   SILBasicBlock *getPostIDom(SILBasicBlock *BB) {
     auto PDINode = PDI[getNode(BB)]->getIDom();
-    return PDINode ? PDINode->getBlock()->BB : nullptr;
+    return PDINode && PDINode->getBlock() ? PDINode->getBlock()->BB : nullptr;
   }
 
   void dump();
