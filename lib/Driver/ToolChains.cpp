@@ -785,7 +785,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::TY_ObjCHeader);
+                   types::TY_ObjCHeader, "-emit-objc-header-path");
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
