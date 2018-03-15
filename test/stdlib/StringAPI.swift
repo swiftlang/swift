@@ -272,21 +272,10 @@ StringTests.test("LosslessStringConvertible") {
 let substringTests = tests.map {
   (test: ComparisonTest) -> ComparisonTest in
   switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-  case (.eq, "\u{0}", "\u{0}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-332"))
 
   case (.gt, "\r\n", "\n"):
     return test.replacingPredicate(.objCRuntime(
       "blocked on rdar://problem/19036555"))
-
-  case (.eq, "\u{0301}", "\u{0341}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-243"))
-
-  case (.lt, "\u{1F1E7}", "\u{1F1E7}\u{1F1E7}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-367"))
 
   default:
     return test

@@ -80,13 +80,13 @@ class C<T> : B {}
 //   Instantiation pattern.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMP"
 //   Generic parameter count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Generic requirement count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Key generic arguments count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Extra generic arguments count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Generic parameter descriptor #1: flags. -128 == 0x80 == Key
 // CHECK-SAME: i8 -128,
 ///  Padding.

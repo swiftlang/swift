@@ -320,6 +320,8 @@ func statementTests() {
   }
   repeat { } while true
   LABEL: repeat { } while false
+  while true { }
+  LABEL: while true { }
   LABEL: do {}
   LABEL: switch foo {
     case 1:

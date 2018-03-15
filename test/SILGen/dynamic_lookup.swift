@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 

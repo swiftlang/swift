@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name argument_labels -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 public struct X { }
 public struct Y { }

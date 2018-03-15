@@ -1398,7 +1398,7 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                               "withoutActuallyEscaping block";
     auto messageLength = strlen(message);
 
-    if (_swift_reportFatalErrorsToDebugger)
+    if (_swift_shouldReportFatalErrorsToDebugger())
       _swift_reportToDebugger(RuntimeErrorFlagFatal, message);
 
     char *log;

@@ -1,8 +1,10 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
+// REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
+
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main

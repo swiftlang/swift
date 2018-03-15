@@ -2342,14 +2342,6 @@ public:
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst:
         case SILInstructionKind::PartialApplyInst:
-          // Non-Mutating set pattern that allows a inout (that can't really
-          // write back. Only SILGen generates PointerToThinkFunction
-          // instructions in the writeback code.
-          if (auto *AI = dyn_cast<ApplyInst>(inst)) {
-            if (isa<PointerToThinFunctionInst>(AI->getCallee())) {
-              break;
-            }
-          }
           if (isConsumingOrMutatingApplyUse(use))
             return true;
           else
@@ -3849,7 +3841,13 @@ public:
         case KeyPathPatternComponent::Kind::SettableProperty: {
           bool hasIndices = !component.getSubscriptIndices().empty();
         
-          // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
+          ParameterConvention normalArgConvention;
+          if (F.getModule().getOptions().EnableGuaranteedNormalArguments)
+            normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
+          else
+            normalArgConvention = ParameterConvention::Indirect_In;
+        
+          // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
           {
             auto getter = component.getComputedPropertyGetter();
             auto substGetterType = getter->getLoweredFunctionType()
@@ -3861,9 +3859,8 @@ public:
             require(substGetterType->getNumParameters() == 1 + hasIndices,
                     "getter should have one parameter");
             auto baseParam = substGetterType->getParameters()[0];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "getter base parameter should be @in");
+            require(baseParam.getConvention() == normalArgConvention,
+                    "getter base parameter should have normal arg convention");
             require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
                     "getter base parameter should match base of component");
             
@@ -3889,7 +3886,7 @@ public:
           
           if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
             // Setter should be
-            // <Sig...> @convention(thin) (@in Result, @in Base) -> ()
+            // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
             
             auto setter = component.getComputedPropertySetter();
             auto substSetterType = setter->getLoweredFunctionType()
@@ -3903,16 +3900,17 @@ public:
                     "setter should have two parameters");
 
             auto newValueParam = substSetterType->getParameters()[0];
-            require(newValueParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "setter value parameter should be @in");
+            // TODO: This should probably be unconditionally +1 when we
+            // can represent that.
+            require(newValueParam.getConvention() == normalArgConvention,
+                    "setter value parameter should havee normal arg convention");
 
             auto baseParam = substSetterType->getParameters()[1];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In
+            require(baseParam.getConvention() == normalArgConvention
                     || baseParam.getConvention() ==
                         ParameterConvention::Indirect_Inout,
-                    "setter base parameter should be @in or @inout");
+                    "setter base parameter should be normal arg convention "
+                    "or @inout");
             
             if (hasIndices) {
               auto indicesParam = substSetterType->getParameters()[2];

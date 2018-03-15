@@ -1320,8 +1320,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
     if (!S)
       continue;
 
-    SVI->replaceAllUsesWith(S);
-    SVI->eraseFromParent();
+    replaceAllSimplifiedUsesAndErase(SVI, S);
     Changed = true;
   }
 

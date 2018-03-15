@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name generic_closures  -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift
 

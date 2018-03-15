@@ -34,7 +34,7 @@ import Swift
 // --       template instantiation pattern
 // CHECK-SAME:   @"$S15generic_classes11RootGenericCMP"
 // --       generic parameters, requirements, key arguments, extra arguments
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
+// CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       vtable offset
 // CHECK-SAME:   i32 11,
 // --       vtable size

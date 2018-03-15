@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -primary-file %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name partial_apply_protocol -enable-sil-ownership -emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name partial_apply_protocol -enable-sil-ownership -emit-ir -primary-file %s
 
 protocol Clonable {
   func clone() -> Self
