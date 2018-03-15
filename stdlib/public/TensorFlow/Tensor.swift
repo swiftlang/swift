@@ -320,6 +320,44 @@ public extension Tensor where Scalar : Numeric {
       )
     )
   }
+
+  /// Creates a one-hot tensor at given indices. The locations represented by
+  /// `indices` take value `onValue` (`1` by default), while all other locations
+  /// take value `offValue` (`0` by default). If the input `indices` is rank
+  /// `n`, the new tensor will have rank `n+1`. The new axis is created at
+  /// dimension `axis` (by default, the new axis is appended at the end).
+  ///
+  /// If `indices` is a scalar, the new tensor's shape will be a vector of
+  /// length `depth`.
+  ///
+  /// If `indices` is a vector of length `features`, the output shape will be:
+  ///     features x depth, if axis == -1
+  ///     depth x features, if axis == 0
+  ///
+  /// If `indices` is a matrix (batch) with shape `[batch, features]`, the
+  /// output shape will be:
+  ///     batch x features x depth, if axis == -1
+  ///     batch x depth x features, if axis == 1
+  ///     depth x batch x features, if axis == 0
+  ///
+  /// - Parameters:
+  ///   - indices: A `Tensor` of indices.
+  ///   - depth: A scalar defining the depth of the one hot dimension.
+  ///   - onValue: A scalar defining the value at the location referred to by
+  ///     some index in `indices`.
+  ///   - offValue: A scalar defining the value at a location that is not
+  ///     referred to by any index in `indices`.
+  ///   - axis: The axis to fill. The default is `-1`, a new inner-most axis.
+  ///
+  @_inlineable @inline(__always)
+  init(oneHotAtIndices indices: Tensor<Int32>, depth: Int32,
+       onValue: Scalar = 1, offValue: Scalar = 0, axis: Int = -1) {
+    self.init(
+      handle: #tfop("OneHot", indices, Tensor<Int32>(depth),
+                    Tensor(onValue), Tensor(offValue),
+                    axis: axis, T: Scalar.self, TI: Int32.self)
+    )
+  }
 }
 
 //===----------------------------------------------------------------------===//
