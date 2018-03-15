@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_transparent.swift
 // RUN: llvm-bcanalyzer %t/def_transparent.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -module-name transparent -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
