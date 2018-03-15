@@ -4467,24 +4467,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     return SolutionKind::Error;
   }
 
-  // T <c U ===> T! <c U
-  //
-  // We don't want to allow this after user-defined conversions:
-  //   - it gets really complex for users to understand why there's
-  //     a dereference in their code
-  //   - it would allow nil to be coercible to a non-optional type
-  // Fortunately, user-defined conversions only allow subtype
-  // conversions on their results.
-  case ConversionRestrictionKind::ForceUnchecked: {
-    addContextualScore();
-    assert(matchKind >= ConstraintKind::Conversion);
-
-    if (type1->isTypeVariableOrMember())
-      return formUnsolved();
-
-    return SolutionKind::Error;
-  }
-      
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:
   case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
   case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {
