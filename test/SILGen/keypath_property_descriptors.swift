@@ -79,5 +79,18 @@ public struct A {
   internal subscript<T>(d x: T) -> T { return x }
   fileprivate subscript<T>(e x: T) -> T { return x }
   private subscript<T>(f x: T) -> T { return x }
+
+  // no descriptor
+  public var count: Int {
+    mutating get {
+      _count += 1
+      return _count
+    }
+    set {
+      _count = newValue
+    }
+  }
+
+  private var _count: Int = 0
 }
 
