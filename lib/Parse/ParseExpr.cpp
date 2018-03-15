@@ -1573,17 +1573,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   case tok::kw_self:     // self
-  case tok::kw_Self: {   // Self
-    auto Result = makeParserResult(parseExprIdentifier());
-
-    // If there is an expr-call-suffix, parse it and form a call.
-    if (Tok.isFollowingLParen()) {
-      Result = parseExprCallSuffix(Result, isExprBasic);
-      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
-    }
-
-    return Result;
-  }
+  case tok::kw_Self:     // Self
+    return makeParserResult(parseExprIdentifier());
 
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
