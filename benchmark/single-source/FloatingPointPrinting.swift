@@ -17,18 +17,33 @@ import TestsUtils
 
 public let FloatingPointPrinting = [
   BenchmarkInfo(
-    name: "FloatingPointPrinting_Float_description",
-    runFunction: run_FloatingPointPrinting_Float_description,
+    name: "FloatingPointPrinting_Float_description_small",
+    runFunction: run_FloatingPointPrinting_Float_description_small,
     tags: [.validation, .api, .runtime, .String]),
 
   BenchmarkInfo(
-    name: "FloatingPointPrinting_Double_description",
-    runFunction: run_FloatingPointPrinting_Double_description,
+    name: "FloatingPointPrinting_Double_description_small",
+    runFunction: run_FloatingPointPrinting_Double_description_small,
     tags: [.validation, .api, .runtime, .String]),
 
   BenchmarkInfo(
-    name: "FloatingPointPrinting_Float80_description",
-    runFunction: run_FloatingPointPrinting_Float80_description,
+    name: "FloatingPointPrinting_Float80_description_small",
+    runFunction: run_FloatingPointPrinting_Float80_description_small,
+    tags: [.validation, .api, .runtime, .String]),
+
+  BenchmarkInfo(
+    name: "FloatingPointPrinting_Float_description_uniform",
+    runFunction: run_FloatingPointPrinting_Float_description_uniform,
+    tags: [.validation, .api, .runtime, .String]),
+
+  BenchmarkInfo(
+    name: "FloatingPointPrinting_Double_description_uniform",
+    runFunction: run_FloatingPointPrinting_Double_description_uniform,
+    tags: [.validation, .api, .runtime, .String]),
+
+  BenchmarkInfo(
+    name: "FloatingPointPrinting_Float80_description_uniform",
+    runFunction: run_FloatingPointPrinting_Float80_description_uniform,
     tags: [.validation, .api, .runtime, .String]),
 
   BenchmarkInfo(
@@ -47,11 +62,55 @@ public let FloatingPointPrinting = [
     tags: [.validation, .api, .runtime, .String])
 ]
 
-// Description test just generates description for 100,000
-// values across a range of bit patterns.
+// Generate descriptions for 100,000 values around 1.0.
+//
+// Note that some formatting algorithms behave very
+// differently for values around 1.0 than they do for
+// less-common extreme values.  Having a "small" test
+// and a "uniform" test exercises both cases.
+//
+// Dividing integers 1...100000 by 101 (a prime) yields floating-point
+// values from about 1e-2 to about 1e3, each with plenty of digits after
+// the decimal:
 
 @inline(never)
-public func run_FloatingPointPrinting_Float_description(_ N: Int) {
+public func run_FloatingPointPrinting_Float_description_small(_ N: Int) {
+  let count = 100_000
+  for _ in 0..<N {
+    for i in 1...count {
+      let f = Float(i) / 101.0
+      blackHole(f.description)
+    }
+  }
+}
+
+@inline(never)
+public func run_FloatingPointPrinting_Double_description_small(_ N: Int) {
+  let count = 100_000
+  for _ in 0..<N {
+    for i in 1...count {
+      let f = Double(i) / 101.0
+      blackHole(f.description)
+    }
+  }
+}
+
+@inline(never)
+public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
+  let count = 100_000
+  for _ in 0..<N {
+    for i in 1...count {
+      let f = Float80(i) / 101.0
+      blackHole(f.description)
+    }
+  }
+}
+
+// Generate descriptions for 100,000 values spread evenly across
+// the full range of the type:
+
+@inline(never)
+public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
   let count = 100_000
   let step = UInt32.max / UInt32(count)
   var s = ""
@@ -59,14 +118,13 @@ public func run_FloatingPointPrinting_Float_description(_ N: Int) {
     for i in 0..<count {
       let raw = UInt32(i) * step
       let f = Float(bitPattern: raw)
-      s = f.description
+      blackHole(f.description)
     }
   }
-  CheckResults(s.count > 1)
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Double_description(_ N: Int) {
+public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
   let count = 100_000
   let step = UInt64.max / UInt64(count)
   var s = ""
@@ -74,14 +132,13 @@ public func run_FloatingPointPrinting_Double_description(_ N: Int) {
     for i in 0..<count {
       let raw = UInt64(i) * step
       let f = Double(bitPattern: raw)
-      s = f.description
+      blackHole(f.description)
     }
   }
-  CheckResults(s.count > 1)
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Float80_description(_ N: Int) {
+public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
   let count = 100_000
   let step = UInt64.max / UInt64(count)
   var s = ""
@@ -90,10 +147,9 @@ public func run_FloatingPointPrinting_Float80_description(_ N: Int) {
       let fraction = UInt64(i) * step
       let exponent = UInt(i) % 32768
       let f = Float80(sign: .plus, exponentBitPattern: exponent, significandBitPattern: fraction)
-      s = f.description
+      blackHole(f.description)
     }
   }
-  CheckResults(s.count > 1)
 }
 
 // The "interpolated" tests verify that any storage optimizations used while
@@ -109,7 +165,7 @@ public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
     for i in 0..<count {
       let raw = UInt32(i) * step
       let f = Float(bitPattern: raw)
-      s = "result was \(f)"
+      blackHole("and the actual result was \(f)")
     }
   }
   CheckResults(s.count > 1)
@@ -124,7 +180,7 @@ public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
     for i in 0..<count {
       let raw = UInt64(i) * step
       let f = Double(bitPattern: raw)
-      s = "result was \(f)"
+      blackHole("and the actual result was \(f)")
     }
   }
   CheckResults(s.count > 1)
@@ -140,7 +196,7 @@ public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
       let fraction = UInt64(i) * step
       let exponent = UInt(i) % 32768
       let f = Float80(sign: .plus, exponentBitPattern: exponent, significandBitPattern: fraction)
-      s = "result was \(f)"
+      blackHole("and the actual result was \(f)")
     }
   }
   CheckResults(s.count > 1)
