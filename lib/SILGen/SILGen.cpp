@@ -1172,6 +1172,10 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
   if (!decl->getGetter())
     return false;
 
+  // If the getter is mutating, we cannot form a keypath to it at all.
+  if (decl->isGetterMutating())
+    return false;
+
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
 
