@@ -5282,23 +5282,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
 }
 
 
-RValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
-                                                   Expr *funcExpr,
-                                                   Type resultType,
-                                                   RValue &&operand) {
-  // Walk the function expression, which should produce a reference to the
-  // callee, leaving the final curry level unapplied.
-  CallEmission emission = CallEmission::forApplyExpr(*this, funcExpr);
-  // Rewrite the operand type to the expected argument type, to handle tuple
-  // conversions etc.
-  auto funcTy = cast<FunctionType>(funcExpr->getType()->getCanonicalType());
-  operand.rewriteType(funcTy.getInput());
-  // Add the operand as the final callsite.
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(operand)),
-                       resultType->getCanonicalType(), funcTy->throws());
-  return emission.apply();
-}
-
 // Create a partial application of a dynamic method, applying bridging thunks
 // if necessary.
 static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,

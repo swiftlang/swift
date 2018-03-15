@@ -671,3 +671,9 @@ func testBridgeFunctionPointerTypedefs(fptrTypedef: FPTypedef) {
   let _: Int = fptrTypedef // expected-error{{'@convention(c) (String) -> String'}}
   let _: Int = getFP() // expected-error{{'@convention(c) (String) -> String'}}
 }
+
+func testNonTrivialStructs() {
+  _ = NonTrivialToCopy() // expected-error {{use of unresolved identifier 'NonTrivialToCopy'}}
+  _ = NonTrivialToCopyWrapper() // expected-error {{use of unresolved identifier 'NonTrivialToCopyWrapper'}}
+  _ = TrivialToCopy() // okay
+}

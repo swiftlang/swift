@@ -4086,6 +4086,7 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
 
 DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
+  assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
   properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
