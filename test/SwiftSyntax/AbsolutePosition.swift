@@ -103,21 +103,25 @@ PositionTests.test("Recursion") {
 
 PositionTests.test("Trivias") {
   expectDoesNotThrow({
-    var l = [CodeBlockItemSyntax]()
-    let leading = Trivia.newlines(1).appending(TriviaPiece.backticks(1))
-      .appending(TriviaPiece.docLineComment("/// some comment"))
+    let leading = Trivia(pieces: [
+      .newlines(1),
+      .backticks(1),
+      .docLineComment("/// some comment")
+      ])
     let trailing = Trivia.docLineComment("/// This is comment\n")
     let idx = 5
-    for _ in 0...idx {
-      l.append(SyntaxFactory.makeCodeBlockItem(
-        item: SyntaxFactory.makeReturnStmt(
-          returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
-            .withTrailingTrivia(trailing).withLeadingTrivia(leading)
-            , expression: nil), semicolon: nil))
-    }
+    let items : [CodeBlockItemSyntax] =
+      [CodeBlockItemSyntax](repeating: CodeBlockItemSyntax {
+        $0.useItem(ReturnStmtSyntax {
+          $0.useReturnKeyword(
+            SyntaxFactory.makeReturnKeyword(
+              leadingTrivia: leading,
+              trailingTrivia: trailing))
+        })}, count: idx + 1)
     let root = SyntaxFactory.makeSourceFile(
-      statements: SyntaxFactory.makeCodeBlockItemList(l),
+      statements: SyntaxFactory.makeCodeBlockItemList(items),
       eofToken: SyntaxFactory.makeToken(.eof, presence: .present))
+
     expectEqual(root.leadingTrivia!.count, 3)
     expectEqual(root.trailingTrivia!.count, 0)
     let state = root.statements[idx]
