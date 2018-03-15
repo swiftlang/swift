@@ -29,6 +29,8 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "llvm/Support/PrettyStackTrace.h"
+
 using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
@@ -148,6 +150,8 @@ static bool isArrayUninitialized(SILInstruction *call) {
 /// Scan the function looking for call sites that should be inlined to expose
 /// tensor operations, and inline them to expose those ops.
 void TFDeabstraction::inlineCalls() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::inlineCalls");
+
   // We generally want to carefully and deliberately choose which functions to
   // inline into our 'fn' function, but if this is a main function with top
   // level code (e.g. in a playground) then we want to aggressively inline
@@ -336,6 +340,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
 /// operations to avoid additional linear scans over the function.
 ///
 void TFDeabstraction::simplifyTensorOperands() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -381,6 +386,8 @@ namespace {
 /// Analyze the dataflow values feeding into the specified tensor operations in
 /// order to find promotable stack and global references.
 void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
+  llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
+
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands())
       findPromotableMemoryFromValue(operand.get());
@@ -438,6 +445,11 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
             isa<EndAccessInst>(user)) // Just a marker.
           continue;
 
+        // Anything that dives into an element of the global can continue to
+        // dive into the promoted value.
+        if (isa<StructElementAddrInst>(user) || isa<TupleElementAddrInst>(user))
+          continue;
+
         // If this is a store to the global, analyze the input value.
         if (auto *si = dyn_cast<StoreInst>(user)) {
           if (use->getOperandNumber() == 1) {
@@ -460,7 +472,6 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
           // check over.
           goto restart;
         }
-
 
         // Some other unexpected user of the address is left around.  We should
         // handle this some day, but for now just leave the global access
@@ -591,6 +602,8 @@ findPromotableMemoryFromLoadedAddress(SILValue pointer) {
 void TFDeabstraction::
 promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
                       SmallVectorImpl<AllocStackInst*> &stackAllocs) {
+  llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::promoteGlobals");
+
   DenseMap<SILGlobalVariable*, AllocStackInst*> stackAllocForGlobal;
 
   // Promote each global by making a stack allocation that corresponds to them,
@@ -690,6 +703,8 @@ void TFDeabstraction::promoteToSSA(MutableArrayRef<AllocStackInst*> allocs) {
   // If there is nothing to promote, don't bother calculating dominator info.
   if (allocs.empty())
     return;
+
+  llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::promoteToSSA");
 
   // Do any necessary preprocessing of the stack allocations before promoting
   // them.
@@ -899,6 +914,16 @@ propagateTensorOperand(SILValue v,
       // If this is an aggregate basic block argument, explode it into its
       // component values.
       if (!accessPath.empty()) {
+
+        // Do a quick pass over all of the predecessors to see if they are
+        // unconditional branches.  If not, we can't explode them.
+        // TODO: We should handle things like switch_enum someday.
+        for (auto pi : arg->getParent()->getPredecessorBlocks()) {
+          if (!isa<BranchInst>(pi->getTerminator()))
+            // Cannot explode this BB argument.
+            return lastRootValue;
+        }
+
         // We're going to erase 'arg', so don't leave dangling pointers in the
         // set.
         checkedPhis.erase(arg);
@@ -908,7 +933,7 @@ propagateTensorOperand(SILValue v,
                  arg->getType().is<BoundGenericStructType>())
           v = explodeSILStructArgument(arg);
         else
-          break; // Cannot handle this.
+          return lastRootValue; // Cannot handle this.
         continue;
       }
 
@@ -965,6 +990,8 @@ propagateTensorOperand(SILValue v,
 
 /// Propagate the operand values for all tensors.
 void TFDeabstraction::propagateTensorOperands() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorOperands");
+
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
@@ -986,6 +1013,8 @@ void TFDeabstraction::propagateTensorOperands() {
 /// Canonicalize tensor ops, validating their attribute arguments have
 /// constants, and flattening array parameters.
 void TFDeabstraction::canonicalizeOps() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::canonicalizeOps");
+
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -1123,6 +1152,11 @@ void TFDeabstractionPass::run() {
     // isolation.
     if (!tfc.shouldBePartitioned(&fn))
       continue;
+
+    // If something crashes, make sure the pretty stack trace says what we
+    // were doing.
+    llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
+                                   fn.getName().str().c_str());
 
     TFDeabstraction(fn, tfc, PM).doIt();
 
