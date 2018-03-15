@@ -60,6 +60,6 @@ public extension TensorProtocol where Scalar : Numeric {
 
 public protocol ParameterAggregate {
   associatedtype Parameter : TensorProtocol
-  mutating func update(with gradient: Self,
+  mutating func update(with other: Self,
                        by updateParameter: (inout Parameter, Parameter) -> Void)
 }
