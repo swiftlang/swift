@@ -225,22 +225,27 @@ public struct _Hasher {
   /// of test results.
   public // SPI
   static var _isDeterministic: Bool {
-    return _swift_stdlib_Hashing_deterministicHashing
+    @_inlineable
+    @inline(__always)
+    get {
+      return _swift_stdlib_Hashing_parameters.deterministic;
+    }
   }
 
   /// The 128-bit hash seed used to initialize the hasher state. Initialized
   /// once during process startup.
   public // SPI
   static var _seed: (UInt64, UInt64) {
+    @_inlineable
+    @inline(__always)
     get {
-      if _isDeterministic { return (0, 0) }
       // The seed itself is defined in C++ code so that it is initialized during
       // static construction.  Almost every Swift program uses hash tables, so
       // initializing the seed during the startup seems to be the right
       // trade-off.
       return (
-        _swift_stdlib_Hashing_seed.seed0,
-        _swift_stdlib_Hashing_seed.seed1)
+        _swift_stdlib_Hashing_parameters.seed0,
+        _swift_stdlib_Hashing_parameters.seed1)
     }
   }
 
