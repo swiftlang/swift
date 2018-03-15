@@ -387,10 +387,7 @@ public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
 // this whole mess in graph without leaving anything on the host that will cause
 // a send/receive.
 public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
-  // expected-error @+1 {{cannot lower a 'send' to the host yet}}
-  let scalar = a.toDevice().mean().scalar!  // expected-warning {{value implicitly copied to the host}} expected-note {{value used here}}
-  // expected-warning @-1 {{value implicitly copied to the accelerator}}
-  let b = Tensor(scalar) // expected-note {{value used here}}
+  let scalar = a.toDevice().mean()
+  let b = Tensor(scalar)
   return (b+b).toHost()
 }
-
