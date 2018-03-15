@@ -969,18 +969,6 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  // For -index-file-path arguments, the desired driver semantics are to ensure
-  // that the given file is marked as primary. In order to do that, pass that
-  // argument along instead of the plain argument giving the input file. Then,
-  // addFrontendInputArguments can know to mark that input as primary. With the
-  // introduction of batch mode, it may someday make sense to have more than one
-  // such argument, so allow for it here.
-
-  // Create an O(1) map of these so the Arg can be substituted later.
-  llvm::StringMap<const Arg *> IndexFilePathArgs;
-  for (const Arg *A : Args.filtered(options::OPT_index_file_path))
-    IndexFilePathArgs.insert(std::make_pair(A->getValue(), A));
-
   llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
@@ -1002,11 +990,9 @@ void Driver::buildInputs(const ToolChain &TC,
           Ty = types::TY_Object;
         }
       }
-      if (checkInputExistence(*this, Args, Diags, Value)) {
-        // Substitute the OPT_index_file_path Arg if this is one of them.
-        const Arg *IA = IndexFilePathArgs.lookup(Value);
-        Inputs.push_back(std::make_pair(Ty, IA ? IA : A));
-      }
+
+      if (checkInputExistence(*this, Args, Diags, Value))
+        Inputs.push_back(std::make_pair(Ty, A));
 
       if (Ty == types::TY_Swift) {
         StringRef Basename = llvm::sys::path::filename(Value);
