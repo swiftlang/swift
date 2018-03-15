@@ -380,14 +380,3 @@ public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
  // %53 = apply [[FINISHFN]]({{.*}}, [[RESULTMP]], {{.*}}) : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
 */
 
-
-
-// Here ".mean()" contains a tensor2scalar operation, and we then convert that
-// scalar back to a tensor.  This checks to make sure that tf-partition can pull
-// this whole mess in graph without leaving anything on the host that will cause
-// a send/receive.
-public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
-  let scalar = a.toDevice().mean()
-  let b = Tensor(scalar)
-  return (b+b).toHost()
-}
