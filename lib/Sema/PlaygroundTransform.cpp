@@ -22,6 +22,8 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TensorFlow.h"
 
 #include <random>
 #include <forward_list>
@@ -42,6 +44,24 @@ private:
   DeclContext *TypeCheckDC;
   unsigned &TmpNameIndex;
   bool HighPerformance;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  tf::TypeContainsTensorHandle tcth;
+
+  bool shouldLogType(Type ty) {
+    // Don't log any types that contain Tensor values, as this will cause
+    // implicit copies to host.
+    // TODO: when we support sends and receives, we should have the logger
+    // wrap these values in a summary op.
+
+    // If the TensorFlow module hasn't been imported, then don't do anything
+    // complicated here.
+    if (Context.getTensorHandleDecl() &&
+        tcth.containsTensorHandle(ty))
+      return false;
+
+    return true;
+  }
 
   struct BracePair {
   public:
@@ -300,6 +320,10 @@ public:
       return std::make_pair(Added<Expr *>(nullptr), nullptr);
     case ExprKind::DeclRef: {
       ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
+      // SWIFT_ENABLE_TENSORFLOW
+      if (!shouldLogType(E->getType()))
+        return std::make_pair(Added<Expr *>(nullptr), nullptr);
+
       Added<Expr *> DRE = new (Context) DeclRefExpr(
           ConcreteDeclRef(D), cast<DeclRefExpr>(E)->getNameLoc(),
           true, // implicit
@@ -395,7 +419,8 @@ public:
                 ++EI;
               }
             }
-          } else {
+            // SWIFT_ENABLE_TENSORFLOW
+          } else if (shouldLogType(AE->getSrc()->getType())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(AE->getSrc());
             DeclRefExpr *DRE = new (Context)
@@ -487,7 +512,9 @@ public:
             }
             Handled = true; // Never log ()
           }
-          if (!Handled) {
+
+          // SWIFT_ENABLE_TENSORFLOW
+          if (!Handled && shouldLogType(E->getType())) {
             // do the same as for all other expressions
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
@@ -505,7 +532,9 @@ public:
             }
           }
         } else {
-          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType) {
+          // SWIFT_ENABLE_TENSORFLOW
+          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType &&
+              shouldLogType(E->getType())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
             Added<Stmt *> Log = buildLoggerCall(
@@ -525,7 +554,8 @@ public:
       } else if (auto *S = Element.dyn_cast<Stmt *>()) {
         S->walk(CF);
         if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-          if (RS->hasResult()) {
+          // SWIFT_ENABLE_TENSORFLOW
+          if (RS->hasResult() && shouldLogType(RS->getResult()->getType())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(RS->getResult());
             DeclRefExpr *DRE = new (Context) DeclRefExpr(
@@ -606,6 +636,10 @@ public:
       return nullptr;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!shouldLogType(VD->getType()))
+      return nullptr;
+
     return buildLoggerCall(
         new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
                                   true, // implicit
@@ -623,6 +657,10 @@ public:
         return nullptr;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
+      if (!shouldLogType(VD->getType()))
+        return nullptr;
+
       return buildLoggerCall(
           new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
                                     true, // implicit
@@ -636,6 +674,10 @@ public:
         // Don't log attributes of "self" in a constructor
         return nullptr;
       }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      if (!shouldLogType(MRE->getType()) && !shouldLogType(B->getType()))
+        return nullptr;
 
       return buildLoggerCall(
           new (Context) MemberRefExpr(B, SourceLoc(), M, DeclNameLoc(),

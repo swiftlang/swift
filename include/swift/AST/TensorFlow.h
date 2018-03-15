@@ -19,13 +19,37 @@
 #define SWIFT_AST_TENSORFLOW_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-namespace tf {
+  class NominalTypeDecl;
+  class StructDecl;
+  class Type;
 
-  // Nothing right now, but this will probably be useful later.
+namespace tf {
+  /// If the specified type is the well-known TensorHandle<T> type, then return
+  /// "T".  If not, return a null type.
+  Type isTensorHandle(Type ty);
+
+  /// This class provides an efficient implementation of a predicate that
+  /// determines whether a type is or contains a TensorHandle that will be
+  /// exposed after deabstraction.  This is a class instead of a simple function
+  /// because we memoize state to avoid rechecking types over and over again.
+  class TypeContainsTensorHandle {
+    /// This map memoizes whether the specified type declaration is known to
+    /// contain a TensorHandle or not, used to accelerate queries against types
+    /// that are frequently referenced like Tensor.
+    llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+  public:
+    TypeContainsTensorHandle() {}
+
+    /// Return true if the specified type contains a TensorHandle that will be
+    /// exposed after deabstraction.
+    bool containsTensorHandle(Type ty);
+
+  private:
+    bool structContainsTensorHandle(StructDecl *decl);
+  };
 
 } // end namespace tf
 } // end namespace swift
