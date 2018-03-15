@@ -836,8 +836,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredInterfaceType();
-  ProtocolConformance *conformance;
-    ASTContext &ctx = nominal->getASTContext();
+  ASTContext &ctx = nominal->getASTContext();
   if (entry->getKind() == ConformanceEntryKind::Inherited) {
     // For an inherited conformance, the conforming nominal type will
     // be different from the nominal type.
@@ -854,9 +853,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
                                                           protocol);
 
     // Form the inherited conformance.
-    conformance = ctx.getInheritedConformance(
-                    type,
-                    inheritedConformance->getConcrete());
+    entry->Conformance =
+        ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredInterfaceType();
@@ -865,9 +863,22 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
-    conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
-                                     conformingDC,
-                                     ProtocolConformanceState::Incomplete);
+    auto normalConf =
+        ctx.getConformance(conformingType, protocol, conformanceLoc,
+                           conformingDC, ProtocolConformanceState::Incomplete);
+    // Invalid code may cause the getConformance call below to loop, so break
+    // the infinite recursion by setting this eagerly to shortcircuit with the
+    // early return at the start of this function.
+    entry->Conformance = normalConf;
+
+    NormalProtocolConformance *implyingConf = nullptr;
+    if (entry->Source.getKind() == ConformanceEntryKind::Implied) {
+      auto implyingEntry = entry->Source.getImpliedSource();
+      implyingConf = getConformance(conformingNominal, implyingEntry)
+                         ->getRootNormalConformance();
+    }
+    normalConf->setSourceKindAndImplyingConformance(entry->Source.getKind(),
+                                                    implyingConf);
 
     // If the conformance was synthesized by the ClangImporter, give it a
     // lazy loader that will be used to populate the conformance.
@@ -889,17 +900,14 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
         if (otherProto == impliedProto) {
           // Set the conformance loader to the loader stashed inside
           // the attribute.
-          cast<NormalProtocolConformance>(conformance)
-              ->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
+          normalConf->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
           break;
         }
       }
     }
   }
 
-  // Record the conformance.
-  entry->Conformance = conformance;
-  return conformance;
+  return entry->Conformance.get<ProtocolConformance *>();
 }
 
 void ConformanceLookupTable::addSynthesizedConformance(NominalTypeDecl *nominal,
