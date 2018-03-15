@@ -110,16 +110,6 @@ public func testZeros() -> Tensor<Float> {
   return (b1+b2).toHost()
 }
 
-// Here ".mean()" contains a tensor2scalar operation, and we then convert that
-// scalar back to a tensor.  This checks to make sure that tf-partition can pull
-// this whole mess in graph without leaving anything on the host that will cause
-// a send/receive.
-public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
-  let scalar = a.toDevice().mean().scalar!
-  let b = Tensor(scalar)
-  return (b+b).toHost()
-}
-
 // Verify that we are able to run randomUniform on the device, or at least hoist
 // it to being an argument so we don't get copy-ins.
 public func randomUniformHoisting() -> Tensor<Float> {
