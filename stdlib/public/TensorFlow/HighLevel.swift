@@ -185,7 +185,7 @@ public protocol Optimizer : AnyObject {
   associatedtype Trainee : Learnable
 
   /// The learning rate for gradient descent.
-  var learningRate: Trainee.Parameters.DifferentiationCurrency { get set }
+  var learningRate: Trainee.Parameters.Scalar { get }
 
   /// Optimizes the parameters of a `Trainee` instance given the gradient of the
   /// trainee's parameters.
@@ -193,6 +193,31 @@ public protocol Optimizer : AnyObject {
     _ parameters: inout Trainee.Parameters,
     gradient: Trainee.Parameters
   )
+}
+
+//===----------------------------------------------------------------------===//
+// Common optimizers
+//===----------------------------------------------------------------------===//
+
+public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
+  public let learningRate: Trainee.Parameters.Scalar
+  // NOTE: To be implemented later.
+  // public let momentum: Trainee.Parameters.Scalar = 0
+  // public let decay: Trainee.Parameters.Scalar = 0
+  // public let isNesterovMomentum: Bool = false
+  // public private(set) var epoch: Int32 = 0
+
+  @_inlineable @inline(__always)
+  public init(learningRate: Trainee.Parameters.Scalar) {
+    self.learningRate = learningRate
+  }
+
+  public func optimize(_ parameters: inout Trainee.Parameters,
+                       gradient: Trainee.Parameters) {
+    parameters.update(with: gradient) { param, grad in
+      param -= grad * learningRate
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
