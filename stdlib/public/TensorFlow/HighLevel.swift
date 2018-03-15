@@ -30,11 +30,10 @@
 /// attribute. The Swift compiler automatically generates a member struct type
 /// `Parameters`, which includes all of the marked properties.
 ///
-
 public protocol Parameterized {
   /// The type representing all parameters, synthesized from stored properties
   /// marked with `@parameter`.
-  associatedtype Parameters
+  associatedtype Parameters : ParameterAggregate
 
   /// A synthesized instance of Parameters.
   var parameters: Parameters { get set }
@@ -191,7 +190,7 @@ public protocol Optimizer : AnyObject {
   /// Optimizes the parameters of a `Trainee` instance given the gradient of the
   /// trainee's parameters.
   func optimize(
-    _ instance: inout Trainee.Parameters,
+    _ parameters: inout Trainee.Parameters,
     gradient: Trainee.Parameters
   )
 }
@@ -374,13 +373,15 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
-  public struct Parameters : Differentiable {
+  public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
     public typealias DifferentiationCurrency = Scalar
+
+    public typealias Parameter = Tensor<Scalar>
 
     // Synthesized properties. `weight` and `bias` will be synthesized in
     // `Parameters` because they will be marked with `@parameter`.
@@ -410,6 +411,14 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
         weight: lhs.weight + rhs.weight,
         bias: lhs.bias + rhs.bias
       )
+    }
+
+    public mutating func update(
+      with gradient: Parameters,
+      by updateParameter: (inout Parameter, Parameter) -> Void
+    ) {
+      updateParameter(&weight, gradient.weight)
+      updateParameter(&bias, gradient.bias)
     }
   }
 
@@ -524,13 +533,15 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
-  public struct Parameters : Differentiable {
+  public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
     public typealias DifferentiationCurrency = Scalar
+
+    public typealias Parameter = Tensor<Scalar>
 
     // Synthesized properties. `offset` and `scale` will be synthesized in
     // `Parameters` because they will be marked with `@parameter`.
@@ -560,6 +571,14 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
         offset: lhs.offset + rhs.offset,
         scale: lhs.scale + rhs.scale
       )
+    }
+
+    public mutating func update(
+      with gradient: Parameters,
+      by updateParameter: (inout Parameter, Parameter) -> Void
+    ) {
+      updateParameter(&offset, gradient.offset)
+      updateParameter(&scale, gradient.scale)
     }
   }
 
