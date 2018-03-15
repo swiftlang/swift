@@ -278,4 +278,10 @@ _T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method
 _T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __ObjC.Gizmo.modifyString(Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
 _T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test
 _T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfC ---> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69).init() -> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69)
+_$S10NibbleSort0A10CollectionVys6UInt64VAEcis ---> _$S10NibbleSort0A10CollectionVys6UInt64VAEcis
+_T0D ---> _T0D
+_T0s3SetVyxGs10CollectiotySivm ---> _T0s3SetVyxGs10CollectiotySivm
+_T0s18ReversedCollectionVyxGs04LazyB8ProtocolfC ---> _T0s18ReversedCollectionVyxGs04LazyB8ProtocolfC
+_T0iW ---> _T0iW
+_T0s5print_9separator10terminatoryypfC ---> _T0s5print_9separator10terminatoryypfC
 
