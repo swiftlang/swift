@@ -78,6 +78,9 @@ int main(int argc, char **argv) {
     "dump-module", llvm::cl::desc(
       "Dump the imported module after checking it imports just fine"));
 
+  llvm::cl::opt<bool> Verbose(
+      "verbose", llvm::cl::desc("Dump informations on the loaded module"));
+
   llvm::cl::opt<std::string> ModuleCachePath(
     "module-cache-path", llvm::cl::desc("Clang module cache path"));
 
@@ -167,10 +170,12 @@ int main(int argc, char **argv) {
             exit(1);
           }
 
-          for (auto path : modules)
-            llvm::outs() << "Loaded module " << path << " from " << name
-                         << "\n";
-          printValidationInfo(fileBuf.get()->getBuffer());
+          if (Verbose) {
+            for (auto path : modules)
+              llvm::outs() << "Loaded module " << path << " from " << name
+                           << "\n";
+            printValidationInfo(fileBuf.get()->getBuffer());
+          }
 
           // Deliberately leak the llvm::MemoryBuffer. We can't delete it
           // while it's in use anyway.
@@ -188,10 +193,12 @@ int main(int argc, char **argv) {
         if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))
           exit(1);
 
-        for (auto path : modules)
-          llvm::outs() << "Loaded module " << path << " from " << name
-                       << "\n";
-        printValidationInfo(Buf);
+        if (Verbose) {
+          for (auto path : modules)
+            llvm::outs() << "Loaded module " << path << " from " << name
+                         << "\n";
+          printValidationInfo(Buf);
+        }
       }
     }
     ObjFiles.push_back(std::move(*OF));
@@ -199,7 +206,8 @@ int main(int argc, char **argv) {
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
-    llvm::outs() << "Importing " << path << "... ";
+    if (Verbose)
+      llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
@@ -216,10 +224,12 @@ int main(int argc, char **argv) {
 
     auto Module = CI.getASTContext().getModule(AccessPath);
     if (!Module) {
-      llvm::errs() << "FAIL!\n";
+      if (Verbose)
+        llvm::errs() << "FAIL!\n";
       return 1;
     }
-    llvm::outs() << "ok!\n";
+    if (Verbose)
+      llvm::outs() << "ok!\n";
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);
