@@ -1481,11 +1481,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
   
-  case tok::kw_nil: {
+  case tok::kw_nil:
     ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
     return makeParserResult(new (Context)
                                 NilLiteralExpr(consumeToken(tok::kw_nil)));
-  }
 
   case tok::kw_true:
   case tok::kw_false: {
@@ -1585,12 +1584,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::dollarident: // $1
     return makeParserResult(parseExprAnonClosureArg());
 
-    // If the next token is '_', parse a discard expression.
-  case tok::kw__: {
+  case tok::kw__: // _
     ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
     return makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
-  }
 
   case tok::pound_selector: // expr-selector
     return parseExprSelector();
@@ -1724,7 +1721,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::kw_super: // super.foo or super[foo]
     return parseExprSuper(isExprBasic);
 
-  case tok::l_paren: {
+  case tok::l_paren:
     // Build a tuple expression syntax node.
     // AST differentiates paren and tuple expression where the former allows
     // only one element without label. However, libSyntax tree doesn't have this
@@ -1733,7 +1730,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
     return parseExprList(tok::l_paren, tok::r_paren,
                          SyntaxKind::TupleElementList);
-  }
+
   case tok::l_square:
     return parseExprCollection();
 
