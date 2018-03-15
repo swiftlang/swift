@@ -14,7 +14,6 @@ _RuntimeConfig.printsDebugLog = false
 
 var x = Tensor<Int8>([1,2,3])*2
 
-// TODO: Causes a send.
-//x = x + x
+x = x + x
 
 expectEqual(x.array, ShapedArray(shape: [3], scalars: [2,4,6]))
