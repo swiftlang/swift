@@ -18,6 +18,7 @@
 
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
@@ -86,6 +87,9 @@ int main(int argc, char **argv) {
   llvm::cl::list<std::string> FrameworkPaths(
     "F", llvm::cl::desc("add a directory to the framework search path"));
 
+  llvm::cl::opt<std::string> DumpTypeFromMangled(
+      "type-from-mangled", llvm::cl::desc("dump type from mangled name"));
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
@@ -93,6 +97,7 @@ int main(int argc, char **argv) {
   ImportPaths.removeArgument();
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
+  DumpTypeFromMangled.removeArgument();
   SDK.removeArgument();
   InputNames.removeArgument();
 
@@ -220,6 +225,30 @@ int main(int argc, char **argv) {
       Module->getTopLevelDecls(Decls);
       for (auto Decl : Decls) {
         Decl->dump(llvm::outs());
+      }
+    }
+    if (!DumpTypeFromMangled.empty()) {
+      std::string Error;
+      std::string Name;
+      swift::ASTContext &Ctx = CI.getASTContext();
+      llvm::SmallVector<std::string, 8> MangledNames;
+
+      std::ifstream InputStream(DumpTypeFromMangled);
+      while (std::getline(InputStream, Name)) {
+        if (Name.empty())
+          continue;
+        MangledNames.push_back(Name);
+      }
+
+      for (auto &Mangled : MangledNames) {
+        swift::Type ResolvedType = swift::ide::getTypeFromMangledSymbolname(
+            Ctx, Mangled, Error);
+        if (!ResolvedType) {
+          llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+        } else {
+          ResolvedType->print(llvm::errs());
+          llvm::errs() << "\n";
+        }
       }
     }
   }
