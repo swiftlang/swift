@@ -3990,15 +3990,16 @@ extension _Native${Self}Buffer
   @_versioned
   internal func _localHasher() -> _Hasher {
     // We assign a unique seed to each distinct hash table size, so that we
-    // prevent the quadratic copy problem without breaking value semantics.
-    // See https://bugs.swift.org/browse/SR-3268
+    // avoid certain copy operations becoming quadratic, without breaking value
+    // semantics. (See https://bugs.swift.org/browse/SR-3268)
     //
-    // We don't need to generate brand new seed; changing a few bits in the
-    // global seed by XORing the bucket count prevents the issue just as well.
+    // We don't need to generate a brand new seed for each table size: it's
+    // enough to change a single bit in the global seed by XORing the bucket
+    // count to it. (The bucket count is always a power of two.)
     //
-    // FIXME: Use true per-instance seeding. This requires adding the local seed
-    // into the storage class, because COW copies need to use the same seed as
-    // their original instance.
+    // FIXME: Use an approximation of true per-instance seeding. We can't just
+    // use the base address, because COW copies need to share the same seed.
+    // (This will require storing the local seed in the storage class.)
     let seed = _Hasher._seed
     let perturbation = bucketCount
     return _Hasher(
