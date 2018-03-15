@@ -713,7 +713,7 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM.get(),
+  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -724,7 +724,8 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM.get(), workingDirectory, TC, *C);
+  buildJobs(TopLevelActions, OI, OFM ? OFM.getPointer() : nullptr,
+            workingDirectory, TC, *C);
 
   if (DriverPrintDerivedOutputFileMap) {
     C->getDerivedOutputFileMap().dump(llvm::outs(), true);
