@@ -29,7 +29,6 @@ namespace tf {
 
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
-  Type isTensorHandle(Type ty);
   bool isTensorHandle(SILType ty);
 
   /// This function maps a Swift type (either a language type like Float or an
@@ -169,10 +168,7 @@ namespace tf {
   /// exposed after deabstraction.  This is a class instead of a simple function
   /// because we memoize state to avoid rechecking types over and over again.
   class TensorFunctionClassifier {
-    /// This map memoizes whether the specified type declaration is known to
-    /// contain a TensorHandle or not, used to accelerate queries against types
-    /// that are frequently referenced like Tensor.
-    llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+    TypeContainsTensorHandle tcth;
   public:
     TensorFunctionClassifier() {}
 
@@ -190,10 +186,9 @@ namespace tf {
 
     /// Return true if the specified type contains a TensorHandle that will be
     /// exposed after deabstraction.
-    bool containsTensorHandle(Type ty);
-
-  private:
-    bool structContainsTensorHandle(StructDecl *decl);
+    bool containsTensorHandle(Type ty) {
+      return tcth.containsTensorHandle(ty);
+    }
   };
 
   /// Lower the specified SIL function (which was formed by the partitioner)

@@ -43,19 +43,6 @@ bool tf::shouldDumpIntermediates() {
   return TFDumpIntermediates;
 }
 
-
-/// If the specified type is the well-known TensorHandle<T> type, then return
-/// "T".  If not, return a null type.
-Type tf::isTensorHandle(Type ty) {
-  if (auto *bgct = ty->getAs<BoundGenericClassType>()) {
-    if (bgct->getDecl()->getNameStr() == "TensorHandle") {
-      assert(bgct->getGenericArgs().size() == 1 && "Expected one generic arg");
-      return bgct->getGenericArgs()[0];
-    }
-  }
-  return Type();
-}
-
 bool tf::isTensorHandle(SILType ty) {
   return (bool)isTensorHandle(ty.getSwiftRValueType());
 }
@@ -1421,61 +1408,3 @@ bool TensorFunctionClassifier::containsTensorHandle(CanSILFunctionType fnType) {
 }
 
 
-/// Return true if the specified type contains a TensorHandle that will be
-/// exposed after deabstraction.
-bool TensorFunctionClassifier::containsTensorHandle(Type ty) {
-  // If this type literally is TensorHandle, then yep, we contain it.  This is
-  // the base case.
-  if (isTensorHandle(ty))
-    return true;
-
-  // Deabstraction flattens tuples, so if a tuple contains any tensor handles,
-  // then the tuple itself does.
-  if (auto *tuple = ty->getAs<TupleType>()) {
-    for (auto &elt : tuple->getElements())
-      if (containsTensorHandle(elt.getType()))
-        return true;
-    return false;
-  }
-
-  // Deabstraction scalarizes structs.
-  if (auto *st = ty->getAs<StructType>())
-    return structContainsTensorHandle(st->getDecl());
-
-  // Deabstractions binds specialized generic structs.  Check if either the
-  // struct itself or one of the generic arguments contains a TensorHandle.
-  if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
-    // Check the generic arguments.
-    for (auto arg : bgst->getGenericArgs())
-      if (containsTensorHandle(arg))
-        return true;
-
-    return structContainsTensorHandle(bgst->getDecl());
-  }
-
-  // Handle still-generic types that may contain a TensorHandle.
-  if (auto *ugst = ty->getAs<UnboundGenericType>())
-    if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
-      return structContainsTensorHandle(decl);
-
-  // Otherwise we have a class or some other type that is opaque to
-  // deabstraction.
-  return false;
-}
-
-/// Determine whether the given struct contains a TensorHandle, caching the
-/// result.
-bool TensorFunctionClassifier::structContainsTensorHandle(StructDecl *decl) {
-  auto it = declContainsTensorHandle.find(decl);
-  if (it != declContainsTensorHandle.end())
-    return it->second;
-
-  bool hasTensorHandle = false;
-  for (auto p : decl->getStoredProperties())
-    if (containsTensorHandle(p->getType())) {
-      hasTensorHandle = true;
-      break;
-    }
-
-  return declContainsTensorHandle[decl] = hasTensorHandle;
-}
