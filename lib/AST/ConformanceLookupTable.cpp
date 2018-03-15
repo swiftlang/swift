@@ -642,6 +642,24 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
+  // Prefer the least conditional implier, which we approximate by seeing if one
+  // of the contexts syntactically has no generic requirements. This misses
+  // redundant cases like `struct Foo<T: P> {} extension Foo: P where T: P {}`
+  // (Foo : P is unconditional), but isConstrainedExtension doesn't fly as it
+  // requires the generic signature of the extension to exist, which requires
+  // conformances to exist, which is what we're doing here.
+  auto hasAdditionalRequirements = [&](ConformanceEntry *entry) {
+    if (auto ED = dyn_cast<ExtensionDecl>(entry->getDeclContext()))
+      if (auto TWC = ED->getTrailingWhereClause())
+        return !TWC->getRequirements().empty();
+
+    return false;
+  };
+  bool lhsHasReqs = hasAdditionalRequirements(lhs);
+  bool rhsHasReqs = hasAdditionalRequirements(rhs);
+  if (lhsHasReqs != rhsHasReqs)
+    return lhsHasReqs ? Ordering::After : Ordering::Before;
+
   // If the two conformances come from the same file, pick the first context
   // in the file.
   auto lhsSF = lhs->getDeclContext()->getParentSourceFile();
