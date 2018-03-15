@@ -857,6 +857,18 @@ public extension Tensor where Scalar == Bool {
     return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
+
+  @_inlineable @inline(__always)
+  func all(alongAxes axes: Int32...) -> Tensor {
+    return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
+
+  @_inlineable @inline(__always)
+  func any(alongAxes axes: Int32...) -> Tensor {
+    return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: true,
+                 Tidx: Int32.self)
+  }
 }
 
 public extension Tensor where Scalar : Numeric & Comparable {
@@ -873,12 +885,12 @@ public extension Tensor where Scalar : Numeric & Comparable {
   }
 
   @_inlineable @inline(__always)
-  func argmax(alongAxis axis: Int32) -> Tensor<Int32> {
+  func argmax(squeezingAxis axis: Int32) -> Tensor<Int32> {
     return #tfop("ArgMax", handle, Tensor<Int32>(axis), output_type: Int32.self)
   }
 
   @_inlineable @inline(__always)
-  func argmin(alongAxis axis: Int32) -> Tensor<Int32> {
+  func argmin(squeezingAxis axis: Int32) -> Tensor<Int32> {
     return #tfop("ArgMin", handle, Tensor<Int32>(axis), output_type: Int32.self)
   }
 }
