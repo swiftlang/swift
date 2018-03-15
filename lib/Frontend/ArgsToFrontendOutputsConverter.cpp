@@ -495,7 +495,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_emit_loaded_module_trace_path,
                                options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
-                   diag::error_cannot_have_supplementary_outputs_map,
+                   diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");
     return None;
   }
