@@ -3404,6 +3404,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   
   scope.pop();
   B.createReturn(loc, result);
+
+  // Now that the thunk body has been completely emitted, verify the
+  // body early.
+  F.verify();
 }
 
 //===----------------------------------------------------------------------===//
