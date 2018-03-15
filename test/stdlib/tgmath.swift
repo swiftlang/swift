@@ -60,6 +60,17 @@ let gz = CGFloat(3.3)
 
 let ix = Int(11)
 
+
+/*  Note on error tolerances:
+ *
+ *  These tests are *not* intended to test the underlying math library; rather,
+ *  they are only testing that the Swift wrappers call the right functions.
+ *  Because of this, there's nothing wrong with relaxing these tolerances
+ *  from 1 ulp to 3 or more, as needed to support platforms with less accurate
+ *  implementations.
+ *
+ *  The 0-ulp tolerances should be preserved, however, and XFAILED or #if'd
+ *  out for platforms that do not satisfy them.                               */
 MathTests.test("Unary functions") {
   expectEqualWithAccuracy(acos(dx), acos(fx), acos(gx), 1.4706289056333368, ulps: 1)
 
