@@ -1191,6 +1191,24 @@ static void VisitNodePrivateDeclName(
   }
 }
 
+static void VisitLocalDeclVariableName(ASTContext *ast,
+                                       Demangle::NodePointer child,
+                                       VisitNodeResult &result) {
+  if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
+    if (result._error.empty())
+      result._error =
+          "unable to retrieve content for Node::Kind::LocalDeclName";
+    return;
+  }
+
+  auto name = child->getChild(1);
+  FindNamedDecls(ast, ast->getIdentifier(name->getText()), result);
+  if (result._decls.empty())
+    result._error = stringWithFormat(
+      "demangled identifier '%s' could not be found by name lookup",
+      name->getText());
+}
+
 // VisitNodeFunction gets used for Function, Variable and Allocator:
 static void VisitNodeFunction(
     ASTContext *ast,
@@ -1256,22 +1274,9 @@ static void VisitNodeFunction(
     }
 
     case Demangle::Node::Kind::LocalDeclName: {
-      if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
-        if (result._error.empty())
-          result._error =
-              "unable to retrieve content for Node::Kind::LocalDeclName";
+      VisitLocalDeclVariableName(ast, child, decl_scope_result);
+      if (decl_scope_result._decls.empty())
         break;
-      }
-
-      auto name = child->getChild(1); // First child is number.
-      FindNamedDecls(ast, ast->getIdentifier(name->getText()),
-                     decl_scope_result);
-      if (decl_scope_result._decls.empty()) {
-        llvm::raw_string_ostream OS(result._error);
-        OS << "demangled identifier " << name->getText()
-           << " could not be found by name lookup";
-        break;
-      }
       std::copy(decl_scope_result._decls.begin(),
                 decl_scope_result._decls.end(),
                 back_inserter(identifier_result._decls));
