@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -emit-sil %s | %FileCheck %s
 
 protocol PPP {
     func f()

@@ -605,7 +605,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *value = getArg(argv, "value");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    if (strategy.getElementsWithPayload().size() > 0) {
+    if (!strategy.getElementsWithPayload().empty()) {
       strategy.destructiveProjectDataForLoad(
           IGF, concreteType,
           Address(value, type.getBestKnownAlignment()));
@@ -1060,6 +1060,98 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                     concreteLoweredType, concreteTI);
 }
 
+static constexpr uint64_t sizeAndAlignment(Size size, Alignment alignment) {
+  return ((uint64_t)size.getValue() << 32) | alignment.getValue();
+}
+
+/// Return a reference to a known value witness table from the runtime
+/// that's suitable for the given type, if there is one, or return null
+/// if we should emit a new one.
+static llvm::Constant *
+getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
+  // Native PE binaries shouldn't reference data symbols across DLLs, so disable
+  // this on Windows.
+  if (IGM.useDllStorage())
+    return nullptr;
+  
+  if (auto nom = type->getAnyNominal()) {
+    // TODO: Generic metadata patterns relative-reference their VWT, which won't
+    // work if it's in a different module without supporting indirection through
+    // the GOT.
+    if (nom->isGenericContext())
+      return nullptr;
+    // TODO: Enums need additional value witnesses for their tag manipulation.
+    if (isa<EnumDecl>(nom))
+      return nullptr;
+  }
+  
+  type = getFormalTypeInContext(type);
+  
+  auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
+  // We only have witnesses for fixed type info.
+  auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
+  if (!fixedTI)
+    return nullptr;
+  
+  CanType witnessSurrogate;
+
+  // Handle common POD type layouts.
+  auto &C = type->getASTContext();
+  ReferenceCounting refCounting;
+  if (fixedTI->isPOD(ResilienceExpansion::Maximal)
+      && fixedTI->getFixedExtraInhabitantCount(IGM) == 0) {
+    // Reuse one of the integer witnesses if applicable.
+    switch (sizeAndAlignment(fixedTI->getFixedSize(),
+                             fixedTI->getFixedAlignment())) {
+    case sizeAndAlignment(Size(0), Alignment(1)):
+      witnessSurrogate = TupleType::getEmpty(C);
+      break;
+    case sizeAndAlignment(Size(1), Alignment(1)):
+      witnessSurrogate = BuiltinIntegerType::get(8, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(2), Alignment(2)):
+      witnessSurrogate = BuiltinIntegerType::get(16, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(4), Alignment(4)):
+      witnessSurrogate = BuiltinIntegerType::get(32, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(8), Alignment(8)):
+      witnessSurrogate = BuiltinIntegerType::get(64, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(16), Alignment(16)):
+      witnessSurrogate = BuiltinIntegerType::get(128, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(32), Alignment(32)):
+      witnessSurrogate = BuiltinIntegerType::get(256, C)->getCanonicalType();
+      break;
+    case sizeAndAlignment(Size(64), Alignment(64)):
+      witnessSurrogate = BuiltinIntegerType::get(512, C)->getCanonicalType();
+      break;
+    }
+  } else if (fixedTI->isSingleRetainablePointer(ResilienceExpansion::Maximal,
+                                                &refCounting)) {
+    switch (refCounting) {
+    case ReferenceCounting::Native:
+      witnessSurrogate = C.TheNativeObjectType;
+      break;
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
+      witnessSurrogate = C.TheUnknownObjectType;
+      break;
+    case ReferenceCounting::Bridge:
+      witnessSurrogate = C.TheBridgeObjectType;
+      break;
+    case ReferenceCounting::Error:
+      break;
+    }
+  }
+  
+  if (witnessSurrogate)
+    return IGM.getAddrOfValueWitnessTable(witnessSurrogate);
+  return nullptr;
+}
+
 /// Emit a value-witness table for the given type, which is assumed to
 /// be non-dependent.
 llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
@@ -1068,7 +1160,16 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   // We shouldn't emit global value witness tables for generic type instances.
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
-
+  
+  // See if we can use a prefab witness table from the runtime.
+  // Note that we can't do this on Windows since the PE loader does not support
+  // cross-DLL pointers in data.
+  if (!isPattern) {
+    if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType)) {
+      return known;
+    }
+  }
+  
   // We should never be making a pattern if the layout isn't fixed.
   // The reverse can be true for types whose layout depends on
   // resilient types.

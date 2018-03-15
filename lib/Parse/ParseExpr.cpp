@@ -290,7 +290,7 @@ parse_operator:
           CodeCompletion->completeAssignmentRHS(assign);
         }
         consumeToken();
-        if (SequencedExprs.size() > 0 && (SequencedExprs.size() & 1) == 0) {
+        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
           // Make sure we have odd number of sequence exprs.
           SequencedExprs.pop_back();
         }
@@ -2628,9 +2628,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
         Identifier name = Tok.is(tok::identifier) ?
             Context.getIdentifier(Tok.getText()) : Identifier();
-        auto var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                           SourceLoc(), Identifier(),
-                                           Tok.getLoc(), name, Type(), nullptr);
+        auto var = new (Context)
+            ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                      Identifier(), Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
 
@@ -2929,9 +2929,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),SourceLoc(),
-                                        Identifier(), varLoc, ident, Type(),
-                                        closure);
+    auto *var = new (Context)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), varLoc, ident, Type(), closure);
     var->setImplicit();
     decls.push_back(var);
   }
@@ -3089,6 +3089,12 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
 ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   SourceLoc braceLoc = Tok.getLoc();
 
+  // Record the line numbers for the diagnostics below.
+  // Note that *do not* move this to after 'parseExprClosure()' it slows down
+  // 'getLineNumber()' call because of cache in SourceMgr.
+  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
+  auto braceLine = SourceMgr.getLineNumber(braceLoc);
+
   // Parse the closure.
   ParserResult<Expr> closure = parseExprClosure();
   if (closure.isNull())
@@ -3097,8 +3103,6 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   // Warn if the trailing closure is separated from its callee by more than
   // one line. A single-line separation is acceptable for a trailing closure
   // call, and will be diagnosed later only if the call fails to typecheck.
-  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
-  auto braceLine = SourceMgr.getLineNumber(braceLoc);
   if (braceLine > origLine + 1) {
     diagnose(braceLoc, diag::trailing_closure_after_newlines);
     diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
@@ -3189,7 +3193,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
 
     // Try and construct a FixIt for the argument label.
-    if (argLabelLocs.size() > 0 && !argLabels[0].empty()) {
+    if (!argLabelLocs.empty() && !argLabels[0].empty()) {
       auto ArgLoc = argLabelLocs[0];
       auto FirstElementName = argLabels[0];
             

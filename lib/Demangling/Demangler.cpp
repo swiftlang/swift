@@ -596,6 +596,9 @@ NodePointer Demangler::demangleOperator() {
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
+    case 'n':
+      return createType(
+          createWithChild(Node::Kind::Owned, popTypeAndGetChild()));
     case 'o': return demangleOperatorIdentifier();
     case 'p': return demangleProtocolListType();
     case 'q': return createType(demangleGenericParamIndex());
@@ -1892,8 +1895,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           return nullptr;
         StringRef Text = Name->getText();
         if (ParamKind ==
-              FunctionSigSpecializationParamKind::ConstantPropString &&
-            Text.size() > 0 && Text[0] == '_') {
+                FunctionSigSpecializationParamKind::ConstantPropString &&
+            !Text.empty() && Text[0] == '_') {
           // A '_' escapes a leading digit or '_' of a string constant.
           Text = Text.drop_front(1);
         }
@@ -2100,10 +2103,16 @@ NodePointer Demangler::demangleWitness() {
                                 Conf, AssocTypePath, ProtoTy);
     }
     case 'y': {
+      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+        return createWithChildren(Node::Kind::OutlinedCopy,
+                                  popNode(Node::Kind::Type), sig);
       return createWithChild(Node::Kind::OutlinedCopy,
                              popNode(Node::Kind::Type));
     }
     case 'e': {
+      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+        return createWithChildren(Node::Kind::OutlinedCopy,
+                                  popNode(Node::Kind::Type), sig);
       return createWithChild(Node::Kind::OutlinedConsume,
                              popNode(Node::Kind::Type));
     }

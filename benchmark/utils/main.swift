@@ -50,6 +50,7 @@ import DictTest3
 import DictTest4
 import DictionaryBridge
 import DictionaryCompactMapValues
+import DictionaryCopy
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
@@ -200,6 +201,7 @@ registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryCompactMapValues)
+registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
@@ -282,6 +284,8 @@ registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)
+registerBenchmark(StringInterpolationSmall)
+registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringTests)

@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
 
@@ -170,7 +172,7 @@ public enum FloatingPointSign: Int64 {
   case minus
 }
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
@@ -195,7 +197,7 @@ public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 
 public protocol Error {}
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil @$Ss3foo1eys5Error_pSg_tF : $@convention(thin) (@owned Optional<Error>) -> () {

@@ -70,7 +70,7 @@ KNOWN_SETTINGS=(
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
-    swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
+    swift-stdlib-enable-resilience "1"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     lldb-build-with-xcode       "1"              "Use xcodebuild to build LLDB, instead of CMake"
@@ -2346,6 +2346,15 @@ for host in "${ALL_HOSTS[@]}"; do
                         fi
                         ;;
                 esac
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS=NO
+                        )
+                else
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS=YES
+                    )
+                fi
                 ;;
             llbuild)
                 cmake_options=(
@@ -2354,8 +2363,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIT_EXECUTABLE:PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
-                    -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
-                    -DLLBUILD_SUPPORT_BINDINGS:=Swift
+                    -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                 )
                 ;;
             swiftpm)
@@ -2782,7 +2790,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 # Handle test subdirectory clause
-                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
                     LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
@@ -2804,7 +2812,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # If we need to use the system debugserver, do so explicitly.
                 if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver"
+                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver --out-of-tree-debugserver"
                 else
                     LLDB_TEST_DEBUG_SERVER=""
                 fi
@@ -2824,16 +2832,17 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
-                           call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                           "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                           --executable "${lldb_executable}" \
-                           ${LLDB_TEST_DEBUG_SERVER} \
-                           ${LLDB_TEST_SUBDIR_CLAUSE} \
-                           ${LLDB_TEST_CATEGORIES} \
-                           ${LLDB_DOTEST_CC_OPTS} \
-                           ${LLDB_FORMATTER_OPTS} \
-                           -E "${DOTEST_EXTRA}"
+                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                    SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                    "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                    --executable "${lldb_executable}" \
+                    ${LLDB_TEST_DEBUG_SERVER} \
+                    ${LLDB_TEST_SUBDIR_CLAUSE} \
+                    ${LLDB_TEST_CATEGORIES} \
+                    ${LLDB_DOTEST_CC_OPTS} \
+                    ${LLDB_FORMATTER_OPTS} \
+                    --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                    -E "${DOTEST_EXTRA}"
                 continue
                 ;;
             llbuild)

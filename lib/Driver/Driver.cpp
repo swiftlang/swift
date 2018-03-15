@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (Args.size() > 0) {
+  if (!Args.empty()) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
@@ -191,6 +191,9 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (name.find('=') != StringRef::npos)
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
+                     name);
+    else if (name.startswith("-D"))
+      diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
     else if (!Lexer::isIdentifier(name))
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
@@ -515,9 +518,9 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution);
+    ArgList->hasArg(options::OPT_driver_skip_execution,
+                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -679,9 +682,12 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   OutputLevel Level = OutputLevel::Normal;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_v,
-                                         options::OPT_parseable_output)) {
-    if (A->getOption().matches(options::OPT_v))
+  if (const Arg *A =
+          ArgList->getLastArg(options::OPT_driver_print_jobs, options::OPT_v,
+                              options::OPT_parseable_output)) {
+    if (A->getOption().matches(options::OPT_driver_print_jobs))
+      Level = OutputLevel::PrintJobs;
+    else if (A->getOption().matches(options::OPT_v))
       Level = OutputLevel::Verbose;
     else if (A->getOption().matches(options::OPT_parseable_output))
       Level = OutputLevel::Parseable;
@@ -753,11 +759,6 @@ Driver::buildCompilation(const ToolChain &TC,
 
   if (DriverPrintBindings)
     return nullptr;
-
-  if (DriverPrintJobs) {
-    printJobs(*C);
-    return nullptr;
-  }
 
   return C;
 }
@@ -2620,11 +2621,6 @@ void Driver::printActions(const Compilation &C) const {
   for (const Action *A : C.getActions()) {
     ::printActions(A, Ids);
   }
-}
-
-void Driver::printJobs(const Compilation &C) const {
-  for (const Job *J : C.getJobs())
-    J->printCommandLineAndEnvironment(llvm::outs());
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {

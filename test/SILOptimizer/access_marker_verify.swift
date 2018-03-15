@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -160,15 +162,11 @@ class LetClass {
   let x = 3
 }
 
-// FIXME: should be a [unknown] access.
-//
 // CHECK-LABEL: sil hidden @$S20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF : $@convention(thin) (@owned LetClass) -> Int {
 // CHECK: bb0(%0 : @owned $LetClass):
 // CHECK:   begin_borrow %0 : $LetClass
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [read] [dynamic]
 // CHECK:   load [trivial]
-// CHECK:   end_access
 // CHECK:   end_borrow
 // CHECK:   destroy_value %0 : $LetClass
 // CHECK:   return
@@ -200,9 +198,7 @@ final class SubWrapper : BaseClass {
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [modify] [dynamic]
 // CHECK:   assign %0 to
-// CHECK:   end_access
 // CHECK:   end_borrow
 // CHECK-NOT: begin_access
 // CHECK:   load [take]
@@ -754,7 +750,7 @@ class C : Abstractable {
 // CHECK-NOT: begin_access
 // CHECK:   store [[PA]] to [init] [[ADR]] : $*@callee_guaranteed () -> @out Int
 // CHECK:   [[PTR:%.*]] = address_to_pointer [[ADR]] : $*@callee_guaranteed () -> @out Int to $Builtin.RawPointer
-// CHECK:   [[FPTR:%.*]] = thin_function_to_pointer %{{.*}} : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout C, @thick C.Type) -> () to $Builtin.RawPointer
+// CHECK:   [[FPTR:%.*]] = thin_function_to_pointer %{{.*}} : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () to $Builtin.RawPointer
 // CHECK:   [[ENUM:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[FPTR]] : $Builtin.RawPointer
 // CHECK:   [[R:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[ENUM]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[R]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)

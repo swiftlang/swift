@@ -1952,7 +1952,36 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
                         diag::expected_tok_in_sil_instr, "$")
         || parseASTType(ty, patternEnv))
       return true;
-    
+
+    SILFunction *equals = nullptr;
+    SILFunction *hash = nullptr;
+
+    while (P.consumeIf(tok::comma)) {
+      Identifier subKind;
+      SourceLoc subKindLoc;
+      if (parseSILIdentifier(subKind, subKindLoc,
+                             diag::sil_keypath_expected_component_kind))
+        return true;
+
+      if (subKind.str() == "indices_equals") {
+        if (parseSILFunctionRef(InstLoc, equals))
+          return true;
+      } else if (subKind.str() == "indices_hash") {
+        if (parseSILFunctionRef(InstLoc, hash))
+          return true;
+      } else {
+        P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
+                   subKind);
+        return true;
+      }
+    }
+
+    if (!indexes.empty() != (equals && hash)) {
+      P.diagnose(componentLoc,
+                 diag::sil_keypath_external_missing_part);
+      return true;
+    }
+
     if (!parsedSubs.empty()) {
       auto genericEnv = externalDecl->getInnermostDeclContext()
                                     ->getGenericEnvironmentOfContext();
@@ -1977,12 +2006,13 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
         sub = sub.getCanonicalSubstitution();
     }
     
+
     auto indexesCopy = P.Context.AllocateCopy(indexes);
     auto subsCopy = P.Context.AllocateCopy(subs);
     
     component = KeyPathPatternComponent::forExternal(
         cast<AbstractStorageDecl>(externalDecl),
-        subsCopy, indexesCopy, ty);
+        subsCopy, indexesCopy, equals, hash, ty);
     return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {
@@ -2655,6 +2685,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(CopyBlock)
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
+    UNARY_INSTRUCTION(IsEscapingClosure)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(CopyUnownedValue)
@@ -3605,7 +3636,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (IsObjC && ElementTypes.size() != 0) {
+    if (IsObjC && !ElementTypes.empty()) {
       P.diagnose(P.Tok, diag::sil_objc_with_tail_elements);
       return true;
     }

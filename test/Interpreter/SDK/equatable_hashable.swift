@@ -8,12 +8,15 @@ import Foundation
 
 func testHash<H: Hashable>(_ x: H) -> Int { return x.hashValue }
 
+// CHECK: (1 as UInt8): hash = [[HASH:-?[0-9]+]]
+print("(1 as UInt8): hash = \((1 as UInt8).hashValue)")
+
 func test_CBool() {
   let x: CBool = true
   let hash = testHash(x)
   print("C_Bool: hash = \(hash)")
 }
-// CHECK: C_Bool: hash = 1
+// CHECK: C_Bool: hash = [[HASH]]
 test_CBool()
 
 func test_ObjCBool() {
@@ -21,7 +24,7 @@ func test_ObjCBool() {
   let hash = testHash(x.boolValue)
   print("ObjCBool: hash = \(hash)")
 }
-// CHECK-NEXT: ObjCBool: hash = 1
+// CHECK-NEXT: ObjCBool: hash = [[HASH]]
 test_ObjCBool()
 
 func testEquatable<E: Equatable>(_ x: E) {}

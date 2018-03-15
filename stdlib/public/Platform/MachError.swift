@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
 @_fixed_layout // FIXME(sil-serialize-all)
 @objc
@@ -203,4 +203,4 @@ public enum MachErrorCode : Int32 {
   /// The requested property cannot be changed at this time.
   case policyStatic             = 51
 }
-#endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)

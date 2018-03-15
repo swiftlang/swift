@@ -1,10 +1,27 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %utils/chex.py < %s > %t/generic_structs.sil
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
 
 // REQUIRES: CPU=x86_64
 
 import Builtin
+
+// -- Generic structs with fixed layout should have no completion function
+//    and emit the field offset vector as part of the pattern.
+// CHECK:       [[PATTERN:@.*]] = internal constant [3 x i64] [i64 0, i64 1, i64 8]
+// CHECK-LABEL: @"$S15generic_structs18FixedLayoutGenericVMP" = internal constant <{ {{.*}} }> <{
+// -- instantiation function
+// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S15generic_structs18FixedLayoutGenericVMi"
+// -- completion function
+// CHECK-SAME:   i32 0,
+// -- pattern flags
+// CHECK-SAME:   i32 2097153,
+// -- vwtable pointer
+// CHECK-SAME:   @"$S15generic_structs18FixedLayoutGenericVWV"
+// -- extra data pattern
+// CHECK-SAME: [3 x i64]* [[PATTERN]]
+// CHECK-SAME: i16 1,
+// CHECK-SAME: i16 3 }>
 
 // -- Generic structs with dynamic layout contain the vwtable pattern as part
 //    of the metadata pattern, and no independent vwtable symbol
@@ -33,7 +50,7 @@ import Builtin
 // CHECK-SAME:   [{{[0-9]+}} x i8*]* @"$S15generic_structs13SingleDynamicVMI"
 // CHECK-SAME:   @"$S15generic_structs13SingleDynamicVMP"
 // --       generic params, requirements, key args, extra args
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
+// CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       generic parameters
 // CHECK-SAME:   <i8 0x80>
 // CHECK-SAME: }>
@@ -56,7 +73,7 @@ import Builtin
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
 // --       generic params, requirements, key args, extra args
-// CHECK-SAME: i32 2, i32 2, i32 2, i32 2,
+// CHECK-SAME: i16 2, i16 2, i16 2, i16 2,
 // --       generic parameters
 // CHECK-SAME: <i8 0x80>, <i8 0x80>,
 // --       generic requirement
@@ -87,6 +104,12 @@ import Builtin
 // CHECK: @"$S15generic_structs8StringlyVMf" = internal constant <{ {{.*}} i64, i64, i64 }> <{
 // CHECK-SAME:   i64 0, i64 8, i64 16
 // CHECK-SAME: }>
+
+struct FixedLayoutGeneric<T> {
+  var x: Byteful
+  var y: Byteful
+  var z: Intish
+}
 
 struct SingleDynamic<T> {
   var x : T

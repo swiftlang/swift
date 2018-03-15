@@ -4712,11 +4712,17 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return DerivedConformance::deriveRawRepresentable(*this, Decl,
                                                       TypeDecl, Requirement);
 
+  case KnownProtocolKind::CaseIterable:
+    return DerivedConformance::deriveCaseIterable(*this, Decl,
+                                                  TypeDecl, Requirement);
+
   case KnownProtocolKind::Equatable:
-    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl,
+                                               Requirement);
   
   case KnownProtocolKind::Hashable:
-    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl,
+                                              Requirement);
     
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
@@ -4752,7 +4758,9 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::RawRepresentable:
     return DerivedConformance::deriveRawRepresentable(*this, Decl,
                                                       TypeDecl, AssocType);
-        
+  case KnownProtocolKind::CaseIterable:
+    return DerivedConformance::deriveCaseIterable(*this, Decl,
+                                                  TypeDecl, AssocType);
   default:
     return nullptr;
   }

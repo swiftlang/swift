@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name specialize_checked_cast_branch -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
 class C {}
 class D : C {}

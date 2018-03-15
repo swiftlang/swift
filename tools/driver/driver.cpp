@@ -71,7 +71,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
                                   SmallVectorImpl<const char *> &Args) {
-  assert(Args.size() > 0);
+  assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
   // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'

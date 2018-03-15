@@ -644,11 +644,7 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type {
-    InOutMask    = 1 << 0,
-    SharedMask   = 1 << 1,
-    VariadicMask = 1 << 2,
-  };
+  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -656,14 +652,10 @@ class TargetParameterTypeFlags {
 public:
   constexpr TargetParameterTypeFlags() : Data(0) {}
 
-  constexpr TargetParameterTypeFlags<int_type> withInOut(bool isInOut) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~InOutMask) |
-                                              (isInOut ? InOutMask : 0));
-  }
-
-  constexpr TargetParameterTypeFlags<int_type> withShared(bool isShared) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~SharedMask) |
-                                              (isShared ? SharedMask : 0));
+  constexpr TargetParameterTypeFlags<int_type>
+  withValueOwnership(ValueOwnership ownership) const {
+    return TargetParameterTypeFlags<int_type>((Data & ~ValueOwnershipMask) |
+                                              (int_type)ownership);
   }
 
   constexpr TargetParameterTypeFlags<int_type>
@@ -673,9 +665,11 @@ public:
   }
 
   bool isNone() const { return Data == 0; }
-  bool isInOut() const { return Data & InOutMask; }
-  bool isShared() const { return Data & SharedMask; }
   bool isVariadic() const { return Data & VariadicMask; }
+
+  ValueOwnership getValueOwnership() const {
+    return (ValueOwnership)(Data & ValueOwnershipMask);
+  }
 
   int_type getIntValue() const { return Data; }
 

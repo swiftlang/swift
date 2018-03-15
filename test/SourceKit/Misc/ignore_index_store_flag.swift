@@ -1,8 +1,7 @@
 var s = 10
 s.
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/t.h
 // RUN: %sourcekitd-test -req=sema %s -- %s -import-objc-header %t/t.h -pch-output-dir %t/pch -index-store-path %t/idx | %FileCheck %s -check-prefix=DIAG
 // RUN: not find %t/idx

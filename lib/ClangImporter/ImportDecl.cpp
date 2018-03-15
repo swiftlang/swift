@@ -434,7 +434,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
-  auto param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
+  auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  rawTy,
@@ -708,7 +708,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
-  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
+  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Default,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedFieldDecl->getType(),
@@ -1267,7 +1267,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
-        ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), argName,
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationStarted();
@@ -1689,7 +1689,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(),
                         elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
@@ -1870,7 +1870,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+      SourceLoc(), C.Id_errorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationStarted();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
@@ -2740,7 +2740,7 @@ namespace {
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
-          //   public static var _nsErrorDomain: String { return error-domain }
+          //   public static var errorDomain: String { return error-domain }
           addErrorDomain(errorWrapper, enumInfo.getErrorDomain(), Impl);
 
           // Note: the Code will be added after it's created.
@@ -3065,6 +3065,23 @@ namespace {
       decl = decl->getDefinition();
       if (!decl) {
         forwardDeclaration = true;
+        return nullptr;
+      }
+
+      // FIXME: We should actually support strong ARC references and similar in
+      // C structs. That'll require some SIL and IRGen work, though.
+      if (decl->isNonTrivialToPrimitiveCopy() ||
+          decl->isNonTrivialToPrimitiveDestroy()) {
+        // Note that there is a third predicate related to these,
+        // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
+        // for us because Swift never "trivially default-initializes" a struct
+        // (i.e. uses whatever bits were lying around as an initial value).
+
+        // FIXME: It would be nice to instead import the declaration but mark
+        // it as unavailable, but then it might get used as a type for an
+        // imported function and the developer would be able to use it without
+        // referencing the name, which would sidestep our availability
+        // diagnostics.
         return nullptr;
       }
 
@@ -7777,6 +7794,22 @@ static void finishInheritedConformances(
   }
 }
 
+static Type
+recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
+                              DependentMemberType *depMemTy) {
+  Type origBase = depMemTy->getBase();
+  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
+    Type substBase = recursivelySubstituteBaseType(conformance, depBase);
+    ModuleDecl *module = conformance->getDeclContext()->getParentModule();
+    return depMemTy->substBaseType(module, substBase);
+  }
+
+  const ProtocolDecl *proto = conformance->getProtocol();
+  assert(origBase->isEqual(proto->getSelfInterfaceType()));
+  return conformance->getTypeWitness(depMemTy->getAssocType(),
+                                     /*resolver=*/nullptr);
+}
+
 /// Collect conformances for the requirement signature.
 static void finishSignatureConformances(
     NormalProtocolConformance *conformance) {
@@ -7793,9 +7826,7 @@ static void finishSignatureConformances(
       substTy = conformance->getType();
     } else {
       auto *depMemTy = origTy->castTo<DependentMemberType>();
-      assert(depMemTy->getBase()->isEqual(proto->getSelfInterfaceType()));
-      substTy = conformance->getTypeWitness(depMemTy->getAssocType(),
-                                            /*resolver=*/nullptr);
+      substTy = recursivelySubstituteBaseType(conformance, depMemTy);
     }
     auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
 

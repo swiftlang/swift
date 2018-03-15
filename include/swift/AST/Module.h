@@ -206,7 +206,7 @@ private:
   struct {
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 2;
+    unsigned ResilienceStrategy : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);

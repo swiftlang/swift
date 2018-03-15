@@ -106,20 +106,37 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   0 // int entries; (zero'd bits)
 };
 
-static __swift_uint64_t randomUInt64() {
+static swift::_SwiftHashingSeed initializeHashingSeed() {
+#if defined(__APPLE__)
+  // Use arc4random if available.
+  swift::_SwiftHashingSeed seed = { 0, 0 };
+  arc4random_buf(&seed, sizeof(seed));
+  return seed;
+#else
   std::random_device randomDevice;
-  std::mt19937_64 twisterEngine(randomDevice());
+  std::mt19937_64 engine(randomDevice());
   std::uniform_int_distribution<__swift_uint64_t> distribution;
-  return distribution(twisterEngine);
+  return { distribution(engine), distribution(engine) };
+#endif
+}
+
+static __swift_bool initializeHashingDeterminism() {
+  // Setting the environment variable SWIFT_DETERMINISTIC_HASHING to "1"
+  // disables randomized hash seeding. This is useful in cases we need to ensure
+  // results are repeatable, e.g., in certain test environments.  (Note that
+  // even if the seed override is enabled, hash values aren't guaranteed to
+  // remain stable across even minor stdlib releases.)
+  auto determinism = getenv("SWIFT_DETERMINISTIC_HASHING");
+  return determinism && 0 == strcmp(determinism, "1");
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
-swift::_SwiftHashingSecretKey swift::_swift_stdlib_Hashing_secretKey = {
-  randomUInt64(), randomUInt64()
-};
+swift::_SwiftHashingSeed swift::_swift_stdlib_Hashing_seed =
+  initializeHashingSeed();
+__swift_bool swift::_swift_stdlib_Hashing_deterministicHashing =
+  initializeHashingDeterminism();
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
-__swift_uint64_t swift::_swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_instantiateInertHeapObject(void *address,

@@ -316,14 +316,14 @@ protected:
     StorageKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+2+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
 
     /// \brief The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
-    Specifier : 2,
+    Specifier : 4,
 
     /// \brief Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
@@ -543,12 +543,16 @@ protected:
     HasUnreferenceableStorage : 1
   );
   
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2,
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2+1,
     /// The stage of the raw type circularity check for this class.
     Circularity : 2,
 
     /// True if the enum has cases and at least one case has associated values.
-    HasAssociatedValues : 2
+    HasAssociatedValues : 2,
+    /// True if the enum has at least one case that has some availability
+    /// attribute.  A single bit because it's lazily computed along with the
+    /// HasAssociatedValues bit.
+    HasAnyUnavailableValues : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3220,6 +3224,11 @@ public:
   /// Note that this is true for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
 
+  /// True if any of the enum cases have availability annotations.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasPotentiallyUnavailableCaseValue() const;
+
   /// True if the enum has cases.
   bool hasCases() const {
     return !getAllElements().empty();
@@ -3870,7 +3879,7 @@ enum class AccessorKind {
 };
 
 /// The safety semantics of this addressor.
-enum class AddressorKind : unsigned char {
+enum class AddressorKind : uint8_t {
   /// \brief This is not an addressor.
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
@@ -3887,7 +3896,7 @@ enum class AddressorKind : unsigned char {
 };
 
 /// Whether an access to storage is for reading, writing, or both.
-enum class AccessKind : unsigned char {
+enum class AccessKind : uint8_t {
   /// The access is just to read the current value.
   Read,
 
@@ -3899,11 +3908,11 @@ enum class AccessKind : unsigned char {
 };
 
 /// The way to actually evaluate an access to storage.
-enum class AccessStrategy : unsigned char {
+enum class AccessStrategy : uint8_t {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
-  
+
   /// The decl is a VarDecl with storage defined by a property behavior;
   /// this access may initialize or reassign the storage based on dataflow.
   BehaviorStorage,
@@ -4445,17 +4454,18 @@ class VarDecl : public AbstractStorageDecl {
 public:
   enum class Specifier : uint8_t {
     // For Var Decls
-    
-    Let  = 0,
-    Var  = 1,
-    
+
+    Let = 0,
+    Var = 1,
+
     // For Param Decls
-    
-    Owned  = Let,
+
+    Default = Let,
     InOut = 2,
     Shared = 3,
+    Owned = 4,
   };
-  
+
 protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
@@ -4602,10 +4612,23 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
+  bool isImmutable() const {
+    switch (getSpecifier()) {
+    case Specifier::Let:
+    case Specifier::Shared:
+    case Specifier::Owned:
+      return true;
+    case Specifier::Var:
+    case Specifier::InOut:
+      return false;
+    }
+  }
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
   /// Is this an immutable 'shared' property?
   bool isShared() const { return getSpecifier() == Specifier::Shared; }
+  /// Is this an immutable 'owned' property?
+  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
 
   ValueOwnership getValueOwnership() const {
     switch (getSpecifier()) {
@@ -4617,6 +4640,8 @@ public:
       return ValueOwnership::InOut;
     case Specifier::Shared:
       return ValueOwnership::Shared;
+    case Specifier::Owned:
+      return ValueOwnership::Owned;
     }
   }
 

@@ -1219,8 +1219,8 @@ static void configureImplicitSelf(TypeChecker &tc,
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   auto specifier = selfParam.getParameterFlags().isInOut()
-                 ? VarDecl::Specifier::InOut
-                 : VarDecl::Specifier::Owned;
+                       ? VarDecl::Specifier::InOut
+                       : VarDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
@@ -7556,8 +7556,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
   }
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;
 
@@ -9014,6 +9012,13 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
       if (!evaluateTargetConformanceTo(decodableProto))
         (void)evaluateTargetConformanceTo(encodableProto);
+    } else if (baseName.getIdentifier() == Context.Id_allCases ||
+               baseName.getIdentifier() == Context.Id_AllCases) {
+      // If the target should conform to the CaseIterable protocol, check the
+      // conformance here to attempt synthesis.
+      auto *caseIterableProto
+          = Context.getProtocol(KnownProtocolKind::CaseIterable);
+      (void)evaluateTargetConformanceTo(caseIterableProto);
     }
   } else {
     auto argumentNames = member.getArgumentNames();

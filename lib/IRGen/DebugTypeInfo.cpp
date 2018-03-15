@@ -77,14 +77,14 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
   }
 
   // DynamicSelfType is also sugar as far as debug info is concerned.
-  auto DeclSelfType = DeclType;
+  auto Sugared = DeclType;
   if (auto DynSelfTy = DeclType->getAs<DynamicSelfType>())
-    DeclSelfType = DynSelfTy->getSelfType();
+    Sugared = DynSelfTy->getSelfType();
 
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  auto *Type = DeclSelfType->isEqual(RealType) ? DeclType.getPointer()
-                                               : RealType.getPointer();
+  auto *Type = Sugared->isEqual(RealType) ? DeclType.getPointer()
+                                          : RealType.getPointer();
   return getFromTypeInfo(DC, GE, Type, Info);
 }
 

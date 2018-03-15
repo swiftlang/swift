@@ -82,6 +82,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
@@ -414,12 +415,9 @@ ManagedValue Transform::transform(ManagedValue v,
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {
-      SILValue result = v.getValue();
       if (v.getType().isAddress())
-        result = SGF.B.createUncheckedAddrCast(Loc, result, loweredResultTy);
-      else
-        result = SGF.B.createUncheckedBitCast(Loc, result, loweredResultTy);
-      return ManagedValue(result, v.getCleanup());
+        return SGF.B.createUncheckedAddrCast(Loc, v, loweredResultTy);
+      return SGF.B.createUncheckedBitCast(Loc, v, loweredResultTy);
     }
 
     auto transformOptionalPayload =
@@ -785,40 +783,6 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   return SGF.emitManagedRValueWithCleanup(outputTuple, outputTL);
 }
 
-static ManagedValue manageParam(SILGenFunction &SGF,
-                                SILLocation loc,
-                                SILValue paramValue,
-                                SILParameterInfo info) {
-  switch (info.getConvention()) {
-  case ParameterConvention::Indirect_In_Guaranteed:
-    if (SGF.silConv.useLoweredAddresses())
-      return ManagedValue::forUnmanaged(paramValue);
-    LLVM_FALLTHROUGH;
-  case ParameterConvention::Direct_Guaranteed:
-    return SGF.emitManagedBeginBorrow(loc, paramValue);
-  // Unowned parameters are only guaranteed at the instant of the call, so we
-  // must retain them even if we're in a context that can accept a +0 value.
-  case ParameterConvention::Direct_Unowned:
-    paramValue = SGF.getTypeLowering(paramValue->getType())
-        .emitCopyValue(SGF.B, loc, paramValue);
-    LLVM_FALLTHROUGH;
-  case ParameterConvention::Direct_Owned:
-    return SGF.emitManagedRValueWithCleanup(paramValue);
-
-  case ParameterConvention::Indirect_In:
-    if (SGF.silConv.useLoweredAddresses())
-      return SGF.emitManagedBufferWithCleanup(paramValue);
-    return SGF.emitManagedRValueWithCleanup(paramValue);
-
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-    return ManagedValue::forLValue(paramValue);
-  case ParameterConvention::Indirect_In_Constant:
-    break;
-  }
-  llvm_unreachable("bad parameter convention");
-}
-
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
     SmallVectorImpl<SILArgument *> *indirectResults) {
@@ -834,9 +798,7 @@ void SILGenFunction::collectThunkParams(
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(F.getConventions().getSILType(param));
-    auto paramValue = F.begin()->createFunctionArgument(paramTy);
-    auto paramMV = manageParam(*this, loc, paramValue, param);
-    params.push_back(paramMV);
+    params.push_back(B.createInputFunctionArgument(paramTy, loc));
   }
 }
 
@@ -1573,9 +1535,6 @@ class ResultPlanner {
       ///
       /// Valid: reabstraction info, InnerResult, OuterResult.
       ReabstractDirectToDirect,
-
-      /// Ignore the next direct inner result, since the outer is 'Void'.
-      IgnoreDirectResult,
     };
 
     Operation(Kind kind) : TheKind(kind) {}
@@ -1719,24 +1678,6 @@ private:
                                     SILValue innerResultAddr,
                                     SILResultInfo outerResult,
                                     SILValue optOuterResultAddr);
-
-  void planIgnoredResult(AbstractionPattern innerOrigType,
-                         CanType innerSubstType, PlanData &planData) {
-    if (innerOrigType.isTuple()) {
-      auto innerSubstTuple = cast<TupleType>(innerSubstType);
-      for (unsigned i = 0, n = innerSubstTuple->getNumElements(); i != n; ++i)
-        planIgnoredResult(innerOrigType.getTupleElementType(i),
-                          innerSubstTuple.getElementType(i), planData);
-      return;
-    }
-
-    auto innerResult = claimNextInnerResult(planData);
-    if (innerResult.isFormalIndirect() &&
-        SGF.silConv.isSILIndirect(innerResult))
-      (void)addInnerIndirectResultTemporary(planData, innerResult);
-    else
-      addIgnoreDirectResult();
-  }
 
   /// Claim the next inner result from the plan data.
   SILResultInfo claimNextInnerResult(PlanData &data) {
@@ -1887,10 +1828,6 @@ private:
     op.OuterOrigType = outerOrigType;
     op.OuterSubstType = outerSubstType;
   }
-
-  void addIgnoreDirectResult() {
-    (void)addOperation(Operation::IgnoreDirectResult);
-  }
 };
 
 } // end anonymous namespace
@@ -1901,13 +1838,6 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
                          AbstractionPattern outerOrigType,
                          CanType outerSubstType,
                          PlanData &planData) {
-  // Conversion from `() -> T` to `() -> Void` is allowed when
-  // the argument is a closure.
-  if (!innerSubstType->isVoid() && outerSubstType->isVoid()) {
-    planIgnoredResult(innerOrigType, innerSubstType, planData);
-    return;
-  }
-
   // The substituted types must match up in tuple-ness and arity.
   assert(
       isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
@@ -2616,10 +2546,6 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
     case Operation::InjectOptionalIndirect:
       SGF.B.createInjectEnumAddr(Loc, op.OuterResultAddr, op.SomeDecl);
       continue;
-
-    case Operation::IgnoreDirectResult:
-      (void)claimNext(innerDirectResults);
-      continue;
     }
     llvm_unreachable("bad operation kind");
   }
@@ -3147,7 +3073,8 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
   SGF.B.createReturn(loc, result);
 }
 
-ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
+ManagedValue
+SILGenFunction::createWithoutActuallyEscapingClosure(
     SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
 
   auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
@@ -3189,7 +3116,6 @@ ManagedValue SILGenFunction::createWithoutActuallyEscapingClosure(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnType), subs,
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
-
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we rerpresent these captures by the same value the following works.
   thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);

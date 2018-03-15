@@ -296,7 +296,7 @@ namespace {
       // - -1 -- if we have a payload
       // -  0 -- if there's no payload
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-          ElementsWithPayload.size() > 0 ? -1 : 0);
+                                    !ElementsWithPayload.empty() ? -1 : 0);
     }
 
     llvm::Value *
@@ -676,6 +676,14 @@ namespace {
       return ClusteredBitVector::getConstant(
                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
                      true);
+    }
+
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      auto singleton = getSingleton();
+      if (!singleton)
+        return false;
+      return singleton->isSingleRetainablePointer(expansion, rc);
     }
   };
 
@@ -1423,15 +1431,35 @@ namespace {
       PayloadTypesAndTagType.push_back(type);
     }
   }
+  
+  static std::pair<CanType, CanGenericSignature>
+  getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
+    auto loweredType = type.getSwiftRValueType();
+    if (loweredType->hasArchetype()) {
+      GenericEnvironment *env = nullptr;
+      loweredType.findIf([&env](Type t) -> bool {
+        if (auto arch = t->getAs<ArchetypeType>()) {
+          env = arch->getGenericEnvironment();
+          return true;
+        }
+        return false;
+      });
+      assert(env && "has archetype but no archetype?!");
+      return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
+              env->getGenericSignature()->getCanonicalSignature()};
+    }
+    return {loweredType, nullptr};
+  }
 
   static llvm::Function *createOutlineLLVMFunction(
       IRGenModule &IGM, std::string &name,
-      SmallVector<llvm::Type *, 2> &PayloadTypesAndTagType) {
+      ArrayRef<llvm::Type *> PayloadTypesAndTagType) {
     auto consumeTy = llvm::FunctionType::get(IGM.VoidTy, PayloadTypesAndTagType,
                                              /*isVarArg*/ false);
     auto func =
-        llvm::Function::Create(consumeTy, llvm::GlobalValue::InternalLinkage,
+        llvm::Function::Create(consumeTy, llvm::GlobalValue::LinkOnceODRLinkage,
                                llvm::StringRef(name), IGM.getModule());
+    func->setVisibility(llvm::GlobalValue::HiddenVisibility);
     func->setAttributes(IGM.constructInitialAttributes());
     func->setDoesNotThrow();
     func->setCallingConv(IGM.DefaultCC);
@@ -1490,14 +1518,19 @@ namespace {
 
     unsigned NumExtraInhabitantTagValues = ~0U;
 
-    llvm::Function *copyEnumFunction = nullptr;
-    llvm::Function *consumeEnumFunction = nullptr;
+    SILType loweredType;
+    mutable llvm::Function *copyEnumFunction = nullptr;
+    mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
 
-    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
+    llvm::Function *
+    emitCopyEnumFunction(IRGenModule &IGM, SILType theEnumType) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(
-          theEnum->getAsNominalTypeOrNominalTypeExtensionContext());
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
+      std::string name =
+        Mangler.mangleOutlinedCopyFunction(manglingBits.first,
+                                           manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -1528,9 +1561,13 @@ namespace {
     }
 
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            EnumDecl *theEnum) {
+                                            SILType theEnumType) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedConsumeFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
+      std::string name =
+        Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
+                                              manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -2274,7 +2311,8 @@ namespace {
         return;
 
       case Normal: {
-        assert(copyEnumFunction && "Did not create copy function for enum");
+        if (!copyEnumFunction)
+          copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -2307,8 +2345,8 @@ namespace {
         return;
 
       case Normal: {
-        assert(consumeEnumFunction &&
-               "Did not create consume function for enum");
+        if (!consumeEnumFunction)
+          consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -2977,13 +3015,18 @@ namespace {
     ReferenceCounting Refcounting;
     bool AllowFixedLayoutOptimizations;
 
-    llvm::Function *copyEnumFunction = nullptr;
-    llvm::Function *consumeEnumFunction = nullptr;
+    SILType loweredType;
+    mutable llvm::Function *copyEnumFunction = nullptr;
+    mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
 
-    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
+    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(type);
+      std::string name =
+        Mangler.mangleOutlinedCopyFunction(manglingBits.first,
+                                           manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -3007,14 +3050,17 @@ namespace {
     }
 
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            EnumDecl *theEnum) {
+                                            SILType type) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedConsumeFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(type);
+      std::string name =
+        Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
+                                              manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
-
       auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
 
       forNontrivialPayloads(IGF, parts.tag, [&](unsigned tagIndex,
@@ -3502,7 +3548,7 @@ namespace {
       
     found_empty_case:
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
-      if (CommonSpareBits.size() > 0) {
+      if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
           .emitCompare(IGF, APInt::getAllOnesValue(CommonSpareBits.size()),
                        payloadValue);
@@ -3591,7 +3637,7 @@ namespace {
         auto tagVal = llvm::ConstantInt::get(C, APInt(numTagBits, tagIndex));
         
         // If the payload is empty, there's only one case per tag.
-        if (CommonSpareBits.size() == 0) {
+        if (CommonSpareBits.empty()) {
           auto found = destMap.find(elti->decl);
           if (found != destMap.end())
             tagSwitch->addCase(tagVal, found->second);
@@ -3716,7 +3762,7 @@ namespace {
                              const LoadableTypeInfo &payloadTI,
                              Explosion &out) const {
       // If the payload is empty, so is the explosion.
-      if (CommonSpareBits.size() == 0)
+      if (CommonSpareBits.empty())
         return;
       
       // If we have spare bits, we have to mask out any set tag bits packed
@@ -3843,7 +3889,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGM, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = APInt(CommonSpareBits.size(), tagIndex);
       }
@@ -3886,7 +3932,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGF, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
 #if defined(__BIG_ENDIAN__) && defined(__LP64__)
@@ -4021,7 +4067,8 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
-        assert(copyEnumFunction && "Did not create copy function for enum");
+        if (!copyEnumFunction)
+          copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -4062,8 +4109,8 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
-        assert(consumeEnumFunction &&
-               "Did not create consume function for enum");
+        if (!consumeEnumFunction)
+          consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -4755,8 +4802,8 @@ namespace {
 
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
       ClusteredBitVector bits;
-      
-      if (CommonSpareBits.size() > 0)
+
+      if (!CommonSpareBits.empty())
         bits = getBitVectorFromAPInt(payloadPart);
 
       unsigned totalSize
@@ -5243,7 +5290,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
-    assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
+    assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
            new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
@@ -5353,6 +5400,10 @@ namespace {
                               Address dest,
                               SILType T) const override {
       return Strategy.storeExtraInhabitant(IGF, index, dest, T);
+    }
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      return Strategy.isSingleRetainablePointer(expansion, rc);
     }
   };
 
@@ -5725,8 +5776,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
       payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
-    copyEnumFunction = emitCopyEnumFunction(TC.IGM, theEnum);
-    consumeEnumFunction = emitConsumeEnumFunction(TC.IGM, theEnum);
+    loweredType = Type;
   }
 
   return const_cast<TypeInfo *>(TI);
@@ -5916,8 +5966,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
-    copyEnumFunction = emitCopyEnumFunction(TC.IGM, theEnum);
-    consumeEnumFunction = emitConsumeEnumFunction(TC.IGM, theEnum);
+    loweredType = Type;
   }
 
   return const_cast<TypeInfo *>(TI);

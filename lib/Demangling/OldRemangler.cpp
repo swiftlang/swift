@@ -1470,6 +1470,11 @@ void Remangler::mangleShared(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleOwned(Node *node) {
+  Out << 'n';
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleInOut(Node *node) {
   Out << 'R';
   mangleSingleChildNode(node); // type

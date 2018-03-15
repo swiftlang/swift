@@ -2090,6 +2090,7 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   CASE(Var)
   CASE(InOut)
   CASE(Shared)
+  CASE(Owned)
   }
 #undef CASE
   return None;
@@ -4055,6 +4056,7 @@ getActualValueOwnership(serialization::ValueOwnership raw) {
   CASE(Default)
   CASE(InOut)
   CASE(Shared)
+  CASE(Owned)
 #undef CASE
   }
   return None;

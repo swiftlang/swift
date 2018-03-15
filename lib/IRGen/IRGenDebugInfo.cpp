@@ -1251,14 +1251,15 @@ private:
     case TypeKind::BuiltinVector: {
       (void)MangledName; // FIXME emit the name somewhere.
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-      DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
-                              DbgTy.getGenericEnvironment(),
-                              BuiltinVectorTy->getElementType(),
-                              DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
-      auto Subscripts = nullptr;
-      return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
+      auto ElemTy = BuiltinVectorTy->getElementType();
+      auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), ElemTy,
+          IGM.getTypeInfoForUnlowered(ElemTy));
+      unsigned Count = BuiltinVectorTy->getNumElements();
+      auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
+      return DBuilder.createVectorType(SizeInBits,
                                        AlignInBits, getOrCreateType(ElemDbgTy),
-                                       Subscripts);
+                                       DBuilder.getOrCreateArray(Subscript));
     }
 
     // Reference storage types.
@@ -1951,7 +1952,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0)
+  if (Storage.empty())
     emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                      DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }

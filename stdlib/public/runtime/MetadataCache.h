@@ -44,6 +44,79 @@ template <class EntryTy>
 using SimpleGlobalCache =
   ConcurrentMap<EntryTy, /*destructor*/ false, MetadataAllocator>;
 
+/// A map for which there is a phase of initialization that is guaranteed
+/// to be performed exclusively.
+///
+/// In addition to the requirements of ConcurrentMap, the entry type must
+/// provide the following members:
+///
+///   /// A type which provides a contextual operator bool; this is used
+///   /// by the data structure when calling checkStatus to test whether
+///   /// initialization has completed.
+///   using StatusType = ...;
+///
+///   /// Check the current status of the entry.  If 'locked' is true,
+///   /// there are no competing operations to modify the entry.
+///   StatusType checkStatus(bool locked, ArgTys...)
+template <class EntryType, bool ProvideDestructor = true>
+class LockingConcurrentMap {
+  ConcurrentMap<EntryType, /*destructor*/ false, MetadataAllocator> Map;
+
+  struct ConcurrencyControl {
+    Mutex Lock;
+    ConditionVariable Queue;
+  };
+
+  using StatusType = typename EntryType::StatusType;
+
+  ConcurrencyControl *Concurrency;
+public:
+  LockingConcurrentMap() : Concurrency(new ConcurrencyControl()) {}
+
+  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
+
+  template <class KeyType, class... ExtraArgTys>
+  std::pair<EntryType*, StatusType>
+  getOrInsert(KeyType key, ExtraArgTys ...extraArgs) {
+    auto result = Map.getOrInsert(key, extraArgs...);
+    auto entry = result.first;
+    auto concurrency = Concurrency;
+
+    // If we are not inserting the entry, we need to check whether the entry
+    // currently satisfies our conditions.
+    if (!result.second) {
+      // Check status.
+      StatusType status = entry->checkStatus(false, extraArgs...);
+      if (status) {
+        return { entry, std::move(status) };
+      }
+
+      concurrency->Lock.withLockOrWait(concurrency->Queue, [&] {
+        status = entry->checkStatus(true, extraArgs...);
+
+        // If the status is ever satisfied, we can stop waiting.
+        if (status) {
+          return true;
+        }
+
+        return false;
+      });
+
+      return { entry, std::move(status) };
+    }
+
+    // Initialize the entry.
+    StatusType status = entry->initialize(extraArgs...);
+
+    // Notify anyone who might be waiting.
+    concurrency->Lock.withLockThenNotifyAll(concurrency->Queue, [&] {
+      entry->flagInitializedStatus(status);
+    });
+
+    return { entry, std::move(status) };
+  }
+};
+
 // A wrapper around a pointer to a metadata cache entry that provides
 // DenseMap semantics that compare values in the key vector for the metadata
 // instance.
@@ -58,19 +131,9 @@ class KeyDataRef {
     : Args(args), Length(length) {}
 
 public:
-  template <class Entry>
-  static KeyDataRef forEntry(const Entry *e, unsigned numArguments) {
-    return KeyDataRef(e->getArgumentsBuffer(), numArguments);
-  }
-
   static KeyDataRef forArguments(const void * const *args,
                                  unsigned numArguments) {
     return KeyDataRef(args, numArguments);
-  }
-
-  template <class Entry>
-  const Entry *getEntry() const {
-    return Entry::fromArgumentsBuffer(Args, Length);
   }
 
   bool operator==(KeyDataRef rhs) const {
@@ -117,242 +180,170 @@ public:
   unsigned size() const { return Length; }
 };
 
-template <class Impl>
-struct CacheEntryHeader {};
+/// A key value as provided to the concurrent map.
+struct MetadataCacheKey {
+  size_t Hash;
+  KeyDataRef KeyData;
 
-/// A CRTP class for defining entries in a metadata cache.
-template <class Impl, class Header = CacheEntryHeader<Impl> >
-class alignas(void*) CacheEntry : public Header {
+  MetadataCacheKey(KeyDataRef data) : Hash(data.hash()), KeyData(data) {}
+  MetadataCacheKey(const void *const *data, size_t size)
+    : MetadataCacheKey(KeyDataRef::forArguments(data, size)) {}
+};
 
-  CacheEntry(const CacheEntry &other) = delete;
-  void operator=(const CacheEntry &other) = delete;
-
-  Impl *asImpl() { return static_cast<Impl*>(this); }
-  const Impl *asImpl() const { return static_cast<const Impl*>(this); }
-
+/// A helper class for ConcurrentMap entry types which allows trailing objects
+/// objects and automatically implements the getExtraAllocationSize methods
+/// in terms of numTrailingObjects calls.
+///
+/// For each trailing object type T, the subclass must provide:
+///   size_t numTrailingObjects(OverloadToken<T>) const;
+///   static size_t numTrailingObjects(OverloadToken<T>, ...) const;
+/// where the arguments to the latter are the arguments to getOrInsert,
+/// including the key.
+template <class Impl, class... Objects>
+struct ConcurrentMapTrailingObjectsEntry
+    : swift::ABI::TrailingObjects<Impl, Objects...> {
 protected:
-  CacheEntry() = default;
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<Impl, Objects...>;
+
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  static Impl *allocate(MetadataAllocator &allocator,
-                        const void * const *arguments,
-                        size_t numArguments, size_t payloadSize) {
-    void *buffer = allocator.Allocate(sizeof(Impl)  +
-                                      numArguments * sizeof(void*) +
-                                      payloadSize,
-                                      alignof(Impl));
-    void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
-    auto result = new (resultPtr) Impl(numArguments);
-
-    // Copy the arguments into the right place for the key.
-    memcpy(buffer, arguments,
-           numArguments * sizeof(void*));
-
-    return result;
+  template <class... Args>
+  static size_t getExtraAllocationSize(const MetadataCacheKey &key,
+                                       Args &&...args) {
+    return TrailingObjects::template additionalSizeToAlloc<Objects...>(
+        Impl::numTrailingObjects(OverloadToken<Objects>(), key, args...)...);
   }
-
-  void **getArgumentsBuffer() {
-    return reinterpret_cast<void**>(this) - asImpl()->getNumArguments();
-  }
-
-  void * const *getArgumentsBuffer() const {
-    return reinterpret_cast<void * const *>(this)
-      - asImpl()->getNumArguments();
-  }
-
-  template <class T> T *getData() {
-    return reinterpret_cast<T *>(asImpl() + 1);
-  }
-
-  template <class T> const T *getData() const {
-    return const_cast<CacheEntry*>(this)->getData<T>();
-  }
-
-  static const Impl *fromArgumentsBuffer(const void * const *argsBuffer,
-                                         unsigned numArguments) {
-    return reinterpret_cast<const Impl *>(argsBuffer + numArguments);
+  size_t getExtraAllocationSize() const {
+    return TrailingObjects::template additionalSizeToAlloc<Objects...>(
+        asImpl().numTrailingObjects(OverloadToken<Objects>())...);
   }
 };
 
-/// The implementation of a metadata cache.  Note that all-zero must
-/// be a valid state for the cache.
-template <class ValueTy> class MetadataCache {
-  /// A key value as provided to the concurrent map.
-  struct Key {
-    size_t Hash;
-    KeyDataRef KeyData;
-
-    Key(KeyDataRef data) : Hash(data.hash()), KeyData(data) {}
-  };
-
-  /// The layout of an entry in the concurrent map.
-  class Entry {
-    size_t Hash;
-    unsigned KeyLength;
-
-    /// Does this entry have a value, or is it currently undergoing
-    /// initialization?
-    ///
-    /// This (and the following field) is ever modified under the lock,
-    /// but it can be read from any thread, including while the lock
-    /// is held.
-    std::atomic<bool> HasValue;
-    union {
-      ValueTy *Value;
-      std::thread::id InitializingThread;
-    };
-
-    const void **getKeyDataBuffer() {
-      return reinterpret_cast<const void **>(this + 1);
-    }
-    const void * const *getKeyDataBuffer() const {
-      return reinterpret_cast<const void * const *>(this + 1);
-    }
-  public:
-    Entry(const Key &key)
-      : Hash(key.Hash), KeyLength(key.KeyData.size()), HasValue(false) {
-      InitializingThread = std::this_thread::get_id();
-      memcpy(getKeyDataBuffer(), key.KeyData.begin(),
-             KeyLength * sizeof(void*));
-    }
-
-    bool isBeingInitializedByCurrentThread() const {
-      return InitializingThread == std::this_thread::get_id();
-    }
-
-    KeyDataRef getKeyData() const {
-      return KeyDataRef::forArguments(getKeyDataBuffer(), KeyLength);
-    }
-
-    intptr_t getKeyIntValueForDump() const {
-      return Hash;
-    }
-
-    static size_t getExtraAllocationSize(const Key &key) {
-      return key.KeyData.size() * sizeof(void*);
-    }
-    size_t getExtraAllocationSize() const {
-      return getKeyData().size() * sizeof(void*);
-    }
-
-    int compareWithKey(const Key &key) const {
-      // Order by hash first, then by the actual key data.
-      if (key.Hash != Hash) {
-        return (key.Hash < Hash ? -1 : 1);
-      } else {
-        return key.KeyData.compare(getKeyData());
-      }
-    }
-
-    ValueTy *getValue() const {
-      if (HasValue.load(std::memory_order_acquire)) {
-        return Value;
-      }
-      return nullptr;
-    }
-
-    void setValue(ValueTy *value) {
-      Value = value;
-      HasValue.store(true, std::memory_order_release);
-    }
-  };
-
-  /// The concurrent map.
-  ConcurrentMap<Entry, /*Destructor*/ false, MetadataAllocator> Map;
-
-  struct ConcurrencyControl {
-    Mutex Lock;
-    ConditionVariable Queue;
-  };
-  std::unique_ptr<ConcurrencyControl> Concurrency;
+/// A base class offerring a reasonable default implementation for entries
+/// in a generic metadata cache.  Supports variably-sized keys.
+///
+/// The value type may be an arbitrary type, but it must be contextually
+/// convertible to bool, and it must be default-constructible in a false
+/// state.
+///
+/// Concrete implementations should provide:
+///   /// A name describing the map; used in debugging diagnostics.
+///   static const char *getName();
+///
+///   /// A constructor which should set up an entry.  Note that this phase
+///   /// of initialization may race with other threads attempting to set up
+///   /// the same entry; do not do anything during it which might block or
+///   /// need to be reverted.
+///   /// The extra arguments are those provided to getOrInsert.
+///   Entry(MetadataCacheKey key, ExtraArgTys...);
+///
+///   /// As described in LockingConcurrentMap.
+///   static ValueType initialize(ExtraArgTys...);
+template <class Impl, class ValueType_, class... Objects>
+class MetadataCacheEntryBase
+    : public ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...> {
+  using super =
+             ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...>;
+  friend super;
+  using TrailingObjects = typename super::TrailingObjects;
+  friend TrailingObjects;
 
 public:
-  MetadataCache() : Concurrency(new ConcurrencyControl()) {}
-  ~MetadataCache() = default;
+  using ValueType = ValueType_;
+  using StatusType = ValueType;
 
-  /// Caches are not copyable.
-  MetadataCache(const MetadataCache &other) = delete;
-  MetadataCache &operator=(const MetadataCache &other) = delete;
+protected:
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
-  /// Get the allocator for metadata in this cache.
-  /// The allocator can only be safely used while the cache is locked during
-  /// an addMetadataEntry call.
-  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
+  size_t numTrailingObjects(OverloadToken<const void *>) const {
+    return KeyLength;
+  }
 
-  /// Look up a cached metadata entry. If a cache match exists, return it.
-  /// Otherwise, call entryBuilder() and add that to the cache.
-  const ValueTy *findOrAdd(const void * const *arguments, size_t numArguments,
-                           llvm::function_ref<ValueTy *()> builder) {
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<const void *>,
+                                   const MetadataCacheKey &key,
+                                   Args &&...extraArgs) {
+    return key.KeyData.size();
+  }
 
-#if SWIFT_DEBUG_RUNTIME
-    printf("%s(%p): looking for entry with %zu arguments:\n",
-           ValueTy::getName(), this, numArguments);
-    for (size_t i = 0; i < numArguments; i++) {
-      printf("%s(%p):     %p\n", ValueTy::getName(), this, arguments[i]);
+  using super::asImpl;
+
+private:
+  size_t Hash;
+  unsigned KeyLength;
+
+  /// Does this entry have a value, or is it currently undergoing
+  /// initialization?
+  ///
+  /// This (and the following field) is ever modified under the lock,
+  /// but it can be read from any thread, including while the lock
+  /// is held.
+  std::atomic<bool> HasValue;
+  union {
+    ValueType Value;
+    std::thread::id InitializingThread;
+  };
+
+public:
+  MetadataCacheEntryBase(const MetadataCacheKey &key)
+      : Hash(key.Hash), KeyLength(key.KeyData.size()), HasValue(false) {
+    InitializingThread = std::this_thread::get_id();
+    memcpy(this->template getTrailingObjects<const void*>(),
+           key.KeyData.begin(),
+           KeyLength * sizeof(void*));
+  }
+
+  bool isBeingInitializedByCurrentThread() const {
+    return InitializingThread == std::this_thread::get_id();
+  }
+
+  KeyDataRef getKeyData() const {
+    return KeyDataRef::forArguments(
+                              this->template getTrailingObjects<const void*>(),
+                                    KeyLength);
+  }
+
+  intptr_t getKeyIntValueForDump() const {
+    return Hash;
+  }
+
+  int compareWithKey(const MetadataCacheKey &key) const {
+    // Order by hash first, then by the actual key data.
+    if (auto comparison = compareIntegers(key.Hash, Hash)) {
+      return comparison;
+    } else {
+      return key.KeyData.compare(getKeyData());
     }
-#endif
+  }
 
-    Key key(KeyDataRef::forArguments(arguments, numArguments));
-
-#if SWIFT_DEBUG_RUNTIME
-    printf("%s(%p): generated hash %zu\n",
-           ValueTy::getName(), this, key.Hash);
-#endif
-
-    // Ensure the existence of a map entry.
-    auto insertResult = Map.getOrInsert(key);
-    Entry *entry = insertResult.first;
-
-    // If we didn't insert the entry, then we just need to get the
-    // initialized value from the entry.
-    if (!insertResult.second) {
-
-      // If the entry is already initialized, great.
-      auto value = entry->getValue();
-      if (value) {
-        return value;
-      }
-
-      // Otherwise, we have to grab the lock and wait for the value to
-      // appear there.  Note that we have to check again immediately
-      // after acquiring the lock to prevent a race.
-      auto concurrency = Concurrency.get();
-      concurrency->Lock.withLockOrWait(concurrency->Queue, [&, this] {
-        if ((value = entry->getValue())) {
-          return true; // found a value, done waiting
-        }
-
-        // As a QoI safe-guard against the simplest form of cyclic
-        // dependency, check whether this thread is the one responsible
-        // for initializing the metadata.
-        if (entry->isBeingInitializedByCurrentThread()) {
-          fprintf(stderr,
-                  "%s(%p): cyclic metadata dependency detected, aborting\n",
-                  ValueTy::getName(), (void*) this);
-          abort();
-        }
-
-        return false; // don't have a value, continue waiting
-      });
-
-      return value;
+  template <class... Args>
+  ValueType checkStatus(bool locked, Args &&...extraArgs) const {
+    if (HasValue.load(std::memory_order_acquire)) {
+      return Value;
     }
 
-    // Otherwise, we created the entry and are responsible for
-    // creating the metadata.
-    auto value = builder();
+    // As a QoI safe-guard against the simplest form of cyclic
+    // dependency, check whether this thread is the one responsible
+    // for initializing the metadata.
+    if (locked && isBeingInitializedByCurrentThread()) {
+      fprintf(stderr,
+              "%s(%p): cyclic metadata dependency detected, aborting\n",
+              Impl::getName(), static_cast<const void*>(this));
+      abort();
+    }
 
-#if SWIFT_DEBUG_RUNTIME
-        printf("%s(%p): created %p\n",
-               ValueTy::getName(), (void*) this, value);
-#endif
+    return ValueType();
+  }
 
-    // Acquire the lock, set the value, and notify any waiters.
-    auto concurrency = Concurrency.get();
-    concurrency->Lock.withLockThenNotifyAll(
-        concurrency->Queue, [&entry, &value] { entry->setValue(value); });
-
-    return value;
+  void flagInitializedStatus(ValueType value) {
+    Value = value;
+    HasValue.store(true, std::memory_order_release);
   }
 };
 

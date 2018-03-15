@@ -247,28 +247,50 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque()[range])
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other, range: range)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView[range])
     } else {
       _appendInPlace(other._unmanagedUTF16View[range])
     }
   }
 
+  @_versioned // @opaque
+  internal final func _opaqueAppendInPlace(
+    opaqueOther other: _StringGuts, range: Range<Int>
+  ) {
+    _sanityCheck(other._isOpaque)
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque()[range])
+  }
+
   @_inlineable
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque())
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView)
     } else {
       _appendInPlace(other._unmanagedUTF16View)
     }
+  }
+
+  @_versioned // @opaque
+  internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
+    _sanityCheck(other._isOpaque)
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque())
   }
 
   @_inlineable

@@ -2855,7 +2855,7 @@ public:
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();
-    if (ArgLabels.size() > 0) {
+    if (!ArgLabels.empty()) {
       if (!HaveLParen)
         Builder.addLeftParen();
       else
@@ -4024,7 +4024,7 @@ public:
       }
 
       return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (auto *paren = dyn_cast<ParenExpr>(CallE->getArg())) {
+    } else if (isa<ParenExpr>(CallE->getArg())) {
       HasName = false;
       Position = 0;
       return true;

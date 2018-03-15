@@ -386,6 +386,7 @@ private:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
     case Node::Kind::PartialApplyForwarder:
@@ -891,10 +892,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::OutlinedCopy:
     Printer << "outlined copy of ";
     print(Node->getChild(0));
+    if (Node->getNumChildren() > 1)
+      print(Node->getChild(1));
     return nullptr;
   case Node::Kind::OutlinedConsume:
     Printer << "outlined consume of ";
     print(Node->getChild(0));
+    if (Node->getNumChildren() > 1)
+      print(Node->getChild(1));
     return nullptr;
   case Node::Kind::OutlinedRetain:
     Printer << "outlined retain of ";
@@ -1126,6 +1131,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Shared:
     Printer << "__shared ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::Owned:
+    Printer << "__owned ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:

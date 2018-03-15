@@ -677,6 +677,16 @@ FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt))
 
+// bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
+//                                            const unsigned char *filename,
+//                                            int32_t filenameLength,
+//                                            int32_t line);
+FUNCTION(IsEscapingClosureAtFileLocation, swift_isEscapingClosureAtFileLocation,
+         C_CC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind, ZExt))
+
 // void swift_arrayInitWithCopy(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayInitWithCopy, swift_arrayInitWithCopy, C_CC,
          RETURNS(VoidTy),

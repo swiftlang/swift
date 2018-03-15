@@ -529,7 +529,6 @@ FloatingPoint.test("${Self}.significandWidth") {
 %end
 
 let floatNextUpDownTests: [(Float, Float)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -553,7 +552,6 @@ FloatingPoint.test("Float.nextUp, .nextDown")
 }
 
 let doubleNextUpDownTests: [(Double, Double)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -575,6 +573,16 @@ FloatingPoint.test("Double.nextUp, .nextDown")
   expectBitwiseEqual(-succ, (-prev).nextDown)
   expectBitwiseEqual(-prev, (-succ).nextUp)
 }
+
+%for Self in ['Float', 'Double']:
+FloatingPoint.test("${Self}.nextUp, .nextDown/nan") {
+  let x = ${Self}.nan
+  expectTrue(x.nextUp.isNaN)
+  expectTrue(x.nextDown.isNaN)
+  expectTrue((-x).nextDown.isNaN)
+  expectTrue((-x).nextUp.isNaN)
+}
+%end
 
 #if arch(i386) || arch(x86_64)
 
