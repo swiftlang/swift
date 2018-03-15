@@ -446,7 +446,7 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
 
       case ConformanceEntryKind::Implied:
         // Ignore implied circular protocol inheritance
-        if (existingEntry->getProtocol() == protocol)
+        if (existingEntry->getDeclContext() == dc)
           return false;
 
         // An implied conformance is better than a synthesized one, unless
