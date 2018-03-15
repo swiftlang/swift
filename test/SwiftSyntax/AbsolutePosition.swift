@@ -101,4 +101,31 @@ PositionTests.test("Recursion") {
   })
 }
 
+PositionTests.test("Trivias") {
+  expectDoesNotThrow({
+    var l = [CodeBlockItemSyntax]()
+    let leading = Trivia.newlines(1).appending(TriviaPiece.backticks(1))
+      .appending(TriviaPiece.docLineComment("/// some comment"))
+    let trailing = Trivia.docLineComment("/// This is comment\n")
+    let idx = 5
+    for _ in 0...idx {
+      l.append(SyntaxFactory.makeCodeBlockItem(
+        item: SyntaxFactory.makeReturnStmt(
+          returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
+            .withTrailingTrivia(trailing).withLeadingTrivia(leading)
+            , expression: nil), semicolon: nil))
+    }
+    let root = SyntaxFactory.makeSourceFile(
+      statements: SyntaxFactory.makeCodeBlockItemList(l),
+      eofToken: SyntaxFactory.makeToken(.eof, presence: .present))
+    expectEqual(root.leadingTrivia!.count, 3)
+    expectEqual(root.trailingTrivia!.count, 0)
+    let state = root.statements[idx]
+    expectEqual(state.leadingTrivia!.count, 3)
+    expectEqual(state.trailingTrivia!.count, 1)
+    expectEqual(state.leadingTrivia!.byteSize + state.trailingTrivia!.byteSize
+      + state.byteSizeAfterTrimmingTrivia, state.byteSize)
+  })
+}
+
 runAllTests()

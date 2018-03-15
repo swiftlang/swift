@@ -214,22 +214,40 @@ extension RawSyntax {
     }
   }
 
-  func accumulateLeadingTrivia(_ pos: AbsolutePosition) -> Bool {
+  var leadingTrivia: Trivia? {
     switch self {
     case .node(_, let layout, _):
       for child in layout {
         guard let child = child else { continue }
-        if child.accumulateLeadingTrivia(pos) {
-          return true
-        }
+        guard let result = child.leadingTrivia else { continue }
+        return result
       }
-      return false
+      return nil
     case let .token(_, leadingTrivia, _, presence):
-      guard case .present = presence else { return false }
-      for piece in leadingTrivia {
-        piece.accumulateAbsolutePosition(pos)
+      guard case .present = presence else { return nil }
+      return leadingTrivia
+    }
+  }
+
+  var trailingTrivia: Trivia? {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout.reversed() {
+        guard let child = child else { continue }
+        guard let result = child.trailingTrivia else { continue }
+        return result
       }
-      return true
+      return nil
+    case let .token(_, _, trailingTrivia, presence):
+      guard case .present = presence else { return nil }
+      return trailingTrivia
+    }
+  }
+
+  func accumulateLeadingTrivia(_ pos: AbsolutePosition) {
+    guard let trivia = leadingTrivia else { return }
+    for piece in trivia {
+      piece.accumulateAbsolutePosition(pos)
     }
   }
 

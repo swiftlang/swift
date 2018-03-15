@@ -138,6 +138,27 @@ extension Syntax {
     return data.byteSize
   }
 
+  /// The leading trivia of this syntax node. Leading trivia is attached to
+  /// the first token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var leadingTrivia: Trivia? {
+    return raw.leadingTrivia
+  }
+
+  /// The trailing trivia of this syntax node. Trailing trivia is attached to
+  /// the last token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var trailingTrivia: Trivia? {
+    return raw.trailingTrivia
+  }
+
+  /// The textual byte length of this node exluding leading and trailing trivia.
+  public var byteSizeAfterTrimmingTrivia: Int {
+    return data.byteSize -
+      (leadingTrivia == nil ? 0 : leadingTrivia!.byteSize) -
+      (trailingTrivia == nil ? 0 : trailingTrivia!.byteSize)
+  }
+
   /// The root of the tree in which this node resides.
   public var root: Syntax {
     return makeSyntax(root: _root,  data: _root)
