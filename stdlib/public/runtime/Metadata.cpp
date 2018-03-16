@@ -183,11 +183,11 @@ namespace {
     }
 
     MetadataRequest::BasicKind inferStateForMetadata(Metadata *metadata) {
-      // FIXME: base this on whether the VWT is incomplete.
-      if (isa<ClassMetadata>(metadata))
-        return MetadataRequest::LayoutComplete;
-      else
+      if (metadata->getValueWitnesses()->isIncomplete())
         return MetadataRequest::Abstract;
+
+      // TODO: internal vs. external layout-complete?
+      return MetadataRequest::LayoutComplete;
     }
 
     // Note that we have to pass 'arguments' separately here instead of

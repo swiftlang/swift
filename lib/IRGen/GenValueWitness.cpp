@@ -932,6 +932,8 @@ static void addValueWitness(IRGenModule &IGM,
                       fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
                    .withBitwiseTakable(
                       fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal));
+    } else {
+      flags = flags.withIncomplete(true);
     }
 
     if (concreteType.getEnumOrBoundGenericEnum())

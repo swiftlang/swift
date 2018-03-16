@@ -29,7 +29,7 @@ import Builtin
 // CHECK-SAME:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @"$S15generic_structs13SingleDynamicVwCP" to i8*),
 // -- ...
 // -- placeholder for size, flags, stride
-// CHECK-SAME:   i8* null, i8* null, i8* null
+// CHECK-SAME:   i8* null, i8* inttoptr (i64 4194304 to i8*), i8* null
 // -- extra inhabitants
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S15generic_structs13SingleDynamicVwxs" to i8*),

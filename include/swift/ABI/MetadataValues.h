@@ -83,13 +83,14 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : int_type {
-    AlignmentMask = 0x0000FFFF,
-    IsNonPOD =      0x00010000,
-    IsNonInline =   0x00020000,
+    AlignmentMask =       0x0000FFFF,
+    IsNonPOD =            0x00010000,
+    IsNonInline =         0x00020000,
     HasExtraInhabitants = 0x00040000,
-    HasSpareBits =  0x00080000,
+    HasSpareBits =        0x00080000,
     IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses = 0x00200000,
+    HasEnumWitnesses =    0x00200000,
+    Incomplete =          0x00400000,
 
     // Everything else is reserved.
   };
@@ -169,6 +170,16 @@ public:
   withEnumWitnesses(bool hasEnumWitnesses) const {
     return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
                                    (hasEnumWitnesses ? HasEnumWitnesses : 0));
+  }
+
+  /// True if the type with this value-witness table is incomplete,
+  /// meaning that its external layout (size, etc.) is meaningless
+  /// pending completion of the metadata layout.
+  bool isIncomplete() const { return Data & Incomplete; }
+  constexpr TargetValueWitnessFlags
+  withIncomplete(bool isIncomplete) const {
+    return TargetValueWitnessFlags((Data & ~Incomplete) |
+                                   (isIncomplete ? Incomplete : 0));
   }
 
   constexpr int_type getOpaqueValue() const { return Data; }

@@ -292,6 +292,11 @@ struct ValueWitnessTable {
   value_witness_types::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
 
+  /// Is the external type layout of this type incomplete?
+  bool isIncomplete() const {
+    return flags.isIncomplete();
+  }
+
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
   static bool isValueInline(size_t size, size_t alignment) {
