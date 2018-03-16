@@ -962,7 +962,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
                                               SourceLoc(), /*Implicit=*/true);
 
         // super.init(from:)
-        auto initName = DeclName(C, C.Id_init, C.Id_from);
+        auto initName = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
         auto *initCall = new (C) UnresolvedDotExpr(superRef, SourceLoc(),
                                                    initName, DeclNameLoc(),
                                                    /*Implicit=*/true);
@@ -980,7 +980,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         statements.push_back(tryExpr);
       } else {
         // The explicit constructor name is a compound name taking no arguments.
-        DeclName initName(C, C.Id_init, ArrayRef<Identifier>());
+        DeclName initName(C, DeclBaseName::createConstructor(), ArrayRef<Identifier>());
 
         // We need to look this up in the superclass to see if it throws.
         auto result = superclassDecl->lookupDirect(initName);
@@ -1074,7 +1074,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
 
   // Func name: init(from: Decoder)
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
                                            SourceLoc(), /*Throws=*/true,
@@ -1160,7 +1160,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
         // arguments (as opposed to a simple name when omitted).
-        memberName = DeclName(C, DeclBaseName(C.Id_init),
+        memberName = DeclName(C, DeclBaseName::createConstructor(),
                               ArrayRef<Identifier>());
       }
 
@@ -1283,7 +1283,7 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
   if (!isa<StructDecl>(target) && !isa<ClassDecl>(target))
     return nullptr;
 
-  if (requirement->getBaseName() != tc.Context.Id_init) {
+  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
     // Unknown requirement.
     tc.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
     return nullptr;

@@ -1949,7 +1949,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   auto paramList = ParameterList::create(context, params);
   
   // Create the constructor.
-  DeclName name(context, context.Id_init, paramList);
+  DeclName name(context, DeclBaseName::createConstructor(), paramList);
   auto *selfParam = ParamDecl::createSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
   auto *ctor =

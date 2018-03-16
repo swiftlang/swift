@@ -854,7 +854,8 @@ static void VisitNodeConstructor(
 
   if (kind_type_result.HasSingleType() && type_result.HasSingleType()) {
     bool found = false;
-    const size_t n = FindNamedDecls(ast, ast->Id_init, kind_type_result);
+    const size_t n = FindNamedDecls(ast, DeclBaseName::createConstructor(),
+                                    kind_type_result);
     if (n == 1) {
       found = true;
       kind_type_result._types[0] = FixCallingConv(

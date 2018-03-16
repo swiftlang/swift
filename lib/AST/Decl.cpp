@@ -2773,7 +2773,7 @@ void ClassDecl::addImplicitDestructor() {
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
-  (void)mutableThis->lookupDirect(getASTContext().Id_init,
+  (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
                                   /*ignoreNewExtensions*/true);
   return Bits.ClassDecl.HasMissingDesignatedInitializers;
 }
@@ -2821,11 +2821,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Look at all of the initializers of the subclass to gather the initializers
   // they override from the superclass.
-  auto &ctx = getASTContext();
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   if (resolver)
     resolver->resolveImplicitConstructors(this);
-  for (auto member : lookupDirect(ctx.Id_init)) {
+  for (auto member : lookupDirect(DeclBaseName::createConstructor())) {
     auto ctor = dyn_cast<ConstructorDecl>(member);
     if (!ctor)
       continue;
@@ -2855,7 +2854,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   // Note: This should be treated as a lookup for intra-module dependency
   // purposes, but a subclass already depends on its superclasses and any
   // extensions for many other reasons.
-  for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
+  for (auto member : superclassDecl->lookupDirect(DeclBaseName::createConstructor())) {
     if (AvailableAttr::isUnavailable(member))
       continue;
 
@@ -5195,6 +5194,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
+
+  assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
@@ -5441,7 +5442,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
-        if (dotExpr->getName().getBaseName() != "init")
+        if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
           return { true, E };
 
         arg = dotExpr->getBase();

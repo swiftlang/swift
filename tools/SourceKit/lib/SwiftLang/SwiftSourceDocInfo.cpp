@@ -1015,7 +1015,10 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   DeclName OrigName = VD->getFullName();
   DeclBaseName BaseName = Info.BaseName.empty()
                               ? OrigName.getBaseName()
-                              : DeclBaseName(Ctx.getIdentifier(Info.BaseName));
+                              : DeclBaseName(
+                                Info.BaseName == "init"
+                                  ? DeclBaseName::createConstructor()
+                                  : Ctx.getIdentifier(Info.BaseName));
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
   if (Info.ArgNames.size() > OrigArgs.size())
