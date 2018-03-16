@@ -2472,19 +2472,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Error;
   }
 
-  NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
-  if (isa<AbstractFunctionDecl>(useDC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
-  auto instanceType = valueType;
-  if (auto *selfType = instanceType->getAs<DynamicSelfType>())
-    instanceType = selfType->getSelfType();
-
-  auto ctors = TC.lookupConstructors(useDC, instanceType, lookupOptions);
-  if (!ctors)
-    return SolutionKind::Error;
-
-  auto name = DeclBaseName::createConstructor();
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
   auto fnLocator = getConstraintLocator(locator,
@@ -2497,7 +2484,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
+  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
+                           DeclBaseName::createConstructor(),
                            FunctionType::get(tv, resultType),
                            useDC, functionRefKind,
                            getConstraintLocator(
