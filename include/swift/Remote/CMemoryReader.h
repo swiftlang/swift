@@ -25,12 +25,7 @@ struct MemoryReaderImpl {
   // Opaque pointer passed to all the callback functions.
   void *reader_context;
 
-  // May be NULL, then getPointerSize and getSizeSize are used instead.
   QueryDataLayoutFunction queryDataLayout;
-
-  PointerSizeFunction getPointerSize;
-  SizeSizeFunction getSizeSize;
-
   FreeBytesFunction free;
   ReadBytesFunction readBytes;
   GetStringLengthFunction getStringLength;
@@ -47,35 +42,15 @@ class CMemoryReader final : public MemoryReader {
 
 public:
   CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl) {
-    if (!this->Impl.queryDataLayout) {
-      assert(this->Impl.getPointerSize && "No getPointerSize implementation");
-      assert(this->Impl.getStringLength && "No stringLength implementation");
-      assert(this->Impl.getPointerSize(this->Impl.reader_context) != 0 &&
-             "Invalid target pointer size");
-    }
+    assert(this->Impl.queryDataLayout && "No queryDataLayout implementation");
+    assert(this->Impl.getStringLength && "No stringLength implementation");
     assert(this->Impl.readBytes && "No readBytes implementation");
   }
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
-    if (Impl.queryDataLayout)
-      return Impl.queryDataLayout(Impl.reader_context, type, inBuffer,
-                                  outBuffer) != 0;
-
-    switch (type) {
-      case DLQ_GetPointerSize: {
-        auto result = static_cast<uint8_t *>(outBuffer);
-        *result = Impl.getPointerSize(Impl.reader_context);
-        return true;
-      }
-      case DLQ_GetSizeSize: {
-        auto result = static_cast<uint8_t *>(outBuffer);
-        *result = Impl.getSizeSize(Impl.reader_context);
-        return true;
-      }
-    }
-
-    return false;
+    return Impl.queryDataLayout(Impl.reader_context, type, inBuffer,
+                                outBuffer) != 0;
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override {

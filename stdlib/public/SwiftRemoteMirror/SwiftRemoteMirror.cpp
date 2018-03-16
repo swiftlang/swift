@@ -50,6 +50,18 @@ swift_reflection_getSupportedMetadataVersion() {
   return SWIFT_REFLECTION_METADATA_VERSION;
 }
 
+template <uint8_t WordSize>
+static int minimalDataLayoutQueryFunction(void *ReaderContext,
+                                          DataLayoutQueryType type,
+                                          void *inBuffer, void *outBuffer) {
+  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    *result = WordSize;
+    return 1;
+  }
+  return 0;
+}
+
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,
@@ -60,15 +72,12 @@ swift_reflection_createReflectionContext(void *ReaderContext,
   assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
   assert(PointerSize == sizeof(uintptr_t) &&
          "We currently only support the pointer size this file was compiled with.");
-  
-  auto GetSize = PointerSize == 4
-    ? [](void *){ return (uint8_t)4; }
-    : [](void *){ return (uint8_t)8; };
+
+  auto *DataLayout = PointerSize == 4 ? minimalDataLayoutQueryFunction<4>
+                                      : minimalDataLayoutQueryFunction<8>;
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    nullptr,
-    GetSize,
-    GetSize,
+    DataLayout,
     Free,
     ReadBytes,
     GetStringLength,
@@ -88,8 +97,6 @@ swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
     DataLayout,
-    nullptr,
-    nullptr,
     Free,
     ReadBytes,
     GetStringLength,
