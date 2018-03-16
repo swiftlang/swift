@@ -486,7 +486,8 @@ private:
                       const FailureHandler &failure);
   void emitEnumElementDispatchWithOwnership(
       ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-      const SpecializationHandler &handleSpec, const FailureHandler &failure);
+      const SpecializationHandler &handleSpec, const FailureHandler &failure,
+      ProfileCounter defaultCaseCount);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -1795,8 +1796,8 @@ static void generateEnumCaseBlocks(
 /// OptionalSomePattern.
 void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-    const SpecializationHandler &handleCase,
-    const FailureHandler &outerFailure) {
+    const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
+    ProfileCounter defaultCastCount) {
   assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
          "SIL ownership does not support TakeOnSuccess");
 
@@ -1821,7 +1822,9 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
   SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
   // FIXME: Pass caseCounts in here as well, as it is in
   // emitEnumElementDispatch.
-  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
+  ArrayRef<ProfileCounter> caseCountsArrayRef = caseCounts;
+  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs, caseCountsArrayRef,
+                         defaultCastCount);
 
   // Okay, now emit all the cases.
   for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
@@ -1940,7 +1943,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // use the dispatch code path.
   if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
     return emitEnumElementDispatchWithOwnership(rows, src, handleCase,
-                                                outerFailure);
+                                                outerFailure, defaultCaseCount);
   }
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
