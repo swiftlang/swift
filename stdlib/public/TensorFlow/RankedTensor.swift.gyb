@@ -234,12 +234,21 @@ public extension ${TensorXD} where Scalar : Numeric {
 
 /// Initializers
 public extension ${TensorXD} {
+% if rank == 1:
   /// Creates a ${TensorXD} from with the specified elements.
   @_inlineable @inline(__always)
   init<C : RandomAccessCollection>(_ elements: C)
     where C.Element == ${elementArrayLiteral} {
-    self.init(elements)
+    self.init(base: Tensor<Scalar>(elements))
   }
+% else:
+  /// Creates a ${TensorXD} from with the specified elements.
+  @_inlineable @inline(__always)
+  init<C : RandomAccessCollection>(_ elements: C)
+    where C.Element == ${elementArrayLiteral} {
+    self.init(base: Tensor<Scalar>(Array(elements)))
+  }
+% end
 
   /// Creates a ${TensorXD} from a ShapedArray. Returns nil if the ShapedArray
   /// does not have rank ${rank}.
@@ -499,8 +508,21 @@ public extension ${TensorXD} {
   subscript(bounds: Range<Int32>) -> ${TensorXD} {
     @inline(__always)
     get {
-      return ${TensorXD}<Scalar>(base: base[bounds])
+      return ${TensorXD}(base: base[bounds])
     }
+  }
+
+  /// Extracts a slice from a tensor. This operation extracts a slice at the
+  /// ranges specified by `dimensionalBounds`.
+  ///
+  /// - Parameter dimensionalBounds: Bounds at each dimension.
+  ///
+  @_inlineable @inline(__always)
+  func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> ${TensorXD} {
+    /// TODO: Precondition `lowerBounds.count == upperBounds.count`, and
+    /// `lowerBounds.count == rank`, preferably in graph.
+    return ${TensorXD}(base: base.slice(lowerBounds: lowerBounds,
+                                        upperBounds: upperBounds))
   }
 }
 
