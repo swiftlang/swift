@@ -2404,27 +2404,6 @@ public:
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
 
-  /// Returns true if the reference or any of its parents is an
-  /// implicit function.
-  bool isInsideImplicitFunction(SourceRange ReferenceRange,
-                                const DeclContext *DC);
-
-  /// Returns true if the reference or any of its parents is an
-  /// unavailable (or obsoleted) declaration.
-  bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
-                                      const DeclContext *DC);
-
-  /// Returns true if the reference or any of its parents is an
-  /// unconditional unavailable declaration for the same platform.
-  bool isInsideCompatibleUnavailableDeclaration(SourceRange ReferenceRange,
-                                                const DeclContext *DC,
-                                                const AvailableAttr *attr);
-
-  /// Returns true if the reference is lexically contained in a declaration
-  /// that is deprecated on all deployment targets.
-  bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                     const DeclContext *DC);
-
   /// Returns the availability attribute indicating deprecation if the
   /// declaration is deprecated or null otherwise.
   static const AvailableAttr *getDeprecated(const Decl *D);
