@@ -1215,6 +1215,63 @@ public:
                                  value_setMetadataKind)
 };
 
+/// Kinds of requests for metadata.
+class MetadataRequest : public FlagSet<size_t> {
+public:
+  enum BasicKind {
+    /// A request for fully-completed metadata.  The metadata must be
+    /// prepared for all supported type operations.  This is a superset
+    /// of the requirements of LayoutComplete.
+    ///
+    /// For example, a class must be ready for subclassing and instantiation:
+    /// it must have a completed instance layout and (under ObjCInterop)
+    /// must have been realized by the Objective-C runtime.
+    Complete,
+
+    /// A request for metadata that can be used for type layout; that is,
+    /// the type's value witness table must be completely initialized.
+    LayoutComplete,
+
+    /// A request for a metadata pointer that fully identifies the type.
+    /// Basic type structure, such as the type context descriptor and the
+    /// list of generic arguments, should have been installed, but there is
+    /// no requirement for a valid value witness table.
+    Abstract,
+  };
+
+private:
+  enum {
+    BasicKind_bit = 0,
+    BasicKind_width = 8,
+
+    /// A blocking request will not return until the runtime is able to produce
+    /// metadata with the given kind.  A non-blocking request will return
+    /// "immediately", producing an abstract metadata and a flag saying that
+    /// the operation failed.
+    ///
+    /// An abstract request will never be non-zero.
+    NonBlocking_bit = 8,
+  };
+
+public:
+  MetadataRequest(BasicKind kind, bool isNonBlocking = false) {
+    setBasicKind(kind);
+    setIsNonBlocking(isNonBlocking);
+  }
+  explicit MetadataRequest(size_t bits) : FlagSet(bits) {}
+  constexpr MetadataRequest() {}
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(BasicKind_bit,
+                                 BasicKind_width,
+                                 BasicKind,
+                                 getBasicKind,
+                                 setBasicKind)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
+                                isNonBlocking,
+                                setIsNonBlocking)
+};
+
 } // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */

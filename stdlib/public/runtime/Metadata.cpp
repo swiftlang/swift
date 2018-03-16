@@ -155,20 +155,16 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
 }
 
 namespace {
-  struct GenericCacheEntry final
-      : MetadataCacheEntryBase<GenericCacheEntry, const Metadata *> {
-
+  struct GenericCacheEntry final : MetadataCacheEntryBase<GenericCacheEntry> {
     static const char *getName() { return "GenericCache"; }
 
     template <class... Args>
     GenericCacheEntry(MetadataCacheKey key, Args &&...args)
       : MetadataCacheEntryBase(key) {}
 
-    // Note that we have to pass 'arguments' separately here instead of
-    // using the key data because there might be non-key arguments,
-    // like protocol conformances.
-    const Metadata *initialize(const TypeContextDescriptor *description,
-                               const void * const *arguments) {
+    AllocationResult allocate(MetadataRequest request,
+                              const TypeContextDescriptor *description,
+                              const void * const *arguments) {
       // Find a pattern.  Currently we always use the default pattern.
       auto &generics = description->getFullGenericContextHeader();
       auto pattern = generics.DefaultInstantiationPattern.get();
@@ -177,19 +173,52 @@ namespace {
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
 
-      // Complete the metadata's instantiation.
-      if (!pattern->CompletionFunction.isNull()) {
-        MetadataCompletionContext context = {};
-        auto dep = pattern->CompletionFunction(metadata, &context, pattern);
-        assert(!dep && "completion dependencies not yet supported"); (void) dep;
+      MetadataRequest::BasicKind state;
+      if (pattern->CompletionFunction.isNull()) {
+        state = MetadataRequest::Complete;
+      } else {
+        state = inferStateForMetadata(metadata);
       }
+      return { metadata, state };
+    }
 
-      return metadata;
+    MetadataRequest::BasicKind inferStateForMetadata(Metadata *metadata) {
+      // FIXME: base this on whether the VWT is incomplete.
+      if (isa<ClassMetadata>(metadata))
+        return MetadataRequest::LayoutComplete;
+      else
+        return MetadataRequest::Abstract;
+    }
+
+    // Note that we have to pass 'arguments' separately here instead of
+    // using the key data because there might be non-key arguments,
+    // like protocol conformances.
+    TryInitializeResult tryInitialize(Metadata *metadata,
+                                      MetadataCompletionContext *context,
+                                      MetadataRequest request,
+                                      const TypeContextDescriptor *description,
+                                      const void * const *arguments) {
+      // Find a pattern.  Currently we always use the default pattern.
+      auto &generics = description->getFullGenericContextHeader();
+      auto pattern = generics.DefaultInstantiationPattern.get();
+
+      // Complete the metadata's instantiation.
+      auto dependency = pattern->CompletionFunction(metadata, context, pattern);
+
+      // FIXME: use a more precise dependency requirement returned by the
+      // completion function.
+      auto dependencyRequirement = MetadataRequest::Complete;
+
+      auto state = dependency == nullptr
+                     ? MetadataRequest::Complete
+                     : inferStateForMetadata(metadata);
+
+      return { state, dependencyRequirement, dependency };
     }
   };
 } // end anonymous namespace
 
-using GenericMetadataCache = LockingConcurrentMap<GenericCacheEntry>;
+using GenericMetadataCache = MetadataCache<GenericCacheEntry, false>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
@@ -449,10 +478,14 @@ swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
-  auto result = getCache(generics).getOrInsert(key, description, genericArgs);
+  MetadataRequest request(MetadataRequest::Complete);
 
-  return result.second;
+  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  auto result =
+    getCache(generics).getOrInsert(key, request, description, genericArgs);
+
+  // TODO: report cases where the state is inadequate
+  return result.second.Value;
 }
 
 /***************************************************************************/
@@ -3033,11 +3066,6 @@ class WitnessTableCacheEntry {
   std::atomic<WitnessTable*> Table;
 
 public:
-  /// We use a pointer to the allocated witness table directly as a
-  /// status value.  The witness table itself is actually allocated in the
-  /// tail storage of the entry.
-  using StatusType = WitnessTable*;
-
   /// Do the structural initialization necessary for this entry to appear
   /// in a concurrent map.
   WitnessTableCacheEntry(const Metadata *type,
@@ -3072,17 +3100,75 @@ public:
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
   }
 
+  /// We use a pointer to the allocated witness table directly as a
+  /// status value.  The witness table itself is actually allocated in the
+  /// tail storage of the entry.
+  using Status = WitnessTable*;
+
+  static WitnessTable *status_hasBlockers() {
+    return reinterpret_cast<WitnessTable*>(uintptr_t(1));
+  }
+
   WitnessTable *checkStatus(bool isLocked,
                             GenericWitnessTable *genericTable,
                             void ** const *instantiationArgs) {
-    return Table.load(std::memory_order_acquire);
+    auto table = Table.load(std::memory_order_acquire);
+
+    // If we've got the lock, and the table is null, we're about to
+    // wait on the condition variable.  Inform the initializing thread
+    // that it has waiters.
+    if (isLocked) {
+      while (table == nullptr &&
+             !Table.compare_exchange_weak(table, status_hasBlockers(),
+                                          std::memory_order_relaxed,
+                                          std::memory_order_acquire)) {
+        // All the work is done in the condition.
+      }
+    }
+
+    return (table == status_hasBlockers() ? nullptr : table);
   }
 
-  WitnessTable *initialize(GenericWitnessTable *genericTable,
-                           void ** const *instantiationArgs);
+  static bool shouldWait(WitnessTable *table,
+                         GenericWitnessTable *genericTable,
+                         void ** const *instantiationArgs) {
+    return table == nullptr;
+  }
 
-  void flagInitializedStatus(WitnessTable *table) {
-    Table.store(table, std::memory_order_release);
+  bool prepareToWaitWithLock(WitnessTable *table,
+                             GenericWitnessTable *genericTable,
+                             void ** const *instantiationArgs) {
+    return true;
+  }
+
+  using AllocationResult = int; // unused
+
+  std::pair<AllocationResult, ConcurrencyRequest>
+  beginAllocation(GenericWitnessTable *genericTable,
+                  void ** const *instantiationArgs){
+    // We don't do anything in the allocation phase.
+    return { 0, ConcurrencyRequest::None };
+  }
+
+  bool finishAllocationWithLock(int) {
+    swift_runtime_unreachable("beginAllocation never returns "
+                              "AcquireLockAndCallBack");
+  }
+
+  using InitializationResult = WitnessTable *;
+
+  std::pair<WitnessTable *, ConcurrencyRequest>
+  beginInitialization(GenericWitnessTable *genericTable,
+                      void ** const *instantiationArgs);
+
+  bool finishInitializationWithLock(WitnessTable *table) {
+    swift_runtime_unreachable("beginInitialization never returns "
+                              "AcquireLockAndCallBack");
+  }
+
+  WitnessTable *finishInitialization(WitnessTable *table,
+                                     ConcurrencyRequest request) {
+    return table;
   }
 };
 
@@ -3126,9 +3212,9 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
-WitnessTable *
-WitnessTableCacheEntry::initialize(GenericWitnessTable *genericTable,
-                                   void ** const *instantiationArgs) {
+std::pair<WitnessTable *, ConcurrencyRequest>
+WitnessTableCacheEntry::beginInitialization(GenericWitnessTable *genericTable,
+                                            void ** const *instantiationArgs) {
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
@@ -3181,7 +3267,16 @@ WitnessTableCacheEntry::initialize(GenericWitnessTable *genericTable,
     genericTable->Instantiator(castTable, Type, instantiationArgs);
   }
 
-  return castTable;
+  // Publish the table.
+  auto oldTableRef = Table.exchange(castTable, std::memory_order_release);
+
+  // Notify all the waiters if there are any.
+  assert(oldTableRef == nullptr || oldTableRef == status_hasBlockers());
+  auto request = (oldTableRef != nullptr
+                    ? ConcurrencyRequest::NotifyAll
+                    : ConcurrencyRequest::None);
+
+  return { castTable, request };
 }
 
 const WitnessTable *
@@ -3197,6 +3292,85 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
 
   // Our returned 'status' is the witness table itself.
   return result.second;
+}
+
+/***************************************************************************/
+/*** Recursive metadata dependencies ***************************************/
+/***************************************************************************/
+
+template <class Result, class Callbacks>
+static Result performOnMetadataCache(Metadata *metadata,
+                                     Callbacks &&callbacks) {
+  // Handle different kinds of type that can delay their metadata.
+  const TypeContextDescriptor *description;
+  if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+    description = classMetadata->getDescription();
+  } else {
+    auto valueMetadata = cast<ValueMetadata>(metadata);
+    description = valueMetadata->getDescription();
+  }
+
+  assert(description->isGeneric() &&
+         "only generic metadata can delay evaluation for now");
+  auto &generics = description->getFullGenericContextHeader();
+
+  auto genericArgs =
+    reinterpret_cast<const void * const *>(
+                                    description->getGenericArguments(metadata));
+  size_t numGenericArgs = generics.Base.NumKeyArguments;
+  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+
+  return std::move(callbacks).forGenericMetadata(metadata, description,
+                                                 getCache(generics), key);
+}
+
+bool swift::addToMetadataQueue(
+                  std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
+                  Metadata *dependency,
+                  MetadataRequest::BasicKind dependencyRequirement) {
+  struct EnqueueCallbacks {
+    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
+
+    bool forGenericMetadata(Metadata *metadata,
+                            const TypeContextDescriptor *description,
+                            GenericMetadataCache &cache,
+                            MetadataCacheKey key) && {
+      return cache.enqueue(key, std::move(QueueEntry));
+    }
+  } callbacks = { std::move(queueEntry) };
+
+  // Set the requirement.
+  queueEntry->DependencyRequirement = dependencyRequirement;
+
+  return performOnMetadataCache<bool>(dependency, std::move(callbacks));
+}
+
+void swift::resumeMetadataCompletion(
+                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+  struct ResumeCallbacks {
+    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
+
+    static MetadataRequest getRequest() {
+      return MetadataRequest(MetadataRequest::Complete,
+                             /*non-blocking*/ true);
+    }
+
+    void forGenericMetadata(Metadata *metadata,
+                            const TypeContextDescriptor *description,
+                            GenericMetadataCache &cache,
+                            MetadataCacheKey key) && {
+      cache.resumeInitialization(key, std::move(QueueEntry),
+                                 getRequest(),
+                                 description,
+                                 // This array comes from the metadata, so
+                                 // we can just "unslice" it to get the
+                                 // non-key arguments.
+                                 key.KeyData.begin());
+    }
+  } callbacks = { std::move(queueEntry) };
+
+  auto metadata = queueEntry->Value;
+  performOnMetadataCache<void>(metadata, std::move(callbacks));
 }
 
 /***************************************************************************/
