@@ -1088,9 +1088,24 @@ public extension Tensor {
       return #tfop("Slice", self, startIndices, boundSizes, Index: Int32.self)
     }
   }
-  // TODO: Add strided slices? (increment by something different than 1)
+
+  // TODO(danielzheng): Add strided slices? (increment by something different than 1)
   // Ideas for strided slice API: it could be another subscript method, or it
   // be a top level `stride` function like Swift's `stride(from:to:by:)`.
+
+  /// Extracts a slice from a tensor. This operation extracts a slice at the
+  /// ranges specified by `dimensionalBounds`.
+  ///
+  /// - Parameter dimensionalBounds: Bounds at each dimension.
+  ///
+  @_inlineable @inline(__always)
+  func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
+    /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
+    /// preferably in graph.
+    let lowerBoundsTensor = Tensor<Int32>(lowerBounds) 
+    return #tfop("Slice", self, lowerBoundsTensor,
+                 Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+  }
 }
 
 //===----------------------------------------------------------------------===//
