@@ -108,6 +108,9 @@ def _apply_default_arguments(args):
     if args.llbuild_assertions is None:
         args.llbuild_assertions = args.assertions
 
+    if args.lldb_assertions is None:
+        args.lldb_assertions = args.assertions
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
