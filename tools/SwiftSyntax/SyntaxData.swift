@@ -291,20 +291,18 @@ public class AbsolutePosition {
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
   internal func add(text: String) {
-    guard let chars = text.cString(using: .utf8) else {
-      return
-    }
-    let cr: CChar = 13
-    let nl: CChar = 10
+    let chars = text.utf8
+    let cr: UTF8.CodeUnit = 13
+    let nl: UTF8.CodeUnit = 10
     var idx = chars.startIndex
-    while chars[idx] != 0 {
+    while idx != chars.endIndex {
       let c = chars[idx]
-      idx += 1
+      idx = chars.index(after: idx)
       switch c {
       case cr:
         if chars[idx] == nl {
           add(lines: 1, size: 2)
-          idx += 1
+          idx = chars.index(after: idx)
         } else {
           add(lines: 1, size: 1)
         }
