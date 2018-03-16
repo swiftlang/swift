@@ -819,7 +819,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 }
 
 extension _StringGuts {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
@@ -831,7 +831,7 @@ extension _StringGuts {
 }
 
 extension _UnmanagedOpaqueString {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
@@ -843,7 +843,7 @@ extension _UnmanagedOpaqueString {
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
@@ -855,7 +855,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  func hasNormalizationBoundary(after index: Index) -> Bool {
+  internal func hasNormalizationBoundary(after index: Index) -> Bool {
     let nextIndex = self.index(after: index)
     if nextIndex == self.endIndex {
       return true

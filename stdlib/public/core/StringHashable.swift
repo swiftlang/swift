@@ -20,24 +20,47 @@ func _emptyASCIIHashBuffer() -> _UIntBuffer<UInt64, UInt8> {
   return buffer
 }
 
+internal struct ASCIIHasher {
+  private var buffer = _emptyASCIIHashBuffer()
+
+  internal mutating func consume() -> UInt64? {
+    if !buffer.isEmpty {
+      defer { resetBuffer() }
+      return buffer._storage
+    }
+    return nil
+  }
+
+  private mutating func resetBuffer() {
+    buffer = _emptyASCIIHashBuffer()
+  }
+
+  internal mutating func append(_ c: UInt8) -> UInt64? {
+    if buffer.count < buffer.capacity {
+      buffer.append(c)
+    }
+
+    if buffer.count == buffer.capacity {
+      defer { resetBuffer() }
+      return buffer._storage
+    }
+    return nil
+  }
+}
+
 extension _UnmanagedString where CodeUnit == UInt8 {
   // NOT @_versioned
   @effects(releasenone)
   internal func hashASCII(into hasher: inout _Hasher) {
-    var buffer = _emptyASCIIHashBuffer()
+    var asciiHasher = ASCIIHasher()
     for c in self {
-      if buffer.count < buffer.capacity {
-        buffer.append(UInt8(truncatingIfNeeded: c))
-      }
-
-      if buffer.count == buffer.capacity {
-        hasher.append(buffer._storage)
-        buffer = _emptyASCIIHashBuffer()
+      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: c)) {
+        hasher.append(combined)
       }
     }
 
-    if buffer.count > 0 {
-      hasher.append(buffer._storage)
+    if let combined = asciiHasher.consume() {
+      hasher.append(combined)
     }
   }
 }
@@ -45,18 +68,16 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // NOT @_versioned
   internal func hashUTF16(into hasher: inout _Hasher) {
-    var buffer = _emptyASCIIHashBuffer()
+    var asciiHasher = ASCIIHasher()
 
-    var i = startIndex
-    for cu in self {
-      defer { i = index(after: i) }
+    for i in self.indices {
+      let cu = self[i]
       let cuIsASCII = cu <= 0x7F
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       guard cuIsASCII && isSingleSegmentScalar else {
-        if buffer.count != 0 {
-          hasher.append(buffer._storage)
-          buffer = _emptyASCIIHashBuffer()
+        if let combined = asciiHasher.consume() {
+          hasher.append(combined)
         }
 
         let codeUnitSequence = IteratorSequence(
@@ -68,17 +89,13 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
         return
       }
 
-      buffer.append(UInt8(truncatingIfNeeded: cu))
-
-      if buffer.count >= buffer.capacity {
-        hasher.append(buffer._storage)
-        buffer = _emptyASCIIHashBuffer()
+      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: cu)) {
+        hasher.append(combined)
       }
     }
 
-    if buffer.count > 0 {
-      hasher.append(buffer._storage)
-      buffer = _emptyASCIIHashBuffer()
+    if let combined = asciiHasher.consume() {
+      hasher.append(combined)
     }
   }
 }
@@ -86,7 +103,7 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 extension _UnmanagedString where CodeUnit == UInt8 {
   @effects(releasenone)
   @_versioned
-  internal func hash(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashASCII(into: &hasher)
   }
 }
@@ -94,14 +111,14 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 extension _UnmanagedString where CodeUnit == UInt16 {
   @effects(releasenone)
   @_versioned
-  internal func hash(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
 
 extension _UnmanagedOpaqueString {
   @_versioned
-  internal func hash(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
@@ -112,14 +129,14 @@ extension _StringGuts {
   internal func _hash(into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      _asOpaque().hash(into: &hasher)
+      _asOpaque().computeHashValue(into: &hasher)
       return
     }
     if isASCII {
-      _unmanagedASCIIView.hash(into: &hasher)
+      _unmanagedASCIIView.computeHashValue(into: &hasher)
       return
     }
-    _unmanagedUTF16View.hash(into: &hasher)
+    _unmanagedUTF16View.computeHashValue(into: &hasher)
   }
 
   @_versioned
@@ -127,14 +144,14 @@ extension _StringGuts {
   internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      _asOpaque()[range].hash(into: &hasher)
+      _asOpaque()[range].computeHashValue(into: &hasher)
       return
     }
     if isASCII {
-      _unmanagedASCIIView[range].hash(into: &hasher)
+      _unmanagedASCIIView[range].computeHashValue(into: &hasher)
       return
     }
-    _unmanagedUTF16View[range].hash(into: &hasher)
+    _unmanagedUTF16View[range].computeHashValue(into: &hasher)
   }
 }
 
