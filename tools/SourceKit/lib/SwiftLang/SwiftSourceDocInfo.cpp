@@ -1516,9 +1516,16 @@ static void resolveRange(SwiftLangSupport &Lang,
 
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
+
       RangeInfo Result;
       Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
-      Result.RangeContent = Info.ContentRange.str();
+      if (Info.Kind == RangeKind::Invalid) {
+        Result.RangeContent = "";
+      } else {
+        assert(Info.ContentRange.isValid());
+        Result.RangeContent = Info.ContentRange.str();
+      }
+
       switch (Info.Kind) {
       case RangeKind::SingleExpression: {
         SmallString<64> SS;
