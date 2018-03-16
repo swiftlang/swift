@@ -326,16 +326,16 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     return true;
   }
 
-  // We don't allow lookups of an associated type or typealias of an
-  // existential type, because we have no way to represent such types.
-  if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-    if (type->isExistentialType() &&
-        (isa<TypeAliasDecl>(typeDecl) ||
-         isa<AssociatedTypeDecl>(typeDecl))) {
-      if (memberType->hasTypeParameter()) {
-        return true;
-      }
-    }
+  if (type->isExistentialType() &&
+      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    // TODO: Temporarily allow typealias and associated type lookup on
+    //       existential type iff it doesn't have any type parameters.
+    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
+      return memberType->hasTypeParameter();
+
+    // Don't allow lookups of nested types of an existential type,
+    // because there is no way to represent such types.
+    return true;
   }
 
   return false;
