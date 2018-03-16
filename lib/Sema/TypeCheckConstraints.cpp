@@ -787,6 +787,10 @@ namespace {
     /// Simplify a key path expression into a canonical form.
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
+    /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
+    /// the type conforms to the expected literal protocol.
+    Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
@@ -991,6 +995,9 @@ namespace {
         resolveKeyPathExpr(KPE);
         return KPE;
       }
+
+      if (auto *init = simplifyTypeConstructionWithLiteralArg(expr))
+        return init;
 
       return expr;
     }
@@ -1548,6 +1555,86 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   KPE->setRootType(rootType);
   KPE->resolveComponents(TC.Context, components);
+}
+
+Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
+  // If constructor call is followed by `BOE` or `FVE` it means that such
+  // call is supposed to produce optional and literal constructors aren't
+  // failable so let's not attempt this optimization.
+  if (!ExprStack.empty()) {
+    auto *parent = ExprStack.back();
+    if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
+      return nullptr;
+  }
+
+  auto *call = dyn_cast<CallExpr>(E);
+  if (!call || call->getNumArguments() != 1)
+    return nullptr;
+
+  auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
+  if (!typeExpr)
+    return nullptr;
+
+  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
+  auto *literal = dyn_cast<LiteralExpr>(argExpr);
+  if (!literal)
+    return nullptr;
+
+  auto *protocol = TC.getLiteralProtocol(literal);
+  if (!protocol)
+    return nullptr;
+
+  Type type;
+  if (auto *rep = typeExpr->getTypeRepr()) {
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::InExpression;
+    type = TC.resolveType(rep, DC, options);
+  } else {
+    type = typeExpr->getTypeLoc().getType();
+  }
+
+  if (!type)
+    return nullptr;
+
+  ConformanceCheckOptions options;
+  options |= ConformanceCheckFlags::InExpression;
+  options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  if (!result || !result->isConcrete())
+    return nullptr;
+
+  auto initializers = protocol->lookupDirect(DeclBaseName::createConstructor());
+  // We are only interested in protocol requirements.
+  initializers.erase(std::remove_if(initializers.begin(), initializers.end(),
+                                    [&](ValueDecl *init) {
+                                      return !isa<ProtocolDecl>(
+                                          init->getDeclContext());
+                                    }),
+                     initializers.end());
+
+  if (initializers.size() != 1)
+    return nullptr;
+
+  auto *init = cast<ConstructorDecl>(initializers.front());
+  auto paramType = init->getArgumentInterfaceType();
+
+  auto *TT = paramType->getAs<TupleType>();
+  if (!TT || TT->getNumElements() != 1)
+    return nullptr;
+
+  auto *arg =
+      TupleExpr::create(TC.Context, call->getArg()->getStartLoc(), {argExpr},
+                        {TT->getElement(0).getName()}, {argExpr->getStartLoc()},
+                        call->getArg()->getEndLoc(), false, false);
+
+  auto *initCall = CallExpr::create(TC.Context, call->getFn(), arg,
+                                    {TT->getElement(0).getName()},
+                                    {argExpr->getStartLoc()}, false, false);
+
+  initCall->setType(type);
+  return initCall;
 }
 
 /// \brief Clean up the given ill-formed expression, removing any references
