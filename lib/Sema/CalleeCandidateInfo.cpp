@@ -683,7 +683,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // If we have useful information about the type we're
     // initializing, provide it.
-    if (UDE->getName().getBaseName() == CS.TC.Context.Id_init) {
+    if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
         declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;

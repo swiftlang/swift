@@ -444,7 +444,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
 
   auto paramPL = ParameterList::createWithoutLoc(param);
   
-  DeclName name(C, C.Id_init, paramPL);
+  DeclName name(C, DeclBaseName::createConstructor(), paramPL);
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             OTK_Optional, /*FailabilityLoc=*/SourceLoc(),
@@ -1167,7 +1167,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto emptyPL = ParameterList::createEmpty(context);
 
   // Create the constructor.
-  DeclName name(context, context.Id_init, emptyPL);
+  DeclName name(context, DeclBaseName::createConstructor(), emptyPL);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, emptyPL,
@@ -1282,7 +1282,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
       ParameterList::create(context, valueParameters)};
 
   // Create the constructor
-  DeclName name(context, context.Id_init, paramLists[1]);
+  DeclName name(context, DeclBaseName::createConstructor(), paramLists[1]);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, paramLists[1],
@@ -2264,7 +2264,7 @@ namespace {
 
     bool isFactoryInit(ImportedName &name) {
       return name &&
-             name.getDeclName().getBaseName() == Impl.SwiftContext.Id_init &&
+             name.getDeclName().getBaseName() == DeclBaseName::createConstructor() &&
              (name.getInitKind() == CtorInitializerKind::Factory ||
               name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
     }
@@ -3521,7 +3521,7 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       if (importedName.importAsMember()) {
         // Handle initializers.
-        if (name.getBaseName() == Impl.SwiftContext.Id_init) {
+        if (name.getBaseName() == DeclBaseName::createConstructor()) {
           assert(!accessorInfo);
           return importGlobalAsInitializer(decl, name, dc,
                                            importedName.getInitKind(),
@@ -7234,7 +7234,7 @@ void SwiftDeclConverter::importInheritedConstructors(
   // If we have a superclass, import from it.
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->lookupDirect(Impl.SwiftContext.Id_init),
+      inheritConstructors(superclass->lookupDirect(DeclBaseName::createConstructor()),
                           kind);
     }
   }
