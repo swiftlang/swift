@@ -53,7 +53,7 @@ public func testEmptyScalarsArray() {
 // This tests the attributes necessary to get arrays of integers and strings going.
 public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
   return x.toDevice().convolved2D(withFilter: filter.toDevice(),
-                       strides: [1, 2, 3, 4], padding: .same)
+                       strides: (1, 2, 3, 4), padding: .same)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution

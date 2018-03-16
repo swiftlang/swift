@@ -329,11 +329,12 @@ extension Tensor where Scalar : FloatingPoint {
     shape: Tensor<Int32>,
     filter: Tensor,
     backpropOutput: Tensor,
-    strides: [Int32],
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
     return #tfop("Conv2DBackpropInput", shape, filter, backpropOutput,
-      strides: strides, padding: padding.cName)
+                 strides: [strides.0, strides.1, strides.2, strides.3],
+                 padding: padding.cName)
   }
 
   /// TensorFlow builtin conv2d gradient helper for the filter.
@@ -346,11 +347,12 @@ extension Tensor where Scalar : FloatingPoint {
     input: Tensor,
     filterSizes: Tensor<Int32>,
     backpropOutput: Tensor,
-    strides: [Int32],
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
     return #tfop("Conv2DBackpropFilter", input, filterSizes, backpropOutput,
-      strides: strides, padding: padding.cName)
+                 strides: [strides.0, strides.1, strides.2, strides.3],
+                 padding: padding.cName)
   }
 
   @_inlineable @_versioned
@@ -358,15 +360,15 @@ extension Tensor where Scalar : FloatingPoint {
     _ shape: Tensor<Int32>,
     _ filter: Tensor,
     _ backpropOutput: Tensor,
-    _ strides: [Int32],
+    _ strides: (Int32, Int32, Int32, Int32),
     _ padding: Padding,
     _ partial: Tensor,
     _ seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
       _TFConv2DBackpropFilter(input: seed, filterSizes: shape,
-        backpropOutput: backpropOutput, strides: strides,
-        padding: padding),
+                              backpropOutput: backpropOutput, strides: strides,
+                              padding: padding),
       seed.convolved2D(withFilter: filter, strides: strides, padding: padding)
     )
   }
@@ -376,15 +378,15 @@ extension Tensor where Scalar : FloatingPoint {
     _ input: Tensor,
     _ filterSizes: Tensor<Int32>,
     _ backpropOutput: Tensor,
-    _ strides: [Int32],
+    _ strides: (Int32, Int32, Int32, Int32),
     _ padding: Padding,
     _ partial: Tensor,
     _ seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
       _TFConv2DBackpropInput(shape: filterSizes, filter: seed,
-        backpropOutput: backpropOutput, strides: strides,
-        padding: padding),
+                             backpropOutput: backpropOutput, strides: strides,
+                             padding: padding),
       input.convolved2D(withFilter: seed, strides: strides, padding: padding)
     )
   }
@@ -392,48 +394,55 @@ extension Tensor where Scalar : FloatingPoint {
   @_inlineable @_versioned
   func _adjointConvolved2D(
     filter: Tensor,
-    strides: [Int32],
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
     partial: Tensor,
     seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
-      _TFConv2DBackpropInput(shape: shapeTensor, filter: filter,
-                             backpropOutput: seed, strides: strides,
-                             padding: padding),
-      _TFConv2DBackpropFilter(input: self, filterSizes: filter.shapeTensor,
-                              backpropOutput: seed, strides: strides,
-                              padding: padding
+      _TFConv2DBackpropInput(
+        shape: shapeTensor, filter: filter, backpropOutput: seed,
+        strides: strides, padding: padding
+      ),
+      _TFConv2DBackpropFilter(
+        input: self, filterSizes: filter.shapeTensor, backpropOutput: seed,
+        strides: strides, padding: padding
       )
     )
   }
 
   @_inlineable @_versioned
   func _adjointMaxPooled(
-    kernelSize: Tensor<Int32>,
-    strides: Tensor<Int32>,
+    kernelSize: (Int32, Int32, Int32, Int32),
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
     partial: Tensor,
     seed: Tensor
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
     // closed form.
-    return #tfop("MaxPoolGradV2", shapeTensor, partial, seed, kernelSize,
-                 strides, padding: padding.cName)
+    return #tfop(
+      "MaxPoolGradV2", shapeTensor, partial, seed, Tensor<Int32>(kernelSize),
+      Tensor<Int32>(strides), padding: padding.cName
+    )
   }
 
   @_inlineable @_versioned
   func _adjointAveragePooled(
-    kernelSize: [Int32],
-    strides: [Int32],
+    kernelSize: (Int32, Int32, Int32, Int32),
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
     partial: Tensor,
     seed: Tensor
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
     // closed form.
-    return #tfop("AvgPoolGrad", shapeTensor, seed, ksize: kernelSize,
-                 strides: strides, padding: padding.cName)
+    return #tfop(
+      "AvgPoolGrad", shapeTensor, seed,
+      ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
+      strides: [strides.0, strides.1, strides.2, strides.3],
+      padding: padding.cName
+    )
   }
 }
 
