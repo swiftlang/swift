@@ -212,6 +212,9 @@ public:
   /// Return the BaseInput numbered by \p Index.
   StringRef getBaseInput(size_t Index) const;
 
+  /// Write a file map naming the outputs for each primary input.
+  void writeOutputFileMap(llvm::raw_ostream &out) const;
+
   void print(raw_ostream &Stream) const;
   void dump() const LLVM_ATTRIBUTE_USED;
 
@@ -307,9 +310,6 @@ public:
   ArrayRef<std::pair<const char *, const char *>> getExtraEnvironment() const {
     return ExtraEnvironment;
   }
-
-  /// Write a file map naming the outputs for each primary input.
-  void writeOutputFileMap(llvm::raw_ostream &out) const;
 
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.

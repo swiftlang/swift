@@ -1156,7 +1156,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
       break;
     }
     case FilelistInfo::WhichFiles::SupplementaryOutput: {
-      job->writeOutputFileMap(out);
+      job->getOutput().writeOutputFileMap(out);
       break;
     }
     }

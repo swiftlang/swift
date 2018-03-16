@@ -314,13 +314,14 @@ CommandOutput::dump() const {
   llvm::errs() << '\n';
 }
 
-void Job::writeOutputFileMap(llvm::raw_ostream &out) const {
+void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
   std::vector<StringRef> inputs;
-  for (const Action *A : getSource().getInputs()) {
-    const auto *IA = cast<InputAction>(A);
-    inputs.push_back(IA->getInputArg().getValue());
+  for (const CommandInputPair IP : Inputs) {
+    assert(IP.Base == IP.Primary && !IP.Base.empty() &&
+           "output file maps won't work if these differ");
+    inputs.push_back(IP.Primary);
   }
-  getOutput().getDerivedOutputMap().write(out, inputs);
+  getDerivedOutputMap().write(out, inputs);
 }
 
 Job::~Job() = default;
