@@ -1537,6 +1537,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::identifier:  // foo
+  case tok::kw_self:     // self
     // Attempt to parse for 'type(of: <expr>)'.
     if (canParseTypeOf(*this)) {
       return parseExprTypeOf();
@@ -1571,7 +1572,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     }
 
     LLVM_FALLTHROUGH;
-  case tok::kw_self:     // self
   case tok::kw_Self:     // Self
     return makeParserResult(parseExprIdentifier());
 
