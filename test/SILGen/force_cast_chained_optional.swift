@@ -17,13 +17,12 @@ class D: C {}
 // CHECK: bb0([[ARG:%.*]] : @owned $Foo):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   class_method [[BORROWED_ARG]] : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar?, $@convention(method) (@guaranteed Foo) ->
-// CHECK:   select_enum_addr
-// CHECK:   cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]
+// CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[SOME_BAR:bb[0-9]+]], case #Optional.none!enumelt: [[NO_BAR:bb[0-9]+]]
 //
 // CHECK: [[NO_BAR]]:
 // CHECK:   br [[TRAP:bb[0-9]+]]
 //
-// CHECK: [[SOME_BAR]]:
+// CHECK: [[SOME_BAR]](
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:   [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
 // CHECK:   [[BORROWED_BAR:%.*]] = begin_borrow [[BAR]]

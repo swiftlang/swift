@@ -583,6 +583,13 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
         }
 
       } else if (auto FD = dyn_cast<AbstractFunctionDecl>(parent_decl)) {
+        // FIXME: We should not end up here at all. For some reason we're trying
+        // to look up members of a local type inside the parent context of the
+        // local type.
+        //
+        // This code path is broken and is about to be replaced.
+        if (name.isSpecial())
+          return result._decls.size();
 
         // Do a local lookup into the function, using the end loc to approximate
         // being able to see all the local variables.
