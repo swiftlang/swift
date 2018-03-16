@@ -712,9 +712,7 @@ public final class _TensorComputation {
         // Set the cancelability of the detached thread.
         pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
         // Execute the tensor computation.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        let arg = arg
-#else
+#if !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
         let arg = arg!
 #endif
         let computation: _TensorComputation =

@@ -143,6 +143,7 @@ func debugLog(_ message: @autoclosure () -> String,
 private func random() -> Int
 #endif
 
+@_fixed_layout
 open class RandomState {
   /// The global pseudorandom state.
   public static let global = RandomState(seed: UInt32(time(nil)),
@@ -168,7 +169,8 @@ open class RandomState {
   ///     information. It is initialized based on `seed`. `size` must be
   ///     between 8 and 256, and should be a power of two.
   ///
-  fileprivate init(seed: UInt32, bufferSize: Int = 64) {
+  @_versioned
+  init(seed: UInt32, bufferSize: Int = 64) {
     self.bufferAddress = .allocate(capacity: bufferSize)
     self.bufferSize = bufferSize
     self.seed(with: seed)
@@ -226,6 +228,7 @@ open class RandomState {
 }
 
 /// A sequence of pseudorandom numbers.
+@_fixed_layout
 public struct RandomNumberSequence : Sequence {
   public let seed: UInt32?
 
