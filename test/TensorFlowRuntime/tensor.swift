@@ -431,6 +431,24 @@ TensorTests.testAllBackends("BroadcastTensor") {
   expectEqual(Array(repeating: 1, count: 24), broadcasted.scalars)
 }
 
+TensorTests.testAllBackends("Unbroadcast1") {
+  let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
+  let y = Tensor<Float>(shape: [4, 5], repeating: 1)
+  let z = x.unbroadcast(to: y)
+  expectEqual(ShapedArray<Float>(shape: [4, 5],
+                                 repeating: 6),
+              z.array)
+}
+
+TensorTests.testAllBackends("Unbroadcast2") {
+  let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
+  let y = Tensor<Float>(shape: [3, 1, 5], repeating: 1)
+  let z = x.unbroadcast(to: y)
+  expectEqual(ShapedArray<Float>(shape: [3, 1, 5],
+                                 repeating: 8),
+              z.array)
+}
+
 // TODO: Merge all rank/shape getter tests into one when we support code motion
 // to avoid sends.
 
