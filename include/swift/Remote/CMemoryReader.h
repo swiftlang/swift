@@ -63,12 +63,12 @@ public:
                                   outBuffer) != 0;
 
     switch (type) {
-      case PointerSize: {
+      case DLQ_GetPointerSize: {
         auto result = static_cast<uint8_t *>(outBuffer);
         *result = Impl.getPointerSize(Impl.reader_context);
         return true;
       }
-      case SizeSize: {
+      case DLQ_GetSizeSize: {
         auto result = static_cast<uint8_t *>(outBuffer);
         *result = Impl.getSizeSize(Impl.reader_context);
         return true;

@@ -164,12 +164,12 @@ public:
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
     switch (type) {
-      case PointerSize: {
+      case DLQ_GetPointerSize: {
         auto result = static_cast<uint8_t *>(outBuffer);
         *result = sizeof(void *);
         return true;
       }
-      case SizeSize: {
+      case DLQ_GetSizeSize: {
         auto result = static_cast<uint8_t *>(outBuffer);
         *result = sizeof(size_t);
         return true;

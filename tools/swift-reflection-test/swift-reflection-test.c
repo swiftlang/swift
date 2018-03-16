@@ -182,12 +182,12 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
                                              DataLayoutQueryType type,
                                              void *inBuffer, void *outBuffer) {
   switch (type) {
-    case PointerSize: {
+    case DLQ_GetPointerSize: {
       uint8_t *result = (uint8_t *)outBuffer;
       *result = sizeof(void *);
       return 1;
     }
-    case SizeSize: {
+    case DLQ_GetSizeSize: {
       uint8_t *result = (uint8_t *)outBuffer;
       *result = sizeof(size_t);
       return 1;

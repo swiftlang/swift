@@ -79,12 +79,12 @@ typedef enum {
   /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
   /// should be populated with the size of an ordinary pointer in the remote
   /// process, in bytes.
-  PointerSize,
+  DLQ_GetPointerSize,
 
   /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
   /// should be populated with the size of size_t in the remote process, in
   /// bytes.
-  SizeSize,
+  DLQ_GetSizeSize,
 } DataLayoutQueryType;
 
 /// Data layout query function, which returns answers based on query types (from
