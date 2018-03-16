@@ -473,24 +473,26 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   apply %{{.*}}<Int, [Int]>
 // ----- access the temporary array result of the getter
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]]
-// CHECK:   select_enum_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, case #Optional.some!enumelt.1
-// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK:   [[TEMP2:%.*]] = alloc_stack $Optional<Array<Int>>
+// CHECK:   copy_addr [[TEMPACCESS]] to [initialization] [[TEMP2]]
+// CHECK:   [[VALUE:%.*]] = load [take] [[TEMP2]]
+// CHECK:   switch_enum [[VALUE]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 //
 // CHECK: bb1:
 // CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
 // CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
 // CHECK-NOT: begin_access
 // CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
-// CHECK:   alloc_stack $Int
+// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
 // CHECK-NOT: begin_access
-// CHECK:   store %{{.*}} to [trivial] %31 : $*Int
+// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
 // Call Dictionary.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
 // CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
 // CHECK:   end_access [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
 // CHECK:   br
 //
-// CHECK: bb2:
+// CHECK: bb2(
 // CHECK-NOT: begin_access
 // CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt.1
 // ----- call Array.append

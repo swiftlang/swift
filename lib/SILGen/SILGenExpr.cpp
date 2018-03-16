@@ -4253,24 +4253,24 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SwitchEnumBuilder SEB(SGF.B, loc, optVal);
 
-  auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-  SEB.addCase(someDecl, isPresentBB, contBB, [&](ManagedValue input,
-                                                 SwitchCaseFullExpr &scope) {
-    if (resultTL.isAddressOnly()) {
-      SILValue addr =
-          addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
-      input = SGF.B.createUncheckedTakeEnumDataAddr(
-          loc, input, someDecl, input.getType().getOptionalObjectType());
-      SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
-                           IsInitialization);
-      scope.exitAndBranch(loc);
-      return;
-    }
-    scope.exitAndBranch(loc, input.forward(SGF));
-  });
-  SEB.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+  SEB.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+        if (resultTL.isAddressOnly()) {
+          SILValue addr =
+              addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+          auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
+          input = SGF.B.createUncheckedTakeEnumDataAddr(
+              loc, input, someDecl, input.getType().getOptionalObjectType());
+          SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
+                               IsInitialization);
+          scope.exitAndBranch(loc);
+          return;
+        }
+        scope.exitAndBranch(loc, input.forward(SGF));
+      });
+  SEB.addOptionalNoneCase(
+      isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (resultTL.isAddressOnly()) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
@@ -4896,24 +4896,32 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-void SILGenFunction::emitBindOptional(SILLocation loc,
-                                      ManagedValue optionalAddrOrValue,
+void SILGenFunction::emitBindOptional(SILLocation loc, ManagedValue optValue,
                                       unsigned depth) {
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
 
-  // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  auto hasValue =
-      emitDoesOptionalHaveValue(loc, optionalAddrOrValue.getValue());
+  SILBasicBlock *hasNoValueBB = createBasicBlock();
 
+  // We make a copy to ensure that we pass the value into the
+  // switch_enum at plus 1. This is important since emitBindOptional
+  // does not consume its argument. Additionally, we need to make sure
+  // to create the switch enum builder /after/ emitting the block for
+  // cleanups lest we emit an extra destroy in the .none block.
+  SwitchEnumBuilder SEB(B, loc, optValue.copy(*this, loc));
+  SEB.addOptionalSomeCase(hasValueBB);
   // If not, thread out through a bunch of cleanups.
-  SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
-  
-  // If so, continue.
-  B.emitBlock(hasValueBB);
+  SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
+                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                            expr.exitAndBranch(loc);
+                          });
+  std::move(SEB).emit();
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  B.setInsertionPoint(hasValueBB);
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {

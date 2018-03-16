@@ -779,7 +779,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   // path, causing a use (the destroy on the negative path) to be created that
   // does not dominate its definition (in the positive path).
   auto handler = [&SGF, &loc, &failureDest](ManagedValue mv,
-                                            SwitchCaseFullExpr &expr) {
+                                            SwitchCaseFullExpr &&expr) {
     expr.exit();
     SGF.Cleanups.emitBranchAndCleanups(failureDest, loc);
   };
@@ -804,7 +804,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   switchBuilder.addCase(
       eltDecl, someBlock, contBlock,
       [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
-                                               SwitchCaseFullExpr &expr) {
+                                               SwitchCaseFullExpr &&expr) {
         // If the enum case has no bound value, we're done.
         if (!eltDecl->hasAssociatedValues()) {
           assert(
