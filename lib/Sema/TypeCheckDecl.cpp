@@ -8894,11 +8894,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
       // A designated or required initializer has not been overridden.
 
-      // Skip this designated initializer if it's in an extension.
-      // FIXME: We shouldn't allow this.
-      if (isa<ExtensionDecl>(superclassCtor->getDeclContext()))
-        continue;
-
       // If we have already introduced an initializer with this parameter type,
       // don't add one now.
       if (!initializerParamTypes.insert(
