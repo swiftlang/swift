@@ -199,6 +199,7 @@ internal struct _LegacyHasher {
 
 
 // NOT @_fixed_layout
+@_fixed_layout // FIXME - remove - radar 38549901
 public struct _Hasher {
   internal typealias Core = _SipHash13
 
