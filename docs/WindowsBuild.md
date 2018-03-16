@@ -74,7 +74,9 @@ argument to `x86` and run
 VsDevCmd -arch=x86
 ```
 
-- Then adapt the following command and run it.
+- Then adapt the following command and run it. Make sure to use forward slashes 
+  (`/`) instead of backslashes (`\`) as the path seperators. `clang` breaks 
+  with backslashed paths
 ```cmd
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
