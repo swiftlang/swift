@@ -2707,7 +2707,8 @@ namespace {
 
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
-                                      {KnownProtocolKind::BridgedStoredNSError});
+                               {KnownProtocolKind::BridgedStoredNSError,
+                                KnownProtocolKind::ObjectiveCBridgeableError});
 
           // Create the _nsError member.
           //   public let _nsError: NSError

@@ -4665,6 +4665,9 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
   ASTContext &ctx = sourceFile.getASTContext();
   FrontendStatsTracer statsTracer(ctx.Stats, "used-conformances");
 
+  // If we saw any errors, don't bother; we won't generate any code.
+  if (ctx.Diags.hadAnyError()) return;
+
   // Queue containing protocol conformances that still need to be completed.
   // Entrance to this queue is guarded by the source file's list of "used"
   // conformances, so it will not contain duplicates.
@@ -4675,6 +4678,9 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
     std::vector<NormalProtocolConformance *> &conformanceQueue;
     ASTContext &ctx;
 
+    /// The set of interesting types that we've already visited.
+    llvm::DenseSet<CanType> visitedTypes;
+
     /// _ObjectiveCBridgeable
     Optional<ProtocolDecl *> objCBridgeableProto;
 
@@ -4684,16 +4690,15 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
     /// _ErrorCodeProtocol
     Optional<ProtocolDecl *> errorCodeProto;
 
-    /// Look for a nominal generic type.
-    void visitTypeForBoundGenerics(Type type) {
-      auto nominal = type->getAnyNominal();
-      if (!nominal) return;
+    /// When we should skip the given type.
+    static bool shouldSkipType(Type type) {
+      return !type || type->hasError() || type->hasUnboundGenericType();
+    }
 
+    /// Visit the conformances within any bound generic type.
+    void visitTypeForBoundGenerics(Type type, NominalTypeDecl *nominal) {
       auto genericSig = nominal->getGenericSignature();
       if (!genericSig) return;
-
-      // We cannot look into any type containing an unbound generic type.
-      if (type->hasUnboundGenericType()) return;
 
       // Dig out the substitutions.
       auto subMap =
@@ -4715,8 +4720,35 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
       }
     }
 
+    /// Visit the types involved in layout of this type.
+    void visitTypeForLayout(Type type, NominalTypeDecl *nominal) {
+      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+        for (auto element : enumDecl->getAllElements()) {
+          tc.validateDecl(element);
+
+          Type memberType = element->getArgumentInterfaceType();
+          if (shouldSkipType(memberType)) continue;
+
+          memberType = type->getTypeOfMember(sourceFile.getParentModule(),
+                                             element, memberType);
+          visitType(memberType);
+          continue;
+        }
+        return;
+      }
+
+      for (auto storedProp : nominal->getStoredProperties()) {
+        tc.validateDecl(storedProp);
+        if (shouldSkipType(storedProp->getInterfaceType())) continue;
+
+        auto memberType = type->getTypeOfMember(sourceFile.getParentModule(),
+                                                storedProp);
+        visitType(memberType);
+      }
+    }
+
     /// Look for _ObjectiveCBridgeable conformances on the given type.
-    void visitTypeForObjectiveCBridgeable(Type type) {
+    void visitTypeForObjectiveCBridgeable(Type type, NominalTypeDecl *nominal) {
       // Dig out the Objective-C bridgeable protocol, if we haven't looked
       // before.
       if (!objCBridgeableProto) {
@@ -4727,13 +4759,8 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
       // If there isn't an _ObjectiveCBridgeable protocol, do nothing.
       if (!*objCBridgeableProto) return;
 
-      // If we have a type, "use" its conformance to
-      // _ObjectiveCBridgeable if it has one.
-      auto *nominalDecl = type->getAnyNominal();
-      if (!nominalDecl) return;
-
       // Classes and protocols cannot conform to _ObjectiveCBridgeable.
-      if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
+      if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return;
 
       // If this type conforms to _ObjectiveCBridgeable, visit the conformance.
@@ -4748,7 +4775,7 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
     }
 
     /// Look for Error-bridging-related conformances on the given type.
-    void visitTypeForErrorBridging(Type type) {
+    void visitTypeForErrorBridging(Type type, NominalTypeDecl *nominal) {
       // Dig out the protocols we need, if we haven't looked before.
       if (!bridgedStoredNSErrorProto) {
         bridgedStoredNSErrorProto =
@@ -4759,9 +4786,6 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
       // If any of the named protocols are unavailable, we're done.
       if (!*bridgedStoredNSErrorProto || !*errorCodeProto)
         return;
-
-      // Only nominal types can conform to these protocols.
-      if (!type->getAnyNominal()) return;
 
       ConformanceCheckOptions options =
         (ConformanceCheckFlags::InExpression |
@@ -4839,16 +4863,26 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
     }
 
     void visitType(Type type){
-      if (!type) return;
+      if (shouldSkipType(type)) return;
 
       type.visit([&](Type type) {
-        // If we have a nominal type, check whether there are substitutions
-        // that need to be considered.
-        visitTypeForBoundGenerics(type);
+        // Only nominal types are interesting.
+        auto nominal = type->getAnyNominal();
+        if (!nominal) return;
 
+        // Make sure we only visit this type once.
+        if (!visitedTypes.insert(type->getCanonicalType()).second) return;
+
+        // Consider bound generics.
+        visitTypeForBoundGenerics(type, nominal);
+
+        // Visit the types of stored properties.
+        visitTypeForLayout(type, nominal);
+
+        // Visit conformances for bridging.
         if (ctx.LangOpts.EnableObjCInterop) {
-          visitTypeForObjectiveCBridgeable(type);
-          visitTypeForErrorBridging(type);
+          visitTypeForObjectiveCBridgeable(type, nominal);
+          visitTypeForErrorBridging(type, nominal);
         }
       });
     }
@@ -4874,6 +4908,40 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
       if (auto declRef = E->getReferencedDecl())
         visitConcreteDeclRef(declRef);
 
+      if (auto erasure = dyn_cast<ErasureExpr>(E)) {
+        for (auto conformance : erasure->getConformances())
+          visitConformanceRef(conformance);
+        return E;
+      }
+
+      if (auto anyHashableErasure = dyn_cast<AnyHashableErasureExpr>(E)) {
+        visitConformanceRef(anyHashableErasure->getConformance());
+        return E;
+      }
+
+      if (auto keyPath = dyn_cast<KeyPathExpr>(E)) {
+        for (const auto &component : keyPath->getComponents()) {
+          for (auto conformance :
+                 component.getSubscriptIndexHashableConformances())
+            visitConformanceRef(conformance);
+        }
+        return E;
+      }
+
+      if (auto stringLiteral = dyn_cast<StringLiteralExpr>(E)) {
+        visitConcreteDeclRef(stringLiteral->getInitializer());
+        visitConcreteDeclRef(stringLiteral->getBuiltinInitializer());
+        return E;
+      }
+
+      if (auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(E)) {
+        if (magicLiteral->isString()) {
+          visitConcreteDeclRef(magicLiteral->getInitializer());
+          visitConcreteDeclRef(magicLiteral->getBuiltinInitializer());
+        }
+        return E;
+      }
+
       return E;
     }
 
@@ -4897,9 +4965,17 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
 
   // Complete all of the conformances we've discovered along the way.
   for (unsigned i = 0; i != conformanceQueue.size(); ++i) {
-    // Check this conformance.
     auto normal = conformanceQueue[i];
+
+    // Serialized AST files always have complete conformances.
+    if (isa<SerializedASTFile>(
+                          normal->getDeclContext()->getModuleScopeContext()))
+      continue;
+
+    // Check this conformance.
     checkConformance(normal);
+
+    // FIXME: PartiallyCheckedConformances
 
     // Visit the conformances that satisfy the constraints in the requirement
     // signature.
@@ -4908,7 +4984,15 @@ void TypeChecker::completeUsedProtocolConformances(SourceFile &sourceFile,
                      walker.visitConformanceRef(conformance);
                    });
 
-    // Visit the value witness references themselves.
+    // Visit each of the type witnesses.
+    normal->forEachTypeWitness(
+      nullptr,
+      [&](AssociatedTypeDecl *assocType, Type type, TypeDecl *decl) {
+        walker.visitType(type);
+        return false;
+      });
+
+    // Visit the value witness references.
     normal->forEachValueWitness(
       nullptr,
       [&](ValueDecl *req, const Witness &witness) {

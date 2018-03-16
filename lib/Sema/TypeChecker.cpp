@@ -476,6 +476,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC,
         continue;
 
       TC.finalizeDecl(decl);
+      // FIXME? TC.completeUsedProtocolConformances(sourceFile, decl);
     }
 
     // Ensure that the requirements of the given conformance are

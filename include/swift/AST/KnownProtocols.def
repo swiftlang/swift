@@ -68,6 +68,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
 PROTOCOL_(ObjectiveCBridgeable)
+PROTOCOL_(ObjectiveCBridgeableError)
 PROTOCOL_(DestructorSafeContainer)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral)

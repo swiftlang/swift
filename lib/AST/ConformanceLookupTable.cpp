@@ -529,9 +529,17 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         addProtocol(bridgedNSError, SourceLoc(),
                     ConformanceSource::forImplied(conformanceEntry));
       }
+      if (auto bridgeableError =
+            ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeableError)) {
+        addProtocol(bridgeableError, SourceLoc(),
+                    ConformanceSource::forImplied(conformanceEntry));
+      }
     }
 
     // Add inherited protocols.
+    if (resolver)
+      resolver->resolveInheritedProtocols(conformingProtocol);
+
     addProtocols(conformingProtocol->getInherited(),
                  ConformanceSource::forImplied(conformanceEntry),
                  resolver);
