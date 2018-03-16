@@ -66,8 +66,30 @@ swift_reflection_createReflectionContext(void *ReaderContext,
     : [](void *){ return (uint8_t)8; };
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
+    nullptr,
     GetSize,
     GetSize,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
+  };
+
+  return new SwiftReflectionContext(ReaderImpl);
+}
+
+SwiftReflectionContextRef
+swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
+                                    QueryDataLayoutFunction DataLayout,
+                                    FreeBytesFunction Free,
+                                    ReadBytesFunction ReadBytes,
+                                    GetStringLengthFunction GetStringLength,
+                                    GetSymbolAddressFunction GetSymbolAddress) {
+  MemoryReaderImpl ReaderImpl {
+    ReaderContext,
+    DataLayout,
+    nullptr,
+    nullptr,
     Free,
     ReadBytes,
     GetStringLength,

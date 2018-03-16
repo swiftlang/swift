@@ -51,6 +51,16 @@ swift_reflection_createReflectionContext(void *ReaderContext,
                                          GetStringLengthFunction GetStringLength,
                                          GetSymbolAddressFunction GetSymbolAddress);
 
+/// \returns An opaque reflection context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+SwiftReflectionContextRef
+swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
+                                     QueryDataLayoutFunction DataLayout,
+                                     FreeBytesFunction Free,
+                                     ReadBytesFunction ReadBytes,
+                                     GetStringLengthFunction GetStringLength,
+                                     GetSymbolAddressFunction GetSymbolAddress);
+
 /// Destroys an opaque reflection context.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void

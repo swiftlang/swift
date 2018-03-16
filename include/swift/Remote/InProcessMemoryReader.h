@@ -27,12 +27,22 @@ namespace remote {
 /// An implementation of MemoryReader which simply reads from the current
 /// address space.
 class InProcessMemoryReader final : public MemoryReader {
-  uint8_t getPointerSize() override {
-    return sizeof(uintptr_t);
-  }
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    switch (type) {
+      case PointerSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(void *);
+        return true;
+      }
+      case SizeSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(size_t);
+        return true;
+      }
+    }
 
-  uint8_t getSizeSize() override {
-    return sizeof(size_t);
+    return false;
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override;

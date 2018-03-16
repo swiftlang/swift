@@ -178,6 +178,25 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
   }
 }
 
+static int PipeMemoryReader_queryDataLayout(void *Context,
+                                             DataLayoutQueryType type,
+                                             void *inBuffer, void *outBuffer) {
+  switch (type) {
+    case PointerSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(void *);
+      return 1;
+    }
+    case SizeSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(size_t);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
                                        void *context) {
   free((void *)bytes);
@@ -438,13 +457,12 @@ int doDumpHeapInstance(const char *BinaryFilename) {
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
-      SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
-        (void*)&Pipe,
-        sizeof(void *),
-        PipeMemoryReader_freeBytes,
-        PipeMemoryReader_readBytes,
-        PipeMemoryReader_getStringLength,
-        PipeMemoryReader_getSymbolAddress);
+      SwiftReflectionContextRef RC =
+          swift_reflection_createReflectionContextWithDataLayout(
+              (void *)&Pipe, PipeMemoryReader_queryDataLayout,
+              PipeMemoryReader_freeBytes, PipeMemoryReader_readBytes,
+              PipeMemoryReader_getStringLength,
+              PipeMemoryReader_getSymbolAddress);
 
       uint8_t PointerSize = PipeMemoryReader_getPointerSize((void*)&Pipe);
       if (PointerSize != sizeof(uintptr_t))
