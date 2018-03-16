@@ -258,7 +258,7 @@ extension ${ArrayXD} : RandomAccessCollection, MutableCollection {
       return ${SliceXD}(
         base: ShapedArraySlice(
           base: base,
-          bounds: Range(bounds)
+          bounds: bounds
         )
       )
     }
@@ -443,7 +443,7 @@ extension ${SliceXD} : RandomAccessCollection, MutableCollection {
         base: ShapedArraySlice(
           base: base.base,
           baseIndices: base.baseIndices,
-          bounds: Range(bounds)
+          bounds: bounds
         )
       )
     }

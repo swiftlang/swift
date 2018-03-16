@@ -158,6 +158,30 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: Tensor(shape: shape, scalars: scalars))
   }
 
+  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The shape must have ${rank} dimensions.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  @_inlineable @inline(__always)
+  public init(shape: TensorShape, scalars: UnsafeBufferPointer<Scalar>) {
+    // TODO: Precondition `scalars.count == shape.contiguousSize`, preferably in
+    // graph.
+    self.init(base: Tensor(shape: shape, scalars: scalars))
+  }
+
+  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The shape must have ${rank} dimensions.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  @_inlineable @inline(__always)
+  public init<C : RandomAccessCollection>(shape: TensorShape, scalars: C)
+    where C.Element == Scalar {
+    // TODO: Precondition `shape.count == ${rank}`, preferably in graph.
+    self.init(base: Tensor(shape: shape, scalars: scalars))
+  }
+
   /// Creates a ${TensorXD} with the specified shape and a single, repeated
   /// value.
   /// - Precondition: The shape must have ${rank} dimensions.
@@ -210,6 +234,13 @@ public extension ${TensorXD} where Scalar : Numeric {
 
 /// Initializers
 public extension ${TensorXD} {
+  /// Creates a ${TensorXD} from with the specified elements.
+  @_inlineable @inline(__always)
+  init<C : RandomAccessCollection>(_ elements: C)
+    where C.Element == ${elementArrayLiteral} {
+    self.init(elements)
+  }
+
   /// Creates a ${TensorXD} from a ShapedArray. Returns nil if the ShapedArray
   /// does not have rank ${rank}.
   @_inlineable @inline(__always)
@@ -234,14 +265,14 @@ public extension ${TensorXD} {
 
   /// Creates a ${TensorXD} containing the given element literals.
   @_inlineable @inline(__always)
-  init(_ scalars: [${elementArrayLiteral}]) {
-    self.init(base: Tensor<Scalar>(scalars))
+  init(_ elements: [${elementArrayLiteral}]) {
+    self.init(base: Tensor<Scalar>(elements))
   }
 
   /// Creates a ${TensorXD} containing the given element literals.
   @_inlineable @inline(__always)
-  init(_ scalars: ${elementArrayLiteral}...) {
-    self.init(scalars)
+  init(_ elements: ${elementArrayLiteral}...) {
+    self.init(elements)
   }
 
   /// Creates a ${TensorXD} by broadcasting the given scalar to a {rank}-D
