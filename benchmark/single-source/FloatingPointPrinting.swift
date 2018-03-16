@@ -119,7 +119,6 @@ public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
 public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
   let count = 100_000
   let step = UInt32.max / UInt32(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let raw = UInt32(i) * step
@@ -133,7 +132,6 @@ public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
 public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
   let count = 100_000
   let step = UInt64.max / UInt64(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let raw = UInt64(i) * step
@@ -151,7 +149,6 @@ public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
 #if arch(x86_64) || arch(i386)
   let count = 100_000
   let step = UInt64.max / UInt64(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let fraction = UInt64(i) * step
@@ -172,7 +169,6 @@ public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
 public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
   let count = 100_000
   let step = UInt32.max / UInt32(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let raw = UInt32(i) * step
@@ -180,14 +176,12 @@ public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
       blackHole("and the actual result was \(f)")
     }
   }
-  CheckResults(s.count > 1)
 }
 
 @inline(never)
 public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
   let count = 100_000
   let step = UInt64.max / UInt64(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let raw = UInt64(i) * step
@@ -195,7 +189,6 @@ public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
       blackHole("and the actual result was \(f)")
     }
   }
-  CheckResults(s.count > 1)
 }
 
 @inline(never)
@@ -206,7 +199,6 @@ public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
 #if arch(x86_64) || arch(i386)
   let count = 100_000
   let step = UInt64.max / UInt64(count)
-  var s = ""
   for _ in 0..<N {
     for i in 0..<count {
       let fraction = UInt64(i) * step
@@ -215,7 +207,6 @@ public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
       blackHole("and the actual result was \(f)")
     }
   }
-  CheckResults(s.count > 1)
 #endif // x86
 #endif // Darwin/Linux
 }
