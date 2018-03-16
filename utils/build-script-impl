@@ -2836,18 +2836,42 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
                 fi
                 call mkdir -p "${results_dir}"
-                with_pushd "${results_dir}" \
-                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                    SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                    "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                    --executable "${lldb_executable}" \
-                    ${LLDB_TEST_DEBUG_SERVER} \
-                    ${LLDB_TEST_SUBDIR_CLAUSE} \
-                    ${LLDB_TEST_CATEGORIES} \
-                    ${LLDB_DOTEST_CC_OPTS} \
-                    ${LLDB_FORMATTER_OPTS} \
-                    --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                    -E "${DOTEST_EXTRA}"
+
+                # Prefer to use lldb-dotest, as building it guarantees that we build all
+                # test dependencies. Ultimately we want to delete as much lldb-specific logic
+                # from this file as possible and just have a single call to lldb-dotest.
+                dotest_extra_args=""
+                if [[ ! -z "${DOTEST_EXTRA}" ]] ; then
+                    dotest_extra_args="-E ${DOTEST_EXTRA}"
+                fi
+                if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "FALSE" ]] ; then
+                    with_pushd ${lldb_build_dir} \
+                        ${NINJA_BIN} lldb-dotest
+
+                    lldb_dotest="${lldb_build_dir}"/bin/lldb-dotest
+                    with_pushd ${results_dir} \
+                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                        ${lldb_dotest} \
+                        ${LLDB_TEST_SUBDIR_CLAUSE} \
+                        ${LLDB_TEST_CATEGORIES} \
+                        ${LLDB_FORMATTER_OPTS} \
+                        ${dotest_extra_args}
+		else
+                    with_pushd "${results_dir}" \
+                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                        "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                        --executable "${lldb_executable}" \
+                        ${LLDB_TEST_DEBUG_SERVER} \
+                        ${LLDB_TEST_SUBDIR_CLAUSE} \
+                        ${LLDB_TEST_CATEGORIES} \
+                        ${LLDB_DOTEST_CC_OPTS} \
+                        ${LLDB_FORMATTER_OPTS} \
+                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                        ${dotest_extra_args}
+                fi
+
                 continue
                 ;;
             llbuild)
