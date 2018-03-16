@@ -22,11 +22,17 @@
   import Glibc
 #endif
 
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+  typealias TestLiteralType = Float80
+#else
+  typealias TestLiteralType = Double
+#endif
+
 import StdlibUnittest
 
 let MathTests = TestSuite("TGMath")
 
-func expectEqualWithTolerance<T>(_ expected: _MaxBuiltinFloatType, _ actual: T,
+func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
                                  ulps allowed: T = 3,
                                  file: String = #file, line: UInt = #line)
                                  where T: BinaryFloatingPoint {
@@ -34,7 +40,7 @@ func expectEqualWithTolerance<T>(_ expected: _MaxBuiltinFloatType, _ actual: T,
     return
   }
   //  Compute error in ulp, compare to tolerance.
-  let absoluteError = T(abs(_MaxBuiltinFloatType(actual) - expected))
+  let absoluteError = T(abs(TestLiteralType(actual) - expected))
   let ulpError = absoluteError / T(expected).ulp
   expectTrue(ulpError <= allowed,
              "\(actual) != \(expected) as \(T.self)" +
