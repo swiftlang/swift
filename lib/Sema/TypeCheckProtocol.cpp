@@ -1849,6 +1849,41 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
 
+  // Objective-C's type-erased generics don't allow the
+  auto &ctx = assocType->getASTContext();
+  if (ctx.LangOpts.EnableObjCInterop && !type->hasError()) {
+    if (auto classDecl = Adoptee->getClassOrBoundGenericClass()) {
+      if (classDecl->usesObjCGenericsModel() && type->hasTypeParameter()) {
+        // Find one of the generic parameters named. It doesn't matter
+        // which one.
+        Type genericParam;
+
+        (void)type.findIf([&](Type type) {
+          if (auto gp = type->getAs<GenericTypeParamType>()) {
+            genericParam = gp;
+            return true;
+          }
+
+          return false;
+        });
+
+        auto &diags = assocType->getASTContext().Diags;
+        if (typeDecl) {
+          diags.diagnose(typeDecl, diag::type_witness_objc_generic_parameter,
+                         type, genericParam, !genericParam.isNull(),
+                         assocType->getFullName(), Proto->getFullName());
+        } else {
+          diags.diagnose(Conformance->getLoc(),
+                         diag::type_witness_objc_generic_parameter,
+                         type, genericParam,  !genericParam.isNull(),
+                         assocType->getFullName(), Proto->getFullName());
+        }
+
+        type = ErrorType::get(type);
+      }
+    }
+  }
+
   if (typeDecl) {
     // Check access.
     AccessScope requiredAccessScope =
