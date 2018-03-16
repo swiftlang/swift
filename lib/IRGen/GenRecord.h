@@ -275,7 +275,7 @@ public:
                                                    fType);
     }
     if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        typeToMetadataVec.size() != 0) {
+        T.hasArchetype()) {
       auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
       assert(metadata && "Expected Type Metadata Ref");
       typeToMetadataVec.insert(std::make_pair(canType, metadata));
