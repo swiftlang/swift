@@ -51,7 +51,7 @@ bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
   return InputActions.size() > TOO_MANY_FILES;
 }
 
-bool ToolChain::JobContext::shouldUseMainOutputFileListInCompilerInvocation()
+bool ToolChain::JobContext::shouldUseMainOutputFileListInFrontendInvocation()
     const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
@@ -59,18 +59,18 @@ bool ToolChain::JobContext::shouldUseMainOutputFileListInCompilerInvocation()
 }
 
 bool ToolChain::JobContext::
-    shouldUseSupplementaryOutputFileMapInCompilerInvocation() const {
+    shouldUseSupplementaryOutputFileMapInFrontendInvocation() const {
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
       types::TY_INVALID;
   return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
-  TOO_MANY_FILES;
+         TOO_MANY_FILES;
 }
 
-bool ToolChain::JobContext::shouldFilterCompilerInputsByType() const {
-  // SingleCompile's must not filter inputs by type in order for the
-  // playground (test) to work.
+bool ToolChain::JobContext::shouldFilterFrontendInputsByType() const {
+  // FIXME: SingleCompile has not filtered its inputs in the past and now people
+  // rely upon that. But we would like the compilation modes to be consistent.
   return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
 }
 
@@ -349,7 +349,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    if (context.shouldUseMainOutputFileListInCompilerInvocation()) {
+    if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
@@ -459,9 +459,9 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   const bool UsePrimaryFileList =
       MayHavePrimaryInputs &&
       shouldUsePrimaryInputFileListInFrontendInvocation();
-  const bool FilterInputsByType = shouldFilterCompilerInputsByType();
+  const bool FilterInputsByType = shouldFilterFrontendInputsByType();
   const bool UseSupplementaryOutputFileList =
-      shouldUseSupplementaryOutputFileMapInCompilerInvocation();
+      shouldUseSupplementaryOutputFileMapInFrontendInvocation();
 
   if (UseFileList) {
     Arguments.push_back("-filelist");
@@ -519,7 +519,7 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
       arguments.push_back("-primary-file");
       arguments.push_back(inputName);
     }
-    if (!isPrimary && !useFileList)
+    if ((!isPrimary || usePrimaryFileList) && !useFileList)
       arguments.push_back(inputName);
   }
 }

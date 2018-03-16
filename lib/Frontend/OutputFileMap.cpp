@@ -102,24 +102,29 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   }
 }
 
+static void writeQuotedEscaped(llvm::raw_ostream &os,
+                               const StringRef fileName) {
+  os << "\"";
+  os.write_escaped(fileName);
+  os << "\"";
+}
+
 void OutputFileMap::write(llvm::raw_ostream &os,
                           ArrayRef<StringRef> inputs) const {
   for (const auto input : inputs) {
     const TypeToPathMap *outputMap = getOutputMapForInput(input);
     if (!outputMap)
       continue;
-    os.write_escaped(input);
+    writeQuotedEscaped(os, input);
     os << ":\n";
     for (auto &typeAndOutputPath : *outputMap) {
       types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();
       os << "  " << types::getTypeName(type) << ": ";
-      os << "\"";
-      os.write_escaped(output);
-      os << "\"";
+      writeQuotedEscaped(os, output);
       os << "\n";
-      }
     }
+  }
 }
 
 llvm::Expected<OutputFileMap>

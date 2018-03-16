@@ -92,15 +92,15 @@ protected:
 
     bool shouldUsePrimaryInputFileListInFrontendInvocation() const;
 
-    bool shouldUseMainOutputFileListInCompilerInvocation() const;
+    bool shouldUseMainOutputFileListInFrontendInvocation() const;
 
-    bool shouldUseSupplementaryOutputFileMapInCompilerInvocation() const;
+    bool shouldUseSupplementaryOutputFileMapInFrontendInvocation() const;
 
     /// Reify the existing behavior that SingleCompile compile actions do not
     /// filter, but batch-mode and single-file compilations do. Some clients are
     /// relying on this (i.e., they pass inputs that don't have ".swift" as an
     /// extension.) It would be nice to eliminate this distinction someday.
-    bool shouldFilterCompilerInputsByType() const;
+    bool shouldFilterFrontendInputsByType() const;
 
     const char *computeFrontendModeForCompile() const;
 
@@ -110,9 +110,8 @@ protected:
 
   private:
     void addFrontendCommandLineInputArguments(
-        const bool mayHavePrimaryInputs, const bool useFileList,
-        const bool usePrimaryFileList, const bool filterByType,
-        llvm::opt::ArgStringList &arguments) const;
+        bool mayHavePrimaryInputs, bool useFileList, bool usePrimaryFileList,
+        bool filterByType, llvm::opt::ArgStringList &arguments) const;
     void addFrontendSupplementaryOutputArguments(
         llvm::opt::ArgStringList &arguments) const;
   };

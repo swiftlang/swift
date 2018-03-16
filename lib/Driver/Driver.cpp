@@ -2659,8 +2659,6 @@ void Driver::printHelp(bool ShowHidden) const {
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(
     const CommandOutput &Output) const {
-  // SingleCompiles (WMO's) must not return true because then all inputs
-  // erroneously end up in primary file list.
   switch (CompilerMode) {
   case Mode::StandardCompile:
   case Mode::BatchModeCompile:
