@@ -4130,8 +4130,6 @@ static ConstraintResult visitInherited(
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
 
-  // FIXME: Should this whole thing use getExistentialLayout() instead?
-
   visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
     // Decompose explicitly-written protocol compositions.
     if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
@@ -4933,6 +4931,22 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->representativeOrEquivClass = T1;
+
+  // Layout requirements.
+  if (equivClass2 && equivClass2->layout) {
+    if (!equivClass->layout) {
+      equivClass->layout = equivClass2->layout;
+      equivClass->layoutConstraints = std::move(equivClass2->layoutConstraints);
+    } else {
+      const RequirementSource *source2
+        = equivClass2->layoutConstraints.front().source;
+      addLayoutRequirementDirect(T1, equivClass2->layout, source2);
+      equivClass->layoutConstraints.insert(
+                                   equivClass->layoutConstraints.end(),
+                                   equivClass2->layoutConstraints.begin() + 1,
+                                   equivClass2->layoutConstraints.end());
+    }
+  }
 
   // Superclass requirements.
   if (equivClass2 && equivClass2->superclass) {
