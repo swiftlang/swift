@@ -2689,6 +2689,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.EnumDecl.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
+  Bits.EnumDecl.HasAnyUnavailableValues
+    = false;
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -2771,7 +2773,7 @@ void ClassDecl::addImplicitDestructor() {
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
-  (void)mutableThis->lookupDirect(getASTContext().Id_init,
+  (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
                                   /*ignoreNewExtensions*/true);
   return Bits.ClassDecl.HasMissingDesignatedInitializers;
 }
@@ -2819,11 +2821,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Look at all of the initializers of the subclass to gather the initializers
   // they override from the superclass.
-  auto &ctx = getASTContext();
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   if (resolver)
     resolver->resolveImplicitConstructors(this);
-  for (auto member : lookupDirect(ctx.Id_init)) {
+  for (auto member : lookupDirect(DeclBaseName::createConstructor())) {
     auto ctor = dyn_cast<ConstructorDecl>(member);
     if (!ctor)
       continue;
@@ -2853,7 +2854,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   // Note: This should be treated as a lookup for intra-module dependency
   // purposes, but a subclass already depends on its superclasses and any
   // extensions for many other reasons.
-  for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
+  for (auto member : superclassDecl->lookupDirect(DeclBaseName::createConstructor())) {
     if (AvailableAttr::isUnavailable(member))
       continue;
 
@@ -3041,6 +3042,17 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
   return nullptr;
 }
 
+bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
+  switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
+    case AssociatedValueCheck::Unchecked:
+      // Compute below
+      this->hasOnlyCasesWithoutAssociatedValues();
+      LLVM_FALLTHROUGH;
+    default:
+      return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
+  }
+}
+
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   // Check whether we already have a cached answer.
   switch (static_cast<AssociatedValueCheck>(
@@ -3056,6 +3068,15 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
       return false;
   }
   for (auto elt : getAllElements()) {
+    for (auto Attr : elt->getAttrs()) {
+      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+        if (!AvAttr->isInvalid()) {
+          const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAnyUnavailableValues
+            = true;
+        }
+      }
+    }
+
     if (elt->hasAssociatedValues()) {
       const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
         = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
@@ -4751,15 +4772,15 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
 
   auto &ctx = getASTContext();
 
-  Identifier baseName;
+  StringRef baseNameStr;
   if (isa<DestructorDecl>(this)) {
     // Deinitializers are always called "dealloc".
     return ObjCSelector(ctx, 0, ctx.Id_dealloc);
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
-    baseName = func->getName();
+    baseNameStr = func->getName().str();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    baseName = ctor->getName();
+    baseNameStr = "init";
   } else {
     llvm_unreachable("Unknown subclass of AbstractFunctionDecl");
   }
@@ -4772,9 +4793,11 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
     if (argNames.size() != preferredName.getArgumentNames().size()) {
       return ObjCSelector();
     }
-    baseName = preferredName.getBaseIdentifier();
+    baseNameStr = preferredName.getBaseName().userFacingName();
     argNames = preferredName.getArgumentNames();
   }
+
+  auto baseName = ctx.getIdentifier(baseNameStr);
 
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     // For a getter or setter, go through the variable or subscript decl.
@@ -5171,6 +5194,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
+
+  assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
@@ -5417,7 +5442,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
-        if (dotExpr->getName().getBaseName() != "init")
+        if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
           return { true, E };
 
         arg = dotExpr->getBase();

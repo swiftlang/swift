@@ -577,8 +577,8 @@ FloatingPoint.test("Double.nextUp, .nextDown")
 %for Self in ['Float', 'Double']:
 FloatingPoint.test("${Self}.nextUp, .nextDown/nan") {
   let x = ${Self}.nan
-  expectBitwiseEqual(x, x.nextUp)
-  expectBitwiseEqual(x, x.nextDown)
+  expectTrue(x.nextUp.isNaN)
+  expectTrue(x.nextDown.isNaN)
   expectTrue((-x).nextDown.isNaN)
   expectTrue((-x).nextUp.isNaN)
 }

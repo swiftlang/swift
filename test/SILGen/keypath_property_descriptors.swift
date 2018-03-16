@@ -50,12 +50,12 @@ public struct A {
   // CHECK-NOT: sil_property #A.f
   private static var f: Int = 0
 
-  // CHECK-LABEL: sil_property #A.subscript
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript(a x: Int) -> Int { return x }
-  // CHECK-LABEL: sil_property #A.subscript
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
   @_inlineable
   public subscript(b x: Int) -> Int { return x }
-  // CHECK-LABEL: sil_property #A.subscript
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
   @_versioned
   internal subscript(c x: Int) -> Int { return x }
   
@@ -65,16 +65,32 @@ public struct A {
   fileprivate subscript(e x: Int) -> Int { return x }
   private subscript(f x: Int) -> Int { return x }
 
-  // TODO: Subscripts with non-hashable subscripts should get descriptors
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript<T>(a x: T) -> T { return x }
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
   @_inlineable
   public subscript<T>(b x: T) -> T { return x }
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
   @_versioned
   internal subscript<T>(c x: T) -> T { return x }
   
   // no descriptor
+  // CHECK-NOT: sil_property #A.subscript
   internal subscript<T>(d x: T) -> T { return x }
   fileprivate subscript<T>(e x: T) -> T { return x }
   private subscript<T>(f x: T) -> T { return x }
+
+  // no descriptor
+  public var count: Int {
+    mutating get {
+      _count += 1
+      return _count
+    }
+    set {
+      _count = newValue
+    }
+  }
+
+  private var _count: Int = 0
 }
 

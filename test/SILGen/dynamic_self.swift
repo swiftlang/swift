@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-ir %s -disable-objc-attr-requires-foundation-module
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name dynamic_self -emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -module-name dynamic_self -emit-sil -O %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -module-name dynamic_self -emit-ir %s -disable-objc-attr-requires-foundation-module
 
 protocol P {
   func f() -> Self

@@ -12,7 +12,7 @@
 
 // FIXME: Only defining POSIXErrorCode for Darwin and Linux at the moment.
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 
 /// Enumeration describing POSIX error codes.
 @_fixed_layout // FIXME(sil-serialize-all)

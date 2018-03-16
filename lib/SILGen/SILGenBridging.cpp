@@ -1063,9 +1063,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     // Bitcast to Optional. This provides a barrier to the optimizer to prevent
     // it from attempting to eliminate null checks.
     auto optionalBridgedTy = SILType::getOptionalType(loweredBridgedTy);
-    auto optionalV =
-      SGF.B.createUncheckedBitCast(loc, v.getValue(), optionalBridgedTy);
-    auto optionalMV = ManagedValue(optionalV, v.getCleanup());
+    auto optionalMV =
+      SGF.B.createUncheckedBitCast(loc, v, optionalBridgedTy);
     return SGF.emitApplyOfLibraryIntrinsic(loc,
                            SGF.getASTContext().getBridgeAnyObjectToAny(nullptr),
                            SubstitutionMap(), optionalMV, C)

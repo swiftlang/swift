@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -789,3 +791,67 @@ struct r29810997 {
 
 //   DI will turn this into a direct capture of the specific stored property.
 // CHECK-LABEL: sil hidden @$S8closures16r29810997_helperyS3iXEF : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> Int
+
+// rdar://problem/37790062
+
+protocol P_37790062 {
+  associatedtype T
+  var elt: T { get }
+}
+
+func rdar37790062() {
+  struct S<T> {
+    init(_ a: () -> T, _ b: () -> T) {}
+  }
+
+  class C1 : P_37790062 {
+    typealias T = Int
+    var elt: T { return 42 }
+  }
+
+  class C2 : P_37790062 {
+    typealias T = (String, Int, Void)
+    var elt: T { return ("question", 42, ()) }
+  }
+
+  func foo() -> Int { return 42 }
+  func bar() -> Void {}
+  func baz() -> (String, Int) { return ("question", 42) }
+  func bzz<T>(_ a: T) -> T { return a }
+  func faz<T: P_37790062>(_ a: T) -> T.T { return a.elt }
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU0_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ foo() }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU1_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU2_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ baz() }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU3_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU4_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ bzz(("question", 42)) }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU5_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU6_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ bzz(String.self) }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU7_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU8_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ bzz(((), (()))) }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU9_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU10_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ bzz(C1()) }, { bar() })
+
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU11_
+  // CHECK: function_ref @$S8closures12rdar37790062yyFyyXEfU12_
+  // CHECK: function_ref @$S8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
+  _ = S({ faz(C2()) }, { bar() })
+}

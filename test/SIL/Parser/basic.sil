@@ -1470,6 +1470,13 @@ bb0(%0 : $*Builtin.NativeObject):
   %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
   return %1 : $Builtin.Int1
 }
+// CHECK-LABEL: sil @is_escaping_closure
+sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
+  return %1 : $Builtin.Int1
+}
 
 // CHECK-LABEL: sil @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
 sil @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {

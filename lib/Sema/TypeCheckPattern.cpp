@@ -437,6 +437,9 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
+    if (ume->getName().getBaseName().isSpecial())
+      return nullptr;
+
     // FIXME: Compound names.
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),

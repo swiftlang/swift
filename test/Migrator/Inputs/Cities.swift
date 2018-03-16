@@ -10,7 +10,7 @@ open class Cities {
   open func noosa() -> [[String : Cities]?] { return [] }
   open func maroochy(x: Int?, y: Int?) {}
   public struct CityKind {
-    static public let Town = 1
+    public static let Town = 1
   }
 }
 

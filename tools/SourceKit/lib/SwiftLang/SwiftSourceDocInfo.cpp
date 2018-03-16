@@ -1015,7 +1015,10 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   DeclName OrigName = VD->getFullName();
   DeclBaseName BaseName = Info.BaseName.empty()
                               ? OrigName.getBaseName()
-                              : DeclBaseName(Ctx.getIdentifier(Info.BaseName));
+                              : DeclBaseName(
+                                Info.BaseName == "init"
+                                  ? DeclBaseName::createConstructor()
+                                  : Ctx.getIdentifier(Info.BaseName));
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
   if (Info.ArgNames.size() > OrigArgs.size())
@@ -1097,7 +1100,7 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
     DeclName Name = Importer->importName(Named, ObjCName);
     NameTranslatingInfo Result;
     Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-    Result.BaseName = Name.getBaseIdentifier().str();
+    Result.BaseName = Name.getBaseName().userFacingName();
     std::transform(Name.getArgumentNames().begin(),
                    Name.getArgumentNames().end(),
                    std::back_inserter(Result.ArgNames),

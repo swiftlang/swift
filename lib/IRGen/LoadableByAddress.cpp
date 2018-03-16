@@ -123,7 +123,7 @@ static bool containsFunctionSignature(GenericEnvironment *genEnv,
       if (auto optionalObject = objectType.getOptionalObjectType()) {
         objectType = optionalObject;
       }
-      if (auto fnType = objectType.getAs<SILFunctionType>()) {
+      if (objectType.is<SILFunctionType>()) {
         return true;
       }
     }

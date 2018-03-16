@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -verify %s | %FileCheck %s
 
 // SR-3090:
@@ -31,15 +33,13 @@ class Box<T> {
 // CHECK:   destroy_value [[TUPLEB]] : $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [[CALL]] : $Box<(Int, () -> ())> 
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_CALL]] : $Box<(Int, () -> ())>, #Box.value
-// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[REF]] : $*(Int, @callee_guaranteed (@in ()) -> @out ())
-// CHECK:   [[TUPLEC:%.*]] = load [copy] [[READ]] : $*(Int, @callee_guaranteed (@in ()) -> @out ())
+// CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF]] : $*(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   [[BORROW_TUPLEC:%.*]] = begin_borrow [[TUPLEC]] : $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   [[TUPLEC_0:%.*]] = tuple_extract [[BORROW_TUPLEC]] : $(Int, @callee_guaranteed (@in ()) -> @out ()), 0
 // CHECK:   [[TUPLEC_1:%.*]] = tuple_extract [[BORROW_TUPLEC]] : $(Int, @callee_guaranteed (@in ()) -> @out ()), 1
 // CHECK:   [[COPYC_1:%.*]] = copy_value [[TUPLEC_1]] : $@callee_guaranteed (@in ()) -> @out ()
 // CHECK:   [[THUNK2:%.*]] = function_ref @$SytytIegir_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed (@in ()) -> @out ()) -> ()
 // CHECK:   [[PA2:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[COPYC_1]]) : $@convention(thin) (@guaranteed @callee_guaranteed (@in ()) -> @out ()) -> ()
-// CHECK:   end_access [[READ]] : $*(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   destroy_value [[PA2]] : $@callee_guaranteed () -> ()    
 // CHECK:   end_borrow [[BORROW_TUPLEC]] from %{{.*}} : $(Int, @callee_guaranteed (@in ()) -> @out ()), $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   destroy_value [[TUPLEC]] : $(Int, @callee_guaranteed (@in ()) -> @out ())

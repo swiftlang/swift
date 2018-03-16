@@ -870,6 +870,9 @@ namespace {
         return convertFloatingType(Ctx.getTargetInfo().getDoubleFormat());
       case clang::BuiltinType::LongDouble:
         return convertFloatingType(Ctx.getTargetInfo().getLongDoubleFormat());
+      case clang::BuiltinType::Float16:
+        llvm_unreachable("When upstream support is added for Float16 in "
+                         "clang::TargetInfo, use the implementation here");
       case clang::BuiltinType::Float128:
         return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
 
@@ -1920,7 +1923,7 @@ void CallEmission::setFromCallee() {
 
     // Fill in the context pointer if necessary.
     if (!contextPtr) {
-      assert(!CurCallee.getOrigFunctionType()->isNoEscape() &&
+      assert(!CurCallee.getOrigFunctionType()->getExtInfo().hasContext() &&
              "Missing context?");
       contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
     }

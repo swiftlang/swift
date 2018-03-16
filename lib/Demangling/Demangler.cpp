@@ -2103,10 +2103,16 @@ NodePointer Demangler::demangleWitness() {
                                 Conf, AssocTypePath, ProtoTy);
     }
     case 'y': {
+      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+        return createWithChildren(Node::Kind::OutlinedCopy,
+                                  popNode(Node::Kind::Type), sig);
       return createWithChild(Node::Kind::OutlinedCopy,
                              popNode(Node::Kind::Type));
     }
     case 'e': {
+      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+        return createWithChildren(Node::Kind::OutlinedCopy,
+                                  popNode(Node::Kind::Type), sig);
       return createWithChild(Node::Kind::OutlinedConsume,
                              popNode(Node::Kind::Type));
     }

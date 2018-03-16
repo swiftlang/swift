@@ -1676,7 +1676,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == TC.Context.Id_init.str() &&
+  } else if (parsed.BaseName == "init" &&
              call && isa<CallExpr>(call)) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
@@ -1879,7 +1879,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   // and bindings to member types and class/static properties.
   if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
         (parsed.isMember() && parsed.IsFunctionName) ||
-        (parsed.BaseName == ctx.Id_init.str() &&
+        (parsed.BaseName == "init" &&
          !dyn_cast_or_null<ConstructorDecl>(D)))) {
     return None;
   }
@@ -1890,14 +1890,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
     name << parsed.ContextName << '.';
 
   if (parsed.IsFunctionName) {
-    // FIXME: duplicated from above.
-    SmallVector<Identifier, 4> argumentLabelIDs;
-    std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
-                   std::back_inserter(argumentLabelIDs),
-                   [&ctx](StringRef labelStr) -> Identifier {
-      return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
-    });
-    name << DeclName(ctx, ctx.getIdentifier(parsed.BaseName), argumentLabelIDs);
+    name << parsed.formDeclName(ctx);
   } else {
     name << parsed.BaseName;
   }
@@ -2007,7 +2000,7 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
 
     // Only initializers should be named 'init'.
     if (isa<ConstructorDecl>(override) ^
-        (parsedName.BaseName == Context.Id_init.str())) {
+        (parsedName.BaseName == "init")) {
       return;
     }
 

@@ -1612,20 +1612,10 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// flag is set.
     RelativeDirectPointer<InitializationFunction_t> InitializationFunction;
     
-    /// The uniquing key for the metadata record. Metadata records with the
-    /// same Name string are considered equivalent by the runtime, and the
-    /// runtime will pick one to be canonical.
-    RelativeDirectPointer<const char> Name;
-
     mutable std::atomic<CacheValue> Cache;
   };
 
   struct HeaderType : HeaderPrefix, TargetTypeMetadataHeader<Runtime> {};
-
-  TargetPointer<Runtime, const char> getName() const {
-    return reinterpret_cast<TargetPointer<Runtime, const char>>(
-      asFullMetadata(this)->Name.get());
-  }
 
   CacheValue getCacheValue() const {
     /// NB: This can be a relaxed-order load if there is no initialization
@@ -1941,7 +1931,7 @@ const
   FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
 template <typename Runtime> struct TargetProtocolDescriptor;
-  
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -2131,6 +2121,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), Protocols() {}
   
+  explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
+    : TargetMetadata<Runtime>(MetadataKind::Existential),
+      Flags(Flags), Protocols() {}
+
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
   
@@ -2191,6 +2185,17 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
+
+/// The standard metadata for the empty protocol composition type, Any.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
+
+/// The standard metadata for the empty class-constrained protocol composition
+/// type, AnyObject.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANYOBJECT_MANGLING);
 
 /// The basic layout of an existential metatype type.
 template <typename Runtime>
@@ -2654,7 +2659,7 @@ using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {
-  uint32_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+  uint16_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
   
   uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;

@@ -626,8 +626,7 @@ SILSerializer::writeKeyPathPatternComponent(
         ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
         serializeAfter.push_back(index.Hashable);
       }
-      if (!indices.empty() &&
-          component.getKind() != KeyPathPatternComponent::Kind::External) {
+      if (!indices.empty()) {
         ListOfValues.push_back(
           addSILFunctionRef(component.getSubscriptIndexEquals()));
         ListOfValues.push_back(
@@ -1230,6 +1229,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:

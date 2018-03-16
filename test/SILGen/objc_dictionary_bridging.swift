@@ -1,7 +1,9 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_dictionary_bridging -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

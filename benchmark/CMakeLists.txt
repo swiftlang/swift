@@ -55,6 +55,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
@@ -62,6 +63,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest3
     single-source/DictTest4
     single-source/DictionaryBridge
+    single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
@@ -75,6 +77,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
@@ -228,6 +231,14 @@ endif()
 
 set(SWIFT_BENCHMARK_EXTRA_FLAGS "" CACHE STRING
     "Extra options to pass to swiftc when building the benchmarks")
+
+if (SWIFT_BENCHMARK_BUILT_STANDALONE)
+  # This option's value must match the value of the same option used when
+  # building the swift runtime.
+  option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
+    FALSE)
+endif()
 
 set(SWIFT_BENCHMARK_NUM_O_ITERATIONS "" CACHE STRING
     "Number of iterations to perform when running -O benchmarks via cmake")

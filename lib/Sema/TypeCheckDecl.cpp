@@ -8481,7 +8481,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // We're going to diagnose on the concrete init(from:) decl if it exists
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
-      auto initFrom = DeclName(C, C.Id_init, C.Id_from);
+      auto initFrom = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
       auto result = tc.lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |
                                     NameLookupFlags::IgnoreAccessControl);
@@ -8719,7 +8719,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   //        this. Investigate why this hasn't worked otherwise.
   DeclName synthesizedInitializers[1] = {
     // init(from:) is synthesized by derived conformance to Decodable.
-    DeclName(Context, DeclBaseName(Context.Id_init), Context.Id_from)
+    DeclName(Context, DeclBaseName::createConstructor(), Context.Id_from)
   };
 
   auto initializerIsSynthesized = [=](ConstructorDecl *initializer) {
@@ -8951,8 +8951,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                                             DeclName member) {
   auto baseName = member.getBaseName();
-  if (baseName.isSpecial())
-    return;
 
   // Checks whether the target conforms to the given protocol. If the
   // conformance is incomplete, check the conformance to force synthesis, if
@@ -8996,7 +8994,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     return false;
   };
 
-  if (member.isSimpleName()) {
+  if (member.isSimpleName() && !baseName.isSpecial()) {
     if (baseName.getIdentifier() == Context.Id_CodingKeys) {
       // CodingKeys is a special type which may be synthesized as part of
       // Encodable/Decodable conformance. If the target conforms to either
@@ -9012,6 +9010,13 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
       if (!evaluateTargetConformanceTo(decodableProto))
         (void)evaluateTargetConformanceTo(encodableProto);
+    } else if (baseName.getIdentifier() == Context.Id_allCases ||
+               baseName.getIdentifier() == Context.Id_AllCases) {
+      // If the target should conform to the CaseIterable protocol, check the
+      // conformance here to attempt synthesis.
+      auto *caseIterableProto
+          = Context.getProtocol(KnownProtocolKind::CaseIterable);
+      (void)evaluateTargetConformanceTo(caseIterableProto);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
@@ -9019,7 +9024,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       return;
 
     auto argumentName = argumentNames.front();
-    if (baseName.getIdentifier() == Context.Id_init &&
+    if (baseName == DeclBaseName::createConstructor() &&
         argumentName == Context.Id_from) {
       // init(from:) may be synthesized as part of derived conformance to the
       // Decodable protocol.
@@ -9027,7 +9032,8 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       // conformance here to attempt synthesis.
       auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
       (void)evaluateTargetConformanceTo(decodableProto);
-    } else if (baseName.getIdentifier() == Context.Id_encode &&
+    } else if (!baseName.isSpecial() &&
+               baseName.getIdentifier() == Context.Id_encode &&
                argumentName == Context.Id_to) {
       // encode(to:) may be synthesized as part of derived conformance to the
       // Encodable protocol.

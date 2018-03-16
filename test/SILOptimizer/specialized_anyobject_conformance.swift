@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name specialized_anyobject_conformance -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 // rdar://problem/31910351
 

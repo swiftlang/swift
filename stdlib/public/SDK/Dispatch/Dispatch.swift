@@ -114,10 +114,10 @@ public struct DispatchQoS : Equatable {
 		self.qosClass = qosClass
 		self.relativePriority = relativePriority
 	}
-}
 
-public func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
-	return a.qosClass == b.qosClass && a.relativePriority == b.relativePriority
+	public static func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
+		return a.qosClass == b.qosClass && a.relativePriority == b.relativePriority
+	}
 }
 
 /// 
@@ -131,7 +131,7 @@ public enum DispatchTimeoutResult {
 
 public extension DispatchGroup {
 	public func notify(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], queue: DispatchQueue, execute work: @escaping @convention(block) () -> Void) {
-		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
+		if #available(macOS 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
 			_swift_dispatch_group_notify(self, queue, item._block)
 		} else {

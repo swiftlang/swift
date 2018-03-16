@@ -1837,12 +1837,12 @@ void Remangler::mangleVariadicMarker(Node *node) {
 }
 
 void Remangler::mangleOutlinedCopy(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << "Wy";
 }
 
 void Remangler::mangleOutlinedConsume(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << "We";
 }
 

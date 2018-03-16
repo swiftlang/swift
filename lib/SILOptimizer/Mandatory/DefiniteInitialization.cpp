@@ -191,11 +191,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  enum class DIKind : unsigned char {
-    No,
-    Yes,
-    Partial
-  };
+enum class DIKind : uint8_t { No, Yes, Partial };
 } // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
@@ -965,7 +961,8 @@ static void maybeSuggestNoArgSelfInit(SILModule &module, SILLocation loc,
     return;
 
   ASTContext &ctx = module.getASTContext();
-  DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
+  DeclName noArgInit(ctx, DeclBaseName::createConstructor(),
+                     ArrayRef<Identifier>());
 
   auto lookupResults = theStruct->lookupDirect(noArgInit);
   if (lookupResults.size() != 1)

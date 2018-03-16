@@ -125,7 +125,9 @@ set(SWIFTLIB_ESSENTIAL
   StringComparable.swift
   StringComparison.swift
   StringGuts.swift
+  StringGutsVisitor.swift
   StringObject.swift
+  StringProtocol.swift
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift

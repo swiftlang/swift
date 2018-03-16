@@ -32,13 +32,13 @@
 // -- instantiation pattern
 // CHECK-SAME:   @"$S13generic_types1ACMP"
 // -- num generic params
-// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i16 1,
 // -- num generic requirement
-// CHECK-SAME:   i32 0,
+// CHECK-SAME:   i16 0,
 // -- num key arguments
-// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i16 1,
 // -- num extra arguments
-// CHECK-SAME:   i32 0,
+// CHECK-SAME:   i16 0,
 // -- parameter descriptor 1
 // CHECK-SAME:   i8 -128,
 

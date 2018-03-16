@@ -2664,7 +2664,8 @@ public:
 
     assert(CurrDeclContext);
     SmallVector<ValueDecl *, 16> initializers;
-    if (CurrDeclContext->lookupQualified(type, Ctx.Id_init, NL_QualifiedDefault,
+    if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
+                                         NL_QualifiedDefault,
                                          TypeResolver.get(), initializers)) {
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
@@ -2851,7 +2852,7 @@ public:
 
     // Base name
     addLeadingDot(Builder);
-    Builder.addTextChunk(AFD->getBaseName().getIdentifier().str());
+    Builder.addTextChunk(AFD->getBaseName().userFacingName());
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();
@@ -4024,7 +4025,7 @@ public:
       }
 
       return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (auto *paren = dyn_cast<ParenExpr>(CallE->getArg())) {
+    } else if (isa<ParenExpr>(CallE->getArg())) {
       HasName = false;
       Position = 0;
       return true;

@@ -205,7 +205,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
 
   // If the OS supports user info value providers, use those
   // to lazily populate the user-info dictionary for this domain.
-  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+  if #available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
     // Note: the Cocoa error domain specifically excluded from
     // user-info value providers.
     let domain = error._domain
@@ -525,6 +525,38 @@ extension _BridgedStoredNSError {
     return lhs._nsError.isEqual(rhs._nsError)
   }
 }
+
+extension _SwiftNewtypeWrapper where Self.RawValue == Error {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _bridgeToObjectiveC() -> NSError {
+    return rawValue as NSError
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _forceBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) {
+    result = Self(rawValue: source)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) -> Bool {
+    result = Self(rawValue: source)
+    return result != nil
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSError?
+  ) -> Self {
+    return Self(rawValue: _convertNSErrorToError(source))!
+  }
+}
+
 
 @available(*, unavailable, renamed: "CocoaError")
 public typealias NSCocoaError = CocoaError
@@ -3219,6 +3251,7 @@ extension MachError {
 }
 
 public struct ErrorUserInfoKey : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
+  public typealias _ObjectiveCType = NSString
   public init(rawValue: String) { self.rawValue = rawValue }
   public var rawValue: String
 }

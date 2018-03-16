@@ -1795,6 +1795,9 @@ public:
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+    *this << getIDAndType(CUI->getOperand());
+  }
   void visitDeallocStackInst(DeallocStackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
@@ -2149,6 +2152,17 @@ public:
       }
       
       *this << " : $" << component.getComponentType();
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
     }
     }
   }
@@ -2609,6 +2623,11 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   OS << '(';
   SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
   OS << ")\n";
+}
+
+void SILProperty::dump() const {
+  SILPrintContext context(llvm::errs());
+  print(context);
 }
 
 static void printSILProperties(SILPrintContext &Ctx,

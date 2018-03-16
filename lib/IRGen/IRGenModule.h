@@ -1023,6 +1023,8 @@ public:
 //--- Runtime ---------------------------------------------------------------
 public:
   llvm::Constant *getEmptyTupleMetadata();
+  llvm::Constant *getAnyExistentialMetadata();
+  llvm::Constant *getAnyObjectExistentialMetadata();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
   llvm::InlineAsm *getObjCRetainAutoreleasedReturnValueMarker();
@@ -1034,6 +1036,8 @@ public:
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
+  llvm::Constant *AnyExistentialMetadata = nullptr;
+  llvm::Constant *AnyObjectExistentialMetadata = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;

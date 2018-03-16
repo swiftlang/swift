@@ -290,7 +290,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 5 };
+  enum { NumFlagBits = 8 };
   SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
@@ -2367,7 +2367,7 @@ BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 
 /// A language-level calling convention.
-enum class SILFunctionLanguage : unsigned char {
+enum class SILFunctionLanguage : uint8_t {
   /// A variation of the Swift calling convention.
   Swift = 0,
 

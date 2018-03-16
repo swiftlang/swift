@@ -631,7 +631,7 @@ ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
-      (Identifier, unsigned))
+      (DeclName, unsigned))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
@@ -2096,10 +2096,11 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
-
 ERROR(cannot_synthesize_in_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension", (Type))
 
+ERROR(broken_case_iterable_requirement,none,
+      "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
@@ -3645,6 +3646,10 @@ WARNING(availability_query_useless_enclosing_scope, none,
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
+
+WARNING(availability_extension_platform_agnostic, none,
+        "'@available' without an OS is ignored on extensions; "
+        "apply the attribute to each member instead", ())
 
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
