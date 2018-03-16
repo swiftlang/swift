@@ -36,8 +36,6 @@
 // TODO:
 // - Add gradients for more ops ('sum', 'mean', etc).
 // - Fix gradients for broadcasting ops (need to perform reduction).
-// - Implement unbroadcasting, which is necessary to calculate adjoints for many
-//   binary ops.
 // - When the trailing 'where' clause in @differentiable is properly
 //   type-checked, define constraints on FloatingPoint in primal declarations
 //   and define adjoints on FloatingPoint.
@@ -48,29 +46,57 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Unbroadcasting
+//===----------------------------------------------------------------------===//
+
+public extension TensorProtocol {
+  @_inlineable @inline(__always)
+  func unbroadcast(to other: Self) -> Self {
+    let rankDifference = (rankTensor - other.rankTensor).rankLifted()
+    let ones: Tensor<Int32> = #tfop("Fill", rankDifference, Tensor<Int32>(1))
+    let paddedShape = ones ++ other.shapeTensor
+    let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
+    let broadcastIndices = Tensor<Int64>(
+      handle: #tfop("Where", nonEqualIndices, T: Bool.self)
+    ).flattened()
+    let unbroadcasted: Self = #tfop(
+      "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
+      Tidx: Int32.self
+    )
+    return #tfop("Reshape", unbroadcasted, other.shapeTensor)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
 extension TensorProtocol where Scalar : Numeric {
   @_inlineable @_versioned
   static func _adjointAdd(
-    _: Self, _: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed, seed)
+    let dfdx = seed.unbroadcast(to: x)
+    let dfdy = seed.unbroadcast(to: y)
+    return (dfdx, dfdy)
   }
 
   @_inlineable @_versioned
   static func _adjointSubtract(
-    _: Self, _: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed, 0-seed)
+    let dfdx = seed.unbroadcast(to: x)
+    let dfdy = 0 - seed.unbroadcast(to: y)
+    return (dfdx, dfdy)
   }
 
   @_inlineable @_versioned
   static func _adjointMultiply(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (y * seed, x * seed)
+    let dfdx = (y * seed).unbroadcast(to: x)
+    let dfdy = (x * seed).unbroadcast(to: y)
+    return (dfdx, dfdy)
   }
 
   @_inlineable @_versioned
@@ -83,21 +109,21 @@ extension TensorProtocol where Scalar : Numeric {
 
 @_inlineable @_versioned
 func _adjointMin<T : TensorProtocol>(
-  _ lhs: T, _ rhs: T, partial: T, seed: T
+  _ x: T, _ y: T, partial: T, seed: T
 ) -> (T, T) where T.Scalar : Numeric & Comparable {
-  let denom = 1 + T(lhs.elementsEqual(rhs))
-  let dfdx = seed * T(rhs.elementsEqual(partial)) / denom
-  let dfdy = seed * T(lhs.elementsEqual(partial)) / denom
+  let denom = 1 + T(x.elementsEqual(y))
+  let dfdx = seed * T(y.elementsEqual(partial)) / denom
+  let dfdy = seed * T(x.elementsEqual(partial)) / denom
   return (dfdx, dfdy)
 }
 
 @_inlineable @_versioned
 func _adjointMax<T : TensorProtocol>(
-  _ lhs: T, _ rhs: T, partial: T, seed: T
+  _ x: T, _ y: T, partial: T, seed: T
 ) -> (T, T) where T.Scalar : Numeric & Comparable {
-  let denom = 1 + T(lhs.elementsEqual(rhs))
-  let dfdx = seed * T(lhs.elementsEqual(partial)) / denom
-  let dfdy = seed * T(rhs.elementsEqual(partial)) / denom
+  let denom = 1 + T(x.elementsEqual(y))
+  let dfdx = seed * T(x.elementsEqual(partial)) / denom
+  let dfdy = seed * T(y.elementsEqual(partial)) / denom
   return (dfdx, dfdy)
 }
 
