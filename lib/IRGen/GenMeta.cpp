@@ -26,7 +26,6 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/Metadata.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"

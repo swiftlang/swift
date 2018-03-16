@@ -15,7 +15,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
 using namespace irgen;
