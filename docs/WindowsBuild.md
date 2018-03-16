@@ -146,7 +146,7 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DSWIFT_INCLUDE_DOCS=FALSE^
  -DSWIFT_INCLUDE_TESTS=FALSE^
  -DCMAKE_C_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
- -DCMAKE_CXX_COMPILER="%llvm_bin_dir%/bin/clang-cl.exe"^
+ -DCMAKE_CXX_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
  -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
  -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7" ^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
