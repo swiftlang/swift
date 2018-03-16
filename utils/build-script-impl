@@ -59,6 +59,7 @@ KNOWN_SETTINGS=(
     lldb-test-swift-only        "1"               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
+    lldb-assertions             "1"              "build lldb with assertions enabled"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
@@ -1779,6 +1780,12 @@ function set_lldb_xcodebuild_options() {
 	    "${lldb_xcodebuild_options[@]}"
 	    ENABLE_UNDEFINED_BEHAVIOR_SANITIZER="YES"
 	    -enableUndefinedBehaviorSanitizer=YES
+	)
+    fi
+    if [[ "$(true_false ${LLDB_ASSERTIONS})" == "FALSE" ]]; then
+	lldb_xcodebuild_options=(
+	    "${lldb_xcodebuild_options[@]}"
+	    OTHER_CFLAGS="-DNDEBUG"
 	)
     fi
 }

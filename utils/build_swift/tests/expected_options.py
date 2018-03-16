@@ -136,7 +136,7 @@ EXPECTED_DEFAULTS = {
     'libicu_build_variant': 'Debug',
     'lit_args': '-sv',
     'llbuild_assertions': True,
-    'lldb_assertions': None,
+    'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
     'lldb_build_with_xcode': '1',
     'llvm_assertions': True,
