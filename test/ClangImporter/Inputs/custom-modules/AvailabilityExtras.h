@@ -93,3 +93,17 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
     NSEnumAddedCasesIn2017ExistingCaseThree,
     NSEnumAddedCasesIn2017NewCaseOne __attribute__((availability(macosx,introduced=10.13))) __attribute__((availability(ios,introduced=11.0))) __attribute__((availability(tvos,introduced=11.0))) __attribute__((availability(watchos,introduced=4.0)))
 };
+
+@interface AccessorDeprecations: NSObject
+@property int fullyDeprecated __attribute__((deprecated));
+
+@property int getterDeprecated;
+- (int)getterDeprecated __attribute__((deprecated));
+@property (class) int getterDeprecatedClass;
++ (int)getterDeprecatedClass __attribute__((deprecated));
+
+@property int setterDeprecated;
+- (void)setSetterDeprecated:(int)setterDeprecated __attribute__((deprecated));
+@property (class) int setterDeprecatedClass;
++ (void)setSetterDeprecatedClass:(int)setterDeprecated __attribute__((deprecated));
+@end

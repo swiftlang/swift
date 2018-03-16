@@ -3590,22 +3590,23 @@ NOTE(availability_obsoleted, none,
     (DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: %5",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple,
+         StringRef))
 
 WARNING(availability_deprecated_rename, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: "
-        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
-        "'%7'",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, bool, unsigned,
-         StringRef))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
+        "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
+        "'%8'",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple, bool,
+         unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
