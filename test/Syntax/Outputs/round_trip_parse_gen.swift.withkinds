@@ -34,7 +34,8 @@ class C <MemberDeclBlock>{<FunctionDecl>
     bar1</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<FloatLiteralExpr>1.1</FloatLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)</FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)</FunctionCallExpr><VariableDecl>
     var <PatternBinding><IdentifierPattern>f </IdentifierPattern><InitializerClause>= <PrefixOperatorExpr>/*comments*/+<FloatLiteralExpr>0.1</FloatLiteralExpr></PrefixOperatorExpr></InitializerClause></PatternBinding></VariableDecl><FunctionCallExpr><IdentifierExpr>/*comments*/
-    foo</IdentifierExpr>()</FunctionCallExpr>
+    foo</IdentifierExpr>()</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><StringLiteralExpr>"🙂🤗🤩🤔🤨"</StringLiteralExpr></SequenceExpr>
   }</CodeBlock></FunctionDecl><FunctionDecl>
 
   func foo1<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
