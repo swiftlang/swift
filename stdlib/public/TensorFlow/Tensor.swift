@@ -288,6 +288,14 @@ public extension Tensor {
     let shapeTensor = Tensor<Int32>(shape: [rank], repeating: 1)
     self.init(handle: #tfop("Fill", shapeTensor, Tensor(scalar)))
   }
+
+  /// Creates a tensor of shape `[4]` from a 4-tuple.
+  /// - Note: This is intended for internal use, for example, to initialize a
+  ///   tensor attribute from `convolved2D`'s `strides` argument.
+  @_versioned @_inlineable @inline(__always)
+  internal init(_ scalars: (Scalar, Scalar, Scalar, Scalar)) {
+    self.init([scalars.0, scalars.1, scalars.2, scalars.3])
+  }
 }
 
 //===----------------------------------------------------------------------===//

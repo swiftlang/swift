@@ -259,7 +259,7 @@ TensorTests.testAllBackends("Convolution") {
   let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
                              scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-  let y = x.convolved2D(withFilter: filter, strides: [1, 1, 1, 1],
+  let y = x.convolved2D(withFilter: filter, strides: (1, 1, 1, 1),
                         padding: .same)
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,

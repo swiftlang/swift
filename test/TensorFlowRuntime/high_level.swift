@@ -20,8 +20,9 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
   let convLayer = Convolution2DLayer<Float>(
     filter: Tensor<Float>(shape: [1, 1, 3, 3],
                           scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0]),
-    strides: [1, 1, 1, 1],
-    padding: .same)
+    strides: (1, 1, 1, 1),
+    padding: .same
+  )
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
   let (_, dParameters) = convLayer.gradient(for: input,
