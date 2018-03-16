@@ -161,12 +161,24 @@ public:
   {
   }
 
-  uint8_t getPointerSize() override {
-    return sizeof(uintptr_t);
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    switch (type) {
+      case DLQ_GetPointerSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(void *);
+        return true;
+      }
+      case DLQ_GetSizeSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(size_t);
+        return true;
+      }
+    }
+
+    return false;
   }
-  uint8_t getSizeSize() override {
-    return sizeof(size_t);
-  }
+
   RemoteAddress getSymbolAddress(const std::string &name) override {
     for (auto &object : ObjectFiles) {
       for (auto &symbol : object->symbols()) {
