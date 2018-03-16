@@ -2937,8 +2937,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
     SILGenFunction &SGF, CanSILFunctionType &noEscapingType,
-    CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
-    SubstitutionMap &contextSubs) {
+    CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv) {
 
   assert(escapingType->getExtInfo() ==
          noEscapingType->getExtInfo().withNoEscape(false));
@@ -2955,22 +2954,7 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
   if (noEscapingType->hasArchetype()) {
     genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = SGF.F.getGenericEnvironment();
-    auto subsArray = SGF.F.getForwardingSubstitutions();
-    contextSubs = genericSig->getSubstitutionMap(subsArray);
   }
-
-  auto substIntoThunkContext = [&](CanType t) -> CanType {
-    return t.subst(
-      [&](SubstitutableType *type) -> Type {
-        return Type(type).subst(contextSubs);
-      },
-      LookUpConformanceInSubstitutionMap(contextSubs),
-      SubstFlags::AllowLoweredTypes)
-        ->getCanonicalType();
-  };
-
-  escapingType = cast<SILFunctionType>(substIntoThunkContext(escapingType));
-  noEscapingType = cast<SILFunctionType>(substIntoThunkContext(noEscapingType));
 
   // If our parent function was pseudogeneric, this thunk must also be
   // pseudogeneric, since we have no way to pass generic parameters.
@@ -3085,12 +3069,11 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
                                            .withNoEscape(false));
 
   GenericEnvironment *genericEnv = nullptr;
-  SubstitutionMap contextSubs;
   auto noEscapingFnTy =
       noEscapingFunctionValue.getType().castTo<SILFunctionType>();
 
   auto thunkType = buildWithoutActuallyEscapingThunkType(
-      *this, noEscapingFnTy, escapingFnTy, genericEnv, contextSubs);
+      *this, noEscapingFnTy, escapingFnTy, genericEnv);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
       thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
@@ -3101,19 +3084,17 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
     buildWithoutActuallyEscapingThunkBody(thunkSGF);
   }
 
-  CanSILFunctionType substFnType = thunkType;
-  SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkType->getGenericSignature()) {
-    genericSig->getSubstitutions(contextSubs, subs);
-    substFnType = thunkType->substGenericArgs(F.getModule(), contextSubs);
-  }
+  CanSILFunctionType substFnType = thunkType->substGenericArgs(
+      F.getModule(), thunk->getForwardingSubstitutions());
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
   SILValue noEscapeValue =
       noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnType), subs,
+      loc, thunkValue,
+      SILType::getPrimitiveObjectType(substFnType),
+      thunk->getForwardingSubstitutions(),
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
