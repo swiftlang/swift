@@ -23,7 +23,11 @@ func localFunctionTouchingGlobalVar() {
 }
 x += one
 x += one
+#if false  // FIXME: Re-enable when deabstraction is smarter.
 localFunctionTouchingGlobalVar()       // reassigns one to x
+#else
+x = one
+#endif
 x -= one
 print(x)
 

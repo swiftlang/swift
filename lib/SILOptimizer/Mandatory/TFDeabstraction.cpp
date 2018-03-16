@@ -191,10 +191,21 @@ void TFDeabstraction::inlineCalls() {
     if (isArrayUninitialized(site.getInstruction()))
       return false;
 
-    // If we're trying to flatten the code into the top level function, then
-    // yes, we should inline this.
-    if (forciblyFlattened)
-      return true;
+    // If we're forcibly flattening code into the top level function, and if the
+    // callee is in the same source file as that top-level function (and thus
+    // has visibility into its global variables) then force inline it.
+    if (forciblyFlattened) {
+      if (auto *apply = dyn_cast<ApplyInst>(site.getInstruction())) {
+        if (auto *callee = apply->getCalleeFunction()) {
+          // FIXME: We will miscompile functions that use variables in top level
+          // code right now.  We need to implement this properly.
+#if 0
+          if (shouldBeForciblyFlattened(*callee))
+            return true;
+#endif
+        }
+      }
+    }
 
     // Get the type of the function being called after applying substitutions
     // at the call site.
