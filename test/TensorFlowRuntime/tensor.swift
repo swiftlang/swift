@@ -184,6 +184,15 @@ TensorTests.test("SliceIndexing") {
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
 }
 
+TensorTests.test("WholeTensorSlicing") {
+  let t: Tensor<Int32> = [[[1, 1, 1], [2, 2, 2]],
+                          [[3, 3, 3], [4, 4, 4]],
+                          [[5, 5, 5], [6, 6, 6]]]
+  let slice2 = t.slice(lowerBounds: [1, 0, 0], upperBounds: [2, 1, 3])
+  expectEqual(ShapedArray(shape: [1, 1, 3], scalars: [3, 3, 3]),
+              slice2.array)
+}
+
 TensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
