@@ -19,6 +19,7 @@
 #define SWIFT_REMOTE_MEMORYREADER_H
 
 #include "swift/Remote/RemoteAddress.h"
+#include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 
 #include <cstring>
 #include <functional>
@@ -38,11 +39,8 @@ public:
   /// A convenient name for the return type from readBytes.
   using ReadBytesResult = std::unique_ptr<const void, std::function<void(const void *)>>;
 
-  /// Return the size of an ordinary pointer in the remote process, in bytes.
-  virtual uint8_t getPointerSize() = 0;
-
-  /// Return the size of size_t in the remote process, in bytes.
-  virtual uint8_t getSizeSize() = 0;
+  virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                               void *outBuffer) = 0;
 
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;

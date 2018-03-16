@@ -21,6 +21,17 @@
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 #include "swift/Remote/MemoryReader.h"
 
+struct MemoryReaderImpl {
+  // Opaque pointer passed to all the callback functions.
+  void *reader_context;
+
+  QueryDataLayoutFunction queryDataLayout;
+  FreeBytesFunction free;
+  ReadBytesFunction readBytes;
+  GetStringLengthFunction getStringLength;
+  GetSymbolAddressFunction getSymbolAddress;
+};
+
 namespace swift {
 namespace remote {
 
@@ -31,19 +42,15 @@ class CMemoryReader final : public MemoryReader {
 
 public:
   CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl) {
-    assert(this->Impl.getPointerSize && "No getPointerSize implementation");
+    assert(this->Impl.queryDataLayout && "No queryDataLayout implementation");
     assert(this->Impl.getStringLength && "No stringLength implementation");
     assert(this->Impl.readBytes && "No readBytes implementation");
-    assert(this->Impl.getPointerSize(this->Impl.reader_context) != 0 &&
-           "Invalid target pointer size");
   }
 
-  uint8_t getPointerSize() override {
-    return Impl.getPointerSize(Impl.reader_context);
-  }
-
-  uint8_t getSizeSize() override {
-    return Impl.getSizeSize(Impl.reader_context);
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    return Impl.queryDataLayout(Impl.reader_context, type, inBuffer,
+                                outBuffer) != 0;
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override {
