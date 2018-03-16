@@ -199,6 +199,7 @@ public protocol Optimizer : AnyObject {
 // Common optimizers
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout
 public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
   public let learningRate: Trainee.Parameters.Scalar
   // NOTE: To be implemented later.
@@ -212,6 +213,7 @@ public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
     self.learningRate = learningRate
   }
 
+  @_inlineable @inline(__always)
   public func optimize(_ parameters: inout Trainee.Parameters,
                        gradient: Trainee.Parameters) {
     parameters.update(with: gradient) { param, grad in
@@ -225,6 +227,7 @@ public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
 //===----------------------------------------------------------------------===//
 
 /// A layer with a 4-D kernel that computes 2-D convolutions given 4-D inputs.
+@_fixed_layout
 public struct Convolution2DLayer<Scalar> : DifferentiableModule
   where Scalar : FloatingPoint & AccelerableByTensorFlow {
 
@@ -265,6 +268,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
+  @_fixed_layout
   public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
@@ -322,6 +326,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     }
   }
 
+  @_fixed_layout
   public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
     public let result: Tensor<Scalar>
     @_versioned @_inlineable
@@ -371,6 +376,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
 // TODO:
 // - Add initializers that take in input/output sizes and initialization
 //   strategies for weight/bias (ones, zeros, random uniform, etc).
+@_fixed_layout
 public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   where Scalar : FloatingPoint & AccelerableByTensorFlow {
 
@@ -398,6 +404,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
+  @_fixed_layout
   public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
@@ -461,6 +468,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     }
   }
 
+  @_fixed_layout
   public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
     @_versioned let dot: Tensor<Scalar>
     public let result: Tensor<Scalar>
@@ -507,6 +515,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
 /// mean, a running variance, and a momentum. They may optionally have an
 /// offset, a scale, and a variance epsilon.
 // TODO: Handle running mean/variance.
+@_fixed_layout
 public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   where Scalar : BinaryFloatingPoint & AccelerableByTensorFlow {
 
@@ -558,6 +567,7 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
+  @_fixed_layout
   public struct Parameters : Differentiable, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
@@ -621,6 +631,7 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     }
   }
 
+  @_fixed_layout
   public struct DifferentiationPrimalValues : DifferentiationTapeProtocol {
     public let result: Tensor<Scalar>
     @_versioned @_inlineable
