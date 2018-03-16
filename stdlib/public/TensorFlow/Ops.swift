@@ -1165,10 +1165,11 @@ public extension Tensor where Scalar : FloatingPoint {
   )
   func convolved2D(
     withFilter filter: Tensor,
-    strides: [Int32],
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("Conv2D", handle, filter, strides: strides,
+    return #tfop("Conv2D", handle, filter,
+                 strides: [strides.0, strides.1, strides.2, strides.3],
                  padding: padding.cName)
   }
 
@@ -1179,23 +1180,12 @@ public extension Tensor where Scalar : FloatingPoint {
       _adjointMaxPooled(kernelSize:strides:padding:partial:seed:)
   )
   func maxPooled(
-    kernelSize: Tensor<Int32>,
-    strides: Tensor<Int32>,
+    kernelSize: (Int32, Int32, Int32, Int32),
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
     return #tfop("MaxPoolV2", handle, Tensor<Int32>(kernelSize),
                  Tensor<Int32>(strides), padding: padding.cName)
-  }
-
-  @_inlineable @inline(__always)
-  func maxPooled(
-    kernelSize: [Int32],
-    strides: [Int32],
-    padding: Padding
-  ) -> Tensor {
-    return maxPooled(kernelSize: Tensor<Int32>(kernelSize),
-                     strides: Tensor<Int32>(strides),
-                     padding: padding)
   }
 
   @_inlineable @inline(__always)
@@ -1204,12 +1194,16 @@ public extension Tensor where Scalar : FloatingPoint {
     gradient: _adjointAveragePooled(kernelSize:strides:padding:partial:seed:)
   )
   func averagePooled(
-    kernelSize: [Int32],
-    strides: [Int32],
+    kernelSize: (Int32, Int32, Int32, Int32),
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("AvgPool", handle, ksize: kernelSize, strides: strides,
-                 padding: padding.cName)
+    return #tfop(
+      "AvgPool", handle,
+      ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
+      strides: [strides.0, strides.1, strides.2, strides.3],
+      padding: padding.cName
+    )
   }
 }
 
@@ -1217,7 +1211,7 @@ public extension Tensor4D where Scalar : FloatingPoint {
   @_inlineable @inline(__always)
   func convolved2D(
     withFilter filter: Tensor4D,
-    strides: [Int32],
+    strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor4D {
     return Tensor4D(

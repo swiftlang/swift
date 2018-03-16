@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines high-level neural network APIs.
+// This file defines experimental high-level neural network APIs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -182,17 +182,17 @@ public protocol Learnable : DifferentiableModule {
 /// `Optimizer` instances can optimize `Trainee` instances given the gradient of
 /// the trainee's parameters.
 public protocol Optimizer : AnyObject {
-  associatedtype Trainee : Learnable
+  associatedtype Scalar : BinaryFloatingPoint
 
   /// The learning rate for gradient descent.
-  var learningRate: Trainee.Parameters.Scalar { get }
+  var learningRate: Scalar { get }
 
   /// Optimizes the parameters of a `Trainee` instance given the gradient of the
   /// trainee's parameters.
-  func optimize(
-    _ parameters: inout Trainee.Parameters,
-    gradient: Trainee.Parameters
-  )
+  func optimize<P : ParameterAggregate>(
+    _ parameters: inout P,
+    gradient: P
+  ) where P.Scalar == Scalar
 }
 
 //===----------------------------------------------------------------------===//
@@ -200,8 +200,9 @@ public protocol Optimizer : AnyObject {
 //===----------------------------------------------------------------------===//
 
 @_fixed_layout
-public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
-  public let learningRate: Trainee.Parameters.Scalar
+public final class StochasticGradientDescent<Scalar> : Optimizer
+  where Scalar : BinaryFloatingPoint {
+  public let learningRate: Scalar
   // NOTE: To be implemented later.
   // public let momentum: Trainee.Parameters.Scalar = 0
   // public let decay: Trainee.Parameters.Scalar = 0
@@ -209,13 +210,15 @@ public final class StochasticGradientDescent<Trainee : Learnable> : Optimizer {
   // public private(set) var epoch: Int32 = 0
 
   @_inlineable @inline(__always)
-  public init(learningRate: Trainee.Parameters.Scalar) {
+  public init(learningRate: Scalar) {
     self.learningRate = learningRate
   }
 
   @_inlineable @inline(__always)
-  public func optimize(_ parameters: inout Trainee.Parameters,
-                       gradient: Trainee.Parameters) {
+  public func optimize<P : ParameterAggregate>(
+    _ parameters: inout P,
+    gradient: P
+  ) where P.Scalar == Scalar {
     parameters.update(with: gradient) { param, grad in
       param -= grad * learningRate
     }
@@ -239,9 +242,8 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   public var filter: Tensor<Scalar>
 
   /// The strides of the sliding window for each dimension of a 4-D input.
-  /// `strides.count` must equal 4 and `strides[0]` and `strides[3]` must equal
-  /// 1.
-  public let strides: [Int32]
+  /// Strides in non-spatial dimensions must be 1.
+  public let strides: (Int32, Int32, Int32, Int32)
 
   /// The padding algorithm for convolution.
   public let padding: Padding
@@ -249,17 +251,19 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   /// Creates a new instance with the specified filter, strides, and padding.
   // NOTE: Swift generates default memberwise initializers, but they have
   // internal access, not public. Public initializers must be manually declared.
-  // TODO: Consider adding default argument values? (eg. strides = [1, 1, 1, 1])
+  // TODO: Consider adding default argument values? (eg. strides = (1, 1, 1, 1))
   // Default values might not work out of the box (send/receive errors).
   @_inlineable @inline(__always)
-  public init(filter: Tensor<Scalar>, strides: [Int32], padding: Padding) {
+  public init(filter: Tensor<Scalar>, strides: (Int32, Int32, Int32, Int32),
+              padding: Padding) {
     self.filter = filter
     self.strides = strides
     self.padding = padding
   }
 
   @_inlineable @inline(__always)
-  public init(filterShape: TensorShape, strides: [Int32], padding: Padding) {
+  public init(filterShape: TensorShape, strides: (Int32, Int32, Int32, Int32),
+              padding: Padding) {
     self.init(filter: Tensor(randomNormal: filterShape),
               strides: strides,
               padding: padding)
@@ -305,6 +309,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       )
     }
 
+    @_inlineable @inline(__always)
     public mutating func update(
       with gradient: Parameters,
       by updateParameter: (inout Parameter, Parameter) -> Void
@@ -445,6 +450,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
       )
     }
 
+    @_inlineable @inline(__always)
     public mutating func update(
       with gradient: Parameters,
       by updateParameter: (inout Parameter, Parameter) -> Void
@@ -608,6 +614,7 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
       )
     }
 
+    @_inlineable @inline(__always)
     public mutating func update(
       with gradient: Parameters,
       by updateParameter: (inout Parameter, Parameter) -> Void
