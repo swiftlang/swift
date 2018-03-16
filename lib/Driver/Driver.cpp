@@ -2659,12 +2659,14 @@ void Driver::printHelp(bool ShowHidden) const {
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(
     const CommandOutput &Output) const {
+  // SingleCompiles (WMO's) must not return true because then all inputs
+  // erroneously end up in primary file list.
   switch (CompilerMode) {
   case Mode::StandardCompile:
   case Mode::BatchModeCompile:
     return true;
   case Mode::SingleCompile:
-    return Output.getPrimaryOutputType() == types::TY_IndexData;
+    return false;
   case Mode::Immediate:
   case Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");

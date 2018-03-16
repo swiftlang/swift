@@ -235,11 +235,6 @@ public:
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
                                          StringRef sanitizer,
                                          bool shared=true) const;
-
-  /// For an index data job,
-  /// only make the index-file-path ones primary.
-  static bool canCompileInputArgumentBePrimary(const CommandOutput &Output,
-                                               const llvm::opt::Arg &A);
 };
 } // end namespace driver
 } // end namespace swift

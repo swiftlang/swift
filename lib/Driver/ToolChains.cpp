@@ -46,8 +46,6 @@ bool ToolChain::JobContext::shouldUseInputFileList() const {
 
 bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
     const {
-  // SingleCompile's must not return true because then all inputs erroneously
-  // end up in primary file list.
   if (Args.hasArg(options::OPT_driver_use_filelists))
     return true;
   return InputActions.size() > TOO_MANY_FILES;
@@ -501,33 +499,29 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     for (const Action *A : InputActions) {
       const auto *IA = cast<InputAction>(A);
       const llvm::opt::Arg &InArg = IA->getInputArg();
-      // For an index data job,
-      // only make the index-file-path ones primary
-      if (ToolChain::canCompileInputArgumentBePrimary(Output, InArg))
-        primaries.insert(InArg.getValue());
+      primaries.insert(InArg.getValue());
     }
+  }
+  // -index-file compilations are weird. They are processed as SingleCompiles
+  // (WMO), but must indicate that there is one primary file, designated by
+  // -index-file-path.
+  if (Arg *A = Args.getLastArg(options::OPT_index_file_path)) {
+    assert(primaries.empty() &&
+           "index file jobs should be treated as single (WMO) compiles");
+    primaries.insert(A->getValue());
   }
   for (auto inputPair : getTopLevelInputFiles()) {
     if (filterByType && !types::isPartOfSwiftCompilation(inputPair.first))
       continue;
     const char *inputName = inputPair.second->getValue();
-    if (primaries.count(inputName)) {
-      if (!usePrimaryFileList) {
-        arguments.push_back("-primary-file");
-        arguments.push_back(inputName);
-      }
-    } else {
-      if (!useFileList) {
-        arguments.push_back(inputName);
-      }
+    const bool isPrimary = primaries.count(inputName);
+    if (isPrimary && !usePrimaryFileList) {
+      arguments.push_back("-primary-file");
+      arguments.push_back(inputName);
     }
+    if (!isPrimary && !useFileList)
+      arguments.push_back(inputName);
   }
-}
-
-bool ToolChain::canCompileInputArgumentBePrimary(const CommandOutput &Output,
-                                                 const llvm::opt::Arg &A) {
-  return Output.getPrimaryOutputType() != types::TY_IndexData ||
-         A.getOption().getID() == options::OPT_index_file_path;
 }
 
 void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(

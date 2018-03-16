@@ -26,6 +26,7 @@
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Frontend/OutputFileMap.h"
+#include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -128,7 +129,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     Stats(std::move(StatsReporter)) {
 };
 
-static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
+static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
+                                     DiagnosticEngine &diags);
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 using CommandSetVector = llvm::SetVector<const Job*>;
@@ -258,7 +260,8 @@ namespace driver {
 
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
-      bool success = writeFilelistIfNecessary(Cmd, Comp.Diags);
+      bool success =
+          writeFilelistIfNecessary(Cmd, *Comp.TranslatedArgs.get(), Comp.Diags);
       assert(success && "failed to write filelist");
       (void)success;
 
@@ -1108,7 +1111,8 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
-static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
+static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
+                                     DiagnosticEngine &diags) {
   bool ok = true;
   for (const FilelistInfo &filelistInfo : job->getFilelistInfos()) {
     if (filelistInfo.path.empty())
@@ -1140,12 +1144,16 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
       }
       break;
     case FilelistInfo::WhichFiles::PrimaryInputs:
-      for (const Action *A : job->getSource().getInputs()) {
-        const auto *IA = cast<InputAction>(A);
-        const llvm::opt::Arg &InArg = IA->getInputArg();
-        if (ToolChain::canCompileInputArgumentBePrimary(job->getOutput(),
-                                                        InArg))
+      // Ensure that -index-file-path works in conjunction with
+      // -driver-use-filelists. It needs to be the only primary.
+      if (Arg *A = args.getLastArg(options::OPT_index_file_path))
+        out << A->getValue() << "\n";
+      else {
+        // The normal case for non-single-compile jobs.
+        for (const Action *A : job->getSource().getInputs()) {
+          const auto *IA = cast<InputAction>(A);
           out << IA->getInputArg().getValue() << "\n";
+        }
       }
       break;
     case FilelistInfo::WhichFiles::Output: {
@@ -1155,10 +1163,9 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
         out << output << "\n";
       break;
     }
-    case FilelistInfo::WhichFiles::SupplementaryOutput: {
+    case FilelistInfo::WhichFiles::SupplementaryOutput:
       job->getOutput().writeOutputFileMap(out);
       break;
-    }
     }
   }
   return ok;
@@ -1198,7 +1205,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   }
 
-  if (!writeFilelistIfNecessary(Cmd, Diags))
+  if (!writeFilelistIfNecessary(Cmd, *TranslatedArgs.get(), Diags))
     return 1;
 
   switch (Level) {
