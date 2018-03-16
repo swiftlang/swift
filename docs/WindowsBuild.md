@@ -126,8 +126,8 @@ set llvm_bin_dir="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64/
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
-mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
-pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
+mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DSWIFT_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
@@ -151,7 +151,7 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7" ^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
-cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
+cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 ```
 
 - To create a Visual Studio project, you'll need to change the generator and,
@@ -172,8 +172,8 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
 Follow instructions 1-6 for `clang-cl`, but run the following instead to build Swift
 
 ```cmd
-mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
-pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
+mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DSWIFT_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
@@ -194,5 +194,5 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
-cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
+cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 ```
