@@ -257,9 +257,27 @@ func hasLocalDecls() {
 
   // FIXME
   // CHECK: decl: FAILURE for 'LocalType'
-  // The following is the implicit ctor
-  // CHECK: decl: FAILURE for ''
-  struct LocalType {}
+  struct LocalType {
+    // CHECK: FAILURE for 'localMethod'
+    func localMethod() {}
+
+    // CHECK: FAILURE for 'subscript'
+    subscript(x: Int) { get {} set {} }
+
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+
+  }
+
+  // FIXME
+  // CHECK: decl: FAILURE for 'LocalClass'
+  class LocalClass {
+    // CHECK: FAILURE for 'deinit'
+    deinit {}
+
+    // CHECK: decl: FAILURE for ''
+  }
 
   // CHECK: decl: FAILURE for 'LocalAlias'
   typealias LocalAlias = LocalType
