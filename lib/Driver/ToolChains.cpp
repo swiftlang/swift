@@ -476,9 +476,9 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
                              FilelistInfo::WhichFiles::PrimaryInputs});
   }
   if (!UseFileList || !UsePrimaryFileList) {
-    addFrontendInputArguments(MayHavePrimaryInputs, UseFileList,
-                              UsePrimaryFileList, FilterInputsByType,
-                              Arguments);
+    addFrontendCommandLineInputArguments(MayHavePrimaryInputs, UseFileList,
+                                         UsePrimaryFileList, FilterInputsByType,
+                                         Arguments);
   }
 
   if (UseSupplementaryOutputFileList) {
@@ -491,7 +491,7 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   }
 }
 
-void ToolChain::JobContext::addFrontendInputArguments(
+void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     const bool mayHavePrimaryInputs, const bool useFileList,
     const bool usePrimaryFileList, const bool filterByType,
     ArgStringList &arguments) const {

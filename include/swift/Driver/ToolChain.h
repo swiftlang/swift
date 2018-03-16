@@ -109,11 +109,10 @@ protected:
         std::vector<FilelistInfo> &FilelistInfos) const;
 
   private:
-    void addFrontendInputArguments(const bool mayHavePrimaryInputs,
-                                   const bool useFileList,
-                                   const bool usePrimaryFileList,
-                                   const bool filterByType,
-                                   llvm::opt::ArgStringList &arguments) const;
+    void addFrontendCommandLineInputArguments(
+        const bool mayHavePrimaryInputs, const bool useFileList,
+        const bool usePrimaryFileList, const bool filterByType,
+        llvm::opt::ArgStringList &arguments) const;
     void addFrontendSupplementaryOutputArguments(
         llvm::opt::ArgStringList &arguments) const;
   };
