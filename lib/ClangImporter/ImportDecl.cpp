@@ -6163,8 +6163,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
-  bool resultIsOptional;
-  (void)oldFnType->getResult()->getOptionalObjectType(resultIsOptional);
+  bool resultIsOptional = (bool) oldFnType->getResult()->getOptionalObjectType();
 
   // Update the failability appropriately based on the imported method type.
   assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());

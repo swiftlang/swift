@@ -1238,8 +1238,8 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_UnsafeMutablePointer)
       return Type();
 
-    bool isOptional;
-    auto insideOptionalType = elementType->getOptionalObjectType(isOptional);
+    auto insideOptionalType = elementType->getOptionalObjectType();
+    bool isOptional = (bool) insideOptionalType;
     if (!insideOptionalType)
       insideOptionalType = elementType;
 
@@ -1950,8 +1950,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
       clangDecl->getMethodFamily() == clang::OMF_performSelector) {
     // performSelector methods that return 'id' should be imported into Swift
     // as returning Unmanaged<AnyObject>.
-    bool resultIsOptional;
-    Type nonOptionalTy = swiftResultTy->getOptionalObjectType(resultIsOptional);
+    Type nonOptionalTy = swiftResultTy->getOptionalObjectType();
+    bool resultIsOptional = (bool) nonOptionalTy;
     if (!nonOptionalTy)
       nonOptionalTy = swiftResultTy;
 

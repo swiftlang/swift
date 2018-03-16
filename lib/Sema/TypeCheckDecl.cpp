@@ -5607,11 +5607,8 @@ public:
       if (!TL.getTypeRepr())
         return;
 
-      bool paramIsOptional;
-      (void)paramTy->getOptionalObjectType(paramIsOptional);
-
-      bool parentIsOptional;
-      (void)parentParamTy->getOptionalObjectType(parentIsOptional);
+      bool paramIsOptional =  (bool) paramTy->getOptionalObjectType();
+      bool parentIsOptional = (bool) parentParamTy->getOptionalObjectType();
 
       if (paramIsOptional == parentIsOptional)
         return;

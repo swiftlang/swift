@@ -3133,12 +3133,10 @@ namespace {
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       // A non-failable initializer cannot delegate to a failable
       // initializer.
-      bool isOptional;
       Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
-      Type valueTy =
-          cs.getType(unwrappedSubExpr)->getOptionalObjectType(isOptional);
+      Type valueTy = cs.getType(unwrappedSubExpr)->getOptionalObjectType();
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
-      if (isOptional && inCtor->getFailability() == OTK_None) {
+      if (valueTy && inCtor->getFailability() == OTK_None) {
         bool isChaining;
         auto *otherCtorRef = expr->getCalledConstructor(isChaining);
         ConstructorDecl *ctor = otherCtorRef->getDecl();
@@ -6449,10 +6447,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
       PointerTypeKind pointerKind;
       auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
@@ -6474,10 +6474,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
@@ -6489,10 +6491,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::StringToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
