@@ -787,6 +787,10 @@ namespace {
     /// Simplify a key path expression into a canonical form.
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
+    /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
+    /// the type conforms to the expected literal protocol.
+    Expr *simplifyInitWithLiteral(Expr *E);
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
@@ -988,6 +992,9 @@ namespace {
         resolveKeyPathExpr(KPE);
         return KPE;
       }
+
+      if (auto *simplified = simplifyInitWithLiteral(expr))
+        return simplified;
 
       return expr;
     }
@@ -1545,6 +1552,53 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   KPE->setRootType(rootType);
   KPE->resolveComponents(TC.Context, components);
+}
+
+Expr *PreCheckExpression::simplifyInitWithLiteral(Expr *E) {
+  auto *call = dyn_cast<CallExpr>(E);
+  if (!call || call->getNumArguments() != 1)
+    return nullptr;
+
+  auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
+  if (!typeExpr)
+    return nullptr;
+
+  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
+  auto *number = dyn_cast<NumberLiteralExpr>(argExpr);
+  if (!number)
+    return nullptr;
+
+  auto *protocol = TC.getLiteralProtocol(number);
+  if (!protocol)
+    return nullptr;
+
+  Type type;
+  if (auto *rep = typeExpr->getTypeRepr()) {
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::InExpression;
+    type = TC.resolveType(rep, DC, options);
+  } else {
+    type = typeExpr->getTypeLoc().getType();
+  }
+
+  if (!type)
+    return nullptr;
+
+  ConformanceCheckOptions options;
+  options |= ConformanceCheckFlags::InExpression;
+  options |= ConformanceCheckFlags::SuppressDependencyTracking;
+  options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  if (result) {
+    auto *expr =
+        new (TC.Context) CoerceExpr(argExpr, {}, typeExpr->getTypeRepr());
+    expr->setImplicit();
+    return expr;
+  }
+
+  return nullptr;
 }
 
 /// \brief Clean up the given ill-formed expression, removing any references
