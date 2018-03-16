@@ -17,6 +17,10 @@ TensorTests.testAllBackends("Initializers") {
   let scalar: Tensor<Float> = 1.0
   let matrix: Tensor<Float> = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
   let broadcastScalar = Tensor<Float>(broadcasting: 10, rank: 3)
+  let some4d = Tensor<Float>(shape: [2, 1, 2, 1],
+                             scalars: AnyRandomAccessCollection([2, 3, 4, 5]))
+  expectEqual(ShapedArray(shape: [2, 1, 2, 1], scalars: [2, 3, 4, 5]),
+              some4d.array)
   expectEqual(ShapedArray(shape: [], scalars: [1]), scalar.array)
   expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
               matrix.array)

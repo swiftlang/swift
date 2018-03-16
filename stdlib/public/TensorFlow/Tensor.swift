@@ -165,25 +165,116 @@ public extension Tensor {
     self.init(handle: #tfop("Pack", elements))
   }
 
-  /// Creates a tensor from an array representing a vector.
+  /// Creates a 1D tensor in from contiguous scalars in row-major order.
+  ///
+  /// - Parameters:
+  ///   - vector: The scalar contents of the tensor.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  ///
   @_inlineable @inline(__always)
   init(_ vector: [Scalar]) {
     self.init(handle: _TFTensorFromScalars1D(vector))
   }
 
-  /// Creates a tensor with the specified shape and contiguous scalars in
-  /// row-major order.
+  /// Creates a 1D tensor in from contiguous scalars in row-major order.
+  ///
+  /// - Parameters:
+  ///   - vector: The scalar contents of the tensor.
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
+  ///
+  @_inlineable @inline(__always)
+  init<C : RandomAccessCollection>(_ vector: C) where C.Element == Scalar {
+    let handle = _TFHoistable {
+      TensorHandle<Scalar>(
+        shape: [Int32(vector.count)],
+        scalarsInitializer: { addr in
+          var currentAddr = addr
+          for scalar in vector {
+            currentAddr.pointee = scalar
+            currentAddr = currentAddr.advanced(by: 1)
+          }
+        }
+      )
+    }
+    self.init(handle: handle)
+  }
+
+  /// Creates a tensor with the specified shape and contiguous scalars in
+  /// row-major order.
+  ///
+  /// - Parameters:
+  ///   - shape: The shape of the tensor.
+  ///   - scalars: The scalar contents of the tensor.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  ///
   @_inlineable @inline(__always)
   init(shape: TensorShape, scalars: [Scalar]) {
+    // NOTE: We use `_TFTensorFromScalars` here so the compiler can try to
+    // promote constants and avoid copies.
     self.init(handle: _TFTensorFromScalars(scalars, shape: shape.dimensions))
   }
 
+  /// Creates a tensor with the specified shape and contiguous scalars in
+  /// row-major order.
+  ///
+  /// - Parameters:
+  ///   - shape: The shape of the tensor.
+  ///   - scalars: The scalar contents of the tensor.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  ///
+  @_inlineable @inline(__always)
+  init(shape: TensorShape, scalars: UnsafeBufferPointer<Scalar>) {
+    let handle: TensorHandle<Scalar> = _TFHoistable {
+      precondition(scalars.count == shape.contiguousSize)
+      return TensorHandle<Scalar>(
+        shape: shape.dimensions,
+        scalarsInitializer: { addr in
+          addr.assign(from: scalars.baseAddress!,
+                      count: Int(shape.contiguousSize))
+        }
+      )
+    }
+    self.init(handle: handle)
+  }
+
+  /// Creates a tensor with the specified shape and contiguous scalars in
+  /// row-major order.
+  ///
+  /// - Parameters:
+  ///   - shape: The shape of the tensor.
+  ///   - scalars: The scalar contents of the tensor.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
+  ///
+  @_inlineable @inline(__always)
+  init<C : RandomAccessCollection>(shape: TensorShape, scalars: C)
+    where C.Element == Scalar {
+    let handle: TensorHandle<Scalar> = _TFHoistable {
+      precondition(scalars.count == shape.contiguousSize)
+      return TensorHandle<Scalar>(
+        shape: shape.dimensions,
+        scalarsInitializer: { addr in
+          var currentAddr = addr
+          for scalar in scalars {
+            currentAddr.pointee = scalar
+            currentAddr = currentAddr.advanced(by: 1)
+          }
+        }
+      )
+    }
+    self.init(handle: handle)
+  }
+
   /// Creates a tensor with the specified shape and a single, repeated value.
+  ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
+  ///
   @_inlineable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     self.init(handle: #tfop("Fill", Tensor<Int32>(shape.dimensions),
