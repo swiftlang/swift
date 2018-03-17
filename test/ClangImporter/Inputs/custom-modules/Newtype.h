@@ -102,3 +102,8 @@ __attribute((swift_name("NSSomeContext.Name")));
 
 extern const NSSomeContextName NSMyContextName;
 
+
+typedef NSError *ErrorNewType __attribute((swift_newtype(struct)));
+
+void testErrorDictionary(NSDictionary<NSError *, NSString *> * _Nonnull);
+void testErrorDictionaryNewtype(NSDictionary<ErrorNewType, NSString *> * _Nonnull);

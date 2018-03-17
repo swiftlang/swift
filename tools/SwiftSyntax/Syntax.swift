@@ -120,7 +120,7 @@ extension Syntax {
     return data.indexInParent
   }
 
-  /// The absolute position of the starting point this node. If the first token
+  /// The absolute position of the starting point of this node. If the first token
   /// is with leading trivia, the position points to the start of the leading
   /// trivia.
   public var position: AbsolutePosition {
@@ -136,6 +136,26 @@ extension Syntax {
   /// The textual byte length of this node including leading and trailing trivia.
   public var byteSize: Int {
     return data.byteSize
+  }
+
+  /// The leading trivia of this syntax node. Leading trivia is attached to
+  /// the first token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var leadingTrivia: Trivia? {
+    return raw.leadingTrivia
+  }
+
+  /// The trailing trivia of this syntax node. Trailing trivia is attached to
+  /// the last token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var trailingTrivia: Trivia? {
+    return raw.trailingTrivia
+  }
+
+  /// The textual byte length of this node exluding leading and trailing trivia.
+  public var byteSizeAfterTrimmingTrivia: Int {
+    return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
+      (trailingTrivia?.byteSize ?? 0)
   }
 
   /// The root of the tree in which this node resides.

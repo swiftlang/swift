@@ -17,6 +17,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
@@ -37,8 +38,41 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The limit for passing a list of files on the command line.
-static const size_t TOO_MANY_FILES = 128;
+bool ToolChain::JobContext::shouldUseInputFileList() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return getTopLevelInputFiles().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
+    const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return InputActions.size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldUseMainOutputFileListInFrontendInvocation()
+    const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::
+    shouldUseSupplementaryOutputFileMapInFrontendInvocation() const {
+  if (Args.hasArg(options::OPT_driver_use_filelists))
+    return true;
+  static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
+      types::TY_INVALID;
+  return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
+         TOO_MANY_FILES;
+}
+
+bool ToolChain::JobContext::shouldFilterFrontendInputsByType() const {
+  // FIXME: SingleCompile has not filtered its inputs in the past and now people
+  // rely upon that. But we would like the compilation modes to be consistent.
+  return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
+}
 
 static void addInputsOfType(ArgStringList &Arguments,
                             ArrayRef<const Action *> Inputs,
@@ -214,18 +248,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
 
-  addOutputsOfType(arguments, output, inputArgs,
-                   types::TY_SwiftModuleDocFile,
-                   "-emit-module-doc-path");
-
   if (llvm::sys::Process::StandardErrHasColors())
     arguments.push_back("-color-diagnostics");
-
-  addOutputsOfType(arguments, output, inputArgs,
-                   types::TY_SerializedDiagnostics,
-                   "-serialize-diagnostics-path");
 }
-
 
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
@@ -235,164 +260,15 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   Arguments.push_back("-frontend");
 
-  // Determine the frontend mode option.
-  const char *FrontendModeOption = nullptr;
-  switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::BatchModeCompile: {
-    switch (context.Output.getPrimaryOutputType()) {
-    case types::TY_Object:
-      FrontendModeOption = "-c";
-      break;
-    case types::TY_PCH:
-      FrontendModeOption = "-emit-pch";
-      break;
-    case types::TY_RawSIL:
-      FrontendModeOption = "-emit-silgen";
-      break;
-    case types::TY_SIL:
-      FrontendModeOption = "-emit-sil";
-      break;
-    case types::TY_RawSIB:
-      FrontendModeOption = "-emit-sibgen";
-      break;
-    case types::TY_SIB:
-      FrontendModeOption = "-emit-sib";
-      break;
-    case types::TY_LLVM_IR:
-      FrontendModeOption = "-emit-ir";
-      break;
-    case types::TY_LLVM_BC:
-      FrontendModeOption = "-emit-bc";
-      break;
-    case types::TY_Assembly:
-      FrontendModeOption = "-S";
-      break;
-    case types::TY_SwiftModuleFile:
-      // Since this is our primary output, we need to specify the option here.
-      FrontendModeOption = "-emit-module";
-      break;
-    case types::TY_ImportedModules:
-      FrontendModeOption = "-emit-imported-modules";
-      break;
-    case types::TY_IndexData:
-      FrontendModeOption = "-typecheck";
-      break;
-    case types::TY_Remapping:
-      FrontendModeOption = "-update-code";
-      break;
-    case types::TY_Nothing:
-      // We were told to output nothing, so get the last mode option and use that.
-      if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
-        FrontendModeOption = A->getSpelling().data();
-      else
-        llvm_unreachable("We were told to perform a standard compile, "
-                         "but no mode option was passed to the driver.");
-      break;
-    case types::TY_Swift:
-    case types::TY_dSYM:
-    case types::TY_AutolinkFile:
-    case types::TY_Dependencies:
-    case types::TY_SwiftModuleDocFile:
-    case types::TY_ClangModuleFile:
-    case types::TY_SerializedDiagnostics:
-    case types::TY_ObjCHeader:
-    case types::TY_Image:
-    case types::TY_SwiftDeps:
-    case types::TY_ModuleTrace:
-    case types::TY_TBD:
-    case types::TY_OptRecord:
-      llvm_unreachable("Output type can never be primary output.");
-    case types::TY_INVALID:
-      llvm_unreachable("Invalid type ID");
-    }
-    break;
-  }
-  case OutputInfo::Mode::Immediate:
-  case OutputInfo::Mode::REPL:
-    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  {
+    // Determine the frontend mode option.
+    const char *FrontendModeOption = context.computeFrontendModeForCompile();
+    assert(FrontendModeOption != nullptr &&
+           "No frontend mode option specified!");
+    Arguments.push_back(FrontendModeOption);
   }
 
-  assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
-  Arguments.push_back(FrontendModeOption);
-
-  // Add input arguments.
-  switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-    assert(context.InputActions.size() == 1 &&
-           "Standard-compile mode takes exactly one input (the primary file)");
-    LLVM_FALLTHROUGH;
-  case OutputInfo::Mode::BatchModeCompile: {
-    bool UseFileList =
-      (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-       context.getTopLevelInputFiles().size() > TOO_MANY_FILES);
-    bool UsePrimaryFileList =
-      ((context.OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) &&
-       (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.InputActions.size() > TOO_MANY_FILES));
-    if (UseFileList) {
-      Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath());
-    }
-    if (UsePrimaryFileList) {
-      Arguments.push_back("-primary-filelist");
-      Arguments.push_back(context.getTemporaryFilePath("primaryInputs", ""));
-      II.FilelistInfos.push_back({Arguments.back(), types::TY_Swift,
-                                  FilelistInfo::WhichFiles::PrimaryInputs});
-    }
-    if (!UseFileList || !UsePrimaryFileList) {
-      llvm::StringSet<> primaries;
-      for (const Action *A : context.InputActions) {
-        const auto *IA = cast<InputAction>(A);
-        primaries.insert(IA->getInputArg().getValue());
-      }
-      for (auto inputPair : context.getTopLevelInputFiles()) {
-        if (!types::isPartOfSwiftCompilation(inputPair.first))
-          continue;
-        const char *inputName = inputPair.second->getValue();
-        if (primaries.count(inputName)) {
-          if (!UsePrimaryFileList) {
-            Arguments.push_back("-primary-file");
-            Arguments.push_back(inputName);
-          }
-        } else {
-          if (!UseFileList) {
-            Arguments.push_back(inputName);
-          }
-        }
-      }
-    }
-    break;
-  }
-  case OutputInfo::Mode::SingleCompile: {
-    StringRef PrimaryFileWrittenToCommandLine;
-    if (context.Output.getPrimaryOutputType() == types::TY_IndexData) {
-      if (Arg *A = context.Args.getLastArg(options::OPT_index_file_path)) {
-        Arguments.push_back("-primary-file");
-        Arguments.push_back(A->getValue());
-        PrimaryFileWrittenToCommandLine = A->getValue();
-      }
-    }
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.InputActions.size() > TOO_MANY_FILES) {
-      Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath());
-    } else {
-      for (const Action *A : context.InputActions) {
-        const Arg &InputArg = cast<InputAction>(A)->getInputArg();
-        // Frontend no longer tolerates redundant input files on command line.
-        if (InputArg.getValue() != PrimaryFileWrittenToCommandLine)
-          InputArg.render(context.Args, Arguments);
-      }
-    }
-    break;
-  }
-  case OutputInfo::Mode::Immediate:
-  case OutputInfo::Mode::REPL:
-    llvm_unreachable("REPL and immediate modes handled elsewhere");
-  }
+  context.addFrontendInputAndOutputArguments(Arguments, II.FilelistInfos);
 
   // Forward migrator flags.
   if (auto DataPath = context.Args.getLastArg(options::
@@ -454,33 +330,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
   addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::ID::TY_SwiftModuleFile,
-                   "-emit-module-path");
-
-  if (addOutputsOfType(Arguments, context.Output, context.Args,
-                       types::ID::TY_ObjCHeader, "-emit-objc-header-path")) {
-      assert(context.OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
-             "The Swift tool should only emit an Obj-C header in single compile"
-             "mode!");
-  }
-
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::TY_Dependencies,
-                   "-emit-dependencies-path");
-
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::TY_SwiftDeps,
-                   "-emit-reference-dependencies-path");
-
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::TY_ModuleTrace,
-                   "-emit-loaded-module-trace-path");
-
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   types::TY_TBD,
-                   "-emit-tbd-path");
-
-  addOutputsOfType(Arguments, context.Output, context.Args,
                    types::TY_OptRecord,
                    "-save-optimization-record-path");
 
@@ -500,8 +349,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
+    if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
@@ -524,6 +372,185 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   }
 
   return II;
+}
+
+const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
+  switch (Output.getPrimaryOutputType()) {
+  case types::TY_Object:
+    return "-c";
+  case types::TY_PCH:
+    return "-emit-pch";
+  case types::TY_RawSIL:
+    return "-emit-silgen";
+  case types::TY_SIL:
+    return "-emit-sil";
+  case types::TY_RawSIB:
+    return "-emit-sibgen";
+  case types::TY_SIB:
+    return "-emit-sib";
+  case types::TY_LLVM_IR:
+    return "-emit-ir";
+  case types::TY_LLVM_BC:
+    return "-emit-bc";
+  case types::TY_Assembly:
+    return "-S";
+  case types::TY_SwiftModuleFile:
+    // Since this is our primary output, we need to specify the option here.
+    return "-emit-module";
+  case types::TY_ImportedModules:
+    return "-emit-imported-modules";
+  case types::TY_IndexData:
+    return "-typecheck";
+  case types::TY_Remapping:
+    return "-update-code";
+  case types::TY_Nothing:
+    // We were told to output nothing, so get the last mode option and use that.
+    if (const Arg *A = Args.getLastArg(options::OPT_modes_Group))
+      return A->getSpelling().data();
+    else
+      llvm_unreachable("We were told to perform a standard compile, "
+                       "but no mode option was passed to the driver.");
+  case types::TY_Swift:
+  case types::TY_dSYM:
+  case types::TY_AutolinkFile:
+  case types::TY_Dependencies:
+  case types::TY_SwiftModuleDocFile:
+  case types::TY_ClangModuleFile:
+  case types::TY_SerializedDiagnostics:
+  case types::TY_ObjCHeader:
+  case types::TY_Image:
+  case types::TY_SwiftDeps:
+  case types::TY_ModuleTrace:
+  case types::TY_TBD:
+  case types::TY_OptRecord:
+    llvm_unreachable("Output type can never be primary output.");
+  case types::TY_INVALID:
+    llvm_unreachable("Invalid type ID");
+  }
+}
+
+void ToolChain::JobContext::addFrontendInputAndOutputArguments(
+    ArgStringList &Arguments, std::vector<FilelistInfo> &FilelistInfos) const {
+
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+    assert(InputActions.size() == 1 &&
+           "Standard-compile mode takes exactly one input (the primary file)");
+    break;
+  case OutputInfo::Mode::BatchModeCompile:
+  case OutputInfo::Mode::SingleCompile:
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
+
+  const bool UseFileList = shouldUseInputFileList();
+  const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs(Output);
+  const bool UsePrimaryFileList =
+      MayHavePrimaryInputs &&
+      shouldUsePrimaryInputFileListInFrontendInvocation();
+  const bool FilterInputsByType = shouldFilterFrontendInputsByType();
+  const bool UseSupplementaryOutputFileList =
+      shouldUseSupplementaryOutputFileMapInFrontendInvocation();
+
+  if (UseFileList) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(getAllSourcesPath());
+  }
+  if (UsePrimaryFileList) {
+    Arguments.push_back("-primary-filelist");
+    Arguments.push_back(getTemporaryFilePath("primaryInputs", ""));
+    FilelistInfos.push_back({Arguments.back(), types::TY_Swift,
+                             FilelistInfo::WhichFiles::PrimaryInputs});
+  }
+  if (!UseFileList || !UsePrimaryFileList) {
+    addFrontendCommandLineInputArguments(MayHavePrimaryInputs, UseFileList,
+                                         UsePrimaryFileList, FilterInputsByType,
+                                         Arguments);
+  }
+
+  if (UseSupplementaryOutputFileList) {
+    Arguments.push_back("-supplementary-output-file-map");
+    Arguments.push_back(getTemporaryFilePath("supplementaryOutputs", ""));
+    FilelistInfos.push_back({Arguments.back(), types::TY_INVALID,
+                             FilelistInfo::WhichFiles::SupplementaryOutput});
+  } else {
+    addFrontendSupplementaryOutputArguments(Arguments);
+  }
+}
+
+void ToolChain::JobContext::addFrontendCommandLineInputArguments(
+    const bool mayHavePrimaryInputs, const bool useFileList,
+    const bool usePrimaryFileList, const bool filterByType,
+    ArgStringList &arguments) const {
+  llvm::StringSet<> primaries;
+
+  if (mayHavePrimaryInputs) {
+    for (const Action *A : InputActions) {
+      const auto *IA = cast<InputAction>(A);
+      const llvm::opt::Arg &InArg = IA->getInputArg();
+      primaries.insert(InArg.getValue());
+    }
+  }
+  // -index-file compilations are weird. They are processed as SingleCompiles
+  // (WMO), but must indicate that there is one primary file, designated by
+  // -index-file-path.
+  if (Arg *A = Args.getLastArg(options::OPT_index_file_path)) {
+    assert(primaries.empty() &&
+           "index file jobs should be treated as single (WMO) compiles");
+    primaries.insert(A->getValue());
+  }
+  for (auto inputPair : getTopLevelInputFiles()) {
+    if (filterByType && !types::isPartOfSwiftCompilation(inputPair.first))
+      continue;
+    const char *inputName = inputPair.second->getValue();
+    const bool isPrimary = primaries.count(inputName);
+    if (isPrimary && !usePrimaryFileList) {
+      arguments.push_back("-primary-file");
+      arguments.push_back(inputName);
+    }
+    if ((!isPrimary || usePrimaryFileList) && !useFileList)
+      arguments.push_back(inputName);
+  }
+}
+
+void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
+    ArgStringList &arguments) const {
+  // FIXME: Get these and other argument strings from the same place for both
+  // driver and frontend.
+  addOutputsOfType(arguments, Output, Args, types::ID::TY_SwiftModuleFile,
+                   "-emit-module-path");
+
+  addOutputsOfType(arguments, Output, Args, types::TY_SwiftModuleDocFile,
+                   "-emit-module-doc-path");
+
+  addOutputsOfType(arguments, Output, Args, types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  if (addOutputsOfType(arguments, Output, Args, types::ID::TY_ObjCHeader,
+                       "-emit-objc-header-path")) {
+    assert(OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+           "The Swift tool should only emit an Obj-C header in single compile"
+           "mode!");
+  }
+
+  addOutputsOfType(arguments, Output, Args, types::TY_Dependencies,
+                   "-emit-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, types::TY_SwiftDeps,
+                   "-emit-reference-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, types::TY_ModuleTrace,
+                   "-emit-loaded-module-trace-path");
+  addOutputsOfType(arguments, Output, Args, types::TY_TBD, "-emit-tbd-path");
 }
 
 ToolChain::InvocationInfo
@@ -711,8 +738,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
+  if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
     II.FilelistInfos.push_back({Arguments.back(), types::TY_SwiftModuleFile,
@@ -747,6 +773,14 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_ObjCHeader, "-emit-objc-header-path");
+
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   Arguments.push_back("-module-name");
@@ -755,13 +789,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
 
-  auto ObjCHeaderOutputPath =
-    context.Output.getAdditionalOutputForType(types::TY_ObjCHeader);
-  if (!ObjCHeaderOutputPath.empty()) {
-    Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(
-        context.Args.MakeArgString(ObjCHeaderOutputPath));
-  }
 
   Arguments.push_back("-o");
   Arguments.push_back(context.Args.MakeArgString(
@@ -899,6 +926,9 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
 
   addInputsOfType(Arguments, context.InputActions, types::TY_ObjCHeader);
   context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
@@ -1269,8 +1299,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   InvocationInfo II = {LD};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
+  if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(

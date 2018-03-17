@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_nested_class -emit-sil -O %s | %FileCheck %s
 
 fileprivate class Outer<T> {
   class Inner<U> : Base<T, U> {

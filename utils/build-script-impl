@@ -57,9 +57,10 @@ KNOWN_SETTINGS=(
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
-    lldb-test-swift-only        "1"               "when running lldb tests, only include Swift-specific tests"
+    lldb-test-swift-only        "0"              "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
+    lldb-assertions             "1"              "build lldb with assertions enabled"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
@@ -632,7 +633,6 @@ function set_build_options_for_host() {
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -675,7 +675,6 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-                -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
             ;;
         *)
@@ -1784,6 +1783,12 @@ function set_lldb_xcodebuild_options() {
 	    -enableUndefinedBehaviorSanitizer=YES
 	)
     fi
+    if [[ "$(true_false ${LLDB_ASSERTIONS})" == "FALSE" ]]; then
+	lldb_xcodebuild_options=(
+	    "${lldb_xcodebuild_options[@]}"
+	    OTHER_CFLAGS="-DNDEBUG"
+	)
+    fi
 }
 
 #
@@ -2804,7 +2809,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 # Handle test subdirectory clause
-                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
                     LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
@@ -2826,7 +2831,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # If we need to use the system debugserver, do so explicitly.
                 if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver"
+                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver --out-of-tree-debugserver"
                 else
                     LLDB_TEST_DEBUG_SERVER=""
                 fi
@@ -2845,18 +2850,42 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
                 fi
                 call mkdir -p "${results_dir}"
-                with_pushd "${results_dir}" \
-                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                    SWIFTLIBS="${swift_build_dir}/${LIBDIR}/swift" \
-                    "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                    --executable "${lldb_executable}" \
-                    ${LLDB_TEST_DEBUG_SERVER} \
-                    ${LLDB_TEST_SUBDIR_CLAUSE} \
-                    ${LLDB_TEST_CATEGORIES} \
-                    ${LLDB_DOTEST_CC_OPTS} \
-                    ${LLDB_FORMATTER_OPTS} \
-                    --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                    -E "${DOTEST_EXTRA}"
+
+                # Prefer to use lldb-dotest, as building it guarantees that we build all
+                # test dependencies. Ultimately we want to delete as much lldb-specific logic
+                # from this file as possible and just have a single call to lldb-dotest.
+                dotest_extra_args=""
+                if [[ ! -z "${DOTEST_EXTRA}" ]] ; then
+                    dotest_extra_args="-E ${DOTEST_EXTRA}"
+                fi
+                if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "FALSE" ]] ; then
+                    with_pushd ${lldb_build_dir} \
+                        ${NINJA_BIN} lldb-dotest
+
+                    lldb_dotest="${lldb_build_dir}"/bin/lldb-dotest
+                    with_pushd ${results_dir} \
+                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        SWIFTLIBS="${swift_build_dir}/${LIBDIR}/swift" \
+                        ${lldb_dotest} \
+                        ${LLDB_TEST_SUBDIR_CLAUSE} \
+                        ${LLDB_TEST_CATEGORIES} \
+                        ${LLDB_FORMATTER_OPTS} \
+                        ${dotest_extra_args}
+		            else
+                    with_pushd "${results_dir}" \
+                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        SWIFTLIBS="${swift_build_dir}/${LIBDIR}/swift" \
+                        "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                        --executable "${lldb_executable}" \
+                        ${LLDB_TEST_DEBUG_SERVER} \
+                        ${LLDB_TEST_SUBDIR_CLAUSE} \
+                        ${LLDB_TEST_CATEGORIES} \
+                        ${LLDB_DOTEST_CC_OPTS} \
+                        ${LLDB_FORMATTER_OPTS} \
+                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                        ${dotest_extra_args}
+                fi
+
                 continue
                 ;;
             llbuild)

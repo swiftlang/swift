@@ -48,24 +48,19 @@ extension String {
   ///     string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
-    if count == 0 {
-      self = ""
-    } else if count == 1 {
-      self = repeatedValue
-    } else {
-      precondition(count > 0, "Negative count not allowed")
-      defer { _fixLifetime(repeatedValue) }
-      if _slowPath(repeatedValue._guts._isOpaque) {
-        let opaque = repeatedValue._guts._asOpaque()
-        self.init(_StringGuts(opaque._repeated(count)))
-      } else if repeatedValue._guts.isASCII {
-        let ascii = repeatedValue._guts._unmanagedASCIIView
-        self.init(_StringGuts(ascii._repeated(count)))
-      } else {
-        let utf16 = repeatedValue._guts._unmanagedUTF16View
-        self.init(_StringGuts(utf16._repeated(count)))
-      }
+    guard count > 1 else {
+      self = count == 0 ? "" : repeatedValue
+      return
     }
+
+    precondition(count > 0, "Negative count not allowed")
+    self = _visitGuts(repeatedValue._guts, range: nil, args: count,
+      ascii: { ascii, count in
+        return String(_StringGuts(_large: ascii._repeated(count))) },
+      utf16: { utf16, count in
+        return String(_StringGuts(_large: utf16._repeated(count))) },
+      opaque: { opaque, count in
+        return String(_StringGuts(_large: opaque._repeated(count))) })
   }
 
   /// A Boolean value indicating whether a string has no characters.

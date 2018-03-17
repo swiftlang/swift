@@ -1147,11 +1147,6 @@ public:
                         RValue &&optionalSubscripts,
                         SILType addressType);
 
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
-
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);

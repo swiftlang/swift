@@ -185,7 +185,8 @@
     },
     {
       "tokenKind": {
-        "kind": "eof"
+        "kind": "eof",
+        "text": ""
       },
       "leadingTrivia": [
         {

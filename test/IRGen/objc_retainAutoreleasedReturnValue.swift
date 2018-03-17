@@ -1,7 +1,7 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -O -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -O -target x86_64-apple-macosx10.12 -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64

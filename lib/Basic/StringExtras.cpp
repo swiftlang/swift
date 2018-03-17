@@ -29,11 +29,12 @@ using namespace swift;
 using namespace camel_case;
 
 bool swift::canBeArgumentLabel(StringRef identifier) {
-  if (identifier == "var" || identifier == "let" || identifier == "inout" ||
-      identifier == "$")
-    return false;
-
-  return true;
+  return llvm::StringSwitch<bool>(identifier)
+    .Case("var", false)
+    .Case("let", false)
+    .Case("inout", false)
+    .Case("$", false)
+    .Default(true);
 }
 
 bool swift::canBeMemberName(StringRef identifier) {

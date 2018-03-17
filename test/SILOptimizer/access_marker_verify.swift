@@ -1,8 +1,8 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -162,15 +162,11 @@ class LetClass {
   let x = 3
 }
 
-// FIXME: should be a [unknown] access.
-//
 // CHECK-LABEL: sil hidden @$S20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF : $@convention(thin) (@owned LetClass) -> Int {
 // CHECK: bb0(%0 : @owned $LetClass):
 // CHECK:   begin_borrow %0 : $LetClass
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [read] [dynamic]
 // CHECK:   load [trivial]
-// CHECK:   end_access
 // CHECK:   end_borrow
 // CHECK:   destroy_value %0 : $LetClass
 // CHECK:   return
@@ -202,9 +198,7 @@ final class SubWrapper : BaseClass {
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [modify] [dynamic]
 // CHECK:   assign %0 to
-// CHECK:   end_access
 // CHECK:   end_borrow
 // CHECK-NOT: begin_access
 // CHECK:   load [take]
@@ -479,24 +473,26 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   apply %{{.*}}<Int, [Int]>
 // ----- access the temporary array result of the getter
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]]
-// CHECK:   select_enum_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, case #Optional.some!enumelt.1
-// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK:   [[TEMP2:%.*]] = alloc_stack $Optional<Array<Int>>
+// CHECK:   copy_addr [[TEMPACCESS]] to [initialization] [[TEMP2]]
+// CHECK:   [[VALUE:%.*]] = load [take] [[TEMP2]]
+// CHECK:   switch_enum [[VALUE]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 //
 // CHECK: bb1:
 // CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
 // CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
 // CHECK-NOT: begin_access
 // CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
-// CHECK:   alloc_stack $Int
+// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
 // CHECK-NOT: begin_access
-// CHECK:   store %{{.*}} to [trivial] %31 : $*Int
+// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
 // Call Dictionary.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
 // CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
 // CHECK:   end_access [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
 // CHECK:   br
 //
-// CHECK: bb2:
+// CHECK: bb2(
 // CHECK-NOT: begin_access
 // CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt.1
 // ----- call Array.append

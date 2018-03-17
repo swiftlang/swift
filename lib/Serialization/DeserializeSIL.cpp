@@ -798,8 +798,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     }
     
     indices = MF->getContext().AllocateCopy(indicesBuf);
-    if (!indices.empty() &&
-        kind != KeyPathComponentKindEncoding::External) {
+    if (!indices.empty()) {
       auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
       auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
       indicesEquals = getFuncForReference(indicesEqualsName.str());
@@ -851,7 +850,8 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     }
     handleComputedIndices();
     return KeyPathPatternComponent::forExternal(decl,
-        MF->getContext().AllocateCopy(subs), indices, type);
+        MF->getContext().AllocateCopy(subs),
+        indices, indicesEquals, indicesHash, type);
   }
   }
 }

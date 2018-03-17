@@ -450,11 +450,9 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   }
   case tok::oper_binary_unspaced:  // fixme?
   case tok::oper_binary_spaced:
-    // A binary operator can be part of a SILDeclRef.
-    Result = P.Context.getIdentifier(P.Tok.getText());
-    break;
   case tok::kw_init:
-    Result = P.Context.Id_init;
+    // A binary operator or `init` can be part of a SILDeclRef.
+    Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   default:
     // If it's some other keyword, grab an identifier for it.
@@ -1183,6 +1181,10 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
     case tok::kw_subscript:
       P.consumeToken();
       FullName.push_back(DeclBaseName::createSubscript());
+      break;
+    case tok::kw_init:
+      P.consumeToken();
+      FullName.push_back(DeclBaseName::createConstructor());
       break;
     case tok::kw_deinit:
       P.consumeToken();
@@ -1952,7 +1954,36 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
                         diag::expected_tok_in_sil_instr, "$")
         || parseASTType(ty, patternEnv))
       return true;
-    
+
+    SILFunction *equals = nullptr;
+    SILFunction *hash = nullptr;
+
+    while (P.consumeIf(tok::comma)) {
+      Identifier subKind;
+      SourceLoc subKindLoc;
+      if (parseSILIdentifier(subKind, subKindLoc,
+                             diag::sil_keypath_expected_component_kind))
+        return true;
+
+      if (subKind.str() == "indices_equals") {
+        if (parseSILFunctionRef(InstLoc, equals))
+          return true;
+      } else if (subKind.str() == "indices_hash") {
+        if (parseSILFunctionRef(InstLoc, hash))
+          return true;
+      } else {
+        P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
+                   subKind);
+        return true;
+      }
+    }
+
+    if (!indexes.empty() != (equals && hash)) {
+      P.diagnose(componentLoc,
+                 diag::sil_keypath_external_missing_part);
+      return true;
+    }
+
     if (!parsedSubs.empty()) {
       auto genericEnv = externalDecl->getInnermostDeclContext()
                                     ->getGenericEnvironmentOfContext();
@@ -1977,12 +2008,13 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
         sub = sub.getCanonicalSubstitution();
     }
     
+
     auto indexesCopy = P.Context.AllocateCopy(indexes);
     auto subsCopy = P.Context.AllocateCopy(subs);
     
     component = KeyPathPatternComponent::forExternal(
         cast<AbstractStorageDecl>(externalDecl),
-        subsCopy, indexesCopy, ty);
+        subsCopy, indexesCopy, equals, hash, ty);
     return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {

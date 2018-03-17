@@ -83,7 +83,6 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.empty())
     return false;
 
-  ASTContext &ctx = decls.front()->getASTContext();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
     while (auto overrides = decl->getOverriddenDecl()) {
@@ -95,7 +94,7 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // C.init overrides B.init overrides A.init, but only C.init and
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
-      if (decl->getFullName().getBaseName() == ctx.Id_init) {
+      if (decl->getFullName().getBaseName() == DeclBaseName::createConstructor()) {
         /// FIXME: Avoid the possibility of an infinite loop by fixing the root
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
@@ -1367,7 +1366,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // that appears to special-case initializers (clang-imported initializer
   // sorting, implicit initializer synthesis), so for the time being we have to
   // turn it off for them entirely.
-  if (name.getBaseName() == ctx.Id_init)
+  if (name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
   DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
@@ -1753,7 +1752,7 @@ bool DeclContext::lookupQualified(Type type,
 
     // Make sure we've resolved implicit members, if we need them.
     if (typeResolver) {
-      if (member.getBaseName() == ctx.Id_init)
+      if (member.getBaseName() == DeclBaseName::createConstructor())
         typeResolver->resolveImplicitConstructors(current);
 
       typeResolver->resolveImplicitMember(current, member);
@@ -1782,7 +1781,7 @@ bool DeclContext::lookupQualified(Type type,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       bool visitSuperclass = true;
-      if (member.getBaseName() == ctx.Id_init) {
+      if (member.getBaseName() == DeclBaseName::createConstructor()) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else

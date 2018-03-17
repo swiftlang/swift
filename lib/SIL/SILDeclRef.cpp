@@ -285,19 +285,29 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
-    // If the type is public, the property initializer is referenced from
-    // inlinable initializers, and has PublicNonABI linkage.
+    // Three cases:
     //
-    // Note that we don't serialize the presence of an initializer, so there's
-    // no way to reference one from another module except for this case.
+    // 1) Type is formally @_fixed_layout. Root initializers can be declared
+    //    @_inlineable. The property initializer must only reference
+    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
+    //
+    // 2) Type is not formally @_fixed_layout and the module is not resilient.
+    //    Root initializers can be declared @_inlineable. This is the annoying
+    //    case. We give the initializer public linkage if the type is public.
+    //
+    // 3) Type is resilient. The property initializer is never public because
+    //    root initializers cannot be @_inlineable.
+    //
+    // FIXME: Get rid of case 2 somehow.
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
 
-    // Otherwise, use the visibility of the type itself, because even if the
-    // property is private, we might reference the initializer from another
-    // file.
     d = cast<NominalTypeDecl>(d->getDeclContext());
-    neverPublic = true;
+
+    // FIXME: This should always be true.
+    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient)
+      neverPublic = true;
   }
 
   // The global addressor is never public for resilient globals.

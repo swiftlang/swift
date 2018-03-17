@@ -112,6 +112,7 @@ func testKeyPath(a: A, b: B) {
 
   let dict: [String: Int] = [:]
   let _: Int? = dict[#keyPath(A.propB)]
+  let _ = [#keyPath(A.propB)]
 }
 
 func testAsStaticString() {

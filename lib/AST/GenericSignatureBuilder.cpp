@@ -912,18 +912,15 @@ bool RequirementSource::isSelfDerivedSource(GenericSignatureBuilder &builder,
 }
 
 /// Replace 'Self' in the given dependent type (\c depTy) with the given
-/// potential archetype, producing a new potential archetype that refers to
+/// dependent type, producing a type that refers to
 /// the nested type. This limited operation makes sure that it does not
 /// create any new potential archetypes along the way, so it should only be
 /// used in cases where we're reconstructing something that we know exists.
 static Type replaceSelfWithType(Type selfType, Type depTy) {
   if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
     Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
-
-    if (auto assocType = depMemTy->getAssocType())
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, depMemTy->getName());
+    assert(depMemTy->getAssocType() && "Missing associated type");
+    return DependentMemberType::get(baseType, depMemTy->getAssocType());
   }
 
   assert(depTy->is<GenericTypeParamType>() && "missing Self?");
@@ -1098,14 +1095,15 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   // If we haven't seen a protocol requirement, we're done.
   if (!sawProtocolRequirement) return this;
 
-  // The root archetype might be a nested type, which implies constraints
+  // The root might be a nested type, which implies constraints
   // for each of the protocols of the associated types referenced (if any).
   for (auto depMemTy = rootType->getAs<DependentMemberType>(); depMemTy;
        depMemTy = depMemTy->getBase()->getAs<DependentMemberType>()) {
-    if (auto assocType = depMemTy->getAssocType()) {
-      if (addTypeConstraint(depMemTy->getBase(), assocType->getProtocol(), nullptr))
-        return nullptr;
-    }
+    auto assocType = depMemTy->getAssocType();
+    assert(assocType);
+    if (addTypeConstraint(depMemTy->getBase(), assocType->getProtocol(),
+                          nullptr))
+      return nullptr;
   }
 
   return this;
@@ -1634,10 +1632,8 @@ static Type formProtocolRelativeType(ProtocolDecl *proto,
   auto depMemTy = type->castTo<DependentMemberType>();
   Type newBaseType = formProtocolRelativeType(proto, baseType,
                                               depMemTy->getBase());
-  if (auto assocType = depMemTy->getAssocType())
-    return DependentMemberType::get(newBaseType, assocType);
-
-  return DependentMemberType::get(newBaseType, depMemTy->getName());
+  auto assocType = depMemTy->getAssocType();
+  return DependentMemberType::get(newBaseType, assocType);
 }
 
 const RequirementSource *FloatingRequirementSource::getSource(
@@ -2310,15 +2306,7 @@ Type EquivalenceClass::getAnchor(
 #endif
   }
 
-  // FIXME: Once we are no longer constructing potential archetypes with
-  // concrete nested types, we can turn this into assert(updatedAnchor);
-  if (!updatedAnchor) {
-    ++NumArchetypeAnchorCacheMisses;
-    archetypeAnchorCache.anchor =
-      builder.getCanonicalTypeParameter(members.front()->getDependentType({ }));
-    archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
-  }
-
+  assert(updatedAnchor && "Couldn't update anchor?");
   return substAnchor();
 }
 
@@ -2726,8 +2714,8 @@ static void maybeAddSameTypeRequirementForNestedType(
   if (auto depMemTy =
         nested.getDependentType(builder)->getAs<DependentMemberType>())
     assocType = depMemTy->getAssocType();
-
-  if (!assocType) return;
+  else
+    return;
 
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance().getConcrete();
@@ -2820,19 +2808,10 @@ int swift::compareDependentTypes(Type type1, Type type2) {
                                                   depMemTy2->getName().str()))
     return compareNames;
 
-  if (auto *assocType1 = depMemTy1->getAssocType()) {
-    if (auto *assocType2 = depMemTy2->getAssocType()) {
-      if (int result = compareAssociatedTypes(assocType1, assocType2))
-        return result;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
-    }
-  } else {
-    // A resolved archetype is always ordered before an unresolved one.
-    if (depMemTy2->getAssocType())
-      return +1;
-  }
+  auto *assocType1 = depMemTy1->getAssocType();
+  auto *assocType2 = depMemTy2->getAssocType();
+  if (int result = compareAssociatedTypes(assocType1, assocType2))
+    return result;
 
   return 0;
 }
@@ -4994,8 +4973,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Recursively merge the associated types of T2 into T1.
   auto dependentT1 = T1->getDependentType(getGenericParams());
+  SmallPtrSet<Identifier, 4> visited;
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
+      // Only visit each name once.
+      if (!visited.insert(T2Nested.first).second) continue;
+
       // If T1 is concrete but T2 is not, concretize the nested types of T2.
       if (t1IsConcrete && !t2IsConcrete) {
         concretizeNestedTypeFromConcreteParent(T1, T2Nested.second.front(),
@@ -5024,9 +5007,13 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   }
 
   // If T2 is concrete but T1 was not, concretize the nested types of T1.
+  visited.clear();
   if (t2IsConcrete && !t1IsConcrete) {
     for (auto equivT1 : equivClass1Members) {
       for (auto T1Nested : equivT1->NestedTypes) {
+        // Only visit each name once.
+        if (!visited.insert(T1Nested.first).second) continue;
+
         concretizeNestedTypeFromConcreteParent(T2, T1Nested.second.front(),
                                                *this);
       }

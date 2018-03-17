@@ -1704,11 +1704,13 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    Identifier baseName, unsigned numParams, StringRef argumentLabel,
+    DeclBaseName baseName, unsigned numParams, StringRef argumentLabel,
     bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
+  auto baseNameStr = baseName.userFacingName();
+
   // Don't introduce a default argument for setters with only a single
   // parameter.
-  if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
+  if (numParams == 1 && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
@@ -1730,7 +1732,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
   }
 
   // Don't introduce an empty options default arguments for setters.
-  if (isFirstParameter && camel_case::getFirstWord(baseName.str()) == "set")
+  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Option sets default to "[]" if they have "Options" in their name.
@@ -1752,8 +1754,8 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
       if (objcClass->getName() == "NSDictionary") {
         StringRef searchStr = argumentLabel;
-        if (searchStr.empty() && !baseName.empty())
-          searchStr = baseName.str();
+        if (searchStr.empty() && !baseNameStr.empty())
+          searchStr = baseNameStr;
 
         auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
         if (clangOptionality == OTK_Optional)
@@ -2125,7 +2127,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseIdentifier(), numEffectiveParams,
+          importedName.getDeclName().getBaseName(), numEffectiveParams,
           name.empty() ? StringRef() : name.str(), paramIndex == 0,
           isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
