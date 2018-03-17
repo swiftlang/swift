@@ -88,6 +88,7 @@ namespace {
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
     SILPassManager *passManager;
+    TypeContainsTensorHandle tcth;
 
     /// This is set to true by the early inlining phase if the function was
     /// forcibly flattened to make all references to global variables visible
@@ -133,7 +134,7 @@ namespace {
                                SmallVectorImpl<AllocStackInst*> &stackAllocs);
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
-    void propagateTensorOperands();
+    void propagateTensorValues();
     void canonicalizeOps();
   };
 }  // end anonymous namespace
@@ -382,12 +383,13 @@ namespace {
     SmallPtrSet<SILValue, 32> visitedDownward;
 
     SmallVector<GlobalAddrInst*, 8> globalAddrs;
-    TypeContainsTensorHandle tcth;
+    TypeContainsTensorHandle &tcth;
   public:
 
     PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
-                           SmallVectorImpl<AllocStackInst*> &stackAllocs)
-      : globals(globals), stackAllocs(stackAllocs) {}
+                           SmallVectorImpl<AllocStackInst*> &stackAllocs,
+                           TypeContainsTensorHandle &tcth)
+      : globals(globals), stackAllocs(stackAllocs), tcth(tcth) {}
 
     void run(ArrayRef<BuiltinInst*> tensorOps);
   private:
@@ -1073,12 +1075,75 @@ propagateTensorOperand(SILValue v,
   return lastRootValue;
 }
 
-/// Propagate the operand values for all tensors.
-void TFDeabstraction::propagateTensorOperands() {
-  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorOperands");
+/// Propagate the operand values for all tensors: this ensures that all tensor
+/// operands and results are directly linked together in the SSA graph at the
+/// TensorHandle level, without going through intervening struct/tuple wrappers.
+void TFDeabstraction::propagateTensorValues() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorValues");
 
+  // Find retain and release instructions involving TensorHandle values.  We
+  // need to deabstract retain/release of aggregate values (which may contain
+  // tensor handle values in nested positions) because these can show up as uses
+  // of tensor ops, and we want the partitioning pass to be able to cleanly
+  // remove these as it removes the ops themselves from the host program.
+  SmallVector<SILInstruction*, 4> instructionsToSimplify;
+
+  for (auto &BB : fn) {
+    for (auto I = BB.begin(), E = BB.end(); I != E; ) {
+      // Manually move iterator to avoid invalidation if we replace 'inst'.
+      auto *inst = dyn_cast<RefCountingInst>(&*I++);
+      if (!inst) continue;
+
+      // TODO: Handle SROA of destroy_addr, and other by-address values.
+      if (!isa<RetainValueInst>(inst) && !isa<ReleaseValueInst>(inst))
+        continue;
+
+      auto eltType = inst->getOperand(0)->getType();
+
+      // If this is a direct retain/release of a TensorHandle value, then
+      // remember it as something we want to simplify.
+      if (isTensorHandle(eltType)) {
+        instructionsToSimplify.push_back(inst);
+        continue;
+      }
+
+      // Otherwise, if it contains a TensorHandle as a element of its
+      // deabstracted type, then we need to explode it by at least one level of
+      // its nested type.  If it is just some unrelated type like String, we
+      // leave it alone.
+      if (!tcth.containsTensorHandle(eltType.getSwiftRValueType()))
+        continue;  // Unrelated to tensors.
+
+      // We emit the new instructions right after the retain/release instruction
+      // so we can find them.
+      SILBuilder B(&*I);
+      auto &tl = B.getTypeLowering(eltType);
+      if (isa<RetainValueInst>(inst)) {
+        tl.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                      inst->getOperand(0));
+      } else {
+        assert(isa<ReleaseValueInst>(inst) && "Unhandled r/r instruction");
+        tl.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                         inst->getOperand(0));
+      }
+
+      // Reset our iterator to the first instruction we just produced so we
+      // walk through them and recursively expand or remember them as
+      // appropriate.
+      I = ++SILBasicBlock::iterator(inst);
+      inst->eraseFromParent();
+    }
+  }
+
+  // We want to simplify all the tensor ops as well.
+  for (auto *op : tensorOps)
+    instructionsToSimplify.push_back(op);
+
+  // Now that we have directly exposed retain/release instructions and tensor
+  // operations, go through and make sure they are directly linked to each
+  // other.
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
-  for (auto *op : tensorOps) {
+  for (auto *op : instructionsToSimplify) {
     for (auto &operand : op->getAllOperands()) {
 
       // Get the propagated value.  This call can change the tensor operand.
@@ -1174,7 +1239,7 @@ void TFDeabstraction::doIt() {
   // and global variables that must be promoted to SSA.
   SmallVector<SILGlobalVariable*, 8> globals;
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  PromotableMemoryFinder(globals, stackAllocs).run(tensorOps);
+  PromotableMemoryFinder(globals, stackAllocs, tcth).run(tensorOps);
 
   // If any global variable references were found in the operation chain, try
   // to predictably promote their references to unblock analysis.  This is only
@@ -1190,7 +1255,7 @@ void TFDeabstraction::doIt() {
   // Now that we've promoted all the allocations in the way of our dataflow,
   // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
-  propagateTensorOperands();
+  propagateTensorValues();
 
 #if 0 // Not ready yet.
   // Canonicalize tensor ops, validating their attribute arguments have
