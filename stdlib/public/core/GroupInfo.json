@@ -37,6 +37,7 @@
     "UnicodeEncoding.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
+    "UnicodeScalarProperties.swift",
     "UnavailableStringAPIs.swift",
     "UnmanagedOpaqueString.swift",
     "UnmanagedString.swift",
