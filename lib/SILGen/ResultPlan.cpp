@@ -328,7 +328,10 @@ public:
     // of optional.
     errorPtrType = errorParameter.getType();
     unwrappedPtrType = errorPtrType;
-    if (Type unwrapped = errorPtrType->getOptionalObjectType(isOptional))
+    Type unwrapped = errorPtrType->getOptionalObjectType();
+    isOptional = (bool) unwrapped;
+
+    if (unwrapped)
       unwrappedPtrType = unwrapped->getCanonicalType();
 
     auto errorType =

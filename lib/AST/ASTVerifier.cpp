@@ -2688,8 +2688,7 @@ public:
       if (!CD->isInvalid() &&
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
-        bool resultIsOptional;
-        CD->getResultInterfaceType()->getOptionalObjectType(resultIsOptional);
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
         auto declIsOptional = CD->getFailability() != OTK_None;
 
         if (resultIsOptional != declIsOptional) {
@@ -2701,10 +2700,10 @@ public:
         // Also check the interface type.
         if (auto genericFn 
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
-          genericFn->getResult()
+          resultIsOptional = (bool) genericFn->getResult()
               ->castTo<AnyFunctionType>()
               ->getResult()
-              ->getOptionalObjectType(resultIsOptional);
+              ->getOptionalObjectType();
           if (resultIsOptional != declIsOptional) {
             Out << "Initializer has result optionality/failability mismatch\n";
             CD->dump(llvm::errs());
