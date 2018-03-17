@@ -119,9 +119,12 @@ class CommandOutput {
   /// DerivedOutputFileMap.
   llvm::SmallSet<types::ID, 4> AdditionalOutputTypes;
 
-  /// The set of input filenames for this \c CommandOutput; combined with \c
-  /// DerivedOutputMap, specifies a set of output filenames (of which one -- the
-  /// one of type \c PrimaryOutputType) is the primary output filename.
+  /// The list of inputs for this \c CommandOutput. Each input in the list has
+  /// two names (often but not always the same), of which the second (\c
+  /// CommandInputPair::Primary) acts as a key into \c DerivedOutputMap.  Each
+  /// input thus designates an associated _set_ of outputs, one of which (the
+  /// one of type \c PrimaryOutputType) is considered the "primary output" for
+  /// the input.
   SmallVector<CommandInputPair, 1> Inputs;
 
   /// All CommandOutputs in a Compilation share the same \c
