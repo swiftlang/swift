@@ -3238,8 +3238,6 @@ namespace {
       Optional<ProtocolConformanceRef> Conformance;
     };
 
-    SmallVector<FillOp, 8> FillOps;
-
   protected:
     using super::IGM;
     using super::asImpl;
@@ -3301,33 +3299,6 @@ namespace {
       // Allocate the metadata.
       llvm::Value *metadata =
         asImpl().emitAllocateMetadata(IGF, descriptor, args, templatePointer);
-
-      // Execute the fill ops. Cast the parameters to word pointers because the
-      // fill indexes are word-indexed.
-      auto *metadataWords =
-        IGF.Builder.CreateBitCast(metadata, IGM.Int8PtrPtrTy);
-
-      auto genericReqtOffset = IGM.getNominalMetadataLayout(Target)
-          .getGenericRequirementsOffset(IGF);
-
-      for (auto &fillOp : FillOps) {
-        llvm::Value *value;
-        if (fillOp.Conformance) {
-          value = emitWitnessTableRef(IGF, fillOp.Type, *fillOp.Conformance);
-        } else {
-          value = IGF.emitTypeMetadataRef(fillOp.Type);
-        }
-
-        auto dest = IGF.emitAddressAtOffset(metadataWords, genericReqtOffset,
-                                            IGM.Int8PtrTy,
-                                            IGM.getPointerAlignment());
-
-        value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
-        IGF.Builder.CreateStore(value, dest);
-
-        genericReqtOffset = genericReqtOffset.offsetBy(
-            IGF, IGM.getPointerSize());
-      }
 
       IGF.Builder.CreateRet(metadata);
     }
@@ -3491,10 +3462,6 @@ namespace {
     }
 
     void emitInstantiationDefinitions() {
-      // Register fill ops for all the immediate type arguments.
-      // This must happen before we emit the instantiation function below.
-      asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
-
       // Force the emission of the nominal type descriptor, although we
       // don't use it yet.
       (void) asImpl().emitNominalTypeDescriptor();
@@ -3508,17 +3475,6 @@ namespace {
 
       // Emit the instantiation cache.
       asImpl().emitInstantiationCache();
-    }
-
-    template <class... T>
-    void addGenericArgument(CanType type, T &&...args) {
-      FillOps.push_back({type, None});
-    }
-
-    template <class... T>
-    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
-                                T &&...args) {
-      FillOps.push_back({type, conf});
     }
   };
 

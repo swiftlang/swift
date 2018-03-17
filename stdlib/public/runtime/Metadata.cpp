@@ -66,7 +66,19 @@
 using namespace swift;
 using namespace metadataimpl;
 
-static const size_t ValueTypeMetadataAddressPoint = sizeof(TypeMetadataHeader);
+/// Copy the generic arguments into place in a newly-allocated metadata.
+static void installGenericArguments(Metadata *metadata,
+                                    const TypeContextDescriptor *description,
+                                    const void *arguments) {
+  auto &generics = description->getFullGenericContextHeader();
+
+  // If we ever have parameter packs, we may need to do more than just
+  // copy here.
+  memcpy(reinterpret_cast<const void **>(metadata)
+           + description->getGenericArgumentOffset(),
+         reinterpret_cast<const void * const *>(arguments),
+         generics.Base.getNumArguments() * sizeof(void*));
+}
 
 static ClassMetadataBounds
 computeMetadataBoundsForSuperclass(const void *ref,
@@ -404,6 +416,9 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
 
   assert(metadata->isTypeMetadata());
 
+  // Copy the generic arguments into place.
+  installGenericArguments(metadata, description, arguments);
+
   return metadata;
 }
 
@@ -465,6 +480,9 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
   initializeValueMetadataFromPattern(metadata, description, pattern);
+
+  // Copy the generic arguments into place.
+  installGenericArguments(metadata, description, arguments);
 
   return metadata;
 }
