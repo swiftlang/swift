@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
@@ -377,8 +378,11 @@ namespace {
   class PromotableMemoryFinder {
     SmallVectorImpl<SILGlobalVariable*> &globals;
     SmallVectorImpl<AllocStackInst*> &stackAllocs;
-    SmallPtrSet<SILInstruction*, 32> visited;
+    SmallPtrSet<SILInstruction*, 32> visitedUpward;
+    SmallPtrSet<SILValue, 32> visitedDownward;
+
     SmallVector<GlobalAddrInst*, 8> globalAddrs;
+    TypeContainsTensorHandle tcth;
   public:
 
     PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
@@ -388,7 +392,9 @@ namespace {
     void run(ArrayRef<BuiltinInst*> tensorOps);
   private:
     void findPromotableMemoryFromValue(SILValue value);
-    void findPromotableMemoryFromLoadedAddress(SILValue pointer);
+    void findPromotableMemoryFromResult(SILValue value);
+    void findPromotableMemoryFromAccessedAddress(SILValue pointer,
+                                                 bool isUpward);
   };
 } // end anonymous namespace
 
@@ -399,9 +405,19 @@ namespace {
 void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
 
+  // The StackAllocs list can end up with duplicates, make sure to remove them
+  // when we are done collecting them.
+  SWIFT_DEFER {
+    llvm::array_pod_sort(stackAllocs.begin(), stackAllocs.end());
+    stackAllocs.erase(std::unique(stackAllocs.begin(), stackAllocs.end()),
+                      stackAllocs.end());
+  };
+
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands())
       findPromotableMemoryFromValue(operand.get());
+    for (auto result : op->getResults())
+      findPromotableMemoryFromResult(result);
   }
 
   // If we found any global variables, scan the function once to collect all of
@@ -452,8 +468,7 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
         // Take an extremely conservative approach to handling accesses of the
         // global, whitelisting specific sorts of uses.  If we find anything
         // we can't handle, we abort promotion of this global.
-        if (isa<LoadInst>(user) || // Loads don't provide a value.
-            isa<EndAccessInst>(user)) // Just a marker.
+        if (isa<EndAccessInst>(user)) // Just a marker.
           continue;
 
         // Anything that dives into an element of the global can continue to
@@ -467,6 +482,12 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
             findPromotableMemoryFromValue(si->getOperand(0));
             continue;
           }
+        }
+
+        // If this is a load from the global, analyze its uses.
+        if (auto *load = dyn_cast<LoadInst>(user)) {
+          findPromotableMemoryFromResult(load);
+          continue;
         }
 
         // If this is a begin_access instruction, then it is a projection/copy
@@ -510,14 +531,14 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
 
 
 
-/// Scan the def-use chains of the specified operand value, looking through
-/// operations that we can deabstract.  If we find stack allocations along the
-/// way, add them to our set.
+/// Scan upward through the def-use chains of the specified operand value,
+/// looking through operations that we can deabstract.  If we find stack
+/// allocations along the way, add them to our set.
 void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // If we found a non-instruction operand, or an instruction we've already
   // visited, then we're done scanning it.
   auto *inst = value->getDefiningInstruction();
-  if (!inst || !visited.insert(inst).second)
+  if (!inst || !visitedUpward.insert(inst).second)
     return;
 
   // If this is one of the instructions we can deabstract by scalarizing, just
@@ -532,15 +553,49 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
   if (auto *load = dyn_cast<LoadInst>(inst))
-    findPromotableMemoryFromLoadedAddress(load->getOperand());
+    findPromotableMemoryFromAccessedAddress(load->getOperand(),
+                                            /*isUpward*/true);
 }
 
-/// The specific pointer is being loaded by a tensor operation.  Recursively
-/// process the pointer - if it is to a stack allocation that we can deabstract,
-/// then recursively process any stores into it as values that feed the tensor
-/// operation.
+/// Scan downward through the def-use chains of the result of an op result,
+/// looking for stores of the tensor handle value into memory.  If we find them,
+/// they could lead to retain and release uses, so we need to deabstract through
+/// those to avoid extraneous host copies.
+void PromotableMemoryFinder::findPromotableMemoryFromResult(SILValue value) {
+  // Don't reprocess values more than once.
+  if (!visitedDownward.insert(value).second)
+    return;
+
+  // If we found something that doesn't contain a tensor, then we're done.  This
+  // happens when walking down through a struct extract of a non-tensor field
+  // from a struct that contains a tensor and other stuff.
+  if (!tcth.containsTensorHandle(value->getType().getSwiftRValueType()))
+    return;
+
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (auto *store = dyn_cast<StoreInst>(user))
+      findPromotableMemoryFromAccessedAddress(store->getDest(),
+                                              /*isUpward*/false);
+    auto *inst = dyn_cast<SingleValueInstruction>(user);
+    if (!inst) continue;
+
+    if (isa<StructInst>(inst) || isa<TupleInst>(inst))
+      findPromotableMemoryFromResult(inst);
+    if (isa<StructExtractInst>(inst) || isa<TupleExtractInst>(inst))
+      findPromotableMemoryFromResult(inst);
+  }
+}
+
+/// The specific pointer is being loaded (if 'isUpward' is true) or store (if
+/// false) by a tensor operation operand/result.  Recursively process the
+/// pointer - if it is to a stack allocation that we can deabstract,
+/// then recursively process any load/stores into it as values that feed the
+/// tensor operation.
 void PromotableMemoryFinder::
-findPromotableMemoryFromLoadedAddress(SILValue pointer) {
+findPromotableMemoryFromAccessedAddress(SILValue pointer, bool isUpward) {
+  bool isDownward = !isUpward;
+
   while (isa<TupleElementAddrInst>(pointer) ||
          isa<StructElementAddrInst>(pointer) ||
          isa<BeginAccessInst>(pointer)) {
@@ -557,9 +612,12 @@ findPromotableMemoryFromLoadedAddress(SILValue pointer) {
   // If the base of the pointer is something other than a stack allocation or if
   // we already processed this, then we're done.
   auto *alloc = dyn_cast<AllocStackInst>(pointer);
-  if (!alloc || !visited.insert(alloc).second) return;
+  if (!alloc ||
+      (isUpward && !visitedUpward.insert(alloc).second) ||
+      (isDownward && !visitedDownward.insert(pointer).second))
+    return;
 
-  // Ok, we can handle this, remember it.
+  // Ok, this is a stack allocation we want to promote, remember it.
   stackAllocs.push_back(alloc);
 
   // Walk the use-def chains of the allocation, finding any stores that feed
@@ -573,22 +631,38 @@ findPromotableMemoryFromLoadedAddress(SILValue pointer) {
     for (auto result : inst->getResults())
       for (auto use : result->getUses()) {
         auto *user = use->getUser();
-        // If we bottomed out with a store instruction, and if the store is *to*
-        // the alloc then we can recursively process the value stored into it.
-        // Otherwise we keep chasing uses.
+        // If we found a store instruction on the upward pass, and if the store
+        // is *to* the alloc then we can recursively process the value stored
+        // into it.
         if (auto *store = dyn_cast<StoreInst>(user)) {
           // If this is a store *to* the address, then process the stored value
           // as an input.
-          if (use->getOperandNumber() == 1)
+          if (isUpward && use->getOperandNumber() == 1)
             findPromotableMemoryFromValue(store->getSrc());
           continue;
         }
 
-        // If we bottomed out with a copy_addr into this address, then this is
-        // a load of the other operand.
+        // If we found a load instruction on the downward pass, then we can
+        // recursively process uses of the load.
+        if (auto *load = dyn_cast<LoadInst>(user)) {
+          if (isDownward)
+            findPromotableMemoryFromResult(load);
+          continue;
+        }
+
+        // copy_addr's are a load+store pair.
         if (auto *copyaddr = dyn_cast<CopyAddrInst>(user)) {
-          if (use->getOperandNumber() == 1)
-            findPromotableMemoryFromLoadedAddress(copyaddr->getSrc());
+          // If we found a copy_addr from this address during a downward scan,
+          // then this is a store of the other operand.
+          if (isDownward && use->getOperandNumber() == 0)
+            findPromotableMemoryFromAccessedAddress(copyaddr->getDest(),
+                                                    /*false*/isUpward);
+
+          // If we found a copy_addr into this address during an upward scan,
+          // then this is a load of the other operand.
+          if (isUpward && use->getOperandNumber() == 1)
+            findPromotableMemoryFromAccessedAddress(copyaddr->getSrc(),
+                                                    /*true*/isUpward);
         }
 
         // If this is the original allocation or an SRoA'able projection of its
