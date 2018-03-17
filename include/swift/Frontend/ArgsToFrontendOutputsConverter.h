@@ -130,10 +130,7 @@ private:
   /// \Return a set of supplementary output paths for each input that might
   /// produce supplementary outputs, or None to signal an error.
   /// \note
-  /// At present, only one input can produce supplementary outputs, but
-  /// in the future, batch-mode will support multiple primary inputs and thus,
-  /// multiple sets of supplementary outputs. This function is written with that
-  /// future in mind.
+  /// Batch-mode supports multiple primary inputs.
   /// \par
   /// The paths are derived from arguments
   /// such as -emit-module-path. These are not the final computed paths,
@@ -144,6 +141,11 @@ private:
   /// arguments become burdensome.
   Optional<std::vector<SupplementaryOutputPaths>>
   getSupplementaryOutputPathsFromArguments() const;
+
+  /// Read a supplementary output file map file.
+  /// \returns `None` if it could not open the file map.
+  Optional<std::vector<SupplementaryOutputPaths>>
+  readSupplementaryOutputFileMap() const;
 
   /// Given an ID corresponding to supplementary output argument
   /// (e.g. -emit-module-path), collect all such paths, and ensure

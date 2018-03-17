@@ -19,11 +19,10 @@
 #include <functional>
 
 namespace swift {
-namespace driver {
 namespace types {
   enum ID : uint8_t {
 #define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) TY_##ID,
-#include "swift/Driver/Types.def"
+#include "swift/Frontend/Types.def"
 #undef TYPE
     TY_INVALID
   };
@@ -62,13 +61,12 @@ namespace types {
   template <typename Fn>
   void forAllTypes(const Fn &fn);
 } // end namespace types
-} // end namespace driver
 } // end namespace swift
 
 namespace llvm {
   template<>
-  struct DenseMapInfo<swift::driver::types::ID> {
-    using ID = swift::driver::types::ID;
+  struct DenseMapInfo<swift::types::ID> {
+    using ID = swift::types::ID;
     static inline ID getEmptyKey() {
       return ID::TY_INVALID;
     }
@@ -85,7 +83,7 @@ namespace llvm {
 }
 
 template <typename Fn>
-void swift::driver::types::forAllTypes(const Fn &fn) {
+void swift::types::forAllTypes(const Fn &fn) {
   static_assert(std::is_constructible<std::function<void(types::ID)>,Fn>::value,
                 "must have the signature 'void(types::ID)'");
   for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)
