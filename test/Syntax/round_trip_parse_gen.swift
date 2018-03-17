@@ -9,6 +9,8 @@
 // RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t/serialized.json -output-filename %t/output.swift
 // RUN: diff -u %s %t/output.swift
 
+// REQUIRES: rdar38567449
+
 import ABC
 import A.B.C
 @objc import A.B
