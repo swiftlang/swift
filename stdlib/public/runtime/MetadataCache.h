@@ -53,6 +53,7 @@ public:
   StaticOwningPointer &operator=(const StaticOwningPointer &) = delete;
   ~StaticOwningPointer() { delete Ptr; }
 
+  T &operator*() const { return *Ptr; }
   T *operator->() const { return Ptr; }
 };
 
@@ -64,6 +65,7 @@ public:
   StaticOwningPointer(const StaticOwningPointer &) = delete;
   StaticOwningPointer &operator=(const StaticOwningPointer &) = delete;
 
+  T &operator*() const { return *Ptr; }
   T *operator->() const { return Ptr; }
 };
 
@@ -78,85 +80,48 @@ enum class ConcurrencyRequest {
   NotifyAll,
 };
 
+struct ConcurrencyControl {
+  Mutex Lock;
+  ConditionVariable Queue;
+};
+
 /// A map for which there is a phase of initialization that is guaranteed
 /// to be performed exclusively.
 ///
 /// In addition to the requirements of ConcurrentMap, the entry type must
 /// provide the following members:
 ///
-///   /// An encapsulation of the status of the entry.
+///   /// An encapsulation of the status of the entry.  The result type
+///   /// of most operations.
 ///   using Status = ...;
 ///
-///   /// Check the current status of the entry.  If 'locked' is true,
-///   /// the entry's lock is held.
-///   Status checkStatus(bool locked, ArgTys...);
+///   /// Given that this is not the thread currently responsible for
+///   /// initializing the entry, wait for the entry to complete.
+///   Status await(ConcurrencyControl &concurrency, ArgTys...);
 ///
-///   /// Given the current status of an entry, decide whether we should
-///   /// block for the given request.
-///   bool shouldWait(Status status, ArgTys...);
+///   /// Perform allocation.  If this returns a status, initialization
+///   /// is skipped.
+///   Optional<Status>
+///   beginAllocation(ConcurrencyControl &concurrency, ArgTys...);
 ///
-///   /// Prepare to wait for the given request.  The lock is held.
-///   /// If this returns false, the wait is cancelled.
-///   bool prepareToWaitWithLock(Status status, ArgTys...);
+///   /// Attempt to initialize an entry.  This is called once for the entry,
+///   /// immediately after construction, by the thread that successfully
+///   /// constructed the entry.
+///   Status beginInitialization(ConcurrencyControl &concurrency, ArgTys...);
 ///
-///   /// An encapsulation of the result of allocation.
-///   using AllocationResult = ...;
+///   /// Attempt to resume initializing an entry.  Only one thread will be
+///   /// trying this at once.  This only need to be implemented if
+///   /// resumeInitialization is called on the map.
+///   Status resumeInitialization(ConcurrencyControl &concurrency, ArgTys...);
 ///
-///   /// Perform allocation.  The lock is not held.
-///   std::pair<AllocationResult, ConcurrencyRequest>
-///   beginAllocation(ArgTys...);
-///
-///   /// Finish allocation.  The lock is held.  This is only called
-///   /// if beginAllocation requests it by returning AcquireLockAndCallBack.
-///   ///
-///   /// If this returns true, all waiters on the condition variable will
-///   /// be notified.
-///   bool finishAllocationWithLock(AllocationResult);
-///
-///   /// An encapsulation of the result of initialization.
-///   using InitializationResult = ...;
-///
-///   /// Attempt to initialize an entry.  The entry's lock is not held,
-///   /// but only one thread will be trying this at once.  This is called
-///   /// once for the entry, immediately after construction, by the thread
-///   /// that successfully constructed the entry.
-///   std::pair<InitializationResult, ConcurrencyRequest>
-///   beginInitialization(ArgTys...);
-///
-///   /// Attempt to resume initializing an entry.  The entry's lock is
-///   /// not held, but only one thread will be trying this at once.
-///   /// This only need to be implemented if resumeInitialization is
-///   /// called on the map.
-///   std::pair<InitializationResult, ConcurrencyRequest>
-///   resumeInitialization(ArgTys...);
-///
-///   /// Perform a final phase of initialization with the entry's lock
-///   /// acquired.  This is only performed if beginInitialization or
-///   /// resumeInitialization requests it by returning AcquireLockAndCallBack.
-///   ///
-///   /// If this returns true, all waiters on the condition variable will
-///   /// be notified.
-///   bool finishInitializationWithLock(InitializationResult &result);
-///
-///   /// Conclude an initialization attempt.  The entry's lock is not held.
-///   /// This is called after finishInitializationWithLock.
-///   Status finishInitialization(InitializationResult &result,
-///                                   ConcurrencyRequest request);
-///
-///   /// Perform an "enqueueWithLock" operation.  The entry's lock is held.
+///   /// Perform an enqueue operation.
 ///   /// This only needs to be implemented if enqueue is called on the map.
-///   bool enqueueWithLock(ArgTys...);
+///   bool enqueueWithLock(ConcurrencyControl &concurrency, ArgTys...);
 template <class EntryType, bool ProvideDestructor = true>
 class LockingConcurrentMap {
   ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
 
-  struct ConcurrencyControl {
-    Mutex Lock;
-    ConditionVariable Queue;
-  };
-
   using Status = typename EntryType::Status;
-  using InitializationResult = typename EntryType::InitializationResult;
 
   StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
 public:
@@ -164,93 +129,156 @@ public:
 
   MetadataAllocator &getAllocator() { return Map.getAllocator(); }
 
-  template <class KeyType, class... ExtraArgTys>
+  template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
-  getOrInsert(KeyType key, ExtraArgTys &&...extraArgs) {
-    auto result = Map.getOrInsert(key, extraArgs...);
+  getOrInsert(KeyType key, ArgTys &&...args) {
+    auto result = Map.getOrInsert(key, args...);
     auto entry = result.first;
 
-    // If we are not inserting the entry, we need to check whether the entry
+    // If we are not inserting the entry, we need to potentially block on 
     // currently satisfies our conditions.
     if (!result.second) {
-      // Check status without the lock, just in case we're already in an
-      // acceptable state.
-      Status status = entry->checkStatus(false, extraArgs...);
-      if (!entry->shouldWait(status, extraArgs...)) {
-        return { entry, std::move(status) };
-      }
-
-      // Check status with the lock and potentially block this thread.
-      // FIXME: priority inversion?
-      // TODO: Try to steal work from other threads instead of letting
-      //   some other thread do all the work.
-      Concurrency->Lock.withLockOrWait(Concurrency->Queue, [&] {
-        status = entry->checkStatus(true, extraArgs...);
-        bool shouldWait = entry->shouldWait(status, extraArgs...);
-        if (shouldWait)
-          shouldWait = entry->prepareToWaitWithLock(status, extraArgs...);
-        return !shouldWait;
-      });
-
-      return { entry, std::move(status) };
+      auto status =
+        entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+      return { entry, status };
     }
 
-    // Okay, we inserted.  We own the right to initialize the entry.
-    // Eagerly try to initialize it.
-    auto allocationResult = entry->beginAllocation(extraArgs...);
-    if (allocationResult.second == ConcurrencyRequest::AcquireLockAndCallBack) {
-      // Notify anyone who might be waiting.
-      Concurrency->Lock.withLock([&] {
-        if (entry->finishAllocationWithLock(allocationResult.first))
-          Concurrency->Queue.notifyAll();
-      });
-    } else if (allocationResult.second == ConcurrencyRequest::NotifyAll) {
-      Concurrency->Queue.notifyAll();
+    // Okay, we inserted.  We are responsible for allocating and
+    // subsequently trying to initialize the entry.
+
+    // Allocation.  This can fast-path and bypass initialization by returning
+    // a status.
+    if (auto status = entry->beginAllocation(*Concurrency, args...)) {
+      return { entry, *status };
     }
 
-    auto initResult =
-      entry->beginInitialization(std::forward<ExtraArgTys>(extraArgs)...);
-    return finishInitialization(entry, std::move(initResult));
+    // Initialization.
+    auto status = entry->beginInitialization(*Concurrency,
+                                             std::forward<ArgTys>(args)...);
+    return { entry, status };
   }
 
-  template <class KeyType, class... ExtraArgTys>
+  template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
-  resumeInitialization(KeyType key, ExtraArgTys &&...extraArgs) {
+  resumeInitialization(KeyType key, ArgTys &&...args) {
     auto entry = Map.find(key);
     assert(entry && "entry doesn't already exist!");
 
-    auto initResult =
-      entry->resumeInitialization(std::forward<ExtraArgTys>(extraArgs)...);
-    return finishInitialization(entry, std::move(initResult));
+    auto status =
+      entry->resumeInitialization(*Concurrency, std::forward<ArgTys>(args)...);
+    return { entry, status };
   }
 
-  template <class KeyType, class... ExtraArgTys>
-  bool enqueue(KeyType key, ExtraArgTys &&...extraArgs) {
+  template <class KeyType, class... ArgTys>
+  bool enqueue(KeyType key, ArgTys &&...args) {
     auto entry = Map.find(key);
     assert(entry && "entry doesn't already exist!");
 
-    return Concurrency->Lock.withLock([&] {
-      return entry->enqueueWithLock(std::forward<ExtraArgTys>(extraArgs)...);
+    return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+};
+
+/// A base class for metadata cache entries which supports an unfailing
+/// one-phase allocation strategy.
+///
+/// In addition to the requirements of ConcurrentMap, subclasses should
+/// provide:
+///
+///   /// Allocate the cached entry.  This is not allowed to fail.
+///   ValueType allocate(ArgTys...);
+template <class Impl, class ValueType>
+class SimpleLockingCacheEntryBase {
+  static_assert(std::is_pointer<ValueType>::value,
+                "value type must be a pointer type");
+
+  static const uintptr_t Empty_NoWaiters = 0;
+  static const uintptr_t Empty_HasWaiters = 1;
+  static bool isSpecialValue(uintptr_t value) {
+    return value <= Empty_HasWaiters;
+  }
+
+  std::atomic<uintptr_t> Value;
+
+protected:
+  Impl &asImpl() { return static_cast<Impl &>(*this); }
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
+
+  SimpleLockingCacheEntryBase() : Value(Empty_NoWaiters) {}
+
+public:
+  using Status = ValueType;
+
+  template <class... ArgTys>
+  Status await(ConcurrencyControl &concurrency, ArgTys &&...args) {
+    // Load the value.  If this is not a special value, we're done.
+    auto value = Value.load(std::memory_order_acquire);
+    if (!isSpecialValue(value)) {
+      return reinterpret_cast<ValueType>(value);
+    }
+
+    // The initializing thread will try to atomically swap in a valid value.
+    // It can do that while we're holding the lock.  If it sees that there
+    // aren't any waiters, it will not acquire the lock and will not try
+    // to notify any waiters.  If it does see that there are waiters, it will
+    // acquire the lock before notifying them in order to ensure that it
+    // catches them all.  On the waiter side, we must set the has-waiters
+    // flag while holding the lock.  This is because we otherwise can't be
+    // sure that we'll have started waiting before the initializing thread
+    // notifies the queue.
+    //
+    // We're adding a bit of complexity here for the advantage that, in the
+    // absence of early contention, we never touch the lock at all.
+    concurrency.Lock.withLockOrWait(concurrency.Queue, [&] {
+      // Reload the current value.
+      value = Value.load(std::memory_order_acquire);
+
+      // If the value is still no-waiters, try to flag that
+      // there's a waiter.  If that succeeds, we can go ahead and wait.
+      if (value == Empty_NoWaiters &&
+          Value.compare_exchange_strong(value, Empty_HasWaiters,
+                                        std::memory_order_relaxed,
+                                        std::memory_order_acquire))
+        return false; // wait
+
+      assert(value != Empty_NoWaiters);
+
+      // If the value is already in the has-waiters state, we can go
+      // ahead and wait.
+      if (value == Empty_HasWaiters)
+        return false; // wait
+
+      // Otherwise, the initializing thread has finished, and we must not wait.
+      return true;
     });
+
+    return reinterpret_cast<ValueType>(value);
   }
 
-private:
-  std::pair<EntryType*, Status>
-  finishInitialization(EntryType *entry,
-                       std::pair<InitializationResult,
-                                 ConcurrencyRequest> &&result) {
-    if (result.second == ConcurrencyRequest::AcquireLockAndCallBack) {
-      // Notify anyone who might be waiting.
-      Concurrency->Lock.withLock([&] {
-        if (entry->finishInitializationWithLock(result.first))
-          Concurrency->Queue.notifyAll();
-      });
-    } else if (result.second == ConcurrencyRequest::NotifyAll) {
-      Concurrency->Queue.notifyAll();
+  template <class... ArgTys>
+  Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+                                   ArgTys &&...args) {
+    // Delegate to the implementation class.
+    ValueType origValue = asImpl().allocate(std::forward<ArgTys>(args)...);
+
+    auto value = reinterpret_cast<uintptr_t>(origValue);
+    assert(!isSpecialValue(value) && "allocate returned a special value");
+
+    // Publish the value.
+    auto oldValue = Value.exchange(value, std::memory_order_release);
+    assert(isSpecialValue(oldValue));
+
+    // If there were any waiters, acquire the lock and notify the queue.
+    if (oldValue != Empty_NoWaiters) {
+      concurrency.Lock.withLockThenNotifyAll(concurrency.Queue, []{});
     }
 
-    return { entry, entry->finishInitialization(std::move(result.first),
-                                                result.second) };
+    return origValue;
+  }
+
+  template <class... ArgTys>
+  Status beginInitialization(ConcurrencyControl &concurrency,
+                             ArgTys &&...args) {
+    swift_runtime_unreachable("beginAllocation always short-circuits");
   }
 };
 
@@ -362,125 +390,116 @@ public:
   }
 };
 
-enum class MetadataState : uint8_t {
-  /// The metadata is being allocated.
-  Allocating,
+class MetadataState {
+public:
+  using RawType = uint8_t;
 
-  /// The metadata is being allocated, and there are threads waiting for it.
-  AllocatingWithWaiters,
+  enum BasicKind : RawType {
+    /// The metadata is being allocated.
+    Allocating,
 
-  /// The metadata has been allocated, but is not yet complete for
-  /// external layout: that is, it does not have a size.
-  Abstract,
-  AbstractWithWaiters,
+    /// The metadata has been allocated, but is not yet complete for
+    /// external layout: that is, it does not have a size.
+    Abstract,
 
-  /// The metadata has a complete external layout, but may not have
-  /// been fully initialized.
-  LayoutComplete,
-  LayoutCompleteWithWaiters,
+    /// The metadata has a complete external layout, but may not have
+    /// been fully initialized.
+    LayoutComplete,
 
-  /// The metadata has a complete external layout and has been fully
-  /// initialized.  There should no longer be waiters.
-  Complete
+    /// The metadata has a complete external layout and has been fully
+    /// initialized.  There should no longer be waiters.
+    Complete
+  };
+
+private:
+  enum : RawType {
+    BasicKindMask = 0x3,
+    HasWaiters = 0x4
+  };
+
+  uint8_t Data;
+
+public:
+  explicit MetadataState(RawType data) : Data(data) {}
+  /*implicit*/ MetadataState(BasicKind kind) : Data(kind) {}
+
+  BasicKind getBasicKind() const {
+    return BasicKind(Data & BasicKindMask);
+  }
+
+  /// Does the state mean that we've allocated metadata?
+  bool hasAllocatedMetadata() const {
+    return getBasicKind() != Allocating;
+  }
+
+  bool isComplete() const {
+    return getBasicKind() == Complete;
+  }
+
+  bool hasWaiters() const { return Data & HasWaiters; }
+  MetadataState addWaiters() const {
+    assert(!isComplete() && "adding waiters to completed state");
+    return MetadataState(Data | HasWaiters);
+  }
+  MetadataState removeWaiters() const {
+    return MetadataState(Data & ~HasWaiters);
+  }
+
+  MetadataRequest::BasicKind getAccomplishedRequestState() const {
+    switch (getBasicKind()) {
+    case Allocating:
+      swift_runtime_unreachable("cannot call on allocating state");
+    case Abstract:
+      return MetadataRequest::Abstract;
+    case LayoutComplete:
+      return MetadataRequest::LayoutComplete;
+    case Complete:
+      return MetadataRequest::Complete;
+    }
+    swift_runtime_unreachable("bad state");
+  }
+
+  static MetadataState forRequestState(MetadataRequest::BasicKind state) {
+    switch (state) {
+    case MetadataRequest::Abstract:
+      return Abstract;
+    case MetadataRequest::LayoutComplete:
+      return LayoutComplete;
+    case MetadataRequest::Complete:
+      return Complete;
+    }
+    swift_runtime_unreachable("bad state");    
+  }
+
+  bool satisfies(MetadataRequest::BasicKind requirement) {
+    switch (requirement) {
+    case MetadataRequest::Abstract:
+      return getBasicKind() >= Abstract;
+    case MetadataRequest::LayoutComplete:
+      return getBasicKind() >= LayoutComplete;
+    case MetadataRequest::Complete:
+      return getBasicKind() >= Complete;
+    }
+    swift_runtime_unreachable("unsupported requirement kind");
+  }
+
+  bool shouldWait(MetadataRequest request) {
+    // Always wait if we're allocating.  Non-blocking requests still need
+    // to have an allocation that the downstream consumers can report
+    // a dependency on.
+    if (getBasicKind() == Allocating)
+      return true;
+
+    // Otherwise, if it's a non-blocking request, we do not need to block.
+    if (request.isNonBlocking())
+      return false;
+
+    return !satisfies(request.getBasicKind());
+  }
+
+  RawType getRawValue() const { return Data; }
+  RawType &getRawValueRef() { return Data; }
 };
-inline bool operator<=(MetadataState lhs, MetadataState rhs) {
-  return unsigned(lhs) <= unsigned(rhs);
-}
-inline bool operator>=(MetadataState lhs, MetadataState rhs) {
-  return unsigned(lhs) >= unsigned(rhs);
-}
-
-inline MetadataState
-getMetadataStateForRequestState(MetadataRequest::BasicKind state) {
-  switch (state) {
-  case MetadataRequest::Abstract:
-    return MetadataState::Abstract;
-  case MetadataRequest::LayoutComplete:
-    return MetadataState::LayoutComplete;
-  case MetadataRequest::Complete:
-    return MetadataState::Complete;
-  }
-  swift_runtime_unreachable("bad state");
-}
-
-inline bool satisfies(MetadataState state,
-                      MetadataRequest::BasicKind requirement) {
-  switch (requirement) {
-  case MetadataRequest::Abstract:
-    return state >= MetadataState::Abstract;
-  case MetadataRequest::LayoutComplete:
-    return state >= MetadataState::LayoutComplete;
-  case MetadataRequest::Complete:
-    return state >= MetadataState::Complete;
-  }
-  swift_runtime_unreachable("unsupported requirement kind");
-}
-
-inline bool shouldWait(MetadataState state, MetadataRequest request) {
-  // Always wait if we're allocating.  Non-blocking requests still need
-  // to have an allocation that the downstream consumers can report
-  // a dependency on.
-  if (state == MetadataState::Allocating)
-    return true;
-
-  // Otherwise, if it's a non-blocking request, we do not need to block.
-  if (request.isNonBlocking())
-    return false;
-
-  return !satisfies(state, request.getBasicKind());
-}
-
-/// Does the given metadata state say that there are other threads or
-/// metadata waiting for the metadata to advance?
-inline bool hasWaiters(MetadataState state) {
-  switch (state) {
-  case MetadataState::Allocating:
-  case MetadataState::Abstract:
-  case MetadataState::LayoutComplete:
-  case MetadataState::Complete:
-    return false;
-
-  case MetadataState::AllocatingWithWaiters:
-  case MetadataState::AbstractWithWaiters:
-  case MetadataState::LayoutCompleteWithWaiters:
-    return true;
-  }
-  swift_runtime_unreachable("bad kind");
-}
-
-inline MetadataState addWaiters(MetadataState state) {
-  switch (state) {
-  case MetadataState::Allocating:
-  case MetadataState::AllocatingWithWaiters:
-    return MetadataState::AllocatingWithWaiters;
-  case MetadataState::Abstract:
-  case MetadataState::AbstractWithWaiters:
-    return MetadataState::AbstractWithWaiters;
-  case MetadataState::LayoutComplete:
-  case MetadataState::LayoutCompleteWithWaiters:
-    return MetadataState::LayoutCompleteWithWaiters;
-  case MetadataState::Complete:
-    return MetadataState::Complete;
-  }
-  swift_runtime_unreachable("bad kind");
-}
-
-inline MetadataState removeWaiters(MetadataState state) {
-  switch (state) {
-  case MetadataState::Allocating:
-  case MetadataState::AllocatingWithWaiters:
-    return MetadataState::Allocating;
-  case MetadataState::Abstract:
-  case MetadataState::AbstractWithWaiters:
-    return MetadataState::Abstract;
-  case MetadataState::LayoutComplete:
-  case MetadataState::LayoutCompleteWithWaiters:
-    return MetadataState::LayoutComplete;
-  case MetadataState::Complete:
-    return MetadataState::Complete;
-  }
-  swift_runtime_unreachable("bad kind");
-}
 
 struct MetadataCompletionQueueEntry {
   /// The metadata whose completion is blocked.
@@ -550,7 +569,7 @@ public:
   using ValueType = Metadata *;
   struct Status {
     ValueType Value;
-    MetadataState State;
+    MetadataRequest::BasicKind State;
   };
 
 protected:
@@ -578,20 +597,20 @@ private:
   /// What kind of data is stored in the LockedStorage field below?
   ///
   /// This is only ever modified under the lock.
-  enum class LSK {
+  enum class LSK : uint8_t {
     AllocatingThread,
     CompletionQueue,
   };
   LSK LockedStorageKind;
 
-  /// Does this entry have a value, or is it currently undergoing
-  /// initialization?
+  /// The current state of this metadata cache entry.
   ///
-  /// This (and the following field) can be modified while not under the lock,
-  /// but the change from Allocating to Abstract happens under the lock.
-  std::atomic<MetadataState> State;
+  /// This has to be stored as a MetadataState::RawType instead of a
+  /// MetadataState because some of our targets don't support interesting
+  /// structs as atomic types.
+  std::atomic<MetadataState::RawType> State;
 
-  /// Valid if State >= MetadataState::Abstract.
+  /// Valid if State.getBasicKind() >= MetadataState::Abstract.
   ValueType Value;
 
   /// Additional storage that is only ever accessed under the lock.
@@ -609,7 +628,7 @@ private:
 public:
   MetadataCacheEntryBase(const MetadataCacheKey &key)
       : Hash(key.Hash), KeyLength(key.KeyData.size()),
-        State(MetadataState::Allocating) {
+        State(MetadataState(MetadataState::Allocating).getRawValue()) {
     LockedStorageKind = LSK::AllocatingThread;
     LockedStorage.AllocatingThread = std::this_thread::get_id();
     memcpy(this->template getTrailingObjects<const void*>(),
@@ -646,183 +665,87 @@ public:
     }
   }
 
+  /// Given that this thread doesn't own the right to initialize the
+  /// metadata, await the metadata being in the right state.
   template <class... Args>
-  Status checkStatus(bool locked, Args &&...extraArgs) const {
-    auto state = State.load(std::memory_order_acquire);
-    if (state == MetadataState::Complete) {
-      return { Value, state };
+  Status await(ConcurrencyControl &concurrency, MetadataRequest request,
+               Args &&...extraArgs) {
+    auto state = MetadataState(State.load(std::memory_order_acquire));
+
+    if (state.shouldWait(request)) {
+      awaitSatisfyingState(concurrency, request, state);
     }
 
-    if (!locked && state >= MetadataState::Abstract) {
-      return { Value, state };
-    }
-
-    // As a QoI safe-guard against the simplest form of cyclic
-    // dependency, check whether this thread is the one responsible
-    // for allocating the metadata.
-    if (locked && isBeingAllocatedByCurrentThread()) {
-      fprintf(stderr,
-              "%s(%p): cyclic metadata dependency detected, aborting\n",
-              Impl::getName(), static_cast<const void*>(this));
-      abort();
-    }
-
-    // TODO: we should have all the information we need to check for a
-    // perfect cycle.
-
-    return { ValueType(), state };
+    assert(state.hasAllocatedMetadata());
+    return { Value, state.getAccomplishedRequestState() };
   }
 
+  /// The expected return type of allocate.
+  using AllocationResult = Status;
+
+  /// Perform the allocation operation.
   template <class... Args>
-  static bool shouldWait(const Status &status,
-                         MetadataRequest request, Args &&...extraArgs) {
-    return swift::shouldWait(status.State, request);
-  }
-
-  template <class... Args>
-  bool prepareToWaitWithLock(Status &status, Args &&...extraArgs) {
-    // Add the has-waiters bit to the current state.
-    auto oldState = status.State;
-    auto newState = addWaiters(oldState);
-
-    // If the current state doesn't already have that bit, try to set it.
-    while (oldState != newState &&
-           !State.compare_exchange_weak(oldState, newState,
-                                        std::memory_order_release,
-                                        std::memory_order_acquire)) {
-      // That can fail, and it might fail due to the state being updated
-      // to something we should no longer wait on.  In this case, update
-      // the status and abort the wait.
-      if (!shouldWait(status, extraArgs...)) {
-        assert(oldState >= MetadataState::Abstract);
-        status.State = oldState;
-        status.Value = Value;
-        return false;
-      }
-
-      // Otherwise, try again with whatever the new state is.
-      newState = addWaiters(oldState);
-    }
-
-    // Wait.
-    return true;
-  }
-
-  /// Publish a new metadata state, preserving the existence of waiters.
-  ///
-  /// This is the initializing thread.  The lock is not held.
-  void publishMetadataState(MetadataState &oldState,
-                            MetadataState &newState,
-                            bool &isCompleteAndHadWaiters) {
-    while (!State.compare_exchange_weak(oldState, newState,
-                                        std::memory_order_release,
-                                        std::memory_order_relaxed)) {
-      // If the exchange failed because we have waiters, remember
-      // that we have waiters in the new state.
-      if (hasWaiters(oldState)) {
-        if (newState == MetadataState::Complete) {
-          isCompleteAndHadWaiters = true;
-        } else {
-          newState = addWaiters(newState);
-        }
-      }
-    }
-  }
-
-  struct AllocationResult {
-    ValueType Value;
-    MetadataRequest::BasicKind State;
-  };
-
-  /// Allocate the metadata.
-  ///
-  /// This is the initializing thread.  The lock is not held.
-  template <class... Args>
-  std::pair<AllocationResult, ConcurrencyRequest>
-  beginAllocation(Args &&...args) {
+  Optional<Status>
+  beginAllocation(ConcurrencyControl &concurrency, Args &&...args) {
+    // Allocate the metadata.
     AllocationResult allocationResult =
       asImpl().allocate(std::forward<Args>(args)...);
 
     // Publish the value.
     Value = allocationResult.Value;
-    auto oldState = MetadataState::Allocating;
-    auto newState = getMetadataStateForRequestState(allocationResult.State);
-    bool isComplete = false;
-    publishMetadataState(oldState, newState, isComplete);
+    auto newState = MetadataState::forRequestState(allocationResult.State);
+    publishMetadataState(concurrency, newState);
 
-    return { allocationResult,
-             isComplete ? ConcurrencyRequest::NotifyAll
-                        : ConcurrencyRequest::None };
+    // If allocation gave us completed metadata, short-circuit initialization.
+    if (allocationResult.State == MetadataRequest::Complete) {
+      return Status{allocationResult.Value, allocationResult.State};
+    }
+
+    return None;
   }
-
-  /// Finish allocation with the lock held.  This is currently never called.
-  ///
-  /// This is the initializing thread.  The lock is held.
-  bool finishAllocationWithLock(AllocationResult result) {
-    swift_runtime_unreachable("never used");
-  }
-
-  struct InitializationResult {
-    MetadataCacheEntryBase::Status Status;
-    bool ShouldNotifyAll = false;
-    std::unique_ptr<MetadataCompletionQueueEntry> CompletionsToResume;
-  };
 
   /// Begin initialization immediately after allocation.
-  ///
-  /// This is the initializing thread.  The lock is not held.
   template <class... Args>
-  std::pair<InitializationResult, ConcurrencyRequest>
-  beginInitialization(Args &&...args) {
-    return initializeFromEntry(nullptr, std::forward<Args>(args)...);
+  Status beginInitialization(ConcurrencyControl &concurrency, Args &&...args) {
+    return doInitialization(concurrency, nullptr, std::forward<Args>(args)...);
   }
 
   /// Resume initialization after a previous failure resulted in the
   /// metadata being enqueued on another metadata cache.
   ///
-  /// This is the initializing thread.  The lock is not held.
-  ///
   /// We expect the first argument here to be of type
   /// std::unique_ptr<MetadataCompletionQueueEntry> &&.
   template <class... Args>
-  std::pair<InitializationResult, ConcurrencyRequest>
-  resumeInitialization(Args &&...args) {
-    return initializeFromEntry(std::forward<Args>(args)...);
+  Status resumeInitialization(ConcurrencyControl &concurrency, Args &&...args) {
+    return doInitialization(concurrency, std::forward<Args>(args)...);
   }
 
+protected:
+  /// The expected return type of tryInitialize.
   struct TryInitializeResult {
     MetadataRequest::BasicKind NewState;
     MetadataRequest::BasicKind DependencyRequirement;
     Metadata *Dependency;
   };
 
+private:
   /// Try to complete the metadata.
   ///
   /// This is the initializing thread.  The lock is not held.
   template <class... Args>
-  std::pair<InitializationResult, ConcurrencyRequest>
-  initializeFromEntry(std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                      Args &&...args) {
+  Status doInitialization(ConcurrencyControl &concurrency,
+                     std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
+                          MetadataRequest request,
+                          Args &&...args) {
     // We should always have fully synchronized with any previous threads
     // that were processing the initialization, so a relaxed load is fine
     // here.  (This ordering is achieved by the locking which occurs as part
     // of queuing and dequeuing metadata.)
-    auto origState = State.load(std::memory_order_relaxed);
-    assert(origState >= MetadataState::Abstract);
+    auto curState = MetadataState(State.load(std::memory_order_relaxed));
+    assert(curState.hasAllocatedMetadata());
+    assert(!curState.isComplete());
+
     auto value = Value;
-
-    std::pair<InitializationResult, ConcurrencyRequest> result;
-    result.first.Status.Value = value;
-    auto &curState = result.first.Status.State;
-    curState = origState;
-
-    // The state is only already in the initialized state in specific
-    // circumstances where allocation was able to put it into that state.
-    // In such a world, we don't need to do anything else.
-    if (origState == MetadataState::Complete) {
-      result.second = ConcurrencyRequest::None;
-      return result;
-    }
 
     // Figure out the completion context.
     MetadataCompletionContext scratchContext;
@@ -834,29 +757,43 @@ public:
       context = &scratchContext;
     }
 
-    bool isCompleteAndHadWaiters = false;
-
-    // Try the complete the metadata.  This only loops if completion
-    // doesn't succeed, but the new dependency is resolved when we go to
+    // Try the complete the metadata.  This only loops if initialization
+    // has a dependency, but the new dependency is resolved when we go to
     // add ourselves to its queue.
+    bool hasProgress = false;
     while (true) {
       TryInitializeResult tryInitializeResult =
         asImpl().tryInitialize(value, context, args...);
-      MetadataState newState =
-        getMetadataStateForRequestState(tryInitializeResult.NewState);
+      auto newState =
+        MetadataState::forRequestState(tryInitializeResult.NewState);
 
-      // Publish the current state of the metadata.
-      publishMetadataState(curState, newState, isCompleteAndHadWaiters);
+      assert(curState.getBasicKind() <= newState.getBasicKind() &&
+             "initialization regressed to an earlier state");
+
+      // Publish the new state of the metadata (waking any waiting
+      // threads immediately) if we've made any progress.  This seems prudent,
+      // but it might mean acquiring the lock multiple times.
+      if (curState.getBasicKind() < newState.getBasicKind()) {
+        hasProgress = true;
+        curState = newState;
+        publishMetadataState(concurrency, newState);
+      }
 
       // If we don't have a dependency, we're finished.
       if (!tryInitializeResult.Dependency) {
-        assert(newState == MetadataState::Complete);
+        assert(newState.isComplete() &&
+               "initialization didn't report a dependency but isn't complete");
+        hasProgress = true;
         break;
       }
 
+      assert(!newState.isComplete() &&
+             "completed initialization reported a dependency");
+
       // Otherwise, we need to block this metadata on the dependency's queue.
 
-      // Create a queue entry if necessary.
+      // Create a queue entry if necessary.  Start using its context
+      // as the continuation context.
       if (!queueEntry) {
         queueEntry.reset(
           new MetadataCompletionQueueEntry(value, scratchContext));
@@ -864,10 +801,10 @@ public:
       }
 
       // Try to block this metadata initialization on that queue.
-      // If this succeeds, we aren't really the initializing thread anymore.
-      // The small amount of notification we do afterwards should be
-      // okay to race with another thread potentially taking over
-      // initialization.
+      // If this succeeds, we can't consider ourselves the initializing
+      // thread anymore.  The small amount of notification we do at the
+      // end of this function is okay to race with another thread
+      // potentially taking over initialization.
       if (addToMetadataQueue(std::move(queueEntry),
                              tryInitializeResult.Dependency,
                              tryInitializeResult.DependencyRequirement))
@@ -877,35 +814,46 @@ public:
       assert(queueEntry);
     }
 
-    // If the state was updated, we need to notify waiters of all kinds.
-    // That means threads and, potentially, metadata in our completion queue.
-    result.second = ConcurrencyRequest::None;
-    if (origState != curState) {
-      result.first.ShouldNotifyAll =
-        (isCompleteAndHadWaiters || hasWaiters(curState));
-      result.second = ConcurrencyRequest::AcquireLockAndCallBack;
+    // If we made progress, claim all the completion-queue entries that
+    // are now satisfied and try to make progress on them.
+    if (hasProgress) {
+      auto queue = concurrency.Lock.withLock([&] {
+        return claimSatisfiedQueueEntriesWithLock(curState);
+      });
+
+      // Immediately process all the entries we extracted.
+      while (auto cur = std::move(queue)) {
+        queue = std::move(cur->Next);
+        resumeMetadataCompletion(std::move(cur));
+      }
     }
 
-    return result;
+    // If we're not actually satisfied by the current state, we might need
+    // to block here.
+    if (curState.shouldWait(request)) {
+      awaitSatisfyingState(concurrency, request, curState);
+    }
+
+    return { value, curState.getAccomplishedRequestState() };
   }
 
-  /// Wake waiters of all kinds because we've made progress with the metadata.
-  /// Called after initializeFromEntry when it returns AcquireLockAndCallBack.
-  ///
-  /// The lock is held.  This thread is not necessarily the initializing
-  /// thread anymore.
-  bool finishInitializationWithLock(InitializationResult &result) {
+  /// Claim all the satisfied completion queue entries, given that
+  /// we're holding the lock.
+  std::unique_ptr<MetadataCompletionQueueEntry>
+  claimSatisfiedQueueEntriesWithLock(MetadataState newState) {
     // Collect anything in the metadata's queue whose target state has been
     // reached to the queue in result.  Note that we repurpose the Next field
     // in the collected entries.
 
+    std::unique_ptr<MetadataCompletionQueueEntry> result;
+
     // If we're not even currently storing a completion queue,
     // there's nothing to do but wake waiting threads.
     if (LockedStorageKind != LSK::CompletionQueue) {
-      return claimWaitersWithLock(result);
+      return result;
     }
 
-    auto nextToResume = &result.CompletionsToResume;
+    auto nextToResume = &result;
     assert(!*nextToResume && "already items in queue?");
 
     // Walk the completion queue.
@@ -913,7 +861,7 @@ public:
     while (auto waiter = nextWaiter->get()) {
       // If the new state of this entry doesn't satisfy the waiter's
       // requirements, skip over it.
-      if (!satisfies(result.Status.State, waiter->DependencyRequirement)) {
+      if (!newState.satisfies(waiter->DependencyRequirement)) {
         nextWaiter = &waiter->Next;
         continue;
       }
@@ -929,87 +877,96 @@ public:
       assert(!*nextToResume);
     }
 
-    // Wake waiting threads.
-    return claimWaitersWithLock(result);
+    return result;
   }
 
-  /// Check whether we need to notify any waiters.  If so, clear the
-  /// has-waiters bit.
-  ///
-  /// The lock is held.  This thread is not necessarily the initializing
-  /// thread anymore.
-  bool claimWaitersWithLock(InitializationResult &result) {
-    if (!result.ShouldNotifyAll) return false;
+  /// Publish a new metadata state.  Wake waiters if we had any.
+  void publishMetadataState(ConcurrencyControl &concurrency,
+                            MetadataState newState) {
+    assert(newState.hasAllocatedMetadata());
+    assert(!newState.hasWaiters());
 
-    // Crucially, we never get a new waiting thread while we're holding
-    // the lock.
+    auto oldState = MetadataState(State.exchange(newState.getRawValue(),
+                                                 std::memory_order_release));
+    assert(!oldState.isComplete());
 
-    MetadataState curState = result.Status.State;
-    auto newState = removeWaiters(curState);
-
-    // If the state without waiters is the same as the old state,
-    // we must be complete, and we don't need to update State.
-    if (curState == newState) {
-      assert(curState == MetadataState::Complete);
-    } else {
-      // Because we're not necessarily the initializing thread anymore,
-      // we can't just store this; we need to do a compare-and-swap to
-      // protect against possibly reversing work done by the initializing
-      // thread.  If this doesn't work, it doesn't matter: all it means
-      // is that the new initializing thread might think that it has
-      // waiters when it doesn't, which will lead to nothing more harmful
-      // than some wasteful extra notifies.
-      (void) State.compare_exchange_strong(curState, newState,
-                                           std::memory_order_relaxed,
-                                           std::memory_order_relaxed);
+    // If we have existing waiters, wake them now, since we no longer
+    // remember in State that we have any.
+    if (oldState.hasWaiters()) {
+      // We need to acquire the lock.  There could be an arbitrary number
+      // of threads simultaneously trying to set the has-waiters flag, and we
+      // have to make sure they start waiting before we notify the queue.
+      concurrency.Lock.withLockThenNotifyAll(concurrency.Queue, [] {});
     }
-
-    return true;
   }
 
-  /// Finish an initialization attempt by resuming any unblocked metadata
-  /// initializations.
-  ///
-  /// The lock is not held.  This thread is not necessarily the initializing
-  /// thread anymore.
-  static Status finishInitialization(InitializationResult &&result,
-                                     ConcurrencyRequest concurrentRequest) {
-    // Process all the waiters we removed from the completion queue.
-    while (auto cur = std::move(result.CompletionsToResume)) {
-      result.CompletionsToResume = std::move(cur->Next);
+  /// Wait for the request to be satisfied by the current state.
+  void awaitSatisfyingState(ConcurrencyControl &concurrency,
+                            MetadataRequest request, MetadataState &state) {
+    concurrency.Lock.withLockOrWait(concurrency.Queue, [&] {
+      // Re-load the state now that we have the lock.  If we don't
+      // need to wait, we're done.  Otherwise, flag the existence of a
+      // waiter; if that fails, start over with the freshly-loaded state.
+      state = MetadataState(State.load(std::memory_order_acquire));
+      while (true) {
+        if (!state.shouldWait(request))
+          return true;
 
-      resumeMetadataCompletion(std::move(cur));
-    }
+        if (state.hasWaiters())
+          break;
 
-    return result.Status;
+        // Try to swap in the has-waiters bit.  If this succeeds, we can
+        // ahead and wait.
+        if (State.compare_exchange_weak(state.getRawValueRef(),
+                                        state.addWaiters().getRawValue(),
+                                        std::memory_order_relaxed,
+                                        std::memory_order_acquire))
+          break;
+      }
+
+      // As a QoI safe-guard against the simplest form of cyclic
+      // dependency, check whether this thread is the one responsible
+      // for allocating the metadata.
+      if (isBeingAllocatedByCurrentThread()) {
+        fprintf(stderr,
+                "%s(%p): cyclic metadata dependency detected, aborting\n",
+                Impl::getName(), static_cast<const void*>(this));
+        abort();
+      }
+
+      return false;
+    });
   }
 
+public:
   /// Block a metadata initialization on the completion of this
   /// initialization.
   ///
   /// This is always called from the initializing thread.  The lock is not held.
-  bool enqueueWithLock(
-                  std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+  bool enqueue(ConcurrencyControl &concurrency,
+               std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
     assert(queueEntry);
     assert(!queueEntry->Next);
 
-    auto curState = State.load(std::memory_order_acquire);
-    if (satisfies(curState, queueEntry->DependencyRequirement))
-      return false;
+    return concurrency.Lock.withLock([&] {
+      auto curState = MetadataState(State.load(std::memory_order_acquire));
+      if (curState.satisfies(queueEntry->DependencyRequirement))
+        return false;
 
-    // Note that we don't set the waiters bit because we're not actually
-    // blocking any threads.
+      // Note that we don't set the waiters bit because we're not actually
+      // blocking any threads.
 
-    // Transition the locked storage to the completion queue.
-    if (LockedStorageKind != LSK::CompletionQueue) {
-      LockedStorageKind = LSK::CompletionQueue;
-      new (&LockedStorage.CompletionQueue)
-        std::unique_ptr<MetadataCompletionQueueEntry>();
-    }
+      // Transition the locked storage to the completion queue.
+      if (LockedStorageKind != LSK::CompletionQueue) {
+        LockedStorageKind = LSK::CompletionQueue;
+        new (&LockedStorage.CompletionQueue)
+          std::unique_ptr<MetadataCompletionQueueEntry>();
+      }
 
-    queueEntry->Next = std::move(LockedStorage.CompletionQueue);
-    LockedStorage.CompletionQueue = std::move(queueEntry);
-    return true;
+      queueEntry->Next = std::move(LockedStorage.CompletionQueue);
+      LockedStorage.CompletionQueue = std::move(queueEntry);
+      return true;
+    });
   }
 };
 

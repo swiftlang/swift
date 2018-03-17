@@ -195,7 +195,6 @@ namespace {
     // like protocol conformances.
     TryInitializeResult tryInitialize(Metadata *metadata,
                                       MetadataCompletionContext *context,
-                                      MetadataRequest request,
                                       const TypeContextDescriptor *description,
                                       const void * const *arguments) {
       // Find a pattern.  Currently we always use the default pattern.
@@ -3053,7 +3052,8 @@ template <> void Metadata::dump() const {
 namespace {
 
 /// A cache-entry type suitable for use with LockingConcurrentMap.
-class WitnessTableCacheEntry {
+class WitnessTableCacheEntry :
+    public SimpleLockingCacheEntryBase<WitnessTableCacheEntry, WitnessTable*> {
   /// The type for which this table was instantiated.
   const Metadata * const Type;
 
@@ -3062,16 +3062,13 @@ class WitnessTableCacheEntry {
   /// allocate the entry.
   GenericWitnessTable * const GenericTable;
 
-  /// The table.  When this is fully-initialized, we set it to the table.
-  std::atomic<WitnessTable*> Table;
-
 public:
   /// Do the structural initialization necessary for this entry to appear
   /// in a concurrent map.
   WitnessTableCacheEntry(const Metadata *type,
                          GenericWitnessTable *genericTable,
                          void ** const *instantiationArgs)
-    : Type(type), GenericTable(genericTable), Table(nullptr) {}
+    : Type(type), GenericTable(genericTable) {}
 
   intptr_t getKeyIntValueForDump() const {
     return reinterpret_cast<intptr_t>(Type);
@@ -3100,76 +3097,8 @@ public:
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
   }
 
-  /// We use a pointer to the allocated witness table directly as a
-  /// status value.  The witness table itself is actually allocated in the
-  /// tail storage of the entry.
-  using Status = WitnessTable*;
-
-  static WitnessTable *status_hasBlockers() {
-    return reinterpret_cast<WitnessTable*>(uintptr_t(1));
-  }
-
-  WitnessTable *checkStatus(bool isLocked,
-                            GenericWitnessTable *genericTable,
-                            void ** const *instantiationArgs) {
-    auto table = Table.load(std::memory_order_acquire);
-
-    // If we've got the lock, and the table is null, we're about to
-    // wait on the condition variable.  Inform the initializing thread
-    // that it has waiters.
-    if (isLocked) {
-      while (table == nullptr &&
-             !Table.compare_exchange_weak(table, status_hasBlockers(),
-                                          std::memory_order_relaxed,
-                                          std::memory_order_acquire)) {
-        // All the work is done in the condition.
-      }
-    }
-
-    return (table == status_hasBlockers() ? nullptr : table);
-  }
-
-  static bool shouldWait(WitnessTable *table,
-                         GenericWitnessTable *genericTable,
-                         void ** const *instantiationArgs) {
-    return table == nullptr;
-  }
-
-  bool prepareToWaitWithLock(WitnessTable *table,
-                             GenericWitnessTable *genericTable,
-                             void ** const *instantiationArgs) {
-    return true;
-  }
-
-  using AllocationResult = int; // unused
-
-  std::pair<AllocationResult, ConcurrencyRequest>
-  beginAllocation(GenericWitnessTable *genericTable,
-                  void ** const *instantiationArgs){
-    // We don't do anything in the allocation phase.
-    return { 0, ConcurrencyRequest::None };
-  }
-
-  bool finishAllocationWithLock(int) {
-    swift_runtime_unreachable("beginAllocation never returns "
-                              "AcquireLockAndCallBack");
-  }
-
-  using InitializationResult = WitnessTable *;
-
-  std::pair<WitnessTable *, ConcurrencyRequest>
-  beginInitialization(GenericWitnessTable *genericTable,
-                      void ** const *instantiationArgs);
-
-  bool finishInitializationWithLock(WitnessTable *table) {
-    swift_runtime_unreachable("beginInitialization never returns "
-                              "AcquireLockAndCallBack");
-  }
-
-  WitnessTable *finishInitialization(WitnessTable *table,
-                                     ConcurrencyRequest request) {
-    return table;
-  }
+  WitnessTable *allocate(GenericWitnessTable *genericTable,
+                         void ** const *instantiationArgs);
 };
 
 } // end anonymous namespace
@@ -3212,9 +3141,9 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
-std::pair<WitnessTable *, ConcurrencyRequest>
-WitnessTableCacheEntry::beginInitialization(GenericWitnessTable *genericTable,
-                                            void ** const *instantiationArgs) {
+WitnessTable *
+WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
+                                 void ** const *instantiationArgs) {
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
@@ -3267,16 +3196,7 @@ WitnessTableCacheEntry::beginInitialization(GenericWitnessTable *genericTable,
     genericTable->Instantiator(castTable, Type, instantiationArgs);
   }
 
-  // Publish the table.
-  auto oldTableRef = Table.exchange(castTable, std::memory_order_release);
-
-  // Notify all the waiters if there are any.
-  assert(oldTableRef == nullptr || oldTableRef == status_hasBlockers());
-  auto request = (oldTableRef != nullptr
-                    ? ConcurrencyRequest::NotifyAll
-                    : ConcurrencyRequest::None);
-
-  return { castTable, request };
+  return castTable;
 }
 
 const WitnessTable *
