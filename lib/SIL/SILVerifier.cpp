@@ -209,9 +209,12 @@ void verifyKeyPathComponent(SILModule &M,
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
-    require(property->getDeclContext()
-             == baseTy->getAnyNominal(),
-            "property decl should be a member of the component base type");
+    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+                         ->getReferenceStorageReferent()
+                         ->getCanonicalType();
+    require(fieldTy == componentTy,
+            "property decl should be a member of the base with the same type "
+            "as the component");
     switch (property->getStorageKind()) {
     case AbstractStorageDecl::Stored:
     case AbstractStorageDecl::StoredWithObservers:

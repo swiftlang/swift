@@ -309,15 +309,16 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
-  assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
+  auto baseTy = getSwiftRValueType();
+
   AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                            field, nullptr)->getCanonicalType();
+      baseTy->getTypeOfMember(M.getSwiftModule(),
+                              field, nullptr)->getCanonicalType();
   }
   auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
