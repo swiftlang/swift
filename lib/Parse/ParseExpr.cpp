@@ -1360,36 +1360,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
 /// parseExprPostfix
 ///
-///   expr-literal:
-///     integer_literal
-///     floating_literal
-///     string_literal
-///     nil
-///     true
-///     false
-///     #file
-///     #line
-///     #column
-///     #function
-///     #dsohandle
-///
-///   expr-primary:
-///     expr-literal
-///     expr-identifier expr-call-suffix?
-///     expr-closure
-///     expr-anon-closure-argument
-///     expr-delayed-identifier
-///     expr-paren
-///     expr-super
-///     expr-discard
-///     expr-selector
-///
-///   expr-delayed-identifier:
-///     '.' identifier
-///
-///   expr-discard:
-///     '_'
-///
 ///   expr-dot:
 ///     expr-postfix '.' 'type'
 ///     expr-postfix '.' (identifier|keyword) generic-args? expr-call-suffix?
@@ -1425,7 +1395,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 ///
 ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
-  auto Result = parseExprPostfixWithoutSuffix(ID, isExprBasic);
+  auto Result = parseExprPrimary(ID, isExprBasic);
   // If we had a parse error, don't attempt to parse suffixes.
   if (Result.isParseError())
     return Result;
@@ -1446,28 +1416,55 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   return Result;
 }
 
-ParserResult<Expr>
-Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
+/// parseExprPrimary
+///
+///   expr-literal:
+///     integer_literal
+///     floating_literal
+///     string_literal
+///     nil
+///     true
+///     false
+///     #file
+///     #line
+///     #column
+///     #function
+///     #dsohandle
+///
+///   expr-delayed-identifier:
+///     '.' identifier
+///
+///   expr-discard:
+///     '_'
+///
+///   expr-primary:
+///     expr-literal
+///     expr-identifier expr-call-suffix?
+///     expr-closure
+///     expr-anon-closure-argument
+///     expr-delayed-identifier
+///     expr-paren
+///     expr-super
+///     expr-discard
+///     expr-selector
+///
+ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
-  ParserResult<Expr> Result;
   switch (Tok.getKind()) {
-  case tok::pound_keyPath:
-    return parseExprKeyPathObjC();
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    SyntaxContext->setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
-    Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
-                                                           /*Implicit=*/false));
-    break;
+    ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
+    return makeParserResult(new (Context)
+                                IntegerLiteralExpr(Text, Loc,
+                                                   /*Implicit=*/false));
   }
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    SyntaxContext->setCreateSyntax(SyntaxKind::FloatLiteralExpr);
-    Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
+    ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
+    return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
-    break;
   }
   case tok::at_sign:
     // Objective-C programmers habitually type @"foo", so recover gracefully
@@ -1482,24 +1479,19 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
       
   case tok::string_literal:  // "foo"
-    Result = parseExprStringLiteral();
-    break;
+    return parseExprStringLiteral();
   
-  case tok::kw_nil: {
-    SyntaxParsingContext NilContext(SyntaxContext, SyntaxKind::NilLiteralExpr);
-    Result = makeParserResult(
-                      new (Context) NilLiteralExpr(consumeToken(tok::kw_nil)));
-    break;
-  }
+  case tok::kw_nil:
+    ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
+    return makeParserResult(new (Context)
+                                NilLiteralExpr(consumeToken(tok::kw_nil)));
 
   case tok::kw_true:
   case tok::kw_false: {
-    SyntaxParsingContext BoolContext(SyntaxContext,
-                                     SyntaxKind::BooleanLiteralExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::BooleanLiteralExpr);
     bool isTrue = Tok.is(tok::kw_true);
-    Result = makeParserResult(
-               new (Context) BooleanLiteralExpr(isTrue, consumeToken()));
-    break;
+    return makeParserResult(new (Context)
+                                BooleanLiteralExpr(isTrue, consumeToken()));
   }
 
   case tok::kw___FILE__:
@@ -1537,19 +1529,17 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     case tok::pound_dsohandle: SKind = SyntaxKind::PoundDsohandleExpr; break;
     default: break;
     }
-    SyntaxParsingContext MagicIdCtx(SyntaxContext, SKind);
+    ExprContext.setCreateSyntax(SKind);
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
-    Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*implicit=*/false));
-    break;
+    return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
+        Kind, Loc, /*implicit=*/false));
   }
       
   case tok::identifier:  // foo
     // Attempt to parse for 'type(of: <expr>)'.
     if (canParseTypeOf(*this)) {
-      Result = parseExprTypeOf();
-      break;
+      return parseExprTypeOf();
     }
 
     // If we are parsing a refutable pattern and are inside a let/var pattern,
@@ -1577,52 +1567,36 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
             SyntaxFactory::makeUnresolvedPatternExpr(PatternNode);
         SyntaxContext->addSyntax(ExprNode);
       }
-      Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-      break;
+      return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
 
     LLVM_FALLTHROUGH;
   case tok::kw_self:     // self
   case tok::kw_Self:     // Self
-    Result = makeParserResult(parseExprIdentifier());
-
-    // If there is an expr-call-suffix, parse it and form a call.
-    if (Tok.isFollowingLParen()) {
-      Result = parseExprCallSuffix(Result, isExprBasic);
-      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
-      break;
-    }
-
-    break;
+    return makeParserResult(parseExprIdentifier());
 
   case tok::kw_Any: { // Any
-    SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::TypeExpr);
+    ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
     auto TyR = parseAnyType();
-    auto expr = new (Context) TypeExpr(TypeLoc(TyR.get()));
-    Result = makeParserResult(expr);
-    break;
+    return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
   }
 
   case tok::dollarident: // $1
-    Result = makeParserResult(parseExprAnonClosureArg());
-    break;
+    return makeParserResult(parseExprAnonClosureArg());
 
-    // If the next token is '_', parse a discard expression.
-  case tok::kw__: {
-    SyntaxParsingContext DAContext(SyntaxContext,
-                                   SyntaxKind::DiscardAssignmentExpr);
-    Result = makeParserResult(
+  case tok::kw__: // _
+    ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
+    return makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
-    break;
-  }
 
   case tok::pound_selector: // expr-selector
-    Result = parseExprSelector();
-    break;
+    return parseExprSelector();
+
+  case tok::pound_keyPath:
+    return parseExprKeyPathObjC();
 
   case tok::l_brace:     // expr-closure
-    Result = parseExprClosure();
-    break;
+    return parseExprClosure();
 
   case tok::period:              //=.foo
   case tok::period_prefix: {     // .foo
@@ -1644,10 +1618,9 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
       FltText = copyAndStripUnderscores(Context, FltText);
       
       consumeToken(tok::integer_literal);
-      Result = makeParserResult(new (Context)
-                                FloatLiteralExpr(FltText, DotLoc,
-                                                 /*Implicit=*/false));
-      break;
+      return makeParserResult(new (Context)
+                                  FloatLiteralExpr(FltText, DotLoc,
+                                                   /*Implicit=*/false));
     }
     
     DeclName Name;
@@ -1657,7 +1630,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
       auto Expr = UnresolvedMemberExpr::create(
                     Context, DotLoc, DeclNameLoc(DotLoc.getAdvancedLoc(1)),
                     Context.getIdentifier("_"), /*implicit=*/false);
-      Result = makeParserResult(Expr);
+      auto Result = makeParserResult(Expr);
       if (CodeCompletion) {
         std::vector<StringRef> Identifiers;
 
@@ -1708,16 +1681,13 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
         return nullptr;
 
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
-      Result = makeParserResult(
+      return makeParserResult(
                  status,
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                               lParenLoc, args, argLabels,
                                               argLabelLocs, rParenLoc,
                                               trailingClosure,
                                               /*implicit=*/false));
-      if (Result.hasCodeCompletion())
-        return Result;
-      break;
     }
 
     // Check for a trailing closure, if allowed.
@@ -1734,45 +1704,35 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       // Handle .foo by just making an AST node.
-      Result = makeParserResult(
+      return makeParserResult(
                  ParserStatus(closure),
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                               SourceLoc(), { }, { }, { },
                                               SourceLoc(), closure.get(),
                                               /*implicit=*/false));
-
-      if (Result.hasCodeCompletion())
-        return Result;
-
-      break;
     }
 
     // Handle .foo by just making an AST node.
-    Result = makeParserResult(
+    return makeParserResult(
                UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                             /*implicit=*/false));
-    break;
   }
       
-  case tok::kw_super: {      // super.foo or super[foo]
-    Result = parseExprSuper(isExprBasic);
-    break;
-  }
+  case tok::kw_super: // super.foo or super[foo]
+    return parseExprSuper(isExprBasic);
 
-  case tok::l_paren: {
+  case tok::l_paren:
     // Build a tuple expression syntax node.
     // AST differentiates paren and tuple expression where the former allows
     // only one element without label. However, libSyntax tree doesn't have this
     // differentiation. A tuple expression node in libSyntax can have a single
     // element without label.
-    SyntaxParsingContext TupleContext(SyntaxContext, SyntaxKind::TupleExpr);
-    Result = parseExprList(tok::l_paren, tok::r_paren,
-                           SyntaxKind::TupleElementList);
-    break;
-  }
+    ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
+    return parseExprList(tok::l_paren, tok::r_paren,
+                         SyntaxKind::TupleElementList);
+
   case tok::l_square:
-    Result = parseExprCollection();
-    break;
+    return parseExprCollection();
 
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
@@ -1783,27 +1743,27 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
       return makeParserCodeCompletionStatus();
     if (res.isParseError() || res.isNull())
       return nullptr;
-    Result = makeParserResult(
-                  new (Context) ErrorExpr(res.get()->getSourceRange()));
-    break;
+    return makeParserResult(new (Context)
+                                ErrorExpr(res.get()->getSourceRange()));
   }
 
-
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:  \
-  Result = parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic); \
-  break;
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  case tok::pound_##Name:                                                      \
+    return parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic);
 #include "swift/Syntax/TokenKinds.def"
 
-  case tok::code_complete:
-    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
+  case tok::code_complete: {
+    auto Result =
+        makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
     Result.setHasCodeCompletion();
     if (CodeCompletion &&
         // We cannot code complete anything after var/let.
         (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern))
-      CodeCompletion->completePostfixExprBeginning(dyn_cast<CodeCompletionExpr>(
-        Result.get()));
+      CodeCompletion->completePostfixExprBeginning(
+          dyn_cast<CodeCompletionExpr>(Result.get()));
     consumeToken(tok::code_complete);
-    break;
+    return Result;
+  }
 
   case tok::pound:
     if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
@@ -1825,8 +1785,6 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok, ID);
     return nullptr;
   }
-
-  return Result;
 }
 
 static StringLiteralExpr *
