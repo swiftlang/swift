@@ -78,7 +78,6 @@ internal protocol TGMath: BinaryFloatingPoint {
   static func _fma(_ x: Self, _ y: Self, _ z: Self) -> Self
   static func _lgamma(_ x: Self) -> (Self, Int)
   static func _modf(_ x: Self) -> (Self, Self)
-  static func _ldexp(_ x: Self, _ n: Int) -> Self
   static func _scalbn(_ x: Self, _ n: Int) -> Self
   static func _frexp(_ x: Self) -> (Self, Int)
   static func _ilogb(_ x: Self) -> Int
@@ -146,7 +145,6 @@ internal extension TGMath {
     expectEqual(-Self.ulpOfOne*Self.ulpOfOne,
                 Self._fma(1 + .ulpOfOne, 1 - .ulpOfOne, -1))
     expectEqual((1.0, 0.125), Self._modf(1.125))
-    expectEqual(2.5, Self._ldexp(0.625, 2))
     expectEqual(2.5, Self._scalbn(0.625, 2))
     expectEqual((0.625, 2), Self._frexp(2.5))
     expectEqual(1, Self._ilogb(2.5))
@@ -175,7 +173,6 @@ extension ${T}: TGMath {
   static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return fma(x, y, z) }
   static func _lgamma(_ x: ${T}) -> (${T}, Int) { return lgamma(x) }
   static func _modf(_ x: ${T}) -> (${T}, ${T}) { return modf(x) }
-  static func _ldexp(_ x: ${T}, _ n: Int) -> ${T} { return ldexp(x, n) }
   static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return scalbn(x, n) }
   static func _frexp(_ x: ${T}) -> (${T}, Int) { return frexp(x) }
   static func _ilogb(_ x: ${T}) -> Int { return ilogb(x) }
