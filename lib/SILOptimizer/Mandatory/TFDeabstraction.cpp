@@ -29,7 +29,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
@@ -42,44 +41,6 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-
-/// If the specified instruction is an high-level aggregate operation like
-/// copy_addr or destroy_addr, break it down into its more primitive operations
-/// and return true.  Otherwise, return false.  This leaves the instruction in
-/// place and inserts the additional instructions immediately after any
-/// instruction that is exploded.
-static bool explodeAggregateInst(SILInstruction *inst) {
-
-  // Lower a copy_addr into a load and store + retain/release instructions.
-  if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-    SILBuilder B(copyAddr);
-    auto &TL = B.getTypeLowering(copyAddr->getSrc()->getType());
-    if (!TL.isLoadable())
-      return false;
-
-    // Note, we don't use TL.emitCopyInto because that will produce a copy_addr.
-    auto loc = copyAddr->getLoc();
-    SILValue value =
-      TL.emitLoadOfCopy(B, loc, copyAddr->getSrc(), copyAddr->isTakeOfSrc());
-    TL.emitStoreOfCopy(B, loc, value, copyAddr->getDest(),
-                       copyAddr->isInitializationOfDest());
-    return true;
-  }
-
-  /// Turn a destroy_addr into a load+release_value pair.
-  if (auto *destroy = dyn_cast<DestroyAddrInst>(inst)) {
-    SILBuilder B(destroy);
-    auto &TL = B.getTypeLowering(destroy->getOperand()->getType());
-    if (!TL.isLoadable())
-      return false;
-    TL.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
-    return true;
-  }
-
-  return false;
-}
-
-
 namespace {
   /// This class wraps the state and logic necessary to deabstract code into one
   /// specific SIL function, which has been designated as a potential top-level
@@ -88,7 +49,6 @@ namespace {
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
     SILPassManager *passManager;
-    TypeContainsTensorHandle tcth;
 
     /// This is set to true by the early inlining phase if the function was
     /// forcibly flattened to make all references to global variables visible
@@ -102,8 +62,10 @@ namespace {
     bool changedFunction = false;
 
     /// This is the list of tensor operations in the current function, filled in
-    /// by promoteIndirectTensorOperands.
-    SmallVector<BuiltinInst*, 32> tensorOps;
+    /// by simplifyTensorOperands.  This contains both the builtin instructions
+    /// that reflect the #tfop() invocations, as well as any retain/release
+    /// instructions using TensorHandle values.
+    SmallVector<SILInstruction*, 32> tensorOps;
   public:
     TFDeabstraction(SILFunction &fn, TensorFunctionClassifier &tfc,
                     SILPassManager *PM)
@@ -336,6 +298,67 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   return newInst;
 }
 
+/// If the specified instruction is an high-level aggregate operation like
+/// copy_addr or destroy_addr, and if it is working on a type that contains a
+/// TensorHandle, break it down into its more primitive operations and return
+/// true.  Otherwise, return false.  This leaves the input instruction in place
+/// and inserts the additional instructions immediately after the input
+/// instruction that is exploded.
+static bool explodeAggregateInst(SILInstruction *inst,
+                                 TensorFunctionClassifier &tfc) {
+  // Check to see if this is an instruction we can handle below, early exiting
+  // if not.
+  if (!isa<CopyAddrInst>(inst) &&
+      !isa<DestroyAddrInst>(inst) &&
+      !isa<RetainValueInst>(inst) &&
+      !isa<ReleaseValueInst>(inst))
+    return false;
+
+  // Check to make sure that this operation is doing something on a value
+  // containing a TensorHandle.  If not, just leave it alone.
+  auto type = inst->getOperand(0)->getType();
+  if (!tfc.containsTensorHandle(type))
+    return false;
+
+  // TODO: This is currently just handling loadable types.  We should be able to
+  // scalarize address-only elements, by turning them into by-address operations
+  // on each element.  This can occur when a struct/tuple contains tensors and
+  // also has some address-only type.
+  auto &TL = inst->getModule().getTypeLowering(type);
+  if (!TL.isLoadable())
+    return false;
+
+  // Insert any new instructions right after the one we're going to explode.
+  if (isa<TermInst>(inst)) return false;
+  SILBuilder B(++SILBasicBlock::iterator(inst));
+  B.setCurrentDebugScope(inst->getDebugScope());
+
+  // Lower a copy_addr into a load and store + retain/release instructions.
+  if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+    // Note, we don't use TL.emitCopyInto because that will produce a copy_addr.
+    auto loc = copyAddr->getLoc();
+    SILValue value =
+      TL.emitLoadOfCopy(B, loc, copyAddr->getSrc(), copyAddr->isTakeOfSrc());
+    TL.emitStoreOfCopy(B, loc, value, copyAddr->getDest(),
+                       copyAddr->isInitializationOfDest());
+  } else if (auto *destroy = dyn_cast<DestroyAddrInst>(inst)) {
+    /// Turn a destroy_addr into a load+release_value pair.
+    TL.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
+  } else if (isa<RetainValueInst>(inst)) {
+    // Turn a retain_value into a retain_value on its elements.
+    TL.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                  inst->getOperand(0));
+  } else if (isa<ReleaseValueInst>(inst)) {
+    TL.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                     inst->getOperand(0));
+  } else {
+    llvm_unreachable("unhandled instructions should be filtered above");
+  }
+
+  return true;
+}
+
+
 /// Identify all of the tensor operations in the current function, and scan them
 /// to see if there are any indirect arguments, where the address of a stack
 /// allocation is passed to the builtin.  These occur when the tensor op was in
@@ -345,7 +368,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
 /// address and a use of the loaded value.  This allows the stack allocation to
 /// be promoted, allowing us to construct SSA def-use chains.
 ///
-/// Similarly, if we see a Struct operand that wraps a primitive value, we
+/// Similarly, if we see a struct operand that wraps a primitive value, we
 /// extract out the underlying scalar value until we get to a builtin integer or
 /// floating point value.
 ///
@@ -366,7 +389,34 @@ void TFDeabstraction::simplifyTensorOperands() {
 
         // Remember this for later passes.
         tensorOps.push_back(opInfo->inst);
+        continue;
       }
+
+      // Find retain and release instructions that directly use TensorHandle
+      // values.  We treat them as tensorOps to ensure that their operands are
+      // deabstracted.
+      if (isa<RetainValueInst>(inst) || isa<ReleaseValueInst>(inst)) {
+        if (isTensorHandle(inst->getOperand(0)->getType())) {
+          tensorOps.push_back(inst);
+          continue;
+        }
+      }
+
+      // Check to see if this is an aggregate operation (like a copy_addr, a
+      // retain or release, etc) that involves a TensorHandle value.  If so,
+      // explode it out into its components and reprocess the components.  This
+      // ensures that nothing later in deabstraction or partitioning have to
+      // worry about them.
+      if (explodeAggregateInst(inst, tfc)) {
+        // Reset our iterator to the first instruction we just produced so we
+        // walk through them and recursively expand or remember them as
+        // appropriate.
+        I = ++SILBasicBlock::iterator(inst);
+        inst->eraseFromParent();
+        continue;
+      }
+
+      // Otherwise we leave the instruction alone.
     }
   }
 }
@@ -379,24 +429,21 @@ namespace {
   class PromotableMemoryFinder {
     SmallVectorImpl<SILGlobalVariable*> &globals;
     SmallVectorImpl<AllocStackInst*> &stackAllocs;
-    SmallPtrSet<SILInstruction*, 32> visitedUpward;
-    SmallPtrSet<SILValue, 32> visitedDownward;
+    SmallPtrSet<SILInstruction*, 32> visited;
 
     SmallVector<GlobalAddrInst*, 8> globalAddrs;
-    TypeContainsTensorHandle &tcth;
+    TensorFunctionClassifier &tfc;
   public:
 
     PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
                            SmallVectorImpl<AllocStackInst*> &stackAllocs,
-                           TypeContainsTensorHandle &tcth)
-      : globals(globals), stackAllocs(stackAllocs), tcth(tcth) {}
+                           TensorFunctionClassifier &tfc)
+      : globals(globals), stackAllocs(stackAllocs), tfc(tfc) {}
 
-    void run(ArrayRef<BuiltinInst*> tensorOps);
+    void run(ArrayRef<SILInstruction*> tensorOps);
   private:
     void findPromotableMemoryFromValue(SILValue value);
-    void findPromotableMemoryFromResult(SILValue value);
-    void findPromotableMemoryFromAccessedAddress(SILValue pointer,
-                                                 bool isUpward);
+    void findPromotableMemoryFromLoadedAddress(SILValue pointer);
   };
 } // end anonymous namespace
 
@@ -404,22 +451,12 @@ namespace {
 
 /// Analyze the dataflow values feeding into the specified tensor operations in
 /// order to find promotable stack and global references.
-void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
+void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
-
-  // The StackAllocs list can end up with duplicates, make sure to remove them
-  // when we are done collecting them.
-  SWIFT_DEFER {
-    llvm::array_pod_sort(stackAllocs.begin(), stackAllocs.end());
-    stackAllocs.erase(std::unique(stackAllocs.begin(), stackAllocs.end()),
-                      stackAllocs.end());
-  };
 
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands())
       findPromotableMemoryFromValue(operand.get());
-    for (auto result : op->getResults())
-      findPromotableMemoryFromResult(result);
   }
 
   // If we found any global variables, scan the function once to collect all of
@@ -463,7 +500,6 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
       // Walk the use chains of the addr, looking for stores to it.  Any store
       // to it produces a value that feeds it, which we can contain global
       // variable references and stack allocation references.
-    restart:
       for (auto *use : addr->getUses()) {
         auto user = use->getUser();
 
@@ -486,25 +522,15 @@ void PromotableMemoryFinder::run(ArrayRef<BuiltinInst*> tensorOps) {
           }
         }
 
-        // If this is a load from the global, analyze its uses.
-        if (auto *load = dyn_cast<LoadInst>(user)) {
-          findPromotableMemoryFromResult(load);
+        // Loads are fine.
+        if (isa<LoadInst>(user))
           continue;
-        }
 
         // If this is a begin_access instruction, then it is a projection/copy
         // of the address.  Analyze it too.
         if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
           addrs.push_back(begin);
           continue;
-        }
-
-        // See if this is an aggregate operation that needs to be exploded.
-        if (explodeAggregateInst(user)) {
-          user->eraseFromParent();
-          // We just invalidated the use-def chain that we're walking, start our
-          // check over.
-          goto restart;
         }
 
         // Some other unexpected user of the address is left around.  We should
@@ -540,7 +566,7 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // If we found a non-instruction operand, or an instruction we've already
   // visited, then we're done scanning it.
   auto *inst = value->getDefiningInstruction();
-  if (!inst || !visitedUpward.insert(inst).second)
+  if (!inst || !visited.insert(inst).second)
     return;
 
   // If this is one of the instructions we can deabstract by scalarizing, just
@@ -555,49 +581,15 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
   if (auto *load = dyn_cast<LoadInst>(inst))
-    findPromotableMemoryFromAccessedAddress(load->getOperand(),
-                                            /*isUpward*/true);
+    findPromotableMemoryFromLoadedAddress(load->getOperand());
 }
 
-/// Scan downward through the def-use chains of the result of an op result,
-/// looking for stores of the tensor handle value into memory.  If we find them,
-/// they could lead to retain and release uses, so we need to deabstract through
-/// those to avoid extraneous host copies.
-void PromotableMemoryFinder::findPromotableMemoryFromResult(SILValue value) {
-  // Don't reprocess values more than once.
-  if (!visitedDownward.insert(value).second)
-    return;
-
-  // If we found something that doesn't contain a tensor, then we're done.  This
-  // happens when walking down through a struct extract of a non-tensor field
-  // from a struct that contains a tensor and other stuff.
-  if (!tcth.containsTensorHandle(value->getType().getSwiftRValueType()))
-    return;
-
-  for (auto *use : value->getUses()) {
-    auto *user = use->getUser();
-    if (auto *store = dyn_cast<StoreInst>(user))
-      findPromotableMemoryFromAccessedAddress(store->getDest(),
-                                              /*isUpward*/false);
-    auto *inst = dyn_cast<SingleValueInstruction>(user);
-    if (!inst) continue;
-
-    if (isa<StructInst>(inst) || isa<TupleInst>(inst))
-      findPromotableMemoryFromResult(inst);
-    if (isa<StructExtractInst>(inst) || isa<TupleExtractInst>(inst))
-      findPromotableMemoryFromResult(inst);
-  }
-}
-
-/// The specific pointer is being loaded (if 'isUpward' is true) or store (if
-/// false) by a tensor operation operand/result.  Recursively process the
-/// pointer - if it is to a stack allocation that we can deabstract,
-/// then recursively process any load/stores into it as values that feed the
-/// tensor operation.
+/// The specific pointer is being loaded by a tensor operation operand.
+/// Recursively process the pointer - if it is to a stack allocation that we can
+/// deabstract, then recursively process any stores into it as values that feed
+/// the tensor operation.
 void PromotableMemoryFinder::
-findPromotableMemoryFromAccessedAddress(SILValue pointer, bool isUpward) {
-  bool isDownward = !isUpward;
-
+findPromotableMemoryFromLoadedAddress(SILValue pointer) {
   while (isa<TupleElementAddrInst>(pointer) ||
          isa<StructElementAddrInst>(pointer) ||
          isa<BeginAccessInst>(pointer)) {
@@ -614,9 +606,7 @@ findPromotableMemoryFromAccessedAddress(SILValue pointer, bool isUpward) {
   // If the base of the pointer is something other than a stack allocation or if
   // we already processed this, then we're done.
   auto *alloc = dyn_cast<AllocStackInst>(pointer);
-  if (!alloc ||
-      (isUpward && !visitedUpward.insert(alloc).second) ||
-      (isDownward && !visitedDownward.insert(pointer).second))
+  if (!alloc || !visited.insert(alloc).second)
     return;
 
   // Ok, this is a stack allocation we want to promote, remember it.
@@ -639,32 +629,17 @@ findPromotableMemoryFromAccessedAddress(SILValue pointer, bool isUpward) {
         if (auto *store = dyn_cast<StoreInst>(user)) {
           // If this is a store *to* the address, then process the stored value
           // as an input.
-          if (isUpward && use->getOperandNumber() == 1)
+          if (use->getOperandNumber() == 1)
             findPromotableMemoryFromValue(store->getSrc());
-          continue;
-        }
-
-        // If we found a load instruction on the downward pass, then we can
-        // recursively process uses of the load.
-        if (auto *load = dyn_cast<LoadInst>(user)) {
-          if (isDownward)
-            findPromotableMemoryFromResult(load);
           continue;
         }
 
         // copy_addr's are a load+store pair.
         if (auto *copyaddr = dyn_cast<CopyAddrInst>(user)) {
-          // If we found a copy_addr from this address during a downward scan,
-          // then this is a store of the other operand.
-          if (isDownward && use->getOperandNumber() == 0)
-            findPromotableMemoryFromAccessedAddress(copyaddr->getDest(),
-                                                    /*false*/isUpward);
-
           // If we found a copy_addr into this address during an upward scan,
           // then this is a load of the other operand.
-          if (isUpward && use->getOperandNumber() == 1)
-            findPromotableMemoryFromAccessedAddress(copyaddr->getSrc(),
-                                                    /*true*/isUpward);
+          if (use->getOperandNumber() == 1)
+            findPromotableMemoryFromLoadedAddress(copyaddr->getSrc());
         }
 
         // If this is the original allocation or an SRoA'able projection of its
@@ -842,12 +817,8 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   }
 
   for (auto user : users) {
-    if (explodeAggregateInst(user))
-      user->eraseFromParent();
     if (isa<EndAccessInst>(user))
       user->eraseFromParent();
-
-
   }
 }
 
@@ -1081,69 +1052,11 @@ propagateTensorOperand(SILValue v,
 void TFDeabstraction::propagateTensorValues() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorValues");
 
-  // Find retain and release instructions involving TensorHandle values.  We
-  // need to deabstract retain/release of aggregate values (which may contain
-  // tensor handle values in nested positions) because these can show up as uses
-  // of tensor ops, and we want the partitioning pass to be able to cleanly
-  // remove these as it removes the ops themselves from the host program.
-  SmallVector<SILInstruction*, 4> instructionsToSimplify;
-
-  for (auto &BB : fn) {
-    for (auto I = BB.begin(), E = BB.end(); I != E; ) {
-      // Manually move iterator to avoid invalidation if we replace 'inst'.
-      auto *inst = dyn_cast<RefCountingInst>(&*I++);
-      if (!inst) continue;
-
-      // TODO: Handle SROA of destroy_addr, and other by-address values.
-      if (!isa<RetainValueInst>(inst) && !isa<ReleaseValueInst>(inst))
-        continue;
-
-      auto eltType = inst->getOperand(0)->getType();
-
-      // If this is a direct retain/release of a TensorHandle value, then
-      // remember it as something we want to simplify.
-      if (isTensorHandle(eltType)) {
-        instructionsToSimplify.push_back(inst);
-        continue;
-      }
-
-      // Otherwise, if it contains a TensorHandle as a element of its
-      // deabstracted type, then we need to explode it by at least one level of
-      // its nested type.  If it is just some unrelated type like String, we
-      // leave it alone.
-      if (!tcth.containsTensorHandle(eltType.getSwiftRValueType()))
-        continue;  // Unrelated to tensors.
-
-      // We emit the new instructions right after the retain/release instruction
-      // so we can find them.
-      SILBuilder B(&*I);
-      auto &tl = B.getTypeLowering(eltType);
-      if (isa<RetainValueInst>(inst)) {
-        tl.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                      inst->getOperand(0));
-      } else {
-        assert(isa<ReleaseValueInst>(inst) && "Unhandled r/r instruction");
-        tl.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                         inst->getOperand(0));
-      }
-
-      // Reset our iterator to the first instruction we just produced so we
-      // walk through them and recursively expand or remember them as
-      // appropriate.
-      I = ++SILBasicBlock::iterator(inst);
-      inst->eraseFromParent();
-    }
-  }
-
-  // We want to simplify all the tensor ops as well.
-  for (auto *op : tensorOps)
-    instructionsToSimplify.push_back(op);
-
   // Now that we have directly exposed retain/release instructions and tensor
   // operations, go through and make sure they are directly linked to each
   // other.
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
-  for (auto *op : instructionsToSimplify) {
+  for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
 
       // Get the propagated value.  This call can change the tensor operand.
@@ -1239,7 +1152,7 @@ void TFDeabstraction::doIt() {
   // and global variables that must be promoted to SSA.
   SmallVector<SILGlobalVariable*, 8> globals;
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  PromotableMemoryFinder(globals, stackAllocs, tcth).run(tensorOps);
+  PromotableMemoryFinder(globals, stackAllocs, tfc).run(tensorOps);
 
   // If any global variable references were found in the operation chain, try
   // to predictably promote their references to unblock analysis.  This is only
