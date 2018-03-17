@@ -243,124 +243,6 @@ constexpr inline bool canBeInline() {
 
 struct ValueWitnessTable;
 
-/// Flags stored in the value-witness table.
-class ValueWitnessFlags {
-  typedef size_t int_type;
-  
-  // The polarity of these bits is chosen so that, when doing struct layout, the
-  // flags of the field types can be mostly bitwise-or'ed together to derive the
-  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
-  // still require additional fixup.)
-  enum : int_type {
-    AlignmentMask = 0x0000FFFF,
-    IsNonPOD =      0x00010000,
-    IsNonInline =   0x00020000,
-    HasExtraInhabitants = 0x00040000,
-    HasSpareBits =  0x00080000,
-    IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses = 0x00200000,
-    // Everything else is reserved.
-  };
-  int_type Data;
-
-  constexpr ValueWitnessFlags(int_type data) : Data(data) {}
-public:
-  constexpr ValueWitnessFlags() : Data(0) {}
-
-  /// The required alignment of the first byte of an object of this
-  /// type, expressed as a mask of the low bits that must not be set
-  /// in the pointer.
-  ///
-  /// This representation can be easily converted to the 'alignof'
-  /// result by merely adding 1, but it is more directly useful for
-  /// performing dynamic structure layouts, and it grants an
-  /// additional bit of precision in a compact field without needing
-  /// to switch to an exponent representation.
-  ///
-  /// For example, if the type needs to be 8-byte aligned, the
-  /// appropriate alignment mask should be 0x7.
-  size_t getAlignmentMask() const {
-    return (Data & AlignmentMask);
-  }
-  constexpr ValueWitnessFlags withAlignmentMask(size_t alignMask) const {
-    return ValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
-  }
-
-  size_t getAlignment() const { return getAlignmentMask() + 1; }
-  constexpr ValueWitnessFlags withAlignment(size_t alignment) const {
-    return withAlignmentMask(alignment - 1);
-  }
-
-  /// True if the type requires out-of-line allocation of its storage.
-  bool isInlineStorage() const { return !(Data & IsNonInline); }
-  constexpr ValueWitnessFlags withInlineStorage(bool isInline) const {
-    return ValueWitnessFlags((Data & ~IsNonInline) |
-                               (isInline ? 0 : IsNonInline));
-  }
-
-  /// True if values of this type can be copied with memcpy and
-  /// destroyed with a no-op.
-  bool isPOD() const { return !(Data & IsNonPOD); }
-  constexpr ValueWitnessFlags withPOD(bool isPOD) const {
-    return ValueWitnessFlags((Data & ~IsNonPOD) |
-                               (isPOD ? 0 : IsNonPOD));
-  }
-  
-  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
-  /// 'take' is a destructive operation that invalidates the source object, so
-  /// most types can be taken with a simple bitwise copy. Only types with side
-  /// table references, like @weak references, or types with opaque value
-  /// semantics, like imported C++ types, are not bitwise-takable.
-  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
-  constexpr ValueWitnessFlags withBitwiseTakable(bool isBT) const {
-    return ValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
-                               (isBT ? 0 : IsNonBitwiseTakable));
-  }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
-  /// True if this type's binary representation is that of an enum, and the
-  /// enum value witness table entries are available in this type's value
-  /// witness table.
-  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr ValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return ValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
-  constexpr ValueWitnessFlags
-  withEnumWitnesses(bool hasEnumWitnesses) const {
-    return ValueWitnessFlags((Data & ~HasEnumWitnesses) |
-                             (hasEnumWitnesses ? HasEnumWitnesses : 0));
-  }
-};
-  
-/// Flags stored in a value-witness table with extra inhabitants.
-class ExtraInhabitantFlags {
-  typedef size_t int_type;
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-  };
-  int_type Data;
-  
-  constexpr ExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr ExtraInhabitantFlags() : Data(0) {}
-  
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-  
-  constexpr ExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return ExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                  numExtraInhabitants);
-  }
-};
-
 namespace value_witness_types {
 
 // Note that, for now, we aren't strict about 'const'.
@@ -409,6 +291,11 @@ struct ValueWitnessTable {
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   value_witness_types::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
+
+  /// Is the external type layout of this type incomplete?
+  bool isIncomplete() const {
+    return flags.isIncomplete();
+  }
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
