@@ -998,11 +998,6 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is Optional<T>; otherwise, return the null
-  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
-  /// otherwise.
-  Type getOptionalObjectType(bool &isOptional);
-
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
