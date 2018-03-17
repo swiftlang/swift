@@ -151,7 +151,6 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK-64: call swiftcc void @"$S22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
 // CHECK: ret void
 class SuperBase {

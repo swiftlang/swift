@@ -48,7 +48,7 @@ func takeS(_ s: S) {}
 // CHECK: %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
 // CHECK: %[[ACCESS1:.*]] = begin_access [modify] [unknown] %[[ADDRS]] : $*S
-// CHECK: %[[ADDRI:.*]] = struct_element_addr %15 : $*S, #S.i
+// CHECK: %[[ADDRI:.*]] = struct_element_addr %[[ACCESS1]] : $*S, #S.i
 // CHECK: assign %{{.*}} to %[[ADDRI]] : $*Int
 // CHECK: end_access %[[ACCESS1]] : $*S
 // CHECK: %[[ACCESS2:.*]] = begin_access [read] [unknown] %[[ADDRS]] : $*S

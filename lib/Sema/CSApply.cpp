@@ -1965,6 +1965,41 @@ namespace {
           type = defaultType;
       }
 
+      // By far the most common 'nil' literal is for Optional<T>.none.
+      //
+      // Emit this case directly instead of calling Optional.init(nilLiteral:),
+      // since this generates more efficient SIL.
+      if (auto objectType = type->getOptionalObjectType()) {
+        auto *nilDecl = tc.Context.getOptionalNoneDecl();
+        tc.validateDecl(nilDecl);
+        if (!nilDecl->hasInterfaceType())
+          return nullptr;
+
+        SubstitutionList subs = {Substitution(objectType, {})};
+        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, subs);
+
+        auto nilType = FunctionType::get(
+            {MetatypeType::get(type)}, type);
+        auto *nilRefExpr = new (tc.Context) DeclRefExpr(
+            concreteDeclRef, DeclNameLoc(expr->getLoc()),
+              /*implicit=*/true, AccessSemantics::Ordinary,
+            nilType);
+        cs.cacheType(nilRefExpr);
+
+        auto *typeExpr = TypeExpr::createImplicitHack(
+            expr->getLoc(),
+            type,
+            tc.Context);
+        cs.cacheType(typeExpr);
+
+        auto *callExpr = new (tc.Context) DotSyntaxCallExpr(
+            nilRefExpr, expr->getLoc(), typeExpr, type);
+        callExpr->setImplicit(true);
+        cs.cacheType(callExpr);
+
+        return callExpr;
+      }
+
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_nilLiteral });
       return convertLiteral(expr, type, cs.getType(expr), protocol,
