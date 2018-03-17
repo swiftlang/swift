@@ -107,7 +107,7 @@ public func frexp(_ x: ${T}) -> (${T}, Int) {
   return (x.significand / 2, Int(x.exponent + 1))
 }
 
-@available(swift, deprecated: 4.2, message: "Use scalbn<T>(:T,:Int).")
+@available(swift, deprecated: 4.2, renamed: "scalbn")
 @_transparent
 public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
   return ${T}(sign: .plus, exponent: n, significand: x)
