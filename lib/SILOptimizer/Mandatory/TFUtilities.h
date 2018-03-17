@@ -189,6 +189,13 @@ namespace tf {
     bool containsTensorHandle(Type ty) {
       return tcth.containsTensorHandle(ty);
     }
+
+    /// Return true if the specified type contains a TensorHandle that will be
+    /// exposed after deabstraction.
+    bool containsTensorHandle(SILType ty) {
+      return containsTensorHandle(ty.getSwiftRValueType());
+    }
+
   };
 
   /// Lower the specified SIL function (which was formed by the partitioner)
