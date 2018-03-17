@@ -1637,7 +1637,9 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//

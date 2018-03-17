@@ -2720,7 +2720,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     CanType &inputSubstType,
     CanType &outputSubstType,
     GenericEnvironment *&genericEnv,
-    SubstitutionMap &interfaceSubs) {
+    SubstitutionMap &interfaceSubs,
+    bool withoutActuallyEscaping) {
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
 
@@ -2732,6 +2733,9 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // is only stripped when using this type to materialize a new decl.
   auto extInfo = expectedType->getExtInfo()
     .withRepresentation(SILFunctionType::Representation::Thin);
+
+  if (withoutActuallyEscaping)
+    extInfo = extInfo.withNoEscape(false);
 
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
@@ -2942,82 +2946,12 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
   assert(escapingType->getExtInfo() ==
          noEscapingType->getExtInfo().withNoEscape(false));
 
-  // Strip the closure properties.
-  auto extInfo = noEscapingType->getExtInfo()
-                     .withRepresentation(SILFunctionType::Representation::Thin)
-                     .withNoEscape(false);
-
-  // Inherit the context's generic signature if the closure uses generic
-  // parameters.
-  assert(noEscapingType->hasArchetype() == escapingType->hasArchetype());
-  CanGenericSignature genericSig;
-  if (noEscapingType->hasArchetype()) {
-    genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = SGF.F.getGenericEnvironment();
-  }
-
-  // If our parent function was pseudogeneric, this thunk must also be
-  // pseudogeneric, since we have no way to pass generic parameters.
-  if (genericSig)
-    if (SGF.F.getLoweredFunctionType()->isPseudogeneric())
-      extInfo = extInfo.withIsPseudogeneric();
-
-  // Add the function type as the parameter.
-  auto contextConvention =
-      SILType::getPrimitiveObjectType(noEscapingType).isTrivial(SGF.getModule())
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
-  SmallVector<SILParameterInfo, 4> params;
-  params.append(noEscapingType->getParameters().begin(),
-                noEscapingType->getParameters().end());
-  params.push_back({noEscapingType,
-                    noEscapingType->getExtInfo().hasContext()
-                      ? contextConvention
-                      : ParameterConvention::Direct_Unowned});
-
-  // Map the parameter and expected types out of context to get the interface
-  // type of the thunk.
-  SmallVector<SILParameterInfo, 4> interfaceParams;
-  interfaceParams.reserve(params.size());
-  for (auto &param : params) {
-    auto paramIfaceTy = param.getType()->mapTypeOutOfContext();
-    interfaceParams.push_back(
-      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
-                       param.getConvention()));
-  }
-
-  SmallVector<SILYieldInfo, 4> interfaceYields;
-  for (auto &yield : noEscapingType->getYields()) {
-    auto yieldIfaceTy = yield.getType()->mapTypeOutOfContext();
-    auto interfaceYield =
-      yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
-    interfaceYields.push_back(interfaceYield);
-  }
-
-  SmallVector<SILResultInfo, 4> interfaceResults;
-  for (auto &result : noEscapingType->getResults()) {
-    auto resultIfaceTy = result.getType()->mapTypeOutOfContext();
-    auto interfaceResult =
-      result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
-    interfaceResults.push_back(interfaceResult);
-  }
-
-  Optional<SILResultInfo> interfaceErrorResult;
-  if (noEscapingType->hasErrorResult()) {
-    auto errorResult = noEscapingType->getErrorResult();
-    auto errorIfaceTy = errorResult.getType()->mapTypeOutOfContext();
-    interfaceErrorResult = SILResultInfo(
-        errorIfaceTy->getCanonicalType(genericSig),
-        noEscapingType->getErrorResult().getConvention());
-  }
-
-  // The type of the thunk function.
-  return SILFunctionType::get(genericSig, extInfo,
-                              noEscapingType->getCoroutineKind(),
-                              ParameterConvention::Direct_Unowned,
-                              interfaceParams, interfaceYields,
-                              interfaceResults, interfaceErrorResult,
-                              SGF.getASTContext());
+  CanType inputSubstType, outputSubstType;
+  SubstitutionMap interfaceSubs;
+  return SGF.buildThunkType(noEscapingType, escapingType,
+                            inputSubstType, outputSubstType,
+                            genericEnv, interfaceSubs,
+                            /*withoutActuallyEscaping=*/true);
 }
 
 static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
