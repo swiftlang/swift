@@ -1709,7 +1709,8 @@ bool DeclContext::lookupQualified(Type type,
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isInheritable())
+        if (isa<ClassDecl>(ctor->getDeclContext()) &&
+            !ctor->isInheritable())
           return false;
       } else {
         return false;
