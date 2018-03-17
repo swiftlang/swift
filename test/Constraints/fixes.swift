@@ -144,3 +144,35 @@ struct S1116 {
 
 let a1116: [S1116] = []
 var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
+
+func moreComplexUnwrapFixes() {
+  struct S { let value: Int }
+  struct T {
+    let s: S
+    let optS: S?
+  }
+  struct U {
+    let t: T
+  }
+  func takeNon(_ x: Int) -> Void {}
+  func takeOpt(_ x: Int?) -> Void {}
+
+  let s = S(value: 0)
+  let t: T? = T(s: s, optS: nil)
+  let u: U? = U(t: t!)
+  let os: S? = s
+
+  takeOpt(os.value) // expected-error{{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}} {{13-13=?}}
+  takeNon(os.value) // expected-error{{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}} {{13-13=!}}
+
+  takeOpt(t.s.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  takeNon(t.s.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=!}}
+  takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  takeNon(t.optS.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  // expected-error@-1 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}}{{17-17=!}}
+
+  takeOpt(u.t.s.value) // expected-error{{value of optional type 'U?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  takeNon(u.t.s.value) // expected-error{{value of optional type 'U?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=!}}
+
+  t.s.value = 2 // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=?}}
+}

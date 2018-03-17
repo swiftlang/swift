@@ -7785,6 +7785,21 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
     
   switch (fix.first.getKind()) {
+  case FixKind::OptionalChaining: {
+    if (!solution.DisjunctionChoices.count(locator) ||
+        !solution.getDisjunctionChoice(fix.second)) {
+      auto type = solution.simplifyType(getType(affected))
+      ->getRValueObjectType();
+      auto diag = TC.diagnose(affected->getLoc(),
+                              diag::missing_unwrap_optional, type);
+      diag.fixItInsertAfter(affected->getEndLoc(), "?");
+      return true;
+    }
+    // Making the result optional failed, but non-optional succeeded, so
+    // we can't optional chain after all: fallthrough into forcing.
+    LLVM_FALLTHROUGH;
+  }
+
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
     auto type = solution.simplifyType(getType(affected))
@@ -7806,15 +7821,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
             .fixItInsertAfter(affected->getEndLoc(), ")!");
       }
     }
-    return true;
-  }
-          
-  case FixKind::OptionalChaining: {
-    auto type = solution.simplifyType(getType(affected))
-                ->getRValueObjectType();
-    auto diag = TC.diagnose(affected->getLoc(),
-                            diag::missing_unwrap_optional, type);
-    diag.fixItInsertAfter(affected->getEndLoc(), "?");
     return true;
   }
 
