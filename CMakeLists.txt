@@ -88,6 +88,10 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+option(SWIFT_STDLIB_ENABLE_RESILIENCE
+    "Build the Swift stdlib and overlays with resilience enabled."
+    TRUE)
+
 #
 # Miscellaneous User-configurable options.
 #
