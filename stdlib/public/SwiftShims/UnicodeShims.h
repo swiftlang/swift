@@ -402,6 +402,9 @@ typedef char16_t __swift_stdlib_UChar;
 typedef __swift_uint16_t __swift_stdlib_UChar;
 #endif
 #endif
+#define __SWIFT_STDLIB_U_MAX_VERSION_LENGTH 4
+typedef __swift_uint8_t
+    __swift_stdlib_UVersionInfo[__SWIFT_STDLIB_U_MAX_VERSION_LENGTH];
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_ubrk_close(__swift_stdlib_UBreakIterator *bi);
@@ -456,6 +459,10 @@ __swift_stdlib_UBool
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBool
     __swift_stdlib_u_isdefined(__swift_stdlib_UChar32);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void __swift_stdlib_u_charAge(
+    __swift_stdlib_UChar32, __swift_stdlib_UVersionInfo _Nonnull);
 
 
 

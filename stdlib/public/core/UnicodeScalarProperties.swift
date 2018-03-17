@@ -657,3 +657,29 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_MODIFIER_BASE)
   }
 }
+
+extension Unicode {
+
+  /// A version of the Unicode Standard represented by its `major.minor`
+  /// components.
+  public typealias Version = (major: Int, minor: Int)
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The earliest version of the Unicode Standard in which the scalar was
+  /// assigned.
+  ///
+  /// This value will be nil for code points that have not yet been assigned.
+  ///
+  /// This property corresponds to the `Age` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var age: Unicode.Version? {
+    var versionInfo: __swift_stdlib_UVersionInfo = (0, 0, 0, 0)
+    withUnsafeMutablePointer(to: &versionInfo.0) { versionInfoPointer in
+      __swift_stdlib_u_charAge(_value, versionInfoPointer)
+    }
+    guard versionInfo.0 != 0 else { return nil }
+    return (major: Int(versionInfo.0), Int(versionInfo.1))
+  }
+}

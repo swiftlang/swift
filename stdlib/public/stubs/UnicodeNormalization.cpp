@@ -33,6 +33,9 @@ typedef int32_t UChar32;
 typedef int8_t UBool;
 typedef swift::__swift_stdlib_UProperty UProperty;
 
+#define U_MAX_VERSION_LENGTH 4
+typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
+
 // Grapheme breaking APIs
 void ubrk_close(UBreakIterator *);
 UBreakIterator *ubrk_open(UBreakIteratorType, const char *, const UChar *,
@@ -50,6 +53,7 @@ const UNormalizer2 *unorm2_getNFCInstance(UErrorCode *);
 UBool unorm2_hasBoundaryBefore(const UNormalizer2 *norm2, UChar32 c);
 UBool u_hasBinaryProperty(UChar32, UProperty);
 UBool u_isdefined(UChar32);
+void u_charAge(UChar32, UVersionInfo);
 }
 
 #else
@@ -64,6 +68,7 @@ UBool u_isdefined(UChar32);
 #include <unicode/ubrk.h>
 #include <unicode/uchar.h>
 #include <unicode/uvernum.h>
+#include <unicode/uversion.h>
 
 #pragma clang diagnostic pop
 
@@ -321,6 +326,12 @@ swift::__swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32 c,
 swift::__swift_stdlib_UBool
 swift::__swift_stdlib_u_isdefined(UChar32 c) {
   return u_isdefined(c);
+}
+
+void
+swift::__swift_stdlib_u_charAge(__swift_stdlib_UChar32 c,
+                                __swift_stdlib_UVersionInfo versionInfo) {
+  return u_charAge(c, versionInfo);
 }
 
 
