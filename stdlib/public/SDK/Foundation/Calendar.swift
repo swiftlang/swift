@@ -42,11 +42,11 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         case republicOfChina
         
         /// A simple tabular Islamic calendar using the astronomical/Thursday epoch of CE 622 July 15
-        @available(OSX 10.10, iOS 8.0, *)
+        @available(macOS 10.10, iOS 8.0, *)
         case islamicTabular
         
         /// The Islamic Umm al-Qura calendar used in Saudi Arabia. This is based on astronomical calculation, instead of tabular behavior.
-        @available(OSX 10.10, iOS 8.0, *)
+        @available(macOS 10.10, iOS 8.0, *)
         case islamicUmmAlQura
         
     }
@@ -417,7 +417,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A calendar component.
     /// - parameter date: The specified date.
     /// - returns: A new `DateInterval` if the starting time and duration of a component could be calculated, otherwise `nil`.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateInterval(of component: Component, for date: Date) -> DateInterval? {
         var start : Date = Date(timeIntervalSinceReferenceDate: 0)
         var interval : TimeInterval = 0
@@ -694,7 +694,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     ///
     /// - parameter date: The date contained in the weekend.
     /// - returns: A `DateInterval`, or nil if the date is not in a weekend.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateIntervalOfWeekend(containing date: Date) -> DateInterval? {
         var nsDate : NSDate?
         var ti : TimeInterval = 0
@@ -739,7 +739,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The date at which to begin the search.
     /// - parameter direction: Which direction in time to search. The default value is `.forward`.
     /// - returns: A `DateInterval`, or nil if weekends do not exist in the specific calendar or locale.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func nextWeekend(startingAfter date: Date, direction: SearchDirection = .forward) -> DateInterval? {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
         var nsDate : NSDate?
