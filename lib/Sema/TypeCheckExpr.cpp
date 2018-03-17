@@ -516,7 +516,8 @@ bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
-  auto semantics = value->getAccessSemanticsFromContext(UseDC, /*base*/nullptr);
+  auto semantics = value->getAccessSemanticsFromContext(UseDC,
+                                                       /*isAccessOnSelf*/false);
   return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
@@ -527,7 +528,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
     auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
-                                                             /*base*/nullptr);
+                                                       /*isAccessOnSelf*/false);
     return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
   }
 

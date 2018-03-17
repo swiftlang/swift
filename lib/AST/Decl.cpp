@@ -1297,32 +1297,29 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
-                                         Expr *base) const {
+                                         bool isAccessOnSelf) const {
   // If we're inside a @_transparent function, use the most conservative
   // access pattern, since we may be inlined from a different resilience
   // domain.
   ResilienceExpansion expansion = UseDC->getResilienceExpansion();
 
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
-    // Prevent variable mutations from within their own didSet/willSet
-    // specifiers from becoming infinite loops by accessing directly.
-    if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC)) {
-      if (var->hasStorage() && var->hasAccessorFunctions() &&
-          UseFD->getStorage() == var) {
-        // A plain variable access from within its own observer is direct.
-        if (!base)
-          return AccessSemantics::DirectToStorage;
+    auto isMember = var->getDeclContext()->isTypeContext();
+    if (isAccessOnSelf)
+      assert(isMember && "Access on self, but var isn't a member");
 
-        // A member access on the implicit 'self' declaration within its own
-        // observer is direct. If the base is some other expression, we want
-        // to call the setter, as we might be accessing the member on a
-        // *different* instance.
-        base = base->getValueProvidingExpr();
-        if (auto baseDRE = dyn_cast<DeclRefExpr>(base))
-          if (baseDRE->getDecl() == UseFD->getImplicitSelfDecl())
-            return AccessSemantics::DirectToStorage;
-      }
-    }
+    // Within a variable's own didSet/willSet specifier, access its storage
+    // directly if it's either:
+    // 1) A 'plain variable' (i.e a variable that's not a member).
+    // 2) An access to the member on the implicit 'self' declaration. If it's a
+    //    member access on some other base, we want to call the setter as we
+    //    might be accessing the member on a *different* instance.
+    // This prevents assignments from becoming infinite loops in most cases.
+    if (!isMember || isAccessOnSelf)
+      if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
+        if (var->hasStorage() && var->hasAccessorFunctions() &&
+            UseFD->getStorage() == var)
+          return AccessSemantics::DirectToStorage;
 
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same

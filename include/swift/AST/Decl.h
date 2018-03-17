@@ -2354,10 +2354,10 @@ public:
   ///
   /// \param DC The declaration context.
   ///
-  /// \param base If querying for a MemberRefExpr, this is its base expression.
-  ///             Otherwise, \c nullptr.
+  /// \param isAccessOnSelf Whether this is a member access on the implicit
+  ///        'self' declaration of the declaration context.
   AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
-                                                Expr *base) const;
+                                                bool isAccessOnSelf) const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;
