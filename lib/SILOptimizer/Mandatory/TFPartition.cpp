@@ -705,6 +705,13 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
   if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return;
 
+  // Since we're in early development and don't support copies, we always show
+  // the using instruction that caused the copy.
+  // TODO: Remove this as the stack matures.
+  if (auto *inst = value->getDefiningInstruction())
+    llvm::errs() << "IMPLICIT COPY TO ACCEL OF: " << *inst;
+  llvm::errs() << "IMPLICIT COPY TO ACCEL BY: " << *user;
+
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
 
@@ -795,6 +802,13 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return false;
 
+  // Since we're in early development and don't support copies, we always show
+  // the using instruction that caused the copy.
+  // TODO: Remove this as the stack matures.
+  if (auto *inst = value->getDefiningInstruction())
+    llvm::errs() << "IMPLICIT COPY TO HOST OF: " << *inst;
+  llvm::errs() << "IMPLICIT COPY TO HOST BY: " << *user;
+
   auto &ctx = fn.getModule().getASTContext();
 
   // Emit the warning.
@@ -808,6 +822,7 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
     .highlight(userLoc.getSourceRange());
   }
+
   return true;
 }
 
