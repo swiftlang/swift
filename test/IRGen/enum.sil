@@ -2682,10 +2682,7 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2, [[WORD]] {{4|8}})
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], [[WORD]] 2
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
-// CHECK:   store i8* [[T0]], i8** [[T1]]
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum16DynamicSingletonOMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {

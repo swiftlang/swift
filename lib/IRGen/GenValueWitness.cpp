@@ -918,30 +918,28 @@ static void addValueWitness(IRGenModule &IGM,
   }
 
   case ValueWitness::Flags: {
-    uint64_t flags = 0;
+    ValueWitnessFlags flags;
 
     // If we locally know that the type has fixed layout, we can emit
     // meaningful flags for it.
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
-      flags |= fixedTI->getFixedAlignment().getValue() - 1;
-      if (!fixedTI->isPOD(ResilienceExpansion::Maximal))
-        flags |= ValueWitnessFlags::IsNonPOD;
       assert(packing == FixedPacking::OffsetZero ||
              packing == FixedPacking::Allocate);
-      if (packing != FixedPacking::OffsetZero)
-        flags |= ValueWitnessFlags::IsNonInline;
-
-      if (fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
-        flags |= ValueWitnessFlags::Enum_HasExtraInhabitants;
-
-      if (!fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal))
-        flags |= ValueWitnessFlags::IsNonBitwiseTakable;
+      flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
+                   .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
+                   .withInlineStorage(packing == FixedPacking::OffsetZero)
+                   .withExtraInhabitants(
+                      fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
+                   .withBitwiseTakable(
+                      fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal));
+    } else {
+      flags = flags.withIncomplete(true);
     }
 
     if (concreteType.getEnumOrBoundGenericEnum())
-      flags |= ValueWitnessFlags::HasEnumWitnesses;
+      flags = flags.withEnumWitnesses(true);
 
-    auto value = IGM.getSize(Size(flags));
+    auto value = IGM.getSize(Size(flags.getOpaqueValue()));
     return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
   }
 
@@ -972,9 +970,13 @@ static void addValueWitness(IRGenModule &IGM,
     // If we locally know that the type has fixed layout, we can emit
     // meaningful flags for it.
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
+      ExtraInhabitantFlags flags;
+
       uint64_t numExtraInhabitants = fixedTI->getFixedExtraInhabitantCount(IGM);
       assert(numExtraInhabitants <= ExtraInhabitantFlags::NumExtraInhabitantsMask);
-      auto value = IGM.getSize(Size(numExtraInhabitants));
+      flags = flags.withNumExtraInhabitants(numExtraInhabitants);
+
+      auto value = IGM.getSize(Size(flags.getOpaqueValue()));
       return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
     }
 

@@ -363,15 +363,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the class.
 // CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
-//   Put the generic arguments in their correct positions.
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 18
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %A to i8*
-// CHECK:   store i8* [[T0]], i8** [[A_ADDR]], align 8
-// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 19
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8*
-// CHECK:   store i8* [[T0]], i8** [[B_ADDR]], align 8
-// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK-NEXT:   ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes015GenericInheritsC0CMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
