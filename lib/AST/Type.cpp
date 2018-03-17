@@ -501,25 +501,11 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getOptionalObjectType(bool &isOptional) {
-  if (auto boundTy = getAs<BoundGenericEnumType>()) {
-    if (boundTy->getDecl()->isOptionalDecl()) {
-      isOptional = true;
-      return boundTy->getGenericArgs()[0];
-    }
-  }
-  isOptional = false;
-  return Type();
-}
-
-CanType CanType::getOptionalObjectTypeImpl(CanType type, bool &isOptional) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type)) {
-    if (boundTy->getDecl()->isOptionalDecl()) {
-      isOptional = true;
+CanType CanType::getOptionalObjectTypeImpl(CanType type) {
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+    if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
-    }
-  }
-  isOptional = false;
+
   return CanType();
 }
 

@@ -2102,9 +2102,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
-      bool type2IsOptional;
-      if (Type unwrapped = type2->getOptionalObjectType(type2IsOptional))
+      bool type2IsOptional = false;
+      if (Type unwrapped = type2->getOptionalObjectType()) {
+        type2IsOptional = true;
         unwrappedType2 = unwrapped;
+      }
       PointerTypeKind pointerKind;
       if (Type pointeeTy =
               unwrappedType2->getAnyPointerElementType(pointerKind)) {
@@ -2142,9 +2144,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             // We can potentially convert from an UnsafeMutablePointer
             // of a different type, if we're a void pointer.
             Type unwrappedType1 = type1;
-            bool type1IsOptional;
-            if (Type unwrapped =
-                    type1->getOptionalObjectType(type1IsOptional)) {
+            bool type1IsOptional = false;
+            if (Type unwrapped = type1->getOptionalObjectType()) {
+              type1IsOptional = true;
               unwrappedType1 = unwrapped;
             }
 

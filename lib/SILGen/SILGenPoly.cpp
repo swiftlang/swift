@@ -378,11 +378,11 @@ ManagedValue Transform::transform(ManagedValue v,
   if (v.getType() == loweredResultTy)
     return v;
 
-  bool inputIsOptional, outputIsOptional;
-  CanType inputObjectType =
-      inputSubstType.getOptionalObjectType(inputIsOptional);
-  CanType outputObjectType =
-      outputSubstType.getOptionalObjectType(outputIsOptional);
+  CanType inputObjectType = inputSubstType.getOptionalObjectType();
+  bool inputIsOptional = (bool) inputObjectType;
+
+  CanType outputObjectType = outputSubstType.getOptionalObjectType();
+  bool outputIsOptional = (bool) outputObjectType;
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.

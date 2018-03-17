@@ -1036,9 +1036,11 @@ private:
       os << ", unsafe_unretained";
     } else {
       Type copyTy = ty;
-      bool isOptional;
-      if (auto unwrappedTy = copyTy->getOptionalObjectType(isOptional))
+      bool isOptional = false;
+      if (auto unwrappedTy = copyTy->getOptionalObjectType()) {
+        isOptional = true;
         copyTy = unwrappedTy;
+      }
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {

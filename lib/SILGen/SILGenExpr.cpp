@@ -4317,15 +4317,21 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
   
   auto newSelfTy = E->getSubExpr()->getType();
-  bool outerIsOptional;
-  if (auto objTy = newSelfTy->getOptionalObjectType(outerIsOptional))
+  bool outerIsOptional = false;
+  bool innerIsOptional = false;
+  auto objTy = newSelfTy->getOptionalObjectType();
+  if (objTy) {
+    outerIsOptional = true;
     newSelfTy = objTy;
 
-  // "try? self.init()" can give us two levels of optional if the initializer
-  // we delegate to is failable.
-  bool innerIsOptional;
-  if (auto objTy = newSelfTy->getOptionalObjectType(innerIsOptional))
-    newSelfTy = objTy;
+    // "try? self.init()" can give us two levels of optional if the initializer
+    // we delegate to is failable.
+    objTy = newSelfTy->getOptionalObjectType();
+    if (objTy) {
+      innerIsOptional = true;
+      newSelfTy = objTy;
+    }
+  }
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
