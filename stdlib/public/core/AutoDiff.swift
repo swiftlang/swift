@@ -50,12 +50,16 @@
 ///              to other: Self) {
 ///             self.init(Array(repeating: value, count: elements.count))
 ///         }
+/// 
+///         func combiningAsAdjoint(with newAdjoint: Self) -> Self {
+///             return self + newAdjoint
+///         }
 ///     }
 ///
 public protocol Differentiable {
   /// The currency type in the mathematical model of differentiation. For
   /// example, the currency type of `Float` is `Float`, and the currency type
-  /// for a vector of `Float` is still `Float`. The currency type is used to
+  /// of a vector of `Float` is still `Float`. The currency type is used to
   /// initialize intermediate values during automatic differentiation, such as
   /// the initial adjoint/tangent and the seed.
   associatedtype DifferentiationCurrency : FloatingPoint
@@ -70,8 +74,12 @@ public protocol Differentiable {
   ///
   init(numericallyBroadcasting value: DifferentiationCurrency, to other: Self)
 
-  /// Adds two values and produces their sum.
-  static func + (lhs: Self, rhs: Self) -> Self
+  /// Combining self with the given value as differentiated adjoint, producing
+  /// a new adjoint.
+  ///
+  /// - Note: This will be used by the compiler during reverse-mode automatic
+  /// differentiation, to combine back-propagated gradient values.
+  func combiningAsAdjoint(with newAdjoint: Self) -> Self
 }
 
 public extension FloatingPoint {
@@ -80,4 +88,53 @@ public extension FloatingPoint {
   init(numericallyBroadcasting value: Self, to other: Self) {
     self = value
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  func combiningAsAdjoint(with newAdjoint: Self) -> Self {
+    return self + newAdjoint
+  }
 }
+
+//===----------------------------------------------------------------------===//
+// Runtime
+//===----------------------------------------------------------------------===//
+
+@_versioned
+class _ADTape<Element> {
+  @_versioned var elements: [Element] = []
+  
+  @inline(never)
+  @_semantics("autodiff.create_tape")
+  @_silgen_name("_swift_autodiff_CreateTape")
+  init() {}
+}
+
+extension _ADTape {
+  var count: Int {
+    @inline(never)
+    @_semantics("autodiff.tape_element_count")
+    @_silgen_name("_swift_autodiff_TapeElementCount")
+    get {
+      return elements.count
+    }
+  }
+  
+  @inline(never)
+  @_semantics("autodiff.push_to_tape")
+  @_silgen_name("_swift_autodiff_PushToTape")
+  func push(_ value: Element) {
+    elements.append(value)
+  }
+  
+  @inline(never)
+  @_semantics("autodiff.pop_from_tape")
+  @_silgen_name("_swift_autodiff_PopFromTape")
+  func pop() -> Element {
+    guard let popped = elements.popLast() else {
+      preconditionFailure("Cannot pop from an empty AD tape.")
+    }
+    return popped
+  }
+}
+
