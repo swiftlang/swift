@@ -53,16 +53,16 @@
 
 
 // TWO-OUTPUTS: bin/swift{{c?}} -frontend
-// TWO-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // TWO-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// TWO-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // TWO-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // TWO-OUTPUTS: bin/swift{{c?}} -frontend
 // TWO-OUTPUTS: -emit-module [[MODULE]]
 // TWO-OUTPUTS: -o main.swiftmodule
 
 // THREE-OUTPUTS: bin/swift{{c?}} -frontend
-// THREE-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // THREE-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// THREE-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // THREE-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // THREE-OUTPUTS: bin/swift{{c?}} -frontend
 // THREE-OUTPUTS: -emit-module [[MODULE]]

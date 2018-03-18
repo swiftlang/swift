@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Driver/OutputFileMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
@@ -18,28 +18,34 @@
 #include <system_error>
 
 using namespace swift;
+using namespace swift::driver;
 
-llvm::Expected<OutputFileMap>
+std::unique_ptr<OutputFileMap>
 OutputFileMap::loadFromPath(StringRef Path, StringRef workingDirectory) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(Path);
-  if (!FileBufOrErr) {
-    return llvm::errorCodeToError(FileBufOrErr.getError());
-  }
+    llvm::MemoryBuffer::getFile(Path);
+  if (!FileBufOrErr)
+    return nullptr;
   return loadFromBuffer(std::move(FileBufOrErr.get()), workingDirectory);
 }
 
-llvm::Expected<OutputFileMap>
+std::unique_ptr<OutputFileMap>
 OutputFileMap::loadFromBuffer(StringRef Data, StringRef workingDirectory) {
   std::unique_ptr<llvm::MemoryBuffer> Buffer{
-      llvm::MemoryBuffer::getMemBuffer(Data)};
+    llvm::MemoryBuffer::getMemBuffer(Data)
+  };
   return loadFromBuffer(std::move(Buffer), workingDirectory);
 }
 
-llvm::Expected<OutputFileMap>
+std::unique_ptr<OutputFileMap>
 OutputFileMap::loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
                               StringRef workingDirectory) {
-  return parse(std::move(Buffer), workingDirectory);
+  std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
+
+  if (OFM->parse(std::move(Buffer), workingDirectory))
+    return nullptr;
+
+  return OFM;
 }
 
 const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
@@ -102,56 +108,21 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   }
 }
 
-static void writeQuotedEscaped(llvm::raw_ostream &os,
-                               const StringRef fileName) {
-  os << "\"";
-  os.write_escaped(fileName);
-  os << "\"";
-}
-
-void OutputFileMap::write(llvm::raw_ostream &os,
-                          ArrayRef<StringRef> inputs) const {
-  for (const auto input : inputs) {
-    const TypeToPathMap *outputMap = getOutputMapForInput(input);
-    if (!outputMap)
-      continue;
-    writeQuotedEscaped(os, input);
-    os << ":\n";
-    for (auto &typeAndOutputPath : *outputMap) {
-      types::ID type = typeAndOutputPath.getFirst();
-      StringRef output = typeAndOutputPath.getSecond();
-      os << "  " << types::getTypeName(type) << ": ";
-      writeQuotedEscaped(os, output);
-      os << "\n";
-    }
-  }
-}
-
-llvm::Expected<OutputFileMap>
-OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                     StringRef workingDirectory) {
-  auto constructError =
-      [](const char *errorString) -> llvm::Expected<OutputFileMap> {
-    return llvm::make_error<llvm::StringError>(errorString,
-                                               llvm::inconvertibleErrorCode());
-  };
-  /// FIXME: Make the returned error strings more specific by including some of
-  /// the source.
+bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                          StringRef workingDirectory) {
   llvm::SourceMgr SM;
   llvm::yaml::Stream YAMLStream(Buffer->getMemBufferRef(), SM);
   auto I = YAMLStream.begin();
   if (I == YAMLStream.end())
-    return constructError("empty YAML stream");
+    return true;
 
   auto Root = I->getRoot();
   if (!Root)
-    return constructError("no root");
-
-  OutputFileMap OFM;
+    return true;
 
   auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
   if (!Map)
-    return constructError("root was not a MappingNode");
+    return true;
 
   auto resolvePath =
       [workingDirectory](
@@ -178,19 +149,19 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
     llvm::yaml::Node *Value = Pair.getValue();
 
     if (!Key)
-      return constructError("bad key");
+      return true;
 
     if (!Value)
-      return constructError("bad value");
+      return true;
 
     auto *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
     if (!InputPath)
-      return constructError("input path not a scalar node");
+      return true;
 
     llvm::yaml::MappingNode *OutputMapNode =
       dyn_cast<llvm::yaml::MappingNode>(Value);
     if (!OutputMapNode)
-      return constructError("output map not a MappingNode");
+      return true;
 
     TypeToPathMap OutputMap;
 
@@ -200,11 +171,11 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
 
       auto *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
       if (!KindNode)
-        return constructError("kind not a ScalarNode");
+        return true;
 
       auto *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
       if (!Path)
-        return constructError("path not a scalar node");
+        return true;
 
       llvm::SmallString<16> KindStorage;
       types::ID Kind =
@@ -221,9 +192,9 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
     }
 
     llvm::SmallString<128> InputStorage;
-    OFM.InputToOutputsMap[resolvePath(InputPath, InputStorage)] =
+    InputToOutputsMap[resolvePath(InputPath, InputStorage)] =
         std::move(OutputMap);
   }
 
-  return OFM;
+  return false;
 }

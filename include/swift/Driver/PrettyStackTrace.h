@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_PRETTYSTACKTRACE_H
 #define SWIFT_DRIVER_PRETTYSTACKTRACE_H
 
-#include "swift/Frontend/Types.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "swift/Driver/Types.h"
 
 namespace swift {
 namespace driver {
