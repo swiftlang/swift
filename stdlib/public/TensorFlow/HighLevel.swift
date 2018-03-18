@@ -303,10 +303,8 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
-      return Parameters(
-        filter: lhs.filter + rhs.filter
-      )
+    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
+      return Parameters(filter: filter.combiningAsAdjoint(with: other.filter))
     }
 
     @_inlineable @inline(__always)
@@ -443,10 +441,10 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
       return Parameters(
-        weight: lhs.weight + rhs.weight,
-        bias: lhs.bias + rhs.bias
+        weight: weight.combiningAsAdjoint(with: other.weight),
+        bias: bias.combiningAsAdjoint(with: other.bias)
       )
     }
 
@@ -607,10 +605,10 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
       return Parameters(
-        offset: lhs.offset + rhs.offset,
-        scale: lhs.scale + rhs.scale
+        offset: offset.combiningAsAdjoint(with: other.offset),
+        scale: scale.combiningAsAdjoint(with: other.scale)
       )
     }
 

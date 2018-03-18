@@ -449,6 +449,11 @@ extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
   public init(numericallyBroadcasting value: Scalar, to other: ${TensorXD}) {
     self.init(handle: #tfop("Fill", other.shapeTensor, value))
   }
+
+  @_inlineable @inline(__always)
+  public func combiningAsAdjoint(with other: ${TensorXD}) -> ${TensorXD} {
+    return self + other
+  }
 }
 
 //===----------------------------------------------------------------------===//

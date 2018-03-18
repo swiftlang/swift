@@ -28,7 +28,6 @@ if(SWIFT_ENABLE_TENSORFLOW)
   list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}")
 
   add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-      ADRuntime.swift
       CompilerRuntime.swift
       CompositeMath.swift
       DataTypes.swift
