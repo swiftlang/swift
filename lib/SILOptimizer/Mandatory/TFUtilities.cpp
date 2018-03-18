@@ -898,10 +898,26 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   return newInst;
 }
 
+/// Return true if this apply instruction is to a function that can be
+/// conditionally hoisted into the graph, but don't check the operands to
+/// see if they are actually constants we can handle.
+bool SILTensorOpInfo::isDecodableApply(ApplyInst *apply) {
+  auto fn = apply->getCalleeFunction();
+  if (!fn) return false;
+
+  auto name = fn->getName();
+  return name == "__tf_tensor_from_scalars" ||
+         name == "__tf_tensor_from_scalars_1d";
+}
+
 /// If the specified call is to a function that we can promote to an op,
 /// rewrite the instruction and return a new one that does so.  Otherwise,
 /// return the same instruction.
-SILInstruction *SILTensorOpInfo::decodeApply(ApplyInst *apply, StringRef name) {
+SILInstruction *SILTensorOpInfo::decodeApply(ApplyInst *apply) {
+  auto fn = apply->getCalleeFunction();
+  if (!fn) return apply;
+
+  auto name = fn->getName();
   if (name == "__tf_tensor_from_scalars")
     return decodeTensorFromScalars(apply);
   if (name == "__tf_tensor_from_scalars_1d")
@@ -909,8 +925,6 @@ SILInstruction *SILTensorOpInfo::decodeApply(ApplyInst *apply, StringRef name) {
 
   return apply;
 }
-
-
 
 /// Return the string suffix for the specified attribute modifier.
 const char *SILTensorOpInfo::
