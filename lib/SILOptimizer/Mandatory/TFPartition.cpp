@@ -1472,6 +1472,8 @@ void TFFunctionPartition::promoteCopyToMove() {
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
 bool TFFunctionPartition::markFunction() {
+  bool loggedInput = false;
+
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
@@ -1485,12 +1487,25 @@ bool TFFunctionPartition::markFunction() {
       // If this is a well known function that can be transformed into an op, do
       // so first.
       if (auto apply = dyn_cast<ApplyInst>(inst))
-        if (auto fn = apply->getCalleeFunction())
-          inst = SILTensorOpInfo::decodeApply(apply, fn->getName());
+        inst = SILTensorOpInfo::decodeApply(apply);
 
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
+
+      // If this is the first op we've found, print out the input to the
+      // partitioning pass.  This would ideally be hoisted to the top level, but
+      // we want to make sure to print this even if we encounter an error (so we
+      // can diagnose the errors).
+      if (!loggedInput) {
+        if (auto *outs = getTFDumpIntermediateStream()) {
+          *outs << "---- INPUT FUNCTION " << fn.getName() <<" ----------\n";
+          fn.print(*outs);
+          *outs << "---- END OF INPUT FUNCTION ----------\n";
+          outs->flush();
+        }
+        loggedInput = true;
+      }
 
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
@@ -2946,13 +2961,6 @@ public:
                "nothing in the TensorFlow module should require partitioning, "
                "did you forget @_inlineable on '" + fn->getName().str() + "'?");
       return;
-    }
-
-    if (auto *outs = getTFDumpIntermediateStream()) {
-      *outs << "---- INPUT FUNCTION " << fn->getName() <<" ----------\n";
-      fn->print(*outs);
-      *outs << "---- END OF INPUT FUNCTION ----------\n";
-      outs->flush();
     }
 
     // Actually do the partitioning transformation, splitting out a new SIL
