@@ -19,6 +19,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
@@ -37,10 +38,54 @@ static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
               llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
 
-/// This returns true if we should dump out intermediate results to standard
-/// out.  This is used for integration unit tests.
-bool tf::shouldDumpIntermediates() {
-  return TFDumpIntermediates;
+// For Mac builds, default to saving logging files to /tmp since debugging in
+// Xcode and the REPL is so challenging.
+#if __APPLE__
+#define DEFAULT_TO_TMP_LOGGING true
+#else
+#define DEFAULT_TO_TMP_LOGGING false
+#endif
+
+static llvm::cl::opt<bool>
+TFDumpIntermediatesToTmp("tf-dump-intermediates-tmp",
+                         llvm::cl::init(DEFAULT_TO_TMP_LOGGING),
+                         llvm::cl::desc("Dump intermediate results in "
+                                        "TensorFlow passes to files in /tmp"));
+
+static raw_ostream &getTmpLoggingStream() {
+  // If we are supposed to dump the intermediates into /tmp, set that up now.
+  SmallString<64> resultPath;
+  int resultFD = -1;
+  auto error =
+    llvm::sys::fs::createTemporaryFile("tf-dump-intermediates", "txt",
+                                       resultFD, resultPath);
+
+  // If we had an error, print something to stderr, but keep going.
+  if (error) {
+    llvm::errs() << "error opening -tf-dump-intermediates logging file '"
+                 << resultPath.str() << "'!\n";
+    return llvm::errs();
+  }
+
+  // This file never gets closed since the raw_ostream is immortal.
+  return *new llvm::raw_fd_ostream(resultFD, /*shouldClose*/true,
+                                   /*unbuffered*/true);
+}
+
+/// If the -tf-dump-intermediates flag has been passed, return a pointer to
+/// the stream that we should print debug dump information to.  Otherwise,
+/// return null.  This is used for integration unit tests and debugging.
+llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
+  // If the -tf-dump-intermediates flag was passed, dump to stdout.
+  if (TFDumpIntermediates)
+    return &llvm::outs();
+
+  if (!TFDumpIntermediatesToTmp)
+    return nullptr;
+
+  // Lazily initialize the logging stream.
+  static llvm::raw_ostream &fileStream = getTmpLoggingStream();
+  return &fileStream;
 }
 
 bool tf::isTensorHandle(SILType ty) {

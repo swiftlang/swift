@@ -23,9 +23,10 @@
 
 namespace swift {
 namespace tf {
-  /// This returns true if we should dump out intermediate results to standard
-  /// out.  This is used for integration unit tests.
-  bool shouldDumpIntermediates();
+  /// If the -tf-dump-intermediates flag has been passed, return a pointer to
+  /// the stream that we should print debug dump information to.  Otherwise,
+  /// return null.  This is used for integration unit tests and debugging.
+  llvm::raw_ostream *getTFDumpIntermediateStream();
 
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
