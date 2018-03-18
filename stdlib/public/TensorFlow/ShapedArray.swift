@@ -23,6 +23,7 @@ import CTensorFlow
 /// mode, the buffer object stores a `TF_Tensor*` and bridges to TensorFlow.
 /// In either mode, the buffer object owns the memory and will deallocate it
 /// on `deinit`.
+@_fixed_layout @_versioned
 internal final class TensorBuffer<Scalar> {
   typealias Shape = [Int]
 
@@ -30,7 +31,8 @@ internal final class TensorBuffer<Scalar> {
   /// - Note: an Array is used as the native storage for TensorBuffer. To make
   /// in-place mutation possible when the array is stored in an enum value, the
   /// array must be wrapped in a reference type.
-  class BoxedArray {
+  @_fixed_layout @_versioned
+  final class BoxedArray {
     var array: [Scalar]
 
     init(_ array: [Scalar]) {
@@ -198,7 +200,7 @@ public extension _ShapedArrayProtocol {
     set {
       precondition(newValue.count == scalarCount, "Scalar count mismatch.")
       withUnsafeMutableBufferPointer { ptr in
-        ptr.baseAddress!.assign(from: newValue, count: newValue.count)
+        ptr.baseAddress!.initialize(from: newValue, count: newValue.count)
       }
     }
   }
@@ -283,6 +285,7 @@ fileprivate extension _ShapedArrayProtocol where Scalar : Equatable {
 /// `ShapedArray` is a representation of a multidimensional array. It has a
 /// shape, which has type `[Int]` and defines the array dimensions, and uses
 /// `TensorBuffer` internally as storage.
+@_fixed_layout
 public struct ShapedArray<Scalar> : _ShapedArrayProtocol {
   /// Contiguous memory storing scalars.
   internal var buffer: TensorBuffer<Scalar>
@@ -354,7 +357,7 @@ public extension ShapedArray {
     let buffer = TensorBuffer<Scalar>.create(count: scalarCount) { buffPtr in
       let ptr = buffPtr.baseAddress!
       scalars.withUnsafeBufferPointer { arrayBuf in
-        ptr.assign(from: arrayBuf.baseAddress!, count: scalarCount)
+        ptr.initialize(from: arrayBuf.baseAddress!, count: scalarCount)
       }
     }
     self.init(buffer: buffer, shape: shape)
@@ -368,7 +371,7 @@ public extension ShapedArray {
       var i = 0
       for scalar in scalars {
         guard i < scalarCount else { break }
-        ptr.advanced(by: i).assign(repeating: scalar, count: 1)
+        ptr.advanced(by: i).initialize(to: scalar)
         i += 1
       }
       // If the sequence has fewer elements than the shape needs, this is a
@@ -383,7 +386,7 @@ public extension ShapedArray {
   init(_ scalar: Scalar) {
     let buffer = TensorBuffer<Scalar>.create(count: 1) { buffPtr in
       let ptr = buffPtr.baseAddress!
-      ptr.assign(repeating: scalar, count: 1)
+      ptr.initialize(to: scalar)
     }
     self.init(buffer: buffer, shape: [])
   }
@@ -397,7 +400,7 @@ public extension ShapedArray {
     let scalarCount = shape.reduce(1, *)
     let buffer = TensorBuffer<Scalar>.create(count: scalarCount) { buffPtr in
       let ptr = buffPtr.baseAddress!
-      ptr.assign(repeating: repeatedValue, count: scalarCount)
+      ptr.initialize(repeating: repeatedValue, count: scalarCount)
     }
     self.init(buffer: buffer, shape: shape)
   }
@@ -443,7 +446,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
       withUnsafeMutableBufferPointer { destBuffPtr in
         let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
-          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+          ptr.initialize(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
       }
     }
@@ -473,7 +476,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
       withUnsafeMutableBufferPointer { destBuffPtr in
         let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
-          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+          ptr.initialize(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
       }
     }
@@ -552,9 +555,18 @@ extension ShapedArray : CustomStringConvertible {
 }
 
 // Xcode Playground display conversion
+// NOTE: The new "CustomPlaygroundDisplayConvertible" API causes Xcode
+// Playgrounds to crash on Mac.
+#if false
 extension ShapedArray : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
+  }
+}
+#endif
+extension ShapedArray : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 }
 
@@ -609,6 +621,7 @@ extension ShapedArray : CustomPlaygroundDisplayConvertible {
 ///     // The first 2 elements in `matrix` have been mutated.
 ///     // `matrix` now represents [[0, 0], [0, 0], [4, 5]].
 
+@_fixed_layout
 public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   /// The underlying ShapedArray of the slice.
   internal var base: ShapedArray<Scalar>
@@ -784,7 +797,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
       withUnsafeMutableBufferPointer { destBuffPtr in
         let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
-          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+          ptr.initialize(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
       }
     }
@@ -815,7 +828,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
       withUnsafeMutableBufferPointer { destBuffPtr in
         let ptr = destBuffPtr.baseAddress!.advanced(by: scalarIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
-          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+          ptr.initialize(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
       }
     }
@@ -845,8 +858,17 @@ extension ShapedArraySlice : CustomStringConvertible {
 }
 
 // Xcode Playground display conversion
+// NOTE: The new "CustomPlaygroundDisplayConvertible" API causes Xcode
+// Playgrounds to crash on Mac.
+#if false
 extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
+  }
+}
+#endif
+extension ShapedArraySlice : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 }
