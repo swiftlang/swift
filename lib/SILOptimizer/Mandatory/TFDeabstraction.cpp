@@ -477,6 +477,20 @@ void TFDeabstraction::simplifyTensorOperands() {
         continue;
       }
 
+      // If we have a call to a function that is conditionally promotable to a
+      // tensor op, we add it to the set of tensor operations we're trying to
+      // deabstract.  This ensures that we deabstract its operands, which makes
+      // it possible to tell if its getting a variable or constant value.
+      if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+        if (SILTensorOpInfo::isDecodableApply(apply)) {
+          logIfFirstChange();
+          // Remember this for later passes.
+          tensorOps.push_back(apply);
+          containsOpBuiltin = true;
+          continue;
+        }
+      }
+
       // Find retain and release instructions that directly use TensorHandle
       // values.  We treat them as tensorOps to ensure that their operands are
       // deabstracted.
@@ -1184,8 +1198,7 @@ void TFDeabstraction::canonicalizeOps() {
       // If this is a well known function that can be transformed into an op, do
       // so first.
       if (auto apply = dyn_cast<ApplyInst>(inst))
-        if (auto fn = apply->getCalleeFunction())
-          inst = SILTensorOpInfo::decodeApply(apply, fn->getName());
+        inst = SILTensorOpInfo::decodeApply(apply);
 
       // Try to decode this instruction as an op.  If it isn't one, ignore it.
       auto opInfo = SILTensorOpInfo::decode(inst);
