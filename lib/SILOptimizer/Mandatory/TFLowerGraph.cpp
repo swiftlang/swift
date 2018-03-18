@@ -1409,10 +1409,11 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   // single-entry-single-exit regions.
   auto structure = canonicalizeCFGForXLA(fn);
 
-  if (shouldDumpIntermediates()) {
-    llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
-    structure->print(llvm::outs());
-    llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
+    structure->print(*outs);
+    *outs << "\n--- XLA CFG Canonicalize end\n";
+    outs->flush();
   }
 
   // TensorFlow likes to print out lots of informational messages to the
