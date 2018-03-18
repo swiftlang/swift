@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 class C {}
 
@@ -57,7 +57,8 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var i: GSing<T>
   // -- Multi-element generic struct, need to derive from metadata
-  // CHECK:       [[METADATA:%.*]] = call %swift.type* @"$S11type_layout5GMultVMa"
+  // CHECK:       [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S11type_layout5GMultVMa"([[INT]] 0, %swift.type* %T)
+  // CHECK:       [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK:       [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1
   // CHECK:       [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]

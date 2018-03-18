@@ -1363,9 +1363,11 @@ public:
 };
 
 /// Kinds of requests for metadata.
-class MetadataRequest : public FlagSet<size_t> {
+template <class IntType>
+class TargetMetadataRequest : public FlagSet<IntType> {
+  using super = FlagSet<IntType>;
 public:
-  enum BasicKind {
+  enum BasicKind : IntType {
     /// A request for fully-completed metadata.  The metadata must be
     /// prepared for all supported type operations.  This is a superset
     /// of the requirements of LayoutComplete.
@@ -1387,7 +1389,7 @@ public:
   };
 
 private:
-  enum {
+  enum : IntType {
     BasicKind_bit = 0,
     BasicKind_width = 8,
 
@@ -1401,12 +1403,14 @@ private:
   };
 
 public:
-  MetadataRequest(BasicKind kind, bool isNonBlocking = false) {
+  TargetMetadataRequest(BasicKind kind, bool isNonBlocking = false) {
     setBasicKind(kind);
     setIsNonBlocking(isNonBlocking);
   }
-  explicit MetadataRequest(size_t bits) : FlagSet(bits) {}
-  constexpr MetadataRequest() {}
+  explicit TargetMetadataRequest(IntType bits) : super(bits) {}
+  constexpr TargetMetadataRequest() {}
+
+  FLAGSET_DEFINE_EQUALITY(TargetMetadataRequest)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(BasicKind_bit,
                                  BasicKind_width,
@@ -1418,6 +1422,8 @@ public:
                                 isNonBlocking,
                                 setIsNonBlocking)
 };
+using MetadataRequest =
+  TargetMetadataRequest<size_t>;
 
 } // end namespace swift
 

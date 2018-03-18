@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %utils/chex.py < %s > %t/cf.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 // REQUIRES: objc_interop
@@ -49,14 +49,16 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 
 // CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @"$SSo17CCRefrigeratorRefaMa"()
-// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
+// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"([[INT]] 0)
+// CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
+// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T2]])
 // CHECK:      [[T0:%.*]] = bitcast [[MUTABLE_REFRIGERATOR]]* %1 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @"$SSo24CCMutableRefrigeratorRefaMa"()
-// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
+// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo24CCMutableRefrigeratorRefaMa"([[INT]] 0)
+// CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
+// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T2]])
 // CHECK-NEXT: ret void
 
-// CHECK:    define linkonce_odr hidden [[TYPE]]* @"$SSo17CCRefrigeratorRefaMa"()
+// CHECK:    define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"(
 // CHECK-32:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo17CCRefrigeratorRefaN" to i8*), i32 8) to [[TYPE]]*))
 // CHECK-64:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo17CCRefrigeratorRefaN" to i8*), i64 16) to [[TYPE]]*))
 

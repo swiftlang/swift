@@ -524,7 +524,7 @@ struct MetadataCompletionQueueEntry {
 /// \return false if the entry was not added because the dependency
 ///   has already reached the desired requirement
 bool addToMetadataQueue(std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                        Metadata *dependency,
+                        const Metadata *dependency,
                         MetadataRequest::BasicKind dependencyRequirement);
 
 
@@ -567,10 +567,7 @@ class MetadataCacheEntryBase
 
 public:
   using ValueType = Metadata *;
-  struct Status {
-    ValueType Value;
-    MetadataRequest::BasicKind State;
-  };
+  using Status = MetadataResponse;
 
 protected:
   template<typename T>
@@ -692,7 +689,7 @@ public:
       asImpl().allocate(std::forward<Args>(args)...);
 
     // Publish the value.
-    Value = allocationResult.Value;
+    Value = const_cast<ValueType>(allocationResult.Value);
     auto newState = MetadataState::forRequestState(allocationResult.State);
     publishMetadataState(concurrency, newState);
 
@@ -725,7 +722,7 @@ protected:
   struct TryInitializeResult {
     MetadataRequest::BasicKind NewState;
     MetadataRequest::BasicKind DependencyRequirement;
-    Metadata *Dependency;
+    const Metadata *Dependency;
   };
 
 private:

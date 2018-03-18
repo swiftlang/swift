@@ -106,7 +106,7 @@ public class Concrete : Derived<Int> {
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 // CHECK: ret %swift.type* [[METADATA]]
 
-// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMr"
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 
@@ -120,14 +120,15 @@ public class Concrete : Derived<Int> {
 // CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
 
-// CHECK: ret %swift.type* null
+// CHECK: ret %swift.metadata_response zeroinitializer
 
 
 //// Metadata initialization function for 'Concrete' copies superclass vtable
 //// and installs overrides for 'init()' and 'm3()'.
 
 // CHECK-LABEL: define private void @initialize_metadata_Concrete(i8*)
-// CHECK: [[SUPERCLASS:%.*]] = call %swift.type* @"$S14generic_vtable7DerivedCySiGMa"()
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCySiGMa"(i64 0)
+// CHECK: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})

@@ -847,7 +847,7 @@ public:
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    return accessFunction(allGenericArgs);
+    return accessFunction(MetadataRequest::Complete, allGenericArgs).Value;
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
@@ -1015,10 +1015,10 @@ swift::_getTypeByMangledName(StringRef typeName,
       if (!assocTypeReqIndex) return nullptr;
 
       // Call the associated type access function.
-      using AssociatedTypeAccessFn =
-        const Metadata *(*)(const Metadata *base, const WitnessTable *);
-      return ((const AssociatedTypeAccessFn *)witnessTable)[*assocTypeReqIndex]
-                (base, witnessTable);
+      // TODO: can we just request abstract metadata?  If so, do we have
+      //   a responsibility to try to finish it later?
+      return ((const AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
+                (MetadataRequest::Complete, base, witnessTable).Value;
     });
 
   auto type = Demangle::decodeMangledType(builder, node);

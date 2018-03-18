@@ -48,6 +48,7 @@ namespace irgen {
   class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
+  class MetadataResponse;
   enum RequireMetadata_t : bool;
   class Size;
   class StructLayout;
@@ -66,12 +67,15 @@ namespace irgen {
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
 
+  using LazyCacheEmitter =
+    llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
+
   /// Emit the body of a lazy cache access function.
   void emitLazyCacheAccessFunction(IRGenModule &IGM,
                                    llvm::Function *accessor,
-                                   llvm::GlobalVariable *cacheVariable,
-        const llvm::function_ref<llvm::Value *(IRGenFunction &IGF)> &getValue,
-        bool isReadNone = true);
+                                   llvm::GlobalVariable *cache,
+                                   LazyCacheEmitter getValue,
+                                   bool isReadNone = true);
 
   /// Emit a declaration reference to a metatype object.
   void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

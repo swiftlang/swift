@@ -42,6 +42,7 @@ add_swift_library(swiftIRGen STATIC
   LoadableByAddress.cpp
   LocalTypeData.cpp
   MetadataLayout.cpp
+  MetadataRequest.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
   TypeLayoutVerifier.cpp

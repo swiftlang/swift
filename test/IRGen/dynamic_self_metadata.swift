@@ -27,6 +27,7 @@ class C {
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
   // CHECK: [[CAST1:%.+]] = bitcast %T21dynamic_self_metadata1CC* %0 to [[METATYPE:%.+]]
   // CHECK: [[TYPE1:%.+]] = call %swift.type* @swift_getObjectType([[METATYPE]] [[CAST1]])
-  // CHECK: [[TYPE2:%.+]] = call %swift.type* @"$SSqMa"(%swift.type* [[TYPE1]])
+  // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$SSqMa"(i64 0, %swift.type* [[TYPE1]])
+  // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call swiftcc void @"$S21dynamic_self_metadata2idyxxlF"({{.*}}, %swift.type* [[TYPE2]])
 }

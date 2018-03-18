@@ -189,6 +189,31 @@ class WeakReference;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// The result of requesting type metadata.  Generally the return value of
+/// a function.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataResponse {
+  /// For metadata access functions, this is the requested metadata.
+  ///
+  /// For metadata initialization functions, this is either null,
+  /// indicating that initialization was successful, or a metadata on
+  /// which initialization depends for further progress.
+  const Metadata *Value;
+
+  /// For metadata access functions, this is the current state of the
+  /// metadata returned.  Always use this instead of trying to inspect
+  /// the metadata directly; an incomplete metadata may be getting
+  /// initialized concurrently.  This can generally be ignored if the
+  /// metadata request was for abstract metadata or if the request is
+  /// blocking.
+  ///
+  /// For metadata initialization functions, this is the state that the
+  /// given metadata needs to be in before initialization can continue.
+  MetadataRequest::BasicKind State;
+};
+
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
@@ -1983,6 +2008,16 @@ using TargetWitnessTablePointer =
 
 using WitnessTablePointer = TargetWitnessTablePointer<InProcess>;
 
+using AssociatedTypeAccessFunction =
+  SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                  const Metadata *self,
+                                  const WitnessTable *selfConformance);
+
+using AssociatedWitnessTableAccessFunction =
+  SWIFT_CC(swift) WitnessTable *(const Metadata *associatedType,
+                                 const Metadata *self,
+                                 const WitnessTable *selfConformance);
+
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.
@@ -3008,9 +3043,10 @@ struct MetadataCompletionContext {
 ///   pointer to indicate that completion is blocked on the completion of
 ///   some other type
 using MetadataCompleter =
-  Metadata *(const Metadata *type,
-             MetadataCompletionContext *context,
-             const TargetGenericMetadataPattern<InProcess> *pattern);
+  SWIFT_CC(swift)
+  MetadataResponse(const Metadata *type,
+                   MetadataCompletionContext *context,
+                   const TargetGenericMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
@@ -3229,45 +3265,13 @@ using TypeGenericContextDescriptorHeader =
 /// Wrapper class for the pointer to a metadata access function that provides
 /// operator() overloads to call it with the right calling convention.
 class MetadataAccessFunction {
-  const Metadata * (*Function)(...);
+  MetadataResponse (*Function)(...);
 
   static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
                 "Need to account for change in number of direct arguments");
 
-  template<typename T>
-  const Metadata *applyN(const void *arg0,
-                         const void *arg1,
-                         const void *arg2,
-                         llvm::ArrayRef<T *> argRest) const {
-    using FnN = const Metadata *(const void *,
-                                 const void *,
-                                 const void *,
-                                 const void *);
-    return reinterpret_cast<FnN*>(Function)(arg0, arg1, arg2, argRest.data());
-  }
-  
-  template<typename...Args>
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n,
-                                 const void *arg3,
-                                 Args...argN) const {
-    argRest[n] = arg3;
-    return variadic_apply(arg0, arg1, arg2, argRest, n+1, argN...);
-  }
-  
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n) const {
-    return applyN(arg0, arg1, arg2, argRest);
-  }
-
 public:
-  explicit MetadataAccessFunction(const Metadata * (*Function)(...))
+  explicit MetadataAccessFunction(MetadataResponse (*Function)(...))
     : Function(Function)
   {}
   
@@ -3275,52 +3279,78 @@ public:
     return Function != nullptr;
   }
   
-  // Invoke with an array of arguments.
-  template<typename T>
-  const Metadata *operator()(llvm::ArrayRef<T *> args) const {
+  /// Invoke with an array of arguments of dynamic size.
+  MetadataResponse operator()(MetadataRequest request,
+                              llvm::ArrayRef<const void *> args) const {
     switch (args.size()) {
     case 0:
-      return (*this)();
+      return operator()(request);
     case 1:
-      return (*this)(args[0]);
+      return operator()(request, args[0]);
     case 2:
-      return (*this)(args[0], args[1]);
+      return operator()(request, args[0], args[1]);
     case 3:
-      return (*this)(args[0], args[1], args[2]);
+      return operator()(request, args[0], args[1], args[2]);
     default:
-      return applyN(args[0], args[1], args[2], args);
+      return applyMany(request, args.data());
     }
   }
   
-  // Invoke with n arguments.
-  const Metadata *operator()() const {
-    using Fn0 = const Metadata *();
-    return reinterpret_cast<Fn0*>(Function)();
+  /// Invoke with exactly 0 arguments.
+  MetadataResponse operator()(MetadataRequest request) const {
+    using Fn0 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request);
+    return reinterpret_cast<Fn0*>(Function)(request);
   }
-  const Metadata *operator()(const void *arg0) const {
-    using Fn1 = const Metadata *(const void *);
-    return reinterpret_cast<Fn1*>(Function)(arg0);
+
+  /// Invoke with exactly 1 argument.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0) const {
+    using Fn1 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0);
+    return reinterpret_cast<Fn1*>(Function)(request, arg0);
 
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1) const {
-    using Fn2 = const Metadata *(const void *, const void *);
-    return reinterpret_cast<Fn2*>(Function)(arg0, arg1);
+
+  /// Invoke with exactly 2 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1) const {
+    using Fn2 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1);
+    return reinterpret_cast<Fn2*>(Function)(request, arg0, arg1);
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2) const {
-    using Fn3 = const Metadata *(const void *, const void *, const void *);
-    return reinterpret_cast<Fn3*>(Function)(arg0, arg1, arg2);
+
+  /// Invoke with exactly 3 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2) const {
+    using Fn3 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1,
+                                                 const void *arg2);
+    return reinterpret_cast<Fn3*>(Function)(request, arg0, arg1, arg2);
   }
   
+  /// Invoke with more than 3 arguments.
   template<typename...Args>
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2,
-                             Args...argN) const {
-    const void *args[3 + sizeof...(Args)];
-    return variadic_apply(arg0, arg1, arg2, args, 3, argN...);
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2,
+                              Args... argN) const {
+    const void *args[] = { arg0, arg1, arg2, argN... };
+    return applyMany(request, args);
+  }
+
+private:
+  /// In the more-then-max case, just pass all the arguments as an array.
+  MetadataResponse applyMany(MetadataRequest request,
+                             const void * const *args) const {
+    using FnN = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void * const *args);
+    return reinterpret_cast<FnN*>(Function)(request, args);
   }
 };
 
@@ -3336,7 +3366,7 @@ public:
   /// The function type here is a stand-in. You should use getAccessFunction()
   /// to wrap the function pointer in an accessor that uses the proper calling
   /// convention for a given number of arguments.
-  TargetRelativeDirectPointer<Runtime, const Metadata *(...),
+  TargetRelativeDirectPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
 
   MetadataAccessFunction getAccessFunction() const {
@@ -3855,27 +3885,11 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
 }
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
-///
-/// The basic algorithm for fetching a metadata object is:
-///   func swift_getGenericMetadata(header, arguments) {
-///     if (metadata = getExistingMetadata(&header.PrivateData,
-///                                        arguments[0..header.NumArguments]))
-///       return metadata
-///     metadata = malloc(superclass.MetadataSize +
-///                       numImmediateMembers * sizeof(void *))
-///     memcpy(metadata, header.MetadataTemplate, header.TemplateSize)
-///     for (i in 0..header.NumFillInstructions)
-///       metadata[header.FillInstructions[i].ToIndex]
-///         = arguments[header.FillInstructions[i].FromIndex]
-///     setExistingMetadata(&header.PrivateData,
-///                         arguments[0..header.NumArguments],
-///                         metadata)
-///     return metadata
-///   }
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_getGenericMetadata(const TypeContextDescriptor *description,
-                         const void *arguments);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getGenericMetadata(MetadataRequest request,
+                         const void * const *arguments,
+                         const TypeContextDescriptor *description);
 
 /// Allocate a generic class metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic class.

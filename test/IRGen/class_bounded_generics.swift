@@ -1,6 +1,6 @@
 // REQUIRES: plus_one_runtime
 
-// RUN: %target-swift-frontend -module-name class_bounded_generics -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -module-name class_bounded_generics -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -168,7 +168,8 @@ func class_bounded_protocol_method(_ x: ClassBound) {
 func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[T0:%.*]] = call %swift.type* @"$S22class_bounded_generics13ConcreteClassCMa"()
+  // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
@@ -179,7 +180,8 @@ func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
 func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[T0:%.*]] = call %swift.type* @"$S22class_bounded_generics13ConcreteClassCMa"()
+  // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
@@ -304,7 +306,8 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
 // CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
 // CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
-// CHECK-NEXT: [[A_OF_T:%.*]] = call %swift.type* @"$S22class_bounded_generics1ACMa"(%swift.type* [[T]])
+// CHECK-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics1ACMa"([[INT]] 0, %swift.type* [[T]])
+// CHECK-NEXT: [[A_OF_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: call swiftcc void @"$S22class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF"(%T22class_bounded_generics1AC.1* [[SELF]], %swift.type* [[A_OF_T]])
 // CHECK:      ret void
 

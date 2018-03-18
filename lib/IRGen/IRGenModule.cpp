@@ -186,6 +186,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
 
+  TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
+    TypeMetadataPtrTy,
+    SizeTy
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
