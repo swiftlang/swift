@@ -70,7 +70,6 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
-  IGNORED_ATTR(Available)
   IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -114,6 +113,14 @@ public:
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
+
+  void visitAvailableAttr(AvailableAttr *attr) {
+    if (!isa<ExtensionDecl>(D))
+      return;
+    if (attr->hasPlatform())
+      return;
+    diagnoseAndRemoveAttr(attr, diag::availability_extension_platform_agnostic);
+  }
 
   // @noreturn has been replaced with a 'Never' return type.
   void visitNoReturnAttr(NoReturnAttr *attr) {
@@ -693,7 +700,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isLet())
+    else if (cast<VarDecl>(storage)->isImmutable())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;
@@ -1073,8 +1080,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (TC.getLangOpts().DisableAvailabilityChecking)
     return;
 
-  if (!attr->isActivePlatform(TC.Context) || !attr->Introduced.hasValue())
+  if (!attr->hasPlatform() || !attr->isActivePlatform(TC.Context) ||
+      !attr->Introduced.hasValue()) {
     return;
+  }
 
   SourceLoc attrLoc = attr->getLocation();
 
@@ -2163,8 +2172,10 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
 
     diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
     attr->setInvalid();
-  } else if (dyn_cast<ProtocolDecl>(var->getDeclContext())) {
-    // Ownership does not make sense in protocols.
+  } else if (isa<ProtocolDecl>(var->getDeclContext()) &&
+             !cast<ProtocolDecl>(var->getDeclContext())->isObjC()) {
+    // Ownership does not make sense in protocols, except for "weak" on
+    // properties of Objective-C protocols.
     if (Context.isSwiftVersionAtLeast(5))
       diagnose(attr->getLocation(),
         diag::ownership_invalid_in_protocols,

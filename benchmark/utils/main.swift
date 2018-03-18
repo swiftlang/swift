@@ -28,6 +28,7 @@ import ArrayOfRef
 import ArraySetElement
 import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
+import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
@@ -41,6 +42,7 @@ import CharacterProperties
 import Chars
 import ClassArrayGetter
 import Combos
+import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
 import DictTest
@@ -48,6 +50,7 @@ import DictTest2
 import DictTest3
 import DictTest4
 import DictionaryBridge
+import DictionaryCopy
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
@@ -61,6 +64,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FloatingPointPrinting
 import Hanoi
 import Hash
 import HashQuadratic
@@ -169,6 +173,9 @@ registerBenchmark(ArrayOfRef)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
 registerBenchmark(BinaryFloatingPointConversionFromBinaryInteger)
+registerBenchmark(BinaryFloatingPointPropertiesBinade)
+registerBenchmark(BinaryFloatingPointPropertiesNextUp)
+registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
@@ -187,6 +194,7 @@ registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
 registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
+registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
@@ -194,6 +202,7 @@ registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
@@ -207,6 +216,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(HashQuadratic)
@@ -276,6 +286,8 @@ registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)
+registerBenchmark(StringInterpolationSmall)
+registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringTests)

@@ -16,8 +16,7 @@ import c_layout
 // CHECK-SAME: @"$SSo12AmazingColorVMa"
 
 // CHECK-LABEL: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden global
-// CHECK-SAME:  [[INT:i[0-9]+]] sub ([[INT]] ptrtoint
-// CHECK-SAME:  [[INT]] 0,
+// CHECK-SAME:  [[INT:i[0-9]+]] 0,
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVWV"
 // CHECK-SAME:  [[INT]] 1,
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVMn"

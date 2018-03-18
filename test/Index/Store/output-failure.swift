@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir %t/idx
 
 // Before indexing, do a dry-run to ensure any clang modules are cached. We

@@ -64,7 +64,7 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // false positives
 /*mixed:call*/withAllOfTheAbove(z: 1, 2, c: {return 1})
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="defaults" -is-function-like -old-name "withDefaults(_:y:x:)" -new-name "betterName(x:y:z:)" >> %t.result/callsites_defaults.swift
 // RUN: diff -u %S/Outputs/callsites/defaults.swift.expected %t.result/callsites_defaults.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="trailing" -is-function-like -old-name "withTrailingClosure(x:y:)" -new-name "betterName(a:b:)" >> %t.result/callsites_trailing.swift
@@ -75,7 +75,7 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // RUN: diff -u %S/Outputs/callsites/varargs2.swift.expected %t.result/callsites_varargs2.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="mixed" -is-function-like -old-name "withAllOfTheAbove(x:_:z:c:)" -new-name "betterName(a:b:c:d:)" >> %t.result/callsites_mixed.swift
 // RUN: diff -u %S/Outputs/callsites/mixed.swift.expected %t.result/callsites_mixed.swift
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="defaults" -is-function-like -old-name "withDefaults(_:y:x:)" >> %t.ranges/callsites_defaults.swift
 // RUN: diff -u %S/FindRangeOutputs/callsites/defaults.swift.expected %t.ranges/callsites_defaults.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="trailing" -is-function-like -old-name "withTrailingClosure(x:y:)" >> %t.ranges/callsites_trailing.swift

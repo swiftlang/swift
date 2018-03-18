@@ -9,6 +9,6 @@ func foo(_ a : Int) -> Int {
   return 1
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-expr -source-filename %s -pos=8:13 -end-pos=8:22 >> %t.result/C13-22.swift
 // RUN: diff -u %S/Outputs/name_collision/C13-22.swift.expected %t.result/C13-22.swift

@@ -165,8 +165,10 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
                                   const clang::SourceManager *toInsert) {
     return std::less<const clang::SourceManager *>()(inArray.get(), toInsert);
   });
-  if (iter->get() != &clangSrcMgr)
+  if (iter == sourceManagersWithDiagnostics.end() ||
+      iter->get() != &clangSrcMgr) {
     sourceManagersWithDiagnostics.insert(iter, &clangSrcMgr);
+  }
 
   return loc;
 }

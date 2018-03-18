@@ -33,6 +33,7 @@ Diagnostics.test("DiagnosticEmission") {
   let fixLoc = loc()
 
   let engine = DiagnosticEngine()
+  expectFalse(engine.hasErrors)
 
   engine.diagnose(.cannotConvert(fromType: "Int", toType: "Bool"),
                   location: startLoc) {
@@ -42,10 +43,11 @@ Diagnostics.test("DiagnosticEmission") {
 
   expectEqual(engine.diagnostics.count, 1)
   guard let diag = engine.diagnostics.first else { return }
-  expectEqual(diag.message.text, 
+  expectEqual(diag.message.text,
               "cannot convert value of type 'Int' to 'Bool'")
   expectEqual(diag.message.severity, .error)
   expectEqual(diag.notes.count, 1)
+  expectTrue(engine.hasErrors)
 
   guard let note = diag.notes.first else { return }
   expectEqual(note.message.text, "check for explicit equality to '0'")

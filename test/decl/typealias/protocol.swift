@@ -250,8 +250,8 @@ protocol P9 {
   typealias A = Int
 }
 
-func testT9a<T: P9, U>(_: T, _: U) where T.A == U { }
-func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{'T.A' cannot be equal to both 'Float' and 'P9.A' (aka 'Int')}}
+func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-error {{same-type requirement makes generic parameter 'U' non-generic}}
+func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{generic signature requires types 'P9.A' (aka 'Int') and 'Float' to be the same}}
 
 
 struct X<T> { }

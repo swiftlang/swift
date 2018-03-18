@@ -41,4 +41,12 @@ BoolTestSuite.test("FalsePositive") {
   expectNotEqual(30, result)
 }
 
+BoolTestSuite.test("Toggle") {
+  var result = [false, true, true]
+  result[0].toggle()
+  result[1].toggle()
+  expectEqual([true, false, true], result)
+}
+
+
 runAllTests()

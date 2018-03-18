@@ -21,7 +21,7 @@ struct FourInts { var x,y,z,w: Int32 }
 @_alignment(16)
 struct AlignedFourInts { var x: FourInts }
 
-// CHECK:       @"$S11type_layout14TypeLayoutTestVMn" = hidden constant {{.*}} @"$S11type_layout14TypeLayoutTestVMi"
+// CHECK:       @"$S11type_layout14TypeLayoutTestVMn" = hidden constant {{.*}} @"$S11type_layout14TypeLayoutTestVMP"
 // CHECK:       define internal %swift.type* @"$S11type_layout14TypeLayoutTestVMi"
 struct TypeLayoutTest<T> {
   // -- dynamic layout, projected from metadata

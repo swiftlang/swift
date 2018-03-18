@@ -59,10 +59,6 @@ enum { NumDefaultArgumentKindBits = 4 };
 /// an empty string if it has none.
 llvm::StringRef getDefaultArgumentSpelling(DefaultArgumentKind kind);
 
-/// Infer a default argument kind from an expression, if the
-/// expression is the canonical way to spell that default argument.
-DefaultArgumentKind inferDefaultArgumentKind(Expr *expr);
-
 } // end namespace swift
 
 #endif // LLVM_SWIFT_DEFAULTARGUMENTKIND_H

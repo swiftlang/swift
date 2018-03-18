@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name nested_types_referencing_nested_functions -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 do {
   func foo() { bar(2) }

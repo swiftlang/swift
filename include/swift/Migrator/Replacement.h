@@ -24,13 +24,9 @@ struct Replacement {
     return Remove > 0;
   }
 
-  bool isInsert() const {
-    return Remove == 0 && Text.size() > 0;
-  }
+  bool isInsert() const { return Remove == 0 && !Text.empty(); }
 
-  bool isReplace() const {
-    return Remove > 0 && Text.size() > 0;
-  }
+  bool isReplace() const { return Remove > 0 && !Text.empty(); }
 
   size_t endOffset() const {
     if (isInsert()) {

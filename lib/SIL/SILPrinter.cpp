@@ -1549,7 +1549,7 @@ public:
     interleave(OI->getBaseElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
-    if (OI->getTailElements().size() > 0) {
+    if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
       interleave(OI->getTailElements(),
                  [&](const SILValue &V) { *this << getIDAndType(V); },
@@ -1793,6 +1793,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
+    *this << getIDAndType(CUI->getOperand());
+  }
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
@@ -2149,6 +2152,17 @@ public:
       }
       
       *this << " : $" << component.getComponentType();
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
     }
     }
   }
@@ -2307,8 +2321,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsKind() == EffectsKind::ReadWrite)
+  else if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
+  else if (getEffectsKind() == EffectsKind::ReleaseNone)
+    OS << "[releasenone] ";
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
@@ -2607,6 +2623,11 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   OS << '(';
   SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
   OS << ")\n";
+}
+
+void SILProperty::dump() const {
+  SILPrintContext context(llvm::errs());
+  print(context);
 }
 
 static void printSILProperties(SILPrintContext &Ctx,

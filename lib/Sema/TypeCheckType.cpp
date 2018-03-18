@@ -1514,8 +1514,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
   if (Loc.wasValidated())
     return Loc.isError();
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
@@ -1657,11 +1655,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
-  if (!isa<InOutTypeRepr>(repr) &&
-      !isa<SharedTypeRepr>(repr) &&
-      !isa<TupleTypeRepr>(repr) &&
-      !isa<AttributedTypeRepr>(repr) &&
-      !isa<FunctionTypeRepr>(repr) &&
+  if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
+      !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<IdentTypeRepr>(repr)) {
     options -= TypeResolutionFlags::ImmediateFunctionInput;
     options -= TypeResolutionFlags::FunctionInput;
@@ -1679,6 +1674,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
   case TypeReprKind::InOut:
   case TypeReprKind::Shared:
+  case TypeReprKind::Owned:
     return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
@@ -2658,10 +2654,21 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     } else {
       diagID = diag::attr_only_on_parameters;
     }
-    TC.diagnose(repr->getSpecifierLoc(), diagID,
-                (repr->getKind() == TypeReprKind::InOut)
-                  ? "'inout'"
-                  : "'__shared'");
+    StringRef name;
+    switch (repr->getKind()) {
+    case TypeReprKind::InOut:
+      name = "'inout'";
+      break;
+    case TypeReprKind::Shared:
+      name = "'__shared'";
+      break;
+    case TypeReprKind::Owned:
+      name = "'__owned'";
+      break;
+    default:
+      llvm_unreachable("unknown SpecifierTypeRepr kind");
+    }
+    TC.diagnose(repr->getSpecifierLoc(), diagID, name);
     repr->setInvalid();
     return ErrorType::get(Context);
   }
@@ -2861,6 +2868,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         break;
       case TypeReprKind::InOut:
         ownership = ValueOwnership::InOut;
+        break;
+      case TypeReprKind::Owned:
+        ownership = ValueOwnership::Owned;
         break;
       default:
         ownership = ValueOwnership::Default;

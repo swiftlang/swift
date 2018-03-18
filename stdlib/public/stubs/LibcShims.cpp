@@ -196,27 +196,6 @@ void swift::_stdlib_setErrno(int value) {
 }
 
 
-
-#if defined(__APPLE__)
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-float swift::_stdlib_lgammaf_r(float x, int *psigngam) {
-  return lgammaf_r(x, psigngam);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-double swift::_stdlib_lgamma_r(double x, int *psigngam) {
-  return lgamma_r(x, psigngam);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-long double swift::_stdlib_lgammal_r(long double x, int *psigngam) {
-  return lgammal_r(x, psigngam);
-}
-
-#endif // defined(__APPLE__)
-
-
 #if defined(_WIN32)
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");

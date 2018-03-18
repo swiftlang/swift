@@ -1,4 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// REQUIRES: plus_one_runtime
+
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata

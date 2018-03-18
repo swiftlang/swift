@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 401; // Last change: ValueOwnership
+const uint16_t VERSION_MINOR = 403; // Last change: `init` special name
 
 using DeclIDField = BCFixed<31>;
 
@@ -210,9 +210,10 @@ enum class VarDeclSpecifier : uint8_t {
   Var,
   InOut,
   Shared,
+  Owned,
 };
-using VarDeclSpecifierField = BCFixed<2>;
-  
+using VarDeclSpecifierField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
@@ -325,6 +326,7 @@ enum ValueOwnership : uint8_t {
   Default = 0,
   InOut,
   Shared,
+  Owned
 };
 using ValueOwnershipField = BCFixed<2>;
 
@@ -378,6 +380,7 @@ using OptionalTypeKindField = BCFixed<2>;
 enum class DeclNameKind: uint8_t {
   Normal,
   Subscript,
+  Constructor,
   Destructor
 };
 
@@ -392,6 +395,8 @@ enum SpecialIdentifierID : uint8_t {
   OBJC_HEADER_MODULE_ID,
   /// Special value for the special subscript name
   SUBSCRIPT_ID,
+  /// Special value for the special constructor name
+  CONSTRUCTOR_ID,
   /// Special value for the special destructor name
   DESTRUCTOR_ID,
 

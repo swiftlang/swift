@@ -7,7 +7,7 @@ func foo(_ a : Int) -> Int {
   return foo1() + foo1() + foo1() + a1 + a2 + a3
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-repeat -source-filename %s -pos=4:16 -end-pos=4:17 >> %t.result/two.swift
 // RUN: diff -u %S/Outputs/basic/two.swift.expected %t.result/two.swift
 // RUN: %refactor -extract-repeat -source-filename %s -pos=4:12 -end-pos=4:17 >> %t.result/one-plus-two.swift

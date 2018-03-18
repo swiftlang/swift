@@ -1,0 +1,21 @@
+source.edit.kind.active:
+  95:17-95:18 source.refactoring.range.kind.call-argument-label arg-index=0
+  95:18-95:20 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.active:
+  96:22-96:23 source.refactoring.range.kind.call-argument-label arg-index=0
+  96:23-96:25 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.unknown:
+source.edit.kind.active:
+  97:37-97:38 source.refactoring.range.kind.call-argument-label arg-index=0
+  97:38-97:40 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.active:
+  97:59-97:60 source.refactoring.range.kind.call-argument-label arg-index=0
+  97:60-97:62 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.inactive:
+  103:22-103:23 source.refactoring.range.kind.call-argument-label arg-index=0
+  103:23-103:25 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.unknown:

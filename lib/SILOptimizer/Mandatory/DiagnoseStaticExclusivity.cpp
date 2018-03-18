@@ -905,7 +905,7 @@ static void checkForViolationWithCall(
     const auto &SubAccesses = AS.getSubAccesses();
 
     // Is the capture accessed in the callee?
-    if (SubAccesses.size() == 0)
+    if (SubAccesses.empty())
       continue;
 
     SILValue Argument = Arguments[ArgumentIndex];
@@ -1041,7 +1041,7 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
       continue;
     }
-    if (auto apply = isa<ApplySite>(user)) {
+    if (isa<ApplySite>(user)) {
       SILValue arg = oper->get();
       auto ArgumentFnType = getSILFunctionTypeForValue(arg);
       if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
@@ -1297,7 +1297,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
       }
 #endif
       // Sanity check to make sure entries are properly removed.
-      assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
+      assert((!isa<ReturnInst>(&I) || Accesses.empty()) &&
              "Entries were not properly removed?!");
     }
   }

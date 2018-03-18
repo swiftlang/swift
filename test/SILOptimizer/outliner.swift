@@ -3,6 +3,8 @@
 
 // REQUIRES: objc_interop
 
+// XFAIL: plus_zero_runtime
+
 import Foundation
 
 public class MyGizmo {

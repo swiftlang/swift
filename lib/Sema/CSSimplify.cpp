@@ -1212,8 +1212,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     return result;
 
   // Result type can be covariant (or equal).
-  return matchTypes(func1->getResult(), func2->getResult(), subKind, subflags,
-                    locator.withPathElement(ConstraintLocator::FunctionResult));
+  return matchTypes(func1->getResult(), func2->getResult(), subKind,
+                     subflags,
+                     locator.withPathElement(
+                       ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1499,8 +1501,6 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
-  auto origType1 = type1;
-
   bool isArgumentTupleConversion
           = kind == ConstraintKind::ArgumentTupleConversion ||
             kind == ConstraintKind::OperatorArgumentTupleConversion;
@@ -2102,9 +2102,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
-      bool type2IsOptional;
-      if (Type unwrapped = type2->getOptionalObjectType(type2IsOptional))
+      bool type2IsOptional = false;
+      if (Type unwrapped = type2->getOptionalObjectType()) {
+        type2IsOptional = true;
         unwrappedType2 = unwrapped;
+      }
       PointerTypeKind pointerKind;
       if (Type pointeeTy =
               unwrappedType2->getAnyPointerElementType(pointerKind)) {
@@ -2142,9 +2144,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             // We can potentially convert from an UnsafeMutablePointer
             // of a different type, if we're a void pointer.
             Type unwrappedType1 = type1;
-            bool type1IsOptional;
-            if (Type unwrapped =
-                    type1->getOptionalObjectType(type1IsOptional)) {
+            bool type1IsOptional = false;
+            if (Type unwrapped = type1->getOptionalObjectType()) {
+              type1IsOptional = true;
               unwrappedType1 = unwrapped;
             }
 
@@ -2243,32 +2245,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
-    auto isClosureResult = [&]() {
-      if (elt->getKind() == ConstraintLocator::ClosureResult)
-        return true;
-
-      // If constraint is matching function results where
-      // left-hand side is a 'closure result' we need to allow
-      // certain implicit conversions.
-      if (elt->getKind() != ConstraintLocator::FunctionResult)
-        return false;
-
-      if (auto *typeVar = origType1->getAs<TypeVariableType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        if (!locator)
-          return false;
-
-        auto path = locator->getPath();
-        if (path.empty())
-          return false;
-
-        return path.back().getKind() == ConstraintLocator::ClosureResult;
-      }
-
-      return false;
-    };
-
-    if (isClosureResult()) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
       if (concrete && kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -2497,20 +2474,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Error;
   }
 
-  NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
-  if (isa<AbstractFunctionDecl>(useDC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
-  auto instanceType = valueType;
-  if (auto *selfType = instanceType->getAs<DynamicSelfType>())
-    instanceType = selfType->getSelfType();
-
-  auto ctors = TC.lookupConstructors(useDC, instanceType, lookupOptions);
-  if (!ctors)
-    return SolutionKind::Error;
-
-  auto &context = getASTContext();
-  auto name = context.Id_init;
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
   auto fnLocator = getConstraintLocator(locator,
@@ -2523,7 +2486,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
+  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
+                           DeclBaseName::createConstructor(),
                            FunctionType::get(tv, resultType),
                            useDC, functionRefKind,
                            getConstraintLocator(
@@ -3070,7 +3034,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
   TypeBase *favoredType = nullptr;
-  if (memberName.isSimpleName(TC.Context.Id_init)) {
+  if (memberName.isSimpleName(DeclBaseName::createConstructor())) {
     if (auto anchor = memberLocator->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
@@ -4492,24 +4456,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     return SolutionKind::Error;
   }
 
-  // T <c U ===> T! <c U
-  //
-  // We don't want to allow this after user-defined conversions:
-  //   - it gets really complex for users to understand why there's
-  //     a dereference in their code
-  //   - it would allow nil to be coercible to a non-optional type
-  // Fortunately, user-defined conversions only allow subtype
-  // conversions on their results.
-  case ConversionRestrictionKind::ForceUnchecked: {
-    addContextualScore();
-    assert(matchKind >= ConstraintKind::Conversion);
-
-    if (type1->isTypeVariableOrMember())
-      return formUnsolved();
-
-    return SolutionKind::Error;
-  }
-      
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:
   case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
   case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {

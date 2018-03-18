@@ -160,6 +160,10 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitOwnedTypeRepr(OwnedTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());
   }

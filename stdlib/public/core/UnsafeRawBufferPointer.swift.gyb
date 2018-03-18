@@ -223,6 +223,30 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
 %  end # mutable
   }
 
+% if mutable:
+  /// Exchanges the byte values at the specified indices
+  /// in this buffer's memory.
+  ///
+  /// Both parameters must be valid indices of the buffer, and not
+  /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
+  /// effect.
+  ///
+  /// - Parameters:
+  ///   - i: The index of the first byte to swap.
+  ///   - j: The index of the second byte to swap.
+  @_inlineable
+  public func swapAt(_ i: Int, _ j: Int) {
+    guard i != j else { return }
+    _debugPrecondition(i >= 0 && j >= 0)
+    _debugPrecondition(i < endIndex && j < endIndex)
+    let pi = (_position! + i)
+    let pj = (_position! + j)
+    let tmp = pi.load(fromByteOffset: 0, as: UInt8.self)
+    pi.copyMemory(from: pj, byteCount: MemoryLayout<UInt8>.size)
+    pj.storeBytes(of: tmp, toByteOffset: 0, as: UInt8.self)
+  }
+
+% end # mutable
   /// The number of bytes in the buffer.
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,

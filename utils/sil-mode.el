@@ -94,6 +94,7 @@
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
                     "is_unique" "is_unique_or_pinned"
+                    "is_escaping_closure"
                     "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
                   'words) . font-lock-keyword-face)

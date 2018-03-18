@@ -18,6 +18,8 @@
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
 #include <llvm/Support/Compiler.h>
+#include <cstdarg>
+#include <cstdio>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Unreachable.h"
@@ -221,6 +223,43 @@ void _swift_reportToDebugger(uintptr_t flags, const char *message,
 
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_reportFatalErrorsToDebugger;
+
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_shouldReportFatalErrorsToDebugger();
+
+
+LLVM_ATTRIBUTE_ALWAYS_INLINE
+inline static int swift_asprintf(char **strp, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+#if defined(_WIN32)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+  int len = _vscprintf(fmt, args);
+#pragma GCC diagnostic pop
+  if (len < 0) {
+    va_end(args);
+    return -1;
+  }
+  char *buffer = static_cast<char *>(malloc(len + 1));
+  if (!buffer) {
+    va_end(args);
+    return -1;
+  }
+  int result = vsprintf(buffer, fmt, args);
+  if (result < 0) {
+    va_end(args);
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+#else
+  int result = vasprintf(strp, fmt, args);
+#endif
+  va_end(args);
+  return result;
+}
+
 
 // namespace swift
 }

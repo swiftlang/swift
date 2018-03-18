@@ -267,8 +267,6 @@ public:
       llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
       SILType T) const override {
     auto canType = T.getSwiftRValueType();
-    // get the size before insertions
-    auto SZ = typeToMetadataVec.size();
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
@@ -277,7 +275,7 @@ public:
                                                    fType);
     }
     if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        typeToMetadataVec.size() != SZ) {
+        T.hasArchetype()) {
       auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
       assert(metadata && "Expected Type Metadata Ref");
       typeToMetadataVec.insert(std::make_pair(canType, metadata));

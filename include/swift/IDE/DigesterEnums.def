@@ -72,6 +72,7 @@ NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
 
 DECL_ATTR(deprecated)
+DECL_ATTR(fixedLayout)
 
 KEY(kind)
 KEY(name)

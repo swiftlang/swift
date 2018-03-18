@@ -290,7 +290,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 5 };
+  enum { NumFlagBits = 8 };
   SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
@@ -998,11 +998,6 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is Optional<T>; otherwise, return the null
-  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
-  /// otherwise.
-  Type getOptionalObjectType(bool &isOptional);
-
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
@@ -1580,8 +1575,9 @@ class ParameterTypeFlags {
     Escaping    = 1 << 2,
     InOut       = 1 << 3,
     Shared      = 1 << 4,
+    Owned       = 1 << 5,
 
-    NumBits = 5
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1599,7 +1595,8 @@ public:
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
               (ownership == ValueOwnership::InOut ? InOut : 0) |
-              (ownership == ValueOwnership::Shared ? Shared : 0)) {}
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
@@ -1611,12 +1608,15 @@ public:
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
 
   ValueOwnership getValueOwnership() const {
     if (isInOut())
       return ValueOwnership::InOut;
     else if (isShared())
       return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
 
     return ValueOwnership::Default;
   }
@@ -1639,6 +1639,11 @@ public:
   ParameterTypeFlags withShared(bool isShared) const {
     return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
                                        : value - ParameterTypeFlags::Shared);
+  }
+
+  ParameterTypeFlags withOwned(bool isOwned) const {
+    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
+                                      : value - ParameterTypeFlags::Owned);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2357,7 +2362,7 @@ BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 
 /// A language-level calling convention.
-enum class SILFunctionLanguage : unsigned char {
+enum class SILFunctionLanguage : uint8_t {
   /// A variation of the Swift calling convention.
   Swift = 0,
 
@@ -2530,6 +2535,9 @@ public:
     
     /// Whether the parameter is marked 'shared'
     bool isShared() const { return Flags.isShared(); }
+
+    /// Whether the parameter is marked 'owned'
+    bool isOwned() const { return Flags.isOwned(); }
   };
 
   class CanParam : public Param {

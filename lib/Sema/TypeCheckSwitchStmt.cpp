@@ -1347,15 +1347,12 @@ namespace {
         switch (IP->getCastKind()) {
         case CheckedCastKind::Coercion:
         case CheckedCastKind::BridgingCoercion: {
-          // If the pattern and subpattern types are identical than this is a
-          // non-useful cast that we've already warned about, but it also means
-          // this pattern itself is a no-op and we should examine the subpattern.
           auto *subPattern = IP->getSubPattern();
-          if (subPattern && IP->getType()->isEqual(subPattern->getType()))
+          if (subPattern)
             return projectPattern(TC, subPattern, sawDowngradablePattern);
 
-          // These coercions are irrefutable.  Project with the original type
-          // instead of the cast's target type to maintain consistency with the
+          // With no subpattern coercions are irrefutable.  Project with the original
+          // type instead of the cast's target type to maintain consistency with the
           // scrutinee's type.
           return Space(IP->getType(), Identifier());
         }

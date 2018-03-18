@@ -59,30 +59,12 @@ SuperclassMethodsTest.test("InsertSuperclass") {
     }
     if getVersion() == 0 {
       expectEqual(Leaf().method(), "Base.method()")
+      expectEqual(Leaf().nonOverriddenMethod(), "Base.nonOverriddenMethod()")
       expectEqual(Leaf.classMethod(), "Base.classMethod()")
     } else {
       expectEqual(Leaf().method(), "InBetween.method()")
+      expectEqual(Leaf().nonOverriddenMethod(), "Base.nonOverriddenMethod()")
       expectEqual(Leaf.classMethod(), "InBetween.classMethod()")
-    }
-  }
-}
-
-SuperclassMethodsTest.test("ChangeRoot") {
-  do {
-    class Leaf : ChangeRoot {
-      override func method() -> String {
-        return super.method()
-      }
-      override class func classMethod() -> String {
-        return super.classMethod()
-      }
-    }
-    if getVersion() == 0 {
-      expectEqual(Leaf().method(), "Base.method()")
-      expectEqual(Leaf.classMethod(), "Base.classMethod()")
-    } else {
-      expectEqual(Leaf().method(), "OtherBase.method()")
-      expectEqual(Leaf.classMethod(), "OtherBase.classMethod()")
     }
   }
 }

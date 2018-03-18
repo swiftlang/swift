@@ -181,7 +181,7 @@ protected:
     }
 
     ~BottomUpFunctionOrder() {
-      assert(InitiallyUnscheduled.size() == 0 &&
+      assert(InitiallyUnscheduled.empty() &&
              "not finished scheduling");
       assert(Scheduled.size() == numVisited &&
              "missed some functions to schedule");

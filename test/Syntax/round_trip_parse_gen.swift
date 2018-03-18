@@ -1,8 +1,12 @@
+// RUN: rm -rf %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 // RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -serialize-raw-tree -input-source-filename %s > %t.dump
+// RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
 import ABC
@@ -31,6 +35,7 @@ class C {
     bar1(1.1)
     var f = /*comments*/+0.1/*comments*/
     foo()
+    _ = "🙂🤗🤩🤔🤨"
   }
 
   func foo1() {
@@ -320,6 +325,8 @@ func statementTests() {
   }
   repeat { } while true
   LABEL: repeat { } while false
+  while true { }
+  LABEL: while true { }
   LABEL: do {}
   LABEL: switch foo {
     case 1:

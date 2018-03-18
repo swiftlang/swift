@@ -47,7 +47,7 @@ where Rest.Element : UnsignedInteger {
     guard _fastPath(!overflow0) else { return nil }
     result = result0
   }
-  
+
   while let u = rest.next() {
     let d0 = _asciiDigit(codeUnit: u, radix: radix)
     guard _fastPath(d0 != nil), let d = d0 else { return nil }
@@ -61,6 +61,11 @@ where Rest.Element : UnsignedInteger {
   }
   return result
 }
+
+//
+// TODO (TODO: JIRA): This needs to be completely rewritten. It's about 20KB of
+// always-inline code, most of which are MOV instructions.
+//
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
@@ -145,18 +150,20 @@ extension FixedWidthInteger {
     let r = Self(radix)
     let range = text._encodedOffsetRange
     let guts = text._wholeString._guts
-    defer { _fixLifetime(guts) }
     let result: Self?
-    if _slowPath(guts._isOpaque) {
-      var i = guts._asOpaque()[range].makeIterator()
-      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
-    } else if guts.isASCII {
-      var i = guts._unmanagedASCIIView[range].makeIterator()
-      result = _parseASCII(codeUnits: &i, radix: r)
-    } else {
-      var i = guts._unmanagedUTF16View[range].makeIterator()
-      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
-    }
+    result = _visitGuts(guts,
+      range: (range, false), args: r,
+      ascii: { view, radix in
+        var i = view.makeIterator()
+        return _parseASCII(codeUnits: &i, radix: radix) },
+      utf16: { view, radix in
+        var i = view.makeIterator()
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) },
+      opaque: { view, radix in
+        var i = view.makeIterator()
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) }
+    )
+
     guard _fastPath(result != nil) else { return nil }
     self = result._unsafelyUnwrappedUnchecked
   }

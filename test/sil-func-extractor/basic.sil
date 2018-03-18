@@ -1,6 +1,5 @@
 // RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=use_before_init | %FileCheck %s
-// RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=use_before_init -emit-sib -o %t/out.sib -module-name main && %target-sil-opt %t/out.sib -module-name main | %FileCheck %s
 
 import Builtin

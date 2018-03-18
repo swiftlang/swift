@@ -35,6 +35,6 @@ func test(c: C) {
                             /*C_foo3_call_arg2*/b: 2)
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/ordering/ordering.in.json %s >> %t.result/ordering.expected
 // RUN: diff -u %S/ordering/ordering.expected %t.result/ordering.expected

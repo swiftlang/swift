@@ -42,21 +42,28 @@ namespace swift {
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
-  FrontendInputsAndOutputs &InputsAndOutputs;
 
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
+  /// A place to keep alive any buffers that are loaded as part of setting up
+  /// the frontend inputs.
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> ConfigurationFileBuffers;
 
   llvm::SetVector<StringRef> Files;
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags,
-                                const llvm::opt::ArgList &args,
-                                FrontendInputsAndOutputs &inputsAndOutputs);
+                                const llvm::opt::ArgList &args);
 
-  bool convert();
+  /// Produces a FrontendInputsAndOutputs object with the inputs populated from
+  /// the arguments the converter was initialized with.
+  ///
+  /// \param buffers If present, buffers read in the processing of the frontend
+  /// inputs will be saved here. These should only be used for debugging
+  /// purposes.
+  Optional<FrontendInputsAndOutputs> convert(
+      SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
 
 private:
   bool enforceFilelistExclusion();
@@ -66,11 +73,19 @@ private:
                              llvm::function_ref<void(StringRef)> fn);
   bool addFile(StringRef file);
   Optional<std::set<StringRef>> readPrimaryFiles();
-  std::set<StringRef>
-  createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles);
-  bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles);
 
-  bool isSingleThreadedWMO() const;
+  /// Returns the newly set-up FrontendInputsAndOutputs, as well as a set of
+  /// any unused primary files (those that do not correspond to an input).
+  std::pair<FrontendInputsAndOutputs, std::set<StringRef>>
+  createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles);
+
+  /// Emits an error for each file in \p unusedPrimaryFiles.
+  ///
+  /// \returns true if \p unusedPrimaryFiles is non-empty.
+  bool diagnoseUnusedPrimaryFiles(std::set<StringRef> unusedPrimaryFiles);
+
+  bool
+  isSingleThreadedWMO(const FrontendInputsAndOutputs &inputsAndOutputs) const;
 };
 
 } // namespace swift

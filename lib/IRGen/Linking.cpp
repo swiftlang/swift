@@ -96,6 +96,10 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleTypeMetadataInstantiationFunction(
                                               cast<NominalTypeDecl>(getDecl()));
 
+    case Kind::TypeMetadataCompletionFunction:
+      return mangler.mangleTypeMetadataCompletionFunction(
+                                              cast<NominalTypeDecl>(getDecl()));
+
     case Kind::TypeMetadata:
       switch (getMetadataAddress()) {
         case TypeMetadataAddress::FullMetadata:

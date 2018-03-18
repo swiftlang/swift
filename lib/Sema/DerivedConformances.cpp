@@ -39,11 +39,18 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
         return enumDecl->hasRawType();
 
         // Enums without associated values can implicitly derive Equatable and
-        // Hashable conformance.
+        // Hashable conformances.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(tc, enumDecl, protocol);
       case KnownProtocolKind::Hashable:
         return canDeriveHashable(tc, enumDecl, protocol);
+        // "Simple" enums without availability attributes can explicitly derive
+        // a CaseIterable conformance.
+        //
+        // FIXME: Lift the availability restriction.
+      case KnownProtocolKind::CaseIterable:
+        return !enumDecl->hasPotentiallyUnavailableCaseValue()
+            && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
         // @objc enums can explicitly derive their _BridgedNSError conformance.
       case KnownProtocolKind::BridgedNSError:
@@ -135,6 +142,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
+    // CaseIterable.allValues
+    if (name.isSimpleName(ctx.Id_allCases))
+      return getRequirement(KnownProtocolKind::CaseIterable);
+
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
       return getRequirement(KnownProtocolKind::BridgedNSError);
@@ -191,6 +202,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // RawRepresentable.RawValue
     if (name.isSimpleName(ctx.Id_RawValue))
       return getRequirement(KnownProtocolKind::RawRepresentable);
+
+    // CaseIterable.AllCases
+    if (name.isSimpleName(ctx.Id_AllCases))
+      return getRequirement(KnownProtocolKind::CaseIterable);
 
     return nullptr;
   }

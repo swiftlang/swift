@@ -20,3 +20,30 @@ func baz() {
 @available(swift, introduced: 3.0.1, obsoleted: 3.0.2, message: "tiny bug")
 func bug() {
 }
+
+struct TestStruct {}
+
+@available(macOS 10.11, *)
+extension TestStruct {
+  @available(swift 400)
+  func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
+}
+
+@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+extension TestStruct {
+  func doAnotherThing() {}
+}
+
+@available(macOS 10.11, *)
+func testMemberAvailability() {
+  TestStruct().doTheThing() // expected-error {{'doTheThing()' is unavailable}}
+  TestStruct().doAnotherThing() // okay (for now)
+}
+
+@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+@available(macOS 10.11, *)
+extension TestStruct {}
+
+@available(macOS 10.11, *)
+@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+extension TestStruct {}

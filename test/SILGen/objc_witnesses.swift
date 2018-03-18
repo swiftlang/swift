@@ -100,7 +100,7 @@ extension NSObject : Atom {
   var valence: Int { get { return 1 } set { } }
 }
 
-// CHECK-LABEL: sil private @$SSo8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
+// CHECK-LABEL: sil private @$SSo8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed NSObject, @thick NSObject.Type) -> () {
 // CHECK: objc_method %4 : $NSObject, #NSObject.valence!setter.1.foreign
 // CHECK: }
 

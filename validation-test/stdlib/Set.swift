@@ -3365,11 +3365,14 @@ SetTestSuite.test("popFirst") {
   do {
     var popped = [Int]()
     var s = Set([1010, 2020, 3030])
-    let expected = Array(s)
+    let expected = [1010, 2020, 3030]
     while let element = s.popFirst() {
       popped.append(element)
     }
-    expectEqualSequence(expected, Array(popped))
+    // Note that removing an element may reorder remaining items, so we
+    // can't compare ordering here.
+    popped.sort()
+    expectEqualSequence(expected, popped)
     expectTrue(s.isEmpty)
   }
 }

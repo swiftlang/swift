@@ -501,25 +501,11 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getOptionalObjectType(bool &isOptional) {
-  if (auto boundTy = getAs<BoundGenericEnumType>()) {
-    if (boundTy->getDecl()->isOptionalDecl()) {
-      isOptional = true;
-      return boundTy->getGenericArgs()[0];
-    }
-  }
-  isOptional = false;
-  return Type();
-}
-
-CanType CanType::getOptionalObjectTypeImpl(CanType type, bool &isOptional) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type)) {
-    if (boundTy->getDecl()->isOptionalDecl()) {
-      isOptional = true;
+CanType CanType::getOptionalObjectTypeImpl(CanType type) {
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+    if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
-    }
-  }
-  isOptional = false;
+
   return CanType();
 }
 
@@ -1020,8 +1006,11 @@ getCanonicalInputType(AnyFunctionType *funcType,
     return inputType;
 
   auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
-  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer()))
-    flags = flags.withShared(parenTy->getParameterFlags().isShared());
+  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer())) {
+    auto parenFlags = parenTy->getParameterFlags();
+    flags =
+        flags.withShared(parenFlags.isShared()).withOwned(parenFlags.isOwned());
+  }
 
   inputType = ParenType::get(inputType->getASTContext(),
                              inputType->getInOutObjectType(), flags);

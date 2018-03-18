@@ -1223,7 +1223,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   for (auto *BB : PostOrder->get(F)->getPostOrder()) {
     SmallVector<unsigned, 4> DeadInSuccs;
     ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
-    if (Succs.size() == 0)
+    if (Succs.empty())
       continue;
 
     for (unsigned EdgeIdx = 0, End = Succs.size(); EdgeIdx != End; ++EdgeIdx) {

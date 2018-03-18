@@ -268,7 +268,7 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
   // Build the value to be assigned, reconstructing tuples if needed.
   auto src = RValue(SGF, args.slice(0, args.size() - 1), assignFormalType);
   
-  std::move(src).assignInto(SGF, loc, addr);
+  std::move(src).ensurePlusOne(SGF, loc).assignInto(SGF, loc, addr);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }

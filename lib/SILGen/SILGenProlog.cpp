@@ -92,39 +92,6 @@ public:
     : SGF(sgf), parent(parent), loc(l), functionArgs(functionArgs),
       parameters(parameters) {}
 
-  ManagedValue getManagedValue(SILValue arg, CanType t,
-                               SILParameterInfo parameterInfo) const {
-    switch (parameterInfo.getConvention()) {
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Indirect_In_Guaranteed:
-      // If we have a guaranteed parameter, it is passed in at +0, and its
-      // lifetime is guaranteed. We can potentially use the argument as-is
-      // if the parameter is bound as a 'let' without cleaning up.
-      return ManagedValue::forUnmanaged(arg);
-
-    case ParameterConvention::Direct_Unowned:
-      // An unowned parameter is passed at +0, like guaranteed, but it isn't
-      // kept alive by the caller, so we need to retain and manage it
-      // regardless.
-      return SGF.emitManagedRetain(loc, arg);
-
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      // An inout parameter is +0 and guaranteed, but represents an lvalue.
-      return ManagedValue::forLValue(arg);
-
-    case ParameterConvention::Direct_Owned:
-    case ParameterConvention::Indirect_In:
-      // An owned or 'in' parameter is passed in at +1. We can claim ownership
-      // of the parameter and clean it up when it goes out of scope.
-      return SGF.emitManagedRValueWithCleanup(arg);
-
-    case ParameterConvention::Indirect_In_Constant:
-      break;
-    }
-    llvm_unreachable("bad parameter convention");
-  }
-
   ManagedValue visitType(CanType t) {
     auto argType = SGF.getLoweredType(t);
     // Pop the next parameter info.
@@ -136,9 +103,8 @@ public:
                    SGF.getSILType(parameterInfo))
         && "argument does not have same type as specified by parameter info");
 
-    SILValue arg =
-        parent->createFunctionArgument(argType, loc.getAsASTNode<ValueDecl>());
-    ManagedValue mv = getManagedValue(arg, t, parameterInfo);
+    ManagedValue mv = SGF.B.createInputFunctionArgument(
+        argType, loc.getAsASTNode<ValueDecl>());
 
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
@@ -283,8 +249,7 @@ struct ArgumentInitHelper {
         }
       }
     } else {
-      assert((vd->isLet() || vd->isShared())
-             && "expected parameter to be immutable!");
+      assert(vd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.

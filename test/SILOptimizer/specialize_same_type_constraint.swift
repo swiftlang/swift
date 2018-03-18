@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name specialize_same_type_constraint -O -emit-sil -primary-file %s | %FileCheck %s
 
 protocol FirstChild {}
 

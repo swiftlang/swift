@@ -224,6 +224,10 @@ TypeRepr *CloneVisitor::visitSharedTypeRepr(SharedTypeRepr *T) {
   return new (Ctx) SharedTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
 }
 
+TypeRepr *CloneVisitor::visitOwnedTypeRepr(OwnedTypeRepr *T) {
+  return new (Ctx) OwnedTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
+}
+
 TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
   return new (Ctx) FixedTypeRepr(T->getType(), T->getLoc());
 }
@@ -557,11 +561,19 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
-  if (getKind() == TypeReprKind::InOut) {
+  switch (getKind()) {
+  case TypeReprKind::InOut:
     Printer.printKeyword("inout");
-  } else {
-    assert((getKind() == TypeReprKind::Shared) && "Unknown kind");
+    break;
+  case TypeReprKind::Shared:
     Printer.printKeyword("shared");
+    break;
+  case TypeReprKind::Owned:
+    Printer.printKeyword("owned");
+    break;
+  default:
+    llvm_unreachable("unknown specifier type repr");
+    break;
   }
   Printer << " ";
   printTypeRepr(Base, Printer, Opts);

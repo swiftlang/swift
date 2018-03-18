@@ -9,6 +9,9 @@ func foo1() -> Int { return 0 }
 class C { func foo() {} }
 struct S { func foo() {} }
 
+// MARK: - Something
+struct Something{}
+
 // RUN: %sourcekitd-test -req=range -pos=2:13 -length 5 %s -- %s | %FileCheck %s -check-prefix=CHECK1
 
 // RUN: %sourcekitd-test -req=range -pos=3:3 -length 13 %s -- %s | %FileCheck %s -check-prefix=CHECK2
@@ -34,6 +37,8 @@ struct S { func foo() {} }
 // RUN: %sourcekitd-test -req=range -pos=3:1 -end-pos=4:26 %s -- %s | %FileCheck %s -check-prefix=CHECK8
 // RUN: %sourcekitd-test -req=range -pos=3:1 -end-pos=5:13 %s -- %s | %FileCheck %s -check-prefix=CHECK9
 // RUN: %sourcekitd-test -req=range -pos=4:1 -end-pos=5:13 %s -- %s | %FileCheck %s -check-prefix=CHECK10
+
+// RUN: %sourcekitd-test -req=range -pos=12:4 -end-pos=12:21 %s -- %s | %FileCheck %s -check-prefix=CHECK11
 
 // CHECK1-DAG: <kind>source.lang.swift.range.singleexpression</kind>
 // CHECK1-DAG: <content>1 + 2</content>
@@ -78,3 +83,7 @@ struct S { func foo() {} }
 // CHECK10-DAG: <content>if aaa == 3 { aaa = 4 }
 // CHECK10-DAG:   return aaa</content>
 // CHECK10-DAG: <type></type>
+
+// CHECK11-DAG: <kind>source.lang.swift.range.invalid</kind>
+// CHECK11-DAG: <content></content>
+// CHECK11-DAG: <type></type>

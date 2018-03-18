@@ -21,7 +21,7 @@ public enum BenchmarkCategory : String {
   // we know is important to measure.
   case validation
   // subsystems to validate and their subcategories.
-  case api, Array, String, Dictionary, Codable, Set
+  case api, Array, String, Dictionary, Codable, Set, Data
   case sdk
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.

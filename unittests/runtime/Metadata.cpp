@@ -252,8 +252,7 @@ TEST(Concurrent, ConcurrentMap) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
-    ClassFlags(), 0, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -772,14 +771,9 @@ static void initializeRelativePointer(int32_t *ptr, T value) {
 // Tests for resilient witness table instantiation, with runtime-provided
 // default requirements
 
-struct WitnessTableSlice {
-  WitnessTable **tables;
-  size_t count;
-};
-
 static void witnessTableInstantiator(WitnessTable *instantiatedTable,
                                      const Metadata *type,
-                                     void * const *instantiationArgs) {
+                                     void **const *instantiationArgs) {
   EXPECT_EQ(type, nullptr);
 
   EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 123);
@@ -789,11 +783,10 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
   ((void **) instantiatedTable)[3] = (void *) 345;
 
   auto conditionalTables =
-      reinterpret_cast<const WitnessTableSlice *>(instantiationArgs);
+      reinterpret_cast<const WitnessTable *const *>(instantiationArgs);
 
-  EXPECT_EQ(conditionalTables->count, 1UL);
-  EXPECT_EQ(conditionalTables->tables[0], (void *)678);
-  ((void **)instantiatedTable)[-1] = conditionalTables->tables[0];
+  EXPECT_EQ(conditionalTables[0], (void *)678);
+  ((void **)instantiatedTable)[-1] = (void *)conditionalTables[0];
 }
 
 static void fakeDefaultWitness1() {}
@@ -860,7 +853,6 @@ const void *witnesses[] = {
 };
 
 WitnessTable *conditionalTablesBuffer[] = {(WitnessTable *)678};
-WitnessTableSlice conditionalTablesSlice = {conditionalTablesBuffer, 1};
 
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
@@ -910,7 +902,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -949,7 +941,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
@@ -989,7 +981,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     RaceTest_ExpectEqual<const WitnessTable *>(
       [&]() -> const WitnessTable * {
         const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void**)&conditionalTablesSlice);
+            table, nullptr, (void ***)conditionalTablesBuffer);
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 

@@ -177,7 +177,8 @@ getMemBufferFromRope(StringRef Filename, const RewriteRope &Rope) {
     Length += I.piece().size();
   }
 
-  auto MemBuf = llvm::MemoryBuffer::getNewUninitMemBuffer(Length, Filename);
+  auto MemBuf =
+    llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Length, Filename);
   char *Ptr = (char*)MemBuf->getBufferStart();
   for (RewriteRope::iterator I = Rope.begin(), E = Rope.end(); I != E;
        I.MoveToNextPiece()) {
@@ -186,7 +187,7 @@ getMemBufferFromRope(StringRef Filename, const RewriteRope &Rope) {
     Ptr += Text.size();
   }
 
-  return MemBuf;
+  return std::move(MemBuf);
 }
 
 ImmutableTextBufferRef EditableTextBuffer::getBufferForSnapshot(

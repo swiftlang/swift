@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-silgen  -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name nested_generics -enable-sil-ownership -Xllvm -sil-full-demangle -emit-silgen  -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name nested_generics -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -module-name nested_generics -enable-sil-ownership -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -module-name nested_generics -enable-sil-ownership -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
 
 // TODO:
 // - test generated SIL -- mostly we're just testing mangling here

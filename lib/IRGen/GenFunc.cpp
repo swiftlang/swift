@@ -721,7 +721,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
     getArgumentLoweringType(argType.getSwiftRValueType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
-  return ti.getSchema().size() == 0 && !param.isFormalIndirect();
+  return ti.getSchema().empty() && !param.isFormalIndirect();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially
@@ -1374,7 +1374,7 @@ void irgen::emitFunctionPartialApplication(
 
     // Empty values don't matter.
     auto schema = ti.getSchema();
-    if (schema.size() == 0 && !param.isFormalIndirect())
+    if (schema.empty() && !param.isFormalIndirect())
       continue;
 
     argValTypes.push_back(argType);

@@ -211,7 +211,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     StringRef V = SLI->getValue();
     assert(V.size() <= 32 && "Cannot encode string of length > 32");
     std::string VBuffer;
-    if (V.size() > 0 && (isDigit(V[0]) || V[0] == '_')) {
+    if (!V.empty() && (isDigit(V[0]) || V[0] == '_')) {
       VBuffer = "_";
       VBuffer.append(V.data(), V.size());
       V = VBuffer;

@@ -23,9 +23,9 @@ def make_missing_child(child):
     """
     if child.is_token():
         token = child.main_token()
-        tok_kind = "tok::" + token.kind if token else "tok::unknown"
+        tok_kind = token.kind if token else "unknown"
         tok_text = token.text if token else ""
-        return 'RawSyntax::missing(%s, "%s")' % (tok_kind, tok_text)
+        return 'RawSyntax::missing(tok::%s, "%s")' % (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
@@ -73,7 +73,7 @@ def make_missing_swift_child(child):
     if child.is_token():
         token = child.main_token()
         tok_kind = token.swift_kind() if token else "unknown"
-        if token and not token.text:
+        if not token or not token.text:
             tok_kind += '("")'
         return 'RawSyntax.missingToken(.%s)' % tok_kind
     else:

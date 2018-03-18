@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/imported_swift_module.swift
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s -I %t | %FileCheck %s

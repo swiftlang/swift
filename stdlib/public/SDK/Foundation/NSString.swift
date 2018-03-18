@@ -22,11 +22,6 @@ public class NSSimpleCString {}
 @available(*, unavailable, message: "Please use String or NSString")
 public class NSConstantString {}
 
-// Called by the SwiftObject implementation.
-public func _getDescription<T>(_ x: T) -> NSString {
-  return String(reflecting: x)._bridgeToObjectiveC()
-}
-
 extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(stringLiteral value: StaticString) {

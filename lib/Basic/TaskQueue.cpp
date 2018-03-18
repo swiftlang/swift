@@ -51,7 +51,7 @@ void DummyTaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
 bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
                              TaskQueue::TaskFinishedCallback Finished,
                              TaskQueue::TaskSignalledCallback Signalled) {
-  typedef std::pair<ProcessId, std::unique_ptr<DummyTask>> PidTaskPair;
+  using PidTaskPair = std::pair<ProcessId, std::unique_ptr<DummyTask>>;
   std::queue<PidTaskPair> ExecutingTasks;
 
   bool SubtaskFailed = false;

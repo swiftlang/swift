@@ -25,8 +25,28 @@ func test_unavailable_func(_ x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
 }
 
-func test_deprecated_imported_as_unavailable(_ s:UnsafeMutablePointer<CChar>) {
+func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecations) {
   _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
+
+  _ = obj.fullyDeprecated // expected-warning {{'fullyDeprecated' is deprecated}}
+  obj.fullyDeprecated = 0 // expected-warning {{'fullyDeprecated' is deprecated}}
+  obj.fullyDeprecated += 1 // expected-warning {{'fullyDeprecated' is deprecated}}
+
+  _ = obj.getterDeprecated // expected-warning {{getter for 'getterDeprecated' is deprecated}}
+  obj.getterDeprecated = 0
+  obj.getterDeprecated += 1 // expected-warning {{getter for 'getterDeprecated' is deprecated}}
+
+  _ = AccessorDeprecations.getterDeprecatedClass // expected-warning {{getter for 'getterDeprecatedClass' is deprecated}}
+  AccessorDeprecations.getterDeprecatedClass = 0
+  AccessorDeprecations.getterDeprecatedClass += 1 // expected-warning {{getter for 'getterDeprecatedClass' is deprecated}}
+
+  _ = obj.setterDeprecated
+  obj.setterDeprecated = 0 // expected-warning {{setter for 'setterDeprecated' is deprecated}}
+  obj.setterDeprecated += 1 // expected-warning {{setter for 'setterDeprecated' is deprecated}}
+
+  _ = AccessorDeprecations.setterDeprecatedClass
+  AccessorDeprecations.setterDeprecatedClass = 0 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
+  AccessorDeprecations.setterDeprecatedClass += 1 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
 }
 
 func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}

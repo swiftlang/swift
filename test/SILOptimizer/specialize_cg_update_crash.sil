@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library  -module-name TestMod %S/Inputs/TestMod.sil -emit-module-path %t/TestMod.swiftmodule
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -I %t %s | %FileCheck %s

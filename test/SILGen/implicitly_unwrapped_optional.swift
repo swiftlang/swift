@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name implicitly_unwrapped_optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
@@ -13,11 +15,14 @@ func foo(f f: (() -> ())!) {
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
 // CHECK:   end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_guaranteed () -> ()>
-// CHECK:   [[T1:%.*]] = select_enum_addr [[READ]]
-// CHECK:   cond_br [[T1]], bb2, bb1
+// CHECK:   [[READ_TEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
+// CHECK:   copy_addr [[READ]] to [initialization] [[READ_TEMP]]
+// CHECK:   [[SWITCH_VALUE:%.*]] = load [take] [[READ_TEMP]]
+// CHECK:   switch_enum [[SWITCH_VALUE]] : ${{.*}}, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb2:
+// CHECK:    bb2([[SOME_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[SOME_ARG]]
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
@@ -49,8 +54,8 @@ func wrap_then_unwrap<T>(x x: T) -> T {
 // CHECK-LABEL: sil hidden @$S29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@owned Optional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
-  // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
-  // CHECK: [[NONNULL]]:
+  // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
+  // CHECK: [[NONNULL]](
   // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
   // CHECK-NOT: destroy_value [[STRING]]
 }

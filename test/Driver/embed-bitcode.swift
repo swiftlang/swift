@@ -97,15 +97,15 @@
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
 // CHECK-LIB: swift -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift -frontend
 // CHECK-LIB: -emit-module
-// CHECK-LIB: swift -frontend
-// CHECK-LIB: -c
-// CHECK-LIB: -embed-bitcode
-// CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift -frontend
-// CHECK-LIB: -c
-// CHECK-LIB: -embed-bitcode
-// CHECK-LIB: -disable-llvm-optzns
 // CHECK-LIB-NOT: swift -frontend
 
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE

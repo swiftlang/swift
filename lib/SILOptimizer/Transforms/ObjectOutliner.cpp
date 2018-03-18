@@ -286,20 +286,25 @@ bool ObjectOutliner::optimizeObjectAllocation(
   ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
   SILType TailType;
   unsigned NumTailElems = 0;
-  if (TailCounts.size() > 0) {
-    // We only support a single tail allocated array.
-    if (TailCounts.size() > 1)
+
+  // We only support a single tail allocated arrays.
+  // Stdlib's tail allocated arrays don't have any side-effects in the
+  // constructor if the element type is trivial.
+  // TODO: also exclude custom tail allocated arrays which might have
+  // side-effects in the destructor.
+  if (TailCounts.size() != 1)
       return false;
-    // The number of tail allocated elements must be constant.
-    if (auto *ILI = dyn_cast<IntegerLiteralInst>(TailCounts[0].get())) {
-      if (ILI->getValue().getActiveBits() > 20)
-        return false;
-      NumTailElems = ILI->getValue().getZExtValue();
-      TailType = ARI->getTailAllocatedTypes()[0];
-    } else {
+
+  // The number of tail allocated elements must be constant.
+  if (auto *ILI = dyn_cast<IntegerLiteralInst>(TailCounts[0].get())) {
+    if (ILI->getValue().getActiveBits() > 20)
       return false;
-    }
+    NumTailElems = ILI->getValue().getZExtValue();
+    TailType = ARI->getTailAllocatedTypes()[0];
+  } else {
+    return false;
   }
+
   SILType Ty = ARI->getType();
   ClassDecl *Cl = Ty.getClassOrBoundGenericClass();
   if (!Cl)

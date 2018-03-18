@@ -32,7 +32,7 @@ namespace irgen {
   
 /// The kind of 'isa' encoding a heap object uses to reference its heap
 /// metadata.
-enum class IsaEncoding : unsigned char {
+enum class IsaEncoding : uint8_t {
   /// The object stores a plain pointer to its heap metadata as its first word.
   Pointer,
   /// The object's isa is managed by the Objective-C runtime and must be
@@ -43,7 +43,7 @@ enum class IsaEncoding : unsigned char {
   /// way.
   Unknown = ObjC,
 };
-  
+
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
 ///

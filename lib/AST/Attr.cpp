@@ -601,6 +601,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "effects(readnone)";
       case EffectsKind::ReadOnly:
         return "effects(readonly)";
+      case EffectsKind::ReleaseNone:
+        return "effects(releasenone)";
       case EffectsKind::ReadWrite:
         return "effects(readwrite)";
       case EffectsKind::Unspecified:

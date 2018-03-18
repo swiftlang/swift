@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -Osize -emit-sil
 //
 // Test speculative devirtualization.
 

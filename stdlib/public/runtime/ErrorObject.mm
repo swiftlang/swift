@@ -409,8 +409,10 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   // initialization of the object happens-before the domain initialization so
   // that the domain can be used alone as a flag for the initialization of the
   // object.
-  if (errorObject->domain.load(std::memory_order_acquire))
+  if (errorObject->domain.load(std::memory_order_acquire)) {
+    SWIFT_CC_PLUSZERO_GUARD([ns retain]);
     return ns;
+  }
 
   // Otherwise, calculate the domain, code, and user info, and
   // initialize the NSError.
@@ -451,6 +453,7 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
                                                    std::memory_order_acq_rel))
     objc_release(domain);
 
+  SWIFT_CC_PLUSZERO_GUARD([ns retain]);
   return ns;
 }
 
@@ -521,7 +524,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 
   // If so, attempt the bridge.
   NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
-  objc_retain(srcInstance);
+  SWIFT_CC_PLUSONE_GUARD(objc_retain(srcInstance));
   if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       objc_release(srcInstance);

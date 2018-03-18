@@ -178,6 +178,40 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   return lhs.rawValue != rhs.rawValue
 }
 
+/// A type that can produce a collection of all of its values.
+///
+/// Simple Enumerations
+/// ===================
+///
+/// For any Swift enumeration where every case does not have an associated
+/// value, the Swift compiler can automatically fill out the `CaseIterable`
+/// conformance. When defining your own custom enumeration, specify a
+/// conformance to `CaseIterable` to take advantage of this automatic
+/// derivation.
+///
+/// For example, every case of the `CardinalPoint` enumeration defined here
+/// does not have an associated value:
+///
+///     enum CardinalPoint: CaseIterable {
+///         case north, south, east, west
+///     }
+///
+/// So the compiler automatically creates a conformance.
+///
+///     for cardinality in CardinalPoint.allCases {
+///         print(cardinality)
+///     }
+///     // Prints "north"
+///     // Prints "south"
+///     // Prints "east"
+///     // Prints "west"
+public protocol CaseIterable {
+  associatedtype AllCases: Collection
+    where AllCases.Element == Self
+  /// Returns a collection of all values of this type.
+  static var allCases: AllCases { get }
+}
+
 /// A type that can be initialized using the nil literal, `nil`.
 ///
 /// `nil` has a specific meaning in Swift---the absence of a value. Only the

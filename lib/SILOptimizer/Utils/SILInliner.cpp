@@ -473,6 +473,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::UnownedRetainInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::UnownedToRefInst:

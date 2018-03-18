@@ -712,6 +712,11 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
+  Out << "Mr";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Out << "ML";
   mangleSingleChildNode(node); // type
@@ -1462,6 +1467,11 @@ void Remangler::mangleWeak(Node *node) {
 
 void Remangler::mangleShared(Node *node) {
   Out << 'h';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleOwned(Node *node) {
+  Out << 'n';
   mangleSingleChildNode(node); // type
 }
 

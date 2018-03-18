@@ -148,7 +148,7 @@ class RequirementEnvironment;
 
 /// \brief The result of matching a particular declaration to a given
 /// requirement.
-enum class MatchKind : unsigned char {
+enum class MatchKind : uint8_t {
   /// \brief The witness matched the requirement exactly.
   ExactMatch,
 

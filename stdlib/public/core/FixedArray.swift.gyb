@@ -127,8 +127,8 @@ extension _FixedArray${N} {
   @_versioned
   internal mutating func append(_ newElement: T) {
     _sanityCheck(count < capacity)
-    self[count] = newElement
     _count += 1
+    self[count-1] = newElement
   }
 }
 

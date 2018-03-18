@@ -64,7 +64,17 @@ open class SyntaxRewriter {
   }
 
   func visitChildren(_ node: Syntax) -> Syntax {
-    let newLayout = node.children.map { visit($0).raw }
+    // Visit all children of this node, returning `nil` if child is not
+    // present. This will ensure that there are always the same number
+    // of children after transforming.
+    let newLayout = (0..<node.numberOfChildren).map { (i: Int) -> RawSyntax? in
+      guard let child = node.child(at: i) else { return nil }
+      return visit(child).raw
+    }
+
+    // Sanity check, ensure the new children are the same length.
+    assert(newLayout.count == node.raw.layout.count)
+
     return makeSyntax(node.raw.replacingLayout(newLayout))
   }
 }

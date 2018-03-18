@@ -9,7 +9,7 @@ class C {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=3:13 -end-pos=3:18 >> %t.result/ImplicitGetter.swift
 // RUN: diff -u %S/Outputs/extract_from_accessor/ImplicitGetter.swift.expected %t.result/ImplicitGetter.swift
 

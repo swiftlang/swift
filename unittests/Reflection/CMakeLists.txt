@@ -4,6 +4,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     add_swift_unittest(SwiftReflectionTests
       TypeRef.cpp)
     target_link_libraries(SwiftReflectionTests
+      PRIVATE
       swiftReflection${SWIFT_PRIMARY_VARIANT_SUFFIX})
   endif()
 endif()

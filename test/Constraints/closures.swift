@@ -35,19 +35,22 @@ _ = f0(X2(), {$0.g()})
 
 func inoutToSharedConversions() {
   func fooOW<T, U>(_ f : (__owned T) -> U) {}
-  fooOW({ (x : Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
+  fooOW({ (x : Int) in return Int(5) }) // defaut-to-'__owned' allowed
+  fooOW({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
   fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
-  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(_) -> _'}}
+  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__owned _) -> _'}}
   
   func fooIO<T, U>(_ f : (inout T) -> U) {}
   fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
-  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
   fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : __owned Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__owned Int) -> Int' to expected argument type '(inout _) -> _'}}
 
   func fooSH<T, U>(_ f : (__shared T) -> U) {}
   fooSH({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__shared' allowed
+  fooSH({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
   fooSH({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__shared _) -> _'}}
-  fooSH({ (x : Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
+  fooSH({ (x : Int) in return Int(5) }) // default-to-'__shared' allowed
 }
 
 // Autoclosure
@@ -630,6 +633,7 @@ func rdar33429010_2() {
   let iter = I_33429010()
   var acc: Int = 0 // expected-warning {{}}
   let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0 + $1 })
+  // expected-warning@-1 {{result of operator '+' is unused}}
   let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0.rdar33429010_incr($1) })
 }
 
@@ -678,11 +682,11 @@ func rdar37790062() {
   func bzz<T>(_ a: T) -> T { return a }
   func faz<T: P_37790062>(_ a: T) -> T.T { return a.elt }
 
-  _ = S({ foo() }, { bar() }) // Ok, should infer T to be 'Void'
-  _ = S({ baz() }, { bar() }) // Ok, should infer T to be 'Void'
-  _ = S({ bzz(("question", 42)) }, { bar() }) // Ok
-  _ = S({ bzz(String.self) }, { bar() }) // Ok
-  _ = S({ bzz(((), (()))) }, { bar() }) // Ok
-  _ = S({ bzz(C1()) }, { bar() }) // Ok
-  _ = S({ faz(C2()) }, { bar() }) // Ok
+  _ = S({ foo() }, { bar() }) // expected-warning {{result of call to 'foo()' is unused}}
+  _ = S({ baz() }, { bar() }) // expected-warning {{result of call to 'baz()' is unused}}
+  _ = S({ bzz(("question", 42)) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(String.self) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(((), (()))) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(C1()) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ faz(C2()) }, { bar() }) // expected-warning {{result of call to 'faz' is unused}}
 }

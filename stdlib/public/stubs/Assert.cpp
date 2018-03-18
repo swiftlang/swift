@@ -21,44 +21,11 @@
 
 using namespace swift;
 
-bool swift::_swift_reportFatalErrorsToDebugger = true;
-
-static int swift_asprintf(char **strp, const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-#if defined(_WIN32)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-  int len = _vscprintf(fmt, args);
-#pragma GCC diagnostic pop
-  if (len < 0) {
-    va_end(args);
-    return -1;
-  }
-  char *buffer = static_cast<char *>(malloc(len + 1));
-  if (!buffer) {
-    va_end(args);
-    return -1;
-  }
-  int result = vsprintf(buffer, fmt, args);
-  if (result < 0) {
-    va_end(args);
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-#else
-  int result = vasprintf(strp, fmt, args);
-#endif
-  va_end(args);
-  return result;
-}
-
 static void logPrefixAndMessageToDebugger(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength
 ) {
-  if (!_swift_reportFatalErrorsToDebugger)
+  if (!_swift_shouldReportFatalErrorsToDebugger())
     return;
 
   char *debuggerMessage;

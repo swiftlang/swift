@@ -190,7 +190,7 @@ public:
   /// Check if a class has a formal superclass in the AST.
   static inline
   bool classHasSuperclass(const ClassMetadata *c) {
-    return (c->SuperClass && c->SuperClass != getRootSuperclass());
+    return  (c->Superclass && c->Superclass != getRootSuperclass());
   }
 
   /// Replace entries of a freshly-instantiated value witness table with more

@@ -525,22 +525,6 @@ extension Substring.UnicodeScalarView : RangeReplaceableCollection {
   }
 }
 
-#if _runtime(_ObjC)
-
-extension Substring {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasPrefix(_ prefix: String) -> Bool {
-    return String(self).hasPrefix(prefix)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasSuffix(_ suffix: String) -> Bool {
-    return String(self).hasSuffix(suffix)
-  }
-}
-
-#endif
-
 extension Substring : RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ elements: S)

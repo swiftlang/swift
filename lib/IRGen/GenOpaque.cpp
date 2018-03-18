@@ -902,7 +902,7 @@ llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF, SILType T) {
 /// Load the 'hasExtraInhabitants' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfHasExtraInhabitants(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::Enum_HasExtraInhabitants));
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::HasExtraInhabitants));
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getSize(Size(0)),
                                   flags->getName() + ".hasExtraInhabitants");

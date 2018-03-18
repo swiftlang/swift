@@ -2163,3 +2163,31 @@ bb0(%0 : $@callee_guaranteed () -> ()):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Make sure we can move a release across a releasenone functions.
+//
+// CHECK-LABEL: sil @testReleaseNoneAttribute
+// CHECK-NOT: strong_retain
+// CHECK: [[RELEASENONE:%.*]] = function_ref @releaseNone
+// CHECK-NOT: strong_retain
+// CHECK: apply [[RELEASENONE]]
+// CHECK-NOT: strong_retain
+// CHECK: [[MAYRELEASE:%.*]] = function_ref @mayRelease
+// CHECK-NOT: strong_retain
+// CHECK: apply [[MAYRELEASE]]
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil [releasenone] @releaseNone : $@convention(thin) () -> ()
+sil @mayRelease : $@convention(thin) () -> ()
+
+sil @testReleaseNoneAttribute : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @releaseNone : $@convention(thin) () -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = apply %1() : $@convention(thin) () -> ()
+  %3 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %10 = tuple()
+  return %10 : $()
+}

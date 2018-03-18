@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name let_properties_opts %s -O -enforce-exclusivity=checked -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend -module-name let_properties_opts -primary-file %s -O -emit-sil | %FileCheck %s
 
 // Test propagation of non-static let properties with compile-time constant values.
 

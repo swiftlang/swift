@@ -252,7 +252,7 @@ FoundationTestSuite.test("DarwinBoolean smoke test") {
   let _: CFArrayEqualCallBack = { DarwinBoolean($0 == $1) }
 }
 
-#if os(OSX)
+#if os(macOS)
 FoundationTestSuite.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.
   //

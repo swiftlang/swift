@@ -546,7 +546,7 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 }
 
-// backward compatibility for index interchange.  
+// backward compatibility for index interchange.
 extension String.UTF16View {
   @_inlineable // FIXME(sil-serialize-all)
   @available(

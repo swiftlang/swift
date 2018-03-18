@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -96,6 +98,7 @@ public struct HasTwoStoredProperties {
 
 class C {
   final var x: Int = 0
+  let z: Int = 0
 }
 
 func testClassInstanceProperties(c: C) {
@@ -113,6 +116,20 @@ func testClassInstanceProperties(c: C) {
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[CX]] : $*Int
 // CHECK-NEXT:  assign [[Y]] to [[ACCESS]]
 // CHECK-NEXT:  end_access [[ACCESS]]
+
+func testClassLetProperty(c: C) -> Int {
+  return c.z
+}
+
+// CHECK-LABEL: sil hidden @$S17access_marker_gen20testClassLetProperty1cSiAA1CC_tF : $@convention(thin) (@owned C) -> Int {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[ADR:%.*]] = ref_element_addr %{{.*}} : $C, #C.z
+// CHECK-NOT: begin_access
+// CHECK:   %{{.*}} = load [trivial] [[ADR]] : $*Int
+// CHECK-NOT: end_access
+// CHECK:   destroy_value %0 : $C
+// CHECK:   return %{{.*}} : $Int
+// CHECK-LABEL: } // end sil function '$S17access_marker_gen20testClassLetProperty1cSiAA1CC_tF'
 
 class D {
   var x: Int = 0

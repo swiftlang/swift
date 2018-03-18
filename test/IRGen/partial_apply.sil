@@ -498,3 +498,23 @@ entry(%0: $@thin SwiftStruct.Type, %1: $SwiftClass):
   %closure = partial_apply %fun (%0, %1) : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
   return %closure : $@callee_owned () -> ()
 }
+
+sil @afun : $@convention(thin) (Int) -> @error Error
+
+// Check that we don't assert on a thin noescape function.
+// CHECK-LABEL: define{{.*}} swiftcc void @convert_thin_test
+// CHECK: call swiftcc void @afun(i64 {{.*}}, %swift.refcounted* swiftself undef
+// CHECK: ret void
+sil @convert_thin_test : $@convention(thin) (Int) -> () {
+bb(%0 : $Int):
+  %f = function_ref @afun : $@convention(thin) (Int) -> @error Error
+  %c = convert_function %f : $@convention(thin) (Int) -> @error Error to $@convention(thin) @noescape (Int) -> @error Error
+  try_apply %c(%0) : $@convention(thin) @noescape (Int) -> @error Error, normal bb2, error bb1
+
+bb1(%err: $Error):
+  %t = tuple ()
+  br bb2(%t: $())
+
+bb2(%v : $()):
+  return %v : $()
+}

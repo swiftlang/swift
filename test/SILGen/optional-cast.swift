@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class A {}
@@ -10,15 +12,16 @@ class B : A {}
 //   Check whether the temporary holds a value.
 // CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:      [[T1:%.*]] = select_enum [[ARG_COPY]]
-// CHECK-NEXT: cond_br [[T1]], [[IS_PRESENT:bb.*]], [[NOT_PRESENT:bb[0-9]+]]
+// CHECK:      [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:      switch_enum [[ARG_COPY_COPY]] : $Optional<A>, case #Optional.some!enumelt.1: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
 //
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:      br [[NOT_PRESENT_FINISH:bb[0-9]+]]
 //
 //   If so, pull the value out and check whether it's a B.
-// CHECK:    [[IS_PRESENT]]:
+// CHECK:    [[IS_PRESENT]]([[IS_PRESENT_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[IS_PRESENT_ARG]]
 // CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]] : $Optional<A>, #Optional.some!enumelt.1
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
@@ -62,45 +65,49 @@ func foo(_ y : A?) {
 // -- Check for some(...)
 // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:      [[T1:%.*]] = select_enum [[ARG_COPY]]
-// CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NIL_DEPTH_1:bb[0-9]+]]
+// CHECK-NEXT: [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK-NEXT: switch_enum [[ARG_COPY_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_1]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_0:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(...)).
-// CHECK:    [[P]]:
+// CHECK:    [[P]]([[P_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[P_ARG]]
 // CHECK-NEXT: [[VALUE_OOOA:%.*]] = unchecked_enum_data [[ARG_COPY]]
-// CHECK:      [[T1:%.*]] = select_enum [[VALUE_OOOA]]
-// CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NIL_DEPTH_2:bb[0-9]+]]
+// CHECK-NEXT: [[VALUE_OOOA_COPY:%.*]] = copy_value [[VALUE_OOOA]]
+// CHECK-NEXT: switch_enum [[VALUE_OOOA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_2:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_2]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_0]]
 //
 //   If so, drill down another level and check for some(some(some(...))).
-// CHECK:    [[PP]]:
+// CHECK:    [[PP]]([[PP_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[PP_ARG]]
 // CHECK-NEXT: [[VALUE_OOA:%.*]] = unchecked_enum_data [[VALUE_OOOA]]
-// CHECK:      [[T1:%.*]] = select_enum [[VALUE_OOA]]
-// CHECK-NEXT: cond_br [[T1]], [[PPP:bb.*]], [[NIL_DEPTH_3:bb[0-9]+]]
+// CHECK-NEXT: [[VALUE_OOA_COPY:%.*]] = copy_value [[VALUE_OOA]]
+// CHECK-NEXT: switch_enum [[VALUE_OOA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_3]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_1:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(some(some(...)))).
-// CHECK:    [[PPP]]:
+// CHECK:    [[PPP]]([[PPP_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[PPP_ARG]]
 // CHECK-NEXT: [[VALUE_OA:%.*]] = unchecked_enum_data [[VALUE_OOA]]
-// CHECK:      [[T1:%.*]] = select_enum [[VALUE_OA]]
-// CHECK-NEXT: cond_br [[T1]], [[PPPP:bb.*]], [[NIL_DEPTH_4:bb[0-9]+]]
+// CHECK-NEXT: [[VALUE_OA_COPY:%.*]] = copy_value [[VALUE_OA]]
+// CHECK-NEXT: switch_enum [[VALUE_OA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_4]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_2:bb[0-9]+]]
 //
 //   If so, pull out the A and check whether it's a B.
-// CHECK:    [[PPPP]]:
+// CHECK:    [[PPPP]]([[PPPP_ARG:%.*]] :
+// CHECK-NEXT: destroy_value [[PPPP_ARG]]
 // CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[VALUE_OA]]
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
@@ -118,14 +125,14 @@ func foo(_ y : A?) {
 //
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : @owned $Optional<B>):
-// CHECK:    [[T0:%.*]] = select_enum [[VAL]]
-// CHECK:    cond_br [[T0]], [[HAVE_B:bb[0-9]+]], [[FINISH_NIL_4:bb[0-9]+]]
+// CHECK-NEXT: [[VAL_COPY:%.*]] = copy_value [[VAL]]
+// CHECK-NEXT: switch_enum [[VAL_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[HAVE_B:bb[0-9]+]], case #Optional.none!enumelt: [[FINISH_NIL_4:bb[0-9]+]]
 //
 // CHECK:    [[FINISH_NIL_4]]:
 // CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:      br [[FINISH_NIL_0]]
 //
-// CHECK:    [[HAVE_B]]:
+// CHECK:    [[HAVE_B]](
 // CHECK:      [[UNWRAPPED_VAL:%.*]] = unchecked_enum_data [[VAL]]
 // CHECK:      [[REWRAPPED_VAL:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[UNWRAPPED_VAL]]
 // CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -169,7 +176,8 @@ func bar(_ y : A????) {
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:         [[T1:%.*]] = select_enum [[ARG_COPY]]
+// CHECK-NEXT:    [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:         switch_enum [[ARG_COPY_COPY]]
 // CHECK:       bb1:
 // CHECK:         [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]]
 // CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some

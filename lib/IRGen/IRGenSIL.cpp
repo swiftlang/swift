@@ -26,6 +26,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
@@ -1027,6 +1028,7 @@ public:
   void visitStoreUnownedInst(StoreUnownedInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
@@ -1551,6 +1553,12 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
+  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
+  if (auto dc = f->getModule().getAssociatedContext()) {
+    if (auto sf = dc->getParentSourceFile()) {
+      CurSourceFile = sf;
+    }
+  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 
@@ -3878,6 +3886,27 @@ void IRGenSILFunction::
 visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
   llvm::Value *result = emitIsUnique(*this, i->getOperand(),
                                      i->getLoc().getSourceLoc(), true);
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(i, out);
+}
+
+void IRGenSILFunction::visitIsEscapingClosureInst(
+    swift::IsEscapingClosureInst *i) {
+  assert(i->getOperand()->getType().is<SILFunctionType>() &&
+         i->getOperand()
+             ->getType()
+             .getAs<SILFunctionType>()
+             ->getExtInfo()
+             .hasContext() &&
+         "Must have a closure operand");
+
+  Explosion closure = getLoweredExplosion(i->getOperand());
+  auto func = closure.claimNext();
+  (void)func;
+  auto context = closure.claimNext();
+
+  auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc());
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);

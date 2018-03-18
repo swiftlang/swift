@@ -326,16 +326,16 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     return true;
   }
 
-  // We don't allow lookups of an associated type or typealias of an
-  // existential type, because we have no way to represent such types.
-  if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-    if (type->isExistentialType() &&
-        (isa<TypeAliasDecl>(typeDecl) ||
-         isa<AssociatedTypeDecl>(typeDecl))) {
-      if (memberType->hasTypeParameter()) {
-        return true;
-      }
-    }
+  if (type->isExistentialType() &&
+      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    // TODO: Temporarily allow typealias and associated type lookup on
+    //       existential type iff it doesn't have any type parameters.
+    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
+      return memberType->hasTypeParameter();
+
+    // Don't allow lookups of nested types of an existential type,
+    // because there is no way to represent such types.
+    return true;
   }
 
   return false;
@@ -472,7 +472,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
 LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
                                              NameLookupOptions options) {
-  return lookupMember(dc, type, Context.Id_init, options);
+  return lookupMember(dc, type, DeclBaseName::createConstructor(), options);
 }
 
 enum : unsigned {
@@ -499,8 +499,8 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   }
   assert(argName.getBaseName().getKind() == DeclBaseName::Kind::Normal);
 
-  StringRef argBase = argName.getBaseIdentifier().str();
-  StringRef paramBase = paramName.getBaseIdentifier().str();
+  StringRef argBase = argName.getBaseName().userFacingName();
+  StringRef paramBase = paramName.getBaseName().userFacingName();
 
   unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
 
@@ -644,12 +644,12 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
                         "member");
 
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getBaseName().getIdentifier().str(), kind);
+                         decl->getBaseName().userFacingName(), kind);
     }
   }
 
   return tc.diagnose(decl, diag::note_typo_candidate,
-                     decl->getBaseName().getIdentifier().str());
+                     decl->getBaseName().userFacingName());
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
@@ -660,7 +660,7 @@ void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
 
   if (writtenName.getBaseName() != declName.getBaseName())
     diagnostic.fixItReplace(loc.getBaseNameLoc(),
-                            declName.getBaseIdentifier().str());
+                            declName.getBaseName().userFacingName());
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.

@@ -17,25 +17,25 @@
 #include "swift/Driver/Driver.h"
 
 #include "ToolChains.h"
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/TaskQueue.h"
-#include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TaskQueue.h"
+#include "swift/Basic/Version.h"
+#include "swift/Config.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "swift/Driver/ToolChain.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Config.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -84,7 +84,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::string OptName;
   // However, the driver kind may be overridden if the first argument is
   // --driver-mode.
-  if (Args.size() > 0) {
+  if (!Args.empty()) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
@@ -191,6 +191,9 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     if (name.find('=') != StringRef::npos)
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
+                     name);
+    else if (name.startswith("-D"))
+      diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
     else if (!Lexer::isIdentifier(name))
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
@@ -515,9 +518,9 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution);
+    ArgList->hasArg(options::OPT_driver_skip_execution,
+                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -528,6 +531,8 @@ Driver::buildCompilation(const ToolChain &TC,
                      A->getAsString(*ArgList), A->getValue());
     }
   }
+  DriverForceOneBatchRepartition =
+      ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -618,7 +623,7 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  std::unique_ptr<OutputFileMap> OFM =
+  Optional<OutputFileMap> OFM =
       buildOutputFileMap(*TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError())
@@ -679,9 +684,12 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   OutputLevel Level = OutputLevel::Normal;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_v,
-                                         options::OPT_parseable_output)) {
-    if (A->getOption().matches(options::OPT_v))
+  if (const Arg *A =
+          ArgList->getLastArg(options::OPT_driver_print_jobs, options::OPT_v,
+                              options::OPT_parseable_output)) {
+    if (A->getOption().matches(options::OPT_driver_print_jobs))
+      Level = OutputLevel::PrintJobs;
+    else if (A->getOption().matches(options::OPT_v))
       Level = OutputLevel::Verbose;
     else if (A->getOption().matches(options::OPT_parseable_output))
       Level = OutputLevel::Parseable;
@@ -698,13 +706,14 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  Incremental,
                                                  BatchMode,
                                                  DriverBatchSeed,
+                                                 DriverForceOneBatchRepartition,
                                                  DriverSkipExecution,
                                                  SaveTemps,
                                                  ShowDriverTimeCompilation,
                                                  std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM.get(),
+  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -715,7 +724,8 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM.get(), workingDirectory, TC, *C);
+  buildJobs(TopLevelActions, OI, OFM ? OFM.getPointer() : nullptr,
+            workingDirectory, TC, *C);
 
   if (DriverPrintDerivedOutputFileMap) {
     C->getDerivedOutputFileMap().dump(llvm::outs(), true);
@@ -753,11 +763,6 @@ Driver::buildCompilation(const ToolChain &TC,
 
   if (DriverPrintBindings)
     return nullptr;
-
-  if (DriverPrintJobs) {
-    printJobs(*C);
-    return nullptr;
-  }
 
   return C;
 }
@@ -1101,7 +1106,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   } else { // DriverKind::Batch
     OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization))
+    if (Args.hasArg(options::OPT_whole_module_optimization,
+                    options::OPT_index_file))
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
     OI.CompilerOutputType = types::TY_Object;
   }
@@ -1696,20 +1702,21 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-std::unique_ptr<OutputFileMap>
+Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                            StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
-    return nullptr;
+    return None;
 
   // TODO: perform some preflight checks to ensure the file exists.
-  auto OFM = OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
-  if (!OFM) {
-    // TODO: emit diagnostic with error string
-    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
+  llvm::Expected<OutputFileMap> OFM =
+      OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
+  if (auto Err = OFM.takeError()) {
+    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
+                   llvm::toString(std::move(Err)));
   }
-  return OFM;
+  return *OFM;
 }
 
 void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
@@ -2622,11 +2629,6 @@ void Driver::printActions(const Compilation &C) const {
   }
 }
 
-void Driver::printJobs(const Compilation &C) const {
-  for (const Job *J : C.getJobs())
-    J->printCommandLineAndEnvironment(llvm::outs());
-}
-
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
   OS << version::getSwiftFullVersion(
     version::Version::getCurrentLanguageVersion()) << '\n';
@@ -2653,4 +2655,18 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
+}
+
+bool OutputInfo::mightHaveExplicitPrimaryInputs(
+    const CommandOutput &Output) const {
+  switch (CompilerMode) {
+  case Mode::StandardCompile:
+  case Mode::BatchModeCompile:
+    return true;
+  case Mode::SingleCompile:
+    return false;
+  case Mode::Immediate:
+  case Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
 }

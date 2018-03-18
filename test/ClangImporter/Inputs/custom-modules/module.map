@@ -189,3 +189,13 @@ module IndirectFields {
 module ObjCBridgeNonconforming {
   header "ObjCBridgeNonconforming.h"
 }
+
+module Warnings1 { header "Warnings1.h" }
+module Warnings2 { header "Warnings2.h" }
+module Warnings3 { header "Warnings3.h" }
+module Warnings4 { header "Warnings4.h" }
+module Warnings5 { header "Warnings5.h" }
+module Warnings6 { header "Warnings6.h" }
+module Warnings7 { header "Warnings7.h" }
+module Warnings8 { header "Warnings8.h" }
+module Warnings9 { header "Warnings9.h" }

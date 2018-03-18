@@ -435,6 +435,8 @@ public:
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
 
+  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc);
+
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);

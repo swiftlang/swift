@@ -33,6 +33,9 @@ enum {
   /// The number of words (pointers) in a value buffer.
   NumWords_ValueBuffer = 3,
 
+  /// The number of words in a metadata completion context.
+  NumWords_MetadataCompletionContext = 4,
+
   /// The number of words in a yield-once coroutine buffer.
   NumWords_YieldOnceBuffer = 4,
 
@@ -70,6 +73,153 @@ enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,
 #include "MetadataKind.def"
 };
+
+/// Flags stored in the value-witness table.
+template <typename int_type>
+class TargetValueWitnessFlags {
+public:
+  // The polarity of these bits is chosen so that, when doing struct layout, the
+  // flags of the field types can be mostly bitwise-or'ed together to derive the
+  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
+  // still require additional fixup.)
+  enum : int_type {
+    AlignmentMask =       0x0000FFFF,
+    IsNonPOD =            0x00010000,
+    IsNonInline =         0x00020000,
+    HasExtraInhabitants = 0x00040000,
+    HasSpareBits =        0x00080000,
+    IsNonBitwiseTakable = 0x00100000,
+    HasEnumWitnesses =    0x00200000,
+    Incomplete =          0x00400000,
+
+    // Everything else is reserved.
+  };
+
+private:
+  int_type Data;
+
+  constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
+public:
+  constexpr TargetValueWitnessFlags() : Data(0) {}
+
+  /// The required alignment of the first byte of an object of this
+  /// type, expressed as a mask of the low bits that must not be set
+  /// in the pointer.
+  ///
+  /// This representation can be easily converted to the 'alignof'
+  /// result by merely adding 1, but it is more directly useful for
+  /// performing dynamic structure layouts, and it grants an
+  /// additional bit of precision in a compact field without needing
+  /// to switch to an exponent representation.
+  ///
+  /// For example, if the type needs to be 8-byte aligned, the
+  /// appropriate alignment mask should be 0x7.
+  size_t getAlignmentMask() const {
+    return (Data & AlignmentMask);
+  }
+  constexpr TargetValueWitnessFlags withAlignmentMask(size_t alignMask) const {
+    return TargetValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
+  }
+
+  size_t getAlignment() const { return getAlignmentMask() + 1; }
+  constexpr TargetValueWitnessFlags withAlignment(size_t alignment) const {
+    return withAlignmentMask(alignment - 1);
+  }
+
+  /// True if the type requires out-of-line allocation of its storage.
+  bool isInlineStorage() const { return !(Data & IsNonInline); }
+  constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
+    return TargetValueWitnessFlags((Data & ~IsNonInline) |
+                                   (isInline ? 0 : IsNonInline));
+  }
+
+  /// True if values of this type can be copied with memcpy and
+  /// destroyed with a no-op.
+  bool isPOD() const { return !(Data & IsNonPOD); }
+  constexpr TargetValueWitnessFlags withPOD(bool isPOD) const {
+    return TargetValueWitnessFlags((Data & ~IsNonPOD) |
+                                   (isPOD ? 0 : IsNonPOD));
+  }
+
+  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
+  /// 'take' is a destructive operation that invalidates the source object, so
+  /// most types can be taken with a simple bitwise copy. Only types with side
+  /// table references, like @weak references, or types with opaque value
+  /// semantics, like imported C++ types, are not bitwise-takable.
+  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
+  constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
+    return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
+                                   (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  /// True if this type's binary representation has extra inhabitants, that is,
+  /// bit patterns that do not form valid values of the type.
+  ///
+  /// If true, then the extra inhabitant value witness table entries are
+  /// available in this type's value witness table.
+  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+  /// True if this type's binary representation is that of an enum, and the
+  /// enum value witness table entries are available in this type's value
+  /// witness table.
+  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
+  constexpr TargetValueWitnessFlags
+  withExtraInhabitants(bool hasExtraInhabitants) const {
+    return TargetValueWitnessFlags((Data & ~HasExtraInhabitants) |
+                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
+  }
+  constexpr TargetValueWitnessFlags
+  withEnumWitnesses(bool hasEnumWitnesses) const {
+    return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
+                                   (hasEnumWitnesses ? HasEnumWitnesses : 0));
+  }
+
+  /// True if the type with this value-witness table is incomplete,
+  /// meaning that its external layout (size, etc.) is meaningless
+  /// pending completion of the metadata layout.
+  bool isIncomplete() const { return Data & Incomplete; }
+  constexpr TargetValueWitnessFlags
+  withIncomplete(bool isIncomplete) const {
+    return TargetValueWitnessFlags((Data & ~Incomplete) |
+                                   (isIncomplete ? Incomplete : 0));
+  }
+
+  constexpr int_type getOpaqueValue() const { return Data; }
+  static constexpr TargetValueWitnessFlags getFromOpaqueValue(int_type data) {
+    return TargetValueWitnessFlags(data);
+  }
+};
+using ValueWitnessFlags = TargetValueWitnessFlags<size_t>;
+
+/// Flags stored in a value-witness table with extra inhabitants.
+template <typename int_type>
+class TargetExtraInhabitantFlags {
+public:
+  enum : int_type {
+    NumExtraInhabitantsMask = 0x7FFFFFFFU,
+    ExtraInhabitantFlags
+  };
+  int_type Data;
+
+  constexpr TargetExtraInhabitantFlags(int_type data) : Data(data) {}
+
+public:
+  constexpr TargetExtraInhabitantFlags() : Data(0) {}
+
+  /// The number of extra inhabitants in the type's representation.
+  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
+
+  constexpr TargetExtraInhabitantFlags
+  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
+    return TargetExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
+                                      numExtraInhabitants);
+  }
+
+  constexpr int_type getOpaqueValue() const { return Data; }
+  static constexpr TargetExtraInhabitantFlags getFromOpaqueValue(int_type data){
+    return TargetExtraInhabitantFlags(data);
+  }
+};
+using ExtraInhabitantFlags =
+  TargetExtraInhabitantFlags<size_t>;
 
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {
@@ -641,11 +791,7 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type {
-    InOutMask    = 1 << 0,
-    SharedMask   = 1 << 1,
-    VariadicMask = 1 << 2,
-  };
+  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -653,14 +799,10 @@ class TargetParameterTypeFlags {
 public:
   constexpr TargetParameterTypeFlags() : Data(0) {}
 
-  constexpr TargetParameterTypeFlags<int_type> withInOut(bool isInOut) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~InOutMask) |
-                                              (isInOut ? InOutMask : 0));
-  }
-
-  constexpr TargetParameterTypeFlags<int_type> withShared(bool isShared) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~SharedMask) |
-                                              (isShared ? SharedMask : 0));
+  constexpr TargetParameterTypeFlags<int_type>
+  withValueOwnership(ValueOwnership ownership) const {
+    return TargetParameterTypeFlags<int_type>((Data & ~ValueOwnershipMask) |
+                                              (int_type)ownership);
   }
 
   constexpr TargetParameterTypeFlags<int_type>
@@ -670,9 +812,11 @@ public:
   }
 
   bool isNone() const { return Data == 0; }
-  bool isInOut() const { return Data & InOutMask; }
-  bool isShared() const { return Data & SharedMask; }
   bool isVariadic() const { return Data & VariadicMask; }
+
+  ValueOwnership getValueOwnership() const {
+    return (ValueOwnership)(Data & ValueOwnershipMask);
+  }
 
   int_type getIntValue() const { return Data; }
 
@@ -1021,6 +1165,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Only meaningful for class descriptors.
     Class_SuperclassReferenceKind = 12,
     Class_SuperclassReferenceKind_width = 2,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 11,
   };
 
 public:
@@ -1037,6 +1185,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
                                 class_hasResilientSuperclass,
                                 class_setHasResilientSuperclass)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
+                                class_areImmediateMembersNegative,
+                                class_setAreImmediateMembersNegative)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
                                  Class_SuperclassReferenceKind_width,
@@ -1168,6 +1319,104 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+/// Flags used by generic metadata patterns.
+class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
+  enum {
+    // All of these values are bit offsets or widths.
+    // General flags build up from 0.
+    // Kind-specific flags build down from 31.
+
+    /// Does this pattern have an extra-data pattern?
+    HasExtraDataPattern = 0,
+
+    // Class-specific flags.
+
+    /// Does this pattern have an immediate-members pattern?
+    Class_HasImmediateMembersPattern = 31,
+
+    // Value-specific flags.
+
+    /// For value metadata: the metadata kind of the type.
+    Value_MetadataKind = 21,
+    Value_MetadataKind_width = 11,
+  };
+
+public:
+  explicit GenericMetadataPatternFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr GenericMetadataPatternFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasImmediateMembersPattern,
+                                class_hasImmediateMembersPattern,
+                                class_setHasImmediateMembersPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
+                                hasExtraDataPattern,
+                                setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
+                                 Value_MetadataKind_width,
+                                 MetadataKind,
+                                 value_getMetadataKind,
+                                 value_setMetadataKind)
+};
+
+/// Kinds of requests for metadata.
+class MetadataRequest : public FlagSet<size_t> {
+public:
+  enum BasicKind {
+    /// A request for fully-completed metadata.  The metadata must be
+    /// prepared for all supported type operations.  This is a superset
+    /// of the requirements of LayoutComplete.
+    ///
+    /// For example, a class must be ready for subclassing and instantiation:
+    /// it must have a completed instance layout and (under ObjCInterop)
+    /// must have been realized by the Objective-C runtime.
+    Complete,
+
+    /// A request for metadata that can be used for type layout; that is,
+    /// the type's value witness table must be completely initialized.
+    LayoutComplete,
+
+    /// A request for a metadata pointer that fully identifies the type.
+    /// Basic type structure, such as the type context descriptor and the
+    /// list of generic arguments, should have been installed, but there is
+    /// no requirement for a valid value witness table.
+    Abstract,
+  };
+
+private:
+  enum {
+    BasicKind_bit = 0,
+    BasicKind_width = 8,
+
+    /// A blocking request will not return until the runtime is able to produce
+    /// metadata with the given kind.  A non-blocking request will return
+    /// "immediately", producing an abstract metadata and a flag saying that
+    /// the operation failed.
+    ///
+    /// An abstract request will never be non-zero.
+    NonBlocking_bit = 8,
+  };
+
+public:
+  MetadataRequest(BasicKind kind, bool isNonBlocking = false) {
+    setBasicKind(kind);
+    setIsNonBlocking(isNonBlocking);
+  }
+  explicit MetadataRequest(size_t bits) : FlagSet(bits) {}
+  constexpr MetadataRequest() {}
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(BasicKind_bit,
+                                 BasicKind_width,
+                                 BasicKind,
+                                 getBasicKind,
+                                 setBasicKind)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
+                                isNonBlocking,
+                                setIsNonBlocking)
 };
 
 } // end namespace swift

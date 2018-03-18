@@ -112,11 +112,11 @@ public struct Selector : ExpressibleByStringLiteral {
   }
 }
 
-public func ==(lhs: Selector, rhs: Selector) -> Bool {
-  return sel_isEqual(lhs, rhs)
-}
-
 extension Selector : Equatable, Hashable {
+  public static func ==(lhs: Selector, rhs: Selector) -> Bool {
+    return sel_isEqual(lhs, rhs)
+  }
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -199,6 +199,10 @@ public var NO: ObjCBool {
 // FIXME: what about NSObjectProtocol?
 
 extension NSObject : Equatable, Hashable {
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -210,10 +214,6 @@ extension NSObject : Equatable, Hashable {
   open var hashValue: Int {
     return hash
   }
-}
-
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
 }
 
 extension NSObject : CVarArg {

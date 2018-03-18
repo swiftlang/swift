@@ -55,9 +55,6 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The path to which we should output fixits as source edits.
-  std::string FixitsOutputPath;
-
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 

@@ -34,7 +34,7 @@ namespace irgen {
   class Explosion;
 
   /// Discriminator for checked cast modes.
-  enum class CheckedCastMode : unsigned char {
+  enum class CheckedCastMode : uint8_t {
     Unconditional,
     Conditional,
   };

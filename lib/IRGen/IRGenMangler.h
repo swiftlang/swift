@@ -81,6 +81,10 @@ public:
                                                   const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
+
+  std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
+    return mangleNominalTypeSymbol(Decl, "Mr");
+  }
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
@@ -229,26 +233,32 @@ public:
     return mangleConformanceSymbol(Type(), C, "MA");
   }
 
-  std::string mangleOutlinedCopyFunction(const GenericTypeDecl *Decl) {
+  std::string mangleOutlinedCopyFunction(CanType ty,
+                                         CanGenericSignature sig) {
     beginMangling();
-    appendAnyGenericType(Decl);
+    appendType(ty);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("Wy");
     return finalize();
   }
-  std::string mangleOutlinedConsumeFunction(const GenericTypeDecl *Decl) {
+  std::string mangleOutlinedConsumeFunction(CanType ty,
+                                            CanGenericSignature sig) {
     beginMangling();
-    appendAnyGenericType(Decl);
+    appendType(ty);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("We");
     return finalize();
   }
 
-  std::string mangleOutlinedRetainFunction(const Type t) {
+  std::string mangleOutlinedRetainFunction(Type t) {
     beginMangling();
     appendType(t);
     appendOperator("Wr");
     return finalize();
   }
-  std::string mangleOutlinedReleaseFunction(const Type t) {
+  std::string mangleOutlinedReleaseFunction(Type t) {
     beginMangling();
     appendType(t);
     appendOperator("Ws");

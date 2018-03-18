@@ -138,7 +138,7 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
 
 SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
-                   SymbolPropertySet(), SymbolLanguage::Swift };
+                   SymbolLanguage::Swift, SymbolPropertySet() };
   switch (D->getKind()) {
     case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
     case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;

@@ -21,7 +21,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   SyntaxNodes.swift.gyb
   SyntaxRewriter.swift.gyb
   TokenKind.swift.gyb
-  Trivia.swift
+  Trivia.swift.gyb
 
   SWIFT_MODULE_DEPENDS Foundation
   INSTALL_IN_COMPONENT swift-syntax

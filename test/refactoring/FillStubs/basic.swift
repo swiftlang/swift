@@ -89,7 +89,7 @@ extension C14: P3 {
   func foo3()
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -fill-stub -source-filename %s -pos=5:8 >> %t.result/P5-8.swift
 // RUN: diff -u %S/Outputs/basic/P5-8.swift.expected %t.result/P5-8.swift
 // RUN: %refactor -fill-stub -source-filename %s -pos=8:8 >> %t.result/P8-8.swift

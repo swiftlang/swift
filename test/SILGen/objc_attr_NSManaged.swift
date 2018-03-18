@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -104,7 +106,7 @@ class FinalEntity: NSObject, EntityIDProto {
 	@NSManaged final var entityID: String
 }
 
-// CHECK-LABEL: sil private @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout FinalEntity, @thick FinalEntity.Type) -> ()
+// CHECK-LABEL: sil private @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed FinalEntity, @thick FinalEntity.Type) -> ()
 // CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
 // CHECK: return
 

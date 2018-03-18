@@ -143,7 +143,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable {
     public static let distantPast = Date(timeIntervalSinceReferenceDate: -63114076800.0)
     
     public var hashValue: Int {
-        if #available(OSX 10.12, iOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, *) {
             return Int(bitPattern: __CFHashDouble(_time))
         } else { // 10.11 and previous behavior fallback; this must allocate a date to reference the hash value and then throw away the reference
             return NSDate(timeIntervalSinceReferenceDate: _time).hash

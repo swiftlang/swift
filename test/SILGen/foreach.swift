@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name foreach -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 //////////////////
 // Declarations //

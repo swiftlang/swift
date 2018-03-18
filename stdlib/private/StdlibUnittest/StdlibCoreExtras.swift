@@ -12,7 +12,7 @@
 
 import SwiftPrivate
 import SwiftPrivateLibcExtras
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc

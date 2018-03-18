@@ -2143,7 +2143,7 @@ public:
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter access is out of sync"
-                 " with the access actually on the setter";
+                 " with the access actually on the setter\n";
           abort();
         }
       }
@@ -2151,21 +2151,22 @@ public:
       if (auto getter = ASD->getGetter()) {
         if (getter->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                 " with whether the getter is actually mutating";
+                 " with whether the getter is actually mutating\n";
           abort();
         }
       }
       if (auto setter = ASD->getSetter()) {
         if (setter->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether the setter is actually mutating";
+                 " with whether the setter is actually mutating\n";
           abort();
         }
       }
       if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
-        if (materializeForSet->isMutating() != ASD->isSetterMutating()) {
-          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether materializeForSet is mutating";
+        if (materializeForSet->isMutating() !=
+            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
+          Out << "AbstractStorageDecl::is{Getter,Setter}Mutating is out of sync"
+                 " with whether materializeForSet is mutating\n";
           abort();
         }
       }
@@ -2687,8 +2688,7 @@ public:
       if (!CD->isInvalid() &&
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
-        bool resultIsOptional;
-        CD->getResultInterfaceType()->getOptionalObjectType(resultIsOptional);
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
         auto declIsOptional = CD->getFailability() != OTK_None;
 
         if (resultIsOptional != declIsOptional) {
@@ -2700,10 +2700,10 @@ public:
         // Also check the interface type.
         if (auto genericFn 
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
-          genericFn->getResult()
+          resultIsOptional = (bool) genericFn->getResult()
               ->castTo<AnyFunctionType>()
               ->getResult()
-              ->getOptionalObjectType(resultIsOptional);
+              ->getOptionalObjectType();
           if (resultIsOptional != declIsOptional) {
             Out << "Initializer has result optionality/failability mismatch\n";
             CD->dump(llvm::errs());

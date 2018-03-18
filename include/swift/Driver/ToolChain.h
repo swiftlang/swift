@@ -13,11 +13,11 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/Driver/Action.h"
-#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/Option/Option.h"
+#include "swift/Driver/Action.h"
+#include "swift/Frontend/Types.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Option/Option.h"
 
 #include <memory>
 
@@ -54,6 +54,9 @@ protected:
   private:
     Compilation &C;
 
+    /// The limit for passing a list of files on the command line.
+    static const size_t TOO_MANY_FILES = 128;
+
   public:
     ArrayRef<const Job *> Inputs;
     ArrayRef<const Action *> InputActions;
@@ -83,6 +86,34 @@ protected:
     /// arguments.
     const char *getTemporaryFilePath(const llvm::Twine &name,
                                      StringRef suffix = "") const;
+
+    /// For frontend, merge-module, and link invocations.
+    bool shouldUseInputFileList() const;
+
+    bool shouldUsePrimaryInputFileListInFrontendInvocation() const;
+
+    bool shouldUseMainOutputFileListInFrontendInvocation() const;
+
+    bool shouldUseSupplementaryOutputFileMapInFrontendInvocation() const;
+
+    /// Reify the existing behavior that SingleCompile compile actions do not
+    /// filter, but batch-mode and single-file compilations do. Some clients are
+    /// relying on this (i.e., they pass inputs that don't have ".swift" as an
+    /// extension.) It would be nice to eliminate this distinction someday.
+    bool shouldFilterFrontendInputsByType() const;
+
+    const char *computeFrontendModeForCompile() const;
+
+    void addFrontendInputAndOutputArguments(
+        llvm::opt::ArgStringList &Arguments,
+        std::vector<FilelistInfo> &FilelistInfos) const;
+
+  private:
+    void addFrontendCommandLineInputArguments(
+        bool mayHavePrimaryInputs, bool useFileList, bool usePrimaryFileList,
+        bool filterByType, llvm::opt::ArgStringList &arguments) const;
+    void addFrontendSupplementaryOutputArguments(
+        llvm::opt::ArgStringList &arguments) const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -203,7 +234,6 @@ public:
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
                                          StringRef sanitizer,
                                          bool shared=true) const;
-
 };
 } // end namespace driver
 } // end namespace swift

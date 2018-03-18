@@ -42,12 +42,15 @@ enum class ReferenceOwnership : uint8_t {
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {
-  /// \brief the default ownership (owned)
+  /// \brief the context-dependent default ownership (sometimes shared,
+  /// sometimes owned)
   Default,
   /// \brief an 'inout' mutating pointer-like value
   InOut,
   /// \brief a '__shared' non-mutating pointer-like value
-  Shared
+  Shared,
+  /// \brief an '__owned' value
+  Owned
 };
 
 } // end namespace swift

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name pointer_conversion -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
@@ -309,9 +311,15 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
   // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
-  // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
-  // CHECK: [[SOME_BB]]:
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[COPY]]
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK:   br [[NONE_BB_TARGET:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]]([[SOME_BB_ARG:%.*]] :
+  // TODO: We should be abel to use SOME_BB_ARG for SOME_VALUE
+  // CHECK:   destroy_value [[SOME_BB_ARG]]
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
   // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
@@ -328,7 +336,7 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]
   // CHECK:   destroy_value %0
-  // CHECK: [[NONE_BB]]:
+  // CHECK: [[NONE_BB_TARGET]]:
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[CONT_BB]]([[NO_VALUE]] : $Optional<UnsafePointer<Int>>, [[NO_OWNER]] : $Optional<AnyObject>)
@@ -341,16 +349,21 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
   // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
-  // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
-  // CHECK: [[SOME_BB]]:
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[COPY]]
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<Optional<Array<Int>>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK:   br [[NONE_BB_TARGET:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]](
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[T0:%.*]] = select_enum [[SOME_VALUE]]
-  // CHECK:   cond_br [[T0]], [[SOME_SOME_BB:bb[0-9]+]], [[SOME_NONE_BB:bb[0-9]+]]
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[SOME_VALUE]]
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
+  //
   // CHECK: [[SOME_NONE_BB]]:
   // CHECK:   destroy_value [[SOME_VALUE]]
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
-  // CHECK: [[SOME_SOME_BB]]:
+  // CHECK: [[SOME_SOME_BB]](
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
   // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
@@ -375,7 +388,7 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[SOME_SOME_CONT_BB]]([[NO_VALUE]] : $Optional<UnsafePointer<Int>>, [[NO_OWNER]] : $Optional<AnyObject>)
-  // CHECK: [[NONE_BB]]:
+  // CHECK: [[NONE_BB_TARGET]]:
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<Optional<UnsafePointer<Int>>>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[SOME_CONT_BB]]([[NO_VALUE]] : $Optional<Optional<UnsafePointer<Int>>>, [[NO_OWNER]] : $Optional<AnyObject>)
@@ -388,9 +401,13 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
   // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
-  // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
-  // CHECK: [[SOME_BB]]:
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[COPY]]
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK:   br [[NONE_BB_TARGET:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]](
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
   // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
@@ -407,7 +424,7 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]
   // CHECK:   destroy_value %0
-  // CHECK: [[NONE_BB]]:
+  // CHECK: [[NONE_BB_TARGET]]:
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[CONT_BB]]([[NO_VALUE]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
@@ -420,17 +437,21 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
   // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[COPY]]
   //   FIXME: this should really go somewhere that will make nil, not some(nil)
-  // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
-  // CHECK: [[SOME_BB]]:
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<Optional<String>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK:   br [[NONE_BB_TARGET:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]](
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[T0:%.*]] = select_enum [[SOME_VALUE]]
-  // CHECK:   cond_br [[T0]], [[SOME_SOME_BB:bb[0-9]+]], [[SOME_NONE_BB:bb[0-9]+]]
+  // CHECK:   [[SWITCH_COPY:%.*]] = copy_value [[SOME_VALUE]]
+  // CHECK:   switch_enum [[SWITCH_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_NONE_BB]]:
   // CHECK:   destroy_value [[SOME_VALUE]]
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
-  // CHECK: [[SOME_SOME_BB]]:
+  // CHECK: [[SOME_SOME_BB]](
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
   // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
@@ -455,7 +476,7 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[SOME_SOME_CONT_BB]]([[NO_VALUE]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
-  // CHECK: [[NONE_BB]]:
+  // CHECK: [[NONE_BB_TARGET]]:
   // CHECK:   [[NO_VALUE:%.*]] = enum $Optional<Optional<UnsafeRawPointer>>, #Optional.none
   // CHECK:   [[NO_OWNER:%.*]] = enum $Optional<AnyObject>, #Optional.none
   // CHECK:   br [[SOME_CONT_BB]]([[NO_VALUE]] : $Optional<Optional<UnsafeRawPointer>>, [[NO_OWNER]] : $Optional<AnyObject>)

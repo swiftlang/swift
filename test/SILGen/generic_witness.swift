@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name generic_witness -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name generic_witness -emit-ir -enable-sil-ownership %s
 
 protocol Runcible {
   func runce<A>(_ x: A)

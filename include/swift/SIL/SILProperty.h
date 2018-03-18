@@ -63,6 +63,9 @@ public:
   const KeyPathPatternComponent &getComponent() const { return Component; }
   
   void print(SILPrintContext &Ctx) const;
+  void dump() const;
+  
+  void verify(const SILModule &M) const;
 };
   
 } // end namespace swift

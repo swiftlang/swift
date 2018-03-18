@@ -31,7 +31,7 @@ class ASTContext;
 class ASTPrinter;
 
 /// Describes a layout constraint information.
-enum class LayoutConstraintKind : unsigned char {
+enum class LayoutConstraintKind : uint8_t {
   // It is not a known layout constraint.
   UnknownLayout,
   // It is a layout constraint representing a trivial type of an unknown size.
@@ -395,7 +395,7 @@ template <> struct DenseMapInfo<swift::LayoutConstraint> {
 };
 
 // A LayoutConstraint is "pointer like".
-template <> class PointerLikeTypeTraits<swift::LayoutConstraint> {
+template <> struct PointerLikeTypeTraits<swift::LayoutConstraint> {
 public:
   static inline void *getAsVoidPointer(swift::LayoutConstraint I) {
     return (void *)I.getPointer();

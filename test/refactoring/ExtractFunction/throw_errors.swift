@@ -17,7 +17,7 @@ func foo2() throws {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=8:1 -end-pos=8:13 >> %t.result/L8-8.swift
 // RUN: diff -u %S/Outputs/throw_errors/L8-8.swift.expected %t.result/L8-8.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=9:1 -end-pos=9:14 >> %t.result/L9-9.swift

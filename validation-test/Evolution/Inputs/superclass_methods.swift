@@ -14,15 +14,9 @@ open class Base {
   open class func classMethod() -> String {
     return "Base.classMethod()"
   }
-}
 
-open class OtherBase {
-  public init() {}
-  open func method() -> String {
-    return "OtherBase.method()"
-  }
-  open class func classMethod() -> String {
-    return "OtherBase.classMethod()"
+  open func nonOverriddenMethod() -> String {
+    return "Base.nonOverriddenMethod()"
   }
 }
 
@@ -65,10 +59,4 @@ open class RemoveInterposingMethod : Base {}
 open class InsertSuperclass : Base {}
 #else
 open class InsertSuperclass : InBetween {}
-#endif
-
-#if BEFORE
-open class ChangeRoot : Base {}
-#else
-open class ChangeRoot : OtherBase {}
 #endif

@@ -24,6 +24,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 
@@ -1426,6 +1427,20 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
   llvm::CallInst *call = Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();
+  return call;
+}
+
+llvm::Value *IRGenFunction::emitIsEscapingClosureCall(llvm::Value *value,
+                                                      SourceLoc sourceLoc) {
+  auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
+  auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
+  auto filename = IGM.getAddrOfGlobalString(loc.Filename);
+  auto filenameLength =
+      llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
+  llvm::CallInst *call =
+      Builder.CreateCall(IGM.getIsEscapingClosureAtFileLocationFn(),
+                         {value, filename, filenameLength, line});
   call->setDoesNotThrow();
   return call;
 }

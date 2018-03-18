@@ -123,7 +123,7 @@ macro(configure_sdk_darwin
 
   foreach(arch ${architectures})
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
-        "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+        "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endforeach()
 
   # Add this to the list of known SDKs.
@@ -141,7 +141,7 @@ macro(configure_sdk_unix
   set(SWIFT_SDK_${prefix}_PATH "${sdkpath}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")
+  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
@@ -171,7 +171,7 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
   set(SWIFT_SDK_${prefix}_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "NOTFOUND")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "Win32")

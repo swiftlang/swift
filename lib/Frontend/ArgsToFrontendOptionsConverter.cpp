@@ -45,7 +45,8 @@ static void debugFailWithAssertion() {
 LLVM_ATTRIBUTE_NOINLINE
 static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-bool ArgsToFrontendOptionsConverter::convert() {
+bool ArgsToFrontendOptionsConverter::convert(
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
   using namespace options;
 
   handleDebugCrashGroupArguments();
@@ -93,9 +94,11 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   computeDumpScopeMapLocations();
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
-          .convert())
+  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+      ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+  if (!inputsAndOutputs)
     return true;
+  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
   Opts.RequestedAction = determineRequestedAction(Args);
 
@@ -116,9 +119,6 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   if (checkUnusedSupplementaryOutputPaths())
     return true;
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path))
-    Opts.FixitsOutputPath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();

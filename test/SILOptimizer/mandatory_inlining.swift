@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -enable-sil-ownership -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
 
 // These tests are deliberately shallow, because I do not want to depend on the

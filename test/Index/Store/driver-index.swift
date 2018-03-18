@@ -1,2 +1,2 @@
 // RUN: %swiftc_driver -driver-print-jobs -index-file -index-file-path %s %S/Inputs/SwiftModuleA.swift %s -o %t.output_for_index -index-store-path %t.index_store -module-name driver_index 2>&1 | %FileCheck %s
-// CHECK: {{.*}}swift -frontend -typecheck {{.*}}-primary-file {{.*}}driver-index.swift {{.*}}SwiftModuleA.swift  {{.*}}-o {{.*}}.output_for_index {{.*}}-index-store-path {{.*}}.index_store -index-system-modules
+// CHECK: {{.*}}swift -frontend -typecheck {{.*}}SwiftModuleA.swift -primary-file {{.*}}driver-index.swift {{.*}}-o {{.*}}.output_for_index {{.*}}-index-store-path {{.*}}.index_store -index-system-modules

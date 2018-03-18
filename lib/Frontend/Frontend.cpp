@@ -646,16 +646,11 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto *DelayedCB = SecondaryDelayedCB;
-  if (isPrimaryInput(BufferID)) {
-    DelayedCB = PrimaryDelayedCB;
-  }
-  if (isWholeModuleCompilation())
-    DelayedCB = PrimaryDelayedCB;
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+  auto *DelayedCB = IsPrimary ? PrimaryDelayedCB : SecondaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;

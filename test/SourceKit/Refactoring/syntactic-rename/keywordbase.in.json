@@ -1,0 +1,65 @@
+[
+  {
+    "key.name": "init(x:)",
+    "key.newname": "init(y:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 95,
+        "key.column": 5,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 96,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 97,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 97,
+        "key.column": 25,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 97,
+        "key.column": 47,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 98,
+        "key.column": 13,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 98,
+        "key.column": 21,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 99,
+        "key.column": 9,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 99,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 103,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 104,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.unknown
+      }
+    ]
+  }
+]

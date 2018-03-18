@@ -21,24 +21,23 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-ToolChain::JobContext::JobContext(Compilation &C,
-                                  ArrayRef<const Job *> Inputs,
+ToolChain::JobContext::JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+    : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output), OI(OI),
+      Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
@@ -242,15 +241,19 @@ makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
   return output;
 }
 
-/// Set-union the \c Inputs and \c Actions from each \c Job in \p jobs into the
-/// provided \p inputJobs and \p inputActions vectors, further adding all \c
-/// Actions from the resulting merger to \p batchCJA. Do set-union rather than
-/// concatenation here to avoid mentioning the same input multiple times.
+/// Set-union the \c Inputs and \c InputActions from each \c Job in \p jobs into
+/// the provided \p inputJobs and \p inputActions vectors, further adding all \c
+/// Actions in the \p jobs -- InputActions or otherwise -- to \p batchCJA. Do
+/// set-union rather than concatenation here to avoid mentioning the same input
+/// multiple times.
 static bool
 mergeBatchInputs(ArrayRef<const Job *> jobs,
                  llvm::SmallSetVector<const Job *, 16> &inputJobs,
                  llvm::SmallSetVector<const Action *, 16> &inputActions,
                  CompileJobAction *batchCJA) {
+
+  llvm::SmallSetVector<const Action *, 16> allActions;
+
   for (auto const *J : jobs) {
     for (auto const *I : J->getInputs()) {
       inputJobs.insert(I);
@@ -259,14 +262,50 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
     if (!CJA)
       return true;
     for (auto const *I : CJA->getInputs()) {
-      inputActions.insert(I);
+      // Capture _all_ input actions -- whether or not they are InputActions --
+      // in allActions, to set as the inputs for batchCJA below.
+      allActions.insert(I);
+      // Only collect input actions that _are InputActions_ in the inputActions
+      // array, to load into the JobContext in our caller.
+      if (auto const *IA = dyn_cast<InputAction>(I)) {
+        inputActions.insert(IA);
+      }
     }
   }
 
-  for (auto const *I : inputActions) {
+  for (auto const *I : allActions) {
     batchCJA->addInput(I);
   }
   return false;
+}
+
+/// Debugging only: return whether the set of \p jobs is an ordered subsequence
+/// of the sequence of top-level input files in the \c Compilation \p C.
+static bool
+jobsAreSubsequenceOfCompilationInputs(ArrayRef<const Job *> jobs,
+                                      Compilation &C) {
+  llvm::SmallVector<const Job *, 16> sortedJobs;
+  llvm::StringMap<const Job *> jobsByInput;
+  for (const Job *J : jobs) {
+    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
+    const InputAction* IA = findSingleSwiftInput(CJA);
+    auto R = jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(),
+                                               J));
+    assert(R.second);
+  }
+  for (const InputPair &P : C.getInputFiles()) {
+    auto I = jobsByInput.find(P.second->getValue());
+    if (I != jobsByInput.end()) {
+      sortedJobs.push_back(I->second);
+    }
+  }
+  if (sortedJobs.size() != jobs.size())
+    return false;
+  for (size_t i = 0; i < sortedJobs.size(); ++i) {
+    if (sortedJobs[i] != jobs[i])
+      return false;
+  }
+  return true;
 }
 
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
@@ -276,16 +315,10 @@ std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
                              Compilation &C) const
 {
-#ifndef NDEBUG
-  // Verify that the equivalence relation on the jobs also holds pairwise.
-  for (auto *A : jobs) {
-    for (auto *B : jobs) {
-      assert(jobsAreBatchCombinable(C, A, B));
-    }
-  }
-#endif
-  if (jobs.size() == 0)
+  if (jobs.empty())
     return nullptr;
+
+  assert(jobsAreSubsequenceOfCompilationInputs(jobs, C));
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.

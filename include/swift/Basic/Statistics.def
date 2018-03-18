@@ -132,6 +132,9 @@ FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 /// Number of conformances used by code processed by this frontend job.
 FRONTEND_STATISTIC(AST, NumUsedConformances)
 
+/// Number of full function bodies parsed.
+FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 

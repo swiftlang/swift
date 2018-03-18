@@ -71,10 +71,10 @@ unsigned CompactArrayBuilderImpl::getOffsetForString(StringRef Str) {
 
 std::unique_ptr<llvm::MemoryBuffer>
 CompactArrayBuilderImpl::createBuffer() const {
-  std::unique_ptr<llvm::MemoryBuffer> Buf;
-  Buf = llvm::MemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
-  copyInto(const_cast<char *>(Buf->getBufferStart()), Buf->getBufferSize());
-  return Buf;
+  std::unique_ptr<llvm::WritableMemoryBuffer> Buf;
+  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
+  copyInto(Buf->getBufferStart(), Buf->getBufferSize());
+  return std::move(Buf);
 }
 
 void CompactArrayBuilderImpl::appendTo(SmallVectorImpl<char> &Buf) const {

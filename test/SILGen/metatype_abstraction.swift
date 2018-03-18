@@ -1,3 +1,5 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 enum Optional<Wrapped> {

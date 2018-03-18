@@ -86,11 +86,19 @@ public:
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
   ///
+  /// Any configuration files loaded as a result of parsing arguments will be
+  /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
+  /// buffers should \e not be interpreted by the caller; they are only present
+  /// in order to make it possible to reproduce how these arguments were parsed
+  /// if the compiler ends up crashing or exhibiting other bad behavior.
+  ///
   /// If non-empty, relative search paths are resolved relative to
   /// \p workingDirectory.
   ///
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags,
+                 SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+                     *ConfigurationFileBuffers = nullptr,
                  StringRef workingDirectory = {});
 
   /// Sets specific options based on the given serialized Swift binary data.

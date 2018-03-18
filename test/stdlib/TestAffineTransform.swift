@@ -12,7 +12,7 @@
 
 import Foundation
 
-#if os(OSX)
+#if os(macOS)
 
 #if FOUNDATION_XCTEST
 import XCTest

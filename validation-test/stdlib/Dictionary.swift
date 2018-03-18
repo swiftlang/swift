@@ -4492,7 +4492,8 @@ DictionaryTestSuite.test("dropsBridgedCache") {
 }
 
 DictionaryTestSuite.test("getObjects:andKeys:") {
-  let d = ([1: "one", 2: "two"] as Dictionary<Int, String>) as NSDictionary
+  let native = [1: "one", 2: "two"] as Dictionary<Int, String>
+  let d = native as NSDictionary
   var keys = UnsafeMutableBufferPointer(
     start: UnsafeMutablePointer<NSNumber>.allocate(capacity: 2), count: 2)
   var values = UnsafeMutableBufferPointer(
@@ -4501,17 +4502,27 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
   var null: AutoreleasingUnsafeMutablePointer<AnyObject?>?
 
+  let expectedKeys: [NSNumber]
+  let expectedValues: [NSString]
+  if native.first?.key == 1 {
+    expectedKeys = [1, 2]
+    expectedValues = ["one", "two"]
+  } else {
+    expectedKeys = [2, 1]
+    expectedValues = ["two", "one"]
+  }
+
   d.available_getObjects(null, andKeys: null) // don't segfault
 
   d.available_getObjects(null, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
+  expectEqual(expectedKeys, Array(keys))
 
   d.available_getObjects(vp, andKeys: null)
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  expectEqual(expectedValues, Array(values))
 
   d.available_getObjects(vp, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  expectEqual(expectedKeys, Array(keys))
+  expectEqual(expectedValues, Array(values))
 }
 #endif
 
@@ -4530,11 +4541,14 @@ DictionaryTestSuite.test("popFirst") {
       2020: 2020,
       3030: 3030,
     ]
-    let expected = Array(d.map{($0.0, $0.1)})
+    let expected = [(1010, 1010), (2020, 2020), (3030, 3030)]
     while let element = d.popFirst() {
       popped.append(element)
     }
-    expectEqualSequence(expected, Array(popped)) {
+    // Note that removing an element may reorder remaining items, so we
+    // can't compare ordering here.
+    popped.sort(by: { $0.0 < $1.0 })
+    expectEqualSequence(expected, popped) {
       (lhs: (Int, Int), rhs: (Int, Int)) -> Bool in
       lhs.0 == rhs.0 && lhs.1 == rhs.1
     }

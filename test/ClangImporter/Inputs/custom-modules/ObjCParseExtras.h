@@ -212,3 +212,19 @@ typedef NSArray<NSString *> *NSStringArray;
 
 typedef NSString * _Nonnull (*FPTypedef)(NSString * _Nonnull);
 extern FPTypedef _Nonnull getFP(void);
+
+
+#if !__has_feature(objc_arc_fields)
+# error "Your Clang is not new enough"
+#endif
+struct NonTrivialToCopy {
+  __strong id field;
+};
+
+struct NonTrivialToCopyWrapper {
+  struct NonTrivialToCopy inner;
+};
+
+struct TrivialToCopy {
+  __unsafe_unretained id field;
+};

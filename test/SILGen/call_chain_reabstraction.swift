@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name call_chain_reabstraction -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 struct A {
         func g<U>(_ recur: (A, U) -> U) -> (A, U) -> U {

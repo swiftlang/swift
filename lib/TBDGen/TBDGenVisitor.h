@@ -84,6 +84,8 @@ public:
       addSymbol("main");
   }
 
+  void visitPatternBindingDecl(PatternBindingDecl *PBD);
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD);

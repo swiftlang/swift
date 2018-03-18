@@ -735,7 +735,7 @@ extension _StringObject {
     } else {
       fatalError("Unimplemented string form")
     }
-#endif
+#endif // INTERNAL_CHECKS_ENABLED
   }
 }
 
@@ -754,34 +754,39 @@ extension _StringObject {
     isOpaque: Bool,
     isTwoByte: Bool
   ) {
+#if INTERNAL_CHECKS_ENABLED
+    defer {
+      _sanityCheck(isSmall == (isValue && isSmallOrObjC))
+      _sanityCheck(isUnmanaged == (isValue && !isSmallOrObjC))
+      _sanityCheck(isCocoa == (!isValue && isSmallOrObjC))
+      _sanityCheck(isNative == (!isValue && !isSmallOrObjC))
+    }
+#endif
+
 #if arch(i386) || arch(arm)
-    var variant: _Variant
-    var bits: UInt
     if isValue {
       if isSmallOrObjC {
         _sanityCheck(isOpaque)
-        self.init(
-          isTwoByte ? .smallDoubleByte : .smallSingleByte,
-          _payloadBits)
+        self.init(isTwoByte ? .smallDoubleByte : .smallSingleByte, _payloadBits)
       } else {
         _sanityCheck(!isOpaque)
         self.init(
-          isTwoByte ? .unmanagedDoubleByte : .unmanagedSingleByte,
-          _payloadBits)
+          isTwoByte ? .unmanagedDoubleByte : .unmanagedSingleByte, _payloadBits)
       }
-    } else {
-      var bits: UInt = 0
-      if isSmallOrObjC {
-        bits |= _StringObject._isCocoaBit
-      }
-      if isOpaque {
-        bits |= _StringObject._isOpaqueBit
-      }
-      if isTwoByte {
-        bits |= _StringObject._twoByteBit
-      }
-      self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
+      return
     }
+
+    var bits: UInt = 0
+    if isSmallOrObjC {
+      bits |= _StringObject._isCocoaBit
+    }
+    if isOpaque {
+      bits |= _StringObject._isOpaqueBit
+    }
+    if isTwoByte {
+      bits |= _StringObject._twoByteBit
+    }
+    self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
     var rawBits = _payloadBits & _StringObject._payloadMask
@@ -815,10 +820,6 @@ extension _StringObject {
       self.init(nonTaggedRawBits: rawBits)
     }
 #endif
-    _sanityCheck(isSmall == (isValue && isSmallOrObjC))
-    _sanityCheck(isUnmanaged == (isValue && !isSmallOrObjC))
-    _sanityCheck(isCocoa == (!isValue && isSmallOrObjC))
-    _sanityCheck(isNative == (!isValue && !isSmallOrObjC))
   }
 
   @_versioned

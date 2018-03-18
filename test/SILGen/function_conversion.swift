@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -primary-file %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name function_conversion -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name function_conversion -emit-ir -enable-sil-ownership -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 

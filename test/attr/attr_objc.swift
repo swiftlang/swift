@@ -2294,3 +2294,13 @@ class BadClass {
   @_versioned @objc dynamic func badMethod2() {}
   // expected-error@-1 {{'@_versioned' attribute cannot be applied to 'dynamic' declarations}}
 }
+
+@objc
+protocol ObjCProtocolWithWeakProperty {
+   weak var weakProp: AnyObject? { get set } // okay
+}
+
+@objc
+protocol ObjCProtocolWithUnownedProperty {
+   unowned var unownedProp: AnyObject { get set } // okay
+}

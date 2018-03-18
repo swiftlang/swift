@@ -31,16 +31,16 @@ using namespace swift;
 namespace {
 /// The Mach-O section name for the section containing protocol descriptor
 /// references. This lives within SEG_TEXT.
-constexpr const char ProtocolsSection[] = "__swift5_protos";
+constexpr const char ProtocolsSection[] = "__swift4_protos";
 /// The Mach-O section name for the section containing protocol conformances.
 /// This lives within SEG_TEXT.
-constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
+constexpr const char ProtocolConformancesSection[] = "__swift4_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
+constexpr const char TypeMetadataRecordSection[] = "__swift4_types";
 /// The Mach-O section name for the section containing type field references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeFieldRecordSection[] = "__swift5_fieldmd";
+constexpr const char TypeFieldRecordSection[] = "__swift4_fieldmd";
 
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
@@ -52,7 +52,7 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   using mach_header_platform = mach_header;
 #endif
   
-  // Look for a __swift5_proto section.
+  // Look for a __swift4_proto section.
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),

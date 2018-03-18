@@ -162,10 +162,12 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
   if (offset.isStatic())
     return Offset(offset.getStaticOffset());
 
-  Address offsetBaseAddr(
-    IGF.IGM.getAddrOfClassMetadataBaseOffset(cast<ClassDecl>(getDecl()),
-                                             NotForDefinition),
+  Address layoutAddr(
+    IGF.IGM.getAddrOfClassMetadataBounds(cast<ClassDecl>(getDecl()),
+                                         NotForDefinition),
     IGF.IGM.getPointerAlignment());
+
+  auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
   // FIXME: Should this be an invariant load?
   llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
@@ -490,6 +492,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
     Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfEnumTypeSpecificMetadataMembers());
+    }
+
     void addPayloadSize() {
       Layout.PayloadSizeOffset = getNextOffset();
       super::addPayloadSize();
@@ -526,6 +533,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     StructMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfStructTypeSpecificMetadataMembers());
+    }
 
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();

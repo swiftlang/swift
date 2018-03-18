@@ -127,6 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
+  @_fixed_layout // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
@@ -382,7 +383,7 @@ extension ClosedRange: Equatable {
 
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @_inlineable // FIXME(sil-serialize-all)...\(
+  @_inlineable // FIXME(sil-serialize-all)...
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }

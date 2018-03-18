@@ -2013,6 +2013,14 @@ visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
     getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
 }
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIsEscapingClosureInst(
+    IsEscapingClosureInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createIsEscapingClosure(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
 
 template<typename ImplClass>
 void

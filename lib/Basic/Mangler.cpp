@@ -90,8 +90,8 @@ void Mangle::printManglingStats() {
   }
   
   llvm::outs() << "Mangling operator stats:\n";
-  
-  typedef llvm::StringMapEntry<OpStatEntry> MapEntry;
+
+  using MapEntry = llvm::StringMapEntry<OpStatEntry>;
   std::vector<const MapEntry *> SortedOpStats;
   for (const MapEntry &ME : OpStats) {
     SortedOpStats.push_back(&ME);

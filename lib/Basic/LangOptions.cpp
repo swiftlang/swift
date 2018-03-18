@@ -172,25 +172,25 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" platform condition.
   if (Target.isMacOSX())
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
-  else if (triple.isTvOS())
+  else if (Target.isTvOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
-  else if (triple.isWatchOS())
+  else if (Target.isWatchOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
-  else if (triple.isiOS())
+  else if (Target.isiOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
-  else if (triple.isAndroid())
+  else if (Target.isAndroid())
     addPlatformConditionValue(PlatformConditionKind::OS, "Android");
-  else if (triple.isOSLinux())
+  else if (Target.isOSLinux())
     addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
-  else if (triple.isOSFreeBSD())
+  else if (Target.isOSFreeBSD())
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (triple.isOSWindows())
+  else if (Target.isOSWindows())
     addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
-  else if (triple.isWindowsCygwinEnvironment())
+  else if (Target.isWindowsCygwinEnvironment())
     addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
-  else if (triple.isPS4())
+  else if (Target.isPS4())
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
-  else if (triple.isOSHaiku())
+  else if (Target.isOSHaiku())
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
   else
     UnsupportedOS = true;

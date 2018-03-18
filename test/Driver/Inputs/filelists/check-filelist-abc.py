@@ -38,11 +38,27 @@ with open(filelistFile, 'r') as f:
            lines[2].endswith("/c.swiftmodule\n"))
 
 if primaryFile:
-    print("Handled", os.path.basename(primaryFile))
+    print("Command-line primary", os.path.basename(primaryFile))
+
+if '-primary-filelist' in sys.argv:
+    primaryFilelistFile = sys.argv[sys.argv.index('-primary-filelist') + 1]
+    with open(primaryFilelistFile, 'r') as f:
+        lines = f.readlines()
+        assert(len(lines) == 1)
+        print("Handled", os.path.basename(lines[0]).rstrip())
 elif lines[0].endswith(".swiftmodule\n"):
     print("Handled modules")
 else:
     print("Handled all")
+
+
+if '-supplementary-output-file-map' in sys.argv:
+    supplementaryOutputMapFile = \
+        sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
+    with open(supplementaryOutputMapFile, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            print("Supplementary", line.rstrip())
 
 if '-num-threads' in sys.argv:
     outputListFile = sys.argv[sys.argv.index('-output-filelist') + 1]

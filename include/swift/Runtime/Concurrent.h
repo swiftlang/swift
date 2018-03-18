@@ -127,6 +127,13 @@ template <class ElemTy> struct ConcurrentList {
   std::atomic<ConcurrentListNode<ElemTy> *> First;
 };
 
+/// A utility function for ordering two integers, which is useful
+/// for implementing compareWithKey.
+template <class T>
+static inline int compareIntegers(T left, T right) {
+  return (left == right ? 0 : left < right ? -1 : 1);
+}
+
 /// A utility function for ordering two pointers, which is useful
 /// for implementing compareWithKey.
 template <class T>

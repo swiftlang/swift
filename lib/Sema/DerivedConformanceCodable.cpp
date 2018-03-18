@@ -484,9 +484,9 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             Expr *base, Type returnType,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
-  auto *keyedByDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                        SourceLoc(), C.Id_keyedBy, SourceLoc(),
-                                        C.Id_keyedBy, returnType, DC);
+  auto *keyedByDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, returnType, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -727,9 +727,9 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   // Params: (self [implicit], Encoder)
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
-  auto *encoderParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), C.Id_to, SourceLoc(),
-                                         C.Id_encoder, encoderType, target);
+  auto *encoderParam = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+                SourceLoc(), C.Id_encoder, encoderType, target);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -962,7 +962,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
                                               SourceLoc(), /*Implicit=*/true);
 
         // super.init(from:)
-        auto initName = DeclName(C, C.Id_init, C.Id_from);
+        auto initName = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
         auto *initCall = new (C) UnresolvedDotExpr(superRef, SourceLoc(),
                                                    initName, DeclNameLoc(),
                                                    /*Implicit=*/true);
@@ -980,7 +980,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         statements.push_back(tryExpr);
       } else {
         // The explicit constructor name is a compound name taking no arguments.
-        DeclName initName(C, C.Id_init, ArrayRef<Identifier>());
+        DeclName initName(C, DeclBaseName::createConstructor(), ArrayRef<Identifier>());
 
         // We need to look this up in the superclass to see if it throws.
         auto result = superclassDecl->lookupDirect(initName);
@@ -1065,18 +1065,16 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target,
                                          /*isStatic=*/false,
                                          /*isInOut=*/inOut);
-  auto *decoderParamDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
-                                             SourceLoc(),
-                                             SourceLoc(), C.Id_from,
-                                             SourceLoc(), C.Id_decoder,
-                                             decoderType, target);
+  auto *decoderParamDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_from, SourceLoc(), C.Id_decoder, decoderType, target);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
 
   // Func name: init(from: Decoder)
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
                                            SourceLoc(), /*Throws=*/true,
@@ -1162,7 +1160,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
         // arguments (as opposed to a simple name when omitted).
-        memberName = DeclName(C, DeclBaseName(C.Id_init),
+        memberName = DeclName(C, DeclBaseName::createConstructor(),
                               ArrayRef<Identifier>());
       }
 
@@ -1285,7 +1283,7 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
   if (!isa<StructDecl>(target) && !isa<ClassDecl>(target))
     return nullptr;
 
-  if (requirement->getBaseName() != tc.Context.Id_init) {
+  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
     // Unknown requirement.
     tc.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
     return nullptr;

@@ -75,7 +75,7 @@ static void _buildNameForMetadata(const Metadata *type,
     auto classType = static_cast<const ClassMetadata *>(type);
     // Look through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 
     // Ask the Objective-C runtime to name ObjC classes.
     if (!classType->isTypeMetadata()) {
@@ -262,7 +262,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
     if (sourceType == targetType) {
       return sourceType;
     }
-    sourceType = sourceType->SuperClass;
+    sourceType = sourceType->Superclass;
   } while (sourceType);
   
   return nullptr;
@@ -1973,7 +1973,11 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.object);
+  auto *error = (SwiftError *)errorBox.object;
+  id result =  _swift_stdlib_bridgeErrorToNSError(error);
+  // Now that we have bridged the error to nserror, release the error.
+  SWIFT_CC_PLUSZERO_GUARD(swift_errorRelease(error));
+  return result;
 }
 
 #endif
@@ -2819,8 +2823,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
     return _fail(src, srcType, targetType, flags);
   }
 
-  // Unless we're always supposed to consume the input, retain the
-  // object because the witness takes it at +1.
+  // TODO: Avoid the retain here in +0 mode if the input is never consumed.
   bool alwaysConsumeSrc = (flags & DynamicCastFlags::TakeOnSuccess) &&
                           (flags & DynamicCastFlags::DestroyOnFailure);
   if (!alwaysConsumeSrc) {
@@ -2876,6 +2879,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                 (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType, targetBridgeWitness);
   }
+  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRelease(srcObject));
 
   // If we succeeded, take from the optional buffer into the
   // destination buffer.
@@ -2883,8 +2887,6 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
     targetType->vw_initializeWithTake(dest, (OpaqueValue *)optDestBuffer);
   }
 
-  // Unless we're always supposed to consume the input, release the
-  // input if we need to now.
   if (!alwaysConsumeSrc && shouldDeallocateSource(success, flags)) {
     swift_unknownRelease(srcObject);
   }
@@ -3228,7 +3230,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))
-      return getMetadataForClass(classType->SuperClass);
+      return getMetadataForClass(classType->Superclass);
   return nullptr;
 }
 

@@ -71,52 +71,6 @@ enum class ValueWitness : unsigned {
 #include "swift/ABI/ValueWitness.def"
 };
 
-// The namespaces here are to force the enumerators to be scoped.  We don't
-// use 'enum class' because we want the enumerators to convert freely
-// to uint64_t.
-namespace ValueWitnessFlags {
-  enum : uint64_t {
-    AlignmentMask       = 0x0FFFF,
-    IsNonPOD            = 0x10000,
-    IsNonInline         = 0x20000,
-    
-    /// Flags pertaining to enum representation.
-    Enum_FlagMask = 0xC0000,
-    
-    /// If Flags & Enum_FlagMask == Enum_IsOpaque, then the type does not
-    /// support any optimized representation in enums.
-    Enum_IsOpaque = 0x00000,
-    /// If Flags & Enum_FlagMask == Enum_HasExtraInhabitants, then the type
-    /// has "extra inhabitants" of its binary representation which do not form
-    /// valid values of the type, such as null in a class type. The
-    /// ExtraInhabitants value witnesses are present in the value witness table.
-    Enum_HasExtraInhabitants = 0x40000,
-    /// If Flags & Enum_FlagMask == Enum_HasSpareBits, then the type has
-    /// unused bits in its binary representation. This implies
-    /// HasExtraInhabitants. Both the ExtraInhabitants and SpareBits value
-    /// witnesses are present in the value witness table.
-    Enum_HasSpareBits = 0xC0000,
-
-    IsNonBitwiseTakable = 0x100000,
-
-    /// If Flags & HasEnumWitnesses, then enum value witnesses are present in
-    /// the value witness table.
-    HasEnumWitnesses = 0x00200000,
-  };
-}
-  
-namespace ExtraInhabitantFlags {
-  enum : uint64_t {
-    NumExtraInhabitantsMask = 0x7FFFFFFFULL,
-    
-    NumSpareBitsMask   = 0x0000FFFF00000000ULL,
-    NumSpareBitsShift  = 32,
-    
-    SpareBitsShiftMask = 0xFFFF000000000000ULL,
-    SpareBitsShiftShift = 48,
-  };
-}
- 
 enum {
   NumRequiredValueWitnesses
     = unsigned(ValueWitness::Last_RequiredValueWitness) + 1,

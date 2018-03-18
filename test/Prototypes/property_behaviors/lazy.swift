@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -enable-experimental-property-behaviors %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test

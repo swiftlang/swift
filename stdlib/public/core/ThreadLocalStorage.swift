@@ -68,7 +68,7 @@ internal struct _ThreadLocalStorage {
   // creates and initializes a new one.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  static internal func getPointer()
+  internal static func getPointer()
     -> UnsafeMutablePointer<_ThreadLocalStorage>
   {
     let tlsRawPtr = _stdlib_thread_getspecific(_tlsKey)
@@ -82,7 +82,7 @@ internal struct _ThreadLocalStorage {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  static internal func getUBreakIterator(
+  internal static func getUBreakIterator(
     start: UnsafePointer<UTF16.CodeUnit>,
     count: Int32
   ) -> OpaquePointer {

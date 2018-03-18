@@ -149,7 +149,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
               percent++;
             } else {
               while (isdigit(percent[1])) {
-                precision = 10 * precision + (ch - '0');
+                precision = 10 * precision + (percent[1] - '0');
                 percent++;
               }
               if (precision > 1024) precision = 1024;
@@ -219,9 +219,9 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
             if (precision > 0) { // only encode a pointer if we have been given a length
               hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
               cmd.cmd_type = OSLF_CMD_TYPE_DATA;
-              cmd.cmd_size = precision;
+              cmd.cmd_size = sizeof(void *);
               void *p = va_arg(args, void *);
-              _os_log_encode_arg(ob, &cmd, p);
+              _os_log_encode_arg(ob, &cmd, &p);
               hdr.hdr_cmd_cnt++;
               precision = 0;
               done = true;

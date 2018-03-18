@@ -54,14 +54,7 @@ private:
 
   bool checkUnusedSupplementaryOutputPaths() const;
 
-  /// \returns the output filenames on the command line or in the output
-  /// filelist, or an empty vector if there were neither -o's nor an output
-  /// filelist.
-  ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
-
   bool checkForUnusedOutputPaths() const;
-
-  std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
 
 public:
   ArgsToFrontendOptionsConverter(DiagnosticEngine &Diags,
@@ -69,7 +62,13 @@ public:
                                  FrontendOptions &Opts)
       : Diags(Diags), Args(Args), Opts(Opts) {}
 
-  bool convert();
+  /// Populates the FrontendOptions the converter was initialized with.
+  ///
+  /// \param buffers If present, buffers read in the processing of the frontend
+  /// options will be saved here. These should only be used for debugging
+  /// purposes.
+  bool convert(
+      SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
 
   static FrontendOptions::ActionType
   determineRequestedAction(const llvm::opt::ArgList &);

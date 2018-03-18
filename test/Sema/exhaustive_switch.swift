@@ -801,4 +801,13 @@ func sr6975() {
   case .a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     print("second a")
   }
+
+  func foo(_ str: String) -> Int {
+    switch str { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{do you want to add a default clause?}}
+    case let (x as Int) as Any:
+      return x
+    }
+  }
+  _ = foo("wtf")
 }
