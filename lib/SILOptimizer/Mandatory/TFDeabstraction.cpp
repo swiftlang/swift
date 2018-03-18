@@ -29,16 +29,39 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
+static llvm::cl::opt<bool>
+TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
+                           llvm::cl::init(false),
+           llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
+
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+/// Delete the specified instruction (e.g. like inst->eraseFromParent()), but
+/// also check to see if this instruction was the last use of any code that can
+/// be trivially deleted.  If so, remove that trivially dead code.
+static void deleteInstAndAbandonedUses(SILInstruction *inst) {
+  for (auto &operand : inst->getAllOperands()) {
+    auto opInst = operand.get()->getDefiningInstruction();
+    operand.drop();
+
+    if (opInst && !opInst->hasUsesOfAnyResult())
+      recursivelyDeleteTriviallyDeadInstructions(opInst);
+  }
+
+  // Finally, delete the instruction itself.
+  inst->eraseFromParent();
 }
 
 namespace {
@@ -82,14 +105,10 @@ namespace {
       if (changedFunction) return;
       changedFunction = true;
 
-      if (auto outs = getTFDumpIntermediateStream()) {
-        *outs << "--- TFDeabstraction Input: " << fn.getName() << "\n";
-        fn.print(*outs);
-        *outs << "----\n";
-        outs->flush();
-      }
+      logCurrentState("Input", /*detailed*/false);
     }
   private:
+    void logCurrentState(const char *name, bool isDetailed);
     void inlineCalls();
     void simplifyTensorOperands();
 
@@ -101,6 +120,20 @@ namespace {
     void canonicalizeOps();
   };
 }  // end anonymous namespace
+
+void TFDeabstraction::logCurrentState(const char *name, bool isDetailed) {
+  // If this is detailed information and no-one asked for it, early out.
+  if (isDetailed && !TFDumpDeabstractionDetails)
+    return;
+
+  auto outs = getTFDumpIntermediateStream();
+  if (!outs) return;
+
+  *outs << "--- TFDeabstraction " << name << ": " << fn.getName() << "\n";
+  fn.print(*outs);
+  *outs << "----\n";
+  outs->flush();
+}
 
 
 /// Return true if this is a "array.uninitialized" call, which creates an array
@@ -203,6 +236,15 @@ void TFDeabstraction::inlineCalls() {
   );
 }
 
+/// If the specified value is a StructInst that has one operand, or potentially
+/// a chain of them, dig through and return the underlying value inside of it.
+static SILValue lookThroughSingleElementStructInsts(SILValue value) {
+  if (auto *str = dyn_cast_or_null<StructInst>(value->getDefiningInstruction()))
+    if (str->getNumOperands() == 1)
+      return lookThroughSingleElementStructInsts(str->getOperand(0));
+  return value;
+}
+
 /// Scan the operand list of the builtin.  If any operand is passed indirectly
 /// (i.e., an address of a stack location is passed instead of the value itself)
 /// then rewrite the builtin to use a loaded version of that value.
@@ -283,7 +325,11 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
       operand = load;
     }
 
-    // If this is a struct value, emit a struct extraction instruction.
+    // If the operand is a StructInst building the value that we want to
+    // extract, just get the element out of it, to avoid generating bloated IR.
+    operand = lookThroughSingleElementStructInsts(operand);
+
+    // If this is a struct value, emit struct extraction instruction(s).
     while (auto fieldDecl = getPrimitiveStructField(
                                      operand->getType().getSwiftRValueType())) {
       auto extract = B.createStructExtract(inst->getLoc(), operand, fieldDecl);
@@ -303,7 +349,10 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
 
   // Replace the old with the new and delete the old instruction.
   inst->replaceAllUsesPairwiseWith(newInst);
-  inst->eraseFromParent();
+
+  // Remove the StructInst and other random values that we leave around in the
+  // program, now that we directly refer to the TensorHandle values.
+  deleteInstAndAbandonedUses(inst);
   return newInst;
 }
 
@@ -356,12 +405,25 @@ static bool explodeAggregateInst(SILInstruction *inst,
     /// Turn a destroy_addr into a load+release_value pair.
     TL.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
   } else if (isa<RetainValueInst>(inst) || isa<StrongRetainInst>(inst)) {
-    // Turn a retain_value into a retain_value on its elements.
-    TL.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                  inst->getOperand(0));
+    // Turn a retain_value into a retain_value on its elements.  We peephole
+    // StructInst values because they are so common and this generates cleaner
+    // IR and faster compile times.
+    auto op = lookThroughSingleElementStructInsts(inst->getOperand(0));
+    if (op != inst->getOperand(0) && op->getType().isAnyClassReferenceType())
+      B.createStrongRetain(inst->getLoc(), op, Atomicity::Atomic);
+    else
+      TL.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                    inst->getOperand(0));
   } else if (isa<ReleaseValueInst>(inst) || isa<StrongReleaseInst>(inst)) {
-    TL.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                     inst->getOperand(0));
+    // Turn a retain_value into a retain_value on its elements.  We peephole
+    // StructInst values because they are so common and this generates cleaner
+    // IR and faster compile times.
+    auto op = lookThroughSingleElementStructInsts(inst->getOperand(0));
+    if (op != inst->getOperand(0) && op->getType().isAnyClassReferenceType())
+      B.createStrongRelease(inst->getLoc(), op, Atomicity::Atomic);
+    else
+      TL.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
+                                                       inst->getOperand(0));
   } else {
     llvm_unreachable("unhandled instructions should be filtered above");
   }
@@ -389,6 +451,14 @@ static bool explodeAggregateInst(SILInstruction *inst,
 void TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
   bool containsOpBuiltin = false;
+
+  bool alreadyPrinted = false;
+  auto logIfFirstChange = [&]() {
+    if (alreadyPrinted) return;
+    logCurrentState("After Inlining", /*detailed*/true);
+    alreadyPrinted = true;
+  };
+
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -396,6 +466,8 @@ void TFDeabstraction::simplifyTensorOperands() {
 
       // Try to decode this instruction as an op.  If it isn't one, ignore it.
       if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+        logIfFirstChange();
+
         // Simplify operands if possible.
         opInfo->inst = simplifyOperands(opInfo->inst, *this);
 
@@ -421,6 +493,8 @@ void TFDeabstraction::simplifyTensorOperands() {
       // ensures that nothing later in deabstraction or partitioning have to
       // worry about them.
       if (explodeAggregateInst(inst, tfc)) {
+        logIfFirstChange();
+
         // Reset our iterator to the first instruction we just produced so we
         // walk through them and recursively expand or remember them as
         // appropriate.
@@ -431,15 +505,7 @@ void TFDeabstraction::simplifyTensorOperands() {
         // original value, and therefore strand the StructInst.  Clean this
         // stuff up as we go.  This is better for compile time and it makes it
         // a lot easier to read the debugging dumps.
-        for (auto &operand : inst->getAllOperands()) {
-          auto opInst = operand.get()->getDefiningInstruction();
-          operand.drop();
-
-          if (opInst && !opInst->hasUsesOfAnyResult())
-            recursivelyDeleteTriviallyDeadInstructions(opInst);
-        }
-
-        inst->eraseFromParent();
+        deleteInstAndAbandonedUses(inst);
         continue;
       }
 
@@ -448,7 +514,7 @@ void TFDeabstraction::simplifyTensorOperands() {
   }
 
   // If the tensorOps list just contained retain/release instructions but had
-  // no actual tensor builtings, we'll ignore the function because there is
+  // no actual tensor builtins, we'll ignore the function because there is
   // nothing to partition out of it.  This is probably something actually
   // working on the host-side tensor operation.
   if (!containsOpBuiltin)
@@ -1180,6 +1246,8 @@ void TFDeabstraction::doIt() {
   if (tensorOps.empty())
     return;
 
+  logCurrentState("After simplifyTensorOperands", /*detailed*/true);
+
   // Scan over all of the operands of the tensor ops, finding stack allocations
   // and global variables that must be promoted to SSA.
   SmallVector<SILGlobalVariable*, 8> globals;
@@ -1190,17 +1258,23 @@ void TFDeabstraction::doIt() {
   // to predictably promote their references to unblock analysis.  This is only
   // valid in cases that we have forcibly flattened the function (e.g.
   // Playgrounds, REPL, and other top-level-code situations).
-  if (forciblyFlattened && !globals.empty())
+  if (forciblyFlattened && !globals.empty()) {
     promoteGlobalsToStack(globals, stackAllocs);
+    logCurrentState("After promoteGlobalsToStack", /*detailed*/true);
+  }
 
   // Promote stack allocations to SSA, this allows us to do dataflow analysis,
   // and eliminates mutation from tensor values.
   promoteToSSA(stackAllocs);
 
+  logCurrentState("After promoteToSSA", /*detailed*/true);
+
   // Now that we've promoted all the allocations in the way of our dataflow,
   // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
   propagateTensorValues();
+
+  logCurrentState("After propagateTensorValues", /*detailed*/true);
 
 #if 0 // Not ready yet.
   // Canonicalize tensor ops, validating their attribute arguments have
@@ -1208,12 +1282,7 @@ void TFDeabstraction::doIt() {
   canonicalizeOps();
 #endif
 
-  if (auto outs = getTFDumpIntermediateStream()) {
-    *outs << "--- TFDeabstraction Result: " << fn.getName() << "\n";
-    fn.print(*outs);
-    *outs << "----\n";
-    outs->flush();
-  }
+  logCurrentState("Result", /*detailed*/false);
 }
 
 
