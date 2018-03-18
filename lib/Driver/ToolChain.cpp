@@ -146,8 +146,8 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
   return {};
 }
 
-types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
-  return types::lookupTypeForExtension(Ext);
+file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
+  return file_types::lookupTypeForExtension(Ext);
 }
 
 /// Return a _single_ TY_Swift InputAction, if one exists;
@@ -158,7 +158,7 @@ findSingleSwiftInput(const CompileJobAction *CJA) {
   const InputAction *IA = nullptr;
   for (auto const *I : Inputs) {
     if (auto const *S = dyn_cast<InputAction>(I)) {
-      if (S->getType() == types::TY_Swift) {
+      if (S->getType() == file_types::TY_Swift) {
         if (IA == nullptr) {
           IA = S;
         } else {
@@ -232,7 +232,7 @@ ToolChain::jobsAreBatchCombinable(const Compilation &C,
 /// \c CommandOutputs of all the jobs passed.
 static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
-                       types::ID outputType) {
+                       file_types::ID outputType) {
   auto output =
       llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {

@@ -25,7 +25,7 @@
 // could be displayed to the user, or something which the user could provide.
 
 // The second value is the type id, which will result in a
-// swift::driver::types::TY_XX enum constant.
+// swift::driver::file_types::TY_XX enum constant.
 
 // The third value is the suffix to use when creating temporary files
 // of this type. It is also used when inferring a type from an extension.
