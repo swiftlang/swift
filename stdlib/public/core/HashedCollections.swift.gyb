@@ -3172,6 +3172,9 @@ internal class _RawNative${Self}Storage:
   internal final var values: UnsafeMutableRawPointer
 % end
 
+  @_versioned // FIXME(sil-serialize-all)
+  internal final var seed: (UInt64, UInt64)
+
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -3626,6 +3629,19 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
         bucketCount._builtinWordValue, Key.self, Value.self)
     _storage.values = UnsafeMutableRawPointer(valuesAddr)
 %end
+    // We assign a unique hash seed to each distinct hash table size, so that we
+    // avoid certain copy operations becoming quadratic, without breaking value
+    // semantics. (See https://bugs.swift.org/browse/SR-3268)
+    //
+    // We don't need to generate a brand new seed for each table size: it's
+    // enough to change a single bit in the global seed by XORing the bucket
+    // count to it. (The bucket count is always a power of two.)
+    //
+    // FIXME: Use an approximation of true per-instance seeding. We can't just
+    // use the base address, because COW copies need to share the same seed.
+    let seed = _Hasher._seed
+    let perturbation = bucketCount
+    _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
 
   // Forwarding the individual fields of the storage in various forms
@@ -3986,31 +4002,11 @@ extension _Native${Self}Buffer
     return bucketCount &- 1
   }
 
-  @_inlineable
-  @_versioned
-  internal func _localHasher() -> _Hasher {
-    // We assign a unique seed to each distinct hash table size, so that we
-    // avoid certain copy operations becoming quadratic, without breaking value
-    // semantics. (See https://bugs.swift.org/browse/SR-3268)
-    //
-    // We don't need to generate a brand new seed for each table size: it's
-    // enough to change a single bit in the global seed by XORing the bucket
-    // count to it. (The bucket count is always a power of two.)
-    //
-    // FIXME: Use an approximation of true per-instance seeding. We can't just
-    // use the base address, because COW copies need to share the same seed.
-    // (This will require storing the local seed in the storage class.)
-    let seed = _Hasher._seed
-    let perturbation = bucketCount
-    return _Hasher(
-      seed: (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1))
-  }
-
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _localHasher()
+    var hasher = _Hasher(seed: _storage.seed)
     hasher.append(k)
     return hasher.finalize() & _bucketMask
   }
