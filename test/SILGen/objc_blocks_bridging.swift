@@ -174,12 +174,84 @@ func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}bridgeNoescapeBlock{{.*}}
-func bridgeNoescapeBlock() {
-  // CHECK: function_ref @$SIg_IyB_TR
+// CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tF
+func bridgeNoescapeBlock(fn: () -> ()) {
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU_
+  // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
+  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
+  // CHECK: store [[THICK_FN]] to [trivial] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
+
+  // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
+  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+
+  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
+  // CHECK: dealloc_stack [[BLOCK_ALLOC]]
+  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: apply [[FN]]([[SOME_BLOCK]])
+  noescapeBlock { }
+  // CHECK: destroy_value [[SOME_BLOCK]]
+
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
+  // CHECK: store %0 to [trivial] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
+
+  // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
+  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+
+  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
+  // CHECK: dealloc_stack [[BLOCK_ALLOC]]
+  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: apply [[FN]]([[SOME_BLOCK]])
+  noescapeBlock(fn)
+  // CHECK: destroy_value [[SOME_BLOCK]]
+
+  // CHECK: [[NIL_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.none!enumelt
+  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: apply [[FN]]([[NIL_BLOCK]])
+  noescapeBlock(nil)
+
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU0_
+  // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
+  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
+  // CHECK: store [[THICK_FN]] to [trivial] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
+
+  // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
+  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+
+  // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
+  // CHECK: apply [[FN]]([[BLOCK]])
+  noescapeNonnullBlock { }
+  // CHECK: destroy_value [[BLOCK]]
+
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
+  // CHECK: store %0 to [trivial] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
+
+  // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
+  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+
+  // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
+  // CHECK: apply [[FN]]([[BLOCK]])
+  noescapeNonnullBlock(fn)
+
   noescapeBlockAlias { }
-  // CHECK: function_ref @$SIg_IyB_TR
+  noescapeBlockAlias(fn)
+  noescapeBlockAlias(nil)
+
   noescapeNonnullBlockAlias { }
+  noescapeNonnullBlockAlias(fn)
 }
 
 class ObjCClass : NSObject {}
