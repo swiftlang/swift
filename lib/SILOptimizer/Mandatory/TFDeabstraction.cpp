@@ -82,10 +82,11 @@ namespace {
       if (changedFunction) return;
       changedFunction = true;
 
-      if (shouldDumpIntermediates()) {
-        llvm::outs() << "--- TFDeabstraction Input: " << fn.getName() << "\n";
-        fn.print(llvm::outs());
-        llvm::outs() << "----\n";
+      if (auto outs = getTFDumpIntermediateStream()) {
+        *outs << "--- TFDeabstraction Input: " << fn.getName() << "\n";
+        fn.print(*outs);
+        *outs << "----\n";
+        outs->flush();
       }
     }
   private:
@@ -539,7 +540,7 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
         canPromoteGlobal = false;
 
         // Make this a hard error in the testsuite.
-        if (shouldDumpIntermediates()) {
+        if (getTFDumpIntermediateStream() == &llvm::outs()) {
           llvm::errs() << "unexpected global_addr user in top level code"
                        << " promotion: " << *user << "\n\n";
           llvm::errs() << *user->getFunction();
@@ -1176,10 +1177,11 @@ void TFDeabstraction::doIt() {
   canonicalizeOps();
 #endif
 
-  if (shouldDumpIntermediates()) {
-    llvm::outs() << "--- TFDeabstraction Result: " << fn.getName() << "\n";
-    fn.print(llvm::outs());
-    llvm::outs() << "----\n";
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFDeabstraction Result: " << fn.getName() << "\n";
+    fn.print(*outs);
+    *outs << "----\n";
+    outs->flush();
   }
 }
 

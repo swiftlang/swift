@@ -2944,10 +2944,11 @@ public:
       return;
     }
 
-    if (shouldDumpIntermediates()) {
-      llvm::outs() << "---- INPUT FUNCTION " << fn->getName() <<" ----------\n";
-      fn->print(llvm::outs());
-      llvm::outs() << "---- END OF INPUT FUNCTION ----------\n";
+    if (auto *outs = getTFDumpIntermediateStream()) {
+      *outs << "---- INPUT FUNCTION " << fn->getName() <<" ----------\n";
+      fn->print(*outs);
+      *outs << "---- END OF INPUT FUNCTION ----------\n";
+      outs->flush();
     }
 
     // Actually do the partitioning transformation, splitting out a new SIL
@@ -2969,11 +2970,18 @@ public:
     // make later passes simpler.
     contractUncondBranches(tensorProgram.fn);
 
-    if (isTest || shouldDumpIntermediates()) {
+    if (auto outs = getTFDumpIntermediateStream()) {
+      *outs << "--- TFPartition Accelerator Result: "
+            << tensorProgram.fn->getName() << "\n";
+      tensorProgram.fn->print(*outs);
+      *outs << "----\n";
+      outs->flush();
+    } else if (isTest) {
       llvm::outs() << "--- TFPartition Accelerator Result: "
                    << tensorProgram.fn->getName() << "\n";
       tensorProgram.fn->print(llvm::outs());
       llvm::outs() << "----\n";
+      llvm::outs().flush();
     }
 
     // If this is called from sil-opt, we currently just print out the results
@@ -3024,11 +3032,11 @@ public:
       tensorProgram.entryFunctionNamePlaceholder->eraseFromParent();
     }
 
-    if (shouldDumpIntermediates()) {
-      llvm::outs() << "--- TFPartition Host Result: " << fn->getName() << "\n";
-      fn->print(llvm::outs());
-      llvm::outs() << "---\n";
-      llvm::outs().flush();
+    if (auto outs = getTFDumpIntermediateStream()) {
+      *outs << "--- TFPartition Host Result: " << fn->getName() << "\n";
+      fn->print(*outs);
+      *outs << "---\n";
+      outs->flush();
     }
 
     // Finally, we're done.  Remove the partitioned function so it doesn't go
