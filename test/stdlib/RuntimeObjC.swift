@@ -470,48 +470,6 @@ var nsStringCanaryCount = 0
   }
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: true)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: false)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: true)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: false)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
 RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
