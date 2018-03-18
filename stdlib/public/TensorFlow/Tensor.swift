@@ -705,6 +705,11 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
   public init(numericallyBroadcasting value: Scalar, to other: Tensor) {
     self.init(handle: #tfop("Fill", other.shapeTensor, value))
   }
+
+  @_inlineable @inline(__always)
+  public func combiningAsAdjoint(with other: Tensor) -> Tensor {
+    return self + other
+  }
 }
 
 //===----------------------------------------------------------------------===//
