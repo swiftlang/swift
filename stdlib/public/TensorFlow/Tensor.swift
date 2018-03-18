@@ -551,8 +551,7 @@ public extension Tensor where Scalar : FloatingPoint {
        state: RandomState? = nil) {
     let uniform = Tensor(randomUniform: shape, state: state)
     let boxMullerHelper = Tensor(randomUniform: shape, state: state)
-    let two = Tensor(2)
-    let result = sqrt(-two * log(uniform)) * cos(two * .pi * boxMullerHelper)
+    let result = sqrt(-2 * log(uniform)) * cos(2 * .pi * boxMullerHelper)
     self = result * stddev + mean
   }
 }
