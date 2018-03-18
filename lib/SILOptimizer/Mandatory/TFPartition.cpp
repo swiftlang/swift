@@ -664,7 +664,8 @@ public:
   };
   PartitionedTensorProgram partition();
 
-  void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user);
+  void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
+                                 bool isTensorProgramArgument);
   bool diagnoseCopyToHost(SILValue value, SILInstruction *user,
                           SILLocation loc);
 
@@ -689,7 +690,8 @@ private:
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::
-diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
+diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
+                          bool isTensorProgramArgument) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
@@ -708,9 +710,11 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user) {
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.
-  if (auto *inst = value->getDefiningInstruction())
-    llvm::errs() << "IMPLICIT COPY TO ACCEL OF: " << *inst;
-  llvm::errs() << "IMPLICIT COPY TO ACCEL BY: " << *user;
+  if (!isTensorProgramArgument) {
+    if (auto *inst = value->getDefiningInstruction())
+      llvm::errs() << "IMPLICIT COPY TO ACCEL OF: " << *inst;
+    llvm::errs() << "IMPLICIT COPY TO ACCEL BY: " << *user;
+  }
 
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
@@ -1079,7 +1083,7 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
       arg, { Marking::Argument, getUserSourceLocation(arg) }
     });
     tensorFnArguments.push_back(SILValue(arg));
-    diagnoseCopyToAccelerator(arg, user);
+    diagnoseCopyToAccelerator(arg, user, /*tensorProgramArgument*/true);
     return;
   }
 
@@ -1331,7 +1335,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
-    diagnoseCopyToAccelerator(value, user);
+    diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/true);
     return;
   }
 
@@ -1343,7 +1347,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
 
   // Otherwise, insert a send from the host to the accelerator.
   valuesToSend.insert(value);
-  diagnoseCopyToAccelerator(value, user);
+  diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/false);
 
   // Instead of cloning over this instruction, we'll add a send after it and
   // insert a receive in the accelerator code.
