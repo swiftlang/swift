@@ -798,10 +798,11 @@ static void VisitNodeBuiltinTypeName(
   std::string builtin_name = cur_node->getText();
 
   StringRef builtin_name_ref(builtin_name);
+  std::string builtin_type_prefix = stringWithFormat("%s.", BUILTIN_NAME);
 
-  if (builtin_name_ref.startswith("Builtin.")) {
+  if (builtin_name_ref.startswith(builtin_type_prefix)) {
     StringRef stripped_name_ref =
-        builtin_name_ref.drop_front(strlen("Builtin."));
+        builtin_name_ref.drop_front(strlen(builtin_type_prefix.c_str()));
     SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module =
@@ -814,7 +815,7 @@ static void VisitNodeBuiltinTypeName(
     }
   } else {
     result._error = stringWithFormat(
-        "BuiltinTypeName %s doesn't start with Builtin.", builtin_name.c_str());
+        "BuiltinTypeName %s doesn't start with %s", builtin_name.c_str(), builtin_type_prefix.c_str());
   }
 }
 
