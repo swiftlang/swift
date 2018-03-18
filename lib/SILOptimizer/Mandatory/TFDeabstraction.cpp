@@ -165,8 +165,11 @@ void TFDeabstraction::inlineCalls() {
           // FIXME: We will miscompile functions that use variables in top level
           // code right now.  We need to implement this properly.
 #if 0
-          if (shouldBeForciblyFlattened(*callee))
+          if (shouldBeForciblyFlattened(*callee)) {
+            // Recognize that we're about to change this function.
+            aboutToChangeFunction();
             return true;
+          }
 #endif
         }
       }
@@ -178,7 +181,12 @@ void TFDeabstraction::inlineCalls() {
 
     // If the call we found is to something that processes TensorHandles,
     // then we want it inlined.
-    return tfc.containsTensorHandle(type);
+    if (!tfc.containsTensorHandle(type))
+      return false;
+
+    // Recognize that we're about to change this function.
+    aboutToChangeFunction();
+    return true;
   };
 
   // Use the mandatory inlining algorithm to expose call sites that contain
@@ -380,6 +388,7 @@ static bool explodeAggregateInst(SILInstruction *inst,
 ///
 void TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
+  bool containsOpBuiltin = false;
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -392,6 +401,7 @@ void TFDeabstraction::simplifyTensorOperands() {
 
         // Remember this for later passes.
         tensorOps.push_back(opInfo->inst);
+        containsOpBuiltin = true;
         continue;
       }
 
@@ -415,6 +425,20 @@ void TFDeabstraction::simplifyTensorOperands() {
         // walk through them and recursively expand or remember them as
         // appropriate.
         I = ++SILBasicBlock::iterator(inst);
+
+        // We frequently produce dead code by exploding things, for example a
+        // retain of a StructInst value will end up being a retain of the
+        // original value, and therefore strand the StructInst.  Clean this
+        // stuff up as we go.  This is better for compile time and it makes it
+        // a lot easier to read the debugging dumps.
+        for (auto &operand : inst->getAllOperands()) {
+          auto opInst = operand.get()->getDefiningInstruction();
+          operand.drop();
+
+          if (opInst && !opInst->hasUsesOfAnyResult())
+            recursivelyDeleteTriviallyDeadInstructions(opInst);
+        }
+
         inst->eraseFromParent();
         continue;
       }
@@ -422,6 +446,13 @@ void TFDeabstraction::simplifyTensorOperands() {
       // Otherwise we leave the instruction alone.
     }
   }
+
+  // If the tensorOps list just contained retain/release instructions but had
+  // no actual tensor builtings, we'll ignore the function because there is
+  // nothing to partition out of it.  This is probably something actually
+  // working on the host-side tensor operation.
+  if (!containsOpBuiltin)
+    tensorOps.clear();
 }
 
 namespace {
@@ -435,13 +466,11 @@ namespace {
     SmallPtrSet<SILInstruction*, 32> visited;
 
     SmallVector<GlobalAddrInst*, 8> globalAddrs;
-    TensorFunctionClassifier &tfc;
   public:
 
     PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
-                           SmallVectorImpl<AllocStackInst*> &stackAllocs,
-                           TensorFunctionClassifier &tfc)
-      : globals(globals), stackAllocs(stackAllocs), tfc(tfc) {}
+                           SmallVectorImpl<AllocStackInst*> &stackAllocs)
+      : globals(globals), stackAllocs(stackAllocs) {}
 
     void run(ArrayRef<SILInstruction*> tensorOps);
   private:
@@ -1061,9 +1090,9 @@ void TFDeabstraction::propagateTensorValues() {
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
-
       // Get the propagated value.  This call can change the tensor operand.
       auto newVal = propagateTensorOperand(operand.get(), checkedPhis);
+
       // Get the (possibly-changed) instruction that used to be feeding the
       // tensor operation and set the new value.
       auto opInst = operand.get()->getDefiningInstruction();
@@ -1155,7 +1184,7 @@ void TFDeabstraction::doIt() {
   // and global variables that must be promoted to SSA.
   SmallVector<SILGlobalVariable*, 8> globals;
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  PromotableMemoryFinder(globals, stackAllocs, tfc).run(tensorOps);
+  PromotableMemoryFinder(globals, stackAllocs).run(tensorOps);
 
   // If any global variable references were found in the operation chain, try
   // to predictably promote their references to unblock analysis.  This is only

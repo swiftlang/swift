@@ -88,7 +88,6 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %6 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
 // CHECK-NEXT:  return %6 : $TensorHandle<Float>
 
-
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
   let a = sigmoid(x.toDevice()).toHost()
