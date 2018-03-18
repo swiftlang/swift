@@ -7787,9 +7787,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   switch (fix.first.getKind()) {
   case FixKind::OptionalChaining: {
     if (!solution.DisjunctionChoices.count(locator) ||
-        !solution.getDisjunctionChoice(fix.second)) {
+        !solution.getDisjunctionChoice(locator)) {
       auto type = solution.simplifyType(getType(affected))
-      ->getRValueObjectType();
+                    ->getRValueObjectType();
       auto diag = TC.diagnose(affected->getLoc(),
                               diag::missing_unwrap_optional, type);
       diag.fixItInsertAfter(affected->getEndLoc(), "?");

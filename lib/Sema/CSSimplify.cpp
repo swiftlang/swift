@@ -3464,8 +3464,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
               continuingChain = true;
               break;
             }
-            if (auto innerDot = dyn_cast<UnresolvedDotExpr>(innerExpr))
-              innerExpr = innerDot->getBase();
+            auto innerDot = dyn_cast<UnresolvedDotExpr>(innerExpr);
+            innerExpr = innerDot ? innerDot->getBase() : nullptr;
           }
         }
       }
@@ -3488,7 +3488,7 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
       if (recordFix(fixKind, locator))
         return SolutionKind::Error;
 
-      if (forceUnwrap) {
+      if (forceUnwrap || functionRefKind != FunctionRefKind::Unapplied) {
         // The simple case - just look through one level of optional.
         addValueMemberConstraint(unwrappedBaseObjTy,
                                  member, memberTy, useDC, functionRefKind, locator);
