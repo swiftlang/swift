@@ -312,7 +312,9 @@ static bool explodeAggregateInst(SILInstruction *inst,
   if (!isa<CopyAddrInst>(inst) &&
       !isa<DestroyAddrInst>(inst) &&
       !isa<RetainValueInst>(inst) &&
-      !isa<ReleaseValueInst>(inst))
+      !isa<ReleaseValueInst>(inst) &&
+      !isa<StrongRetainInst>(inst) &&
+      !isa<StrongReleaseInst>(inst))
     return false;
 
   // Check to make sure that this operation is doing something on a value
@@ -345,11 +347,11 @@ static bool explodeAggregateInst(SILInstruction *inst,
   } else if (auto *destroy = dyn_cast<DestroyAddrInst>(inst)) {
     /// Turn a destroy_addr into a load+release_value pair.
     TL.emitDestroyAddress(B, destroy->getLoc(), destroy->getOperand());
-  } else if (isa<RetainValueInst>(inst)) {
+  } else if (isa<RetainValueInst>(inst) || isa<StrongRetainInst>(inst)) {
     // Turn a retain_value into a retain_value on its elements.
     TL.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
                                                   inst->getOperand(0));
-  } else if (isa<ReleaseValueInst>(inst)) {
+  } else if (isa<ReleaseValueInst>(inst) || isa<StrongReleaseInst>(inst)) {
     TL.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
                                                      inst->getOperand(0));
   } else {
@@ -396,7 +398,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // Find retain and release instructions that directly use TensorHandle
       // values.  We treat them as tensorOps to ensure that their operands are
       // deabstracted.
-      if (isa<RetainValueInst>(inst) || isa<ReleaseValueInst>(inst)) {
+      if (isa<StrongRetainInst>(inst) || isa<StrongReleaseInst>(inst)) {
         if (isTensorHandle(inst->getOperand(0)->getType())) {
           tensorOps.push_back(inst);
           continue;
