@@ -934,7 +934,7 @@ NodePointer Demangler::demangleBuiltinType() {
       if (size <= 0)
         return nullptr;
       CharVector name;
-      name.append(BUILTIN_TYPE_NAME_Float, *this);
+      name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
       name.append(size, *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
@@ -954,16 +954,14 @@ NodePointer Demangler::demangleBuiltinType() {
       if (elts <= 0)
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
-      std::string builtin_name = BUILTIN_NAME;
-      std::string builtin_type_prefix = builtin_name + ".";
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
-          !EltType->getText().startswith(builtin_type_prefix))
+          !EltType->getText().startswith(BUILTIN_TYPE_NAME_PREFIX))
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_VEC, *this);
       name.append(elts, *this);
       name.push_back('x', *this);
-      name.append(EltType->getText().substr(strlen(builtin_type_prefix.c_str())), *this);
+      name.append(EltType->getText().substr(strlen(BUILTIN_TYPE_NAME_PREFIX)), *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }

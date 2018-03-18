@@ -3228,9 +3228,7 @@ public:
         llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
         T->getElementType().print(UnderlyingOS);
       }
-      std::string builtin_name = BUILTIN_NAME;
-      std::string builtin_type_prefix = builtin_name + ".";
-      if (UnderlyingStrVec.startswith(builtin_type_prefix))
+      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
         UnderlyingStr = UnderlyingStrVec.substr(8);
       else
         UnderlyingStr = UnderlyingStrVec;

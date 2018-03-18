@@ -614,7 +614,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'w';
   } else if (stripPrefix(text, BUILTIN_TYPE_NAME_INT)) {
     Buffer << 'i' << text << '_';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_Float)) {
+  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_FLOAT)) {
     Buffer << 'f' << text << '_';
   } else if (stripPrefix(text, BUILTIN_TYPE_NAME_VEC)) {
     auto split = text.split('x');

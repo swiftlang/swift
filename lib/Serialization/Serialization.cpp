@@ -3552,9 +3552,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   T->print(OS);
-  std::string builtin_name = BUILTIN_NAME;
-  std::string builtin_type_prefix = builtin_name + ".";
-  assert(FullName.startswith(builtin_type_prefix));
+  assert(FullName.startswith(BUILTIN_TYPE_NAME_PREFIX));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
