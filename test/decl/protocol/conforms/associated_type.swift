@@ -38,8 +38,6 @@ protocol P1 {
   associatedtype A
 
   func f(_: A)
-  // expected-note@-1 {{protocol requires function 'f' with type '(X1c.A) -> ()' (aka '((Int) -> Int) -> ()'); do you want to add a stub?}}
-  // expected-note@-2 {{protocol requires function 'f' with type '((Int) -> Int) -> ()'; do you want to add a stub?}}
 }
 
 struct X1a : P1 {
@@ -52,12 +50,24 @@ struct X1b : P1 {
   func f(_: @escaping (Int) -> Int) { }
 }
 
-struct X1c : P1 { // expected-error{{type 'X1c' does not conform to protocol 'P1'}}
+struct X1c : P1 {
   typealias A = (Int) -> Int
 
-  func f(_: (Int) -> Int) { } // expected-note{{candidate has non-matching type '((Int) -> Int) -> ()'}}
+  func f(_: (Int) -> Int) { }
 }
 
-struct X1d : P1 { // expected-error{{type 'X1d' does not conform to protocol 'P1'}}
-  func f(_: (Int) -> Int) { } // expected-note{{candidate has non-matching type '((Int) -> Int) -> ()' [with A = (Int) -> Int]}}
+struct X1d : P1 {
+  func f(_: (Int) -> Int) { }
+}
+
+protocol P2 {
+  func f(_: (Int) -> Int) // expected-note{{protocol requires function 'f' with type '((Int) -> Int) -> ()'; do you want to add a stub?}}
+}
+
+struct X2a : P2 {
+  func f(_: (Int) -> Int) { }
+}
+
+struct X2b : P2 { // expected-error{{type 'X2b' does not conform to protocol 'P2'}}
+  func f(_: @escaping (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping (Int) -> Int) -> ()'}}
 }
