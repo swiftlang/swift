@@ -69,7 +69,8 @@ extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 extension CGColorSpace {
   public var colorTable: [UInt8]? {
     guard self.model == .indexed else { return nil }
-    var table = [UInt8](repeating: 0, count: self.__colorTableCount)
+    let components = self.baseColorSpace.numberOfComponents
+    var table = [UInt8](repeating: 0, count: self.__colorTableCount * components)
     self.__unsafeGetColorTable(&table)
     return table
   }
