@@ -552,6 +552,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
 
+  /// Check for ill-formed uses of Objective-C generics in a type witness.
+  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
+                                   Type type,
+                                   TypeDecl *typeDecl);
+
   /// Record a type witness.
   ///
   /// \param assocType The associated type whose witness is being recorded.
