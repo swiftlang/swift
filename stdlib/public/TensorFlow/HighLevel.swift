@@ -189,10 +189,8 @@ public protocol Optimizer : AnyObject {
 
   /// Optimizes the parameters of a `Trainee` instance given the gradient of the
   /// trainee's parameters.
-  func optimize<P : ParameterAggregate>(
-    _ parameters: inout P,
-    gradient: P
-  ) where P.Scalar == Scalar
+  func optimize<P : ParameterAggregate>(_ parameters: inout P, gradient: P)
+    where P.Scalar == Scalar
 }
 
 //===----------------------------------------------------------------------===//

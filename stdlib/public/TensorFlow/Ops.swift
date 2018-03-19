@@ -987,6 +987,27 @@ public extension TensorProtocol {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Unbroadcasting
+//===----------------------------------------------------------------------===//
+
+public extension TensorProtocol {
+  @_inlineable @inline(__always)
+  func unbroadcast(to other: Self) -> Self {
+    let rankDifference = (rankTensor - other.rankTensor).rankLifted()
+    let ones: Tensor<Int32> = #tfop("Fill", rankDifference, Tensor<Int32>(1))
+    let paddedShape = ones ++ other.shapeTensor
+    let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
+    let broadcastIndices = Tensor<Int64>(
+      handle: #tfop("Where", nonEqualIndices, T: Bool.self)
+    ).flattened()
+    let unbroadcasted: Self = #tfop(
+      "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
+      Tidx: Int32.self
+    )
+    return #tfop("Reshape", unbroadcasted, other.shapeTensor)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Indexing and slicing
