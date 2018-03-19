@@ -698,10 +698,13 @@ infix operator || : LogicalDisjunctionPrecedence
 // Compound
 
 infix operator   *= : AssignmentPrecedence
+infix operator  &*= : AssignmentPrecedence
 infix operator   /= : AssignmentPrecedence
 infix operator   %= : AssignmentPrecedence
 infix operator   += : AssignmentPrecedence
+infix operator  &+= : AssignmentPrecedence
 infix operator   -= : AssignmentPrecedence
+infix operator  &-= : AssignmentPrecedence
 infix operator  <<= : AssignmentPrecedence
 infix operator &<<= : AssignmentPrecedence
 infix operator  >>= : AssignmentPrecedence
