@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O -assume-parsing-unqualified-ownership-sil %s
 
 sil_stage canonical
@@ -18,16 +18,16 @@ import resilient_protocol
 // CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 1) to {{i32|i64}})){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 1) to {{i32|i64}})){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 1) to {{i32|i64}})){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 1) to {{i32|i64}})){{ | to i32\) }}}]
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 1) to [[INT]])){{ | to i32\) }}},
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 1) to [[INT]])){{ | to i32\) }}},
+// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 1) to [[INT]])){{ | to i32\) }}},
+// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 1) to [[INT]])){{ | to i32\) }}}]
 
 // CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(protected )?}}constant %swift.protocol {
 // CHECK-SAME:   i32 1031,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   i16 8,
-// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint ([8 x %swift.protocol_requirement]* [[RP_REQTS]] to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience17ResilientProtocolMp", i32 0
+// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint ([8 x %swift.protocol_requirement]* [[RP_REQTS]] to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience17ResilientProtocolMp", i32 0
 // CHECK-SAME: }
 
 
@@ -49,7 +49,7 @@ public protocol ResilientProtocol {
 // CHECK-SAME:   i32 7,
 // CHECK-SAME:   i16 1,
 // CHECK-SAME:   i16 1,
-// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint ([1 x %swift.protocol_requirement]* [[IP_REQTS:@.*]] to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience16InternalProtocolMp", i32 0
+// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint ([1 x %swift.protocol_requirement]* [[IP_REQTS:@.*]] to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience16InternalProtocolMp", i32 0
 // CHECK-SAME: }
 
 protocol InternalProtocol {
@@ -60,7 +60,7 @@ protocol InternalProtocol {
 // Witness table for conformance with resilient associated type
 
 // CHECK: @"$S19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden constant [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (%swift.type* ()* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*),
+// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*),
 // CHECK-SAME:   i8* bitcast (i8** ()* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
 // CHECK-SAME: ]
 

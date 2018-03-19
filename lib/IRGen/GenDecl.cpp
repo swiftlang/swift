@@ -3030,8 +3030,9 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  llvm::Type *params[] = { SizeTy }; // MetadataRequest
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3057,24 +3058,27 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     return entry;
   }
 
-  // If we have more arguments than can be passed directly, the remaining
-  // arguments are packed into an array.
-  ArrayRef<llvm::Type *> paramTypes;
+  // If we have more arguments than can be passed directly, all of the
+  // generic arguments are passed as an array.
   llvm::Type *paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs+1];
-  if (genericArgs.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
-    // Copy direct parameter types.
-    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs))
-      paramTypesArray[i] = genericArgs[i];
 
-    paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs] =
-      Int8PtrPtrTy;
-    paramTypes = paramTypesArray;
+  paramTypesArray[0] = SizeTy; // MetadataRequest
+  size_t numParams = 1;
+
+  size_t numGenericArgs = genericArgs.size();
+  if (numGenericArgs > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    paramTypesArray[1] = Int8PtrPtrTy;
+    numParams++;
   } else {
-    paramTypes = genericArgs;
+    for (size_t i : indices(genericArgs))
+      paramTypesArray[i + 1] = genericArgs[i];
+    numParams += numGenericArgs;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, paramTypes, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  auto paramTypes = llvm::makeArrayRef(paramTypesArray, numParams);
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
+                                        paramTypes, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3412,9 +3416,9 @@ IRGenModule::getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
     /// Generic metadata pattern.
     Int8PtrPtrTy
   };
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
                                         argTys, /*isVarArg*/ false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;

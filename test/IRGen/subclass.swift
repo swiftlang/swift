@@ -59,7 +59,7 @@ class G<T> : A {
 
 // CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$S8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
-  // CHECK: call %swift.type* @"$S8subclass1GCySiGMa"()
+  // CHECK: call swiftcc %swift.metadata_response @"$S8subclass1GCySiGMa"(i64 0)
   // CHECK: call i8* @swift_dynamicCastClassUnconditional
   return a as! G<Int>
 }

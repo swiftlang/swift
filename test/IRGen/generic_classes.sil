@@ -243,7 +243,8 @@ sil @$S15generic_classes024RecursiveGenericInheritsD0CfD : $@convention(method) 
 
 
 // CHECK: define{{( protected)?}} swiftcc [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @"$S15generic_classes11RootGenericCMa"
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15generic_classes11RootGenericCMa"(i64 0, %swift.type* %G)
+// CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
@@ -339,9 +340,9 @@ entry(%c : $RootGeneric<Int32>):
  */
 
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes11RootGenericCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
-// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK:   [[METADATA:%.*]] = call{{( tail)?}} %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes11RootGenericCMr"
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S15generic_classes11RootGenericCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 3, i8*** {{%.*}}, i64* {{%.*}})
@@ -350,7 +351,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes22RootGenericFixedLayoutCMr"
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S15generic_classes22RootGenericFixedLayoutCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
@@ -365,9 +366,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 // CHECK-NEXT:   ret %swift.type* [[METADATA]]
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_classes015GenericInheritsC0CMr"
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S15generic_classes015GenericInheritsC0CMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK:   [[SUPER:%.*]] ={{( tail)?}} call %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type* %A)
+// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @"$S15generic_classes11RootGenericCMa"(i64 0, %swift.type* %A)
+// CHECK:   [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   store %swift.type* [[SUPER]], %swift.type** [[T1]],
@@ -382,8 +384,8 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK:   store i8** [[T0]], i8*** [[T1]], align 8
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 1, i8*** [[FIELDS_ADDR]], i64* [[OFFSETS]])
-// CHECK:   ret %swift.type* null
+// CHECK:   ret %swift.metadata_response zeroinitializer
 // CHECK: }
 
-// OSIZE: define hidden %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type*) [[ATTRS:#[0-9]+]] {
+// OSIZE: define hidden swiftcc %swift.metadata_response @"$S15generic_classes11RootGenericCMa"(i64, %swift.type*) [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline

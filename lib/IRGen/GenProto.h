@@ -38,11 +38,13 @@ namespace swift {
 
 namespace irgen {
   class Address;
+  class DynamicMetadataRequest;
   class Explosion;
   class FunctionPointer;
   class IRGenFunction;
   class IRGenModule;
   class MetadataPath;
+  class MetadataResponse;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -73,10 +75,11 @@ namespace irgen {
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to P
   /// \param associatedType - the declaration of X; a member of P
-  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
-                                             llvm::Value *parentMetadata,
-                                             llvm::Value *wtable,
-                                             AssociatedType associatedType);
+  MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                                 llvm::Value *parentMetadata,
+                                                 llvm::Value *wtable,
+                                                 AssociatedType associatedType,
+                                                 DynamicMetadataRequest request);
 
   // Return the offset one should do on a witness table pointer to retrieve the
   // `index`th piece of private data.

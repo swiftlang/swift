@@ -12,7 +12,7 @@
 // FILE1:   [[T2:%.*]] = bitcast %swift.type* [[TYPEMETADATA]] to %swift.type**
 // FILE1:   [[T_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T2]], i64 16
 // FILE1:   [[T:%.*]] = load %swift.type*, %swift.type** [[T_PTR]]
-// FILE1:   call %swift.type* @"$S4test3SubCMa"(%swift.type* [[T]])
+// FILE1:   call swiftcc %swift.metadata_response @"$S4test3SubCMa"(i64 0, %swift.type* [[T]])
 
 public func requestType2<T>(x: T) {
   requestTypeThrough(closure: { x in print(x) }, arg: x)

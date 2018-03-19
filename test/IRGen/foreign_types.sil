@@ -37,8 +37,8 @@ bb0:
   return %ret : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo14HasNestedUnionVMa
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo14HasNestedUnionVMa"(
 // CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}$SSo14HasNestedUnionVN
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo12AmazingColorVMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12AmazingColorVMa"(
 // CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}@"$SSo12AmazingColorVN"

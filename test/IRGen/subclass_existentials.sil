@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -41,18 +41,21 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @checkMetadata()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %0 = call %swift.type* @"$S21subclass_existentials1P_AA1CCXcMa"()
-// CHECK-NEXT:   call swiftcc void @takesMetadata(%swift.type* %0, %swift.type* %0)
+// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1P_AA1CCXcMa"([[INT]] 0)
+// CHECK-NEXT:   [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT:   call swiftcc void @takesMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
 // CHECK-NEXT:   ret void
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$S21subclass_existentials1P_AA1CCXcMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S21subclass_existentials1P_AA1CCXcMa"
+// CHECK-SAME:    ([[INT]])
 // CHECK:      entry:
 // CHECK-NEXT:   [[PROTOCOL_ARRAY:%.*]] = alloca [1 x %swift.protocol*]
 // CHECK:      cacheIsNull:
 // CHECK:        [[PROTOCOLS:%.*]] = bitcast [1 x %swift.protocol*]* [[PROTOCOL_ARRAY]] to %swift.protocol**
 // CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds %swift.protocol*, %swift.protocol** [[PROTOCOLS]], i32 0
 // CHECK-NEXT:   store %swift.protocol* @"$S21subclass_existentials1PMp", %swift.protocol** [[PROTOCOL]]
-// CHECK-NEXT:   [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1CCMa"()
+// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1CCMa"([[INT]] 0)
+// CHECK-NEXT:   [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, %swift.protocol** [[PROTOCOLS]])
 // CHECK:        ret
 
@@ -95,7 +98,8 @@ bb0(%0 : $C, %1 : $C & P):
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
 // CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %0 to i8*
-// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1DCMa"()
+// CHECK-NEXT:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1DCMa"([[INT]] 0)
+// CHECK-NEXT:  [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.type* [[SUPERCLASS]], %swift.protocol* @"$S21subclass_existentials1RMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %T21subclass_existentials1DC*
@@ -180,7 +184,8 @@ sil @checkExistentialMetatypeDowncast : $@convention(thin) (@owned @thick C.Type
 bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
-// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1DCMa"()
+// CHECK-NEXT:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1DCMa"([[INT]] 0)
+// CHECK-NEXT:  [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.type* [[SUPERCLASS]], %swift.protocol* @"$S21subclass_existentials1RMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %swift.type*
