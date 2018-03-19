@@ -247,7 +247,7 @@ void ResponseBuilder::Dictionary::setCustomBuffer(
   std::unique_ptr<llvm::MemoryBuffer> CustomBuf;
   CustomBuf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
       sizeof(uint64_t) + MemBuf->getBufferSize());
-  char *BufPtr = (char*)CustomBuf->getBufferStart();
+  char *BufPtr = const_cast<char*>(CustomBuf->getBufferStart());
   *reinterpret_cast<uint64_t*>(BufPtr) = (uint64_t)Kind;
   BufPtr += sizeof(uint64_t);
   memcpy(BufPtr, MemBuf->getBufferStart(), MemBuf->getBufferSize());
