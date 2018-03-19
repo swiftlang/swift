@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/Types.h"
+#include "swift/Driver/Types.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
-using namespace swift::types;
+using namespace swift::driver;
+using namespace swift::driver::types;
 
 struct TypeInfo {
   const char *Name;
@@ -28,7 +29,7 @@ struct TypeInfo {
 static const TypeInfo TypeInfos[] = {
 #define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
   { NAME, FLAGS, TEMP_SUFFIX },
-#include "swift/Frontend/Types.def"
+#include "swift/Driver/Types.def"
 };
 
 static const TypeInfo &getInfo(unsigned Id) {
@@ -51,7 +52,7 @@ ID types::lookupTypeForExtension(StringRef Ext) {
   return llvm::StringSwitch<types::ID>(Ext.drop_front())
 #define TYPE(NAME, ID, SUFFIX, FLAGS) \
            .Case(SUFFIX, TY_##ID)
-#include "swift/Frontend/Types.def"
+#include "swift/Driver/Types.def"
            .Default(TY_INVALID);
 }
 
@@ -59,7 +60,7 @@ ID types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<types::ID>(Name)
 #define TYPE(NAME, ID, SUFFIX, FLAGS) \
            .Case(NAME, TY_##ID)
-#include "swift/Frontend/Types.def"
+#include "swift/Driver/Types.def"
            .Default(TY_INVALID);
 }
 

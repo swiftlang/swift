@@ -7,10 +7,8 @@ add_swift_library(swiftFrontend STATIC
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
-  OutputFileMap.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
-  Types.cpp
   DEPENDS
     SwiftOptions
   LINK_LIBRARIES

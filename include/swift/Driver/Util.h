@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_UTIL_H
 #define SWIFT_DRIVER_UTIL_H
 
+#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/Types.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -46,12 +46,7 @@ namespace driver {
     enum class WhichFiles : unsigned {
       Input,
       PrimaryInputs,
-      Output,
-      /// Batch mode frontend invocations may have so many supplementary
-      /// outputs that they don't comfortably fit as command-line arguments.
-      /// In that case, add a FilelistInfo to record the path to the file.
-      /// The type is ignored.
-      SupplementaryOutput,
+      Output
     };
 
     StringRef path;

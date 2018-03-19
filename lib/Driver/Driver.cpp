@@ -17,25 +17,25 @@
 #include "swift/Driver/Driver.h"
 
 #include "ToolChains.h"
+#include "swift/Strings.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
-#include "swift/Config.h"
+#include "swift/Basic/Range.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Strings.h"
+#include "swift/Config.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -531,8 +531,6 @@ Driver::buildCompilation(const ToolChain &TC,
                      A->getAsString(*ArgList), A->getValue());
     }
   }
-  DriverForceOneBatchRepartition =
-      ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -623,7 +621,7 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  Optional<OutputFileMap> OFM =
+  std::unique_ptr<OutputFileMap> OFM =
       buildOutputFileMap(*TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError())
@@ -706,14 +704,13 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  Incremental,
                                                  BatchMode,
                                                  DriverBatchSeed,
-                                                 DriverForceOneBatchRepartition,
                                                  DriverSkipExecution,
                                                  SaveTemps,
                                                  ShowDriverTimeCompilation,
                                                  std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
+  buildActions(TopLevelActions, TC, OI, OFM.get(),
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -724,8 +721,7 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM ? OFM.getPointer() : nullptr,
-            workingDirectory, TC, *C);
+  buildJobs(TopLevelActions, OI, OFM.get(), workingDirectory, TC, *C);
 
   if (DriverPrintDerivedOutputFileMap) {
     C->getDerivedOutputFileMap().dump(llvm::outs(), true);
@@ -1106,8 +1102,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   } else { // DriverKind::Batch
     OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization,
-                    options::OPT_index_file))
+    if (Args.hasArg(options::OPT_whole_module_optimization))
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
     OI.CompilerOutputType = types::TY_Object;
   }
@@ -1702,21 +1697,20 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-Optional<OutputFileMap>
+std::unique_ptr<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                            StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
-    return None;
+    return nullptr;
 
   // TODO: perform some preflight checks to ensure the file exists.
-  llvm::Expected<OutputFileMap> OFM =
-      OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
-  if (auto Err = OFM.takeError()) {
-    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   llvm::toString(std::move(Err)));
+  auto OFM = OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
+  if (!OFM) {
+    // TODO: emit diagnostic with error string
+    Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
   }
-  return *OFM;
+  return OFM;
 }
 
 void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
@@ -2655,18 +2649,4 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
-}
-
-bool OutputInfo::mightHaveExplicitPrimaryInputs(
-    const CommandOutput &Output) const {
-  switch (CompilerMode) {
-  case Mode::StandardCompile:
-  case Mode::BatchModeCompile:
-    return true;
-  case Mode::SingleCompile:
-    return false;
-  case Mode::Immediate:
-  case Mode::REPL:
-    llvm_unreachable("REPL and immediate modes handled elsewhere");
-  }
 }

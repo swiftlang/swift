@@ -17,13 +17,12 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
-#include "swift/Basic/ArrayRefView.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -168,11 +167,6 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   unsigned BatchSeed;
 
-  /// In order to test repartitioning, set to true if
-  /// -driver-force-one-batch-repartition is present. This is cleared after the
-  /// forced repartition happens.
-  bool ForceOneBatchRepartition = false;
-
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
@@ -216,7 +210,6 @@ public:
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              bool ForceOneBatchRepartition = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
@@ -278,8 +271,6 @@ public:
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
-
-  bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
