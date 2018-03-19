@@ -103,13 +103,11 @@
 
 // FILELIST: bin/swift
 // FILELIST: -filelist [[SOURCES:(["][^"]+|[^ ]+)sources([^"]+["]|[^ ]+)]]
-// FILELIST: -primary-filelist  [[PRIMARY_FILELIST:(["][^"]+|[^ ]+)primaryInputs([^"]+["]|[^ ]+)]]
-// FILELIST: -supplementary-output-file-map [[SUPPLEMENTARY_OUTPUT_FILEMAP:(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)]]
+// FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
 // FILELIST: -output-filelist {{[^-]}}
 // FILELIST-NEXT: bin/swift
 // FILELIST: -filelist [[SOURCES]]
-// FILELIST: -primary-filelist  {{(["][^"]+|[^ ]+)primaryInputs([^"]+["]|[^ ]+)}}
-// FILELIST: -supplementary-output-file-map {{(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)}}
+// FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
 // FILELIST: -output-filelist {{[^-]}}
 
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift

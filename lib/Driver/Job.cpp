@@ -240,10 +240,6 @@ StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
   return getAdditionalOutputForType(Type);
 }
 
-const OutputFileMap &CommandOutput::getDerivedOutputMap() const {
-  return DerivedOutputMap;
-}
-
 StringRef CommandOutput::getBaseInput(size_t Index) const {
   assert(Index < Inputs.size());
   return Inputs[Index].Base;
@@ -312,16 +308,6 @@ void
 CommandOutput::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
-}
-
-void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
-  SmallVector<StringRef, 4> inputs;
-  for (const CommandInputPair IP : Inputs) {
-    assert(IP.Base == IP.Primary && !IP.Base.empty() &&
-           "output file maps won't work if these differ");
-    inputs.push_back(IP.Primary);
-  }
-  getDerivedOutputMap().write(out, inputs);
 }
 
 Job::~Job() = default;

@@ -26,8 +26,6 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Frontend/OutputFileMap.h"
-#include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -39,13 +37,11 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "CompilationRecord.h"
-
-#define DEBUG_TYPE "batch-mode"
 
 // Batch-mode has a sub-mode for testing that randomizes batch partitions,
 // by user-provided seed. That is the only thing randomized here.
@@ -107,7 +103,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
-                         bool ForceOneBatchRepartition,
                          bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
@@ -124,14 +119,12 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EnableIncrementalBuild(EnableIncrementalBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
-    ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)) {
 };
 
-static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
-                                     DiagnosticEngine &diags);
+static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 using CommandSetVector = llvm::SetVector<const Job*>;
@@ -261,8 +254,7 @@ namespace driver {
 
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
-      bool success =
-          writeFilelistIfNecessary(Cmd, *Comp.TranslatedArgs.get(), Comp.Diags);
+      bool success = writeFilelistIfNecessary(Cmd, Comp.Diags);
       assert(success && "failed to write filelist");
       (void)success;
 
@@ -795,20 +787,12 @@ namespace driver {
         });
     }
 
-    // Due to the multiplication of the number of additional files and the
+    // FIXME: at the moment we're not passing OutputFileMaps to frontends, so
+    // due to the multiplication of the number of additional files and the
     // number of files in a batch, it's pretty easy to construct too-long
     // command lines here, which will then fail to exec. We address this crudely
     // by re-forming batches with a finer partition when we overflow.
-    //
-    // Now that we're passing OutputFileMaps to frontends, this should never
-    // happen, but keep this as insurance, because the decision to pass output
-    // file maps cannot know the exact length of the command line, so may
-    // possibly fail to use the OutputFileMap.
-    //
-    // In order to be able to exercise as much of the code paths as possible,
-    // take a flag to force a retry, but only once.
     bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
-                                       bool &PretendTheCommandLineIsTooLongOnce,
                                        size_t &NumPartitions) {
 
       // Stop rebatching if we can't subdivide batches any further.
@@ -817,14 +801,10 @@ namespace driver {
 
       for (auto const *B : Batches) {
         if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
-                                                          B->getArguments()) ||
-            PretendTheCommandLineIsTooLongOnce) {
-          PretendTheCommandLineIsTooLongOnce = false;
+                                                          B->getArguments())) {
           // To avoid redoing the batch loop too many times, repartition pretty
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
-          DEBUG(llvm::dbgs()
-                << "Should have used a supplementary output file map.\n");
           return true;
         }
       }
@@ -847,8 +827,6 @@ namespace driver {
       size_t NumPartitions = Comp.NumberOfParallelCommands;
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
-      bool PretendTheCommandLineIsTooLongOnce =
-          Comp.getForceOneBatchRepartition();
       do {
         // We might be restarting loop; clear these before proceeding.
         Batchable.clear();
@@ -867,8 +845,7 @@ namespace driver {
           formBatchJobFromPartitionBatch(Batches, Batch);
         }
 
-      } while (shouldRetryWithMorePartitions(
-          Batches, PretendTheCommandLineIsTooLongOnce, NumPartitions));
+      } while (shouldRetryWithMorePartitions(Batches, NumPartitions));
       PendingExecution.clear();
 
       // Save batches so we can locate and decompose them on task-exit.
@@ -1112,8 +1089,7 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
-static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
-                                     DiagnosticEngine &diags) {
+static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
   bool ok = true;
   for (const FilelistInfo &filelistInfo : job->getFilelistInfos()) {
     if (filelistInfo.path.empty())
@@ -1145,27 +1121,16 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       }
       break;
     case FilelistInfo::WhichFiles::PrimaryInputs:
-      // Ensure that -index-file-path works in conjunction with
-      // -driver-use-filelists. It needs to be the only primary.
-      if (Arg *A = args.getLastArg(options::OPT_index_file_path))
-        out << A->getValue() << "\n";
-      else {
-        // The normal case for non-single-compile jobs.
-        for (const Action *A : job->getSource().getInputs()) {
-          const auto *IA = cast<InputAction>(A);
-          out << IA->getInputArg().getValue() << "\n";
-        }
+      for (const Action *A : job->getSource().getInputs()) {
+        const auto *IA = cast<InputAction>(A);
+        out << IA->getInputArg().getValue() << "\n";
       }
       break;
-    case FilelistInfo::WhichFiles::Output: {
+    case FilelistInfo::WhichFiles::Output:
       const CommandOutput &outputInfo = job->getOutput();
       assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
       for (auto &output : outputInfo.getPrimaryOutputFilenames())
         out << output << "\n";
-      break;
-    }
-    case FilelistInfo::WhichFiles::SupplementaryOutput:
-      job->getOutput().writeOutputFileMap(out);
       break;
     }
   }
@@ -1206,7 +1171,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   }
 
-  if (!writeFilelistIfNecessary(Cmd, *TranslatedArgs.get(), Diags))
+  if (!writeFilelistIfNecessary(Cmd, Diags))
     return 1;
 
   switch (Level) {

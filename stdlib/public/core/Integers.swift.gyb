@@ -589,6 +589,66 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
+        '&+': """\
+  /// Adds two values and stores the result in the left-hand-side variable, 
+  /// discarding any overflow.
+  ///
+  /// The masking addition assignment operator (`&+=`) silently discards any 
+  /// overflow that occurs during the operation. In the following example, the 
+  /// sum of `100` and `121` is greater than the maximum representable `Int8` 
+  /// value, so the result is the overflowed value:
+  ///
+  ///     var x: Int8 = 10
+  ///     x &+= 21
+  ///     // x == 31
+  ///     var y: Int8 = 100
+  ///     y &+= 121
+  ///     // y == -35 (after overflow)
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+""",
+        '&-': """\
+  /// Subtracts the second value from the first and stores the difference in the
+  /// left-hand-side variable, discarding any overflow.
+  ///
+  /// The masking subtraction assignment operator (`&-=`) silently discards any
+  /// overflow that occurs during the operation. In the following example, the
+  /// difference of `10` and `21` is less than zero, the minimum representable
+  /// `UInt` value, so the result is the overflowed value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x &-= 10
+  ///     // x == 11
+  ///     var y: UInt8 = 10
+  ///     y &-= 21
+  ///     // y == 245 (after overflow)
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+""",
+        '&*': """\
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable, discarding any overflow.
+  ///
+  /// The masking multiplication assignment operator (`&*=`) silently discards 
+  /// any overflow that occurs during the operation. In the following example, 
+  /// the product of `10` and `50` is greater than the maximum representable 
+  /// `Int8` value, so the result is the overflowed value:
+  ///
+  ///     var x: Int8 = 10
+  ///     x &*= 5
+  ///     // x == 50
+  ///     var y: Int8 = 10
+  ///     y &*= 50
+  ///     // y == -12 (after overflow)
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+""",
         '&': """\
   /// Stores the result of performing a bitwise AND operation on the two given
   /// values in the left-hand-side variable.
@@ -2742,6 +2802,13 @@ ${operatorComment('&' + x.operator, True)}
   @_transparent
   public static func &${x.operator} (lhs: Self, rhs: Self) -> Self {
     return lhs.${x.name}ReportingOverflow(${callLabel}rhs).partialValue
+  }
+
+${assignmentOperatorComment('&' + x.operator, True)}
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func &${x.operator}= (lhs: inout Self, rhs: Self) {
+    lhs = lhs &${x.operator} rhs
   }
 %   end
 % end
