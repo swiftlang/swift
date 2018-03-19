@@ -4130,8 +4130,6 @@ static ConstraintResult visitInherited(
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
 
-  // FIXME: Should this whole thing use getExistentialLayout() instead?
-
   visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
     // Decompose explicitly-written protocol compositions.
     if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
@@ -4933,6 +4931,22 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->representativeOrEquivClass = T1;
+
+  // Layout requirements.
+  if (equivClass2 && equivClass2->layout) {
+    if (!equivClass->layout) {
+      equivClass->layout = equivClass2->layout;
+      equivClass->layoutConstraints = std::move(equivClass2->layoutConstraints);
+    } else {
+      const RequirementSource *source2
+        = equivClass2->layoutConstraints.front().source;
+      addLayoutRequirementDirect(T1, equivClass2->layout, source2);
+      equivClass->layoutConstraints.insert(
+                                   equivClass->layoutConstraints.end(),
+                                   equivClass2->layoutConstraints.begin() + 1,
+                                   equivClass2->layoutConstraints.end());
+    }
+  }
 
   // Superclass requirements.
   if (equivClass2 && equivClass2->superclass) {
@@ -6152,19 +6166,19 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
 /// Determine whether this is a redundantly inheritable Objective-C protocol.
 ///
-/// If we do have a redundantly inheritable Objective-C protocol, record that
-/// the conformance was restated on the protocol whose requirement signature
-/// we are computing.
+/// A redundantly-inheritable Objective-C protocol is one where we will
+/// silently accept a directly-stated redundant conformance to this protocol,
+/// and emit this protocol in the list of "inherited" protocols. There are
+/// two cases where we allow this:
 ///
-/// At present, there is only one such protocol that we know about:
-/// JavaScriptCore's JSExport.
+//    1) For a protocol defined in Objective-C, so that we will match Clang's
+///      behavior, and
+///   2) For an @objc protocol defined in Swift that directly inherits from
+///      JavaScriptCore's JSExport, which depends on this behavior.
 static bool isRedundantlyInheritableObjCProtocol(
                                              ProtocolDecl *proto,
                                              const RequirementSource *source) {
   if (!proto->isObjC()) return false;
-
-  // Only JSExport protocol behaves this way.
-  if (!proto->getName().is("JSExport")) return false;
 
   // Only do this for the requirement signature computation.
   auto parentSource = source->parent;
@@ -6172,9 +6186,14 @@ static bool isRedundantlyInheritableObjCProtocol(
       parentSource->kind != RequirementSource::RequirementSignatureSelf)
     return false;
 
+  // Check the two conditions in which we will suppress the diagnostic and
+  // emit the redundant inheritance.
+  auto inheritingProto = parentSource->getProtocolDecl();
+  if (!inheritingProto->hasClangNode() && !proto->getName().is("JSExport"))
+    return false;
+
   // If the inheriting protocol already has @_restatedObjCConformance with
   // this protocol, we're done.
-  auto inheritingProto = parentSource->getProtocolDecl();
   for (auto *attr : inheritingProto->getAttrs()
                       .getAttributes<RestatedObjCConformanceAttr>()) {
     if (attr->Proto == proto) return true;

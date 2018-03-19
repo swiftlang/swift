@@ -1503,6 +1503,10 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(type_witness_objc_generic_parameter,none,
+      "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
+      "used for associated type %3 of protocol %4",
+      (Type, Type, bool, DeclName, DeclName))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
