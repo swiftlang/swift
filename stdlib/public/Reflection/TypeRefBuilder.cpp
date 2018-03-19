@@ -285,7 +285,7 @@ TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD,
 
 void
 TypeRefBuilder::dumpTypeRef(StringRef MangledName,
-                            std::ostream &OS, bool printTypeName) {
+                            llvm::raw_ostream &OS, bool printTypeName) {
   auto DemangleTree = Dem.demangleType(MangledName);
   auto TypeName = nodeToString(DemangleTree);
   OS << TypeName << '\n';
@@ -300,7 +300,7 @@ TypeRefBuilder::dumpTypeRef(StringRef MangledName,
   OS << '\n';
 }
 
-void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
+void TypeRefBuilder::dumpFieldSection(llvm::raw_ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
     uintptr_t TypeRefOffset = sections.Field.SectionOffset
                             - sections.TypeReference.SectionOffset;
@@ -328,7 +328,7 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
   }
 }
 
-void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
+void TypeRefBuilder::dumpAssociatedTypeSection(llvm::raw_ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
     uintptr_t TypeRefOffset = sections.AssociatedType.SectionOffset
                             - sections.TypeReference.SectionOffset;
@@ -355,7 +355,7 @@ void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
   }
 }
 
-void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
+void TypeRefBuilder::dumpBuiltinTypeSection(llvm::raw_ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
     uintptr_t TypeRefOffset = sections.Builtin.SectionOffset
                             - sections.TypeReference.SectionOffset;
@@ -374,10 +374,10 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
 }
 
 void ClosureContextInfo::dump() const {
-  dump(std::cerr);
+  dump(llvm::errs());
 }
 
-void ClosureContextInfo::dump(std::ostream &OS) const {
+void ClosureContextInfo::dump(llvm::raw_ostream &OS) const {
   OS << "- Capture types:\n";
   for (auto *TR : CaptureTypes) {
     if (TR == nullptr)
@@ -399,7 +399,7 @@ void ClosureContextInfo::dump(std::ostream &OS) const {
   OS << "\n";
 }
 
-void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {
+void TypeRefBuilder::dumpCaptureSection(llvm::raw_ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
     uintptr_t TypeRefOffset = sections.Capture.SectionOffset
                             - sections.TypeReference.SectionOffset;
@@ -410,7 +410,7 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {
   }
 }
 
-void TypeRefBuilder::dumpAllSections(std::ostream &OS) {
+void TypeRefBuilder::dumpAllSections(llvm::raw_ostream &OS) {
   OS << "FIELDS:\n";
   OS << "=======\n";
   dumpFieldSection(OS);

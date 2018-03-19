@@ -24,22 +24,22 @@ using namespace swift;
 using namespace reflection;
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  std::ostream &OS;
+  llvm::raw_ostream &OS;
   unsigned Indent;
 
-  std::ostream &indent(unsigned Amount) {
+  llvm::raw_ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
       OS << ' ';
     return OS;
   }
 
-  std::ostream &printHeader(std::string Name) {
+  llvm::raw_ostream &printHeader(std::string Name) {
     indent(Indent) << '(' << Name;
     return OS;
   }
 
   template<typename T>
-  std::ostream &printField(std::string name, const T &value) {
+  llvm::raw_ostream &printField(std::string name, const T &value) {
     if (!name.empty())
       OS << " " << name << "=" << value;
     else
@@ -56,7 +56,7 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(std::ostream &OS, unsigned Indent)
+  PrintTypeRef(llvm::raw_ostream &OS, unsigned Indent)
     : OS(OS), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
@@ -374,12 +374,12 @@ const OpaqueTypeRef *OpaqueTypeRef::get() {
 }
 
 void TypeRef::dump() const {
-  dump(std::cerr);
+  dump(llvm::errs());
 }
 
-void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
+void TypeRef::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   PrintTypeRef(OS, Indent).visit(this);
-  OS << std::endl;
+  OS << '\n';
 }
 
 bool TypeRef::isConcrete() const {

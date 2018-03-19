@@ -22,8 +22,7 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Runtime/Unreachable.h"
-
-#include <iostream>
+#include "llvm/Support/raw_ostream.h"
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG(expr) expr;
@@ -35,28 +34,28 @@ namespace swift {
 namespace reflection {
 
 void TypeInfo::dump() const {
-  dump(std::cerr);
+  dump(llvm::errs());
 }
 
 namespace {
 
 class PrintTypeInfo {
-  std::ostream &OS;
+  llvm::raw_ostream &OS;
   unsigned Indent;
 
-  std::ostream &indent(unsigned Amount) {
+  llvm::raw_ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
       OS << ' ';
     return OS;
   }
 
-  std::ostream &printHeader(const std::string &name) {
+  llvm::raw_ostream &printHeader(const std::string &name) {
     indent(Indent) << '(' << name;
     return OS;
   }
 
   template<typename T>
-  std::ostream &printField(const std::string &name, const T &value) {
+  llvm::raw_ostream &printField(const std::string &name, const T &value) {
     if (!name.empty())
       OS << " " << name << "=" << value;
     else
@@ -94,7 +93,7 @@ class PrintTypeInfo {
   }
 
 public:
-  PrintTypeInfo(std::ostream &OS, unsigned Indent)
+  PrintTypeInfo(llvm::raw_ostream &OS, unsigned Indent)
     : OS(OS), Indent(Indent) {}
 
   void print(const TypeInfo &TI) {
@@ -192,7 +191,7 @@ public:
 
 } // end anonymous namespace
 
-void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
+void TypeInfo::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
   OS << '\n';
 }
@@ -243,7 +242,7 @@ class ExistentialTypeInfoBuilder {
       std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
           TC.getBuilder().getFieldTypeInfo(P);
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No field descriptor: "; P->dump())
+        DEBUG(llvm::errs() << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
@@ -295,13 +294,13 @@ public:
       // we have an invalid typeref.
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T)) {
-        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+        DEBUG(llvm::errs() << "Bad existential member: "; T->dump())
         Invalid = true;
         return;
       }
       const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No field descriptor: "; T->dump())
+        DEBUG(llvm::errs() << "No field descriptor: "; T->dump())
         Invalid = true;
         return;
       }
@@ -318,7 +317,7 @@ public:
         break;
 
       default:
-        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+        DEBUG(llvm::errs() << "Bad existential member: "; T->dump())
         Invalid = true;
         return;
       }
@@ -341,7 +340,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG(std::cerr << "@objc existential with witness tables\n");
+        DEBUG(llvm::errs() << "@objc existential with witness tables\n");
         return nullptr;
       }
 
@@ -376,7 +375,7 @@ public:
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef());
       if (TI == nullptr) {
-        DEBUG(std::cerr << "No TypeInfo for RawPointer\n");
+        DEBUG(llvm::errs() << "No TypeInfo for RawPointer\n");
         return nullptr;
       }
 
@@ -407,7 +406,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG(std::cerr << "@objc existential with witness tables\n");
+        DEBUG(llvm::errs() << "@objc existential with witness tables\n");
         return nullptr;
       }
 
@@ -455,7 +454,7 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
                                      const TypeRef *TR) {
   const TypeInfo *TI = TC.getTypeInfo(TR);
   if (TI == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for field type: "; TR->dump());
+    DEBUG(llvm::errs() << "No TypeInfo for field type: "; TR->dump());
     Invalid = true;
     return;
   }
@@ -505,7 +504,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
 
   auto *BuiltinTI = Builder.getBuiltinTypeInfo(TR);
   if (BuiltinTI == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
+    DEBUG(llvm::errs() << "No TypeInfo for reference type: "; TR->dump());
     return nullptr;
   }
 
@@ -532,7 +531,7 @@ TypeConverter::getThinFunctionTypeInfo() {
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getThinFunctionTypeRef());
   if (descriptor == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for function type\n");
+    DEBUG(llvm::errs() << "No TypeInfo for function type\n");
     return nullptr;
   }
 
@@ -568,7 +567,7 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for metatype type\n");
+    DEBUG(llvm::errs() << "No TypeInfo for metatype type\n");
     return nullptr;
   }
 
@@ -821,13 +820,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
+    DEBUG(llvm::errs() << "Unresolved generic TypeRef: "; GTP->dump());
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
+    DEBUG(llvm::errs() << "Unresolved generic TypeRef: "; DM->dump());
     return MetatypeRepresentation::Unknown;
   }
 
@@ -903,7 +902,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
-      DEBUG(std::cerr << "No TypeInfo for case type: "; TR->dump());
+      DEBUG(llvm::errs() << "No TypeInfo for case type: "; TR->dump());
       Invalid = true;
       return;
     }
@@ -1049,7 +1048,7 @@ public:
     /// metadata.
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
     if (descriptor == nullptr) {
-      DEBUG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
+      DEBUG(llvm::errs() << "No TypeInfo for builtin type: "; B->dump());
       return nullptr;
     }
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
@@ -1066,7 +1065,7 @@ public:
 
       // Otherwise, we're out of luck.
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
+        DEBUG(llvm::errs() << "No TypeInfo for nominal type: "; TR->dump());
         return nullptr;
       }
     }
@@ -1100,7 +1099,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
+      DEBUG(llvm::errs() << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
 
@@ -1148,7 +1147,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
-      DEBUG(std::cerr << "Unknown metatype representation: "; M->dump());
+      DEBUG(llvm::errs() << "Unknown metatype representation: "; M->dump());
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -1167,7 +1166,7 @@ public:
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
-      DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
+      DEBUG(llvm::errs() << "Invalid existential metatype: "; EM->dump());
       return nullptr;
     }
 
@@ -1176,13 +1175,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
+    DEBUG(llvm::errs() << "Unresolved generic TypeRef: "; GTP->dump());
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
+    DEBUG(llvm::errs() << "Unresolved generic TypeRef: "; DM->dump());
     return nullptr;
   }
 
@@ -1203,7 +1202,7 @@ public:
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
     if (TI == nullptr) {
-      DEBUG(std::cerr << "Invalid reference type");
+      DEBUG(llvm::errs() << "Invalid reference type");
       return nullptr;
     }
 
@@ -1246,7 +1245,7 @@ public:
     }
 
     // Anything else -- give up
-    DEBUG(std::cerr << "Invalid reference type");
+    DEBUG(llvm::errs() << "Invalid reference type");
     return nullptr;
   }
 
@@ -1275,7 +1274,7 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    DEBUG(std::cerr << "Can't lower opaque TypeRef");
+    DEBUG(llvm::errs() << "Can't lower opaque TypeRef");
     return nullptr;
   }
 };
@@ -1289,7 +1288,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
   if (!RecursionCheck.insert(TR).second) {
-    DEBUG(std::cerr << "TypeRef recursion detected");
+    DEBUG(llvm::errs() << "TypeRef recursion detected");
     return nullptr;
   }
 
@@ -1307,7 +1306,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
       getBuilder().getFieldTypeInfo(TR);
   if (FD.first == nullptr) {
-    DEBUG(std::cerr << "No field descriptor: "; TR->dump());
+    DEBUG(llvm::errs() << "No field descriptor: "; TR->dump());
     return nullptr;
   }
 
@@ -1337,7 +1336,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
-    DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
+    DEBUG(llvm::errs() << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
 

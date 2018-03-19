@@ -19,22 +19,22 @@ using namespace reflection;
 
 class PrintMetadataSource
   : public MetadataSourceVisitor<PrintMetadataSource, void> {
-  std::ostream &OS;
+  llvm::raw_ostream &OS;
   unsigned Indent;
 
-  std::ostream &indent(unsigned Amount) {
+  llvm::raw_ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
       OS << ' ';
     return OS;
   }
 
-  std::ostream &printHeader(std::string Name) {
+  llvm::raw_ostream &printHeader(std::string Name) {
     indent(Indent) << '(' << Name;
     return OS;
   }
 
   template<typename T>
-  std::ostream &printField(std::string name, const T &value) {
+  llvm::raw_ostream &printField(std::string name, const T &value) {
     if (!name.empty())
       OS << " " << name << "=" << value;
     else
@@ -55,7 +55,7 @@ class PrintMetadataSource
   }
 
 public:
-  PrintMetadataSource(std::ostream &OS, unsigned Indent)
+  PrintMetadataSource(llvm::raw_ostream &OS, unsigned Indent)
     : OS(OS), Indent(Indent) {}
 
   void
@@ -100,10 +100,10 @@ public:
 };
 
 void MetadataSource::dump() const {
-  dump(std::cerr, 0);
+  dump(llvm::errs(), 0);
 }
 
-void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
+void MetadataSource::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
   OS << '\n';
 }
