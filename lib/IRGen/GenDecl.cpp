@@ -64,6 +64,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
 #include "Signature.h"
 #include "StructLayout.h"
