@@ -104,9 +104,7 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
 
 static void writeQuotedEscaped(llvm::raw_ostream &os,
                                const StringRef fileName) {
-  os << "\"";
-  os.write_escaped(fileName);
-  os << "\"";
+  os << "\"" << llvm::yaml::escape(fileName) << "\"";
 }
 
 void OutputFileMap::write(llvm::raw_ostream &os,
