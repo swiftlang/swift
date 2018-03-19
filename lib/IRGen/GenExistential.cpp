@@ -45,6 +45,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"

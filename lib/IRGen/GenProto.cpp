@@ -2518,6 +2518,24 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, Fn).emit(in, witnessMetadata, getParameter);
 }
 
+/// Given an array of polymorphic arguments as might be set up by
+/// GenericArguments, bind the polymorphic parameters.
+void irgen::emitPolymorphicParametersFromArray(IRGenFunction &IGF,
+                                               NominalTypeDecl *typeDecl,
+                                               Address array) {
+  GenericTypeRequirements requirements(IGF.IGM, typeDecl);
+
+  array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
+
+  auto getInContext = [&](CanType type) -> CanType {
+    return typeDecl->mapTypeIntoContext(type)
+             ->getCanonicalType();
+  };
+
+  // Okay, bind everything else from the context.
+  requirements.bindFromBuffer(IGF, array, getInContext);
+}
+
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
   // We need one pointer for each archetype or witness table.
   return IGM.getPointerSize() * Requirements.size();
@@ -3173,4 +3191,24 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                        llvm::Attribute::NoUnwind);
 
   return Signature(fnType, attrs, SwiftCC);
+}
+
+/// \brief Load a reference to the protocol descriptor for the given protocol.
+///
+/// For Swift protocols, this is a constant reference to the protocol descriptor
+/// symbol.
+/// For ObjC protocols, descriptors are uniqued at runtime by the ObjC runtime.
+/// We need to load the unique reference from a global variable fixed up at
+/// startup.
+llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
+                                              ProtocolDecl *protocol) {
+  if (!protocol->isObjC())
+    return IGF.IGM.getAddrOfProtocolDescriptor(protocol);
+  
+  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);
+  llvm::Value *val
+    = IGF.Builder.CreateLoad(refVar, IGF.IGM.getPointerAlignment());
+  val = IGF.Builder.CreateBitCast(val,
+                          IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
+  return val;
 }

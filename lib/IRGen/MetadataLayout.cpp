@@ -480,6 +480,16 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
   return slot;
 }
 
+Address irgen::emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                         llvm::Value *metadata) {
+  // The superclass field in a class type is the first field past the isa.
+  unsigned index = 1;
+
+  Address addr(metadata, IGF.IGM.getPointerAlignment());
+  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
+  return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
+}
+
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)

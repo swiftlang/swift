@@ -2064,20 +2064,6 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-llvm::Value *IRGenFunction::getLocalSelfMetadata() {
-  assert(LocalSelf && "no local self metadata");
-  switch (SelfKind) {
-  case SwiftMetatype:
-    return LocalSelf;
-  case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
-  case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
-  }
-
-  llvm_unreachable("Not a valid LocalSelfKind.");
-}
-
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
                                          IRGenFunction::LocalSelfKind kind) {
   assert(!LocalSelf && "already have local self metadata");
