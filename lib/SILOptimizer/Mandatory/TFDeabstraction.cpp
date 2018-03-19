@@ -25,6 +25,7 @@
 
 #define DEBUG_TYPE "tf-deabstraction"
 #include "TFUtilities.h"
+#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -71,6 +72,7 @@ namespace {
   class TFDeabstraction {
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
+    ConstExprEvaluator &constantEvaluator;
     SILPassManager *passManager;
 
     /// This is set to true by the early inlining phase if the function was
@@ -91,8 +93,9 @@ namespace {
     SmallVector<SILInstruction*, 32> tensorOps;
   public:
     TFDeabstraction(SILFunction &fn, TensorFunctionClassifier &tfc,
-                    SILPassManager *PM)
-      : fn(fn), tfc(tfc), passManager(PM) {}
+                    ConstExprEvaluator &constantEvaluator, SILPassManager *PM)
+      : fn(fn), tfc(tfc), constantEvaluator(constantEvaluator), passManager(PM){
+    }
 
     /// Deabstract the specified top level function as a deabstraction context.
     void doIt();
@@ -117,7 +120,7 @@ namespace {
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateTensorValues();
-    void canonicalizeOps();
+    void checkAndCanonicalizeAttributes();
   };
 }  // end anonymous namespace
 
@@ -480,7 +483,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // If we have a call to a function that is conditionally promotable to a
       // tensor op, we add it to the set of tensor operations we're trying to
       // deabstract.  This ensures that we deabstract its operands, which makes
-      // it possible to tell if its getting a variable or constant value.
+      // it possible to tell if it is getting a variable or constant value.
       if (auto *apply = dyn_cast<ApplyInst>(inst)) {
         if (SILTensorOpInfo::isDecodableApply(apply)) {
           logIfFirstChange();
@@ -1187,8 +1190,34 @@ void TFDeabstraction::propagateTensorValues() {
 
 /// Canonicalize tensor ops, validating their attribute arguments have
 /// constants, and flattening array parameters.
-void TFDeabstraction::canonicalizeOps() {
-  llvm::PrettyStackTraceFormat X("TFDeabstraction::canonicalizeOps");
+void TFDeabstraction::checkAndCanonicalizeAttributes() {
+  llvm::PrettyStackTraceFormat
+  X("TFDeabstraction::checkAndCanonicalizeAttributes");
+
+  // Do a big sweep over all of the operands to tensor values, collecting ones
+  // that we might be interested in being constants into a single list.
+  SmallVector<SymbolicValue, 32> valuesToCheck;
+
+  for (auto *op : tensorOps) {
+    for (auto &operand : op->getAllOperands()) {
+      // Dump anything that might be an attribute into the list without too much
+      // filtering.  We take out tensor values since they are the most obvious
+      // ones we don't care about later, but there may be other minor things we
+      // over-query on.
+      auto value = operand.get();
+      if (!isTensorHandle(value->getType()))
+        valuesToCheck.push_back({value, 0});
+    }
+  }
+
+  // Eliminate duplicates and sort the array of values so we have an efficient
+  // way to query it later.
+  llvm::array_pod_sort(valuesToCheck.begin(), valuesToCheck.end());
+  valuesToCheck.erase(std::unique(valuesToCheck.begin(), valuesToCheck.end()),
+                      valuesToCheck.end());
+
+  SmallVector<LatticeValue, 32> results;
+  constantEvaluator.computeConstantValues(fn, valuesToCheck, results);
 
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
@@ -1197,6 +1226,8 @@ void TFDeabstraction::canonicalizeOps() {
 
       // If this is a well known function that can be transformed into an op, do
       // so first.
+      // FIXME: This should take into consideration the constants we just
+      // computed!
       if (auto apply = dyn_cast<ApplyInst>(inst))
         inst = SILTensorOpInfo::decodeApply(apply);
 
@@ -1205,6 +1236,9 @@ void TFDeabstraction::canonicalizeOps() {
       if (!opInfo)
         continue;
 
+      // Use the constants we just computed to substitute into parameter values.
+
+#if 0  // Not yet.
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
       auto error = opInfo->checkAndDiagnoseOperands();
@@ -1224,6 +1258,7 @@ void TFDeabstraction::canonicalizeOps() {
       // make all subsequent analyses and promotion of the tensor operations
       // simpler.
       opInfo->canonicalizeOperands();
+#endif
     }
   }
 }
@@ -1289,21 +1324,16 @@ void TFDeabstraction::doIt() {
 
   logCurrentState("After propagateTensorValues", /*detailed*/true);
 
-#if 0 // Not ready yet.
-  // Canonicalize tensor ops, validating their attribute arguments have
-  // constants, and flattening array parameters.
-  canonicalizeOps();
-#endif
+  // Canonicalize attribute arguments, checking that they have constants, and
+  // flattening array attributes.
+  checkAndCanonicalizeAttributes();
 
   logCurrentState("Result", /*detailed*/false);
 }
 
 
 namespace {
-  class TFDeabstractionPass : public SILModuleTransform {
-    TensorFunctionClassifier tfc;
-  public:
-
+  struct TFDeabstractionPass : public SILModuleTransform {
     /// The entry point to the transformation, runs deabstraction on an entire
     /// module.
     void run() override;
@@ -1321,6 +1351,9 @@ void TFDeabstractionPass::run() {
   if (!tfModule)
     return;
 
+  TensorFunctionClassifier tfc;
+  ConstExprEvaluator constantEvaluator;
+
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
   // context.
@@ -1336,7 +1369,7 @@ void TFDeabstractionPass::run() {
     llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
                                    fn.getName().str().c_str());
 
-    TFDeabstraction(fn, tfc, PM).doIt();
+    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
 
     // TODO(clattner): This should eventually be the driver that kicks off
     // the partitioning pass as part of it, and the partitioning and later
