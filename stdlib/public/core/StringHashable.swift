@@ -14,8 +14,8 @@ import SwiftShims
 
 func _emptyASCIIHashBuffer() -> _UIntBuffer<UInt64, UInt8> {
   var buffer = _UIntBuffer<UInt64, UInt8>()
-  // we need to take into account the nul suffix for nul-terminated strings.
-  // A partially filled ascii buffer should have 1s in the leftover space
+  // We don't want the unused bits of a partially filled buffer to collide
+  // with trailing nuls when hashing
   buffer._storage = UInt64.max
   return buffer
 }
