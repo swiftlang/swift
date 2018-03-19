@@ -148,8 +148,17 @@ internal extension TGMath {
     expectEqual(2.5, Self._scalbn(0.625, 2))
     expectEqual((0.625, 2), Self._frexp(2.5))
     expectEqual(1, Self._ilogb(2.5))
+#if os(Linux) && arch(x86_64)
+    // double-precisiion remquo is broken in the glibc in 14.04. Disable this
+    // test for all Linux in the short-term to un-FAIL the build. SR-7234.
+    if Self.significandBitCount != 52 {
+      expectEqual(-0.25, Self._remquo(16, 0.625).0)
+      expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+    }
+#else
     expectEqual(-0.25, Self._remquo(16, 0.625).0)
     expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+#endif
   }
 }
 
