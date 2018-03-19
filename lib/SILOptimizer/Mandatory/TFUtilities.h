@@ -133,6 +133,16 @@ namespace tf {
     }
     static SingleValueInstruction *getAttrOperand(SILValue v);
 
+
+    /// Given an array value on which we recently dropped a consuming use, try
+    /// to remove all the computation that produces the array if possible.  If
+    /// not, emit a destroy_value instruction to avoid leaking it.
+    ///
+    /// FIXME: Move this logic to deabstraction when it is done.
+    ///
+    static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
+                                          SILBuilder &B);
+
   private:
     SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
     bool decodeBuiltin();

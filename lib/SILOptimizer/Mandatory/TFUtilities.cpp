@@ -469,8 +469,11 @@ static bool tryToRemoveArrayValue(SILValue value) {
 /// Given an array value on which we recently dropped a consuming use, try to
 /// remove all the computation that produces the array if possible.  If not,
 /// emit a destroy_value instruction to avoid leaking it.
-static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
-                                      SILBuilder &B) {
+///
+/// FIXME: Move this logic to deabstraction when it is done.
+///
+void SILTensorOpInfo::removeOrDestroyArrayValue(SILValue array, SILLocation loc,
+                                                SILBuilder &B) {
   if (!tryToRemoveArrayValue(array))
     B.emitDestroyValueOperation(loc, array);
 }
@@ -678,6 +681,9 @@ bool SILTensorOpInfo::decodeBuiltin() {
 /// array of constant integer or fp values) and add it as a value$tensor operand
 /// to the specified op that is being built up.  This returns false if the
 /// operand is not an array of constant values.
+///
+/// FIXME: Remove this when Deabstraction subsumes op promotion.
+///
 static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
                                  OperandClass attrKind,
                                  std::string &name,
@@ -741,9 +747,7 @@ static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 ///
-/// It takes a 1D array of scalars, a shape as a 1D array of integers, and a
-/// metatype that corresponds to the Scalar type.  This has been carefully set
-/// up to align with what the Const op wants to see.
+/// It takes a 1D array of scalars and a shape as a 1D array of integers.
 ///
 SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
