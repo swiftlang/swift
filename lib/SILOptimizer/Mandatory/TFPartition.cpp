@@ -26,6 +26,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #undef DEBUG_TYPE
@@ -766,20 +767,33 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
       description = "'" + pd->getName().str().str() + "'";
   }
 
+  auto &ctx = fn.getModule().getASTContext();
+
   // Emit the warning.
-  diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(), diagID,
-           description)
+  diagnose(ctx, loc.getSourceLoc(), diagID, description)
     .highlight(loc.getSourceRange());
+  auto userLoc = getUserSourceLocation(user);
+
+  if (loc.isNull()) {
+    // If there was no source location, then we emitted an unhelpful error at
+    // line 0 of a file that doesn't exist.  At least utter the demangled
+    // function name so we have some way to track this down.
+    auto name =
+      Demangle::demangleSymbolAsString(fn.getName(),
+                      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+    diagnose(ctx, fn.getLocation().getSourceLoc(), diag::tf_op_misuse,
+             "located in " + name + " aka '" + fn.getName().str() + "'");
+    return;
+  }
 
   // If the use is on a different line, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user);
-  auto &SM = fn.getModule().getASTContext().SourceMgr;
-
-  if (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
-        SM.findBufferContainingLoc(userLoc.getSourceLoc()) ||
-      SM.getLineNumber(loc.getSourceLoc()) !=
-        SM.getLineNumber(userLoc.getSourceLoc())) {
-    diagnose(fn.getModule().getASTContext(), userLoc.getSourceLoc(),
+  auto &SM = ctx.SourceMgr;
+  if (!userLoc.isNull() &&
+      (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
+         SM.findBufferContainingLoc(userLoc.getSourceLoc()) ||
+       SM.getLineNumber(loc.getSourceLoc()) !=
+         SM.getLineNumber(userLoc.getSourceLoc()))) {
+    diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
     .highlight(userLoc.getSourceRange());
   }
@@ -818,10 +832,23 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
     .highlight(loc.getSourceRange());
+  auto userLoc = getUserSourceLocation(user);
+
+  if (loc.isNull()) {
+    // If there was no source location, then we emitted an unhelpful error at
+    // line 0 of a file that doesn't exist.  At least utter the demangled
+    // function name so we have some way to track this down.
+    auto name =
+      Demangle::demangleSymbolAsString(fn.getName(),
+                      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+    diagnose(ctx, fn.getLocation().getSourceLoc(), diag::tf_op_misuse,
+             "located in " + name + " aka '" + fn.getName().str() + "'");
+    return true;
+  }
 
   // If the use is at a different position, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user);
-  if (loc.getSourceLoc() != userLoc.getSourceLoc()) {
+  if (!userLoc.isNull() &&
+      loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
     .highlight(userLoc.getSourceRange());
