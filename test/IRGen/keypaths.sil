@@ -284,7 +284,8 @@ entry:
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
 
   // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
-  // CHECK: [[FOO_T:%.*]] = call %swift.type* @"$S8keypaths3FooVMa"(%swift.type* %T)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S8keypaths3FooVMa"([[WORD]] 0, %swift.type* %T)
+  // CHECK: [[FOO_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: store %swift.type* [[FOO_T]], %swift.type** [[PTR]]
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS]])
   %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
@@ -295,7 +296,8 @@ entry:
 // CHECK: define private %swift.type* [[I_GET_GEN_A_A]](i8*)
 // CHECK:   [[BUF:%.*]] = bitcast i8* %0
 // CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
-// CHECK:   [[GEN:%.*]] = call %swift.type* @"$S8keypaths3GenVMa"(%swift.type* [[A]], %swift.type* [[A]])
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S8keypaths3GenVMa"([[WORD]] 0, %swift.type* [[A]], %swift.type* [[A]])
+// CHECK:   [[GEN:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   ret %swift.type* [[GEN]]
 
 

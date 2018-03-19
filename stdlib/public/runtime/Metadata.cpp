@@ -216,15 +216,11 @@ namespace {
       // Complete the metadata's instantiation.
       auto dependency = pattern->CompletionFunction(metadata, context, pattern);
 
-      // FIXME: use a more precise dependency requirement returned by the
-      // completion function.
-      auto dependencyRequirement = MetadataRequest::Complete;
-
-      auto state = dependency == nullptr
+      auto state = dependency.Value == nullptr
                      ? MetadataRequest::Complete
                      : inferStateForMetadata(metadata);
 
-      return { state, dependencyRequirement, dependency };
+      return { state, dependency.State, dependency.Value };
     }
   };
 } // end anonymous namespace
@@ -488,21 +484,18 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 }
 
 /// The primary entrypoint.
-const Metadata *
-swift::swift_getGenericMetadata(const TypeContextDescriptor *description,
-                                const void *arguments) {
-  auto genericArgs = (const void * const *) arguments;
+MetadataResponse
+swift::swift_getGenericMetadata(MetadataRequest request,
+                                const void * const *arguments,
+                                const TypeContextDescriptor *description) {
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  MetadataRequest request(MetadataRequest::Complete);
-
-  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  auto key = MetadataCacheKey(arguments, numGenericArgs);
   auto result =
-    getCache(generics).getOrInsert(key, request, description, genericArgs);
+    getCache(generics).getOrInsert(key, request, description, arguments);
 
-  // TODO: report cases where the state is inadequate
-  return result.second.Value;
+  return result.second;
 }
 
 /***************************************************************************/
@@ -3237,7 +3230,7 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
 /***************************************************************************/
 
 template <class Result, class Callbacks>
-static Result performOnMetadataCache(Metadata *metadata,
+static Result performOnMetadataCache(const Metadata *metadata,
                                      Callbacks &&callbacks) {
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
@@ -3264,12 +3257,12 @@ static Result performOnMetadataCache(Metadata *metadata,
 
 bool swift::addToMetadataQueue(
                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                  Metadata *dependency,
+                  const Metadata *dependency,
                   MetadataRequest::BasicKind dependencyRequirement) {
   struct EnqueueCallbacks {
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
-    bool forGenericMetadata(Metadata *metadata,
+    bool forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
@@ -3293,7 +3286,7 @@ void swift::resumeMetadataCompletion(
                              /*non-blocking*/ true);
     }
 
-    void forGenericMetadata(Metadata *metadata,
+    void forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {

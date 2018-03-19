@@ -801,11 +801,12 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getGenericMetadata(TypeContextDescriptor *type,
-//                                    const void *arguments);
-FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
+// MetadataResponse swift_getGenericMetadata(MetadataRequest request,
+//                                           const void * const *arguments,
+//                                           TypeContextDescriptor *type);
+FUNCTION(GetGenericMetadata, swift_getGenericMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, Int8PtrTy, TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,

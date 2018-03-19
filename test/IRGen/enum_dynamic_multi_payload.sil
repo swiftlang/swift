@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 
@@ -420,7 +420,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 
-// CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMr"
+// CHECK: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S26enum_dynamic_multi_payload8EitherOrOMr"
 // CHECK-SAME: (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 
 // CHECK:      [[BUF:%.*]] = alloca [2 x i8**]
