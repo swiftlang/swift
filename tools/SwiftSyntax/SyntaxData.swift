@@ -40,11 +40,12 @@ final class SyntaxData: Equatable {
 
   let positionCache: AtomicCache<AbsolutePosition>
 
-  fileprivate func calculatePosition() -> AbsolutePosition {
+  fileprivate func calculatePosition(_ initPos: AbsolutePosition) ->
+      AbsolutePosition {
     guard let parent = parent else {
       assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
       // If this node is SourceFileSyntax, its location is the start of the file.
-      return AbsolutePosition()
+      return initPos
     }
 
     // If the node is the first child of its parent, the location is same with
@@ -64,7 +65,7 @@ final class SyntaxData: Equatable {
   }
 
   var position: AbsolutePosition {
-    return positionCache.value { return calculatePosition() }
+    return positionCache.value { return calculatePosition(UTF8Position()) }
   }
 
   var positionAfterSkippingLeadingTrivia: AbsolutePosition {
@@ -261,17 +262,26 @@ final class SyntaxData: Equatable {
 /// An absolute position in a source file as text - the absolute byteOffset from
 /// the start, line, and column.
 public class AbsolutePosition {
-  public private(set) var byteOffset: Int = 0
-  public private(set) var line: Int = 1
-  public private(set) var column: Int = 1
+  public fileprivate(set) var byteOffset: Int
+  public fileprivate(set) var line: Int
+  public fileprivate(set) var column: Int
 
-  internal func copy() -> AbsolutePosition {
-    let result = AbsolutePosition()
-    result.byteOffset = byteOffset
-    result.line = line
-    result.column = column
-    return result
+  required public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0) {
+    self.line = line
+    self.column = column
+    self.byteOffset = byteOffset
   }
+
+  internal func add(text: String) {
+     preconditionFailure("this function must be overridden")
+  }
+
+  internal func copy() -> Self {
+    return type(of: self).init(line: line, column: column, byteOffset: byteOffset)
+  }
+}
+
+extension AbsolutePosition {
 
   /// Add some number of columns to the position.
   internal func add(columns: Int) {
@@ -290,10 +300,10 @@ public class AbsolutePosition {
 
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
-  internal func add(text: String) {
-    let chars = text.utf8
-    let cr: UTF8.CodeUnit = 13
-    let nl: UTF8.CodeUnit = 10
+  fileprivate func add<C: BidirectionalCollection>(text chars: C)
+      where C.Element: UnsignedInteger  {
+    let cr: C.Element = 13
+    let nl: C.Element = 10
     var idx = chars.startIndex
     while idx != chars.endIndex {
       let c = chars[idx]
@@ -312,5 +322,17 @@ public class AbsolutePosition {
         add(columns: 1)
       }
     }
+  }
+}
+
+class UTF8Position: AbsolutePosition {
+  internal override func add(text: String) {
+    add(text: text.utf8)
+  }
+}
+
+class UTF16Position: AbsolutePosition {
+  internal override func add(text: String) {
+    add(text: text.utf16)
   }
 }
