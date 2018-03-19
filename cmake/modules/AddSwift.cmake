@@ -355,7 +355,7 @@ function(_add_variant_link_flags)
     ${ARGN})
 
   precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
-  precondition(LFLAGS_SDK MESSAGE "Should specify an architecture")
+  precondition(LFLAGS_ARCH MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
