@@ -112,8 +112,7 @@ func genericFunc<V: AnyObject>(_ v: V.Type) {
 }
 
 // CHECK-LABEL: sil hidden @$S21objc_imported_generic23configureWithoutOptionsyyF : $@convention(thin) () -> ()
-// CHECK: [[NIL_FN:%.*]] = function_ref @$SSq10nilLiteralxSgyt_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
-// CHECK: apply [[NIL_FN]]<[GenericOption : Any]>({{.*}})
+// CHECK: enum $Optional<Dictionary<GenericOption, Any>>, #Optional.none!enumelt
 // CHECK: return
 func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)
