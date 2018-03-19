@@ -586,7 +586,7 @@ public extension TensorProtocol {
 }
 
 //===----------------------------------------------------------------------===//
-// Elementwise unary math functions
+// Elementwise math functions
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : SignedNumeric {
@@ -738,6 +738,16 @@ public extension TensorProtocol where Scalar : Numeric {
   func squared() -> Self {
     return #tfop("Square", handle)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Non-elementwise math functions
+//===----------------------------------------------------------------------===//
+
+@_inlineable @inline(__always)
+public func logSoftmax<T : TensorProtocol>(_ x: T) -> T
+  where T.Scalar : BinaryFloatingPoint {
+  return #tfop("LogSoftmax", x)
 }
 
 //===----------------------------------------------------------------------===//
@@ -993,10 +1003,10 @@ public extension TensorProtocol {
 
 public extension TensorProtocol {
   @_inlineable @inline(__always)
-  func unbroadcast(to other: Self) -> Self {
-    let rankDifference = (rankTensor - other.rankTensor).rankLifted()
+  func unbroadcast(toShape otherShape: Tensor<Int32>) -> Self {
+    let rankDifference = (rankTensor - otherShape.scalarCountTensor).rankLifted()
     let ones: Tensor<Int32> = #tfop("Fill", rankDifference, Tensor<Int32>(1))
-    let paddedShape = ones ++ other.shapeTensor
+    let paddedShape = ones ++ otherShape
     let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
     let broadcastIndices = Tensor<Int64>(
       handle: #tfop("Where", nonEqualIndices, T: Bool.self)
@@ -1005,7 +1015,17 @@ public extension TensorProtocol {
       "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
       Tidx: Int32.self
     )
-    return #tfop("Reshape", unbroadcasted, other.shapeTensor)
+    return #tfop("Reshape", unbroadcasted, otherShape)
+  }
+
+  @_inlineable @inline(__always)
+  func unbroadcast(to other: Self) -> Self {
+    return unbroadcast(toShape: other.shapeTensor)
+  }
+
+  @_inlineable @inline(__always)
+  func unbroadcast(to shape: TensorShape) -> Self {
+    return unbroadcast(toShape: Tensor(shape.dimensions))
   }
 }
 
