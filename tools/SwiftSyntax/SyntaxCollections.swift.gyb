@@ -107,7 +107,7 @@ public struct ${node.name}: _SyntaxBase {
     /// Make sure the index is a valid index for replacing
     precondition((newLayout.startIndex..<newLayout.endIndex).contains(index),
                  "replacing node at invalid index \(index)")
-    newLayout.replaceSubrange(index...index, with: [syntax])
+    newLayout[index] = syntax
     return replacingLayout(newLayout)
   }
 
