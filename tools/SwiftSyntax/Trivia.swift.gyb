@@ -245,7 +245,7 @@ extension Trivia: Collection {
 
   /// Get the byteSize of this trivia
   public var byteSize: Int {
-    let pos = AbsolutePosition()
+    let pos = UTF8Position()
     for piece in pieces {
       piece.accumulateAbsolutePosition(pos)
     }
