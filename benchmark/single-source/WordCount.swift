@@ -26,28 +26,39 @@ public let WordCount = [
   BenchmarkInfo(
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,
-    tags: [.validation, .api, .String, .algorithm]),
+    tags: [.validation, .api, .String, .algorithm],
+    setUpFunction: { blackHole(someAlphanumerics) }
+  ),
   BenchmarkInfo(
     name: "WordSplitUTF16",
     runFunction: run_WordSplitUTF16,
-    tags: [.validation, .api, .String, .algorithm]),
+    tags: [.validation, .api, .String, .algorithm],
+    setUpFunction: { blackHole(someAlphanumerics) }
+  ),
   BenchmarkInfo(
     name: "WordCountUniqueASCII",
     runFunction: run_WordCountUniqueASCII,
-    tags: [.validation, .api, .String, .Dictionary, .algorithm]),
+    tags: [.validation, .api, .String, .Dictionary, .algorithm],
+    setUpFunction: { blackHole(asciiWords) }
+  ),
   BenchmarkInfo(
     name: "WordCountUniqueUTF16",
     runFunction: run_WordCountUniqueUTF16,
-    tags: [.validation, .api, .String, .Dictionary, .algorithm]),
+    tags: [.validation, .api, .String, .Dictionary, .algorithm],
+    setUpFunction: { blackHole(utf16Words) }
+  ),
   BenchmarkInfo(
     name: "WordCountHistogramASCII",
     runFunction: run_WordCountHistogramASCII,
-    tags: [.validation, .api, .String, .Dictionary, .algorithm]),
+    tags: [.validation, .api, .String, .Dictionary, .algorithm],
+    setUpFunction: { blackHole(asciiWords) }
+  ),
   BenchmarkInfo(
     name: "WordCountHistogramUTF16",
     runFunction: run_WordCountHistogramUTF16,
-    tags: [.validation, .api, .String, .Dictionary, .algorithm]),
-  
+    tags: [.validation, .api, .String, .Dictionary, .algorithm],
+    setUpFunction: { blackHole(utf16Words) }
+  ),
 ]
 
 let asciiText = """
