@@ -27,37 +27,37 @@ public let WordCount = [
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,
     tags: [.validation, .api, .String, .algorithm],
-    setUpFunction: { blackHole(someAlphanumerics) }
+    setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordSplitUTF16",
     runFunction: run_WordSplitUTF16,
     tags: [.validation, .api, .String, .algorithm],
-    setUpFunction: { blackHole(someAlphanumerics) }
+    setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordCountUniqueASCII",
     runFunction: run_WordCountUniqueASCII,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { blackHole(asciiWords) }
+    setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordCountUniqueUTF16",
     runFunction: run_WordCountUniqueUTF16,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { blackHole(utf16Words) }
+    setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordCountHistogramASCII",
     runFunction: run_WordCountHistogramASCII,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { blackHole(asciiWords) }
+    setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordCountHistogramUTF16",
     runFunction: run_WordCountHistogramUTF16,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { blackHole(utf16Words) }
+    setUpFunction: { buildWorkload() }
   ),
 ]
 
@@ -139,6 +139,13 @@ environment. Tö build from source you will need 2 GB of disk space for thé
 source code and over 20 GB of disk space for thé build artifacts. A clean build
 can take multiple hours, but incremental builds will finish much faster.
 """
+
+@inline(never)
+func buildWorkload() {
+  blackHole(someAlphanumerics)
+  blackHole(asciiWords)
+  blackHole(utf16Words)
+}
 
 // A partial set of Unicode alphanumeric characters. (ASCII letters with at most
 // one diacritic (of a limited selection), plus ASCII digits.)
