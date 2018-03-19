@@ -195,16 +195,18 @@ struct Words: IteratorProtocol, Sequence {
 @inline(never)
 public func run_WordSplitASCII(_ N: Int) {
   for _ in 1...10*N {
-    let count = Array(Words(identity(asciiText))).count
-    CheckResults(count == 280)
+    let words = Array(Words(identity(asciiText)))
+    CheckResults(words.count == 280)
+    blackHole(words)
   }
 }
 
 @inline(never)
 public func run_WordSplitUTF16(_ N: Int) {
   for _ in 1...10*N {
-    let count = Array(Words(identity(utf16Text))).count
-    CheckResults(count == 280)
+    let words = Array(Words(identity(utf16Text)))
+    CheckResults(words.count == 280)
+    blackHole(words)
   }
 }
 
