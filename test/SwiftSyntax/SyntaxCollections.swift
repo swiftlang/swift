@@ -7,73 +7,80 @@ import Foundation
 import StdlibUnittest
 import SwiftSyntax
 
+func integerLiteralElement(_ int: Int) -> ArrayElementSyntax {
+    let literal = SyntaxFactory.makeIntegerLiteral("\(int)")
+    return SyntaxFactory.makeArrayElement(
+        expression: SyntaxFactory.makeIntegerLiteralExpr(digits: literal),
+        trailingComma: nil)
+}
+
 var SyntaxCollectionsAPI = TestSuite("SyntaxCollectionsAPI")
 
 SyntaxCollectionsAPI.test("AppendingElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("0"), trailingComma: nil)
+        integerLiteralElement(0)
     ])
     
-    let newArrayElementList = arrayElementList.appending(SyntaxFactory.makeIntegerLiteral("1"))
+    let newArrayElementList = arrayElementList.appending(integerLiteralElement(1))
     
     expectEqual(newArrayElementList.count, 2)
-    expectEqual("\(arrayElementList.child(at: 1)!)", "1")
+    expectEqual("\(newArrayElementList.child(at: 1)!)", "1")
 }
 
 SyntaxCollectionsAPI.test("InsertingElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("1"), trailingComma: nil)
+        integerLiteralElement(1)
     ])
     
-    var newArrayElementList = arrayElementList.inserting(SyntaxFactory.makeIntegerLiteral("0"), at: 0)
+    var newArrayElementList = arrayElementList.inserting(integerLiteralElement(0), at: 0)
     
     expectEqual(newArrayElementList.count, 2)
-    expectEqual("\(arrayElementList.child(at: 0)!)", "0")
+    expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
     
-    newArrayElementList = newArrayElementList.inserting(SyntaxFactory.makeIntegerLiteral("2"), at: 2)
+    newArrayElementList = newArrayElementList.inserting(integerLiteralElement(2), at: 2)
     
     expectEqual(newArrayElementList.count, 3)
-    expectEqual("\(arrayElementList.child(at: 2)!)", "2")
+    expectEqual("\(newArrayElementList.child(at: 2)!)", "2")
 }
 
 SyntaxCollectionsAPI.test("PrependingElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("1"), trailingComma: nil)
+        integerLiteralElement(1)
     ])
     
-    let newArrayElementList = arrayElementList.prepending(SyntaxFactory.makeIntegerLiteral("0"))
+    let newArrayElementList = arrayElementList.prepending(integerLiteralElement(0))
     
     expectEqual(newArrayElementList.count, 2)
-    expectEqual("\(arrayElementList.child(at: 0)!)", "0")
+    expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
 }
 
 SyntaxCollectionsAPI.test("RemovingFirstElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("0"), trailingComma: nil),
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("1"), trailingComma: nil)
+        integerLiteralElement(0),
+        integerLiteralElement(1)
     ])
     
     let newArrayElementList = arrayElementList.removingFirst()
     
     expectEqual(newArrayElementList.count, 1)
-    expectEqual("\(arrayElementList.child(at: 0)!)", "1")
+    expectEqual("\(newArrayElementList.child(at: 0)!)", "1")
 }
 
 SyntaxCollectionsAPI.test("RemovingLastElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("0"), trailingComma: nil),
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("1"), trailingComma: nil)
+        integerLiteralElement(0),
+        integerLiteralElement(1)
     ])
     
     let newArrayElementList = arrayElementList.removingLast()
     
     expectEqual(newArrayElementList.count, 1)
-    expectEqual("\(arrayElementList.child(at: 0)!)", "0")
+    expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
 }
 
 SyntaxCollectionsAPI.test("RemovingElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("0"), trailingComma: nil)
+        integerLiteralElement(0)
     ])
     
     let newArrayElementList = arrayElementList.removing(childAt: 0)
@@ -84,15 +91,15 @@ SyntaxCollectionsAPI.test("RemovingElement") {
 
 SyntaxCollectionsAPI.test("ReplacingElement") {
     let arrayElementList = SyntaxFactory.makeArrayElementList([
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("0"), trailingComma: nil),
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("1"), trailingComma: nil),
-        SyntaxFactory.makeArrayElement(expression: SyntaxFactory.makeIntegerLiteral("2"), trailingComma: nil)
+        integerLiteralElement(0),
+        integerLiteralElement(1),
+        integerLiteralElement(2)
     ])
     
-    arrayElementList.replacing(childAt: 2,
-                               with: SyntaxFactory.makeIntegerLiteral("3"))
+    let newArrayElementList.replacing(childAt: 2,
+                                      with: integerLiteralElement(3))
     
-    expectEqual("\(arrayElementList.child(at: 2)!)", "3")
+    expectEqual("\(newArrayElementList.child(at: 2)!)", "3")
 }
 
 runAllTests()
