@@ -16,6 +16,7 @@ set(MANDATORY_SOURCES
   Mandatory/SemanticARCOpts.cpp
   # SWIFT_ENABLE_TENSORFLOW
   Mandatory/TFCanonicalizeCFG.cpp
+  Mandatory/TFConstExpr.cpp
   Mandatory/TFDeabstraction.cpp
   Mandatory/TFLowerGraph.cpp
   Mandatory/TFPartition.cpp
