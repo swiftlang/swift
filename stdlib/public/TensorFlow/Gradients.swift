@@ -46,28 +46,6 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Unbroadcasting
-//===----------------------------------------------------------------------===//
-
-public extension TensorProtocol {
-  @_inlineable @inline(__always)
-  func unbroadcast(to other: Self) -> Self {
-    let rankDifference = (rankTensor - other.rankTensor).rankLifted()
-    let ones: Tensor<Int32> = #tfop("Fill", rankDifference, Tensor<Int32>(1))
-    let paddedShape = ones ++ other.shapeTensor
-    let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
-    let broadcastIndices = Tensor<Int64>(
-      handle: #tfop("Where", nonEqualIndices, T: Bool.self)
-    ).flattened()
-    let unbroadcasted: Self = #tfop(
-      "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
-      Tidx: Int32.self
-    )
-    return #tfop("Reshape", unbroadcasted, other.shapeTensor)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
@@ -76,34 +54,30 @@ extension TensorProtocol where Scalar : Numeric {
   static func _adjointAdd(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    let dfdx = seed.unbroadcast(to: x)
-    let dfdy = seed.unbroadcast(to: y)
-    return (dfdx, dfdy)
+    return (seed.unbroadcast(to: x), seed.unbroadcast(to: y))
   }
 
   @_inlineable @_versioned
   static func _adjointSubtract(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    let dfdx = seed.unbroadcast(to: x)
-    let dfdy = 0 - seed.unbroadcast(to: y)
-    return (dfdx, dfdy)
+    return (seed.unbroadcast(to: x), 0 - seed.unbroadcast(to: y))
   }
 
   @_inlineable @_versioned
   static func _adjointMultiply(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    let dfdx = (y * seed).unbroadcast(to: x)
-    let dfdy = (x * seed).unbroadcast(to: y)
-    return (dfdx, dfdy)
+    return ((y * seed).unbroadcast(to: x),
+            (x * seed).unbroadcast(to: y))
   }
 
   @_inlineable @_versioned
   static func _adjointDivide(
     _ x: Self, _ y: Self, partial: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed / y, (0-x) / y.squared() * seed)
+    return ((seed / y).unbroadcast(to: x),
+            ((0 - x) / y.squared() * seed).unbroadcast(to: y))
   }
 }
 
@@ -114,7 +88,7 @@ func _adjointMin<T : TensorProtocol>(
   let denom = 1 + T(x.elementsEqual(y))
   let dfdx = seed * T(y.elementsEqual(partial)) / denom
   let dfdy = seed * T(x.elementsEqual(partial)) / denom
-  return (dfdx, dfdy)
+  return (dfdx.unbroadcast(to: x), dfdy.unbroadcast(to: y))
 }
 
 @_inlineable @_versioned
@@ -124,14 +98,15 @@ func _adjointMax<T : TensorProtocol>(
   let denom = 1 + T(x.elementsEqual(y))
   let dfdx = seed * T(x.elementsEqual(partial)) / denom
   let dfdy = seed * T(y.elementsEqual(partial)) / denom
-  return (dfdx, dfdy)
+  return (dfdx.unbroadcast(to: x), dfdy.unbroadcast(to: y))
 }
 
 @_inlineable @_versioned
 func _adjointPow<T : TensorProtocol>(
   _ x: T, _ y: T, partial: T, seed: T
 ) -> (T, T) where T.Scalar : FloatingPoint {
-  return (seed * y * pow(x, y-1), seed * log(x) * partial)
+  return ((seed * y * pow(x, y-1)).unbroadcast(to: x),
+          (seed * log(x) * partial).unbroadcast(to: y))
 }
 
 //===----------------------------------------------------------------------===//
@@ -304,7 +279,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
       dVariance * (-diff * 2).mean(alongAxes: axis)
     let dOffset = seed.sum(alongAxes: axis)
     let dScale = (norm * seed).sum(alongAxes: axis)
-    let dim = Tensor(Tensor<Int32>(self.shape[axis]))
+    let dim = Tensor(Tensor<Int32>(shapeTensor[axis]))
     // NOTE: a temporary variable is necessary here to help the type checker.
     // Otherwise, the following error occurs: "the compiler is unable to
     // type-check this expression in reasonable time".
