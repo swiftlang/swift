@@ -54,6 +54,7 @@ UBool unorm2_hasBoundaryBefore(const UNormalizer2 *norm2, UChar32 c);
 UBool u_hasBinaryProperty(UChar32, UProperty);
 UBool u_isdefined(UChar32);
 void u_charAge(UChar32, UVersionInfo);
+int32_t u_getIntPropertyValue(UChar32, UProperty);
 }
 
 #else
@@ -332,6 +333,12 @@ void
 swift::__swift_stdlib_u_charAge(__swift_stdlib_UChar32 c,
                                 __swift_stdlib_UVersionInfo versionInfo) {
   return u_charAge(c, versionInfo);
+}
+
+__swift_int32_t
+swift::__swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32 c,
+                                            __swift_stdlib_UProperty p) {
+  return u_getIntPropertyValue(c, static_cast<UProperty>(p));
 }
 
 

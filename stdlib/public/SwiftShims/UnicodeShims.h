@@ -389,6 +389,41 @@ typedef enum __swift_stdlib_UBreakIteratorType {
   __swift_stdlib_UBRK_COUNT = 5
 } __swift_stdlib_UBreakIteratorType;
 
+typedef enum __swift_stdlib_UCharCategory {
+  __swift_stdlib_U_UNASSIGNED              = 0,
+  __swift_stdlib_U_GENERAL_OTHER_TYPES     = 0,
+  __swift_stdlib_U_UPPERCASE_LETTER        = 1,
+  __swift_stdlib_U_LOWERCASE_LETTER        = 2,
+  __swift_stdlib_U_TITLECASE_LETTER        = 3,
+  __swift_stdlib_U_MODIFIER_LETTER         = 4,
+  __swift_stdlib_U_OTHER_LETTER            = 5,
+  __swift_stdlib_U_NON_SPACING_MARK        = 6,
+  __swift_stdlib_U_ENCLOSING_MARK          = 7,
+  __swift_stdlib_U_COMBINING_SPACING_MARK  = 8,
+  __swift_stdlib_U_DECIMAL_DIGIT_NUMBER    = 9,
+  __swift_stdlib_U_LETTER_NUMBER           = 10,
+  __swift_stdlib_U_OTHER_NUMBER            = 11,
+  __swift_stdlib_U_SPACE_SEPARATOR         = 12,
+  __swift_stdlib_U_LINE_SEPARATOR          = 13,
+  __swift_stdlib_U_PARAGRAPH_SEPARATOR     = 14,
+  __swift_stdlib_U_CONTROL_CHAR            = 15,
+  __swift_stdlib_U_FORMAT_CHAR             = 16,
+  __swift_stdlib_U_PRIVATE_USE_CHAR        = 17,
+  __swift_stdlib_U_SURROGATE               = 18,
+  __swift_stdlib_U_DASH_PUNCTUATION        = 19,
+  __swift_stdlib_U_START_PUNCTUATION       = 20,
+  __swift_stdlib_U_END_PUNCTUATION         = 21,
+  __swift_stdlib_U_CONNECTOR_PUNCTUATION   = 22,
+  __swift_stdlib_U_OTHER_PUNCTUATION       = 23,
+  __swift_stdlib_U_MATH_SYMBOL             = 24,
+  __swift_stdlib_U_CURRENCY_SYMBOL         = 25,
+  __swift_stdlib_U_MODIFIER_SYMBOL         = 26,
+  __swift_stdlib_U_OTHER_SYMBOL            = 27,
+  __swift_stdlib_U_INITIAL_PUNCTUATION     = 28,
+  __swift_stdlib_U_FINAL_PUNCTUATION       = 29,
+  __swift_stdlib_U_CHAR_CATEGORY_COUNT
+} __swift_stdlib_UCharCategory;
+
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_int8_t __swift_stdlib_UBool;
@@ -464,6 +499,10 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_u_charAge(
     __swift_stdlib_UChar32, __swift_stdlib_UVersionInfo _Nonnull);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t
+    __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32,
+                                         __swift_stdlib_UProperty);
 
 
 #ifdef __cplusplus

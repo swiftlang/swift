@@ -683,3 +683,276 @@ extension Unicode.Scalar.Properties {
     return (major: Int(versionInfo.0), Int(versionInfo.1))
   }
 }
+
+extension Unicode {
+
+  /// The most general classification of a Unicode scalar.
+  ///
+  /// The general category of a scalar is its "first-order, most usual
+  /// categorization". It does not attempt to cover multiple uses of some
+  /// scalars, such as the use of letters to represent Roman numerals.
+  public enum GeneralCategory {
+
+    /// An uppercase letter.
+    ///
+    /// This value corresponds to the category `Uppercase_Letter` (abbreviated
+    /// `Lu`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case uppercaseLetter
+
+    /// A lowercase letter.
+    ///
+    /// This value corresponds to the category `Lowercase_Letter` (abbreviated
+    /// `Ll`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case lowercaseLetter
+
+    /// A digraph character whose first part is uppercase.
+    ///
+    /// This value corresponds to the category `Titlecase_Letter` (abbreviated
+    /// `Lt`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case titlecaseLetter
+
+    /// A modifier letter.
+    ///
+    /// This value corresponds to the category `Modifier_Letter` (abbreviated
+    /// `Lm`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case modifierLetter
+
+    /// Other letters, including syllables and ideographs.
+    ///
+    /// This value corresponds to the category `Other_Letter` (abbreviated
+    /// `Lo`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case otherLetter
+
+    /// A non-spacing combining mark with zero advance width (abbreviated Mn).
+    ///
+    /// This value corresponds to the category `Nonspacing_Mark` (abbreviated
+    /// `Mn`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case nonspacingMark
+
+    /// A spacing combining mark with positive advance width.
+    ///
+    /// This value corresponds to the category `Spacing_Mark` (abbreviated `Mc`)
+    /// in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case spacingMark
+
+    /// An enclosing combining mark.
+    ///
+    /// This value corresponds to the category `Enclosing_Mark` (abbreviated
+    /// `Me`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case enclosingMark
+
+    /// A decimal digit.
+    ///
+    /// This value corresponds to the category `Decimal_Number` (abbreviated
+    /// `Nd`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case decimalNumber
+
+    /// A letter-like numeric character.
+    ///
+    /// This value corresponds to the category `Letter_Number` (abbreviated
+    /// `Nl`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case letterNumber
+
+    /// A numeric character of another type.
+    ///
+    /// This value corresponds to the category `Other_Number` (abbreviated `No`)
+    /// in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case otherNumber
+
+    /// A connecting punctuation mark, like a tie.
+    ///
+    /// This value corresponds to the category `Connector_Punctuation`
+    /// (abbreviated `Pc`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case connectorPunctuation
+
+    /// A dash or hyphen punctuation mark.
+    ///
+    /// This value corresponds to the category `Dash_Punctuation` (abbreviated
+    /// `Pd`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case dashPunctuation
+
+    /// An opening punctuation mark of a pair.
+    ///
+    /// This value corresponds to the category `Open_Punctuation` (abbreviated
+    /// `Ps`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case openPunctuation
+
+    /// A closing punctuation mark of a pair.
+    ///
+    /// This value corresponds to the category `Close_Punctuation` (abbreviated
+    /// `Pe`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case closePunctuation
+
+    /// An initial quotation mark.
+    ///
+    /// This value corresponds to the category `Initial_Punctuation`
+    /// (abbreviated `Pi`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case initialPunctuation
+
+    /// A final quotation mark.
+    ///
+    /// This value corresponds to the category `Final_Punctuation` (abbreviated
+    /// `Pf`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case finalPunctuation
+
+    /// A punctuation mark of another type.
+    ///
+    /// This value corresponds to the category `Other_Punctuation` (abbreviated
+    /// `Po`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case otherPunctuation
+
+    /// A symbol of mathematical use.
+    ///
+    /// This value corresponds to the category `Math_Symbol` (abbreviated `Sm`)
+    /// in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case mathSymbol
+
+    /// A currency sign.
+    ///
+    /// This value corresponds to the category `Currency_Symbol` (abbreviated
+    /// `Sc`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case currencySymbol
+
+    /// A non-letterlike modifier symbol.
+    ///
+    /// This value corresponds to the category `Modifier_Symbol` (abbreviated
+    /// `Sk`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case modifierSymbol
+
+    /// A symbol of another type.
+    ///
+    /// This value corresponds to the category `Other_Symbol` (abbreviated
+    /// `So`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case otherSymbol
+
+    /// A space character of non-zero width.
+    ///
+    /// This value corresponds to the category `Space_Separator` (abbreviated
+    /// `Zs`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case spaceSeparator
+
+    /// A line separator, which is specifically (and only) U+2028 LINE
+    /// SEPARATOR.
+    ///
+    /// This value corresponds to the category `Line_Separator` (abbreviated
+    /// `Zl`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case lineSeparator
+
+    /// A paragraph separator, which is specifically (and only) U+2029 PARAGRAPH
+    /// SEPARATOR.
+    ///
+    /// This value corresponds to the category `Paragraph_Separator`
+    /// (abbreviated `Zp`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case paragraphSeparator
+
+    /// A C0 or C1 control code.
+    ///
+    /// This value corresponds to the category `Control` (abbreviated `Cc`) in
+    /// the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case control
+
+    /// A format control character.
+    ///
+    /// This value corresponds to the category `Format` (abbreviated `Cf`) in
+    /// the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case format
+
+    /// A surrogate code point.
+    ///
+    /// This value corresponds to the category `Surrogate` (abbreviated `Cs`) in
+    /// the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case surrogate
+
+    /// A private-use character.
+    ///
+    /// This value corresponds to the category `Private_Use` (abbreviated `Co`)
+    /// in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case privateUse
+
+    /// A reserved unassigned code point or a non-character.
+    ///
+    /// This value corresponds to the category `Unassigned` (abbreviated `Cn`)
+    /// in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
+    case unassigned
+
+    internal init(rawValue: __swift_stdlib_UCharCategory) {
+      switch rawValue {
+      case __swift_stdlib_U_UNASSIGNED: self = .unassigned
+      case __swift_stdlib_U_UPPERCASE_LETTER: self = .uppercaseLetter
+      case __swift_stdlib_U_LOWERCASE_LETTER: self = .lowercaseLetter
+      case __swift_stdlib_U_TITLECASE_LETTER: self = .titlecaseLetter
+      case __swift_stdlib_U_MODIFIER_LETTER: self = .modifierLetter
+      case __swift_stdlib_U_OTHER_LETTER: self = .otherLetter
+      case __swift_stdlib_U_NON_SPACING_MARK: self = .nonspacingMark
+      case __swift_stdlib_U_ENCLOSING_MARK: self = .enclosingMark
+      case __swift_stdlib_U_COMBINING_SPACING_MARK: self = .spacingMark
+      case __swift_stdlib_U_DECIMAL_DIGIT_NUMBER: self = .decimalNumber
+      case __swift_stdlib_U_LETTER_NUMBER: self = .letterNumber
+      case __swift_stdlib_U_OTHER_NUMBER: self = .otherNumber
+      case __swift_stdlib_U_SPACE_SEPARATOR: self = .spaceSeparator
+      case __swift_stdlib_U_LINE_SEPARATOR: self = .lineSeparator
+      case __swift_stdlib_U_PARAGRAPH_SEPARATOR: self = .paragraphSeparator
+      case __swift_stdlib_U_CONTROL_CHAR: self = .control
+      case __swift_stdlib_U_FORMAT_CHAR: self = .format
+      case __swift_stdlib_U_PRIVATE_USE_CHAR: self = .privateUse
+      case __swift_stdlib_U_SURROGATE: self = .surrogate
+      case __swift_stdlib_U_DASH_PUNCTUATION: self = .dashPunctuation
+      case __swift_stdlib_U_START_PUNCTUATION: self = .openPunctuation
+      case __swift_stdlib_U_END_PUNCTUATION: self = .closePunctuation
+      case __swift_stdlib_U_CONNECTOR_PUNCTUATION: self = .connectorPunctuation
+      case __swift_stdlib_U_OTHER_PUNCTUATION: self = .otherPunctuation
+      case __swift_stdlib_U_MATH_SYMBOL: self = .mathSymbol
+      case __swift_stdlib_U_CURRENCY_SYMBOL: self = .currencySymbol
+      case __swift_stdlib_U_MODIFIER_SYMBOL: self = .modifierSymbol
+      case __swift_stdlib_U_OTHER_SYMBOL: self = .otherSymbol
+      case __swift_stdlib_U_INITIAL_PUNCTUATION: self = .initialPunctuation
+      case __swift_stdlib_U_FINAL_PUNCTUATION: self = .finalPunctuation
+      default: fatalError("Unknown general category \(rawValue)")
+      }
+    }
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The general category (most usual classification) of the scalar.
+  ///
+  /// This property corresponds to the `General_Category` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var generalCategory: Unicode.GeneralCategory {
+    let rawValue = __swift_stdlib_UCharCategory(
+      UInt32(__swift_stdlib_u_getIntPropertyValue(
+        _value, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
+    return Unicode.GeneralCategory(rawValue: rawValue)
+  }
+}
