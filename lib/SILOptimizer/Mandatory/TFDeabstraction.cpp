@@ -42,6 +42,10 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
+static llvm::cl::opt<bool>
+TFCheckDeabstraction("tf-check-deabstraction", llvm::cl::init(false),
+           llvm::cl::desc("Check that the output of deabstraction is valid"));
+
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -1188,6 +1192,176 @@ void TFDeabstraction::propagateTensorValues() {
   }
 }
 
+/// Decode the specified array constant value (which should be an
+/// array of constant integer or fp values) and add it as an expanded operand
+/// to the specified op that is being built up.
+static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
+                                SILTensorOpInfo::OperandClass attrKind,
+                                std::string &name,
+                                SmallVectorImpl<SILValue> &operands,
+                                SILInstruction *forInst) {
+  SILBuilder B(forInst);
+
+  // Add the first operand, which is the metatype for the element.  If it was
+  // a 'Normal' operand, change it to an Array so we can distinguish it in the
+  // case of an empty array.
+  if (attrKind == SILTensorOpInfo::OperandClass::Normal)
+    attrKind = SILTensorOpInfo::OperandClass::Array;
+  name += ","+attrName.str();
+  name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
+
+  auto eltType =
+    SILType::getPrimitiveObjectType(arrayVal.elementType->getCanonicalType());
+
+  auto metatypeType =
+    MetatypeType::get(arrayVal.elementType, MetatypeRepresentation::Thin)
+      ->getCanonicalType();
+  operands.push_back(B.createMetatype(forInst->getLoc(),
+                              SILType::getPrimitiveObjectType(metatypeType)));
+
+  // Add all of the operands as explicit values.  If the instructions came
+  // from an out of line array initializer, make sure to clone them over to
+  // our function.
+  for (auto eltVal : arrayVal.getElements()) {
+    auto elt = eltVal.getConstantInstIfPresent();
+
+    if (!elt || elt->getFunction() != forInst->getFunction()) {
+      // Make a copy of the value, it may be computed.
+      switch (eltVal.getTypeKind()) {
+      case LatticeValue::Array:
+      case LatticeValue::String:
+        llvm_unreachable("unknown type to initialize array");
+
+      case LatticeValue::Integer:
+        elt = B.createIntegerLiteral(forInst->getLoc(), eltType,
+                                     eltVal.getIntegerValue());
+        break;
+      case LatticeValue::Float:
+        elt = B.createFloatLiteral(forInst->getLoc(), eltType,
+                                   eltVal.getFloatValue());
+        break;
+      }
+
+      elt->setDebugLocation(B.getSILDebugLocation(forInst->getLoc()));
+    }
+
+    operands.push_back(elt);
+    name += ",";
+    auto eltKind = SILTensorOpInfo::OperandClass::ArrayElement;
+    name += SILTensorOpInfo::getOperandClassSuffix(eltKind);
+  }
+}
+
+/// If all the operands to a call to __tf_tensor_from_scalars are constants, we
+/// can promote this to a 'Const' node with an attached TF_Tensor attribute.
+/// It takes a 1D array of scalars and a shape as a 1D array of integers.
+///
+/// On success, this removes the applyexpr and returns a pointer to the new
+/// BuiltinInst that is created.  On failure, it returns a nullptr.
+///
+/// FIXME: This is a near duplication of the logic used by TFPartitioning in
+/// SILTensorOpInfo::decodeTensorFromScalars.  When constexpr propagation is
+/// done, we should remove the logic in SILTensorOpInfo.
+static BuiltinInst *
+tryToPromoteTensorFromScalars(ApplyInst *inst,
+                            const DenseMap<SILValue, LatticeValue> &constants) {
+  assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
+         "Unexpected type signature for __tf_tensor_from_scalars");
+
+  // If we can't analyze the operands as arrays of constants, give up.
+  auto scalarIt = constants.find(inst->getOperand(1));
+  if (scalarIt == constants.end()) return nullptr;
+  auto shapeIt = constants.find(inst->getOperand(2));
+  if (shapeIt == constants.end()) return nullptr;
+
+  // Okay, we were able to resolve the two arrays of constants.  Transform this
+  // into the correct Const operation.
+
+  // We transform this into a __tfop_Const instruction, where the values are
+  // part of the 'value' tensor attribute and the shape is specified as a shape
+  // attribute.
+  SmallVector<SILValue, 8> operands;
+  std::string name = "__tfop_Const";
+
+  // Try to expand the array and the shape into their scalars.
+  expandArrayConstant(scalarIt->second.getArrayValue(), "value",
+                      SILTensorOpInfo::OperandClass::Tensor,
+                      name, operands, inst);
+  unsigned numElements = operands.size()-1;
+  expandArrayConstant(shapeIt->second.getArrayValue(), "value",
+                      SILTensorOpInfo::OperandClass::Shape,
+                      name, operands, inst);
+
+  // Verify we have the right number of scalars.  If not, emit an error and
+  // leave the broken code without promoting it to an op.
+  uint64_t scalarCount = 1;
+  std::string errorInfo;
+  for (auto elt : ArrayRef<SILValue>(operands).drop_front(numElements+2)) {
+    auto *eltCst = cast<IntegerLiteralInst>(elt);
+    scalarCount *= eltCst->getValue().getLimitedValue();
+  }
+  if (scalarCount != numElements && errorInfo.empty()) {
+    errorInfo = "tensor literal should have " + llvm::utostr(scalarCount) +
+          " scalars for this shape, but has " + llvm::utostr(numElements);
+  }
+
+  if (!errorInfo.empty()) {
+    auto loc = getUserSourceLocation(inst);
+    diagnose(inst->getType().getSwiftRValueType()->getASTContext(),
+             loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
+      .highlight(loc.getSourceRange());
+    return nullptr;
+  }
+
+  // This takes a Tensor and a Shape operand, but needs a DType added.  The
+  // dtype is the type of the Tensor elements, which we conveniently already
+  // have available as the first operand.
+  operands.push_back(operands[0]);
+  name += ",dtype";
+
+  auto scalarV = inst->getOperand(1);
+  auto shapeV = inst->getOperand(2);
+
+  SILBuilder B(inst);
+  // Finally build a new builtin instruction with the simplified operands.
+  auto newInst =
+    B.createBuiltin(inst->getLoc(),
+                    B.getASTContext().getIdentifier(name),
+                    inst->getType(), /*no substitions*/{},
+                    operands);
+  newInst->setDebugLocation(inst->getDebugLocation());
+  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->eraseFromParent();
+
+  // We are dropping a reference to the element and shape array initializers, so
+  // we need to remove the arrays themselves or at least release them.
+  SILTensorOpInfo::removeOrDestroyArrayValue(scalarV, inst->getLoc(), B);
+  SILTensorOpInfo::removeOrDestroyArrayValue(shapeV, inst->getLoc(), B);
+  return newInst;
+}
+
+/// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
+/// we can promote this to a 'Const' node with an attached TF_Tensor attribute.
+/// This is a specialized form of __tf_tensor_from_scalars, because the later is
+/// defined in terms of a shape of "[scalars.count]" but the performance
+/// optimizer is not reliably constant propagating this.  When we have a
+/// reliable deabstraction pass we can re-evaluate this and hopefully eliminate
+/// it in favor of library code in the TensorFlow module.
+///
+/// On success, this removes the applyexpr and returns a pointer to the new
+/// BuiltinInst that is created.  On failure, it returns a nullptr.
+///
+/// FIXME: This is a near duplication of the logic used by TFPartitioning in
+/// SILTensorOpInfo::decodeTensorFromScalars1D.  When constexpr propagation is
+/// done, we should remove the logic in SILTensorOpInfo.
+static BuiltinInst *
+tryToPromoteTensorFromScalars1D(ApplyInst *inst,
+                            const DenseMap<SILValue, LatticeValue> &constants) {
+  // FIXME: implement this.
+  return nullptr;
+}
+
+
 /// Canonicalize tensor ops, validating their attribute arguments have
 /// constants, and flattening array parameters.
 void TFDeabstraction::checkAndCanonicalizeAttributes() {
@@ -1219,6 +1393,66 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
   SmallVector<LatticeValue, 32> results;
   constantEvaluator.computeConstantValues(fn, valuesToCheck, results);
 
+  // Transform the returned information about constants into a map that we can
+  // query.  The results list should correspond directly to the values we asked
+  // about.
+  DenseMap<SILValue, LatticeValue> constants;
+
+  assert(valuesToCheck.size() == results.size() && "incorrect values returned");
+  for (unsigned i = 0, e = valuesToCheck.size(); i != e; ++i) {
+    // If this value is a non-constant, just ignore it.
+    if (!results[i].isConstant())
+      continue;
+
+    // Otherwise, add the information about it to our map.
+    assert(valuesToCheck[i].index == 0 && "we only query for index #0");
+    constants.insert({valuesToCheck[i].value, results[i]});
+  }
+
+
+  // Now that we've computed whether any of the operands are constants,
+  // substitute them into the operations that we have, eliminating abstractions.
+  // This makes it immediately obvious to partitioning what is and isn't a
+  // constant.
+  //
+  // TODO: When something *isn't* a constant, we should diagnose why: is it a
+  // use of a non-constexpr function that caused the problem, or the use of
+  // some other thing that we can't analyze, like passing through a class?
+  //
+  for (auto *&inst : tensorOps) {
+    // Take a look at the various well known function calls that we can promote
+    // to tensor operations.  We can promote them if we are able to constant
+    // fold all of the operands to these calls.  If so, we rewrite them in terms
+    // of a proper op, and partitioning will continue to treat them that way.
+    if (auto apply = dyn_cast<ApplyInst>(inst)) {
+      // FIXME: Move this upgrading logic out of SILTensorOpInfo into
+      // Deabstraction once partitioning is moved up to the mandatory passes.
+      if (!SILTensorOpInfo::isDecodableApply(apply))
+        continue;
+
+      auto name = apply->getCalleeFunction()->getName();
+      BuiltinInst *result;
+      if (name == "__tf_tensor_from_scalars")
+        result = tryToPromoteTensorFromScalars(apply, constants);
+      else if (name == "__tf_tensor_from_scalars_1d")
+        result = tryToPromoteTensorFromScalars1D(apply, constants);
+      else
+        llvm_unreachable("out of sync with isDecodableApply");
+
+      // If promotion failed, no change is necessary.
+      if (!result) continue;
+
+      // Otherwise, we got a new instruction, so remember it in our tensor op
+      // list.
+      inst = result;
+
+      // Fall into the normal op processing code.
+    }
+
+    // TODO: Handle normal tensor ops with their attributes, subsuming the
+    // following loop.
+  }
+
   for (auto &BB : fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       // Manually move iterator to avoid invalidation if we replace 'inst'.
@@ -1238,7 +1472,19 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
 
       // Use the constants we just computed to substitute into parameter values.
 
-#if 0  // Not yet.
+
+
+      // TODO: Deabstraction isn't fully handling all constant expressions and
+      // other canonicalizations that we expect, so for now we depend on the
+      // performance optimizer.  When deabstraction is done, we will run the
+      // partitioner as part of deabstraction (including at -O0).  Until we are
+      // ready for that, we gate the validation of tensor operations on a flag.
+      // This allows us to write testcases without breaking current use of the
+      // compiler.
+      if (!TFCheckDeabstraction)
+        continue;
+
+
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
       auto error = opInfo->checkAndDiagnoseOperands();
@@ -1258,7 +1504,6 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       // make all subsequent analyses and promotion of the tensor operations
       // simpler.
       opInfo->canonicalizeOperands();
-#endif
     }
   }
 }

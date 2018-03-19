@@ -38,7 +38,7 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
-  class SILInstruction;
+  class SingleValueInstruction;
   class SILValue;
 
 namespace tf {
@@ -48,7 +48,7 @@ namespace tf {
   /// used as keys in hashtables etc.
   ///
   /// We track the (recursive) elements of structs and tuples independently as
-  /// in their exploded form, and each tracked element has an associated a
+  /// in their exploded form, and each tracked element has an associated
   /// lattice value.  For example, consider a SSA value made out of structs and
   /// tuple types written graphically as:
   ///
@@ -81,6 +81,8 @@ namespace tf {
     }
   };
 
+  struct ArrayLatticeValue;
+
   /// This is the lattice value tracked for each SymbolicValue in a scope.  Each
   /// symbolic value may be multiple states as defined by the standard SCCP
   /// algorithm.  We support multiple representational forms for the constant
@@ -110,17 +112,11 @@ namespace tf {
       /// pointer to the instruction whose value this holds.  This is known to
       /// be one of a closed set of constant instructions:
       ///    IntegerLiteralInst, FloatLiteralInst, or StringLiteralInst
-      SILInstruction *inst;
+      SingleValueInstruction *inst;
 
-      struct {
-        /// This is a pointer to lattice elements;
-        const LatticeValue *elements;
-
-        /// This is the number of elements in the array.  We only support up to
-        /// 1024 elements in our model to the possibility of compile time
-        /// explosion.
-        unsigned numElements;
-      } array;
+      /// When this LatticeValue is of "ConstantArray" kind, this pointer stores
+      /// information about the array elements, count, and element type.
+      ArrayLatticeValue *array;
 
       /// TODO: Eventually should support bump pointer allocated APInt's and
       /// APFloat's, and string buffers to represent the product of constant
@@ -139,7 +135,7 @@ namespace tf {
       result.kind = Overdefined;
       return result;
     }
-    static LatticeValue getConstant(SILInstruction *inst) {
+    static LatticeValue getConstant(SingleValueInstruction *inst) {
       LatticeValue result;
       result.kind = ConstantInst;
       result.value.inst = inst;
@@ -148,18 +144,61 @@ namespace tf {
 
     /// This returns a constant lattice value with the specified elements in it.
     /// This assumes that the elements lifetime has been managed for this.
-    static LatticeValue getConstantArray(ArrayRef<LatticeValue> elements) {
+    static LatticeValue getConstantArray(ArrayLatticeValue *array) {
       LatticeValue result;
       result.kind = ConstantArray;
-      result.value.array.elements = elements.data();
-      result.value.array.numElements = elements.size();
+      result.value.array = array;
       return result;
     }
-
 
     /// Return true if this represents a constant value.
     bool isConstant() const {
       return kind != Undefined && kind != Overdefined;
+    }
+
+    SingleValueInstruction *getConstantInstIfPresent() const {
+      return kind == ConstantInst ? value.inst : nullptr;
+    }
+
+    /// For constant values, this enum is used to discriminate across the kinds
+    /// of constant this holds, which allows use of the accessors.
+    enum TypeKind {
+       Integer, Float, String, Array
+    };
+
+    /// For constant values, return the type classification of this value.
+    TypeKind getTypeKind() const;
+
+    ArrayLatticeValue &getArrayValue() const {
+      assert(getTypeKind() == Array);
+      return *value.array;
+    }
+
+    APInt getIntegerValue() const;
+    APFloat getFloatValue() const;
+    // TODO: getStringValue.
+
+  };
+
+  /// This is the representation of a constant array value.  It maintains the
+  /// elements as a trailing array of LatticeValue's.
+  /// FIXME: Finish implementing this.
+  struct ArrayLatticeValue {
+    /// This is the element type of the array.  We store this even though it can
+    /// be derived from the elements, because we may have an empty array with no
+    /// elements.
+    const Type elementType;
+
+    /// This is the number of elements in the array.  We only support up to
+    /// 1024 elements in our model to avoid the possibility of compile time
+    /// explosion.
+    const unsigned numElements;
+
+    /// Return the element constants for this array constant.  These are known
+    /// to all be constants.
+    ArrayRef<LatticeValue> getElements() const {
+      // TODO: Implement.
+      return {};
     }
   };
 

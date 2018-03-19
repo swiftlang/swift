@@ -12,9 +12,40 @@
 
 #define DEBUG_TYPE "TFConstExpr"
 #include "TFConstExpr.h"
+#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 using namespace tf;
+
+/// For constant values, return the type classification of this value.
+auto LatticeValue::getTypeKind() const -> TypeKind {
+  switch (kind) {
+  case Undefined:
+  case Overdefined: assert(0 && "Not a constant value");
+  case ConstantArray: return Array;
+  case ConstantInst:
+    auto *inst = value.inst;
+    if (isa<IntegerLiteralInst>(inst))
+      return Integer;
+    if (isa<FloatLiteralInst>(inst))
+      return Float;
+    assert(isa<StringLiteralInst>(inst) && "Unknown ConstantInst kind");
+    return String;
+  }
+}
+
+APInt LatticeValue::getIntegerValue() const {
+  assert(getTypeKind() == Integer);
+  assert(kind == ConstantInst);
+  return cast<IntegerLiteralInst>(value.inst)->getValue();
+}
+
+APFloat LatticeValue::getFloatValue() const {
+  assert(getTypeKind() == Float);
+  assert(kind == ConstantInst);
+  return cast<FloatLiteralInst>(value.inst)->getValue();
+}
+
 
 /// Analyze the body of the specified function (which itself may not be a
 /// constexpr).  Determine whether the specified SymbolicValue's are
