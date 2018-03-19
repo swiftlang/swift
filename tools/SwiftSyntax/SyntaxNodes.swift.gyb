@@ -40,6 +40,7 @@ Each node will have:
 }%
 
 /// A wrapper around a raw Syntax layout.
+@_fixed_layout
 public struct UnknownSyntax: _SyntaxBase {
   let _root: SyntaxData
   unowned let _data: SyntaxData 
@@ -69,6 +70,7 @@ public protocol ${node.name}: Syntax {}
 %     for line in dedented_lines(node.description):
 /// ${line}
 %     end
+@_fixed_layout
 public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %     if node.children:
   enum Cursor: Int {

@@ -22,6 +22,7 @@ import Glibc
 
 /// A list of possible errors that could be encountered while parsing a
 /// Syntax tree.
+@_fixed_layout
 public enum ParserError: Error {
   case swiftcFailed(Int, String)
   case invalidFile

@@ -16,6 +16,7 @@ import Foundation
 ///
 /// A `missing` node does not mean, necessarily, that the source item is
 /// considered "implicit", but rather that it was not found in the source.
+@_fixed_layout
 public enum SourcePresence: String, Codable {
   /// The syntax was authored by a human and found, or was generated.
   case present = "Present"

@@ -12,7 +12,9 @@
 
 import Foundation
 
+@_fixed_layout
 public struct SyntaxChildren: Sequence {
+  @_fixed_layout
   public struct Iterator: IteratorProtocol {
     let node: Syntax
     var indexIterator: _SyntaxBase.PresentChildIndicesSequence.Iterator

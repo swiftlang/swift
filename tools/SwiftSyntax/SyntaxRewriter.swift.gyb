@@ -25,6 +25,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout
 open class SyntaxRewriter {
   public init() {}
 % for node in SYNTAX_NODES:
@@ -79,6 +80,7 @@ open class SyntaxRewriter {
   }
 }
 
+@_fixed_layout
 open class SyntaxVisitor {
     public init() {}
 % for node in SYNTAX_NODES:

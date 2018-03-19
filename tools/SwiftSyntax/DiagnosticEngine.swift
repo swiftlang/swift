@@ -16,6 +16,7 @@
 import Foundation
 
 /// The DiagnosticEngine allows Swift tools to emit diagnostics.
+@_fixed_layout
 public class DiagnosticEngine {
   /// Creates a new DiagnosticEngine with no diagnostics.
   public init() {

@@ -15,6 +15,7 @@
 import Foundation
 
 /// Represents a source location in a Swift file.
+@_fixed_layout
 public struct SourceLocation: Codable {
   /// The line in the file where this location resides.
   public let line: Int
@@ -38,6 +39,7 @@ public struct SourceLocation: Codable {
 }
 
 /// Represents a start and end location in a Swift file.
+@_fixed_layout
 public struct SourceRange: Codable {
   /// The beginning location in the source range.
   public let start: SourceLocation
@@ -53,6 +55,7 @@ public struct SourceRange: Codable {
 
 /// A FixIt represents a change to source code in order to "correct" a
 /// diagnostic.
+@_fixed_layout
 public enum FixIt: Codable {
   /// Remove the characters from the source file over the provided source range.
   case remove(SourceRange)
@@ -64,6 +67,8 @@ public enum FixIt: Codable {
   /// string.
   case replace(SourceRange, String)
 
+  @_fixed_layout
+  @_versioned
   enum CodingKeys: String, CodingKey {
     case type
     case range
@@ -126,6 +131,7 @@ public enum FixIt: Codable {
 
 /// A Note attached to a Diagnostic. This provides more context for a specific
 /// error, and optionally allows for FixIts.
+@_fixed_layout
 public struct Note: Codable {
   /// The note's message.
   public let message: Diagnostic.Message
@@ -158,6 +164,7 @@ public struct Note: Codable {
 }
 
 /// A Diagnostic message that can be emitted regarding some piece of code.
+@_fixed_layout
 public struct Diagnostic: Codable {
   public struct Message: Codable {
     /// The severity of diagnostic. This can be note, error, or warning.
@@ -175,6 +182,7 @@ public struct Diagnostic: Codable {
 
   // These values must match clang/Frontend/SerializedDiagnostics.h
   /// The severity of the diagnostic.
+  @_fixed_layout
   public enum Severity: UInt8, Codable {
     case note = 1
     case warning = 2
@@ -197,6 +205,7 @@ public struct Diagnostic: Codable {
   public let fixIts: [FixIt]
 
   /// A diagnostic builder that 
+  @_fixed_layout
   public struct Builder {
     /// An in-flight array of notes.
     internal var notes = [Note]()

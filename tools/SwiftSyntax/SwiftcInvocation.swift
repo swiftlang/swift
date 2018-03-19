@@ -22,27 +22,35 @@ import Glibc
 
 /// The result of process execution, containing the exit status code,
 /// stdout, and stderr
+@_versioned
+@_fixed_layout
 struct ProcessResult {
   /// The process exit code. A non-zero exit code usually indicates failure.
+  @_versioned
   let exitCode: Int
 
   /// The contents of the process's stdout as Data. 
+  @_versioned
   let stdoutData: Data
 
   /// The contents of the process's stderr as Data.
+  @_versioned
   let stderrData: Data
 
   /// The contents of the process's stdout, assuming the data was UTF-8 encoded.
+  @_versioned
   var stdout: String {
     return String(data: stdoutData, encoding: .utf8)!
   }
 
   /// The contents of the process's stderr, assuming the data was UTF-8 encoded.
+  @_versioned
   var stderr: String {
     return String(data: stderrData, encoding: .utf8)!
   }
 
   /// Whether or not this process had a non-zero exit code.
+  @_versioned
   var wasSuccessful: Bool {
     return exitCode == 0
   }
@@ -54,6 +62,7 @@ struct ProcessResult {
 ///   - executable: The full file URL to the executable you're running.
 ///   - arguments: A list of strings to pass to the process as arguments.
 /// - Returns: A ProcessResult containing stdout, stderr, and the exit code.
+@_versioned
 func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
   // Use an autoreleasepool to prevent memory- and file-descriptor leaks.
   return autoreleasepool {
@@ -108,12 +117,16 @@ func findFirstObjectFile(for dsohandle: UnsafeRawPointer = #dsohandle) -> URL? {
   return URL(fileURLWithPath: path)
 }
 
+@_versioned
+@_fixed_layout
 enum InvocationError: Error {
   case couldNotFindSwiftc
   case couldNotFindSDK
   case abort(code: Int)
 }
 
+@_versioned
+@_fixed_layout
 struct SwiftcRunner {
   /// Gets the `swiftc` binary packaged alongside this library.
   /// - Returns: The path to `swiftc` relative to the path of this library
@@ -130,6 +143,7 @@ struct SwiftcRunner {
   ///               - ${target}/
   ///                 - libswiftSwiftSyntax.[dylib|so]
   ///         ```
+  @_versioned
   static func locateSwiftc() -> URL? {
     guard let libraryPath = findFirstObjectFile() else { return nil }
     let swiftcURL = libraryPath.deletingLastPathComponent()

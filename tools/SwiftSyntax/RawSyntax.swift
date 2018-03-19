@@ -15,6 +15,7 @@ import Foundation
 /// Represents the raw tree structure underlying the syntax tree. These nodes
 /// have no notion of identity and only provide structure to the tree. They
 /// are immutable and can be freely shared between syntax nodes.
+@_versioned
 indirect enum RawSyntax: Codable {
   /// A tree node with a kind, an array of children, and a source presence.
   case node(SyntaxKind, [RawSyntax?], SourcePresence)
@@ -65,6 +66,8 @@ indirect enum RawSyntax: Codable {
   }
 
   /// Keys for serializing RawSyntax nodes.
+  @_fixed_layout
+  @_versioned
   enum CodingKeys: String, CodingKey {
     // Keys for the `node` case
     case kind, layout, presence

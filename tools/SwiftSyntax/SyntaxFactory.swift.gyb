@@ -27,6 +27,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout
 public enum SyntaxFactory {
   public static func makeToken(_ kind: TokenKind, presence: SourcePresence,
                  leadingTrivia: Trivia = [],

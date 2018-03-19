@@ -27,7 +27,10 @@ import Foundation
 ///
 /// In general, you should deal with the actual Trivia collection instead
 /// of individual pieces whenever possible.
+@_fixed_layout
 public enum TriviaPiece: Codable {
+  @_fixed_layout
+  @_versioned
   enum CodingKeys: CodingKey {
     case kind, value
   }
@@ -159,6 +162,7 @@ extension TriviaPiece: TextOutputStreamable {
 
 /// A collection of leading or trailing trivia. This is the main data structure
 /// for thinking about trivia.
+@_fixed_layout
 public struct Trivia: Codable {
   let pieces: [TriviaPiece]
 
@@ -227,10 +231,12 @@ public struct Trivia: Codable {
 
 /// Conformance for Trivia to the Collection protocol.
 extension Trivia: Collection {
+  @_fixed_layout
   public var startIndex: Int {
     return pieces.startIndex
   }
 
+  @_fixed_layout
   public var endIndex: Int {
     return pieces.endIndex
   }
@@ -244,6 +250,7 @@ extension Trivia: Collection {
   }
 
   /// Get the byteSize of this trivia
+  @_fixed_layout
   public var byteSize: Int {
     let pos = AbsolutePosition()
     for piece in pieces {

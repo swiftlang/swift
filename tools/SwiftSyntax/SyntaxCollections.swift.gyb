@@ -26,6 +26,7 @@ import Foundation
 /// `${node.collection_element_type}` nodes. ${node.name} behaves
 /// as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
+@_fixed_layout
 public struct ${node.name}: _SyntaxBase {
   let _root: SyntaxData
   unowned let _data: SyntaxData
@@ -131,10 +132,12 @@ public struct ${node.name}: _SyntaxBase {
 
 /// Conformance for `${node.name}`` to the Collection protocol.
 extension ${node.name}: Collection {
+  @_fixed_layout
   public var startIndex: Int {
     return data.childCaches.startIndex
   }
 
+  @_fixed_layout
   public var endIndex: Int {
     return data.childCaches.endIndex
   }
@@ -151,6 +154,7 @@ extension ${node.name}: Collection {
 }
 
 /// A type that iterates over a `${node.name}` using its indices.
+@_fixed_layout
 public struct ${node.name}Iterator: IteratorProtocol {
   public typealias Element = ${node.collection_element_type}
 
