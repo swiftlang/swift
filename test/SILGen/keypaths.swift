@@ -24,6 +24,10 @@ class C<T> {
   init() { fatalError() }
 }
 
+extension C {
+  var `extension`: S<T> { fatalError() }
+}
+
 protocol P {
   var x: Int { get }
   var y: String { get set }
@@ -38,6 +42,11 @@ extension P {
     nonmutating set { }
   }
 }
+
+/* TODO: When we support superclass requirements on protocols, we should test
+ * this case as well.
+protocol PoC : C<Int> {}
+*/
 
 // CHECK-LABEL: sil hidden @{{.*}}storedProperties
 func storedProperties<T>(_: T) {
@@ -337,4 +346,42 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
 
   _ = \Subscripts<T>.[Bass()]
   _ = \Subscripts<T>.[Treble()]
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}subclass_generics
+func subclass_generics<T: C<Int>, U: C<V>, V/*: PoC*/>(_: T, _: U, _: V) {
+  _ = \T.x
+  _ = \T.z
+  _ = \T.computed
+  _ = \T.extension
+
+  _ = \U.x
+  _ = \U.z
+  _ = \U.computed
+  _ = \U.extension
+
+/*
+  _ = \V.x
+  _ = \V.z
+  _ = \V.computed
+  _ = \V.extension
+ */
+
+  _ = \(C<Int> & P).x
+  _ = \(C<Int> & P).z
+  _ = \(C<Int> & P).computed
+  _ = \(C<Int> & P).extension
+
+  _ = \(C<V> & P).x
+  _ = \(C<V> & P).z
+  _ = \(C<V> & P).computed
+  _ = \(C<V> & P).extension
+
+/* TODO: When we support superclass requirements on protocols, we should test
+ * this case as well.
+  _ = \PoC.x
+  _ = \PoC.z
+  _ = \PoC.computed
+  _ = \PoC.extension
+ */
 }
