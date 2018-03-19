@@ -1256,7 +1256,7 @@ static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// It takes a 1D array of scalars and a shape as a 1D array of integers.
 ///
-/// On success, this removes the applyexpr and returns a pointer to the new
+/// On success, this removes the ApplyInst and returns a pointer to the new
 /// BuiltinInst that is created.  On failure, it returns a nullptr.
 ///
 /// FIXME: This is a near duplication of the logic used by TFPartitioning in
@@ -1357,8 +1357,74 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 static BuiltinInst *
 tryToPromoteTensorFromScalars1D(ApplyInst *inst,
                             const DenseMap<SILValue, LatticeValue> &constants) {
-  // FIXME: implement this.
-  return nullptr;
+  assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
+         "Unexpected type signature for __tf_tensor_from_scalars_1d");
+
+  // If we can't analyze the scalars as an arrays of constants, give up.
+  auto scalarIt = constants.find(inst->getOperand(1));
+  if (scalarIt == constants.end())
+    return nullptr;
+
+  // We transform this into a __tfop_Const instruction, where the values are
+  // part of the 'value' tensor attribute and the shape is hard coded.
+  SmallVector<SILValue, 8> operands;
+  std::string name = "__tfop_Const";
+
+  // Try to expand the array into its scalars.
+  expandArrayConstant(scalarIt->second.getArrayValue(), "value",
+                      SILTensorOpInfo::OperandClass::Tensor,
+                      name, operands, inst);
+
+  SILBuilder B(inst);
+
+  // This takes a Tensor operand, but needs a Shape and a DType added.  At
+  // this point, the operands list will have a metatype for the tensor as
+  // the first operand then all the elements.
+  uint64_t scalarCount = operands.size()-1;
+
+  // The shape needs a metatype to be well formed, but nothing actually
+  // cares what it is.  Just re-push the metatype for the tensor elements,
+  // even though it might be floating point or something else weird.
+  operands.push_back(operands[0]);
+  name += ",shape";
+  auto shapeKind = SILTensorOpInfo::OperandClass::Shape;
+  name += SILTensorOpInfo::getOperandClassSuffix(shapeKind);
+
+  // The shape of a 1d tensor is just the count of elements.
+  auto &ctx = inst->getFunction()->getASTContext();
+  auto scalarCountVal =
+    B.createIntegerLiteral(inst->getLoc(),
+                           SILType::getBuiltinIntegerType(64, ctx),
+                           scalarCount);
+  operands.push_back(scalarCountVal);
+  name += ",";
+  auto arrayEltKind = SILTensorOpInfo::OperandClass::ArrayElement;
+  name += SILTensorOpInfo::getOperandClassSuffix(arrayEltKind);
+
+  // The  dtype is the type of the Tensor elements, which we conveniently
+  // already have available as the first operand.
+  operands.push_back(operands[0]);
+  name += ",dtype";
+
+  auto arrayValue = inst->getOperand(1);
+
+  // Finally build a new builtin instruction with the simplified operands.
+  auto newInst =
+    B.createBuiltin(inst->getLoc(),
+                    B.getASTContext().getIdentifier(name),
+                    inst->getType(), /*no substitions*/{},
+                    operands);
+  newInst->setDebugLocation(inst->getDebugLocation());
+  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->eraseFromParent();
+
+  // We dropped a reference to the element initializer, so we need to
+  // remove the array itself or at least release it.  This happens after
+  // creating the replacement builtin, so that element initializers aren't
+  // dropped.
+  B.setInsertionPoint(newInst);
+  SILTensorOpInfo::removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
+  return newInst;
 }
 
 
