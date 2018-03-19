@@ -192,7 +192,7 @@ public extension Tensor {
         scalarsInitializer: { addr in
           var currentAddr = addr
           for scalar in vector {
-            currentAddr.pointee = scalar
+            currentAddr.initialize(to: scalar)
             currentAddr = currentAddr.advanced(by: 1)
           }
         }
@@ -233,8 +233,8 @@ public extension Tensor {
       return TensorHandle<Scalar>(
         shape: shape.dimensions,
         scalarsInitializer: { addr in
-          addr.assign(from: scalars.baseAddress!,
-                      count: Int(shape.contiguousSize))
+          addr.initialize(from: scalars.baseAddress!,
+                          count: Int(shape.contiguousSize))
         }
       )
     }
@@ -260,7 +260,7 @@ public extension Tensor {
         scalarsInitializer: { addr in
           var currentAddr = addr
           for scalar in scalars {
-            currentAddr.pointee = scalar
+            currentAddr.initialize(to: scalar)
             currentAddr = currentAddr.advanced(by: 1)
           }
         }
