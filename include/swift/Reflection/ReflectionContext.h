@@ -29,8 +29,8 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Runtime/Unreachable.h"
+#include "llvm/Support/raw_ostream.h"
 
-#include <iostream>
 #include <set>
 #include <vector>
 #include <unordered_map>
@@ -107,7 +107,7 @@ public:
     return sizeof(StoredPointer) * 2;
   }
 
-  void dumpAllSections(std::ostream &OS) {
+  void dumpAllSections(llvm::raw_ostream &OS) {
     getBuilder().dumpAllSections();
   }
 

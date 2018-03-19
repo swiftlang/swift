@@ -21,8 +21,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 
-#include <iostream>
 #include <memory>
 
 namespace swift {
@@ -129,7 +129,7 @@ public:
   unsigned getNumExtraInhabitants() const { return NumExtraInhabitants; }
 
   void dump() const;
-  void dump(std::ostream &OS, unsigned Indent = 0) const;
+  void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 };
 
 struct FieldInfo {
