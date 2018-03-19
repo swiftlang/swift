@@ -110,7 +110,7 @@ open class JSONEncoder {
         case custom((_ codingPath: [CodingKey]) -> CodingKey)
         
         fileprivate static func _convertToSnakeCase(_ stringKey: String) -> String {
-            guard stringKey.count > 0 else { return stringKey }
+            guard !stringKey.isEmpty else { return stringKey }
         
             var words : [Range<String.Index>] = []
             // The general idea of this algorithm is to split words on transition from lower to upper case, then on transition of >1 upper case characters to lowercase
@@ -351,7 +351,7 @@ fileprivate struct _JSONEncodingStorage {
     }
 
     fileprivate mutating func popContainer() -> NSObject {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.popLast()!
     }
 }
@@ -1197,7 +1197,7 @@ fileprivate struct _JSONDecodingStorage {
     }
 
     fileprivate var topContainer: Any {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.last!
     }
 
@@ -1206,7 +1206,7 @@ fileprivate struct _JSONDecodingStorage {
     }
 
     fileprivate mutating func popContainer() {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         self.containers.removeLast()
     }
 }
