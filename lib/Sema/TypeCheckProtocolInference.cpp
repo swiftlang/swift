@@ -607,6 +607,33 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   return result;
 }
 
+/// Perform any necessary adjustments to the inferred associated type to
+/// make it suitable for later use.
+static Type adjustInferredAssociatedType(Type type) {
+  // If we have an optional type, adjust its wrapped type.
+  if (auto optionalObjectType = type->getOptionalObjectType()) {
+    auto newOptionalObjectType =
+      adjustInferredAssociatedType(optionalObjectType);
+    if (newOptionalObjectType.getPointer() == optionalObjectType.getPointer())
+      return type;
+
+    return OptionalType::get(newOptionalObjectType);
+  }
+
+  // If we have a noescape function type, make it escaping.
+  if (auto funcType = type->getAs<FunctionType>()) {
+    if (funcType->isNoEscape()) {
+      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+                               funcType->getExtInfo().withNoEscape(false));
+    }
+  }
+
+  // We can only infer materializable types.
+  if (!type->isMaterializable()) return nullptr;
+
+  return type;
+}
+
 /// Attempt to resolve a type witness via a specific value witness.
 InferredAssociatedTypesByWitness
 AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
@@ -662,10 +689,14 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (secondType->hasError())
         return true;
 
+      Type inferredType = adjustInferredAssociatedType(secondType);
+      if (!inferredType)
+        return true;
+
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
-        Inferred.Inferred.push_back({assocType, secondType});
+        Inferred.Inferred.push_back({assocType, inferredType});
       }
 
       // Always allow mismatches here.
