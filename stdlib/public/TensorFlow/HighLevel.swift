@@ -402,6 +402,12 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     self.bias = bias
   }
 
+  @_inlineable @inline(__always)
+  public init(inputCount: Int32, outputCount: Int32) {
+    self.init(weight: Tensor(randomNormal: [inputCount, outputCount]),
+              bias: Tensor(zeros: [1, outputCount]))
+  }
+
   // TODO: The `Parameters` struct type and the `parameters` stored property
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.

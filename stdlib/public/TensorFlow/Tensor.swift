@@ -570,6 +570,12 @@ public extension AccelerableByTensorFlow {
 }
 
 public extension Tensor where Scalar : Numeric {
+  @_inlineable @inline(__always)
+  func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
+    let zeros: Tensor = #tfop("Fill", shape, Tensor(0))
+    return self + zeros
+  }
+
   /// Broadcast to the same shape as the specified Tensor.
   /// - Precondition: The specified shape must be compatible for broadcasting.
   // TODO: This is a temporary workaround for supporting broadcast on numeric
@@ -577,7 +583,12 @@ public extension Tensor where Scalar : Numeric {
   // implemented.
   @_inlineable @inline(__always)
   func broadcast(to other: Tensor) -> Tensor {
-    let zeros: Tensor = #tfop("Fill", other.shapeTensor, Tensor(0))
+    return broadcast(toShape: other.shapeTensor)
+  }
+
+  @_inlineable @inline(__always)
+  func broadcast(to shape: TensorShape) -> Tensor {
+    let zeros: Tensor = #tfop("Fill", Tensor<Int32>(shape.dimensions), Tensor(0))
     return self + zeros
   }
 }
