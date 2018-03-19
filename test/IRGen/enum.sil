@@ -119,7 +119,7 @@ import Swift
 // --       generic instantiation pattern
 // CHECK-SAME:   @"$S4enum16DynamicSingletonOMP"
 // --       generic parameters, requirements, key, extra
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
+// CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       generic param
 // CHECK-SAME:   i8 -128,
 // CHECK-SAME: }>
@@ -2682,26 +2682,23 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2, [[WORD]] {{4|8}})
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], [[WORD]] 2
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
-// CHECK:   store i8* [[T0]], i8** [[T1]]
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum16DynamicSingletonOMr"
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S4enum16DynamicSingletonOMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
 // CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
-// CHECK:   ret %swift.type* null
+// CHECK:   ret %swift.metadata_response zeroinitializer
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
 // CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum20DynamicSinglePayloadOMi"
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S4enum20DynamicSinglePayloadOMr"
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S4enum20DynamicSinglePayloadOMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1

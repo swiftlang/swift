@@ -55,6 +55,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
@@ -62,6 +63,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest3
     single-source/DictTest4
     single-source/DictionaryBridge
+    single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
@@ -75,6 +77,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic

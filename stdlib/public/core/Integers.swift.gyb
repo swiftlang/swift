@@ -3841,7 +3841,6 @@ extension SignedNumeric where Self : Comparable {
   }
 }
 
-@available(swift, obsoleted: 4)
 extension BinaryInteger {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)

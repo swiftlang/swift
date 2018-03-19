@@ -1423,27 +1423,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     }
     
-    /// Return true if this is 'nil' type checked as an Optional.  This looks
-    /// like this:
-    ///   (call_expr implicit type='Int?'
-    ///     (constructor_ref_call_expr implicit
-    ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
-    static bool isTypeCheckedOptionalNil(Expr *E) {
-      auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
+    /// Return true if this is a 'nil' literal.  This looks
+    /// like this if the type is Optional<T>:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    /// Or like this if it is any other ExpressibleByNilLiteral type:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    bool isTypeCheckedOptionalNil(Expr *E) {
+      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE || !CE->isImplicit())
         return false;
-      
+
+      // First case -- Optional.none
+      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
+        return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
+
+      // Second case -- init(nilLiteral:)
       auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
       if (!CRCE || !CRCE->isImplicit()) return false;
-      
-      auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn());
-      
-      SmallString<32> NameBuffer;
-      auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
-      return name == "init(nilLiteral:)";
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn())) {
+        SmallString<32> NameBuffer;
+        auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
+        return name == "init(nilLiteral:)";
+      }
+
+      return false;
     }
-    
-    
+
+
     /// Warn about surprising implicit optional promotions involving operands to
     /// calls.  Specifically, we warn about these expressions when the 'x'
     /// operand is implicitly promoted to optional:
@@ -3910,7 +3925,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseIdentifier().str();
+  StringRef baseNameStr = name.getBaseName().userFacingName();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())

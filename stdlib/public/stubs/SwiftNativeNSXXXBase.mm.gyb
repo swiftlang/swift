@@ -144,55 +144,6 @@ swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
   return Result;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
-                                       NSString *prefix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
-      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
-      nullptr);
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(theString));
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(prefix));
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
-                                              void *prefix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
-      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
-      nullptr);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool
-swift_stdlib_NSStringHasSuffixNFD(NSString *SWIFT_NS_RELEASES_ARGUMENT theString,
-                                  NSString *SWIFT_NS_RELEASES_ARGUMENT suffix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
-      CFRangeMake(0, Length),
-      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(theString));
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(suffix));
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
-                                              void *suffix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
-      CFRangeMake(0, Length),
-      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
-  return Result;
-}
-
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void swift_stdlib_CFSetGetValues(NSSet *SWIFT_NS_RELEASES_ARGUMENT set,
                                  const void **values) {

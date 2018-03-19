@@ -939,7 +939,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
 
-  for (auto Pair : *Node) {
+  for (auto &Pair : *Node) {
     switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
     case KeyKind::KK_kind:
       Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
@@ -1210,11 +1210,14 @@ static StringRef getEscapedName(DeclBaseName name) {
   switch (name.getKind()) {
   case DeclBaseName::Kind::Subscript:
     return "subscript";
+  case DeclBaseName::Kind::Constructor:
+    return "init";
   case DeclBaseName::Kind::Destructor:
     return "deinit";
   case DeclBaseName::Kind::Normal:
     return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
         .Case("subscript", "`subscript`")
+        .Case("init", "`init`")
         .Case("deinit", "`deinit`")
         .Default(name.getIdentifier().str());
   }

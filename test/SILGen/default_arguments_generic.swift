@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
 
 func foo<T: ExpressibleByIntegerLiteral>(_: T.Type, x: T = 0) { }
 

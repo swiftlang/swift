@@ -23,6 +23,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
@@ -75,6 +76,26 @@ void LocalTypeDataCache::CacheEntry::erase() const {
     return;
   }
   llvm_unreachable("bad cache entry kind");
+}
+
+MetadataResponse
+IRGenFunction::tryGetLocalTypeMetadata(CanType type,
+                                       DynamicMetadataRequest request) {
+  // For now, forTypeMetadata always means *complete* type metadata.
+  auto localDataKind = LocalTypeDataKind::forTypeMetadata();
+  if (auto metadata = tryGetLocalTypeData(type, localDataKind))
+    return MetadataResponse(metadata);
+
+  return MetadataResponse();
+}
+
+void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
+                                               MetadataResponse response) {
+  // For now, forTypeMetadata always means *complete* type metadata.
+  if (response.isStaticallyKnownComplete()) {
+    auto localDataKind = LocalTypeDataKind::forTypeMetadata();
+    setScopedLocalTypeData(type, localDataKind, response.getMetadata());
+  }
 }
 
 llvm::Value *IRGenFunction::getLocalTypeData(CanType type,

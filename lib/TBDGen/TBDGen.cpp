@@ -40,6 +40,21 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
+void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+  for (auto &entry : PBD->getPatternList()) {
+    auto *var = entry.getAnchoringVarDecl();
+
+    // Non-global variables might have an explicit initializer symbol.
+    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
+      auto declRef =
+          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
+    }
+  }
+}
+
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),

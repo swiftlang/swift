@@ -174,7 +174,9 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     if (auto init = C.getEmitInto()) {
-      std::move(*this).asKnownRValue(SGF).forwardInto(SGF, loc, init);
+      std::move(*this).asKnownRValue(SGF)
+                      .ensurePlusOne(SGF, loc)
+                      .forwardInto(SGF, loc, init);
       return ManagedValue::forInContext();
     } else {
       return std::move(*this).asKnownRValue(SGF).getAsSingleValue(SGF, loc);

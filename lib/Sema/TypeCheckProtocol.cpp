@@ -146,13 +146,17 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   if (!reqt->isObjC())
     return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-  bool reqtIsOptional;
-  if (Type reqtValueType = reqtType->getOptionalObjectType(reqtIsOptional))
+  bool reqtIsOptional = false;
+  if (Type reqtValueType = reqtType->getOptionalObjectType()) {
+    reqtIsOptional = true;
     reqtType = reqtValueType;
-  bool witnessIsOptional;
+  }
+  bool witnessIsOptional = false;
   if (Type witnessValueType =
-          witnessType->getOptionalObjectType(witnessIsOptional))
+      witnessType->getOptionalObjectType()) {
+    witnessIsOptional = true;
     witnessType = witnessValueType;
+  }
 
   // When the requirement is an IUO, all is permitted, because we
   // assume that the user knows more about the signature than we

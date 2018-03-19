@@ -1638,7 +1638,7 @@ extension StringProtocol where Index == String.Index {
   /// Equivalent to `self.rangeOfString(other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {
     let r = self.range(of: other) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
+    if #available(macOS 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.contains(other._ephemeralString))
     }
     return r
@@ -1661,7 +1661,7 @@ extension StringProtocol where Index == String.Index {
     let r = self.range(
       of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
+    if #available(macOS 10.10, iOS 8.0, *) {
       _sanityCheck(r ==
         _ns.localizedCaseInsensitiveContains(other._ephemeralString))
     }

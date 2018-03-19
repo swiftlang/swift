@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name switch_abstraction -emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
 struct A {}
 

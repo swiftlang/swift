@@ -83,20 +83,32 @@ protected:
   // Intended to be used in the body of a subclass of FlagSet.
 #define FLAGSET_DEFINE_FLAG_ACCESSORS(BIT, GETTER, SETTER) \
   bool GETTER() const {                                    \
-    return getFlag<BIT>();                                 \
+    return this->template getFlag<BIT>();                  \
   }                                                        \
   void SETTER(bool value) {                                \
-    setFlag<BIT>(value);                                   \
+    this->template setFlag<BIT>(value);                    \
   }
 
   // A convenient macro for defining a getter and setter for a field.
   // Intended to be used in the body of a subclass of FlagSet.
 #define FLAGSET_DEFINE_FIELD_ACCESSORS(BIT, WIDTH, TYPE, GETTER, SETTER) \
   TYPE GETTER() const {                                                  \
-    return getField<BIT, WIDTH, TYPE>();                                 \
+    return this->template getField<BIT, WIDTH, TYPE>();                  \
   }                                                                      \
   void SETTER(TYPE value) {                                              \
-    setField<BIT, WIDTH, TYPE>(value);                                   \
+    this->template setField<BIT, WIDTH, TYPE>(value);                    \
+  }
+
+  // A convenient macro to expose equality operators.
+  // These can't be provided directly by FlagSet because that would allow
+  // different flag sets to be compared if they happen to have the same
+  // underlying type.
+#define FLAGSET_DEFINE_EQUALITY(TYPENAME)                                \
+  friend bool operator==(TYPENAME lhs, TYPENAME rhs) {                   \
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();                 \
+  }                                                                      \
+  friend bool operator!=(TYPENAME lhs, TYPENAME rhs) {                   \
+    return lhs.getOpaqueValue() != rhs.getOpaqueValue();                 \
   }
 
 public:

@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name witness_same_type -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name witness_same_type -enable-sil-ownership -emit-ir %s
 
 protocol Fooable {
   associatedtype Bar

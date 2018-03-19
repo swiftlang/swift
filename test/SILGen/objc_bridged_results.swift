@@ -1,7 +1,9 @@
+// REQUIRES: plus_one_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridged_results -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 

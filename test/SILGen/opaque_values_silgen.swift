@@ -1,6 +1,6 @@
+// REQUIRES: plus_one_runtime
+// XFAIL: *
 // RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
-
-// UNSUPPORTED: resilient_stdlib
 
 struct TrivialStruct {
   var x: Int

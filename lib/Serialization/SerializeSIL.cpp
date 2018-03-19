@@ -626,8 +626,7 @@ SILSerializer::writeKeyPathPatternComponent(
         ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
         serializeAfter.push_back(index.Hashable);
       }
-      if (!indices.empty() &&
-          component.getKind() != KeyPathPatternComponent::Kind::External) {
+      if (!indices.empty()) {
         ListOfValues.push_back(
           addSILFunctionRef(component.getSubscriptIndexEquals()));
         ListOfValues.push_back(

@@ -331,7 +331,8 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @test_partial_apply(%T13partial_apply4BaseC*)
 // CHECK:  [[CTX:%.*]] = bitcast %T13partial_apply4BaseC* %0 to %swift.refcounted*
-// CHECK:  [[TYPE:%.*]] = call %swift.type* @"$S13partial_apply3SubCMa"()
+// CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S13partial_apply3SubCMa"(i64 0)
+// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @"$S26parametric_casting_closureTA.{{[0-9]+}}" to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
 
 // CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$S26parametric_casting_closureTA"(%T13partial_apply4BaseC*, %swift.refcounted* swiftself)
@@ -341,7 +342,8 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 
 
 // CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$S26parametric_casting_closureTA.{{[0-9]+}}"(%swift.refcounted* swiftself)
-// CHECK:  [[TYPE:%.*]] = call %swift.type* @"$S13partial_apply3SubCMa"()
+// CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S13partial_apply3SubCMa"(i64 0)
+// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %T13partial_apply4BaseC*
 // CHECK:  [[CALL:%.*]] = tail call swiftcc %T13partial_apply4BaseC* @parametric_casting_closure(%T13partial_apply4BaseC* [[CTX]], %swift.type* [[TYPE]])
 // CHECK:  [[CAST:%.*]] = bitcast %T13partial_apply4BaseC* [[CALL]] to %T13partial_apply3SubC*

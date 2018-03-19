@@ -186,6 +186,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
 
+  TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
+    TypeMetadataPtrTy,
+    SizeTy
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
@@ -562,18 +567,27 @@ IRGenModule::createStringConstant(StringRef Str,
   return { global, address };
 }
 
-llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
-  if (EmptyTupleMetadata)
-    return EmptyTupleMetadata;
-
-  EmptyTupleMetadata = Module.getOrInsertGlobal(
-                          MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
-                          FullTypeMetadataStructTy);
-  if (useDllStorage())
-    cast<llvm::GlobalVariable>(EmptyTupleMetadata)
-        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-  return EmptyTupleMetadata;
+#define KNOWN_METADATA_ACCESSOR(NAME, SYM) \
+llvm::Constant *IRGenModule::get##NAME() { \
+  if (NAME) \
+    return NAME; \
+  NAME = Module.getOrInsertGlobal( \
+                          SYM, \
+                          FullTypeMetadataStructTy); \
+  if (useDllStorage()) \
+    cast<llvm::GlobalVariable>(NAME) \
+        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass); \
+  return NAME; \
 }
+
+KNOWN_METADATA_ACCESSOR(EmptyTupleMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)))
+KNOWN_METADATA_ACCESSOR(AnyExistentialMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(ANY_MANGLING)))
+KNOWN_METADATA_ACCESSOR(AnyObjectExistentialMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(ANYOBJECT_MANGLING)))
+
+#undef KNOWN_METADATA_ACCESSOR
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
   if (ObjCEmptyCachePtr)

@@ -635,19 +635,20 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
     case MetadataKind::Function:
-    case MetadataKind::Existential: {
-      OpaqueImpl impl;
-      return call(&impl);
-    }
+    case MetadataKind::Existential:
+      break;
 
     // Types can't have these kinds.
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       swift::crash("Swift mirror lookup failure");
-  }
+    }
 
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+    // If we have an unknown kind of type, or a type without special handling,
+    // treat it as opaque.
+    OpaqueImpl impl;
+    return call(&impl);
 }
 
 } // end anonymous namespace
@@ -738,7 +739,7 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(ErrorType Object)";
   }
 
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+  return "(Unknown)";
 }
 
 #if SWIFT_OBJC_INTEROP

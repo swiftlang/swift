@@ -22,3 +22,9 @@ struct Foo {
         let r = ref
     }
 }
+
+// rdar://problem/38390524
+// CHECK-LABEL: sil hidden @$S5owned19oneUnnamedArgument1yyAA14ValueAggregateVnF : $@convention(thin) (@owned ValueAggregate) -> () {
+func oneUnnamedArgument1(_: __owned ValueAggregate) {}
+// CHECK-LABEL: sil hidden @$S5owned19oneUnnamedArgument2yyAA12RefAggregateCnF : $@convention(thin) (@owned RefAggregate) -> () {
+func oneUnnamedArgument2(_: __owned RefAggregate) {}

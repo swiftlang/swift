@@ -251,9 +251,15 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC);
 }
 
-void ConstraintSystem::propagateLValueAccessKind(Expr *E,
-                                                 AccessKind accessKind,
+void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
+                                                 bool isShallow,
                                                  bool allowOverwrite) {
+  // If solver is set up in "shallow" mode we expect that some of the
+  // sub-expressions are already type-checked which means that they
+  // already have access kind set.
+  if (isShallow && E->hasLValueAccessKind() && !allowOverwrite)
+    return;
+
   E->propagateLValueAccessKind(accessKind,
                                [&](Expr *E) -> Type {
                                  return getType(E);
@@ -434,6 +440,7 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
+    bool IsShallow;
 
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
@@ -885,7 +892,8 @@ namespace {
       // will handle this.
       if (record.OpaqueValue && record.OpaqueValue->hasLValueAccessKind())
         cs.propagateLValueAccessKind(record.ExistentialValue,
-                                  record.OpaqueValue->getLValueAccessKind());
+                                     record.OpaqueValue->getLValueAccessKind(),
+                                     IsShallow);
 
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
@@ -1846,9 +1854,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics)
-      : cs(cs), dc(cs.DC), solution(solution), 
-        SuppressDiagnostics(suppressDiagnostics) { }
+                 bool suppressDiagnostics, bool shallow = false)
+        : cs(cs), dc(cs.DC), solution(solution),
+          SuppressDiagnostics(suppressDiagnostics), IsShallow(shallow) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -1924,9 +1932,9 @@ namespace {
       tc.validateDecl(MaxIntegerTypeDecl);
       auto maxType = MaxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_integerLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
       return convertLiteral(
@@ -1957,7 +1965,42 @@ namespace {
           type = defaultType;
       }
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      // By far the most common 'nil' literal is for Optional<T>.none.
+      //
+      // Emit this case directly instead of calling Optional.init(nilLiteral:),
+      // since this generates more efficient SIL.
+      if (auto objectType = type->getOptionalObjectType()) {
+        auto *nilDecl = tc.Context.getOptionalNoneDecl();
+        tc.validateDecl(nilDecl);
+        if (!nilDecl->hasInterfaceType())
+          return nullptr;
+
+        SubstitutionList subs = {Substitution(objectType, {})};
+        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, subs);
+
+        auto nilType = FunctionType::get(
+            {MetatypeType::get(type)}, type);
+        auto *nilRefExpr = new (tc.Context) DeclRefExpr(
+            concreteDeclRef, DeclNameLoc(expr->getLoc()),
+              /*implicit=*/true, AccessSemantics::Ordinary,
+            nilType);
+        cs.cacheType(nilRefExpr);
+
+        auto *typeExpr = TypeExpr::createImplicitHack(
+            expr->getLoc(),
+            type,
+            tc.Context);
+        cs.cacheType(typeExpr);
+
+        auto *callExpr = new (tc.Context) DotSyntaxCallExpr(
+            nilRefExpr, expr->getLoc(), typeExpr, type);
+        callExpr->setImplicit(true);
+        cs.cacheType(callExpr);
+
+        return callExpr;
+      }
+
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_nilLiteral });
       return convertLiteral(expr, type, cs.getType(expr), protocol,
                             Identifier(), initName,
@@ -2017,9 +2060,9 @@ namespace {
       tc.validateDecl(MaxFloatTypeDecl);
       auto maxType = MaxFloatTypeDecl->getUnderlyingTypeLoc().getType();
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinFloatLiteral });
 
       return convertLiteral(
@@ -2052,9 +2095,9 @@ namespace {
         return nullptr;
 
       auto type = simplifyType(cs.getType(expr));
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_booleanLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinBooleanLiteral });
       return convertLiteral(
                expr,
@@ -2137,7 +2180,7 @@ namespace {
         
         literalType = tc.Context.Id_StringLiteralType;
 
-        literalFuncName = DeclName(tc.Context, tc.Context.Id_init,
+        literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
         // If the string contains non-ASCII and the type can handle
@@ -2158,7 +2201,7 @@ namespace {
                                    ConformanceCheckFlags::InExpression))) {
           builtinProtocol = builtinConstUTF16StringProtocol;
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinConstUTF16StringLiteral});
 
           if (stringLiteral)
@@ -2169,7 +2212,7 @@ namespace {
                                       type, builtinProtocol, cs.DC,
                                       ConformanceCheckFlags::InExpression))) {
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinUTF16StringLiteral,
                         tc.Context.getIdentifier("utf16CodeUnitCount")});
 
@@ -2182,7 +2225,7 @@ namespace {
                                          ConformanceCheckFlags::InExpression)) {
           builtinProtocol = builtinConstStringProtocol;
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinConstStringLiteral});
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
@@ -2194,7 +2237,7 @@ namespace {
               expr->getLoc(),
               KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
           builtinLiteralFuncName 
-            = DeclName(tc.Context, tc.Context.Id_init,
+            = DeclName(tc.Context, DeclBaseName::createConstructor(),
                        { tc.Context.Id_builtinStringLiteral,
                          tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
@@ -2208,10 +2251,10 @@ namespace {
       } else if (isGraphemeClusterLiteral) {
         literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_extendedGraphemeClusterLiteral});
         builtinLiteralFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
                        tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
@@ -2231,7 +2274,7 @@ namespace {
                                   builtinUTF16ExtendedGraphemeClusterProtocol,
                                   cs.DC, ConformanceCheckFlags::InExpression)) {
           builtinLiteralFuncName
-            = DeclName(tc.Context, tc.Context.Id_init,
+            = DeclName(tc.Context, DeclBaseName::createConstructor(),
                        { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
                          tc.Context.getIdentifier("utf16CodeUnitCount") });
 
@@ -2248,10 +2291,10 @@ namespace {
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
 
         literalFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_unicodeScalarLiteral});
         builtinLiteralFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_builtinUnicodeScalarLiteral});
 
         builtinProtocol = tc.getProtocol(
@@ -2294,7 +2337,7 @@ namespace {
                          KnownProtocolKind::ExpressibleByStringInterpolation);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_stringInterpolation });
       auto member
         = findNamedWitnessImpl<ConstructorDecl>(
@@ -2302,7 +2345,7 @@ namespace {
             interpolationProto, name,
             diag::interpolation_broken_proto);
 
-      DeclName segmentName(tc.Context, tc.Context.Id_init,
+      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
                            { tc.Context.Id_stringInterpolationSegment });
       auto segmentMember
         = findNamedWitnessImpl<ConstructorDecl>(
@@ -2921,7 +2964,7 @@ namespace {
                                                    tc.Context);
       cs.cacheExprTypes(typeRef);
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
@@ -3002,7 +3045,7 @@ namespace {
                                                    tc.Context);
       cs.cacheExprTypes(typeRef);
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_dictionaryLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
@@ -3095,7 +3138,8 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       if (!cs.getType(expr->getSubExpr())->is<UnresolvedType>())
-        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite);
+        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite,
+                                     IsShallow);
       auto objectTy = cs.getType(expr->getSubExpr())->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -3124,12 +3168,10 @@ namespace {
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       // A non-failable initializer cannot delegate to a failable
       // initializer.
-      bool isOptional;
       Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
-      Type valueTy =
-          cs.getType(unwrappedSubExpr)->getOptionalObjectType(isOptional);
+      Type valueTy = cs.getType(unwrappedSubExpr)->getOptionalObjectType();
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
-      if (isOptional && inCtor->getFailability() == OTK_None) {
+      if (valueTy && inCtor->getFailability() == OTK_None) {
         bool isChaining;
         auto *otherCtorRef = expr->getCalledConstructor(isChaining);
         ConstructorDecl *ctor = otherCtorRef->getDecl();
@@ -3805,7 +3847,8 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
-      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write);
+      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write,
+                                   IsShallow);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -4114,7 +4157,7 @@ namespace {
 
         if (cs.getType(subExpr)->hasLValueType()) {
           // Treat this like a read of the property.
-          cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
+          cs.propagateLValueAccessKind(subExpr, AccessKind::Read, IsShallow);
         }
 
         // Check that we requested a property getter or setter.
@@ -6341,7 +6384,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Load from the lvalue. If we're loading the result of a force,
       // swap the order so that we load first and force the result.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
       if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
         fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
         auto *loadExpr = cs.cacheType(
@@ -6403,10 +6446,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-    case ConversionRestrictionKind::ForceUnchecked: {
-      llvm_unreachable("should never see ForceUnchecked");
-    }
-
     case ConversionRestrictionKind::ArrayUpcast: {
       // Build the value conversion.
       return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false,
@@ -6443,10 +6482,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
       PointerTypeKind pointerKind;
       auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
@@ -6454,8 +6495,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         // Overwrite the l-value access kind to be read-only if we're
         // converting to a non-mutable pointer type.
         auto *E = cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr();
-        cs.propagateLValueAccessKind(E,
-                                     AccessKind::Read, /*overwrite*/ true);
+        cs.propagateLValueAccessKind(E, AccessKind::Read, IsShallow,
+                                     /*overwrite*/ true);
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
@@ -6468,10 +6509,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
@@ -6483,10 +6526,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::StringToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
@@ -6558,7 +6603,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "i += 1", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
+      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
       return cs.cacheType(new (tc.Context)
                               InOutExpr(expr->getStartLoc(), expr,
                                         toIO->getObjectType(),
@@ -6577,7 +6622,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
       expr = cs.cacheType(new (tc.Context)
                               LoadExpr(expr, fromLValue->getObjectType()));
 
@@ -6834,7 +6879,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
+  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
                                           toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
@@ -8007,7 +8052,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics, true);
   rewriter.walkToExprPre(expr);
   Expr *result = rewriter.walkToExprPost(expr);
   if (result)

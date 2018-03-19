@@ -10,11 +10,11 @@ var HashingTestSuite = TestSuite("Hashing")
 
 func checkHash(
   for value: UInt64,
-  withKey key: (UInt64, UInt64),
+  withSeed seed: (UInt64, UInt64),
   expected: UInt64,
   file: String = #file, line: UInt = #line
 ) {
-  var hasher = _Hasher(key: key)
+  var hasher = _Hasher(seed: seed)
   hasher.append(bits: value)
   let hash = hasher.finalize()
   expectEqual(
@@ -24,23 +24,23 @@ func checkHash(
 
 HashingTestSuite.test("_Hasher/CustomKeys") {
   // This assumes _Hasher implements SipHash-1-3.
-  checkHash(for: 0, withKey: (0, 0), expected: 0xbd60acb658c79e45)
-  checkHash(for: 0, withKey: (0, 1), expected: 0x1ce32b0b44e61175)
-  checkHash(for: 0, withKey: (1, 0), expected: 0x9c44b7c8df2ca74b)
-  checkHash(for: 0, withKey: (1, 1), expected: 0x9653ca0a3b455506)
-  checkHash(for: 0, withKey: (.max, .max), expected: 0x3ab336a4895e4d36)
+  checkHash(for: 0, withSeed: (0, 0), expected: 0xbd60acb658c79e45)
+  checkHash(for: 0, withSeed: (0, 1), expected: 0x1ce32b0b44e61175)
+  checkHash(for: 0, withSeed: (1, 0), expected: 0x9c44b7c8df2ca74b)
+  checkHash(for: 0, withSeed: (1, 1), expected: 0x9653ca0a3b455506)
+  checkHash(for: 0, withSeed: (.max, .max), expected: 0x3ab336a4895e4d36)
 
-  checkHash(for: 1, withKey: (0, 0), expected: 0x1e9f734161d62dd9)
-  checkHash(for: 1, withKey: (0, 1), expected: 0xb6fcf32d09f76cba)
-  checkHash(for: 1, withKey: (1, 0), expected: 0xacb556b13007504a)
-  checkHash(for: 1, withKey: (1, 1), expected: 0x7defec680db51d24)
-  checkHash(for: 1, withKey: (.max, .max), expected: 0x212798441870ef6b)
+  checkHash(for: 1, withSeed: (0, 0), expected: 0x1e9f734161d62dd9)
+  checkHash(for: 1, withSeed: (0, 1), expected: 0xb6fcf32d09f76cba)
+  checkHash(for: 1, withSeed: (1, 0), expected: 0xacb556b13007504a)
+  checkHash(for: 1, withSeed: (1, 1), expected: 0x7defec680db51d24)
+  checkHash(for: 1, withSeed: (.max, .max), expected: 0x212798441870ef6b)
 
-  checkHash(for: .max, withKey: (0, 0), expected: 0x2f205be2fec8e38d)
-  checkHash(for: .max, withKey: (0, 1), expected: 0x3ff7fa33381ecf7b)
-  checkHash(for: .max, withKey: (1, 0), expected: 0x404afd8eb2c4b22a)
-  checkHash(for: .max, withKey: (1, 1), expected: 0x855642d657c1bd46)
-  checkHash(for: .max, withKey: (.max, .max), expected: 0x5b16b7a8181980c2)
+  checkHash(for: .max, withSeed: (0, 0), expected: 0x2f205be2fec8e38d)
+  checkHash(for: .max, withSeed: (0, 1), expected: 0x3ff7fa33381ecf7b)
+  checkHash(for: .max, withSeed: (1, 0), expected: 0x404afd8eb2c4b22a)
+  checkHash(for: .max, withSeed: (1, 1), expected: 0x855642d657c1bd46)
+  checkHash(for: .max, withSeed: (.max, .max), expected: 0x5b16b7a8181980c2)
 }
 
 HashingTestSuite.test("_Hasher/DefaultKey") {
@@ -52,22 +52,9 @@ HashingTestSuite.test("_Hasher/DefaultKey") {
   defaultHasher.append(bits: value)
   expectEqual(defaultHasher.finalize(), defaultHash)
 
-  var customHasher = _Hasher(key: _Hasher._secretKey)
+  var customHasher = _Hasher(seed: _Hasher._seed)
   customHasher.append(bits: value)
   expectEqual(customHasher.finalize(), defaultHash)
 }
 
-HashingTestSuite.test("_Hasher/keyOverride") {
-  let value: UInt64 = 0x0102030405060708
-  let expected = Int(truncatingIfNeeded: 0x661dac5d71c78013 as UInt64)
-
-  let originalKey = _Hasher._secretKey
-  _Hasher._secretKey = (1, 2)
-  let hash = _hashValue(for: value)
-  _Hasher._secretKey = originalKey
-
-  expectEqual(hash, expected)
-}
-
 runAllTests()
-

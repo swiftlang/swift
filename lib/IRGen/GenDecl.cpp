@@ -64,6 +64,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
 #include "Signature.h"
 #include "StructLayout.h"
@@ -2631,10 +2632,10 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift4_protos, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift5_protocols";
+    sectionName = "swift4_protocols";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
@@ -2820,10 +2821,10 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift4_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift5_protocol_conformances";
+    sectionName = "swift4_protocol_conformances";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
@@ -2845,10 +2846,10 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift4_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift5_type_metadata";
+    sectionName = "swift4_type_metadata";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
@@ -2910,13 +2911,13 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift4_fieldmd, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift5_fieldmd";
+    sectionName = "swift4_fieldmd";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".swift5_fieldmd";
+    sectionName = ".swift4_fieldmd";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
@@ -3030,8 +3031,9 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  llvm::Type *params[] = { SizeTy }; // MetadataRequest
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3057,24 +3059,27 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     return entry;
   }
 
-  // If we have more arguments than can be passed directly, the remaining
-  // arguments are packed into an array.
-  ArrayRef<llvm::Type *> paramTypes;
+  // If we have more arguments than can be passed directly, all of the
+  // generic arguments are passed as an array.
   llvm::Type *paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs+1];
-  if (genericArgs.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
-    // Copy direct parameter types.
-    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs))
-      paramTypesArray[i] = genericArgs[i];
 
-    paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs] =
-      Int8PtrPtrTy;
-    paramTypes = paramTypesArray;
+  paramTypesArray[0] = SizeTy; // MetadataRequest
+  size_t numParams = 1;
+
+  size_t numGenericArgs = genericArgs.size();
+  if (numGenericArgs > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    paramTypesArray[1] = Int8PtrPtrTy;
+    numParams++;
   } else {
-    paramTypes = genericArgs;
+    for (size_t i : indices(genericArgs))
+      paramTypesArray[i + 1] = genericArgs[i];
+    numParams += numGenericArgs;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, paramTypes, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  auto paramTypes = llvm::makeArrayRef(paramTypesArray, numParams);
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
+                                        paramTypes, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3412,9 +3417,9 @@ IRGenModule::getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
     /// Generic metadata pattern.
     Int8PtrPtrTy
   };
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
                                         argTys, /*isVarArg*/ false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;

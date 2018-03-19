@@ -26,6 +26,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
@@ -61,7 +62,6 @@
 #include "GenExistential.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
-#include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPoly.h"
@@ -71,6 +71,7 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
 #include "WeakTypeInfo.h"
@@ -1552,6 +1553,12 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
+  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
+  if (auto dc = f->getModule().getAssociatedContext()) {
+    if (auto sf = dc->getParentSourceFile()) {
+      CurSourceFile = sf;
+    }
+  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// REQUIRES: plus_one_runtime
+
+// RUN: %target-swift-frontend -module-name weak -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   func f() -> Int { return 42 }
@@ -83,4 +85,9 @@ class CC {
   init() {
     var foo = x
   }
+}
+
+func testNoneWeak() {
+  weak var x: CC? = nil
+  weak var y: CC? = .none
 }

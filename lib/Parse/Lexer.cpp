@@ -278,12 +278,20 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
-  if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
-    CommentLength = TokStart - LastCommentBlockStart;
+  if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    auto Iter = llvm::find_if(LeadingTrivia, [](const TriviaPiece &Piece) {
+      return Piece.isComment();
+    });
+    for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
+      CommentLength += Iter->getTextLength();
+    }
+  }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
+  }
 
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
 }
@@ -292,11 +300,11 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-    LeadingTrivia.push_back(TriviaPiece::backtick());
-    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-    TrailingTrivia.push_back(TriviaPiece::backtick());
-  }
+
+  LeadingTrivia.push_back(TriviaPiece::backtick());
+  assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
+  TrailingTrivia.push_back(TriviaPiece::backtick());
+
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
   // this as escaped-identifier in this case.
@@ -598,24 +606,16 @@ bool Lexer::isOperator(StringRef string) {
 
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
-  tok Kind = llvm::StringSwitch<tok>(Str)
-#define KEYWORD(kw) \
-    .Case(#kw, tok::kw_##kw)
+#define SIL_KEYWORD(kw)
+#define KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-    .Default(tok::identifier);
 
   // SIL keywords are only active in SIL mode.
-  switch (Kind) {
-#define SIL_KEYWORD(kw) \
-    case tok::kw_##kw:
+  if (InSILMode) {
+#define SIL_KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-      if (!InSILMode)
-        Kind = tok::identifier;
-      break;
-    default:
-      break;
   }
-  return Kind;
+  return tok::identifier;
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
@@ -636,21 +636,6 @@ void Lexer::lexIdentifier() {
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
 void Lexer::lexHash() {
   const char *TokStart = CurPtr-1;
-
-  // NOTE: legacy punctuator.  Remove in the future.
-  if (*CurPtr == ']') { // #]
-     ++CurPtr;
-     return formToken(tok::r_square_lit, TokStart);
-  }
-  
-  // Allow a hashbang #! line at the beginning of the file.
-  if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
-    --CurPtr;
-    if (BufferID != SourceMgr.getHashbangBufferID())
-      diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-    skipHashbang(/*EatNewline=*/true);
-    return lexImpl();
-  }
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
@@ -2159,18 +2144,15 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-    LeadingTrivia.clear();
-    TrailingTrivia.clear();
-  }
+  LeadingTrivia.clear();
+  TrailingTrivia.clear();
+
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-        // Add UTF-8 BOM to LeadingTrivia.
-        LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
-      }
+      // Add UTF-8 BOM to LeadingTrivia.
+      LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2178,11 +2160,6 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  // Remember where we started so that we can find the comment range.
-  LastCommentBlockStart = CurPtr;
-  SeenComment = false;
-
-Restart:
   lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
 
   // Remember the start of the token so we can form the text range.
@@ -2198,24 +2175,23 @@ Restart:
       return lexOperatorIdentifier();
 
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/true);
-    if (ShouldTokenize) {
-      return formToken(tok::unknown, TokStart);
-    }
-    goto Restart; // Skip presumed whitespace.
+    assert(
+        ShouldTokenize &&
+        "Invalid UTF-8 sequence should be eaten by lexTrivia as LeadingTrivia");
+    (void)ShouldTokenize;
+    return formToken(tok::unknown, TokStart);
   }
 
   case '\n':
   case '\r':
-    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
-           "newlines should be eaten by lexTrivia as LeadingTrivia");
-    NextToken.setAtStartOfLine(true);
-    goto Restart;  // Skip whitespace.
+    llvm_unreachable("Newlines should be eaten by lexTrivia as LeadingTrivia");
 
   case ' ':
   case '\t':
   case '\f':
   case '\v':
-    goto Restart;  // Skip whitespace.
+    llvm_unreachable(
+        "Whitespaces should be eaten by lexTrivia as LeadingTrivia");
 
   case -1:
   case -2:
@@ -2228,44 +2204,30 @@ Restart:
     case NulCharacterKind::CodeCompletion:
       return formToken(tok::code_complete, TokStart);
 
-    case NulCharacterKind::Embedded:
-      // If this is a random nul character in the middle of a buffer, skip it as
-      // whitespace.
-      diagnoseEmbeddedNul(Diags, CurPtr-1);
-      goto Restart;
     case NulCharacterKind::BufferEnd:
-      // Otherwise, this is the real end of the buffer.  Put CurPtr back into
-      // buffer bounds.
+      // This is the real end of the buffer.
+      // Put CurPtr back into buffer bounds.
       --CurPtr;
       // Return EOF.
       return formToken(tok::eof, TokStart);
+
+    case NulCharacterKind::Embedded:
+      llvm_unreachable(
+          "Embedded nul should be eaten by lexTrivia as LeadingTrivia");
     }
 
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
-  case '[': {
-     // NOTE: Legacy punctuator for old object literal syntax.
-     // Remove in the future.
-     if (*CurPtr == '#') { // [#
-       // NOTE: Do NOT include the '#' in the token, unlike in earlier
-       // versions of Swift that supported the old object literal syntax
-       // directly.  The '#' will be lexed as part of the object literal
-       // keyword token itself.
-       return formToken(tok::l_square_lit, TokStart);
-     }
-     return formToken(tok::l_square, TokStart);
-  }
+  case '[': return formToken(tok::l_square, TokStart);
   case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
-  case ')':
-    return formToken(tok::r_paren, TokStart);
+  case ')': return formToken(tok::r_paren, TokStart);
 
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
   case ':': return formToken(tok::colon, TokStart);
-  case '\\':
-    return formToken(tok::backslash, TokStart);
+  case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
     return lexHash();
@@ -2274,17 +2236,15 @@ Restart:
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment(/*EatNewline=*/true);
-      SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten by lexTrivia as LeadingTrivia");
+      return formToken(tok::comment, TokStart);
     }
     if (CurPtr[0] == '*') { // "/*"
       skipSlashStarComment();
-      SeenComment = true;
-      if (isKeepingComments())
-        return formToken(tok::comment, TokStart);
-      goto Restart;
+      assert(isKeepingComments() &&
+             "Non token comment should be eaten by lexTrivia as LeadingTrivia");
+      return formToken(tok::comment, TokStart);
     }
     return lexOperatorIdentifier();
   case '%':
@@ -2313,13 +2273,9 @@ Restart:
   case '<':
     if (CurPtr[0] == '#')
       return tryLexEditorPlaceholder();
-    else if (CurPtr[0] == '<' && tryLexConflictMarker(/*EatNewline=*/true))
-      goto Restart;
-    return lexOperatorIdentifier();
 
+    return lexOperatorIdentifier();
   case '>':
-    if (CurPtr[0] == '>' && tryLexConflictMarker(/*EatNewline=*/true))
-      goto Restart;
     return lexOperatorIdentifier();
  
   case '=': case '-': case '+': case '*':
@@ -2378,9 +2334,6 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
 }
 
 void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
-  if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
-    return;
-
 Restart:
   const char *TriviaStart = CurPtr;
 
@@ -2421,7 +2374,6 @@ Restart:
       break;
     } else if (*CurPtr == '/') {
       // '// ...' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
@@ -2431,7 +2383,6 @@ Restart:
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;

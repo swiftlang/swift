@@ -954,11 +954,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
-                                                 DeclContext *DC,
-                                                 ProtocolDecl *protocol) {
+static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
+                                       ProtocolDecl *protocol) {
   do {
     if (DC->isTypeContext()) {
+      if (protocol == DC->getAsProtocolOrProtocolExtensionContext())
+        return DC->mapTypeIntoContext(DC->getProtocolSelfType());
+
       auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
       auto type = NTD->getDeclaredType();
 
@@ -971,7 +973,7 @@ static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
           TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
 
       if (result)
-        return NTD;
+        return DC->getDeclaredTypeInContext();
     }
   } while ((DC = DC->getParent()));
 
@@ -1044,10 +1046,10 @@ static void bindArchetypesFromContext(
           contextTy = genericEnv->mapTypeIntoContext(paramTy);
         } else {
           auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
-          auto conformingDC = getInnermostConformingDC(cs.TC, cs.DC, protocol);
-          assert(conformingDC);
-          contextTy = conformingDC->getDeclaredTypeInContext();
+          contextTy = getInnermostConformingType(cs.TC, cs.DC, protocol);
         }
+
+        assert(contextTy);
 
         auto typeVar = found->second;
         cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,

@@ -421,6 +421,13 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
+  Optional<SILLocation> getSubjectLocationOverride(SILLocation loc) const {
+    if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
+      if (!Switch->isImplicit())
+        return SILLocation(Switch->getSubjectExpr());
+    return None;
+  }
+
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
@@ -479,7 +486,8 @@ private:
                       const FailureHandler &failure);
   void emitEnumElementDispatchWithOwnership(
       ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-      const SpecializationHandler &handleSpec, const FailureHandler &failure);
+      const SpecializationHandler &handleSpec, const FailureHandler &failure,
+      ProfileCounter defaultCaseCount);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -1144,6 +1152,7 @@ void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
 void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
                                            ConsumableManagedValue value,
                                            const FailureHandler &failure) {
+  DebugLocOverrideRAII LocOverride{SGF.B, getSubjectLocationOverride(pattern)};
   FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
@@ -1722,23 +1731,22 @@ static void generateEnumCaseBlocks(
       formalElt = osp->getElementDecl();
       subPattern = osp->getSubPattern();
     }
-    auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
-    assert(elt->getParentEnum() == enumDecl);
+    assert(formalElt->getParentEnum() == enumDecl);
 
     unsigned index = caseInfos.size();
-    auto insertionResult = caseToIndex.insert({elt, index});
+    auto insertionResult = caseToIndex.insert({formalElt, index});
     if (!insertionResult.second) {
       index = insertionResult.first->second;
     } else {
       curBB = SGF.createBasicBlock(curBB);
-      caseBBs.push_back({elt, curBB});
+      caseBBs.push_back({formalElt, curBB});
       caseInfos.push_back(CaseInfo());
       caseInfos.back().FormalElement = formalElt;
       caseInfos.back().FirstMatcher = row.Pattern;
       caseCounts.push_back(row.Count);
     }
-    assert(caseToIndex[elt] == index);
-    assert(caseBBs[index].first == elt);
+    assert(caseToIndex[formalElt] == index);
+    assert(caseBBs[index].first == formalElt);
 
     auto &info = caseInfos[index];
     info.Irrefutable = (info.Irrefutable || row.Irrefutable);
@@ -1788,8 +1796,8 @@ static void generateEnumCaseBlocks(
 /// OptionalSomePattern.
 void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-    const SpecializationHandler &handleCase,
-    const FailureHandler &outerFailure) {
+    const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
+    ProfileCounter defaultCastCount) {
   assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
          "SIL ownership does not support TakeOnSuccess");
 
@@ -1814,7 +1822,9 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
   SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
   // FIXME: Pass caseCounts in here as well, as it is in
   // emitEnumElementDispatch.
-  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
+  ArrayRef<ProfileCounter> caseCountsArrayRef = caseCounts;
+  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs, caseCountsArrayRef,
+                         defaultCastCount);
 
   // Okay, now emit all the cases.
   for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
@@ -1933,7 +1943,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // use the dispatch code path.
   if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
     return emitEnumElementDispatchWithOwnership(rows, src, handleCase,
-                                                outerFailure);
+                                                outerFailure, defaultCaseCount);
   }
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();

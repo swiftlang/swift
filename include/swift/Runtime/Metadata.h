@@ -189,6 +189,31 @@ class WeakReference;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// The result of requesting type metadata.  Generally the return value of
+/// a function.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataResponse {
+  /// For metadata access functions, this is the requested metadata.
+  ///
+  /// For metadata initialization functions, this is either null,
+  /// indicating that initialization was successful, or a metadata on
+  /// which initialization depends for further progress.
+  const Metadata *Value;
+
+  /// For metadata access functions, this is the current state of the
+  /// metadata returned.  Always use this instead of trying to inspect
+  /// the metadata directly; an incomplete metadata may be getting
+  /// initialized concurrently.  This can generally be ignored if the
+  /// metadata request was for abstract metadata or if the request is
+  /// blocking.
+  ///
+  /// For metadata initialization functions, this is the state that the
+  /// given metadata needs to be in before initialization can continue.
+  MetadataRequest::BasicKind State;
+};
+
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
@@ -243,124 +268,6 @@ constexpr inline bool canBeInline() {
 
 struct ValueWitnessTable;
 
-/// Flags stored in the value-witness table.
-class ValueWitnessFlags {
-  typedef size_t int_type;
-  
-  // The polarity of these bits is chosen so that, when doing struct layout, the
-  // flags of the field types can be mostly bitwise-or'ed together to derive the
-  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
-  // still require additional fixup.)
-  enum : int_type {
-    AlignmentMask = 0x0000FFFF,
-    IsNonPOD =      0x00010000,
-    IsNonInline =   0x00020000,
-    HasExtraInhabitants = 0x00040000,
-    HasSpareBits =  0x00080000,
-    IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses = 0x00200000,
-    // Everything else is reserved.
-  };
-  int_type Data;
-
-  constexpr ValueWitnessFlags(int_type data) : Data(data) {}
-public:
-  constexpr ValueWitnessFlags() : Data(0) {}
-
-  /// The required alignment of the first byte of an object of this
-  /// type, expressed as a mask of the low bits that must not be set
-  /// in the pointer.
-  ///
-  /// This representation can be easily converted to the 'alignof'
-  /// result by merely adding 1, but it is more directly useful for
-  /// performing dynamic structure layouts, and it grants an
-  /// additional bit of precision in a compact field without needing
-  /// to switch to an exponent representation.
-  ///
-  /// For example, if the type needs to be 8-byte aligned, the
-  /// appropriate alignment mask should be 0x7.
-  size_t getAlignmentMask() const {
-    return (Data & AlignmentMask);
-  }
-  constexpr ValueWitnessFlags withAlignmentMask(size_t alignMask) const {
-    return ValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
-  }
-
-  size_t getAlignment() const { return getAlignmentMask() + 1; }
-  constexpr ValueWitnessFlags withAlignment(size_t alignment) const {
-    return withAlignmentMask(alignment - 1);
-  }
-
-  /// True if the type requires out-of-line allocation of its storage.
-  bool isInlineStorage() const { return !(Data & IsNonInline); }
-  constexpr ValueWitnessFlags withInlineStorage(bool isInline) const {
-    return ValueWitnessFlags((Data & ~IsNonInline) |
-                               (isInline ? 0 : IsNonInline));
-  }
-
-  /// True if values of this type can be copied with memcpy and
-  /// destroyed with a no-op.
-  bool isPOD() const { return !(Data & IsNonPOD); }
-  constexpr ValueWitnessFlags withPOD(bool isPOD) const {
-    return ValueWitnessFlags((Data & ~IsNonPOD) |
-                               (isPOD ? 0 : IsNonPOD));
-  }
-  
-  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
-  /// 'take' is a destructive operation that invalidates the source object, so
-  /// most types can be taken with a simple bitwise copy. Only types with side
-  /// table references, like @weak references, or types with opaque value
-  /// semantics, like imported C++ types, are not bitwise-takable.
-  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
-  constexpr ValueWitnessFlags withBitwiseTakable(bool isBT) const {
-    return ValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
-                               (isBT ? 0 : IsNonBitwiseTakable));
-  }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
-  /// True if this type's binary representation is that of an enum, and the
-  /// enum value witness table entries are available in this type's value
-  /// witness table.
-  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr ValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return ValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
-  constexpr ValueWitnessFlags
-  withEnumWitnesses(bool hasEnumWitnesses) const {
-    return ValueWitnessFlags((Data & ~HasEnumWitnesses) |
-                             (hasEnumWitnesses ? HasEnumWitnesses : 0));
-  }
-};
-  
-/// Flags stored in a value-witness table with extra inhabitants.
-class ExtraInhabitantFlags {
-  typedef size_t int_type;
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-  };
-  int_type Data;
-  
-  constexpr ExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr ExtraInhabitantFlags() : Data(0) {}
-  
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-  
-  constexpr ExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return ExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                  numExtraInhabitants);
-  }
-};
-
 namespace value_witness_types {
 
 // Note that, for now, we aren't strict about 'const'.
@@ -409,6 +316,11 @@ struct ValueWitnessTable {
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   value_witness_types::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
+
+  /// Is the external type layout of this type incomplete?
+  bool isIncomplete() const {
+    return flags.isIncomplete();
+  }
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
@@ -1612,20 +1524,10 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// flag is set.
     RelativeDirectPointer<InitializationFunction_t> InitializationFunction;
     
-    /// The uniquing key for the metadata record. Metadata records with the
-    /// same Name string are considered equivalent by the runtime, and the
-    /// runtime will pick one to be canonical.
-    RelativeDirectPointer<const char> Name;
-
     mutable std::atomic<CacheValue> Cache;
   };
 
   struct HeaderType : HeaderPrefix, TargetTypeMetadataHeader<Runtime> {};
-
-  TargetPointer<Runtime, const char> getName() const {
-    return reinterpret_cast<TargetPointer<Runtime, const char>>(
-      asFullMetadata(this)->Name.get());
-  }
 
   CacheValue getCacheValue() const {
     /// NB: This can be a relaxed-order load if there is no initialization
@@ -1941,7 +1843,7 @@ const
   FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
 template <typename Runtime> struct TargetProtocolDescriptor;
-  
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -2106,6 +2008,16 @@ using TargetWitnessTablePointer =
 
 using WitnessTablePointer = TargetWitnessTablePointer<InProcess>;
 
+using AssociatedTypeAccessFunction =
+  SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                  const Metadata *self,
+                                  const WitnessTable *selfConformance);
+
+using AssociatedWitnessTableAccessFunction =
+  SWIFT_CC(swift) WitnessTable *(const Metadata *associatedType,
+                                 const Metadata *self,
+                                 const WitnessTable *selfConformance);
+
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.
@@ -2131,6 +2043,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), Protocols() {}
   
+  explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
+    : TargetMetadata<Runtime>(MetadataKind::Existential),
+      Flags(Flags), Protocols() {}
+
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
   
@@ -2191,6 +2107,17 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
+
+/// The standard metadata for the empty protocol composition type, Any.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
+
+/// The standard metadata for the empty class-constrained protocol composition
+/// type, AnyObject.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANYOBJECT_MANGLING);
 
 /// The basic layout of an existential metatype type.
 template <typename Runtime>
@@ -2654,7 +2581,7 @@ using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {
-  uint32_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+  uint16_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
   
   uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;
@@ -3116,9 +3043,10 @@ struct MetadataCompletionContext {
 ///   pointer to indicate that completion is blocked on the completion of
 ///   some other type
 using MetadataCompleter =
-  Metadata *(const Metadata *type,
-             MetadataCompletionContext *context,
-             const TargetGenericMetadataPattern<InProcess> *pattern);
+  SWIFT_CC(swift)
+  MetadataResponse(const Metadata *type,
+                   MetadataCompletionContext *context,
+                   const TargetGenericMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
@@ -3337,45 +3265,13 @@ using TypeGenericContextDescriptorHeader =
 /// Wrapper class for the pointer to a metadata access function that provides
 /// operator() overloads to call it with the right calling convention.
 class MetadataAccessFunction {
-  const Metadata * (*Function)(...);
+  MetadataResponse (*Function)(...);
 
   static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
                 "Need to account for change in number of direct arguments");
 
-  template<typename T>
-  const Metadata *applyN(const void *arg0,
-                         const void *arg1,
-                         const void *arg2,
-                         llvm::ArrayRef<T *> argRest) const {
-    using FnN = const Metadata *(const void *,
-                                 const void *,
-                                 const void *,
-                                 const void *);
-    return reinterpret_cast<FnN*>(Function)(arg0, arg1, arg2, argRest.data());
-  }
-  
-  template<typename...Args>
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n,
-                                 const void *arg3,
-                                 Args...argN) const {
-    argRest[n] = arg3;
-    return variadic_apply(arg0, arg1, arg2, argRest, n+1, argN...);
-  }
-  
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n) const {
-    return applyN(arg0, arg1, arg2, argRest);
-  }
-
 public:
-  explicit MetadataAccessFunction(const Metadata * (*Function)(...))
+  explicit MetadataAccessFunction(MetadataResponse (*Function)(...))
     : Function(Function)
   {}
   
@@ -3383,52 +3279,78 @@ public:
     return Function != nullptr;
   }
   
-  // Invoke with an array of arguments.
-  template<typename T>
-  const Metadata *operator()(llvm::ArrayRef<T *> args) const {
+  /// Invoke with an array of arguments of dynamic size.
+  MetadataResponse operator()(MetadataRequest request,
+                              llvm::ArrayRef<const void *> args) const {
     switch (args.size()) {
     case 0:
-      return (*this)();
+      return operator()(request);
     case 1:
-      return (*this)(args[0]);
+      return operator()(request, args[0]);
     case 2:
-      return (*this)(args[0], args[1]);
+      return operator()(request, args[0], args[1]);
     case 3:
-      return (*this)(args[0], args[1], args[2]);
+      return operator()(request, args[0], args[1], args[2]);
     default:
-      return applyN(args[0], args[1], args[2], args);
+      return applyMany(request, args.data());
     }
   }
   
-  // Invoke with n arguments.
-  const Metadata *operator()() const {
-    using Fn0 = const Metadata *();
-    return reinterpret_cast<Fn0*>(Function)();
+  /// Invoke with exactly 0 arguments.
+  MetadataResponse operator()(MetadataRequest request) const {
+    using Fn0 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request);
+    return reinterpret_cast<Fn0*>(Function)(request);
   }
-  const Metadata *operator()(const void *arg0) const {
-    using Fn1 = const Metadata *(const void *);
-    return reinterpret_cast<Fn1*>(Function)(arg0);
+
+  /// Invoke with exactly 1 argument.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0) const {
+    using Fn1 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0);
+    return reinterpret_cast<Fn1*>(Function)(request, arg0);
 
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1) const {
-    using Fn2 = const Metadata *(const void *, const void *);
-    return reinterpret_cast<Fn2*>(Function)(arg0, arg1);
+
+  /// Invoke with exactly 2 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1) const {
+    using Fn2 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1);
+    return reinterpret_cast<Fn2*>(Function)(request, arg0, arg1);
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2) const {
-    using Fn3 = const Metadata *(const void *, const void *, const void *);
-    return reinterpret_cast<Fn3*>(Function)(arg0, arg1, arg2);
+
+  /// Invoke with exactly 3 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2) const {
+    using Fn3 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1,
+                                                 const void *arg2);
+    return reinterpret_cast<Fn3*>(Function)(request, arg0, arg1, arg2);
   }
   
+  /// Invoke with more than 3 arguments.
   template<typename...Args>
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2,
-                             Args...argN) const {
-    const void *args[3 + sizeof...(Args)];
-    return variadic_apply(arg0, arg1, arg2, args, 3, argN...);
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2,
+                              Args... argN) const {
+    const void *args[] = { arg0, arg1, arg2, argN... };
+    return applyMany(request, args);
+  }
+
+private:
+  /// In the more-then-max case, just pass all the arguments as an array.
+  MetadataResponse applyMany(MetadataRequest request,
+                             const void * const *args) const {
+    using FnN = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void * const *args);
+    return reinterpret_cast<FnN*>(Function)(request, args);
   }
 };
 
@@ -3444,7 +3366,7 @@ public:
   /// The function type here is a stand-in. You should use getAccessFunction()
   /// to wrap the function pointer in an accessor that uses the proper calling
   /// convention for a given number of arguments.
-  TargetRelativeDirectPointer<Runtime, const Metadata *(...),
+  TargetRelativeDirectPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
 
   MetadataAccessFunction getAccessFunction() const {
@@ -3963,27 +3885,11 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
 }
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
-///
-/// The basic algorithm for fetching a metadata object is:
-///   func swift_getGenericMetadata(header, arguments) {
-///     if (metadata = getExistingMetadata(&header.PrivateData,
-///                                        arguments[0..header.NumArguments]))
-///       return metadata
-///     metadata = malloc(superclass.MetadataSize +
-///                       numImmediateMembers * sizeof(void *))
-///     memcpy(metadata, header.MetadataTemplate, header.TemplateSize)
-///     for (i in 0..header.NumFillInstructions)
-///       metadata[header.FillInstructions[i].ToIndex]
-///         = arguments[header.FillInstructions[i].FromIndex]
-///     setExistingMetadata(&header.PrivateData,
-///                         arguments[0..header.NumArguments],
-///                         metadata)
-///     return metadata
-///   }
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_getGenericMetadata(const TypeContextDescriptor *description,
-                         const void *arguments);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getGenericMetadata(MetadataRequest request,
+                         const void * const *arguments,
+                         const TypeContextDescriptor *description);
 
 /// Allocate a generic class metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic class.

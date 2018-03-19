@@ -290,7 +290,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 5 };
+  enum { NumFlagBits = 8 };
   SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
@@ -997,11 +997,6 @@ public:
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
-
-  /// Return T if this type is Optional<T>; otherwise, return the null
-  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
-  /// otherwise.
-  Type getOptionalObjectType(bool &isOptional);
 
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
@@ -2367,7 +2362,7 @@ BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 
 /// A language-level calling convention.
-enum class SILFunctionLanguage : unsigned char {
+enum class SILFunctionLanguage : uint8_t {
   /// A variation of the Swift calling convention.
   Swift = 0,
 

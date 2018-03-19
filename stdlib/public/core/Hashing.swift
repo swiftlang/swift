@@ -29,28 +29,12 @@ enum _HashingDetail {
 
   // FIXME(hasher): Remove
   @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static var fixedSeedOverride: UInt64 {
-    get {
-      // HACK: the variable itself is defined in C++ code so that it is
-      // guaranteed to be statically initialized.  This is a temporary
-      // workaround until the compiler can do the same for Swift.
-      return _swift_stdlib_HashingDetail_fixedSeedOverride
-    }
-    set {
-      _swift_stdlib_HashingDetail_fixedSeedOverride = newValue
-    }
-  }
-
-  // FIXME(hasher): Remove
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @_transparent
   internal static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
     // implementation.
-    let seed: UInt64 = 0xff51afd7ed558ccd
-    return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
+    return 0xff51afd7ed558ccd
   }
 
   // FIXME(hasher): Remove
@@ -215,6 +199,7 @@ internal struct _LegacyHasher {
 
 
 // NOT @_fixed_layout
+@_fixed_layout // FIXME - remove - radar 38549901
 public struct _Hasher {
   internal typealias Core = _SipHash13
 
@@ -224,33 +209,44 @@ public struct _Hasher {
   // NOT @_inlineable
   @effects(releasenone)
   public init() {
-    self._core = Core(key: _Hasher._secretKey)
+    self._core = Core(key: _Hasher._seed)
   }
 
   // NOT @_inlineable
   @effects(releasenone)
-  public init(key: (UInt64, UInt64)) {
-    self._core = Core(key: key)
+  public init(seed: (UInt64, UInt64)) {
+    self._core = Core(key: seed)
   }
 
-  // FIXME(ABI)#41 : make this an actual public API.
-  @_inlineable // FIXME(sil-serialize-all)
+  /// Indicates whether we're running in an environment where hashing needs to
+  /// be deterministic. If this is true, the hash seed is not random, and hash
+  /// tables do not apply per-instance perturbation that is not repeatable.
+  /// This is not recommended for production use, but it is useful in certain
+  /// test environments where randomization may lead to unwanted nondeterminism
+  /// of test results.
   public // SPI
-  static var _secretKey: (UInt64, UInt64) {
+  static var _isDeterministic: Bool {
+    @_inlineable
+    @inline(__always)
     get {
-      // The variable itself is defined in C++ code so that it is initialized
-      // during static construction.  Almost every Swift program uses hash
-      // tables, so initializing the secret key during the startup seems to be
-      // the right trade-off.
-      return (
-        _swift_stdlib_Hashing_secretKey.key0,
-        _swift_stdlib_Hashing_secretKey.key1)
+      return _swift_stdlib_Hashing_parameters.deterministic;
     }
-    set {
-      // FIXME(hasher) Replace setter with some override mechanism inside 
-      // the runtime
-      (_swift_stdlib_Hashing_secretKey.key0,
-       _swift_stdlib_Hashing_secretKey.key1) = newValue
+  }
+
+  /// The 128-bit hash seed used to initialize the hasher state. Initialized
+  /// once during process startup.
+  public // SPI
+  static var _seed: (UInt64, UInt64) {
+    @_inlineable
+    @inline(__always)
+    get {
+      // The seed itself is defined in C++ code so that it is initialized during
+      // static construction.  Almost every Swift program uses hash tables, so
+      // initializing the seed during the startup seems to be the right
+      // trade-off.
+      return (
+        _swift_stdlib_Hashing_parameters.seed0,
+        _swift_stdlib_Hashing_parameters.seed1)
     }
   }
 

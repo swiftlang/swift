@@ -21,24 +21,23 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-ToolChain::JobContext::JobContext(Compilation &C,
-                                  ArrayRef<const Job *> Inputs,
+ToolChain::JobContext::JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+    : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output), OI(OI),
+      Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
@@ -280,6 +279,35 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
+/// Debugging only: return whether the set of \p jobs is an ordered subsequence
+/// of the sequence of top-level input files in the \c Compilation \p C.
+static bool
+jobsAreSubsequenceOfCompilationInputs(ArrayRef<const Job *> jobs,
+                                      Compilation &C) {
+  llvm::SmallVector<const Job *, 16> sortedJobs;
+  llvm::StringMap<const Job *> jobsByInput;
+  for (const Job *J : jobs) {
+    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
+    const InputAction* IA = findSingleSwiftInput(CJA);
+    auto R = jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(),
+                                               J));
+    assert(R.second);
+  }
+  for (const InputPair &P : C.getInputFiles()) {
+    auto I = jobsByInput.find(P.second->getValue());
+    if (I != jobsByInput.end()) {
+      sortedJobs.push_back(I->second);
+    }
+  }
+  if (sortedJobs.size() != jobs.size())
+    return false;
+  for (size_t i = 0; i < sortedJobs.size(); ++i) {
+    if (sortedJobs[i] != jobs[i])
+      return false;
+  }
+  return true;
+}
+
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.
@@ -287,16 +315,10 @@ std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
                              Compilation &C) const
 {
-#ifndef NDEBUG
-  // Verify that the equivalence relation on the jobs also holds pairwise.
-  for (auto *A : jobs) {
-    for (auto *B : jobs) {
-      assert(jobsAreBatchCombinable(C, A, B));
-    }
-  }
-#endif
   if (jobs.empty())
     return nullptr;
+
+  assert(jobsAreSubsequenceOfCompilationInputs(jobs, C));
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.

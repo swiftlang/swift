@@ -365,6 +365,23 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
                                        SILType resultTy,
                                        ValueTransformRef transformValue,
                                        SGFContext C) {
+  auto &Ctx = getASTContext();
+
+  // If the input is known to be 'none' just emit a 'none' value of the right
+  // result type right away.
+  auto &resultTL = getTypeLowering(resultTy);
+
+  if (auto *EI = dyn_cast<EnumInst>(input.getValue())) {
+    if (EI->getElement() == Ctx.getOptionalNoneDecl()) {
+      if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
+        SILValue none = B.createEnum(loc, SILValue(), EI->getElement(),
+                                     resultTy);
+        return emitManagedRValueWithCleanup(none);
+      }
+    }
+  }
+
+  // Otherwise perform a dispatch.
   auto contBB = createBasicBlock();
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
@@ -377,8 +394,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   assert(noOptResultTy);
 
   // Create a temporary for the output optional.
-  auto &resultTL = getTypeLowering(resultTy);
-
+  //
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
   // TODO: use the SGFContext passed in.
@@ -391,16 +407,15 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
     finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+  SEBuilder.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         // If we have an address only type, we want to match the old behavior of
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
         if (getTypeLowering(input.getType()).isAddressOnly() &&
             silConv.useLoweredAddresses()) {
-          auto *someDecl = B.getASTContext().getOptionalSomeDecl();
+          auto *someDecl = Ctx.getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
         }
@@ -420,9 +435,9 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         return scope.exitAndBranch(loc);
       });
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+  SEBuilder.addOptionalNoneCase(
+      isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);

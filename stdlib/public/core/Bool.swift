@@ -298,3 +298,19 @@ extension Bool {
     return lhs ? true : try rhs()
   }
 }
+
+extension Bool {
+  @_inlineable
+  /// Toggles the value of the Boolean. 
+  ///
+  /// Calling this method sets the variable to `true` if it was `false`,
+  /// and sets it to `false` if it was `true`. For example:
+  ///
+  ///    var bools = [true, false]
+  ///
+  ///    bools[0].toggle()
+  ///    // bools now contains [false, false]
+  public mutating func toggle() {
+    self = !self
+  }
+}

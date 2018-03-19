@@ -1404,10 +1404,7 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 static bool
 someEnclosingDeclMatches(SourceRange ReferenceRange,
                          const DeclContext *ReferenceDC,
-                         TypeChecker &TC,
                          llvm::function_ref<bool(const Decl *)> Pred) {
-  ASTContext &Ctx = TC.Context;
-
   // Climb the DeclContext hierarchy to see if any of the containing
   // declarations matches the predicate.
   const DeclContext *DC = ReferenceDC;
@@ -1446,6 +1443,7 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   if (ReferenceRange.isInvalid())
     return false;
 
+  ASTContext &Ctx = ReferenceDC->getASTContext();
   const Decl *DeclToSearch =
       findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
 
@@ -1474,28 +1472,32 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   return false;
 }
 
-bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
-                                           const DeclContext *DC) {
+/// Returns true if the reference or any of its parents is an
+/// implicit function.
+static bool isInsideImplicitFunction(SourceRange ReferenceRange,
+                                     const DeclContext *DC) {
   auto IsInsideImplicitFunc = [](const Decl *D) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     return AFD && AFD->isImplicit();
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, DC, *this,
-                                  IsInsideImplicitFunc);
+  return someEnclosingDeclMatches(ReferenceRange, DC, IsInsideImplicitFunc);
 }
 
-bool TypeChecker::isInsideUnavailableDeclaration(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+/// Returns true if the reference or any of its parents is an
+/// unavailable (or obsoleted) declaration.
+static bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
+                                           const DeclContext *ReferenceDC) {
   auto IsUnavailable = [](const Decl *D) {
     return D->getAttrs().getUnavailable(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsUnavailable);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
 }
 
-bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
+/// Returns true if the reference or any of its parents is an
+/// unconditional unavailable declaration for the same platform.
+static bool isInsideCompatibleUnavailableDeclaration(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
     const AvailableAttr *attr) {
   if (!attr->isUnconditionallyUnavailable()) {
@@ -1512,18 +1514,18 @@ bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
     return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsUnavailable);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
 }
 
-bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                                const DeclContext *ReferenceDC){
+/// Returns true if the reference is lexically contained in a declaration
+/// that is deprecated on all deployment targets.
+static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                          const DeclContext *ReferenceDC){
   auto IsDeprecated = [](const Decl *D) {
     return D->getAttrs().getDeprecated(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
-                                  IsDeprecated);
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);
 }
 
 static void fixItAvailableAttrRename(TypeChecker &TC,
@@ -1676,7 +1678,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == TC.Context.Id_init.str() &&
+  } else if (parsed.BaseName == "init" &&
              call && isa<CallExpr>(call)) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
@@ -1879,7 +1881,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   // and bindings to member types and class/static properties.
   if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
         (parsed.isMember() && parsed.IsFunctionName) ||
-        (parsed.BaseName == ctx.Id_init.str() &&
+        (parsed.BaseName == "init" &&
          !dyn_cast_or_null<ConstructorDecl>(D)))) {
     return None;
   }
@@ -1890,14 +1892,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
     name << parsed.ContextName << '.';
 
   if (parsed.IsFunctionName) {
-    // FIXME: duplicated from above.
-    SmallVector<Identifier, 4> argumentLabelIDs;
-    std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
-                   std::back_inserter(argumentLabelIDs),
-                   [&ctx](StringRef labelStr) -> Identifier {
-      return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
-    });
-    name << DeclName(ctx, ctx.getIdentifier(parsed.BaseName), argumentLabelIDs);
+    name << parsed.formDeclName(ctx);
   } else {
     name << parsed.BaseName;
   }
@@ -1937,14 +1932,25 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     }
   }
 
-  DeclName Name = DeprecatedDecl->getFullName();
+  DeclName Name;
+  Optional<unsigned> rawAccessorKind;
+  if (auto *accessor = dyn_cast<AccessorDecl>(DeprecatedDecl)) {
+    Name = accessor->getStorage()->getFullName();
+    assert(accessor->isGetterOrSetter());
+    rawAccessorKind = static_cast<unsigned>(accessor->getAccessorKind());
+  } else {
+    Name = DeprecatedDecl->getFullName();
+  }
+
   StringRef Platform = Attr->prettyPlatformString();
   clang::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
     DeprecatedVersion = Attr->Deprecated.getValue();
 
+  static const unsigned NOT_ACCESSOR_INDEX = 2;
   if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion)
       .highlight(Attr->getRange());
@@ -1958,21 +1964,23 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   if (!Attr->Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion, EncodedMessage.Message)
       .highlight(Attr->getRange());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.getValueOr(ReplacementDeclKind::None));
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
+             rawAccessorKind.getValueOr(NOT_ACCESSOR_INDEX), Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion, replacementDeclKind.hasValue(), rawReplaceKind,
              newName)
       .highlight(Attr->getRange());
   }
 
-  if (!Attr->Rename.empty()) {
+  if (!Attr->Rename.empty() && !rawAccessorKind.hasValue()) {
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
@@ -2007,7 +2015,7 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
 
     // Only initializers should be named 'init'.
     if (isa<ConstructorDecl>(override) ^
-        (parsedName.BaseName == Context.Id_init.str())) {
+        (parsedName.BaseName == "init")) {
       return;
     }
 
@@ -2239,9 +2247,11 @@ public:
       return std::make_pair(false, E);
     };
 
-    if (auto DR = dyn_cast<DeclRefExpr>(E))
+    if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagAvailability(DR->getDecl(), DR->getSourceRange(),
                        getEnclosingApplyExpr());
+      maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
+    }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
@@ -2257,8 +2267,10 @@ public:
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
-      if (S->hasDecl())
+      if (S->hasDecl()) {
         diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
+        maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
+      }
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
@@ -2341,6 +2353,8 @@ private:
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
     // Walk the base in a getter context.
+    // FIXME: We may need to look at the setter too, if we're going to do
+    // writeback. The AST should have this information.
     walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
     ValueDecl *D = E->getMember().getDecl();
@@ -2348,13 +2362,8 @@ private:
     if (diagAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
-    if (TC.getLangOpts().DisableAvailabilityChecking)
-      return;
-
-    if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      // Diagnose for appropriate accessors, given the access context.
-      diagStorageAccess(ASD, E->getSourceRange(), DC);
-    }
+    // Diagnose for appropriate accessors, given the access context.
+    maybeDiagStorageAccess(D, E->getSourceRange(), DC);
   }
   
   /// Walk an inout expression, checking for availability.
@@ -2372,9 +2381,16 @@ private:
 
   /// Emit diagnostics, if necessary, for accesses to storage where
   /// the accessor for the AccessContext is not available.
-  void diagStorageAccess(AbstractStorageDecl *D,
-                         SourceRange ReferenceRange,
-                         const DeclContext *ReferenceDC) const {
+  void maybeDiagStorageAccess(const ValueDecl *VD,
+                              SourceRange ReferenceRange,
+                              const DeclContext *ReferenceDC) const {
+    if (TC.getLangOpts().DisableAvailabilityChecking)
+      return;
+
+    auto *D = dyn_cast<AbstractStorageDecl>(VD);
+    if (!D)
+      return;
+
     if (!D->hasAccessorFunctions()) {
       return;
     }
@@ -2402,13 +2418,18 @@ private:
   }
 
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
-  /// Returns true if a diagnostic was emitted.
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 bool ForInout) const {
     if (!D) {
       return;
     }
+
+    // Make sure not to diagnose an accessor if we already complained about
+    // the property/subscript.
+    if (!TypeChecker::getDeprecated(D->getStorage()))
+      TC.diagnoseIfDeprecated(ReferenceRange, ReferenceDC, D, /*call*/nullptr);
+
     auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceRange.Start,
                                                         DC);
     if (MaybeUnavail.hasValue()) {

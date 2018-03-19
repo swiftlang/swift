@@ -1147,11 +1147,6 @@ public:
                         RValue &&optionalSubscripts,
                         SILType addressType);
 
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
-
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
@@ -1642,7 +1637,9 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//

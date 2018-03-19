@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : StringProtocol, RangeReplaceableCollection {  
+extension String : StringProtocol, RangeReplaceableCollection {
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
@@ -32,7 +32,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Parameters:
   ///   - repeatedValue: The character to repeat.
-  ///   - count: The number of times to repeat `repeatedValue` in the 
+  ///   - count: The number of times to repeat `repeatedValue` in the
   ///     resulting string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: Character, count: Int) {
@@ -43,7 +43,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   // that String conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
   // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
-  
+
   /// Creates a new string containing the characters in the given sequence.
   ///
   /// You can use this initializer to create a new string from the result of
@@ -57,16 +57,16 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter other: A string instance or another sequence of 
+  /// - Parameter other: A string instance or another sequence of
   ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
     self = other.description
   }
-  
+
   // The defaulted argument prevents this initializer from satisfies the
-  // LosslessStringConvertible conformance.  You can satisfy a protocol 
+  // LosslessStringConvertible conformance.  You can satisfy a protocol
   // requirement with something that's not yet available, but not with
   // something that has become unavailable. Without this, the code won't
   // compile as Swift 4.
@@ -120,13 +120,11 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(atOffset: offset)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterIndex(atOffset: offset)
-    } else {
-      return _guts._unmanagedUTF16View.characterIndex(atOffset: offset)
-    }
+    return _visitGuts(_guts, args: offset,
+      ascii: { ascii, offset in return ascii.characterIndex(atOffset: offset) },
+      utf16: { utf16, offset in return utf16.characterIndex(atOffset: offset) },
+      opaque: { opaque, offset in
+        return opaque.characterIndex(atOffset: offset) })
   }
 
   /// Returns the position immediately after the given index.
@@ -136,13 +134,10 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately after `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(after: i)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterIndex(after: i)
-    } else {
-      return _guts._unmanagedUTF16View.characterIndex(after: i)
-    }
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in ascii.characterIndex(after: i) },
+      utf16: { utf16, i in utf16.characterIndex(after: i) },
+      opaque: { opaque, i in opaque.characterIndex(after: i) })
   }
 
   /// Returns the position immediately before the given index.
@@ -152,13 +147,10 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately before `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(before: i)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterIndex(before: i)
-    } else {
-      return _guts._unmanagedUTF16View.characterIndex(before: i)
-    }
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in ascii.characterIndex(before: i) },
+      utf16: { utf16, i in utf16.characterIndex(before: i) },
+      opaque: { opaque, i in opaque.characterIndex(before: i) })
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -185,13 +177,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(i, offsetBy: n)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterIndex(i, offsetBy: n)
-    } else {
-      return _guts._unmanagedUTF16View.characterIndex(i, offsetBy: n)
-    }
+    return _visitGuts(_guts, args: (i, n),
+      ascii: { ascii, args in let (i, n) = args
+        return ascii.characterIndex(i, offsetBy: n) },
+      utf16: { utf16, args in let (i, n) = args
+        return utf16.characterIndex(i, offsetBy: n) },
+      opaque: { opaque, args in let (i, n) = args
+        return opaque.characterIndex(i, offsetBy: n) })
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -235,19 +227,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterIndex(i, offsetBy: n, limitedBy: limit)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterIndex(
-        i,
-        offsetBy: n,
-        limitedBy: limit)
-    } else {
-      return _guts._unmanagedUTF16View.characterIndex(
-        i,
-        offsetBy: n,
-        limitedBy: limit)
-    }
+    return _visitGuts(_guts, args: (i, n, limit),
+      ascii: { ascii, args in let (i, n, limit) = args
+        return ascii.characterIndex(i, offsetBy: n, limitedBy: limit) },
+      utf16: { utf16, args in let (i, n, limit) = args
+        return utf16.characterIndex(i, offsetBy: n, limitedBy: limit) },
+      opaque: { opaque, args in let (i, n, limit) = args
+        return opaque.characterIndex(i, offsetBy: n, limitedBy: limit) })
   }
 
   /// Returns the distance between two indices.
@@ -261,13 +247,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterDistance(from: start, to: end)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterDistance(from: start, to: end)
-    } else {
-      return _guts._unmanagedUTF16View.characterDistance(from: start, to: end)
-    }
+    return _visitGuts(_guts, args: (start, end),
+      ascii: { ascii, args in let (start, end) = args
+        return ascii.characterDistance(from: start, to: end) },
+      utf16: { utf16, args in let (start, end) = args
+        return utf16.characterDistance(from: start, to: end) },
+      opaque: { opaque, args in let (start, end) = args
+        return opaque.characterDistance(from: start, to: end) })
   }
 
   /// Accesses the character at the given position.
@@ -287,13 +273,10 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   string's end index.
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().character(at: i)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.character(at: i)
-    } else {
-      return _guts._unmanagedUTF16View.character(at: i)
-    }
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in return ascii.character(at: i) },
+      utf16: { utf16, i in return utf16.character(at: i) },
+      opaque: { opaque, i in return opaque.character(at: i) })
   }
 }
 
@@ -311,7 +294,7 @@ extension String {
   ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter characters: A string instance or another sequence of 
+  /// - Parameter characters: A string instance or another sequence of
   ///   characters.
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
@@ -489,13 +472,13 @@ extension String {
       return Int(stride)
     }
     let offset = i.encodedOffset
-    if _slowPath(_guts._isOpaque) {
-      return _guts._asOpaque().characterStride(atOffset: offset)
-    } else if _guts.isASCII {
-      return _guts._unmanagedASCIIView.characterStride(atOffset: offset)
-    } else {
-      return _guts._unmanagedUTF16View.characterStride(atOffset: offset)
-    }
+    return _visitGuts(_guts, args: offset,
+      ascii: { ascii, offset in
+        return ascii.characterStride(atOffset: offset) },
+      utf16: { utf16, offset in
+        return utf16.characterStride(atOffset: offset) },
+      opaque: { opaque, offset in
+        return opaque.characterStride(atOffset: offset) })
   }
 
   /// Removes the characters in the given range.
