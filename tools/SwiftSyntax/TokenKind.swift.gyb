@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Enumerates the kinds of tokens in the Swift language.
+@_fixed_layout
 public enum TokenKind: Codable {
   case eof
 % for token in SYNTAX_TOKENS:
@@ -46,10 +47,14 @@ public enum TokenKind: Codable {
   }
 
   /// Keys for serializing and deserializing token kinds.
+  @_fixed_layout
+  @_versioned
   enum CodingKeys: String, CodingKey {
     case kind, text
   }
 
+  @_fixed_layout
+  @_versioned
   enum DecodeError: Error {
     case unknownTokenKind(String)
   }

@@ -30,6 +30,8 @@ typealias NodeIdentifier = [Int]
 ///   parent.cachedChild(at: indexInParent) === self
 ///   raw.layout.count == childCaches.count
 ///   pathToRoot.first === indexInParent
+@_versioned
+@_fixed_layout
 final class SyntaxData: Equatable {
 
   let raw: RawSyntax
@@ -260,6 +262,7 @@ final class SyntaxData: Equatable {
 
 /// An absolute position in a source file as text - the absolute byteOffset from
 /// the start, line, and column.
+@_fixed_layout
 public class AbsolutePosition {
   public private(set) var byteOffset: Int = 0
   public private(set) var line: Int = 1

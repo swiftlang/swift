@@ -17,6 +17,7 @@ import Foundation
 
 /// PrintingDiagnosticConsumer formats diagnostics and prints them to the
 /// console.
+@_fixed_layout
 public class PrintingDiagnosticConsumer: DiagnosticConsumer {
   /// Creates a new PrintingDiagnosticConsumer.
   public init() {

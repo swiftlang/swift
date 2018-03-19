@@ -44,6 +44,8 @@ extension _SyntaxBase {
 }
 
 extension Syntax {
+  @_versioned
+  @_fixed_layout
   var data: SyntaxData {
     guard let base = self as? _SyntaxBase else {
       fatalError("only first-class syntax nodes can conform to Syntax")
@@ -51,6 +53,8 @@ extension Syntax {
     return base._data
   }
 
+  @_versioned
+  @_fixed_layout
   var _root: SyntaxData {
     guard let base = self as? _SyntaxBase else {
       fatalError("only first-class syntax nodes can conform to Syntax")
@@ -59,63 +63,76 @@ extension Syntax {
   }
 
   /// Access the raw syntax assuming the node is a Syntax.
+  @_versioned
+  @_fixed_layout
   var raw: RawSyntax {
     return data.raw
   }
 
   /// An iterator over children of this node.
+  @_fixed_layout
   public var children: SyntaxChildren {
     return SyntaxChildren(node: self)
   }
 
   /// The number of children, `present` or `missing`, in this node.
   /// This value can be used safely with `child(at:)`.
+  @_fixed_layout
   public var numberOfChildren: Int {
     return data.childCaches.count
   }
 
   /// Whether or not this node is marked as `present`.
+  @_fixed_layout
   public var isPresent: Bool {
     return raw.isPresent
   }
 
   /// Whether or not this node is marked as `missing`.
+  @_fixed_layout
   public var isMissing: Bool {
     return raw.isMissing
   }
 
   /// Whether or not this node represents an Expression.
+  @_fixed_layout
   public var isExpr: Bool {
     return raw.kind.isExpr
   }
 
   /// Whether or not this node represents a Declaration.
+  @_fixed_layout
   public var isDecl: Bool {
     return raw.kind.isDecl
   }
 
   /// Whether or not this node represents a Statement.
+  @_fixed_layout
   public var isStmt: Bool {
     return raw.kind.isStmt
   }
 
   /// Whether or not this node represents a Type.
+  @_fixed_layout
   public var isType: Bool {
     return raw.kind.isType
   }
 
   /// Whether or not this node represents a Pattern.
+  @_fixed_layout
   public var isPattern: Bool {
     return raw.kind.isPattern
   }
 
   /// The parent of this syntax node, or `nil` if this node is the root.
+  @_fixed_layout
   public var parent: Syntax? {
     guard let parentData = data.parent else { return nil }
     return makeSyntax(root: _root, data: parentData)
   }
 
   /// The index of this node in the parent's children.
+  @_fixed_layout
   public var indexInParent: Int {
     return data.indexInParent
   }
@@ -123,17 +140,20 @@ extension Syntax {
   /// The absolute position of the starting point of this node. If the first token
   /// is with leading trivia, the position points to the start of the leading
   /// trivia.
+  @_fixed_layout
   public var position: AbsolutePosition {
     return data.position
   }
 
   /// The absolute position of the starting point of this node, skipping any
   /// leading trivia attached to the first token syntax.
+  @_fixed_layout
   public var positionAfterSkippingLeadingTrivia: AbsolutePosition {
     return data.positionAfterSkippingLeadingTrivia
   }
 
   /// The textual byte length of this node including leading and trailing trivia.
+  @_fixed_layout
   public var byteSize: Int {
     return data.byteSize
   }
@@ -141,6 +161,7 @@ extension Syntax {
   /// The leading trivia of this syntax node. Leading trivia is attached to
   /// the first token syntax contained by this node. Without such token, this
   /// property will return nil.
+  @_fixed_layout
   public var leadingTrivia: Trivia? {
     return raw.leadingTrivia
   }
@@ -148,17 +169,20 @@ extension Syntax {
   /// The trailing trivia of this syntax node. Trailing trivia is attached to
   /// the last token syntax contained by this node. Without such token, this
   /// property will return nil.
+  @_fixed_layout
   public var trailingTrivia: Trivia? {
     return raw.trailingTrivia
   }
 
   /// The textual byte length of this node exluding leading and trailing trivia.
+  @_fixed_layout
   public var byteSizeAfterTrimmingTrivia: Int {
     return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
       (trailingTrivia?.byteSize ?? 0)
   }
 
   /// The root of the tree in which this node resides.
+  @_fixed_layout
   public var root: Syntax {
     return makeSyntax(root: _root,  data: _root)
   }
@@ -184,6 +208,7 @@ extension Syntax {
   }
 
   /// A source-accurate description of this node.
+  @_fixed_layout
   public var description: String {
     var s = ""
     self.write(to: &s)
@@ -206,6 +231,7 @@ public func ==(lhs: Syntax, rhs: Syntax) -> Bool {
 /// MARK: - Nodes
 
 /// A Syntax node representing a single token.
+@_fixed_layout
 public struct TokenSyntax: _SyntaxBase, Hashable {
   let _root: SyntaxData
   unowned let _data: SyntaxData 

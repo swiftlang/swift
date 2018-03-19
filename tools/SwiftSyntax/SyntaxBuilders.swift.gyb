@@ -30,6 +30,7 @@ guaranted to be structurally (if not syntactically) valid.
 % for node in SYNTAX_NODES:
 %   if node.is_buildable():
 %     Builder = node.name + "Builder"
+@_fixed_layout
 public struct ${Builder} {
   private var layout =
     Array<RawSyntax?>(repeating: nil, count: ${len(node.children)})

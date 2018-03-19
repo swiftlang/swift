@@ -15,6 +15,7 @@
 
 import Foundation
 
+@_fixed_layout
 public final class JSONDiagnosticConsumer: DiagnosticConsumer {
   /// Enumerates the possible places this consumer might output diagnostics.
   private enum OutputFormat {
