@@ -24,8 +24,16 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
 // Note: NSErrorPointer becomes ErrorPointer in Swift 3.
 public typealias ErrorPointer = NSErrorPointer
 
-public // COMPILER_INTRINSIC
-let _nilObjCError: Error = _GenericObjCError.nilError
+// An error value to use when an Objective-C API indicates error
+// but produces a nil error object.
+// This is 'internal' rather than 'private' for no other reason but to make the
+// type print more nicely. It's not part of the ABI, so if type printing of
+// private things improves we can change it.
+internal enum _GenericObjCError : Error {
+  case nilError
+}
+// A cached instance of the above in order to save on the conversion to Error.
+private let _nilObjCError: Error = _GenericObjCError.nilError
 
 public // COMPILER_INTRINSIC
 func _convertNSErrorToError(_ error: NSError?) -> Error {
@@ -333,12 +341,6 @@ extension CFError : Error {
   public func _getEmbeddedNSError() -> AnyObject? {
     return self
   }
-}
-
-// An error value to use when an Objective-C API indicates error
-// but produces a nil error object.
-public enum _GenericObjCError : Error {
-  case nilError
 }
 
 /// An internal protocol to represent Swift error enums that map to standard
