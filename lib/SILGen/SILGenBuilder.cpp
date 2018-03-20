@@ -207,6 +207,26 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(SILLocation loc,
+                                                          ManagedValue fn,
+                                                          SILType resultTy) {
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  auto resultFnType = resultTy.castTo<SILFunctionType>();
+
+  // Escaping to noescape conversion.
+  assert(resultFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         fnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         !fnType->isNoEscape() && resultFnType->isNoEscape() &&
+         "Expect a escaping to noescape conversion");
+
+  SILValue fnValue = fn.ensurePlusOne(SGF, loc).forward(SGF);
+  SILValue result = createConvertEscapeToNoEscape(loc, fnValue, resultTy);
+  getSILGenFunction().enterPostponedCleanup(fnValue);
+  return ManagedValue::forTrivialObjectRValue(result);
+}
+
 ManagedValue SILGenBuilder::createInitExistentialValue(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
