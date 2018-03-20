@@ -398,10 +398,8 @@ extension Range: Equatable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension Range : Hashable where Bound : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     return _combineHashValues(lowerBound.hashValue, upperBound.hashValue)
   }

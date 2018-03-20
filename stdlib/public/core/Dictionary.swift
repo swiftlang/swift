@@ -1446,12 +1446,10 @@ extension Dictionary: Equatable where Value: Equatable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension Dictionary: Hashable where Value: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Dictionary too
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Dictionary<T> hashValue
     var result = 0
     for (k, v) in self {
       let combined = _combineHashValues(k.hashValue, v.hashValue)

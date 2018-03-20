@@ -764,7 +764,7 @@ extension DictionaryLiteral : RandomAccessCollection {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension DictionaryLiteral: Equatable where Key: Equatable, Value: Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
+  @available(swift, introduced: 4.1) // FIXME(conformance-availability)
   public static func == (
     lhs: DictionaryLiteral<Key, Value>, rhs: DictionaryLiteral<Key, Value>
   ) -> Bool {
@@ -778,7 +778,6 @@ extension DictionaryLiteral: Equatable where Key: Equatable, Value: Equatable {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension DictionaryLiteral: Hashable where Key: Hashable, Value: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
     var result = 0

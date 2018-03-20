@@ -2297,10 +2297,8 @@ extension ${Self} : Equatable where Element : Equatable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension ${Self} : Hashable where Element : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Array too
     var result = 0

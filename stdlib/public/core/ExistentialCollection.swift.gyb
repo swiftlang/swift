@@ -1247,7 +1247,7 @@ extension ${Self}: _AnyCollectionProtocol {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension AnyCollection : Equatable where Element : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
+  @available(swift, introduced: 4.1) // FIXME(conformance-availability)
   public static func == (
     lhs: AnyCollection<Element>, rhs: AnyCollection<Element>
   ) -> Bool {
@@ -1261,9 +1261,8 @@ extension AnyCollection : Equatable where Element : Equatable {
 @available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension AnyCollection : Hashable where Element : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to AnyCollection too
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache AnyCollection<T> hashValue
     var result = 0
     for element in self {
       result = _combineHashValues(result, element.hashValue)

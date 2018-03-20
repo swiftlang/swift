@@ -186,10 +186,8 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
 extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1)
   public var hashValue: Int {
     return base.hashValue
   }
