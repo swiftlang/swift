@@ -1896,10 +1896,26 @@ struct TargetLiteralProtocolDescriptorList
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
 
+/// A protocol requirement descriptor. This describes a single protocol
+/// requirement in a protocol descriptor. The index of the requirement in
+/// the descriptor determines the offset of the witness in a witness table
+/// for this protocol.
 template <typename Runtime>
 struct TargetProtocolRequirement {
   ProtocolRequirementFlags Flags;
   // TODO: name, type
+
+  /// A function pointer to a global symbol which is used by client code
+  /// to invoke the protocol requirement from a witness table. This pointer
+  /// is also to uniquely identify the requirement in resilient witness
+  /// tables, which is why it appears here.
+  ///
+  /// This forms the basis of our mechanism to hide witness table offsets
+  /// from clients, both when calling protocol requirements and when
+  /// defining witness tables.
+  ///
+  /// Will be null if the protocol is not resilient.
+  RelativeDirectPointer<void, /*nullable*/ true> Function;
 
   /// The optional default implementation of the protocol.
   RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;

@@ -3557,6 +3557,9 @@ namespace {
         // Flags.
         reqt.addInt32(info.Flags.getIntValue());
 
+        // Dispatch thunk.
+        reqt.addRelativeAddressOrNull(info.Thunk);
+
         // Default implementation.
         reqt.addRelativeAddressOrNull(info.DefaultImpl);
 #ifndef NDEBUG
@@ -3594,6 +3597,7 @@ namespace {
 
     struct RequirementInfo {
       ProtocolRequirementFlags Flags;
+      llvm::Constant *Thunk;
       llvm::Constant *DefaultImpl;
     };
 
@@ -3603,36 +3607,41 @@ namespace {
       if (entry.isBase()) {
         assert(entry.isOutOfLineBase());
         auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr };
+        return { flags, nullptr, nullptr };
       }
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr };
+        return { flags, nullptr, nullptr };
       }
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr };
+        return { flags, nullptr, nullptr };
       }
 
       assert(entry.isFunction());
-      auto func = entry.getFunction();
+      SILDeclRef func(entry.getFunction());
+
+      // Look up the dispatch thunk if the protocol is resilient.
+      llvm::Constant *thunk = nullptr;
+      if (Protocol->isResilient())
+        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
 
       // Classify the function.
-      auto flags = getMethodDescriptorFlags<Flags>(func);
+      auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
 
       // Look for a default witness.
       llvm::Constant *defaultImpl = findDefaultWitness(func);
 
-      return { flags, defaultImpl };
+      return { flags, thunk, defaultImpl };
     }
 
-    llvm::Constant *findDefaultWitness(AbstractFunctionDecl *func) {
+    llvm::Constant *findDefaultWitness(SILDeclRef func) {
       if (!DefaultWitnesses) return nullptr;
 
       for (auto &entry : DefaultWitnesses->getResilientDefaultEntries()) {
-        if (entry.getRequirement().getDecl() != func)
+        if (entry.getRequirement() != func)
           continue;
         return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
       }
