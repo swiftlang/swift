@@ -180,3 +180,11 @@ public func testGenericThing() {
   let b = a.genericAttr(axis: 42)
   _ = b+b
 }
+
+
+// b/75247714: #tfop crashes when attribute argument is a tuple
+public func test75247714() {
+  // expected-error @+1 {{attribute 'bar' requires a constant argument}}
+  let _ = () = #tfop("foo", bar: (1, 2))
+}
+
