@@ -238,6 +238,52 @@ getActualDefaultArgKind(uint8_t raw) {
   return None;
 }
 
+ParameterList *ModuleFile::maybeReadParameterList() {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  if (kind != PARAMETERLIST)
+    return nullptr;
+
+  unsigned numParams;
+  decls_block::ParameterListLayout::readRecord(scratch, numParams);
+
+  SmallVector<ParamDecl*, 8> params;
+  for (unsigned i = 0; i != numParams; ++i) {
+    scratch.clear();
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+    assert(recordID == PARAMETERLIST_ELT);
+    (void) recordID;
+
+    DeclID paramID;
+    bool isVariadic;
+    uint8_t rawDefaultArg;
+    decls_block::ParameterListEltLayout::readRecord(scratch, paramID,
+                                                    isVariadic, rawDefaultArg);
+
+
+    auto decl = cast<ParamDecl>(getDecl(paramID));
+    decl->setVariadic(isVariadic);
+
+    // Decode the default argument kind.
+    // FIXME: Default argument expression, if available.
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+      decl->setDefaultArgumentKind(*defaultArg);
+    params.push_back(decl);
+  }
+
+  return ParameterList::create(getContext(), params);
+}
+
 ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
@@ -3671,28 +3717,55 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
-    bool hasArgumentType;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
+    IdentifierID blobData;
+    uint8_t rawDefaultArgumentResilienceExpansion;
+    unsigned numArgNames;
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID,
+    decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                interfaceTypeID,
-                                               hasArgumentType,
                                                isImplicit, rawValueKindID,
-                                               isNegative);
+                                               isNegative,
+                                               blobData,
+                                               rawDefaultArgumentResilienceExpansion,
+                                               numArgNames,
+                                               argNameAndDependencyIDs);
+
+    // Resolve the name ids.
+    Identifier baseName = getIdentifier(argNameAndDependencyIDs.front());
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
+      argNames.push_back(getIdentifier(argNameID));
+
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+          baseName, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto *paramList = maybeReadParameterList();
+
+    DeclName name;
+    if (!paramList) {
+      assert(argNames.empty());
+      name = DeclName(baseName);
+    } else {
+      name = DeclName(ctx, baseName, argNames);
+    }
+
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
-                                            getIdentifier(nameID),
-                                            TypeLoc(),
-                                            hasArgumentType,
+                                            name,
+                                            paramList,
                                             SourceLoc(),
                                             nullptr,
                                             DC);
@@ -3703,8 +3776,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getContext().AllocateCopy(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+      auto literalText = getIdentifier(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
@@ -3720,6 +3793,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
+
+    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
+            rawDefaultArgumentResilienceExpansion)) {
+      elem->setDefaultArgumentResilienceExpansion(
+          *defaultArgumentResilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
 
     break;
   }

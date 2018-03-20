@@ -119,10 +119,16 @@ func testTupleUnsplat() {
   let x = 1, y = 2
 
   // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
+  // CHECK: [[TUPLE_VAL:%.+]] = alloc_stack $(Int, Int)
+  // CHECK: store [[TUPLE]] to [trivial] [[TUPLE_VAL]] : $*(Int, Int)
+  // CHECK: [[ENUM_CASE:%.+]] = function_ref @$S6tuples11GenericEnumO3oneyACyxGxcAEmlF
+  // CHECK: apply [[ENUM_CASE]]<(Int, Int)>({{%.+}}, [[TUPLE_VAL]], {{%.+}})
   _ = GenericEnum<(Int, Int)>.one((x, y))
   // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
+  // CHECK: [[TUPLE_VAL:%.+]] = alloc_stack $(Int, Int)
+  // CHECK: store [[TUPLE]] to [trivial] [[TUPLE_VAL]] : $*(Int, Int)
+  // CHECK: [[ENUM_CASE:%.+]] = function_ref @$S6tuples11GenericEnumO3oneyACyxGxcAEmlF
+  // CHECK: apply [[ENUM_CASE]]<(Int, Int)>({{%.+}}, [[TUPLE_VAL]], {{%.+}})
   _ = GenericEnum<(Int, Int)>.one(x, y)
 
   // CHECK: [[THUNK:%.+]] = function_ref @$SSi_SitIegi_S2iIegyy_TR

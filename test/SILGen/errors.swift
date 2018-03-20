@@ -26,7 +26,9 @@ func make_a_cat() throws -> Cat {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
 // CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
-// CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooHard!enumelt
+// CHECK-NEXT: // function_ref HomeworkError.TooHard(_:)
+// CHECK-NEXT: [[ENUM_CASE:%.*]] = function_ref @$S6errors13HomeworkErrorO7TooHardyA2CmF
+// CHECK-NEXT: [[T1:%.*]] = apply [[ENUM_CASE]]([[T0]])
 // CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[BOX]]
@@ -38,7 +40,9 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
 // CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
-// CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooMuch!enumelt
+// CHECK-NEXT: // function_ref HomeworkError.TooMuch(_:)
+// CHECK-NEXT: [[ENUM_CASE:%.*]] = function_ref @$S6errors13HomeworkErrorO7TooMuchyA2CmF
+// CHECK-NEXT: [[T1:%.*]] = apply [[ENUM_CASE]]([[T0]])
 // CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: destroy_addr %1 : $*T

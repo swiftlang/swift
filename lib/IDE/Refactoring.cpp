@@ -152,6 +152,14 @@ private:
     // add an empty range for the local name, or for the decl argument label if
     // IsCollapsible is false.
     StringRef Content = Range.str();
+    if (Content.empty()) {
+      // We can have nothing in the original range if we're trying to rename
+      // a previously nameless enum argument.  This rename behaves like a
+      // rename for a call argument in that case.
+      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+      return;
+    }
+
     size_t ExternalNameEnd = Content.find_first_of(" \t\n\v\f\r/");
 
     if (ExternalNameEnd == StringRef::npos) { // foo([a]: Int)

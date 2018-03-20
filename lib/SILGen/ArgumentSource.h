@@ -223,7 +223,7 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
   bool isTuple() const & { return StoredKind == Kind::Tuple; }
-
+  
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
   RValue &&asKnownRValue(SILGenFunction &SGF) && {

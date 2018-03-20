@@ -42,26 +42,15 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getArgumentTypeLoc().getType())
+    if (!elt->hasInterfaceType())
       tc.validateDecl(elt);
 
-    auto argumentType = elt->getArgumentTypeLoc().getType();
-    if (!argumentType)
+    auto PL = elt->getParameterList();
+    if (!PL)
       continue;
 
-    if (auto tupleType = argumentType->getAs<TupleType>()) {
-      // One associated value with a label or multiple associated values
-      // (labeled or unlabeled) are tuple types.
-      for (auto tupleElementType : tupleType->getElementTypes()) {
-        if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
-                                   ConformanceCheckFlags::Used)) {
-          return false;
-        }
-      }
-    } else {
-      // One associated value with no label is represented as a paren type.
-      auto actualType = argumentType->getWithoutParens();
-      if (!tc.conformsToProtocol(actualType, protocol, declContext,
+    for (auto param : *PL) {
+      if (!tc.conformsToProtocol(param->getType(), protocol, declContext,
                                  ConformanceCheckFlags::Used)) {
         return false;
       }
@@ -154,12 +143,11 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   auto parentDC = enumElementDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto argumentTypeLoc = enumElementDecl->getArgumentTypeLoc();
-  if (argumentTypeLoc.isNull())
-    // No arguments, so no subpattern to match.
+  // No arguments, so no subpattern to match.
+  if (!enumElementDecl->hasAssociatedValues())
     return nullptr;
 
-  auto argumentType = argumentTypeLoc.getType();
+  auto argumentType = enumElementDecl->getArgumentInterfaceType();
   if (auto tupleType = argumentType->getAs<TupleType>()) {
     // Either multiple (labeled or unlabeled) arguments, or one labeled
     // argument. Return a tuple pattern that matches the enum element in arity,

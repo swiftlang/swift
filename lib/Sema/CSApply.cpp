@@ -4964,8 +4964,21 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     SourceLoc loc, ConcreteDeclRef &owner,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
-  auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
-  auto defArg = ownerFn->getDefaultArg(index);
+
+  std::pair<DefaultArgumentKind, Type> defArg;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(owner.getDecl())) {
+    auto paramLists = AFD->getParameterLists();
+
+    // Skip the 'self' parameter; it is not counted.
+    if (AFD->getImplicitSelfDecl())
+      paramLists = paramLists.slice(1);
+
+    defArg = getDefaultArgumentInfo(paramLists, index);
+  } else {
+    defArg = getDefaultArgumentInfo(
+                 cast<EnumElementDecl>(owner.getDecl())->getParameterList(),
+                 index);
+  }
   Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
@@ -5025,7 +5038,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
+  auto defArgType = owner.getDecl()->getDeclContext()
+                       ->mapTypeIntoContext(defArg.second);
   auto resultTy = tc.typeCheckExpression(
       init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
   assert(resultTy && "Conversion cannot fail");

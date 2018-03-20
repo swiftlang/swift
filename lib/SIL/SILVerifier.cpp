@@ -1971,8 +1971,9 @@ public:
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
                                                         F.getModule());
-      if (UI->getModule().getStage() != SILStage::Lowered) {
-        require(caseTy == UI->getOperand()->getType(),
+      if (UI->getModule().getStage() != SILStage::Lowered
+          && !caseTy.is<SILBoxType>()) {
+        requireSameType(caseTy, UI->getOperand()->getType(),
                 "EnumInst operand type does not match type of case");
       }
     }

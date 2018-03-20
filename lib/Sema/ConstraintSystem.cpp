@@ -786,8 +786,7 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   unsigned numParameterLists = 0;
 
   // Enum element with associated value has to be treated
-  // as regular function value and all of the labels have to be
-  // stripped from its parameters.
+  // as regular function value.
   //
   // enum E {
   //   case foo(a: Int)

@@ -1323,6 +1323,9 @@ public:
   void computeAccessLevel(ValueDecl *D);
   void computeDefaultAccessLevel(ExtensionDecl *D);
 
+  /// Check the default arguments that occur within this value decl.
+  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
+
   virtual void resolveAccessControl(ValueDecl *VD) override {
     validateAccessControl(VD);
   }
@@ -1863,7 +1866,7 @@ public:
   /// expression to the given context.
   ///
   /// \returns true if any closures were found
-  static bool contextualizeInitializer(Initializer *DC, Expr *init);
+  static bool contextualizeInitializer(DeclContext *DC, Expr *init);
   static void contextualizeTopLevelCode(TopLevelContext &TLC,
                                         ArrayRef<Decl*> topLevelDecls);
 

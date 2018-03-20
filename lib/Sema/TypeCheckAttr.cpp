@@ -235,7 +235,7 @@ public:
   void visitIndirectAttr(IndirectAttr *attr) {
     if (auto caseDecl = dyn_cast<EnumElementDecl>(D)) {
       // An indirect case should have a payload.
-      if (caseDecl->getArgumentTypeLoc().isNull())
+      if (!caseDecl->hasAssociatedValues())
         TC.diagnose(attr->getLocation(),
                     diag::indirect_case_without_payload, caseDecl->getName());
       // If the enum is already indirect, its cases don't need to be.

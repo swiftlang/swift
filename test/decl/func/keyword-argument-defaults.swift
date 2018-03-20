@@ -119,3 +119,9 @@ func +(_ a: String,
 func +(a: Double, b: String) -> (Int) -> (_ d: Int) -> () {
   return { c in { e in () } }
 }
+
+// Enum elements
+enum TestEnumElements {
+  case element(_ a : String,
+               d d : Double) // expected-error {{enum case cannot have keyword arguments}}
+}

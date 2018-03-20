@@ -316,9 +316,13 @@ static std::vector<CharSourceRange> getLabelRanges(const ParameterList* List, co
     if (NameLoc.isValid()) {
       LabelRanges.push_back(Lexer::getCharSourceRangeFromSourceRange(SM,
                                                                      SourceRange(NameLoc, ParamLoc)));
-    } else {
+    } else if (ParamLoc.isValid()) {
       NameLoc = ParamLoc;
       NameLength = Param->getNameStr().size();
+      LabelRanges.push_back(CharSourceRange(NameLoc, NameLength));
+    } else {
+      NameLoc = Param->getTypeLoc().getLoc();
+      NameLength = 0;
       LabelRanges.push_back(CharSourceRange(NameLoc, NameLength));
     }
   }
@@ -373,21 +377,10 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::NoncollapsibleParam,
                getLabelRanges(SD->getIndices(), getSourceMgr()));
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
-    if (TupleTypeRepr *TTR = dyn_cast_or_null<TupleTypeRepr>(EED->getArgumentTypeLoc().getTypeRepr())) {
-      size_t ElemIndex = 0;
-      std::vector<CharSourceRange> LabelRanges;
-      for(const TupleTypeReprElement &Elem: TTR->getElements()) {
-        SourceLoc LabelStart(Elem.Type->getStartLoc());
-        SourceLoc LabelEnd(LabelStart);
-
-        auto NameIdentifier = TTR->getElementName(ElemIndex);
-        if (!NameIdentifier.empty()) {
-          LabelStart = TTR->getElementNameLoc(ElemIndex);
-        }
-        LabelRanges.push_back(CharSourceRange(getSourceMgr(), LabelStart, LabelEnd));
-        ++ElemIndex;
-      }
-      tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::CallArg, LabelRanges);
+    if (auto *ParamList = EED->getParameterList()) {
+      auto LabelRanges = getLabelRanges(ParamList, getSourceMgr());
+      tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
+                 LabelRanges);
     } else {
       tryResolve(ASTWalker::ParentTy(D), D->getLoc());
     }

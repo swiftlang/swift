@@ -9,7 +9,8 @@ throw MyError.A
 // CHECK: sil @main
 // CHECK: [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK: [[ADDR:%.*]] = project_existential_box $MyError in [[ERR]] : $Error
-// CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
+// CHECK: [[ENUM_CASE:%.*]] = function_ref @$S15toplevel_errors7MyErrorO1AyA2CmF : $@convention(method) (@thin MyError.Type) -> MyError
+// CHECK: [[T0:%.*]] = apply [[ENUM_CASE]]({{%.*}})
 // CHECK: store [[T0]] to [trivial] [[ADDR]] : $*MyError
 // CHECK: builtin "willThrow"([[ERR]] : $Error)
 // CHECK: br bb2([[ERR]] : $Error)

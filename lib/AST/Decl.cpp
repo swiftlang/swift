@@ -1805,6 +1805,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsInstanceMember = isInstanceMember();
   signature.IsProperty = isa<VarDecl>(this);
 
+  // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
@@ -1842,11 +1843,10 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                       funcTy->getExtInfo())
               ->getCanonicalType();
     }
-
     return interfaceType;
-  }
-
-  if (isa<VarDecl>(this)) {
+  } else if (isa<EnumElementDecl>(this)) {
+    return getInterfaceType()->getCanonicalType();
+  } else if (isa<VarDecl>(this)) {
     // If the variable declaration occurs within a generic extension context,
     // consider the generic signature of the extension.
     auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
@@ -1950,6 +1950,7 @@ void ValueDecl::setInterfaceType(Type type) {
   if (!type.isNull() && isa<ParamDecl>(this)) {
     assert(!type->is<InOutType>() && "caller did not pass a base type");
   }
+
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
   //
@@ -4509,12 +4510,13 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
-void DefaultArgumentInitializer::changeFunction(AbstractFunctionDecl *parent) {
-  assert(parent->isLocalContext());
-  setParent(parent);
+void DefaultArgumentInitializer::changeFunction(DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+  if (parent->isLocalContext()) {
+    setParent(parent);
+  }
 
   unsigned offset = getIndex();
-  for (auto list : parent->getParameterLists()) {
+  for (auto list : paramLists) {
     if (offset < list->size()) {
       auto param = list->get(offset);
       if (param->getDefaultValue())
@@ -4681,12 +4683,8 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
 }
 
 std::pair<DefaultArgumentKind, Type>
-AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
-  auto paramLists = getParameterLists();
-
-  if (getImplicitSelfDecl()) // Skip the 'self' parameter; it is not counted.
-    paramLists = paramLists.slice(1);
-
+swift::getDefaultArgumentInfo(ArrayRef<const ParameterList *> paramLists,
+                              unsigned Index) {
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
       auto param = paramList->get(Index);
@@ -5277,8 +5275,8 @@ SourceRange FuncDecl::getSourceRange() const {
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
-  if (ArgumentType.hasLocation())
-    return {getStartLoc(), ArgumentType.getSourceRange().End};
+  if (auto *PL = getParameterList())
+    return {getStartLoc(), PL->getSourceRange().End};
   return {getStartLoc(), getNameLoc()};
 }
 
@@ -5297,8 +5295,16 @@ bool EnumElementDecl::computeType() {
   Type selfTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-  if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
+  if (auto *PL = getParameterList()) {
+    // A parameter type of (Void) indicates that the user wants an empty
+    // payload.
+    Type paramTy;
+    if (PL->size() == 1 && PL->get(0)->getType()->isVoid()) {
+      paramTy = TupleType::getEmpty(getASTContext());
+    } else {
+      paramTy = PL->getType(getASTContext());
+    }
+    resultTy = FunctionType::get(paramTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())
@@ -5314,7 +5320,7 @@ bool EnumElementDecl::computeType() {
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
-  if (!Bits.EnumElementDecl.HasArgumentType)
+  if (!hasAssociatedValues())
     return nullptr;
 
   auto interfaceType = getInterfaceType();

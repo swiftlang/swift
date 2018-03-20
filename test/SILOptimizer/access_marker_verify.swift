@@ -335,10 +335,6 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   mark_uninitialized [delegatingself] %3 : $<τ_0_0> { var GenericEnum<τ_0_0> } <T>
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
-// CHECK:   [[ADR1:%.*]] = init_enum_data_addr [[STK]]
-// CHECK-NOT: begin_access
-// CHECK:   copy_addr %1 to [initialization] [[ADR1]] : $*T
-// CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   copy_addr [take] %{{.*}} to [[ACCESS]] : $*GenericEnum<T>
 // CHECK:   end_access [[ACCESS]] : $*GenericEnum<T>
@@ -356,17 +352,16 @@ enum IndirectEnum {
 func testIndirectEnum() -> IndirectEnum {
   return IndirectEnum.V(3)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16testIndirectEnumAA0eF0OyF : $@convention(thin) () -> @owned IndirectEnum {
-// CHECK: bb0:
+// CHECK-LABEL: sil shared [transparent] @$S20access_marker_verify12IndirectEnumO1VyACSicACmF : $@convention(method) (Int, @thin IndirectEnum.Type) -> @owned IndirectEnum {
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $@thin IndirectEnum.Type):
 // CHECK:   alloc_box ${ var Int }
 // CHECK:   [[PROJ:%.*]] = project_box
-// CHECK:   apply
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access
 // CHECK:   enum $IndirectEnum, #IndirectEnum.V!enumelt.1
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16testIndirectEnumAA0eF0OyF'
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify12IndirectEnumO1VyACSicACmF'
 
 // -- indirect enum with getter.
 enum IntEnum {

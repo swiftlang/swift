@@ -371,3 +371,44 @@ func callThem() throws {
    defaultEscaping()
    autoclosureDefaultEscaping()
 }
+
+enum default_args {
+  case defarg1(x: @autoclosure () -> String = #file, y: @autoclosure () -> Int = #line)
+  case defarg2(i: Int, d: Double = 3.14159, s: String = "Hello")
+}
+
+// CHECK-LABEL: sil hidden @$S17default_arguments18testDefaultArgEnumyyF
+func testDefaultArgEnum() {
+  // CHECK: [[METATYPE_DEF_1:%[0-9]+]] = metatype $@thin default_args.Type
+
+  // implicit closure #1
+  // CHECK: [[THIN_FILE_ARG_THUNK1:%[0-9]+]] = function_ref @$S17default_arguments18testDefaultArgEnumyyFSSyXAfu_ : $@convention(thin) () -> @owned String
+  // CHECK-NEXT: [[THICK_FILE_ARG_THUNK1:%[0-9]+]] = thin_to_thick_function [[THIN_FILE_ARG_THUNK1]] : $@convention(thin) () -> @owned String to $@callee_guaranteed () -> @owned String
+
+  // implicit closure #2
+  // CHECK: [[THIN_LINE_ARG_THUNK2:%[0-9]+]] = function_ref @$S17default_arguments18testDefaultArgEnumyyFSiyXAfu0_ : $@convention(thin) () -> Int
+  // CHECK-NEXT: [[THICK_LINE_ARG_THUNK2:%[0-9]+]] = thin_to_thick_function [[THIN_LINE_ARG_THUNK2]] : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
+
+  // CHECK: [[DEF1_THUNK:%[0-9]+]] = function_ref @$S17default_arguments0A5_argsO7defarg1yACSSyXA_SiyXAtcACmF : $@convention(method) (@owned @callee_guaranteed () -> @owned String, @owned @callee_guaranteed () -> Int, @thin default_args.Type) -> @owned default_args
+
+  // CHECK: apply [[DEF1_THUNK]]([[THICK_FILE_ARG_THUNK1]], [[THICK_LINE_ARG_THUNK2]], [[METATYPE_DEF_1]])
+  _ = default_args.defarg1()
+
+  // CHECK: [[METATYPE_DEF_2:%[0-9]+]] = metatype $@thin default_args.Type
+
+  // user-supplied argument
+  // CHECK: integer_literal $Builtin.Int
+
+  // default argument 1
+  // CHECK: [[DOUBLE_ARG_THUNK:%[0-9]+]] = function_ref @$S17default_arguments0A5_argsOfA0_ : $@convention(thin) () -> Double
+  // CHECK-NEXT: [[DOUBLE_ARG:%[0-9]+]] = apply [[DOUBLE_ARG_THUNK]]() : $@convention(thin) () -> Double
+
+  // default argument 2
+  // CHECK: [[STRING_ARG_THUNK:%[0-9]+]] = function_ref @$S17default_arguments0A5_argsOfA1_ : $@convention(thin) () -> @owned String
+  // CHECK-NEXT: [[STRING_ARG:%[0-9]+]] = apply [[STRING_ARG_THUNK]]() : $@convention(thin) () -> @owned String
+
+  // CHECK: [[DEF2_THUNK:%[0-9]+]] = function_ref @$S17default_arguments0A5_argsO7defarg2yACSi_SdSStcACmF : $@convention(method) (Int, Double, @owned String, @thin default_args.Type) -> @owned default_args
+
+  // CHECK: apply [[DEF2_THUNK]]({{%[0-9]+}}, [[DOUBLE_ARG]], [[STRING_ARG]], [[METATYPE_DEF_2]])
+  _ = default_args.defarg2(i: 5)
+}

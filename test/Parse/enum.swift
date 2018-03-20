@@ -110,7 +110,7 @@ enum Recovery2 {
   case UE1: // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery3 {
-  case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case UE2(Void): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
   case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
@@ -335,8 +335,8 @@ enum DuplicateMembers2 {
 }
 
 enum DuplicateMembers3 {
-  case Foo // expected-note {{previous definition of 'Foo' is here}}
-  case Foo(Int) // expected-error {{duplicate definition of enum element}}
+  case Foo // expected-note {{'Foo' previously declared here}}
+  case Foo(Int) // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
