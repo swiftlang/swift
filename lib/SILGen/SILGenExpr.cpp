@@ -2949,7 +2949,6 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 /// SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
-  SILFunction &F = SGF.F;
   FuncDecl *primalDecl = E->getResolvedPrimal();
   assert(primalDecl && "Primal decl not resolved?");
   SILFunction &primalFn =
@@ -2961,6 +2960,9 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
 
   // If differentiation arguments are specified, lower them to SIL argument
   // indices.
+  // FIXME: Currently we are assuming 1-1 mapping between Swift argument indices
+  // and SIL argument indices, but it is very wrong. SILGen unflattens tuple
+  // arguments and prepends indirect results as arguments.
   SmallVector<unsigned, 8> loweredArgIndices;
   gradName += '_';
   if (!E->getArguments().empty()) {
@@ -2970,9 +2972,11 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
       case swift::AutoDiffArgument::Kind::Index:
         // The original index gets carried over.
         index = arg.getIndex();
+        break;
       case swift::AutoDiffArgument::Kind::Self:
         // The last argument of the SIL function is self.
         index = primalFn.getArguments().size() - 1;
+        break;
       }
       loweredArgIndices.push_back(index);
       gradName += std::to_string(index);

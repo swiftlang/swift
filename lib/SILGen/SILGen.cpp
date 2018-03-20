@@ -688,32 +688,72 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+IntRange<unsigned> SILGenModule::
+getLoweredFunctionParameterIndex(unsigned paramIndex,
+                                 const AbstractFunctionDecl *AFD) {
+  // Returns the number of types the given type will be flattened into as a
+  // function parameter during SILGen.
+  std::function<unsigned(Type)> getNumFlattenedTypes;
+  getNumFlattenedTypes = [&](Type type) {
+    if (auto *tupleTy = type->getAs<TupleType>()) {
+      return accumulate(tupleTy->getElementTypes(), 0,
+                        [&](unsigned prev, Type eltTy) {
+                          return prev + getNumFlattenedTypes(eltTy);
+                        });
+    }
+    return 1;
+  };
+  // Starting from the first parameter index (0), increment `startIndex` until
+  // we find the first corresponding argument index for the given function
+  // parameter index.
+  unsigned startIndex = 0;
+  auto *paramList = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
+  assert(paramIndex < paramList->size() && "Parameter index out of bounds!");
+  for (unsigned i = 0; i != paramIndex; ++i) {
+    auto *PD = paramList->get(i);
+    startIndex += getNumFlattenedTypes(PD->getType()->getCanonicalType());
+  }
+  // Compute the offset from the given parameter's first corresponding argument
+  // index to the last corresponding argument index.
+  unsigned offset = getNumFlattenedTypes(
+    paramList->get(paramIndex)->getType()->getCanonicalType());
+  return range(startIndex, startIndex + offset);
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
 /// Given a @differentiable attribute and the function declaration that holds
 /// this attribute, this function returns the lowered (SIL) argument indices
 /// to differentiate with respect to.
 static SmallVector<unsigned, 8>
-getLoweredDifferentiationIndices(const AbstractFunctionDecl *AFD,
+getLoweredDifferentiationIndices(SILGenModule &SGM,
+                                 const AbstractFunctionDecl *AFD,
+                                 const SILFunction *F,
                                  const DifferentiableAttr *DA) {
   SmallVector<unsigned, 8> indices;
-
-  // If no arguments are specified, it's differentiating wrt all arguments.
+  auto conv = F->getConventions();
+  auto declParamList =
+    AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
+  // If no arguments are specified, it's differentiating wrt all parameters.
   if (DA->getArguments().empty()) {
-    unsigned numArgs = AFD->getImplicitSelfDecl()
-      ? AFD->getParameterList(1)->size() + 1
-      : AFD->getParameterList(0)->size();
-    for (unsigned i = 0; i < numArgs; i++)
-      indices.push_back(i);
+    unsigned numParams = declParamList->size();
+    // We don't diff wrt `self` unless it is explicitly specified, therefore
+    // dropping the last SIL argument if it's a method.
+    for (unsigned i = 0; i < numParams; ++i)
+      for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, AFD))
+        indices.push_back(paramIdx);
     return indices;
   }
-
   // Otherwise, convert differentiation arguments.
   bool hasSelf = false;
   for (auto arg : DA->getArguments()) {
     switch (arg.getKind()) {
     // Normal index maps directly to a SIL argument index.
-    case AutoDiffArgument::Kind::Index:
-      indices.push_back(arg.getIndex());
+    case AutoDiffArgument::Kind::Index: {
+      auto idx = arg.getIndex();
+      auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, AFD);
+      indices.append(paramIdxRange.begin(), paramIdxRange.end());
       break;
+    }
     // 'self' is always the last SIL argument.
     case AutoDiffArgument::Kind::Self:
       // Sema guarantees this case to occur at most once.
@@ -721,10 +761,9 @@ getLoweredDifferentiationIndices(const AbstractFunctionDecl *AFD,
       break;
     }
   }
-  if (hasSelf) {
-    auto numDeclaredArgs = AFD->getParameterList(1)->size();
-    indices.push_back(numDeclaredArgs);
-  }
+  // The last SIL argument is `self`, if needed.
+  if (hasSelf)
+    indices.push_back((unsigned)declParamList->size());
   return indices;
 }
 
@@ -763,7 +802,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     auto *adjointFn = diffAttr->getAdjointFunction();
     assert(adjointFn && "Adjoint should've been type-checked and resolved.");
     auto silAdjFn = getFunction(SILDeclRef(adjointFn), ForDefinition);
-    auto indices = getLoweredDifferentiationIndices(AFD, diffAttr);
+    auto indices = getLoweredDifferentiationIndices(*this, AFD, silPrimalFn,
+                                                    diffAttr);
     silPrimalFn->setDifferentiableAttr(
       SILDifferentiableAttr::create(M, silAdjFn->getName(), indices));
   }
