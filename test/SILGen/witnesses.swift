@@ -519,7 +519,8 @@ protocol EscapingReq {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses18EscapingCovarianceVAA0B3ReqA2aDP1fyyS2icFTW : $@convention(witness_method: EscapingReq) (@owned @callee_guaranteed (Int) -> Int, @in_guaranteed EscapingCovariance) -> ()
 // CHECK-NOT: return
-// CHECK: convert_escape_to_noescape %0
+// CHECK: [[COPIED:%.*]] = copy_value %0
+// CHECK: convert_escape_to_noescape [[COPIED]]
 struct EscapingCovariance: EscapingReq {
   func f(_: (Int) -> Int) { }
 }

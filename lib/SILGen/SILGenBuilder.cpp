@@ -221,11 +221,9 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(SILLocation loc,
          !fnType->isNoEscape() && resultFnType->isNoEscape() &&
          "Expect a escaping to noescape conversion");
 
-  bool fnHasCleanup = fn.hasCleanup();
-  SILValue fnValue = fn.forward(getSILGenFunction());
+  SILValue fnValue = fn.ensurePlusOne(SGF, loc).forward(SGF);
   SILValue result = createConvertEscapeToNoEscape(loc, fnValue, resultTy);
-  if (fnHasCleanup)
-    getSILGenFunction().enterPostponedCleanup(fnValue);
+  getSILGenFunction().enterPostponedCleanup(fnValue);
   return ManagedValue::forTrivialObjectRValue(result);
 }
 
