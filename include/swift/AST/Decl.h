@@ -162,17 +162,6 @@ enum class CircularityCheck {
   Checked
 };
 
-/// Keeps track of whether a given class inherits initializers from its
-/// superclass.
-enum class StoredInheritsSuperclassInits {
-  /// We have not yet checked.
-  Unchecked,
-  /// Superclass initializers are not inherited.
-  NotInherited,
-  /// Convenience initializers in the superclass are inherited.
-  Inherited
-};
-
 /// Describes which spelling was used in the source for the 'static' or 'class'
 /// keyword.
 enum class StaticSpellingKind : uint8_t {
@@ -506,7 +495,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+2+2+1+3+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -514,11 +503,8 @@ protected:
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
-    /// Whether this class inherits its superclass's convenience
-    /// initializers.
-    ///
-    /// This is a value of \c StoredInheritsSuperclassInits.
-    InheritsSuperclassInits : 2,
+    /// Whether this class inherits its superclass's convenience initializers.
+    InheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
@@ -3471,6 +3457,15 @@ public:
   /// \param resolver Used to resolve the signatures of initializers, which is
   /// required for name lookup.
   bool inheritsSuperclassInitializers(LazyResolver *resolver);
+
+  /// Marks that this class inherits convenience initializers from its
+  /// superclass.
+  ///
+  /// This is computed as part of adding implicit initializers.
+  void setInheritsSuperclassInitializers() {
+    assert(addedImplicitInitializers());
+    Bits.ClassDecl.InheritsSuperclassInits = true;
+  }
 
   /// Figure out if this class has any @objc ancestors, in which case it should
   /// have implicitly @objc members. Note that a class with generic ancestry

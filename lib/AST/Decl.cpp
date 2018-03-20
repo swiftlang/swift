@@ -2712,8 +2712,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.ClassDecl.RequiresStoredPropertyInits = 0;
-  Bits.ClassDecl.InheritsSuperclassInits
-    = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
+  Bits.ClassDecl.InheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
   Bits.ClassDecl.HasDestructorDecl = 0;
   Bits.ClassDecl.ObjCKind = 0;
@@ -2784,98 +2783,31 @@ bool ClassDecl::hasMissingVTableEntries() const {
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
-  // Get a resolver from the ASTContext if we don't have one already.
-  if (resolver == nullptr)
-    resolver = getASTContext().getLazyResolver();
-
   // Check whether we already have a cached answer.
-  switch (static_cast<StoredInheritsSuperclassInits>(
-            Bits.ClassDecl.InheritsSuperclassInits)) {
-  case StoredInheritsSuperclassInits::Unchecked:
-    // Compute below.
-    break;
-
-  case StoredInheritsSuperclassInits::Inherited:
-    return true;
-
-  case StoredInheritsSuperclassInits::NotInherited:
-    return false;
-  }
+  if (addedImplicitInitializers())
+    return Bits.ClassDecl.InheritsSuperclassInits;
 
   // If there's no superclass, there's nothing to inherit.
   ClassDecl *superclassDecl;
   if (!getSuperclass() ||
       !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
-    Bits.ClassDecl.InheritsSuperclassInits
-      = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+    setAddedImplicitInitializers();
     return false;
   }
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
-  if (superclassDecl->hasMissingDesignatedInitializers()) {
-    Bits.ClassDecl.InheritsSuperclassInits
-      = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+  if (superclassDecl->hasMissingDesignatedInitializers())
     return false;
-  }
 
-  // Look at all of the initializers of the subclass to gather the initializers
-  // they override from the superclass.
-  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
+  // Otherwise, do all the work of resolving constructors, which will also
+  // calculate the right answer.
+  if (resolver == nullptr)
+    resolver = getASTContext().getLazyResolver();
   if (resolver)
     resolver->resolveImplicitConstructors(this);
-  for (auto member : lookupDirect(DeclBaseName::createConstructor())) {
-    auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor)
-      continue;
 
-    // Swift initializers added in extensions of Objective-C classes can never
-    // be overrides.
-    if (hasClangNode() && !ctor->hasClangNode())
-      return false;
-
-    // Resolve this initializer, if needed.
-    if (!ctor->hasInterfaceType()) {
-      assert(resolver && "Should have a resolver here");
-      resolver->resolveDeclSignature(ctor);
-    }
-
-    // Ignore any stub implementations.
-    if (ctor->hasStubImplementation())
-      continue;
-
-    if (auto overridden = ctor->getOverriddenDecl()) {
-      if (overridden->isDesignatedInit())
-        overriddenInits.insert(overridden);
-    }
-  }
-
-  // Check all of the designated initializers in the direct superclass.
-  // Note: This should be treated as a lookup for intra-module dependency
-  // purposes, but a subclass already depends on its superclasses and any
-  // extensions for many other reasons.
-  for (auto member : superclassDecl->lookupDirect(DeclBaseName::createConstructor())) {
-    if (AvailableAttr::isUnavailable(member))
-      continue;
-
-    // We only care about designated initializers.
-    auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor || !ctor->isDesignatedInit() || ctor->hasStubImplementation())
-      continue;
-
-    // If this designated initializer wasn't overridden, we can't inherit.
-    if (overriddenInits.count(ctor) == 0) {
-      Bits.ClassDecl.InheritsSuperclassInits
-        = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
-      return false;
-    }
-  }
-
-  // All of the direct superclass's designated initializers have been overridden
-  // by the subclass. Initializers can be inherited.
-  Bits.ClassDecl.InheritsSuperclassInits
-    = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
-  return true;
+  return Bits.ClassDecl.InheritsSuperclassInits;
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
