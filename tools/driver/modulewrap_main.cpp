@@ -162,7 +162,9 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SmallString<128> RuntimeResourcePath(MainExecutablePath);
   llvm::sys::path::remove_filename(RuntimeResourcePath); // Remove /swift
   llvm::sys::path::remove_filename(RuntimeResourcePath); // Remove /bin
-  llvm::sys::path::append(RuntimeResourcePath, "lib", "swift");
+
+  llvm::sys::path::append(RuntimeResourcePath, SWIFT_LIBDIR, "swift");
+
   SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
 
   SourceManager SrcMgr;

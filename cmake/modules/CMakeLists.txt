@@ -1,4 +1,4 @@
-set(SWIFT_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/swift)
+set(SWIFT_INSTALL_PACKAGE_DIR ${SWIFT_LIBDIR}/cmake/swift)
 set(swift_cmake_builddir "${SWIFT_BINARY_DIR}/${SWIFT_INSTALL_PACKAGE_DIR}")
 
 # Generate build-tree exports list only

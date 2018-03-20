@@ -494,6 +494,7 @@ class BuildScriptInvocation(object):
                 args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
             "--build-jobs", str(args.build_jobs),
+            "--libdir-suffix=%s" % args.libdir_suffix,
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),
             "--build-args=%s" % ' '.join(

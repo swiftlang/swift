@@ -38,7 +38,9 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::SmallString<128> LibPath(Path);
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  llvm::sys::path::append(LibPath, "lib", "swift");
+
+  llvm::sys::path::append(LibPath, SWIFT_LIBDIR, "swift");
+
   setRuntimeResourcePath(LibPath.str());
 }
 

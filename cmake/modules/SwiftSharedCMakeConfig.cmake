@@ -9,7 +9,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
 
   set(SWIFT_LLVM_CMAKE_PATHS
       "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
-      "${PATH_TO_LLVM_BUILD}/lib/cmake/llvm")
+      "${PATH_TO_LLVM_BUILD}/${SWIFT_LIBDIR}/cmake/llvm")
 
   # Add all LLVM CMake paths to our cmake module path.
   foreach(path ${SWIFT_LLVM_CMAKE_PATHS})
@@ -109,8 +109,8 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}" CACHE STRING "Default options for lit")
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${SWIFT_LIBDIR}")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${SWIFT_LIBDIR}")
 
   set(LLVM_INCLUDE_TESTS TRUE)
   set(LLVM_INCLUDE_DOCS TRUE)
@@ -133,7 +133,7 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   # Add all Clang CMake paths to our cmake module path.
   set(SWIFT_CLANG_CMAKE_PATHS
     "${PATH_TO_CLANG_BUILD}/share/clang/cmake"
-    "${PATH_TO_CLANG_BUILD}/lib/cmake/clang")
+    "${PATH_TO_CLANG_BUILD}/${SWIFT_LIBDIR}/cmake/clang")
   foreach(path ${SWIFT_CLANG_CMAKE_PATHS})
     list(APPEND CMAKE_MODULE_PATH ${path})
   endforeach()
@@ -226,7 +226,7 @@ macro(swift_common_unified_build_config product)
   if(EXISTS "${CMAKE_SOURCE_DIR}/tools/cmark/")
     set(${product}_PATH_TO_CMARK_SOURCE "${CMAKE_SOURCE_DIR}/tools/cmark")
     set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
-    set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
+    set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/${SWIFT_LIBDIR}")
 
     get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
       ABSOLUTE)

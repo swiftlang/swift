@@ -6,7 +6,7 @@ set(datafiles
   overlay.json
 )
 set(SWIFTLIB_DIR
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${SWIFT_LIBDIR}/swift")
 set(output_dir "${SWIFTLIB_DIR}/migrator")
 
 add_custom_command(
@@ -40,7 +40,7 @@ add_custom_target("symlink_migrator_data"
 
 swift_install_in_component(compiler
   FILES ${datafiles}
-DESTINATION "lib/swift/migrator")
+DESTINATION "${SWIFT_LIBDIR}/swift/migrator")
 
 add_swift_library(swiftMigrator STATIC
   APIDiffMigratorPass.cpp

@@ -104,7 +104,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 
   swift_install_in_component(stdlib
     TARGETS swiftImageInspectionShared
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "${SWIFT_LIBDIR}/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
@@ -121,7 +121,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(stdlib
     FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "${SWIFT_LIBDIR}/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 
   add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
@@ -188,7 +188,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
                                  FILES
                                    "${swiftrtPath}"
                                  DESTINATION
-                                   "lib/swift/${arch_subdir}")
+                                   "${SWIFT_LIBDIR}/swift/${arch_subdir}")
       add_dependencies(swift-stdlib-${arch_suffix} ${swiftImageRegistration-${arch_suffix}})
 
       add_custom_target(swiftImageRegistration-${arch_suffix}

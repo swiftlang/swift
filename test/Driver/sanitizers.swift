@@ -33,21 +33,21 @@
 // ASAN: swift
 // ASAN: -sanitize=address
 
-// ASAN_OSX: lib/swift/clang/lib/darwin/libclang_rt.asan_osx_dynamic.dylib
-// ASAN_IOSSIM: lib/swift/clang/lib/darwin/libclang_rt.asan_iossim_dynamic.dylib
-// ASAN_IOS: lib/swift/clang/lib/darwin/libclang_rt.asan_ios_dynamic.dylib
-// ASAN_tvOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.asan_tvossim_dynamic.dylib
-// ASAN_tvOS: lib/swift/clang/lib/darwin/libclang_rt.asan_tvos_dynamic.dylib
-// ASAN_watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.asan_watchossim_dynamic.dylib
-// ASAN_watchOS: lib/swift/clang/lib/darwin/libclang_rt.asan_watchos_dynamic.dylib
-// ASAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.asan-x86_64.a
+// ASAN_OSX: swift/clang/lib/darwin/libclang_rt.asan_osx_dynamic.dylib
+// ASAN_IOSSIM: swift/clang/lib/darwin/libclang_rt.asan_iossim_dynamic.dylib
+// ASAN_IOS: swift/clang/lib/darwin/libclang_rt.asan_ios_dynamic.dylib
+// ASAN_tvOS_SIM: swift/clang/lib/darwin/libclang_rt.asan_tvossim_dynamic.dylib
+// ASAN_tvOS: swift/clang/lib/darwin/libclang_rt.asan_tvos_dynamic.dylib
+// ASAN_watchOS_SIM: swift/clang/lib/darwin/libclang_rt.asan_watchossim_dynamic.dylib
+// ASAN_watchOS: swift/clang/lib/darwin/libclang_rt.asan_watchos_dynamic.dylib
+// ASAN_LINUX: swift/clang/lib/linux/libclang_rt.asan-x86_64.a
 
 // ASAN: -rpath @executable_path
 
 // TSAN: swift
 // TSAN: -sanitize=thread
 
-// TSAN_OSX: lib/swift/clang/lib/darwin/libclang_rt.tsan_osx_dynamic.dylib
+// TSAN_OSX: swift/clang/lib/darwin/libclang_rt.tsan_osx_dynamic.dylib
 // TSAN_OSX_32: unsupported option '-sanitize=thread' for target 'x86-apple-macosx10.9'
 // TSAN_IOSSIM: unsupported option '-sanitize=thread' for target 'x86_64-apple-ios7.1'
 // TSAN_IOS: unsupported option '-sanitize=thread' for target 'arm64-apple-ios7.1'
@@ -56,7 +56,7 @@
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
 // FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
-// TSAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.tsan-x86_64.a
+// TSAN_LINUX: swift/clang/lib/linux/libclang_rt.tsan-x86_64.a
 
 // TSAN: -rpath @executable_path
 

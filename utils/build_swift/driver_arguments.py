@@ -306,6 +306,11 @@ def create_argument_parser():
            default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
+    
+    option('--libdir-suffix', store,
+           metavar='STRING',
+           default='',
+           help='the library folder suffix to be used (32/64 or none). Default to none')
 
     option('--build-subdir', store,
            metavar='PATH',

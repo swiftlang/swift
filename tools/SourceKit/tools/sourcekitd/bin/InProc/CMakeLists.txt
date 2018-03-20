@@ -45,7 +45,7 @@ endif()
 if (SOURCEKIT_BUILT_STANDALONE)
   # Create the symlinks necessary to find the swift runtime.
   add_custom_command(TARGET sourcekitdInProc PRE_BUILD
-    COMMAND ln "-fhs" "${PATH_TO_SWIFT_BUILD}/lib/swift" "${SOURCEKIT_BINARY_DIR}/lib")
+    COMMAND ln "-fhs" "${PATH_TO_SWIFT_BUILD}/${SWIFT_LIBDIR}/swift" "${SOURCEKIT_BINARY_DIR}/${SWIFT_LIBDIR}")
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")

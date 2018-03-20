@@ -6,9 +6,9 @@ include(SwiftWindowsSupport)
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
 set(SWIFTLIB_DIR
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${SWIFT_LIBDIR}/swift")
 set(SWIFTSTATICLIB_DIR
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${SWIFT_LIBDIR}/swift_static")
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -952,7 +952,7 @@ function(_add_swift_library_single target name)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN:/usr/${SWIFT_LIBDIR}/swift/linux")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
@@ -1091,8 +1091,8 @@ function(_add_swift_library_single target name)
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
   set(library_search_directories
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../${SWIFT_LIBDIR}/swift/${SWIFTLIB_SINGLE_SUBDIR}"
+      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../${SWIFT_LIBDIR}/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -1233,8 +1233,8 @@ function(_add_swift_library_single target name)
         COMPILE_FLAGS " ${c_compile_flags}")
     set(library_search_directories
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../${SWIFT_LIBDIR}/swift/${SWIFTLIB_SINGLE_SUBDIR}"
+        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../${SWIFT_LIBDIR}/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     swift_target_link_search_directories("${target_static}" "${library_search_directories}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
@@ -1753,7 +1753,7 @@ function(add_swift_library name)
 
           swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
               FILES "${UNIVERSAL_LIBRARY_NAME}"
-              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+              DESTINATION "${SWIFT_LIBDIR}/${resource_dir}/${resource_dir_sdk_subdir}"
               PERMISSIONS ${file_permissions})
         endif()
 
@@ -1779,7 +1779,7 @@ function(add_swift_library name)
                                  ${THIN_INPUT_TARGETS_STATIC})
           swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
               FILES "${UNIVERSAL_LIBRARY_NAME}"
-              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}"
+              DESTINATION "${SWIFT_LIBDIR}/swift_static/${resource_dir_sdk_subdir}"
               PERMISSIONS
                 OWNER_READ OWNER_WRITE
                 GROUP_READ
@@ -1866,8 +1866,8 @@ function(add_swift_library name)
 
       swift_install_in_component(dev
           TARGETS ${name}
-          ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-          LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+          ARCHIVE DESTINATION ${SWIFT_LIBDIR}
+          LIBRARY DESTINATION ${SWIFT_LIBDIR}
           RUNTIME DESTINATION bin)
       swift_is_installing_component(dev is_installing)
       

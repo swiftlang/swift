@@ -1037,7 +1037,8 @@ static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
     runtimeLibPath.append(programPath.begin(), programPath.end());
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift");
+
+    llvm::sys::path::append(runtimeLibPath, SWIFT_LIBDIR, "swift");
   }
   llvm::sys::path::append(runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
@@ -1071,7 +1072,8 @@ static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
     runtimeLibPath.append(programPath.begin(), programPath.end());
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift_static");
+
+    llvm::sys::path::append(runtimeLibPath, SWIFT_LIBDIR, "swift_static");
   }
   llvm::sys::path::append(runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));

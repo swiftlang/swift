@@ -110,7 +110,7 @@ foreach(sdk ${SWIFT_SDKS})
 
     swift_install_in_component(sdk-overlay
         FILES "${glibc_modulemap_out}"
-        DESTINATION "lib/swift/${arch_subdir}")
+        DESTINATION "${SWIFT_LIBDIR}/swift/${arch_subdir}")
 
   endforeach()
 endforeach()

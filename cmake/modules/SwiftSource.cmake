@@ -336,7 +336,7 @@ function(_compile_swift_files
   if(NOT BUILD_STANDALONE)
     swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
         FILES "${module_file}" "${module_doc_file}"
-        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+        DESTINATION "${SWIFT_LIBDIR}/swift/${library_subdir}")
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
@@ -368,7 +368,7 @@ function(_compile_swift_files
     list(APPEND apinote_files "${apinote_file}")
     swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
       FILES ${apinote_file}
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+      DESTINATION "${SWIFT_LIBDIR}/swift/${library_subdir}")
   endforeach()
 
   # If there are more than one output files, we assume that they are specified

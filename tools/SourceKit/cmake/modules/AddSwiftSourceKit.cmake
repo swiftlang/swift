@@ -199,8 +199,8 @@ macro(add_sourcekit_library name)
   endif()
   swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
       TARGETS ${name}
-      LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      LIBRARY DESTINATION "${SWIFT_LIBDIR}"
+      ARCHIVE DESTINATION "${SWIFT_LIBDIR}"
       RUNTIME DESTINATION "bin")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
   add_sourcekit_default_compiler_flags("${name}")
@@ -335,8 +335,8 @@ macro(add_sourcekit_framework name)
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
         TARGETS ${name}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        LIBRARY DESTINATION ${SWIFT_LIBDIR}
+        ARCHIVE DESTINATION ${SWIFT_LIBDIR}
         RUNTIME DESTINATION bin)
     set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
@@ -353,7 +353,7 @@ macro(add_sourcekit_framework name)
   else()
     swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
         DIRECTORY ${framework_location}
-        DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        DESTINATION ${SWIFT_LIBDIR}
         USE_SOURCE_PERMISSIONS)
     set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
