@@ -230,7 +230,7 @@ extension NSError : Error {
   public var _code: Int { return code }
 }
 
-public enum _GenericObjCError : Error {
+internal enum _GenericObjCError : Error {
   case nilError
 }
 
