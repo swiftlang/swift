@@ -7828,6 +7828,12 @@ static void finishInheritedConformances(
   }
 }
 
+/// A stripped-down version of Type::subst that only works on non-generic
+/// associated types.
+///
+/// This is used to finish a conformance for a concrete imported type that may
+/// rely on default associated types defined in protocol extensions...without
+/// having to do all the work of gathering conformances from scratch.
 static Type
 recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
                               DependentMemberType *depMemTy) {
