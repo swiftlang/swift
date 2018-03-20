@@ -45,7 +45,10 @@ public typealias BidirectionalIndexable = BidirectionalCollection
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection: Collection
-where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
+where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection
+// FIXME: should be constrained by Collection where Prefix == SubSequence
+, Prefix: BidirectionalCollection 
+{
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -54,6 +57,9 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Prefix
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Indices

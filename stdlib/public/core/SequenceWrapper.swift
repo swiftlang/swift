@@ -89,6 +89,20 @@ extension _SequenceWrapper {
   }
 }
 
+extension _SequenceWrapper where Prefix == Base.Prefix {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(_ maxLength: Int) -> Prefix {
+    return _base.prefix(maxLength)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Prefix {
+    return try _base.prefix(while: predicate)
+  }
+}
+
 extension _SequenceWrapper where SubSequence == Base.SubSequence {
   @_inlineable // FIXME(sil-serialize-all)
   public func dropFirst(_ n: Int) -> SubSequence {
@@ -97,10 +111,6 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
   @_inlineable // FIXME(sil-serialize-all)
   public func dropLast(_ n: Int) -> SubSequence {
     return _base.dropLast(n)
-  }
-  @_inlineable // FIXME(sil-serialize-all)
-  public func prefix(_ maxLength: Int) -> SubSequence {
-    return _base.prefix(maxLength)
   }
   @_inlineable // FIXME(sil-serialize-all)
   public func suffix(_ maxLength: Int) -> SubSequence {
@@ -114,13 +124,6 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
     return try _base.drop(while: predicate)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    return try _base.prefix(while: predicate)
-  }
-  
   @_inlineable // FIXME(sil-serialize-all)
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,

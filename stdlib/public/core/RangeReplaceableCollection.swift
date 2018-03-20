@@ -71,9 +71,15 @@ public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 /// parameter. You can override any of the protocol's required methods to 
 /// provide your own custom implementation.
 public protocol RangeReplaceableCollection : Collection
-  where SubSequence : RangeReplaceableCollection {
+where SubSequence : RangeReplaceableCollection
+// FIXME: should be constrained by Collection where Prefix == SubSequence
+, Prefix: RangeReplaceableCollection 
+{
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Prefix
 
   //===--- Fundamental Requirements ---------------------------------------===//
 

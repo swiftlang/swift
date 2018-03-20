@@ -67,6 +67,8 @@ public typealias MutableIndexable = MutableCollection
 ///     let y = x
 public protocol MutableCollection: Collection
 where SubSequence: MutableCollection
+// FIXME: should be constrained by Collection where Prefix == SubSequence
+, Prefix: MutableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -76,6 +78,9 @@ where SubSequence: MutableCollection
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Prefix
 
   /// Accesses the element at the specified position.
   ///

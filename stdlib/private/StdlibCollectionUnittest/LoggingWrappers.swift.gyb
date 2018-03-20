@@ -247,6 +247,7 @@ public struct ${Self}<
   }
 
   public typealias SubSequence = Base.SubSequence
+  public typealias Prefix = Base.Prefix
 
   public func dropFirst(_ n: Int) -> SubSequence {
     Log.dropFirst[selfType] += 1
@@ -265,14 +266,14 @@ public struct ${Self}<
     return try base.drop(while: predicate)
   }
 
-  public func prefix(_ maxLength: Int) -> SubSequence {
+  public func prefix(_ maxLength: Int) -> Prefix {
     Log.prefixMaxLength[selfType] += 1
     return base.prefix(maxLength)
   }
 
   public func prefix(
     while predicate: (Base.Iterator.Element) throws -> Bool
-  ) rethrows -> SubSequence {
+  ) rethrows -> Prefix {
     Log.prefixWhile[selfType] += 1
     return try base.prefix(while: predicate)
   }
@@ -592,13 +593,14 @@ public struct ${Self}<
 /// are uncounted by the standard logging collection wrapper.
 public struct ${Self}<
   Base : MutableCollection & ${collectionForTraversal(Traversal)}
-> : MutableCollection, ${collectionForTraversal(Traversal)}, LoggingType {
+> : MutableCollection, ${collectionForTraversal(Traversal)}, LoggingType where Base.Prefix == Base.SubSequence {
 
   public var base: Base
 
   public typealias Log = MutableCollectionLog
 
   public typealias SubSequence = Base.SubSequence
+  public typealias Prefix = SubSequence
   public typealias Iterator = Base.Iterator
   public typealias Element = Base.Element
 

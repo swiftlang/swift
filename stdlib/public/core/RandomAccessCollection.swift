@@ -40,6 +40,8 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection: BidirectionalCollection
 where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
+// FIXME: should be constrained by Collection where Prefix == SubSequence
+, Prefix: RandomAccessCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -49,6 +51,9 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Prefix
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Indices

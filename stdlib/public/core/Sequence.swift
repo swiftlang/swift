@@ -334,6 +334,10 @@ public protocol Sequence {
   associatedtype SubSequence : Sequence = AnySequence<Element>
     where Element == SubSequence.Element,
           SubSequence.SubSequence == SubSequence
+          
+  associatedtype Prefix: Sequence = PrefixSequence<Self>
+  where Element == Prefix.Element,
+        Prefix.Prefix == Prefix
 
   /// Returns an iterator over the elements of this sequence.
   func makeIterator() -> Iterator
@@ -492,7 +496,7 @@ public protocol Sequence {
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
-  func prefix(_ maxLength: Int) -> SubSequence
+  func prefix(_ maxLength: Int) -> Prefix
 
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
@@ -518,7 +522,7 @@ public protocol Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   func prefix(
     while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence
+  ) rethrows -> Prefix
 
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the sequence.
@@ -695,52 +699,81 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
 ///
 /// The underlying iterator's sequence may be infinite.
 @_fixed_layout
-@_versioned
-internal struct _PrefixSequence<Base : IteratorProtocol>
-    : Sequence, IteratorProtocol {
+public struct PrefixSequence<Base: Sequence> {
   @_versioned
   internal let _maxLength: Int
   @_versioned
-  internal var _iterator: Base
-  @_versioned
-  internal var _taken: Int
-
-  @_versioned
+  internal let _base: Base
+  
   @_inlineable
-  internal init(_iterator: Base, maxLength: Int, taken: Int = 0) {
-    self._iterator = _iterator
-    self._maxLength = maxLength
-    self._taken = taken
+  public init(_ base: Base, maxLength: Int) {
+    _base = base
+    _maxLength = maxLength
   }
+}
 
-  @_versioned
-  @_inlineable
-  internal func makeIterator() -> _PrefixSequence<Base> {
-    return self
+extension PrefixSequence {
+  @_fixed_layout
+  public struct Iterator {
+    @_versioned
+    internal var _base: Base.Iterator
+    @_versioned
+    internal var _taken: Int    
+    @_versioned
+    internal let _maxLength: Int
+
+    @_versioned
+    @_inlineable
+    internal init(_base: Base.Iterator, maxLength: Int) {
+      self._base = _base
+      _maxLength = maxLength
+      _taken = 0
+    }
   }
+}
 
-  @_versioned
+extension PrefixSequence.Iterator: IteratorProtocol {
+  public typealias Element = Base.Element
+  
   @_inlineable
-  internal mutating func next() -> Base.Element? {
-    if _taken >= _maxLength { return nil }
-    _taken += 1
+  public mutating func next() -> Element? {
+    guard _taken < _maxLength else { return nil }
 
-    if let next = _iterator.next() {
+    if let next = _base.next() {
+      _taken += 1
       return next
     }
+    else {
+      _taken = _maxLength
+      return nil
+    }
+  }
+}  
 
-    _taken = _maxLength
-    return nil
+extension PrefixSequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Prefix = PrefixSequence<Base>
+
+  @_inlineable
+  public func makeIterator() -> Iterator {
+    return Iterator(_base: _base.makeIterator(), maxLength: _maxLength)
+  }
+  
+  // custom prefix implementations to avoid double-wrapping
+
+  @_inlineable
+  public func prefix(_ maxLength: Int) -> Prefix {
+    return PrefixSequence(_base, maxLength: Swift.min(maxLength, _maxLength))
   }
 
-  @_versioned
   @_inlineable
-  internal func prefix(_ maxLength: Int) -> AnySequence<Base.Element> {
-    return AnySequence(
-      _PrefixSequence(
-        _iterator: _iterator,
-        maxLength: Swift.min(maxLength, self._maxLength),
-        taken: _taken))
+  public func prefix(while predicate: (Element) throws -> Bool) rethrows -> Prefix {
+    var i = 0
+    for element in _base {
+      guard try i < _maxLength && predicate(element) else { break }
+      i += 1
+    }
+    return PrefixSequence(_base, maxLength: i)
   }
 }
 
@@ -1055,6 +1088,43 @@ extension Sequence where Element : Equatable {
   }
 }
 
+extension Sequence where Prefix == PrefixSequence<Self> {
+  @_inlineable
+  public func prefix(_ maxLength: Int) -> Prefix {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    return PrefixSequence(self, maxLength: maxLength)
+  }
+
+  // NOTE: this implementation assumes sequence is multi-pass
+  @_inlineable
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Prefix {
+    var i = 0
+    for element in self {
+      guard try predicate(element) else { break }
+      i += 1
+    }
+    return PrefixSequence(self, maxLength: i)
+  }
+}
+
+extension Sequence {
+  @available(*, deprecated, message: "Sequence now has a separate Prefix type")
+  public func prefix(_ maxLength: Int) -> AnySequence<Element> {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    return AnySequence(self.prefix(maxLength) as Prefix)
+  }
+
+  @_inlineable
+  @available(*, deprecated, message: "Sequence now has a separate Prefix type")
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> AnySequence<Element> {
+    return AnySequence(try self.prefix(while: predicate) as Prefix)
+  }
+}
+
 extension Sequence where SubSequence == AnySequence<Element> {
 
   /// Returns the longest possible subsequences of the sequence, in order, that
@@ -1299,71 +1369,6 @@ extension Sequence where SubSequence == AnySequence<Element> {
     return try AnySequence(
       _DropWhileSequence(
         iterator: makeIterator(), nextElement: nil, predicate: predicate))
-  }
-
-  /// Returns a subsequence, up to the specified maximum length, containing the
-  /// initial elements of the sequence.
-  ///
-  /// If the maximum length exceeds the number of elements in the sequence,
-  /// the result contains all the elements in the sequence.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.prefix(2))
-  ///     // Prints "[1, 2]"
-  ///     print(numbers.prefix(10))
-  ///     // Prints "[1, 2, 3, 4, 5]"
-  ///
-  /// - Parameter maxLength: The maximum number of elements to return. The
-  ///   value of `maxLength` must be greater than or equal to zero.
-  /// - Returns: A subsequence starting at the beginning of this sequence
-  ///   with at most `maxLength` elements.
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public func prefix(_ maxLength: Int) -> AnySequence<Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
-    if maxLength == 0 {
-      return AnySequence(EmptyCollection<Element>())
-    }
-    return AnySequence(
-      _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
-  }
-
-  /// Returns a subsequence containing the initial, consecutive elements that
-  /// satisfy the given predicate.
-  ///
-  /// The following example uses the `prefix(while:)` method to find the
-  /// positive numbers at the beginning of the `numbers` array. Every element
-  /// of `numbers` up to, but not including, the first negative value is
-  /// included in the result.
-  ///
-  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
-  ///     let positivePrefix = numbers.prefix(while: { $0 > 0 })
-  ///     // positivePrefix == [3, 7, 4]
-  ///
-  /// If `predicate` matches every element in the sequence, the resulting
-  /// sequence contains every element of the sequence.
-  ///
-  /// - Parameter predicate: A closure that takes an element of the sequence as
-  ///   its argument and returns a Boolean value indicating whether the
-  ///   element should be included in the result.
-  /// - Returns: A subsequence of the initial, consecutive elements that
-  ///   satisfy `predicate`.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @_inlineable
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> AnySequence<Element> {
-    var result: [Element] = []
-
-    for element in self {
-      guard try predicate(element) else {
-        break
-      }
-      result.append(element)
-    }
-    return AnySequence(result)
   }
 }
 

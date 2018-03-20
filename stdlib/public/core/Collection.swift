@@ -402,6 +402,12 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
+  // FIXME: this constraint segfaults the compiler
+  // , Prefix == SubSequence
+
+  associatedtype Prefix
+  : Collection /* shouldn't be necessary if == SubSequence */
+   = SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -1320,52 +1326,6 @@ extension Collection {
     return self[start..<endIndex]
   }
 
-  /// Returns a subsequence, up to the specified maximum length, containing
-  /// the initial elements of the collection.
-  ///
-  /// If the maximum length exceeds the number of elements in the collection,
-  /// the result contains all the elements in the collection.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.prefix(2))
-  ///     // Prints "[1, 2]"
-  ///     print(numbers.prefix(10))
-  ///     // Prints "[1, 2, 3, 4, 5]"
-  ///
-  /// - Parameter maxLength: The maximum number of elements to return.
-  ///   `maxLength` must be greater than or equal to zero.
-  /// - Returns: A subsequence starting at the beginning of this collection
-  ///   with at most `maxLength` elements.
-  @_inlineable
-  public func prefix(_ maxLength: Int) -> SubSequence {
-    _precondition(
-      maxLength >= 0,
-      "Can't take a prefix of negative length from a collection")
-    let end = index(startIndex,
-      offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
-    return self[startIndex..<end]
-  }
-  
-  /// Returns a subsequence containing the initial elements until `predicate`
-  /// returns `false` and skipping the remaining elements.
-  ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns `true` if the element should
-  ///   be included or `false` if it should be excluded. Once the predicate
-  ///   returns `false` it will not be called again.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @_inlineable
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    var end = startIndex
-    while try end != endIndex && predicate(self[end]) {
-      formIndex(after: &end)
-    }
-    return self[startIndex..<end]
-  }
-
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the collection.
   ///
@@ -1597,6 +1557,55 @@ extension Collection {
     }
 
     return result
+  }
+}
+
+// FIXME:this should be a constraint on all collections
+extension Collection where Prefix == SubSequence {
+  /// Returns a subsequence, up to the specified maximum length, containing
+  /// the initial elements of the collection.
+  ///
+  /// If the maximum length exceeds the number of elements in the collection,
+  /// the result contains all the elements in the collection.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.prefix(2))
+  ///     // Prints "[1, 2]"
+  ///     print(numbers.prefix(10))
+  ///     // Prints "[1, 2, 3, 4, 5]"
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A subsequence starting at the beginning of this collection
+  ///   with at most `maxLength` elements.
+  @_inlineable
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    _precondition(
+      maxLength >= 0,
+      "Can't take a prefix of negative length from a collection")
+    let end = index(startIndex,
+      offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
+    return self[startIndex..<end]
+  }
+  
+  /// Returns a subsequence containing the initial elements until `predicate`
+  /// returns `false` and skipping the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns `true` if the element should
+  ///   be included or `false` if it should be excluded. Once the predicate
+  ///   returns `false` it will not be called again.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var end = startIndex
+    while try end != endIndex && predicate(self[end]) {
+      formIndex(after: &end)
+    }
+    return self[startIndex..<end]
   }
 }
 
