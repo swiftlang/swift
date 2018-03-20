@@ -542,7 +542,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A capitalized representation of the string that is produced
   /// using the current locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedCapitalized: String {
     return _ns.localizedCapitalized
   }
@@ -888,7 +888,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A lowercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedLowercase: String {
     return _ns.localizedLowercase
   }
@@ -953,7 +953,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardContains<
     T : StringProtocol
   >(_ string: T) -> Bool {
@@ -1128,7 +1128,7 @@ extension StringProtocol where Index == String.Index {
 
   /// An uppercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedUppercase: String {
     return _ns.localizedUppercase as String
   }
@@ -1185,7 +1185,7 @@ extension StringProtocol where Index == String.Index {
 
 #if !DEPLOYMENT_RUNTIME_SWIFT
   /// Perform string transliteration.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func applyingTransform(
     _ transform: StringTransform, reverse: Bool
   ) -> String? {
@@ -1604,7 +1604,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardRange<
     T : StringProtocol
   >(of string: T) -> Range<Index>? {
