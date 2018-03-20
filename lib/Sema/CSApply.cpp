@@ -1975,8 +1975,8 @@ namespace {
         if (!nilDecl->hasInterfaceType())
           return nullptr;
 
-        SubstitutionList subs = {Substitution(objectType, {})};
-        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, subs);
+        Substitution sub(objectType, {});
+        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, {sub});
 
         auto nilType = FunctionType::get(
             {MetatypeType::get(type)}, type);
