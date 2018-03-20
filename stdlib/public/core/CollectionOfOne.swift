@@ -136,23 +136,6 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
-extension CollectionOfOne : Equatable where Element : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, introduced: 4.1) // FIXME(conformance-availability)
-  public static func == (lhs: CollectionOfOne, rhs: CollectionOfOne) -> Bool {
-    return lhs._element == rhs._element
-  }
-}
-
-@available(swift, introduced: 4.1) // FIXME(conformance-availability)
-extension CollectionOfOne : Hashable where Element : Hashable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _element.hashValue
-  }
-}
-
 extension CollectionOfOne : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)

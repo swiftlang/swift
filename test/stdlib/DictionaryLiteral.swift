@@ -54,12 +54,3 @@ expectType(DictionaryLiteral<String, NSObject>.self, &hetero1)
 
 var hetero2: DictionaryLiteral = ["a": 1 as NSNumber, "b": "Foo" as NSString]
 expectType(DictionaryLiteral<String, NSObject>.self, &hetero2)
-
-let instances: [DictionaryLiteral<Int, String>] = [
-  [1: "a", 1: "a", 2: "b"],
-  [1: "a", 2: "b", 1: "a"],
-  [2: "b", 1: "a", 1: "a"],
-  [1: "a", 1: "a", 1: "a"]
-]
-checkEquatable(instances, oracle: { $0 == $1 })
-checkHashable(instances, equalityOracle: { $0 == $1 })

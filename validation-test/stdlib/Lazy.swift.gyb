@@ -209,20 +209,6 @@ LazyTestSuite.test("CollectionOfOne/{CustomDebugStringConvertible,CustomReflecta
     c)
 }
 
-LazyTestSuite.test("CollectionOfOne/Equatable") {
-  let c = CollectionOfOne<Int>(42)
-  let d = CollectionOfOne<Int>(43)
-  let instances = [ c, d ]
-  checkEquatable(instances, oracle: { $0 == $1 })
-}
-
-LazyTestSuite.test("CollectionOfOne/Hashable") {
-  let c = CollectionOfOne<Int>(42)
-  let d = CollectionOfOne<Int>(43)
-  let instances = [ c, d ]
-  checkHashable(instances, equalityOracle: { $0 == $1 })
-}
-
 //===----------------------------------------------------------------------===//
 // EmptyCollection
 //===----------------------------------------------------------------------===//
@@ -255,11 +241,6 @@ LazyTestSuite.test("EmptyCollection/CustomReflectable") {
 LazyTestSuite.test("EmptyCollection/Equatable") {
   let instances = [ EmptyCollection<OpaqueValue<Int>>() ]
   checkEquatable(instances, oracle: { $0 == $1 })
-}
-
-LazyTestSuite.test("EmptyCollection/Equatable") {
-  let instances = [ EmptyCollection<OpaqueValue<Int>>() ]
-  checkHashable(instances, equalityOracle: { $0 == $1 })
 }
 
 LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
