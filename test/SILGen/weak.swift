@@ -86,3 +86,8 @@ class CC {
     var foo = x
   }
 }
+
+func testNoneWeak() {
+  weak var x: CC? = nil
+  weak var y: CC? = .none
+}
