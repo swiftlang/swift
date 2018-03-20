@@ -409,7 +409,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   }
 }
 
-extension Optional : Hashable where Wrapped : Hashable {
+extension Optional: Hashable where Wrapped: Hashable {
   /// The hash value for the optional instance.
   ///
   /// Two optionals that are equal will always have equal hash values.
@@ -418,15 +418,18 @@ extension Optional : Hashable where Wrapped : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    var result: Int
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
     switch self {
     case .none:
-      result = 0
+      hasher.append(0 as UInt8)
     case .some(let wrapped):
-      result = 1
-      result = _combineHashValues(result, wrapped.hashValue)
+      hasher.append(1 as UInt8)
+      hasher.append(wrapped)
     }
-    return result
   }
 }
 

@@ -1449,13 +1449,19 @@ extension Dictionary: Equatable where Value: Equatable {
 extension Dictionary: Hashable where Value: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Dictionary<T> hashValue
-    var result = 0
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    var commutativeHash = 0
     for (k, v) in self {
-      let combined = _combineHashValues(k.hashValue, v.hashValue)
-      result ^= _mixInt(combined)
+      var elementHasher = _Hasher()
+      elementHasher.append(k)
+      elementHasher.append(v)
+      commutativeHash ^= elementHasher.finalize()
     }
-    return result
+    hasher.append(commutativeHash)
   }
 }
 

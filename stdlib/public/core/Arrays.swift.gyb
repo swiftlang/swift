@@ -2297,15 +2297,17 @@ extension ${Self} : Equatable where Element : Equatable {
   }
 }
 
-extension ${Self} : Hashable where Element : Hashable {
+extension ${Self}: Hashable where Element: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Array too
-    var result = 0
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
     for element in self {
-      result = _combineHashValues(result, element.hashValue)
+      hasher.append(element)
     }
-    return result
   }
 }
 

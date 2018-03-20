@@ -398,13 +398,16 @@ extension Range: Equatable {
   }
 }
 
-extension Range : Hashable where Bound : Hashable {
+extension Range: Hashable where Bound: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    var result = 0
-    result = _combineHashValues(result, lowerBound.hashValue)
-    result = _combineHashValues(result, upperBound.hashValue)
-    return result
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(lowerBound)
+    hasher.append(upperBound)
   }
 }
 

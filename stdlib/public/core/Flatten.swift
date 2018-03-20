@@ -237,11 +237,10 @@ extension FlattenCollection.Index : Hashable
     return _hashValue(for: self)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     hasher.append(_outer)
-    if let inner = _inner {
-      hasher.append(inner)
-    }
+    hasher.append(_inner)
   }
 }
 
