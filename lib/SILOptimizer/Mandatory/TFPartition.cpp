@@ -29,12 +29,19 @@
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
+
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
 #define DEBUG_TYPE "tf-partition"
 using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
+
+static llvm::cl::opt<bool>
+TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
+            llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
 
 template<typename...T, typename...U>
@@ -3054,6 +3061,25 @@ public:
 
     // Next translate it to a graph and emit it as a global symbol.
     auto bytes = lowerTFGraph(tensorProgram.fn);
+
+    // If the user wants a copy of the graph in /tmp, emit it now.
+    if (TFDumpGraph) {
+      int resultFD = -1;
+      SmallString<64> resultPath;
+      auto error =
+        llvm::sys::fs::createTemporaryFile("tf-dump-graph-" +
+                                           fn->getName().str(), "pb",
+                                           resultFD, resultPath);
+      if (error) {
+        llvm::errs() << "error opening '" << resultPath.str()
+                     << "' for -tf-dump-graph emission!\n";
+      } else {
+        llvm::errs() << "wrote graph to '" << resultPath.str() << "'\n";
+        llvm::raw_fd_ostream file(resultFD, /*shouldClose*/true,
+                                /*unbuffered*/false);
+        file.write(bytes.data(), bytes.size());
+      }
+    }
 
     // Now that we know what the tensor program actually is, we can replace the
     // placeholder instructions for the data + length with the actual bits we
