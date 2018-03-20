@@ -16,8 +16,50 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <system_error>
+#include <codecvt>
+#include <locale>
 
 using namespace swift;
+
+
+static void write_escaped(raw_ostream &os, StringRef Str) {
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+  std::wstring wide = converter.from_bytes(Str);
+  for (auto &wc: wide) {
+    int ci = wctob(wc);
+    if (ci == EOF) {
+      os << '\\' << 'u';
+      os << llvm::hexdigit((wc >> 12 & 0xF));
+      os << llvm::hexdigit((wc >> 8) & 0xF);
+      os << llvm::hexdigit((wc >> 4 & 0xF));
+      os << llvm::hexdigit((wc >> 0) & 0xF);
+      continue;
+    }
+    switch (char(ci)) {
+      case '\\':
+        os << '\\' << '\\';
+        break;
+      case '\t':
+        os << '\\' << 't';
+        break;
+      case '\n':
+        os << '\\' << 'n';
+        break;
+      case '"':
+        os << '\\' << '"';
+        break;
+      default:
+        if (std::isprint(ci)) {
+          os << char(ci);
+          break;
+        }
+        os << '\\' << 'x';
+        os << llvm::hexdigit((ci >> 4 & 0xF));
+        os << llvm::hexdigit((ci >> 0) & 0xF);
+    }
+  }
+}
+
 
 llvm::Expected<OutputFileMap>
 OutputFileMap::loadFromPath(StringRef Path, StringRef workingDirectory) {
@@ -105,7 +147,8 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
 static void writeQuotedEscaped(llvm::raw_ostream &os,
                                const StringRef fileName) {
   os << "\"";
-  os.write_escaped(fileName, /*UseHexEscapes=*/true);
+  write_escaped(os, fileName);
+  //os.write_escaped(fileName, /*UseHexEscapes=*/true);
   os << "\"";
 }
 
