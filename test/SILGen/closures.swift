@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED
@@ -8,14 +8,14 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil hidden @$S8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed (@in A) -> @out R {
+// CHECK-LABEL: sil hidden @$S8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed (@in_guaranteed A) -> @out R {
 func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
   }
-  // CHECK:  [[FN:%.*]] = function_ref @$S8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1
-  // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [callee_guaranteed] [[FN]]<A, R>() : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1
-  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_guaranteed (@in A) -> @out R
+  // CHECK:  [[FN:%.*]] = function_ref @$S8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1
+  // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [callee_guaranteed] [[FN]]<A, R>() : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1
+  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_guaranteed (@in_guaranteed A) -> @out R
   return f
 }
 
@@ -218,7 +218,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
 }
 // FIXME(integers): the following checks should be updated for the new way +
 // gets invoked. <rdar://problem/29939484>
-// XCHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned { var Int }) -> Int
+// XCHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
 // XCHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : ${ var Int }):
 // XCHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // XCHECK: [[PLUS:%[0-9]+]] = function_ref @$Ss1poiS2i_SitF{{.*}}
@@ -617,9 +617,9 @@ class SuperSub : SuperBase {
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
     // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]]
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[CVT]])
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]    
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let f1 = {
@@ -650,8 +650,8 @@ class SuperSub : SuperBase {
     // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @error Error) -> (@out (), @error Error)
     // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func g1() {

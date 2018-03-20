@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -parse-as-library -module-name Swift -parse-stdlib -emit-silgen -enable-sil-ownership -enable-guaranteed-normal-arguments %s | %FileCheck %s
 
@@ -223,4 +223,12 @@ public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Built
   // conformance.
   let object = Builtin.castToBridgeObject(x, y)
   return object
+}
+
+public struct StructWithOptionalAddressOnlyField<T> {
+  public let newValue: T?
+}
+
+func useStructWithOptionalAddressOnlyField<T>(t: T) -> StructWithOptionalAddressOnlyField<T> {
+  return StructWithOptionalAddressOnlyField<T>(newValue: t)
 }

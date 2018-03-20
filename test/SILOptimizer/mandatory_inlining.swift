@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -enable-sil-ownership -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
 
@@ -154,7 +154,7 @@ func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
   return T.self
 }
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining6invokeyyAA1CCF : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil hidden @$S18mandatory_inlining6invokeyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
 func invoke(_ c: C) {
   // CHECK-NOT: function_ref @$S18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: apply

@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name specialize_checked_cast_branch -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
@@ -26,44 +26,37 @@ public func ArchetypeToArchetypeCast<T1, T2>(t1 : T1, t2 : T2) -> T2 {
   _preconditionFailure("??? Profit?")
 }
 
+// x -> y where x and y are unrelated.
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AA1ECTg5 : $@convention(thin) (@in_guaranteed C, @in_guaranteed E) -> @owned E {
+// CHECK: bb0
+// CHECK-NOT: bb1
+// CHECK: %2 = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail %2 : $Builtin.Int1
+// CHECK: unreachable
+
 // CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt81tAA03NotI0Vx_tlFAE_Tg5 : $@convention(thin) (NotUInt8) -> NotUInt8 {
 // CHECK: bb0
 // CHECK: return %0 : $NotUInt8
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAE_Tg5 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK-LABEL: sil shared [thunk] [always_inline] @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAE_Tg5 : $@convention(thin) (@in_guaranteed C) -> @owned C {
 // CHECK: bb0
-// CHECK: return %0 : $C
+// CHECK:  [[REF:%.*]] = function_ref @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAE_Tg5Tf4n_g : $@convention(thin) (@in_guaranteed C) -> C
+// CHECK:  [[RET:%.*]] = apply [[REF]](%0) : $@convention(thin) (@in_guaranteed C) -> C
+// CHECK:  strong_retain [[RET]]
+// CHECK: return [[RET]] : $C
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5 : $@convention(thin) (@owned D) -> @owned C {
+// CHECK-LABEL: sil shared [thunk] [always_inline] @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5 : $@convention(thin) (@in_guaranteed D) -> @owned C {
 // CHECK: bb0
-// CHECK:  [[CAST:%.*]] = upcast %0 : $D to $C
-// CHECK: return [[CAST]]
+// CHECK:  [[REF:%.*]] = function_ref @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5Tf4n_g : $@convention(thin) (@in_guaranteed D) -> C
+// CHECK:  [[RET:%.*]] = apply [[REF]](%0) : $@convention(thin) (@in_guaranteed D) -> C
+// CHECK:  strong_retain [[RET]]
+// CHECK: return [[RET]] : $C
 
-// x -> y where x is a super class of y.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastD1tAA1DCx_tlFAA1CC_Tg5 : $@convention(thin) (@owned C) -> @owned D {
-// CHECK: checked_cast_br %0 : $C to $D,
-// CHECK: bb1([[T0:%.*]] : $D):
-// CHECK: return [[T0]] : $D
-// CHECK: bb2:
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastE1tAA1ECx_tlFAA1CC_Tg5 : $@convention(thin) (@in_guaranteed C) -> @owned E {
+// CHECK: bb0
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
-
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AA1DCTg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned D
-// CHECK: bb0
-// CHECK:  checked_cast_br %0 : $C to $D, bb1, bb2
-// CHECK: bb1(
-// CHECK:   return
-// CHECK: bb2
-// CHECK:   integer_literal $Builtin.Int1, -1
-// CHECK:   cond_fail
-// CHECK:   unreachable
-
-// x -> x where x is a class.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AFTg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned C {
-// CHECK: bb0
-// CHECK-NOT: bb1
-// CHECK: return %0 : $C
 
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA8NotUInt8V_AFTg5Tf4nd_n : $@convention(thin) (NotUInt8) -> NotUInt8 {
@@ -80,33 +73,26 @@ public func ArchetypeToArchetypeCast<T1, T2>(t1 : T1, t2 : T2) -> T2 {
 // CHECK: unreachable
 
 // x -> y where x is not a class but y is.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA8NotUInt8V_AA1CCTg5Tf4dd_n : $@convention(thin) () -> @owned C {
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA8NotUInt8V_AA1CCTg5Tf4dn_n : $@convention(thin) (@in_guaranteed C) -> @owned C {
 // CHECK: bb0
 // CHECK-NOT: bb1
-// CHECK: %0 = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail %0 : $Builtin.Int1
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail %1 : $Builtin.Int1
 // CHECK: unreachable
 
 // y -> x where x is a class but y is not.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AA8NotUInt8VTg5Tf4dd_n : $@convention(thin) () -> NotUInt8 {
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AA8NotUInt8VTg5Tf4nd_n : $@convention(thin) (@in_guaranteed C) -> NotUInt8 {
 // CHECK: bb0
 // CHECK-NOT: bb1
-// CHECK: %0 = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail %0 : $Builtin.Int1
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail %1 : $Builtin.Int1
 // CHECK: unreachable
 
 // y -> x where x is a super class of y.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1DC_AA1CCTg5Tf4nd_n : $@convention(thin) (@owned D) -> @owned C {
-// CHECK: [[T1:%.*]] = upcast %0 : $D to $C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1DC_AA1CCTg5Tf4nn_g : $@convention(thin) (@in_guaranteed D, @in_guaranteed C) -> C {
+// CHECK: [[T0:%.*]] = load %0 : $*D
+// CHECK: [[T1:%.*]] = upcast [[T0]] : $D to $C
 // CHECK: return [[T1]] : $C
-
-// x -> y where x and y are unrelated.
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1CC_AA1ECTg5Tf4dd_n : $@convention(thin) () -> @owned E {
-// CHECK: bb0
-// CHECK-NOT: bb1
-// CHECK: %0 = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail %0 : $Builtin.Int1
-// CHECK: unreachable
 
 
 _ = ArchetypeToArchetypeCast(t1: c, t2: d)
@@ -152,16 +138,10 @@ func ArchetypeToConcreteCastE<T>(t : T) -> E {
 
 _ = ArchetypeToConcreteCastUInt8(t: b)
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt81tAA03NotI0Vx_tlFAA1CC_Tg5Tf4d_n : $@convention(thin) () -> NotUInt8 {
-// CHECK: bb0
-// CHECK-NOT: checked_cast_br
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail [[TRUE]]
-// CHECK: unreachable
 
 // CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt81tAA03NotI0Vx_tlFAA0J6UInt64V_Tg5Tf4d_n : $@convention(thin) () -> NotUInt8 {
-// CHECK-NEXT: bb0
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK: bb0
+// CHECK-NOT: checked_cast_br
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
@@ -173,16 +153,21 @@ _ = ArchetypeToConcreteCastUInt8(t: b)
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1EC_Tg5Tf4d_n : $@convention(thin) () -> @owned C {
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastC1tAA1CCx_tlFAA1DC_Tg5Tf4n_g : $@convention(thin) (@in_guaranteed D) -> C {
 // CHECK: bb0
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail [[TRUE]]
-// CHECK: unreachable
+// CHECK:  [[LOAD:%.*]] = load %0 : $*D
+// CHECK:  [[CAST:%.*]] = upcast [[LOAD]] : $D to $C
+// CHECK: return [[CAST]]
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastE1tAA1ECx_tlFAA1CC_Tg5Tf4d_n : $@convention(thin) () -> @owned E {
-// CHECK: bb0
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail [[TRUE]]
+// x -> y where x is a super class of y.
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ArchetypeToConcreteCastD1tAA1DCx_tlFAA1CC_Tg5Tf4n_g : $@convention(thin) (@in_guaranteed C) -> D {
+// CHECK:  [[LOAD:%.*]] = load %0 : $*C
+// CHECK: checked_cast_br [[LOAD]] : $C to $D,
+// CHECK: bb1([[T0:%.*]] : $D):
+// CHECK: return [[T0]] : $D
+// CHECK: bb2:
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail
 // CHECK: unreachable
 
 _ = ArchetypeToConcreteCastUInt8(t: c)
@@ -221,7 +206,7 @@ func ConcreteToArchetypeCastD<T>(t: D, t2: T) -> T {
 // CHECK: bb0
 // CHECK: return %0
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt81t2t2xAA03NotI0V_xtlFAA1CC_Tg5Tf4dd_n : $@convention(thin) () -> @owned C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt81t2t2xAA03NotI0V_xtlFAA1CC_Tg5Tf4dn_n : $@convention(thin) (@in_guaranteed C) -> @owned C {
 // CHECK: bb0
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
@@ -233,7 +218,7 @@ func ConcreteToArchetypeCastD<T>(t: D, t2: T) -> T {
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAF_Tg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAF_Tg5Tf4nn_g : $@convention(thin) (@guaranteed C, @in_guaranteed C) -> C {
 // CHECK: bb0
 // CHECK: return %0
 
@@ -243,21 +228,36 @@ func ConcreteToArchetypeCastD<T>(t: D, t2: T) -> T {
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAA1DC_Tg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned D
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAA1DC_Tg5Tf4nn_g : $@convention(thin) (@guaranteed C, @in_guaranteed D) -> D {
 // CHECK: bb0
 // CHECK:  checked_cast_br %0 : $C to $D
 // CHECK: bb1
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAA1EC_Tg5Tf4dd_n : $@convention(thin) () -> @owned E
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastC1t2t2xAA1CC_xtlFAA1EC_Tg5Tf4dn_n : $@convention(thin) (@in_guaranteed E) -> @owned E {
 // CHECK: bb0
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastD1t2t2xAA1DC_xtlFAA1CC_Tg5Tf4nd_n : $@convention(thin) (@owned D) -> @owned C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch24ConcreteToArchetypeCastD1t2t2xAA1DC_xtlFAA1CC_Tg5Tf4nn_g : $@convention(thin) (@guaranteed D, @in_guaranteed C) -> C {
 // CHECK: bb0
 // CHECK:  [[T0:%.*]] = upcast %0 : $D to $C
 // CHECK:  return [[T0]]
+
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAF_Tg5Tf4nn_g : $@convention(thin) (@guaranteed C, @in_guaranteed C) -> C {
+// CHECK: bb0
+// CHECK-NOT: bb1
+// CHECK: return %0 : $C
+
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAA1DC_Tg5Tf4nn_g : $@convention(thin) (@guaranteed C, @in_guaranteed D) -> D {
+// CHECK: bb0
+// CHECK:  checked_cast_br %0 : $C to $D, bb1, bb2
+// CHECK: bb1(
+// CHECK:   return
+// CHECK: bb2
+// CHECK:   integer_literal $Builtin.Int1, -1
+// CHECK:   cond_fail
+// CHECK:   unreachable
 
 _ = ConcreteToArchetypeCastUInt8(t: b, t2: b)
 _ = ConcreteToArchetypeCastUInt8(t: b, t2: c)
@@ -286,27 +286,18 @@ func SuperToArchetypeCastD<T>(d : D, t : T) -> T {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAF_Tg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned C
-// CHECK: bb0
-// CHECK: return %0 : $C
-
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAA1DC_Tg5Tf4nd_n : $@convention(thin) (@owned C) -> @owned D
-// CHECK: bb0
-// CHECK:  checked_cast_br %0 : $C to $D
-// CHECK: bb1
-
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAA8NotUInt8V_Tg5Tf4dd_n : $@convention(thin) () -> NotUInt8
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastC1c1txAA1CC_xtlFAA8NotUInt8V_Tg5Tf4dd_n : $@convention(thin) () -> NotUInt8 {
 // CHECK: bb0
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastD1d1txAA1DC_xtlFAA1CC_Tg5Tf4nd_n : $@convention(thin) (@owned D) -> @owned C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastD1d1txAA1DC_xtlFAA1CC_Tg5Tf4nn_g : $@convention(thin) (@guaranteed D, @in_guaranteed C) -> C {
 // CHECK: bb0
 // CHECK:  [[T0:%.*]] = upcast %0 : $D to $C
 // CHECK:  return [[T0]]
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastD1d1txAA1DC_xtlFAF_Tg5Tf4nd_n : $@convention(thin) (@owned D) -> @owned D
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch21SuperToArchetypeCastD1d1txAA1DC_xtlFAF_Tg5Tf4nn_g : $@convention(thin) (@guaranteed D, @in_guaranteed D) -> D {
 // CHECK: bb0
 // CHECK: return %0 : $D
 
@@ -327,17 +318,17 @@ func ExistentialToArchetypeCast<T>(o : AnyObject, t : T) -> T {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFAA1CC_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned C
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFAA1CC_Tg5Tf4nn_g : $@convention(thin) (@guaranteed AnyObject, @in_guaranteed C) -> C {
 // CHECK: bb0
 // CHECK:  checked_cast_br %0 : $AnyObject to $C
 // CHECK: bb1
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFAA8NotUInt8V_Tg5Tf4gd_n : $@convention(thin) (@guaranteed AnyObject) -> NotUInt8
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFAA8NotUInt8V_Tg5Tf4nd_n : $@convention(thin) (@guaranteed AnyObject) -> NotUInt8 {
 // CHECK: bb0
 // CHECK:  checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to NotUInt8 in {{%.*}} : $*NotUInt8,
 // CHECK: bb1
 
-// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFyXl_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned AnyObject
+// CHECK-LABEL: sil shared @$S30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFyXl_Tg5Tf4nn_g : $@convention(thin) (@guaranteed AnyObject, @in_guaranteed AnyObject) -> AnyObject
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br %
 // CHECK: return %0 : $AnyObject

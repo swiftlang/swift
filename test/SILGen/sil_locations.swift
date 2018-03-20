@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name sil_locations -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
@@ -211,7 +211,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   return {x}
   // CHECK-LABEL: sil hidden @$S13sil_locations14captures_tuple{{[_0-9a-zA-Z]*}}F
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-3]]:27
-  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
+  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
   // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
   // CHECK-LABEL: sil private @$S13sil_locations14captures_tuple{{.*}}fU_

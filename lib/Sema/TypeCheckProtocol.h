@@ -852,13 +852,6 @@ RequirementMatch matchWitness(TypeChecker &tc,
 AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
                                                      ProtocolDecl *proto);
 
-/// Perform any necessary adjustments to the inferred associated type to
-/// make it suitable for later use.
-///
-/// \param noescapeToEscaping Will be set \c true if this operation performed
-/// the noescape-to-escaping adjustment.
-Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
-
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H

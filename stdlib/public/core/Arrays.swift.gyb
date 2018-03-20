@@ -1027,8 +1027,9 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
 // error path.
 @_inlineable
 @_semantics("array.dealloc_uninitialized")
-public func _deallocateUninitialized${Self}<Element>(
-  _ array: ${Self}<Element>
+public // COMPILER_INTRINSIC
+func _deallocateUninitializedArray<Element>(
+  _ array: __owned Array<Element>
 ) {
   var array = array
   array._deallocateUninitialized()

@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -primary-file %s | %FileCheck %s
 
@@ -131,16 +131,14 @@ func reftype_return() -> Ref {
     // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @$S8lifetime11reftype_argyyAA3RefCF : $@convention(thin) (@owned Ref) -> () {
+// CHECK-LABEL: sil hidden @$S8lifetime11reftype_argyyAA3RefCF : $@convention(thin) (@guaranteed Ref) -> () {
 // CHECK: bb0([[A:%[0-9]+]] : $Ref):
 // CHECK:   [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
 // CHECK:   [[PA:%[0-9]+]] = project_box [[AADDR]]
-// CHECK:   [[BORROWED_A:%.*]] = begin_borrow [[A]]
-// CHECK:   [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
+// CHECK:   [[A_COPY:%.*]] = copy_value [[A]]
 // CHECK:   store [[A_COPY]] to [init] [[PA]]
-// CHECK:   end_borrow [[BORROWED_A]] from [[A]]
 // CHECK:   destroy_value [[AADDR]]
-// CHECK:   destroy_value [[A]]
+// CHECK-NOT:   destroy_value [[A]]
 // CHECK:   return
 // CHECK: } // end sil function '$S8lifetime11reftype_argyyAA3RefCF'
 func reftype_arg(_ a: Ref) {
@@ -186,17 +184,15 @@ func reftype_call_arg() {
 // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
 // CHECK:   [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
 // CHECK:   [[PB:%.*]] = project_box [[AADDR]]
-// CHECK:   [[BORROWED_A1:%.*]] = begin_borrow [[A1]]
-// CHECK:   [[A1_COPY:%.*]] = copy_value [[BORROWED_A1]]
+// CHECK:   [[A1_COPY:%.*]] = copy_value [[A1]]
 // CHECK:   store [[A1_COPY]] to [init] [[PB]]
-// CHECK:   end_borrow [[BORROWED_A1]] from [[A1]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
 // CHECK:   [[A2:%[0-9]+]] = load [copy] [[READ]]
 // CHECK:   [[RFWA:%[0-9]+]] = function_ref @$S8lifetime21reftype_func_with_arg{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
 // CHECK:   destroy_value [[RESULT]]
 // CHECK:   destroy_value [[AADDR]]
-// CHECK:   destroy_value [[A1]]
+// CHECK-NOT:   destroy_value [[A1]]
 // CHECK:   return
 func reftype_call_with_arg(_ a: Ref) {
     var a = a
@@ -356,7 +352,7 @@ class RefWithProp {
   var aleph_prop: Aleph { get {} set {} }
 }
 
-// CHECK-LABEL: sil hidden @$S8lifetime015logical_lvalue_A0yyAA11RefWithPropC_SiAA3ValVtF : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
+// CHECK-LABEL: sil hidden @$S8lifetime015logical_lvalue_A0yyAA11RefWithPropC_SiAA3ValVtF : $@convention(thin) (@guaranteed RefWithProp, Int, Val) -> () {
 func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
