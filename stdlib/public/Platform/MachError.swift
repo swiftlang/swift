@@ -12,7 +12,6 @@
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
-@_frozen // FIXME(sil-serialize-all)		
 @objc
 public enum MachErrorCode : Int32 {
   case success                  = 0

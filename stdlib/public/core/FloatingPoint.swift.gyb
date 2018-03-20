@@ -1267,7 +1267,6 @@ public enum FloatingPointClassification {
 }
 
 /// A rule for rounding a floating-point number.
-@_frozen // FIXME(sil-serialize-all)
 public enum FloatingPointRoundingRule {
   /// Round to the closest allowed value; if two values are equally close, the
   /// one with greater magnitude is chosen.
