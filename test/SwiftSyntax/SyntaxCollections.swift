@@ -24,6 +24,7 @@ SyntaxCollectionsAPI.test("AppendingElement") {
     let newArrayElementList = arrayElementList.appending(integerLiteralElement(1))
     
     expectEqual(newArrayElementList.count, 2)
+    expectNotNil(newArrayElementList.child(at: 1))
     expectEqual("\(newArrayElementList.child(at: 1)!)", "1")
 }
 
@@ -35,11 +36,13 @@ SyntaxCollectionsAPI.test("InsertingElement") {
     var newArrayElementList = arrayElementList.inserting(integerLiteralElement(0), at: 0)
     
     expectEqual(newArrayElementList.count, 2)
+    expectNotNil(newArrayElementList.child(at: 0))
     expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
     
     newArrayElementList = newArrayElementList.inserting(integerLiteralElement(2), at: 2)
     
     expectEqual(newArrayElementList.count, 3)
+    expectNotNil(newArrayElementList.child(at: 2))
     expectEqual("\(newArrayElementList.child(at: 2)!)", "2")
 }
 
@@ -51,6 +54,7 @@ SyntaxCollectionsAPI.test("PrependingElement") {
     let newArrayElementList = arrayElementList.prepending(integerLiteralElement(0))
     
     expectEqual(newArrayElementList.count, 2)
+    expectNotNil(newArrayElementList.child(at: 0))
     expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
 }
 
@@ -63,6 +67,7 @@ SyntaxCollectionsAPI.test("RemovingFirstElement") {
     let newArrayElementList = arrayElementList.removingFirst()
     
     expectEqual(newArrayElementList.count, 1)
+    expectNotNil(newArrayElementList.child(at: 0))
     expectEqual("\(newArrayElementList.child(at: 0)!)", "1")
 }
 
@@ -75,6 +80,7 @@ SyntaxCollectionsAPI.test("RemovingLastElement") {
     let newArrayElementList = arrayElementList.removingLast()
     
     expectEqual(newArrayElementList.count, 1)
+    expectNotNil(newArrayElementList.child(at: 0))
     expectEqual("\(newArrayElementList.child(at: 0)!)", "0")
 }
 
@@ -96,9 +102,10 @@ SyntaxCollectionsAPI.test("ReplacingElement") {
         integerLiteralElement(2)
     ])
     
-    let newArrayElementList.replacing(childAt: 2,
-                                      with: integerLiteralElement(3))
+    let newArrayElementList = arrayElementList.replacing(childAt: 2,
+                                                         with: integerLiteralElement(3))
     
+    expectNotNil(newArrayElementList.child(at: 2))
     expectEqual("\(newArrayElementList.child(at: 2)!)", "3")
 }
 
