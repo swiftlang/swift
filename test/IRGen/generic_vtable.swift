@@ -108,7 +108,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
+// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, {{.*}})
 
 // -- method override for 'm2()'
 // CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
@@ -131,7 +131,7 @@ public class Concrete : Derived<Int> {
 // CHECK: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
+// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, {{.*}})
 
 // -- method override for 'init()'
 // CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc" to i8*), i8**

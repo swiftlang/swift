@@ -1405,9 +1405,11 @@ void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
 
   if (isa<ClassDecl>(target)) {
-    IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                           {metadata, numFields,
-                            fields.getAddress(), fieldVector});
+    ClassLayoutFlags flags = ClassLayoutFlags::Swift5Algorithm;
+
+    IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataFn(),
+                           {metadata, IGF.IGM.getSize(Size(uintptr_t(flags))),
+                            numFields, fields.getAddress(), fieldVector});
   } else {
     assert(isa<StructDecl>(target));
     StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;

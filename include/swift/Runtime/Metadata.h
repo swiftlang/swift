@@ -4075,10 +4075,11 @@ swift_relocateClassMetadata(ClassMetadata *self,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
-void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                               size_t numFields,
-                                               const TypeLayout * const *fieldTypes,
-                                               size_t *fieldOffsets);
+void swift_initClassMetadata(ClassMetadata *self,
+                             ClassLayoutFlags flags,
+                             size_t numFields,
+                             const TypeLayout * const *fieldTypes,
+                             size_t *fieldOffsets);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT

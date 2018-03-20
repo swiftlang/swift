@@ -980,6 +980,27 @@ static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
 }
 
+/// Flags for class layout.
+enum class ClassLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+};
+static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
+                                         ClassLayoutFlags rhs) {
+  return ClassLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
+                                           ClassLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
+  return ClassLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(ClassLayoutFlags::AlgorithmMask));
+}
+
 /// Flags for enum layout.
 enum class EnumLayoutFlags : uintptr_t {
   /// Reserve space for 256 layout algorithms.

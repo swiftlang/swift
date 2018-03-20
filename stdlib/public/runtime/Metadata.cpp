@@ -1845,10 +1845,11 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
-swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                                 size_t numFields,
-                                           const TypeLayout * const *fieldTypes,
-                                                 size_t *fieldOffsets) {
+swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets) {
   _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
