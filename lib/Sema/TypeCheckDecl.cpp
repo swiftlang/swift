@@ -8736,81 +8736,99 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   SmallPtrSet<CanType, 4> initializerParamTypes;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      // Synthesized initializers others than the default initializer should
-      // not prevent default initializer synthesis.
-      if (initializerIsSynthesized(ctor)) {
-        FoundSynthesizedInit = true;
-      } else if (ctor->isDesignatedInit()) {
-        FoundDesignatedInit = true;
-      }
-
-      if (isa<StructDecl>(decl))
+  if (decl->hasClangNode() && isa<ClassDecl>(decl)) {
+    // Objective-C classes may have interesting initializers in extensions.
+    for (auto member : decl->lookupDirect(DeclBaseName::createConstructor())) {
+      auto ctor = dyn_cast<ConstructorDecl>(member);
+      if (!ctor)
         continue;
 
-      if (!ctor->isInvalid())
-        initializerParamTypes.insert(getInitializerParamType(ctor));
+      // Swift initializers added in extensions of Objective-C classes can never
+      // be overrides.
+      if (!ctor->hasClangNode())
+        continue;
 
       if (auto overridden = ctor->getOverriddenDecl())
         overriddenInits.insert(overridden);
-
-      continue;
     }
 
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
-        // Initialized 'let' properties have storage, but don't get an argument
-        // to the memberwise initializer since they already have an initial
-        // value that cannot be overridden.
-        if (var->isLet() && var->getParentInitializer()) {
-          
-          // We cannot handle properties like:
-          //   let (a,b) = (1,2)
-          // for now, just disable implicit init synthesization in structs in
-          // this case.
-          auto SP = var->getParentPattern();
-          if (auto *TP = dyn_cast<TypedPattern>(SP))
-            SP = TP->getSubPattern();
-          if (!isa<NamedPattern>(SP) && isa<StructDecl>(decl))
-            return;
-          
+  } else {
+    for (auto member : decl->getMembers()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        // Synthesized initializers others than the default initializer should
+        // not prevent default initializer synthesis.
+        if (initializerIsSynthesized(ctor)) {
+          FoundSynthesizedInit = true;
+        } else if (ctor->isDesignatedInit()) {
+          FoundDesignatedInit = true;
+        }
+
+        if (isa<StructDecl>(decl))
           continue;
-        }
-        
-        FoundMemberwiseInitializedProperty = true;
+
+        if (!ctor->isInvalid())
+          initializerParamTypes.insert(getInitializerParamType(ctor));
+
+        if (auto overridden = ctor->getOverriddenDecl())
+          overriddenInits.insert(overridden);
+
+        continue;
       }
-      
-      // FIXME: Disable memberwise initializer if a property uses a behavior.
-      // Behaviors should be able to control whether they interact with
-      // memberwise initialization.
-      if (var->hasBehavior())
-        SuppressMemberwiseInitializer = true;
-      continue;
-    }
 
-    // If a stored property lacks an initial value and if there is no way to
-    // synthesize an initial value (e.g. for an optional) then we suppress
-    // generation of the default initializer.
-    if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
-        for (auto entry : pbd->getPatternList()) {
-          if (entry.getInit()) continue;
-
-          // If one of the bound variables is @NSManaged, go ahead no matter
-          // what.
-          bool CheckDefaultInitializer = true;
-          entry.getPattern()->forEachVariable([&](VarDecl *vd) {
-            if (vd->getAttrs().hasAttribute<NSManagedAttr>())
-              CheckDefaultInitializer = false;
-          });
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
+          // Initialized 'let' properties have storage, but don't get an argument
+          // to the memberwise initializer since they already have an initial
+          // value that cannot be overridden.
+          if (var->isLet() && var->getParentInitializer()) {
           
-          // If we cannot default initialize the property, we cannot
-          // synthesize a default initializer for the class.
-          if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
-            SuppressDefaultInitializer = true;
+            // We cannot handle properties like:
+            //   let (a,b) = (1,2)
+            // for now, just disable implicit init synthesization in structs in
+            // this case.
+            auto SP = var->getParentPattern();
+            if (auto *TP = dyn_cast<TypedPattern>(SP))
+              SP = TP->getSubPattern();
+            if (!isa<NamedPattern>(SP) && isa<StructDecl>(decl))
+              return;
+          
+            continue;
+          }
+        
+          FoundMemberwiseInitializedProperty = true;
         }
-      continue;
+      
+        // FIXME: Disable memberwise initializer if a property uses a behavior.
+        // Behaviors should be able to control whether they interact with
+        // memberwise initialization.
+        if (var->hasBehavior())
+          SuppressMemberwiseInitializer = true;
+        continue;
+      }
+
+      // If a stored property lacks an initial value and if there is no way to
+      // synthesize an initial value (e.g. for an optional) then we suppress
+      // generation of the default initializer.
+      if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
+        if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
+          for (auto entry : pbd->getPatternList()) {
+            if (entry.getInit()) continue;
+
+            // If one of the bound variables is @NSManaged, go ahead no matter
+            // what.
+            bool CheckDefaultInitializer = true;
+            entry.getPattern()->forEachVariable([&](VarDecl *vd) {
+              if (vd->getAttrs().hasAttribute<NSManagedAttr>())
+                CheckDefaultInitializer = false;
+            });
+          
+            // If we cannot default initialize the property, we cannot
+            // synthesize a default initializer for the class.
+            if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
+              SuppressDefaultInitializer = true;
+          }
+        continue;
+      }
     }
   }
 
@@ -8843,7 +8861,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // We can't define these overrides if we have any uninitialized
     // stored properties.
     if (SuppressDefaultInitializer && !FoundDesignatedInit
-        && !FoundSynthesizedInit) {
+        && !FoundSynthesizedInit && !classDecl->hasClangNode()) {
       diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
@@ -8857,6 +8875,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     auto ctors = lookupConstructors(classDecl, superclassTy,
                                     NameLookupFlags::IgnoreAccessControl);
 
+    bool canInheritConvenienceInitalizers =
+        !superclassDecl->hasMissingDesignatedInitializers();
+    SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
     for (auto memberResult : ctors) {
       auto member = memberResult.getValueDecl();
 
@@ -8869,25 +8890,30 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (superclassCtor->isInvalid())
         continue;
 
-      // We only care about required or designated initializers.
-      if (!superclassCtor->isRequired() &&
-          !superclassCtor->isDesignatedInit())
-        continue;
-
       // If we have an override for this constructor, it's okay.
       if (overriddenInits.count(superclassCtor) > 0)
         continue;
 
-      // If the superclass constructor is a convenience initializer
-      // that is inherited into the current class, it's okay.
-      if (superclassCtor->isInheritable() &&
-          classDecl->inheritsSuperclassInitializers(this)) {
-        assert(superclassCtor->isRequired());
+      // We only care about required or designated initializers.
+      if (!superclassCtor->isDesignatedInit()) {
+        if (superclassCtor->isRequired()) {
+          assert(superclassCtor->isInheritable() &&
+                 "factory initializers cannot be 'required'");
+          requiredConvenienceInitializers.push_back(superclassCtor);
+        }
         continue;
       }
 
+      // Otherwise, it may no longer be safe to inherit convenience
+      // initializers.
+      canInheritConvenienceInitalizers &= canInheritInitializers;
+
+      // Everything after this is only relevant for Swift classes being defined.
+      if (classDecl->hasClangNode())
+        continue;
+
       // Diagnose a missing override of a required initializer.
-      if (superclassCtor->isRequired() && FoundDesignatedInit) {
+      if (superclassCtor->isRequired() && !canInheritInitializers) {
         diagnoseMissingRequiredInitializer(*this, classDecl, superclassCtor);
         continue;
       }
@@ -8919,6 +8945,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                         *this, classDecl, superclassCtor, kind)) {
         classDecl->addMember(ctor);
       }
+    }
+
+    if (canInheritConvenienceInitalizers) {
+      classDecl->setInheritsSuperclassInitializers();
+    } else {
+      for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
+        diagnoseMissingRequiredInitializer(*this, classDecl, requiredCtor);
     }
 
     return;
