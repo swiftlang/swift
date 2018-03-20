@@ -128,3 +128,16 @@ public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
   let b = Tensor(scalar)
   return (b+b).toHost()
 }
+
+
+// The tensor value inside the loop was getting copied back to the host because of
+// the use by a branch instruction.  b/75494462
+public func test75494462() {
+  var x = Tensor<Float>(1)
+  var i: Int32 = 1
+  repeat {
+    x += 1
+    i += 1
+  } while i < 5
+  print(x.array)
+}
