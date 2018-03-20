@@ -343,6 +343,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Must be processed after any other language options that could affect
   // platform conditions.
+  //
+  // Optimization checks will still happen after this call look for OptCheck.
   bool UnsupportedOS, UnsupportedArch;
   std::tie(UnsupportedOS, UnsupportedArch) = Opts.setTarget(Target);
 
@@ -544,6 +546,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          FrontendOptions &FEOpts,
                          DiagnosticEngine &Diags,
                          const llvm::Triple &Triple,
+                         LangOptions &LangOpts,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
@@ -603,7 +606,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       assert(A->getOption().matches(OPT_O));
       Opts.OptMode = OptimizationMode::ForSpeed;
     }
-
+    
+    // set the optimization enabled flag
+    LangOpts.setOptimizationCondition(int(Opts.OptMode) != 1);
+      
     if (Opts.shouldOptimize()) {
       ClangOpts.Optimization = "-Os";
     }
@@ -620,6 +626,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     if (Configuration == "DisableReplacement") {
       Opts.AssertConfig = SILOptions::DisableReplacement;
     } else if (Configuration == "Debug") {
+      LangOpts.setAssertionCondition(true);
       Opts.AssertConfig = SILOptions::Debug;
     } else if (Configuration == "Release") {
       Opts.AssertConfig = SILOptions::Release;
@@ -630,20 +637,28 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
-  } else if (FEOpts.ParseStdlib) {
-    // Disable assertion configuration replacement when we build the standard
-    // library.
-    Opts.AssertConfig = SILOptions::DisableReplacement;
-  } else if (Opts.AssertConfig == SILOptions::Debug) {
-    // Set the assert configuration according to the optimization level if it
-    // has not been set by the -Ounchecked flag.
-    Opts.AssertConfig =
-        (IRGenOpts.shouldOptimize() ? SILOptions::Release : SILOptions::Debug);
-  }
+  } else {
+      if (FEOpts.ParseStdlib) {
+          // Disable assertion configuration replacement when we build the standard
+          // library.
+          Opts.AssertConfig = SILOptions::DisableReplacement;
+      } else if (Opts.AssertConfig == SILOptions::Debug) {
+          // Set the assert configuration according to the optimization level if it
+          // has not been set by the -Ounchecked flag.
+          Opts.AssertConfig =
+          (IRGenOpts.shouldOptimize() ? SILOptions::Release : SILOptions::Debug);
+      }
+      
+      // Neither optimization nor assert configuration identifier means
+      // asserts will fire.
+      if (int(Opts.OptMode) == 1) {
+        LangOpts.setAssertionCondition(true);
+      }
+    }
 
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
-
+    
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
@@ -1050,7 +1065,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
-                   LangOpts.Target, ClangImporterOpts)) {
+                   LangOpts.Target, LangOpts, ClangImporterOpts)) {
     return true;
   }
 

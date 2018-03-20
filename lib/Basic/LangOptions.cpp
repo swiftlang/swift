@@ -61,6 +61,11 @@ static const StringRef SupportedConditionalCompilationRuntimes[] = {
   "_Native",
 };
 
+static const StringRef SupportedConditionalCompilationConfigurations[] = {
+    "optimized",
+    "assertsWillFire"
+};
+
 static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
   "simulator",
 };
@@ -106,6 +111,9 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
                     suggestions);
   case PlatformConditionKind::TargetEnvironment:
     return contains(SupportedConditionalCompilationTargetEnvironments, Value,
+                    suggestions);
+  case PlatformConditionKind::Configuration:
+    return contains(SupportedConditionalCompilationConfigurations, Value,
                     suggestions);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -275,3 +283,18 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   return { false, false };
 }
+
+void LangOptions::setOptimizationCondition(bool optimized) {
+    if (optimized) {
+        addPlatformConditionValue(PlatformConditionKind::Configuration,
+                                  "optimized");
+    }
+}
+
+void LangOptions::setAssertionCondition(bool assertsWillFire) {
+    if (assertsWillFire) {
+        addPlatformConditionValue(PlatformConditionKind::Configuration,
+                                  "assertsWillFire");
+    }
+}
+

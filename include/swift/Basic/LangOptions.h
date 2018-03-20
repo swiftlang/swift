@@ -49,6 +49,8 @@ namespace swift {
     CanImport,
     /// Target Environment (currently just 'simulator' or absent)
     TargetEnvironment,
+    /// Compilation configuration (currently 'optimized' and 'assertsWillFire')
+    Configuration, 
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -270,6 +272,14 @@ namespace swift {
     /// \returns A pair - the first element is true if the OS was invalid.
     /// The second element is true if the Arch was invalid.
     std::pair<bool, bool> setTarget(llvm::Triple triple);
+    
+    /// Sets a platform condition indicating whether the compilation
+    /// is optimized with any variation of -O other than -Onone/-Oplayground.
+    void setOptimizationCondition(bool optimized);
+      
+    /// Sets a platform condition indicating whether asserts can
+    /// fire in this build.
+    void setAssertionCondition(bool assertsWillFire);
 
     /// Returns the minimum platform version to which code will be deployed.
     ///
@@ -365,7 +375,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 7>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

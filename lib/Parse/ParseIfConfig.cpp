@@ -43,6 +43,7 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Case("_runtime", PlatformConditionKind::Runtime)
     .Case("canImport", PlatformConditionKind::CanImport)
     .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
+    .Case("configuration", PlatformConditionKind::Configuration)
     .Default(None);
 }
 
@@ -333,6 +334,8 @@ public:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
         DiagName = "target environment"; break;
+      case PlatformConditionKind::Configuration:
+        DiagName = "configuration"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
