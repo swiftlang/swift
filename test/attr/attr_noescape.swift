@@ -13,7 +13,6 @@ func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-
 var globalAny: Any = 0
 
 func assignToGlobal<T>(_ t: T) {
-  // expected-note@-1 {{in call to function 'assignToGlobal'}}
   globalAny = t
 }
 
@@ -56,15 +55,14 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{type of expression is ambiguous without more context}}
+  _ = [fn] // expected-error {{converting non-escaping value to 'Element' may allow it to escape}}
   _ = [doesEscape(fn)] // expected-error {{'(() -> Int) -> ()' is not convertible to '(@escaping () -> Int) -> ()'}}
-  _ = [1 : fn] // expected-error {{type of expression is ambiguous without more context}}
+  _ = [1 : fn] // expected-error {{converting non-escaping value to 'Value' may allow it to escape}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
 
-  // FIXME: Generate a more specific error about the non-escaping parameter 'fn'
-  assignToGlobal(fn) // expected-error {{generic parameter 'T' could not be inferred}}
+  assignToGlobal(fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
 }
 
 class SomeClass {

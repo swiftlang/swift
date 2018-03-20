@@ -504,6 +504,9 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
+  case FixKind::ExplicitlyEscaping:
+  case FixKind::ExplicitlyEscapingToAny:
+    return "fix: add @escaping";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");

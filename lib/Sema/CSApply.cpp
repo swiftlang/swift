@@ -7817,7 +7817,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
   if (!resolved || !resolved->getAnchor() ||
-      !resolved->getPath().empty())
+      (!resolved->getPath().empty() &&
+       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
+       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -7973,6 +7975,30 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       }
     }
     return false;
+  }
+
+  case FixKind::ExplicitlyEscaping: {
+    auto path = locator->getPath();
+    auto *anchor = locator->getAnchor();
+
+    if (path.empty())
+      return false;
+
+    auto &last = path.back();
+    if (last.getKind() == ConstraintLocator::Archetype) {
+      auto *archetype = last.getArchetype();
+      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                  archetype);
+      return true;
+    }
+    break;
+  }
+
+  case FixKind::ExplicitlyEscapingToAny: {
+    auto *anchor = locator->getAnchor();
+    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                getASTContext().TheAnyType);
+    return true;
   }
   }
 
