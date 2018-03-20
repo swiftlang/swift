@@ -2947,6 +2947,19 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+/// Create arguments in the entry block based on the function type.
+static void createEntryArguments(SILFunction *f) {
+  auto &entry = *f->getEntryBlock();
+  auto conv = f->getConventions();
+  assert(entry.getNumArguments() == 0 &&
+         conv.getNumSILArguments() > 0 &&
+         "Entry already has arguments?!");
+  for (auto indResultTy : conv.getIndirectSILResultTypes())
+    entry.createFunctionArgument(indResultTy.getAddressType());
+  for (auto paramTy : conv.getParameterSILTypes())
+    entry.createFunctionArgument(paramTy);
+}
+
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
   FuncDecl *primalDecl = E->getResolvedPrimal();
@@ -2960,26 +2973,27 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
 
   // If differentiation arguments are specified, lower them to SIL argument
   // indices.
-  // FIXME: Currently we are assuming 1-1 mapping between Swift argument indices
-  // and SIL argument indices, but it is very wrong. SILGen unflattens tuple
-  // arguments and prepends indirect results as arguments.
   SmallVector<unsigned, 8> loweredArgIndices;
   gradName += '_';
   if (!E->getArguments().empty()) {
     interleave(E->getArguments(), [&](AutoDiffArgument arg) {
-      unsigned index;
       switch (arg.getKind()) {
-      case swift::AutoDiffArgument::Kind::Index:
-        // The original index gets carried over.
-        index = arg.getIndex();
-        break;
-      case swift::AutoDiffArgument::Kind::Self:
-        // The last argument of the SIL function is self.
-        index = primalFn.getArguments().size() - 1;
+      case swift::AutoDiffArgument::Kind::Index: {
+        auto silParamIndices =
+          SGF.SGM.getLoweredFunctionParameterIndex(arg.getIndex(), primalDecl);
+        for (auto idx : silParamIndices) {
+          loweredArgIndices.push_back(idx);
+          gradName += std::to_string(idx);
+        }
         break;
       }
-      loweredArgIndices.push_back(index);
-      gradName += std::to_string(index);
+      case swift::AutoDiffArgument::Kind::Self:
+        // `self` is the last argument of the SIL function.
+        auto selfIdx = primalTy->getNumParameters() - 1;
+        loweredArgIndices.push_back(selfIdx);
+        gradName += std::to_string(selfIdx);
+        break;
+      }
     }, [&] {
       gradName += '_';
     });
@@ -3018,15 +3032,8 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
                                       /*DebugScope*/nullptr);
     gradFn->setDebugScope(new (SGF.SGM.M) SILDebugScope(loc, gradFn));
     SILGenFunction gradSGF(SGF.SGM, *gradFn);
-    // FIXME: SIL BB args do not directly correspond to function type params.
-    // Currently we are doing something super basic - emit an argument for each
-    // param, but this will fail verification when there's a tuple argument, for
-    // example. SILGenProlog would do this, but it's tied to ParamDecl and
-    // generates instructions. (We don't want any instructions but
-    // `autodiff_reverse`!)
-    for (auto &arg : gradTy->getParameters())
-      gradSGF.B.createInputFunctionArgument(arg.getSILStorageType(),
-                                            primalDecl);
+    createEntryArguments(gradFn);
+    
     gradSGF.B.createAutoDiffReverse(SILLocation(E), &primalFn,
                                     loweredArgIndices, config.seedable,
                                     config.preservingResult);
