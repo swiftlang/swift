@@ -510,16 +510,3 @@ class CrashableBase {
 // CHECK-NEXT: return [[RESULT]] : $()
 
 class GenericCrashable<T> : CrashableBase, Crashable {}
-
-// rdar://problem/35297911: allow witness with a noescape parameter to
-// match a requirement with an escaping paameter.
-protocol EscapingReq {
-  func f(_: @escaping (Int) -> Int)
-}
-
-// CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses18EscapingCovarianceVAA0B3ReqA2aDP1fyyS2icFTW : $@convention(witness_method: EscapingReq) (@owned @callee_guaranteed (Int) -> Int, @in_guaranteed EscapingCovariance) -> ()
-// CHECK-NOT: return
-// CHECK: convert_escape_to_noescape %0
-struct EscapingCovariance: EscapingReq {
-  func f(_: (Int) -> Int) { }
-}

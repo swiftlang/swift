@@ -607,11 +607,13 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   return result;
 }
 
-Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
+/// Perform any necessary adjustments to the inferred associated type to
+/// make it suitable for later use.
+static Type adjustInferredAssociatedType(Type type) {
   // If we have an optional type, adjust its wrapped type.
   if (auto optionalObjectType = type->getOptionalObjectType()) {
     auto newOptionalObjectType =
-      adjustInferredAssociatedType(optionalObjectType, noescapeToEscaping);
+      adjustInferredAssociatedType(optionalObjectType);
     if (newOptionalObjectType.getPointer() == optionalObjectType.getPointer())
       return type;
 
@@ -621,11 +623,14 @@ Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
   // If we have a noescape function type, make it escaping.
   if (auto funcType = type->getAs<FunctionType>()) {
     if (funcType->isNoEscape()) {
-      noescapeToEscaping = true;
       return FunctionType::get(funcType->getParams(), funcType->getResult(),
                                funcType->getExtInfo().withNoEscape(false));
     }
   }
+
+  // We can only infer materializable types.
+  if (!type->isMaterializable()) return nullptr;
+
   return type;
 }
 
@@ -684,11 +689,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (secondType->hasError())
         return true;
 
-      // Adjust the type to a type that can be written explicitly.
-      bool noescapeToEscaping = false;
-      Type inferredType =
-        adjustInferredAssociatedType(secondType, noescapeToEscaping);
-      if (!inferredType->isMaterializable())
+      Type inferredType = adjustInferredAssociatedType(secondType);
+      if (!inferredType)
         return true;
 
       auto proto = Conformance->getProtocol();
