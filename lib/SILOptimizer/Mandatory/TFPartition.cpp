@@ -2825,6 +2825,18 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
             (it->second == Marking::Delete || it->second == Marking::Move))
           continue;
 
+        // If the user is an unconditional branch instruction, and the value is
+        // feeding a basic block argument that is being moved, then we can
+        // ignore it.
+        if (auto *branch = dyn_cast<BranchInst>(user)) {
+          auto opNumber = operand->getOperandNumber();
+          auto arg = branch->getDestBB()->getArgument(opNumber);
+          auto argInfo = markedBBArguments.find(arg);
+          if (argInfo != markedBBArguments.end() &&
+              argInfo->second.first == Marking::Move)
+            continue;
+        }
+
         // Remember if the instruction has any use.  If not, then it never needs
         // to be sent or returned.
         hasAnyUse = true;
