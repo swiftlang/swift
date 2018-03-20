@@ -2954,7 +2954,12 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
-    enum class TypeOperation { None, Join, JoinInout, JoinMeta };
+    enum class TypeOperation { None,
+                               Join,
+                               JoinInout,
+                               JoinMeta,
+                               JoinNonexistent
+    };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
                                           ASTContext &Context) {
@@ -2970,6 +2975,7 @@ namespace {
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
+          .Case("type_join_nonexistent", TypeOperation::JoinNonexistent)
           .Default(TypeOperation::None);
     }
 
@@ -3033,6 +3039,25 @@ namespace {
           return ErrorType::get(ctx);
 
         return *join;
+      }
+
+      case TypeOperation::JoinNonexistent: {
+        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+        if (!lhsMeta || !rhsMeta)
+          llvm_unreachable("Unexpected argument types for Builtin.type_join_nonexistent!");
+
+        auto &ctx = lhsMeta->getASTContext();
+
+        auto join =
+            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
+
+        // Verify that we could not compute a join.
+        if (join)
+          llvm_unreachable("Unexpected result from join - it should not have been computable!");
+
+        // The return value is unimportant.
+        return MetatypeType::get(ctx.TheAnyType)->getCanonicalType();
       }
       }
     }
