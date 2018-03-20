@@ -551,39 +551,16 @@ public func isnan(_ value: CGFloat) -> Bool { return value.isNaN }
 @available(*, unavailable, message: "use the sign property.")
 public func signbit(_ value: CGFloat) -> Int { return value.sign.rawValue }
 
-// Generic implementation on FloatingPoint as of Swift 4.2
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func modf(_ x: CGFloat) -> (CGFloat, CGFloat) {
-  let (ipart, fpart) = modf(x.native)
-  return (CGFloat(ipart), CGFloat(fpart))
-}
-
 @available(swift, deprecated: 4.2, renamed: "scalbn")
 @_transparent
 public func ldexp(_ x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(ldexp(x.native, n))
 }
 
-// Generic implementation on FloatingPoint as of Swift 4.2
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func frexp(_ x: CGFloat) -> (CGFloat, Int) {
-  let (frac, exp) = frexp(x.native)
-  return (CGFloat(frac), exp)
-}
-
 @available(swift, deprecated: 4.2, message: "use the exponent property.")
 @_transparent
 public func ilogb(_ x: CGFloat) -> Int {
   return Int(x.exponent)
-}
-
-// Generic implementation on FloatingPoint as of Swift 4.2
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func scalbn(_ x: CGFloat, _ n: Int) -> CGFloat {
-  return CGFloat(scalbn(x.native, n))
 }
 
 @_transparent
