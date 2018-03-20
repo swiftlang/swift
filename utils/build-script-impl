@@ -2449,6 +2449,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         "--target=${SWIFT_HOST_TRIPLE}"
                     )
                 fi
+                
+                if [[ -n "${LIBDIR_SUFFIX}" ]]; then
+                    FOUNDATION_BUILD_ARGS+=(
+                            "--libdir-suffix=${LIBDIR_SUFFIX}"
+                    )
+                fi
 
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
@@ -2463,7 +2469,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" LIBDIR="${LIBDIR}" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN}
 
