@@ -26,11 +26,11 @@ Swift 4.2
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
-  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, `ClosedRange`,
-  `AnyCollection`, and `CollectionOfOne` now conform to the `Hashable` protocol
-  when their element or bound types (as the case may be) conform to `Hashable`.
-  This makes synthesized `Hashable` implementations available for types that
-  include stored properties of these types.
+  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
+  `ClosedRange` now conform to the `Hashable` protocol when their element or
+  bound types (as the case may be) conform to `Hashable`.  This makes
+  synthesized `Hashable` implementations available for types that include stored
+  properties of these types.
 
 * [SE-0196][]
   
