@@ -141,11 +141,6 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS_FN:%destructiveInjectEnumTag]] = bitcast i8* [[WITNESS]]
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %0, i32 [[TAG]], %swift.type* [[METADATA2]])
 
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
-// CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
-// CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %1, %swift.type* [[METADATA]])
-
 // CHECK-NEXT: ret void
 
   return Medium.Postcard(s)

@@ -2741,7 +2741,7 @@ entry(%x : $*MyOptional):
 // CHECK:  br i1 [[VAL01]], label %[[TLABEL:.*]], label %[[FLABEL:.*]]
 
 // CHECK: <label>:[[TLABEL]]
-// CHECK:  [[VAL02:%.*]] = sub i33 %tag, 2
+// CHECK:  [[VAL02:%.*]] = sub i32 %tag, 2
 // CHECK:  [[VAL03:%.*]] = trunc i32 [[VAL02]] to i8
 // CHECK:  [[VAL04:%.*]] = bitcast %T4enum40MultiPayloadLessThan32BitsWithEmptyCasesO* [[VAL00]] to i8*
 // CHECK:  store i8 [[VAL03]], i8* [[VAL04]]
