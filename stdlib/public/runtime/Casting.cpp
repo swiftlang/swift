@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
+#include "CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
@@ -2400,10 +2401,10 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 
 /// Perform a dynamic cast to an arbitrary type.
 
-bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
-                              const Metadata *srcType,
-                              const Metadata *targetType,
-                              DynamicCastFlags flags) {
+static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
+                                  const Metadata *srcType,
+                                  const Metadata *targetType,
+                                  DynamicCastFlags flags) {
   auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
                                                    targetType, flags);
   srcType = unwrapResult.payloadType;
@@ -2646,6 +2647,15 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
     return _fail(src, srcType, targetType, flags);
   }
   _failCorruptType(srcType);
+}
+
+bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
+                              const Metadata *srcType,
+                              const Metadata *targetType,
+                              DynamicCastFlags flags) {
+  static CompatibilityOverride<DynamicCastOverride> Override;
+  return Override.call(getDynamicCastOverride, swift_dynamicCastImpl,
+                       dest, src, srcType, targetType, flags);
 }
 
 static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {

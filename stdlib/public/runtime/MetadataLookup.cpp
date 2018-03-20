@@ -31,6 +31,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
@@ -966,9 +967,9 @@ public:
 
 }
 
-TypeInfo
-swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam) {
+static TypeInfo
+_getTypeByMangledNameImpl(StringRef typeName,
+                          SubstGenericParameterFn substGenericParam) {
   auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
@@ -1023,6 +1024,14 @@ swift::_getTypeByMangledName(StringRef typeName,
 
   auto type = Demangle::decodeMangledType(builder, node);
   return {type, builder.getReferenceOwnership()};
+}
+
+TypeInfo
+swift::_getTypeByMangledName(StringRef typeName,
+                             SubstGenericParameterFn substGenericParam) {
+  static CompatibilityOverride<GetTypeByMangledNameOverride> Override;
+  return Override.call(getMangledNameOverride, _getTypeByMangledNameImpl,
+                       typeName, substGenericParam);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
