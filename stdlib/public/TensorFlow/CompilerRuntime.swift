@@ -36,16 +36,23 @@ import Glibc
 #endif
 import CTensorFlow
 
-public enum _ExecutionMode {
+public enum _ExecutionMode : Equatable {
   /// Classical TF interpreter backend, on CPU.
   case cpu
   /// Classical TF interpreter backend, on GPU.
   case gpu
   /// TPU backend.
-  case tpu
+  case tpu(usesInfeed: Bool)
   /// XLA jit-compilation backend (will use GPU when available, and otherwise
   /// CPU).
   case xla
+
+  public var isTPU: Bool {
+    switch self {
+      case .tpu: return true
+      default: return false
+    }
+  }
 }
 
 /// The configuration for the compiler runtime.
@@ -126,6 +133,12 @@ private func configureRuntimeFromEnvironment() {
     debugLog("Setting TF logging verbose level to \(verboseLevel) from env.")
   }
 
+  if let value = getenv("SWIFT_TENSORFLOW_USE_TPU_INFEED"),
+    String(cString: value).lowercased() == "true" {
+      _RuntimeConfig.executionMode = .tpu(usesInfeed: true)
+      debugLog("Setting TPU execution with infeed from env.")
+  }
+
   if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION") {
     if String(cString: value).lowercased() == "true" {
       _RuntimeConfig.usesSynchronousExecution = true
@@ -134,12 +147,19 @@ private func configureRuntimeFromEnvironment() {
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
-    let grpcAddress = String(cString: value)
-    guard grpcAddress.prefix(7) == "grpc://" else {
+    let address = String(cString: value)
+    debugLog("env var SWIFT_TENSORFLOW_SERVER_ADDRESS has value \(address).")
+    if address == "local" {
+      _RuntimeConfig.session = .local
+      debugLog("Using local TF session.")
+      return
+    }
+
+    guard address.prefix(7) == "grpc://" else {
       fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
     }
-    _RuntimeConfig.session = .remote(grpcAddress: grpcAddress)
-    debugLog("Setting TF server address to \(grpcAddress) from env.")
+    _RuntimeConfig.session = .remote(grpcAddress: address)
+    debugLog("Setting TF server address to \(address) from env.")
   }
 }
 
@@ -378,7 +398,8 @@ fileprivate extension _ExecutionContext {
     sync {
       // In TPU mode, the graph will be rewritten before each execution, so do
       // not use the cache in that case.
-      if _RuntimeConfig.executionMode != .tpu {
+      if case .tpu = _RuntimeConfig.executionMode {
+      } else {
         loadedTFPrograms[address] = graph
       }
     }
@@ -505,33 +526,58 @@ extension TFState {
     if returnValues.count > 0 {
       var shutdownNode = TF_Output(oper: nil, index: -1)
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
-      if _RuntimeConfig.executionMode == .tpu {
+      var inputTensorCount = Int32(inputTensors.count)
+      if case .tpu(let usesInfeed) = _RuntimeConfig.executionMode {
         debugLog("Enable TPU execution.")
         var tpuRewrittenSpecs: [TF_Output] = Array(
           repeating: TF_Output(oper: nil, index: -1),
           count: returnValues.count)
+        // "var infeedEnqueueNode: OpaquePointer" does not work for the
+        // TF_SessionRun() call below, where the `target_opers` parameter is
+        // marked const, and cannot take an in/out parameter.
+        let infeedEnqueueNode =
+          UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: 1)
+        debugLog("Rewriting graph and initializing TPU.")
         shutdownNode = TF_SetupTPUExecution(
           cSession, Int32(inputNodeSpecs.count), inputNodeSpecs,
           Int32(outputNodeSpecs.count), outputNodeSpecs,
-          &tpuRewrittenSpecs, status)
+          &tpuRewrittenSpecs, usesInfeed ? infeedEnqueueNode : nil, status)
         checkOk(status)
         outputNodeSpecs = tpuRewrittenSpecs
-      }
-      TF_SessionRun(
-        cSession, nil,
-        // input related parameters
-        inputNodeSpecs, inputTensors, Int32(inputTensors.count),
-        // output related parameters
-        outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-        /*targets*/nil, 0,
-        /*run_metadata*/nil, status
-      )
-      checkOk(status)
-      if _RuntimeConfig.executionMode == .tpu {
+        // When infeed is enabled, run it along with the output tensor nodes
+        // below.
+        let numTargets: Int32 = usesInfeed && inputTensors.count > 0 ? 1 : 0;
+        if numTargets > 0 {
+          debugLog("Running enqueue with \(inputTensors.count) input tensors.")
+        }
+        debugLog("Running the main TF computation.")
+        TF_SessionRun(
+          cSession, nil,
+          // input related parameters
+          inputNodeSpecs, inputTensors, inputTensorCount,
+          // output related parameters
+          outputNodeSpecs, &outputTensors, Int32(returnValues.count),
+          /*targets*/infeedEnqueueNode, numTargets,
+          /*run_metadata*/nil, status
+        )
+        checkOk(status)
+
+        debugLog("Shutting down TPU.")
         TF_ShutdownTPUExecution(cSession, shutdownNode, status)
         checkOk(status)
+      } else {
+        TF_SessionRun(
+          cSession, nil,
+          // input related parameters
+          inputNodeSpecs, inputTensors, Int32(inputTensors.count),
+          // output related parameters
+          outputNodeSpecs, &outputTensors, Int32(returnValues.count),
+          /*targets*/nil, 0,
+          /*run_metadata*/nil, status
+        )
+        checkOk(status)
       }
-      debugLog("Done calling TF_SessionRun.")
+      debugLog("Done running TF computation.")
     } else {
       // TF_SessionRun() does not support execution that involves no
       // outputs. In this case we assume the TF execution is side-effect free,
@@ -609,6 +655,8 @@ public final class _TensorComputation {
        tensorArgumentAddress: UnsafePointer<CTensorHandle>,
        tensorArgumentCount: Int,
        resultCount: Int) {
+    configureRuntimeFromEnvironment()
+
     let inputTensorHandles = UnsafeBufferPointer(start: tensorArgumentAddress,
                                                  count: tensorArgumentCount)
 

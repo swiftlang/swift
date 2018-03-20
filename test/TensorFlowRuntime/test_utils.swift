@@ -88,7 +88,7 @@ extension TestSuite {
 #if TPU && !CUDA
     test(name + "_TPU") {
       _RuntimeConfig.usesTFEagerAPI = false
-      _RuntimeConfig.executionMode = .tpu
+      _RuntimeConfig.executionMode = .tpu(usesInfeed: false)
       _RuntimeConfig.printsDebugLog = false
       body()
     }
@@ -107,7 +107,7 @@ public func shouldDoLoopTest() -> Bool {
     print("Loop tests are skipped in Eager + GPU mode.")
     return false
   }
-  if _RuntimeConfig.executionMode != .tpu {
+  if !_RuntimeConfig.executionMode.isTPU {
     _RuntimeConfig.executionMode = .xla
   }
   return true

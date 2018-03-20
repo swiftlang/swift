@@ -53,7 +53,7 @@ RankedTensorTests.testAllBackends("ArrayXDConversion") {
 
 RankedTensorTests.testAllBackends("DataTypeCast") {
   // TPU does not support DT_INT8 or 16 for cast
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
 
   let x = Tensor2D<Int32>(ones: [5, 5])
   let ints = Tensor2D<Int64>(x)
@@ -65,7 +65,7 @@ RankedTensorTests.testAllBackends("DataTypeCast") {
 }
 
 RankedTensorTests.testAllBackends("BoolToNumericCast") {
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
 
   let bools = Tensor2D<Bool>([[true, false], [true, false]])
   let ints = Tensor2D<Int64>(bools)
@@ -76,9 +76,9 @@ RankedTensorTests.testAllBackends("BoolToNumericCast") {
   expectEqual(Array2D(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
 }
 
-RankedTensorTests.test("ElementIndexing") {
+RankedTensorTests.testAllBackends("ElementIndexing") {
   // XLA compilation error under TPU.
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
 
   // NOTE: This tests the `subscript(index:)` method, which is distinct from
   // the `subscript(indices:)` method.
@@ -108,9 +108,9 @@ RankedTensorTests.test("ElementIndexing") {
   expectEqual(43, element0D)
 }
 
-RankedTensorTests.test("SliceIndexing") {
+RankedTensorTests.testAllBackends("SliceIndexing") {
   // XLA compilation error under TPU.
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
 
   // NOTE: cannot test `TensorXD.shape` or `TensorXD.scalars` directly until
   // send and receive are implemented (without writing a bunch of mini tests).

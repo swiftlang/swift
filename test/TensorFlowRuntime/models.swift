@@ -21,7 +21,7 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
   // FIXME: TPU execution on TAP is timing out. (b/74155319)
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
   // FIXME: GPU training won't converge.
 #if CUDA
   return
@@ -85,7 +85,7 @@ ModelTests.testAllBackends("XORClassifierTraining") {
   // FIXME: This test fails on Eager API.
   guard !_RuntimeConfig.usesTFEagerAPI else { return }
   // FIXME: XORClassifierTraining_TPU crashes with SIGSEGV. (b/74155319)
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
   // FIXME: GPU training won't converge.
 #if CUDA
   return
