@@ -36,6 +36,7 @@ import CString
 import CSVParsing
 import Calculator
 import CaptureProp
+import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import CharacterProperties
@@ -183,6 +184,7 @@ registerBenchmark(CSVParsingAlt)
 registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
+registerBenchmark(ChainedFilterMap)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)
 registerBenchmark(CharacterPropertiesFetch)
