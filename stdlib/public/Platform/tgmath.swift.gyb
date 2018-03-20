@@ -83,30 +83,6 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
 }
 
 %for T in ['Float','Double']:
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func scalbn(_ x: ${T}, _ n : Int) -> ${T} {
-  return ${T}(sign: .plus, exponent: n, significand: x)
-}
-
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func modf(_ x: ${T}) -> (${T}, ${T}) {
-  // inf/NaN: return canonicalized x, fractional part zero.
-  guard x.isFinite else { return (x+0, 0) }
-  let integral = trunc(x)
-  let fractional = x - integral
-  return (integral, fractional)
-}
-
-@available(swift, obsoleted: 4.2)
-@_transparent
-public func frexp(_ x: ${T}) -> (${T}, Int) {
-  guard x.isFinite else { return (x+0, 0) }
-  guard x != 0 else { return (x, 0) }
-  return (x.significand / 2, Int(x.exponent + 1))
-}
-
 @available(swift, deprecated: 4.2, renamed: "scalbn")
 @_transparent
 public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
