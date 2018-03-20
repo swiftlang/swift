@@ -4265,10 +4265,10 @@ public:
   /// Verify differentiation attribute.
   void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
     // Verify if specified argument indices are valid.
-    auto numArgs = F->getArguments().size();
+    auto numParams = F->getLoweredFunctionType()->getNumParameters();
     int lastIndex = -1;
     for (auto argIdx : Attr.getArgIndices()) {
-      require(argIdx < numArgs, "Argument index out of bounds.");
+      require(argIdx < numParams, "Argument index out of bounds.");
       auto currentIdx = (int)argIdx;
       require(currentIdx > lastIndex, "Argument indices not ascending.");
       lastIndex = currentIdx;
