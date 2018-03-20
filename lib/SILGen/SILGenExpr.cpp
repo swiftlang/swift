@@ -3074,7 +3074,7 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
     // Emit the tensor arguments as well as the attribute values.
     for (auto &elt : tuple->getElements().drop_front()) {
-      args.push_back(visit(elt).getScalarValue().forward(SGF));
+      args.push_back(visit(elt).forwardAsSingleValue(SGF, elt));
     }
   }
   auto &resultTL = SGF.getTypeLowering(E->getType());
