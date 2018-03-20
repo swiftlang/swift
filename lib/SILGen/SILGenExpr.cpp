@@ -4915,8 +4915,32 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-void SILGenFunction::emitBindOptional(SILLocation loc, ManagedValue optValue,
-                                      unsigned depth) {
+void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
+                                             ManagedValue optAddress,
+                                             unsigned depth) {
+  assert(optAddress.getType().isAddress() && "Expected an address here");
+  assert(depth < BindOptionalFailureDests.size());
+  auto failureDest =
+      BindOptionalFailureDests[BindOptionalFailureDests.size() - depth - 1];
+  assert(failureDest.isValid() && "too big to fail");
+
+  // Since we know that we have an address, we do not need to worry about
+  // ownership invariants. Instead just use a select_enum_addr.
+  SILBasicBlock *someBB = createBasicBlock();
+  SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
+
+  auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
+  B.createCondBranch(loc, hasValue, someBB, noneBB);
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  B.setInsertionPoint(someBB);
+}
+
+ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
+                                              ManagedValue optValue,
+                                              unsigned depth) {
+  assert(optValue.isPlusOne(*this) && "Can only bind plus one values");
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
@@ -4924,13 +4948,18 @@ void SILGenFunction::emitBindOptional(SILLocation loc, ManagedValue optValue,
   SILBasicBlock *hasValueBB = createBasicBlock();
   SILBasicBlock *hasNoValueBB = createBasicBlock();
 
-  // We make a copy to ensure that we pass the value into the
-  // switch_enum at plus 1. This is important since emitBindOptional
-  // does not consume its argument. Additionally, we need to make sure
-  // to create the switch enum builder /after/ emitting the block for
-  // cleanups lest we emit an extra destroy in the .none block.
-  SwitchEnumBuilder SEB(B, loc, optValue.copy(*this, loc));
-  SEB.addOptionalSomeCase(hasValueBB);
+  SILType optValueTy = optValue.getType();
+  SwitchEnumBuilder SEB(B, loc, optValue);
+  SEB.addOptionalSomeCase(hasValueBB, nullptr,
+                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                            // If mv is not an address, forward it. We will
+                            // recreate the cleanup outside when we return the
+                            // argument.
+                            if (mv.getType().isObject()) {
+                              mv.forward(*this);
+                            }
+                            expr.exit();
+                          });
   // If not, thread out through a bunch of cleanups.
   SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
                           [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
@@ -4941,6 +4970,23 @@ void SILGenFunction::emitBindOptional(SILLocation loc, ManagedValue optValue,
   // Reset the insertion point at the end of hasValueBB so we can
   // continue to emit code there.
   B.setInsertionPoint(hasValueBB);
+
+  // If optValue was loadable, we emitted a switch_enum. In such a case, return
+  // the argument from hasValueBB.
+  if (optValue.getType().isLoadable(F.getModule())) {
+    return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
+  }
+
+  // Otherwise, if we had an address only value, we emitted the value at +0. In
+  // such a case, since we want to model this as a consuming operation. Use
+  // ensure_plus_one and extract out the value from there.
+  auto *someDecl = getASTContext().getOptionalSomeDecl();
+  auto eltTy =
+      optValueTy.getObjectType().getOptionalObjectType().getAddressType();
+  assert(eltTy);
+  SILValue address = optValue.forward(*this);
+  return emitManagedBufferWithCleanup(
+      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -4952,21 +4998,19 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
     optValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
   } else {
     auto temp = SGF.emitTemporary(E, optTL);
-    optValue = temp->getManagedAddress();
 
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), temp.get());
 
+    // And then greab the managed address.
+    optValue = temp->getManagedAddress();
   }
 
   // Check to see whether the optional is present, if not, jump to the current
-  // nil handler block.
-  SGF.emitBindOptional(E, optValue, E->getDepth());
-
-  // If we continued, get the value out as the result of the expression.
-  auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(E, optValue,
-                                                           optTL, C);
-  return RValue(SGF, E, resultValue);
+  // nil handler block. Otherwise, return the value as the result of the
+  // expression.
+  optValue = SGF.emitBindOptional(E, optValue, E->getDepth());
+  return RValue(SGF, E, optValue);
 }
 
 namespace {

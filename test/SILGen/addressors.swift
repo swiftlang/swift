@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-sil %s | %FileCheck %s
 // RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s -check-prefix=SILGEN
@@ -170,7 +170,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @$S10addressors6CArrayVyxSiciau :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
-// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in Int32) -> @out Int32
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in_guaranteed Int32) -> @out Int32
 // CHECK:   store {{%.*}} to [[T3]] :
   array[0] = id_int
 
@@ -179,7 +179,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = function_ref @$S10addressors6CArrayVyxSicilu :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
-// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in Int32) -> @out Int32
+// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in_guaranteed Int32) -> @out Int32
 // CHECK:   [[T5:%.*]] = load [[T4]]
   return array[1](5)
 }
@@ -286,7 +286,7 @@ class F {
 func test_f0(_ f: F) -> Int32 {
   return f.value
 }
-// CHECK-LABEL: sil hidden @$S10addressors7test_f0ys5Int32VAA1FCF : $@convention(thin) (@owned F) -> Int32 {
+// CHECK-LABEL: sil hidden @$S10addressors7test_f0ys5Int32VAA1FCF : $@convention(thin) (@guaranteed F) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $F):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$S10addressors1FC5values5Int32Vvlo : $@convention(method) (@guaranteed F) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
@@ -297,13 +297,13 @@ func test_f0(_ f: F) -> Int32 {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   strong_release [[SELF]] : $F
+// CHECK-NOT:   strong_release [[SELF]] : $F
 // CHECK:   return [[VALUE]] : $Int32
 
 func test_f1(_ f: F) {
   f.value = 14
 }
-// CHECK-LABEL: sil hidden @$S10addressors7test_f1yyAA1FCF : $@convention(thin) (@owned F) -> () {
+// CHECK-LABEL: sil hidden @$S10addressors7test_f1yyAA1FCF : $@convention(thin) (@guaranteed F) -> () {
 // CHECK: bb0([[SELF:%0]] : $F):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
@@ -316,7 +316,7 @@ func test_f1(_ f: F) {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   strong_release [[SELF]] : $F
+// CHECK-NOT:   strong_release [[SELF]] : $F
 
 class G {
   var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
@@ -406,7 +406,7 @@ class H {
 func test_h0(_ f: H) -> Int32 {
   return f.value
 }
-// CHECK-LABEL: sil hidden @$S10addressors7test_h0ys5Int32VAA1HCF : $@convention(thin) (@owned H) -> Int32 {
+// CHECK-LABEL: sil hidden @$S10addressors7test_h0ys5Int32VAA1HCF : $@convention(thin) (@guaranteed H) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $H):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$S10addressors1HC5values5Int32Vvlp : $@convention(method) (@guaranteed H) -> (UnsafePointer<Int32>, @owned Optional<Builtin.NativeObject>)
 
@@ -418,13 +418,13 @@ func test_h0(_ f: H) -> Int32 {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK:   strong_release [[SELF]] : $H
+// CHECK-NOT:   strong_release [[SELF]] : $H
 // CHECK:   return [[VALUE]] : $Int32
 
 func test_h1(_ f: H) {
   f.value = 14
 }
-// CHECK-LABEL: sil hidden @$S10addressors7test_h1yyAA1HCF : $@convention(thin) (@owned H) -> () {
+// CHECK-LABEL: sil hidden @$S10addressors7test_h1yyAA1HCF : $@convention(thin) (@guaranteed H) -> () {
 // CHECK: bb0([[SELF:%0]] : $H):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
@@ -437,7 +437,7 @@ func test_h1(_ f: H) {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK:   strong_release [[SELF]] : $H
+// CHECK-NOT:   strong_release [[SELF]] : $H
 
 class I {
   var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
@@ -530,7 +530,7 @@ func test_rec(_ outer: RecOuter) -> Int32 {
   return outer.middle.inner[0]
 }
 // This uses the mutable addressor.
-// CHECK-LABEL: sil hidden @$S10addressors8test_recys5Int32VAA8RecOuterCF : $@convention(thin) (@owned RecOuter) -> Int32 {
+// CHECK-LABEL: sil hidden @$S10addressors8test_recys5Int32VAA8RecOuterCF : $@convention(thin) (@guaranteed RecOuter) -> Int32 {
 // CHECK:   function_ref @$S10addressors8RecOuterC6middleAA0B6MiddleVvaP
 // CHECK:   struct_element_addr {{.*}} : $*RecMiddle, #RecMiddle.inner
 // CHECK:   function_ref @$S10addressors8RecInnerVys5Int32VAEcig

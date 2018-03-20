@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name unowned -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
@@ -38,9 +38,9 @@ _ = AddressOnly(x: C(), p: X())
 // CHECK:   destroy_value [[X]]
 // CHECK: }
 
-// CHECK-LABEL:    sil hidden @$S7unowned5test01cyAA1CC_tF : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL:    sil hidden @$S7unowned5test01cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 func test0(c c: C) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $C):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
 
   var a: A
   // CHECK:   [[A1:%.*]] = alloc_box ${ var A }, var, name "a"
@@ -50,24 +50,20 @@ func test0(c c: C) {
   unowned var x = c
   // CHECK:   [[X:%.*]] = alloc_box ${ var @sil_unowned C }
   // CHECK:   [[PBX:%.*]] = project_box [[X]]
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C  to $@sil_unowned C
   // CHECK:   [[T2_COPY:%.*]] = copy_value [[T2]] : $@sil_unowned C
   // CHECK:   store [[T2_COPY]] to [init] [[PBX]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = c
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[T1:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C
   // CHECK:   [[T2_COPY:%.*]] = copy_value [[T2]] : $@sil_unowned C
   // CHECK:   assign [[T2_COPY]] to [[T1]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = x
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
@@ -82,7 +78,6 @@ func test0(c c: C) {
   // CHECK:   destroy_value [[T3]] : $C
   // CHECK:   destroy_value [[X]]
   // CHECK:   destroy_value [[MARKED_A1]]
-  // CHECK:   destroy_value [[ARG]]
 }
 // CHECK: } // end sil function '$S7unowned5test01cyAA1CC_tF'
 
@@ -164,4 +159,4 @@ struct Unowned<T: AnyObject> {
   unowned var object: T
 }
 func takesUnownedStruct(_ z: Unowned<C>) {}
-// CHECK-LABEL: sil hidden @$S7unowned18takesUnownedStructyyAA0C0VyAA1CCGF : $@convention(thin) (@owned Unowned<C>) -> ()
+// CHECK-LABEL: sil hidden @$S7unowned18takesUnownedStructyyAA0C0VyAA1CCGF : $@convention(thin) (@guaranteed Unowned<C>) -> ()

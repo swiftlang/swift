@@ -305,7 +305,7 @@ option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
 
 option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   "Build the standard libraries, overlays, and runtime with normal arguments at +0"
-  FALSE)
+  TRUE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."

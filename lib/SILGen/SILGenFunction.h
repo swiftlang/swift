@@ -1510,10 +1510,18 @@ public:
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// NOTE: This operation does *not* consume the managed value.
+  /// NOTE: This operation does consume the managed value.
+  ManagedValue emitBindOptional(SILLocation loc,
+                                ManagedValue optionalAddrOrValue,
+                                unsigned depth);
+
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
+  /// NOTE: This operation does not consume the managed address.
+  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
+                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,

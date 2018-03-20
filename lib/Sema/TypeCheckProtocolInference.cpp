@@ -607,28 +607,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   return result;
 }
 
-Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
-  // If we have an optional type, adjust its wrapped type.
-  if (auto optionalObjectType = type->getOptionalObjectType()) {
-    auto newOptionalObjectType =
-      adjustInferredAssociatedType(optionalObjectType, noescapeToEscaping);
-    if (newOptionalObjectType.getPointer() == optionalObjectType.getPointer())
-      return type;
-
-    return OptionalType::get(newOptionalObjectType);
-  }
-
-  // If we have a noescape function type, make it escaping.
-  if (auto funcType = type->getAs<FunctionType>()) {
-    if (funcType->isNoEscape()) {
-      noescapeToEscaping = true;
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                               funcType->getExtInfo().withNoEscape(false));
-    }
-  }
-  return type;
-}
-
 /// Attempt to resolve a type witness via a specific value witness.
 InferredAssociatedTypesByWitness
 AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
@@ -684,17 +662,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (secondType->hasError())
         return true;
 
-      // Adjust the type to a type that can be written explicitly.
-      bool noescapeToEscaping = false;
-      Type inferredType =
-        adjustInferredAssociatedType(secondType, noescapeToEscaping);
-      if (!inferredType->isMaterializable())
-        return true;
-
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
-        Inferred.Inferred.push_back({assocType, inferredType});
+        Inferred.Inferred.push_back({assocType, secondType});
       }
 
       // Always allow mismatches here.

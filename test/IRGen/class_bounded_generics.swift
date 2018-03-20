@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name class_bounded_generics -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
@@ -95,11 +95,11 @@ func class_bounded_archetype_method<T : ClassBoundBinary>(_ x: T, y: T) {
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* swiftself %0, %swift.type* {{.*}}, i8** [[INHERITED_WTBL]])
   x.classBoundBinaryMethod(y)
-  // CHECK: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
+  // CHECK-NOT: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
   // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 2
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*, i8**)
-  // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
+  // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* %1, %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
 }
 
 // CHECK-LABEL: define hidden swiftcc { %objc_object*, %objc_object* } @"$S22class_bounded_generics0a1_B16_archetype_tuple{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T, i8** %T.ClassBound)

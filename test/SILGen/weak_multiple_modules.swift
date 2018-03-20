@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/weak_other.swiftmodule -module-name=weak_other %S/Inputs/weak_other.swift
@@ -6,7 +6,7 @@
 
 import weak_other
 
-// CHECK-LABEL: sil hidden @$S21weak_multiple_modules11doSomething2uiSb0A6_other2UIC_tF : $@convention(thin) (@owned UI) -> Bool
+// CHECK-LABEL: sil hidden @$S21weak_multiple_modules11doSomething2uiSb0A6_other2UIC_tF : $@convention(thin) (@guaranteed UI) -> Bool
 func doSomething(ui: UI) -> Bool {
   // CHECK: ref_element_addr
   // CHECK-objc: load_unowned

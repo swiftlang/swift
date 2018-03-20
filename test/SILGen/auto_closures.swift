@@ -1,13 +1,13 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
-// RUN: %target-swift-frontend -module-name auto_closures  -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name auto_closures -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @$S13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
-  // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
+  // CHECK: bb0([[CLOSURE:%.*]] : @trivial $@noescape @callee_guaranteed () -> Bool):
   // CHECK: [[RET:%.*]] = apply [[CLOSURE]]()
   // CHECK: return [[RET]]
   return x()
@@ -19,7 +19,6 @@ func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   // CHECK: [[WITHCAPTURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]](
   // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[WITHCAPTURE]]
   // CHECK: [[RET:%.*]] = apply {{%.*}}([[CVT]])
-  // CHECK: destroy_value [[WITHCAPTURE]]
   // CHECK: return [[RET]]
   return call_auto_closure(x)
 }
@@ -40,14 +39,13 @@ public class Base {
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @$S13auto_closures3SubC1xAA4BoolVvg : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
   // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @$S13auto_closures3SubC1xAA4BoolVvgAFyXKfu_ : $@convention(thin) (@guaranteed Sub) -> Bool
   // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [callee_guaranteed] [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
   // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[AUTOCLOSURE]]
   // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @$S13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin)
   // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[CVT]])
-  // CHECK: destroy_value [[AUTOCLOSURE]]
   // CHECK: return [[RET]] : $Bool
   // CHECK: }
 

@@ -35,7 +35,15 @@
 #define AUTORELEASEPOOL @autoreleasepool
 #else
 // On other platforms we rely on the remove from autorelease pool optimization.
-#define AUTORELEASEPOOL
+//
+// PLUS ZERO TODO: Right now we force an autoreleasepool here where we really do
+// not want to do so. The reason why is that without the autoreleasepool (or
+// really something like a defer), we tail call
+// objc_retainAutoreleasedReturnValue which blocks the hand shake. Evidently
+// this is something that we do not want to do. See:
+// b79ff50f1bca97ecfd053372f5f6dc9d017398bc. Until that is resolved, just create
+// an autoreleasepool here.
+#define AUTORELEASEPOOL @autoreleasepool
 #endif
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE

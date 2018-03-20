@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name inlineable_attribute -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
@@ -66,12 +66,12 @@ public class Horse {
   public func gallop() {}
 }
 
-// CHECK-LABEL: sil [serialized] @$S20inlineable_attribute15talkAboutAHorse1hyAA5HorseC_tF : $@convention(thin) (@owned Horse) -> () {
+// CHECK-LABEL: sil [serialized] @$S20inlineable_attribute15talkAboutAHorse1hyAA5HorseC_tF : $@convention(thin) (@guaranteed Horse) -> () {
 // CHECK: function_ref @$S20inlineable_attribute5HorseC6gallopyyFTc
 // CHECK: return
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$S20inlineable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_guaranteed () -> () {
+// CHECK-LABEL: sil shared [serializable] [thunk] @$S20inlineable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@guaranteed Horse) -> @owned @callee_guaranteed () -> () {
 // CHECK: class_method
 // CHECK: return
 // CHECK: }

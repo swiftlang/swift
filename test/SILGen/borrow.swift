@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name borrow -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
@@ -26,8 +26,9 @@ func useD(_ d: D) {}
 // CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
 // CHECK:   destroy_value [[CLASS]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$S6borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
-// CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
+// CHECK:   [[BORROWED_LOADED_VALUE:%.*]] = begin_borrow [[LOADED_VALUE]]
+// CHECK:   [[FUNC:%.*]] = function_ref @$S6borrow4useD{{.*}} : $@convention(thin) (@guaranteed D) -> ()
+// CHECK:   apply [[FUNC]]([[BORROWED_LOADED_VALUE]])
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function '$S6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
 func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {

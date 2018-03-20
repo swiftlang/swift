@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
@@ -10,7 +10,7 @@ import resilient_enum
 // Resilient enums are always address-only, and switches must include
 // a default case
 
-// CHECK-LABEL: sil hidden @$S15enum_resilience15resilientSwitchyy0c1_A06MediumOF : $@convention(thin) (@in Medium) -> ()
+// CHECK-LABEL: sil hidden @$S15enum_resilience15resilientSwitchyy0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt.1: bb3, case #Medium.Postcard!enumelt.1: bb4, default bb5
@@ -36,7 +36,7 @@ import resilient_enum
 // CHECK-NEXT:    builtin "int_trap"()
 // CHECK-NEXT:    unreachable
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr %0
+// CHECK-NOT:    destroy_addr %0
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]]
 
@@ -53,7 +53,7 @@ func resilientSwitch(_ m: Medium) {
 // as part of the value, so we cannot resiliently make assumptions about the
 // enum's size
 
-// CHECK-LABEL: sil hidden @$S15enum_resilience21indirectResilientEnumyy010resilient_A016IndirectApproachOF : $@convention(thin) (@in IndirectApproach) -> ()
+// CHECK-LABEL: sil hidden @$S15enum_resilience21indirectResilientEnumyy010resilient_A016IndirectApproachOF : $@convention(thin) (@in_guaranteed IndirectApproach) -> ()
 func indirectResilientEnum(_ ia: IndirectApproach) {}
 
 public enum MyResilientEnum {
@@ -61,7 +61,7 @@ public enum MyResilientEnum {
   case loki
 }
 
-// CHECK-LABEL: sil @$S15enum_resilience15resilientSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in MyResilientEnum) -> ()
+// CHECK-LABEL: sil @$S15enum_resilience15resilientSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in_guaranteed MyResilientEnum) -> ()
 // CHECK:      switch_enum_addr %2 : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2 //
 // CHECK:      return
 public func resilientSwitch(_ e: MyResilientEnum) {
@@ -73,7 +73,7 @@ public func resilientSwitch(_ e: MyResilientEnum) {
 
 // Inlineable functions must lower the switch as if it came from outside the module
 
-// CHECK-LABEL: sil [serialized] @$S15enum_resilience16inlineableSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in MyResilientEnum) -> ()
+// CHECK-LABEL: sil [serialized] @$S15enum_resilience16inlineableSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in_guaranteed MyResilientEnum) -> ()
 // CHECK:      switch_enum_addr %2 : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2, default bb3
 // CHECK:      return
 @_inlineable public func inlineableSwitch(_ e: MyResilientEnum) {
