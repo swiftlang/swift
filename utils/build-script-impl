@@ -2744,9 +2744,15 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
+		using_xcodebuild="FALSE"
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                    using_xcodebuild="TRUE"
+                fi
+
+
                 # Run the unittests.
                 # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
@@ -2763,7 +2769,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
                 else
                     lldb_executable="${lldb_build_dir}"/bin/lldb
@@ -2842,7 +2848,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ ! -z "${DOTEST_EXTRA}" ]] ; then
                     dotest_extra_args="-E ${DOTEST_EXTRA}"
                 fi
-                if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "FALSE" ]] ; then
+                if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
                         ${NINJA_BIN} lldb-dotest
 
@@ -2854,6 +2860,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${LLDB_TEST_SUBDIR_CLAUSE} \
                         ${LLDB_TEST_CATEGORIES} \
                         ${LLDB_FORMATTER_OPTS} \
+                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
                         ${dotest_extra_args}
 		else
                     with_pushd "${results_dir}" \
