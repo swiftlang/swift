@@ -2445,6 +2445,15 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
                               Alignment alignment,
                               llvm::Type *defaultType,
                               ConstantReference::Directness forceIndirectness) {
+  // ObjC class references can always be directly referenced, even in
+  // the weird cases where we don't see a definition.
+  if (entity.isObjCClassRef()) {
+    auto value = getAddrOfObjCClassRef(
+      const_cast<ClassDecl *>(cast<ClassDecl>(entity.getDecl())));
+    return { cast<llvm::Constant>(value.getAddress()),
+             ConstantReference::Direct };
+  }
+
   // Ensure the variable is at least forward-declared.
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
@@ -2522,7 +2531,7 @@ IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
 
     kind = TypeMetadataRecordKind::IndirectObjCClass;
     defaultTy = TypeMetadataPtrTy;
-    entity = LinkEntity::forObjCClass(clas);
+    entity = LinkEntity::forObjCClassRef(clas);
   } else {
     // A reference to a concrete type.
     // TODO: consider using a symbolic reference (i.e. a symbol string
@@ -2537,8 +2546,8 @@ IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
 
   // Adjust the flags now that we know whether the reference to this
   // entity will be indirect.
-  if (ref.isIndirect() &&
-      kind == TypeMetadataRecordKind::DirectNominalTypeDescriptor) {
+  if (ref.isIndirect()) {
+    assert(kind == TypeMetadataRecordKind::DirectNominalTypeDescriptor);
     kind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
   }
 
