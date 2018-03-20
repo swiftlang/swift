@@ -269,7 +269,7 @@ class Driver::InputInfoMap
 using InputInfoMap = Driver::InputInfoMap;
 
 static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
-                                     StringRef buildRecordPath,
+                                     llvm::Twine buildRecordPath,
                                      StringRef reason = "") {
   if (ShowIncrementalBuildDecisions) {
     llvm::outs() << "Incremental compilation has been disabled due to "
@@ -284,7 +284,7 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
 
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
                                  const InputFileList &inputs,
-                                 StringRef buildRecordPath,
+                                 llvm::Twine buildRecordPath,
                                  bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
@@ -647,12 +647,9 @@ Driver::buildCompilation(const ToolChain &TC,
       Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
 
     } else {
-      StringRef buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-        auto iter = masterOutputMap->find(types::TY_SwiftDeps);
-        if (iter != masterOutputMap->end())
-          buildRecordPath = iter->second;
-      }
+      std::string buildRecordPath;
+      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+        buildRecordPath = masterOutputMap->lookup(types::TY_SwiftDeps);
 
       if (buildRecordPath.empty()) {
         Diags.diagnose(SourceLoc(),
@@ -661,6 +658,31 @@ Driver::buildCompilation(const ToolChain &TC,
         rebuildEverything = true;
 
       } else {
+
+        // In 'emit-module' only mode, if '~moduleonly' suffixed build record
+        // exists and it's newer than normal build record, read from it.
+        // Otherwise, read from normal build record file since it's compatible
+        // with 'emit-module' only mode.
+        bool useModuleOnlybuildRecordPath = false;
+        if (OI.CompilerOutputType == types::TY_SwiftModuleFile) {
+          llvm::sys::fs::file_status Stat;
+          if (!llvm::sys::fs::status(buildRecordPath + "~moduleonly", Stat)) {
+            auto ModuleOnlyModTime = Stat.getLastModificationTime();
+            if (!llvm::sys::fs::status(buildRecordPath, Stat)) {
+              if (ModuleOnlyModTime > Stat.getLastModificationTime()) {
+                // '~moduleonly' suffixed one is newer than normal one.
+                useModuleOnlybuildRecordPath = true;
+              }
+            } else {
+              // Only '~moduleonly' suffixed one exists.
+              useModuleOnlybuildRecordPath = true;
+            }
+          }
+        }
+        if (useModuleOnlybuildRecordPath) {
+          buildRecordPath = buildRecordPath.append("~moduleonly");
+        }
+
         if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
                                  buildRecordPath,
                                  ShowIncrementalBuildDecisions)) {
@@ -746,7 +768,12 @@ Driver::buildCompilation(const ToolChain &TC,
 
   if (OFM) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      C->setCompilationRecordPath(masterOutputMap->lookup(types::TY_SwiftDeps));
+      auto buildRecordFilename = masterOutputMap->lookup(types::TY_SwiftDeps);
+      // In 'emit-module' only mode, append '~moduleonly' to the build record
+      // filename. To keep build record for main compilation clean.
+      if (OI.CompilerOutputType == types::TY_SwiftModuleFile)
+        buildRecordFilename = buildRecordFilename.append("~moduleonly");
+      C->setCompilationRecordPath(buildRecordFilename);
 
       auto buildEntry = outOfDateMap.find(nullptr);
       if (buildEntry != outOfDateMap.end())
