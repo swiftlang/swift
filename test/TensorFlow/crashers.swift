@@ -185,6 +185,6 @@ public func testGenericThing() {
 // b/75247714: #tfop crashes when attribute argument is a tuple
 public func test75247714() {
   // expected-error @+1 {{attribute 'bar' requires a constant argument}}
-  let _ = () = #tfop("foo", bar: (1, 2))
+  let _ : () = #tfop("foo", bar: (1, 2))
 }
 
