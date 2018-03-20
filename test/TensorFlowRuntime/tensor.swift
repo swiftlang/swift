@@ -61,7 +61,7 @@ TensorTests.testAllBackends("ArrayConversion") {
 
 TensorTests.testAllBackends("DataTypeCast_NonTPU") {
   // TPU does not support Int8 or 16 casting.
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
 
   let x = Tensor<Int32>(ones: [5, 5])
   let ints = Tensor<Int64>(x)
@@ -74,7 +74,7 @@ TensorTests.testAllBackends("DataTypeCast_NonTPU") {
 
 TensorTests.testAllBackends("DataTypeCast_TPU") {
   // Non-TPU mode (e.g. eager) does not support Uint32 casting.
-  guard _RuntimeConfig.executionMode == .tpu else { return }
+  guard _RuntimeConfig.executionMode.isTPU else { return }
 
   let x = Tensor<Int32>(ones: [5, 5])
   let ints = Tensor<Int64>(x)
@@ -90,7 +90,7 @@ TensorTests.testAllBackends("BoolToNumericCast_NonTPU") {
   //
   // When changing to UInt32, got another TPU/XLA compilation error when
   // converting from bools to Uint32 (different from missing kernel error).
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  if _RuntimeConfig.executionMode.isTPU { return }
 
   let bools = Tensor<Bool>(shape: [2, 2], scalars: [true, false, true, false])
   let ints = Tensor<Int64>(bools)
@@ -101,9 +101,9 @@ TensorTests.testAllBackends("BoolToNumericCast_NonTPU") {
   expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 0, 1, 0]), i8s.array)
 }
 
-TensorTests.test("ElementIndexing") {
+TensorTests.testAllBackends("ElementIndexing") {
   // XLA compilation error under TPU.
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  if _RuntimeConfig.executionMode.isTPU { return }
 
   // NOTE: This tests the `subscript(index:)` method, which is distinct from
   // the `subscript(indices:)` method.
@@ -132,7 +132,7 @@ TensorTests.test("ElementIndexing") {
   expectEqual([43], array0D.scalars)
 }
 
-TensorTests.test("NestedElementIndexing") {
+TensorTests.testAllBackends("NestedElementIndexing") {
   // NOTE: This tests the `subscript(indices:)` method, which is distinct from
   // the `subscript(index:)` method.
   // NOTE: This test could use a clearer name, along with other "indexing"
@@ -155,9 +155,9 @@ TensorTests.test("NestedElementIndexing") {
   expectEqual([43], array0D.scalars)
 }
 
-TensorTests.test("SliceIndexing") {
+TensorTests.testAllBackends("SliceIndexing") {
   // XLA compilation error under TPU.
-  guard _RuntimeConfig.executionMode != .tpu else { return }
+  if _RuntimeConfig.executionMode.isTPU { return }
 
   // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
   // and receive are implemented (without writing a bunch of mini tests).
