@@ -2921,22 +2921,20 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   // Create it in our current function.
   auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
-  SingleValueInstruction *thunkedFn =
+  ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
-                             subs, fn.ensurePlusOne(SGF, loc).forward(SGF),
+                             subs, fn.ensurePlusOne(SGF, loc),
                              SILType::getPrimitiveObjectType(toType));
 
   if (!expectedType->isNoEscape()) {
-    return SGF.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
+    return thunkedFn;
   }
 
   // Handle the escaping to noescape conversion.
   assert(expectedType->isNoEscape());
-  SingleValueInstruction *noEscapeThunkFn = SGF.B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, expectedTL.getLoweredType());
-  SGF.enterPostponedCleanup(thunkedFn);
-  return SGF.emitManagedRValueWithCleanup(noEscapeThunkFn);
+  return SGF.B.createConvertEscapeToNoEscape(loc, thunkedFn,
+                               SILType::getPrimitiveObjectType(expectedType));
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
@@ -3101,18 +3099,8 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
         SGF.B.createThinToThickFunction(Loc, fn.forward(SGF), resTy));
   } else if (newFnType != expectedFnType) {
     // Escaping to noescape conversion.
-    assert(expectedFnType->getRepresentation() ==
-               SILFunctionTypeRepresentation::Thick &&
-           fnType->getRepresentation() ==
-               SILFunctionTypeRepresentation::Thick &&
-           !fnType->isNoEscape() && expectedFnType->isNoEscape() &&
-           "Expect a escaping to noescape conversion");
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
-    auto fnValue = fn.forward(SGF);
-    SGF.enterPostponedCleanup(fnValue);
-    SingleValueInstruction *noEscapeThunkFn =
-        SGF.B.createConvertEscapeToNoEscape(Loc, fnValue, resTy);
-    fn = SGF.emitManagedRValueWithCleanup(noEscapeThunkFn);
+    fn = SGF.B.createConvertEscapeToNoEscape(Loc, fn, resTy);
   }
 
   return fn;

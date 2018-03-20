@@ -138,6 +138,17 @@ static std::tuple<Type, Type, OptionalAdjustmentKind>
 getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
                   Type witnessType, bool witnessTypeIsIUO,
                   VarianceKind variance) {
+  // If the witness type is noescape but the requirement type is not,
+  // adjust the witness type to be escaping. This permits a limited form of
+  // covariance.
+  bool reqNoescapeToEscaping = false;
+  (void)adjustInferredAssociatedType(reqtType, reqNoescapeToEscaping);
+  bool witnessNoescapeToEscaping = false;
+  Type adjustedWitnessType =
+    adjustInferredAssociatedType(witnessType, witnessNoescapeToEscaping);
+  if (witnessNoescapeToEscaping && !reqNoescapeToEscaping)
+    witnessType = adjustedWitnessType;
+
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
@@ -152,8 +163,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     reqtType = reqtValueType;
   }
   bool witnessIsOptional = false;
-  if (Type witnessValueType =
-      witnessType->getOptionalObjectType()) {
+  if (Type witnessValueType = witnessType->getOptionalObjectType()) {
     witnessIsOptional = true;
     witnessType = witnessValueType;
   }
