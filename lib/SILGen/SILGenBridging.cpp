@@ -925,23 +925,19 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
-  SingleValueInstruction *thunkedFn = B.createPartialApply(
+  ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
-      block.forward(*this),
+      block,
       SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
 
   if (!loweredFuncTy->isNoEscape()) {
-    return emitManagedRValueWithCleanup(thunkedFn);
+    return thunkedFn;
   }
 
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
-
-  auto &funcTL = getTypeLowering(loweredFuncTy);
-  SingleValueInstruction *noEscapeThunkFn =
-      B.createConvertEscapeToNoEscape(loc, thunkedFn, funcTL.getLoweredType());
-  enterPostponedCleanup(thunkedFn);
-  return emitManagedRValueWithCleanup(noEscapeThunkFn);
+  return B.createConvertEscapeToNoEscape(loc, thunkedFn,
+                          SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
