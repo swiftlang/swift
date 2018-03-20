@@ -171,11 +171,9 @@ func setZim(_ f: Foo, b: Bool) {
 
 // CHECK-arm64-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
 // CHECK-arm64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-arm64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
-// CHECK-arm64:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-arm64:   destroy_value [[ARG0]]
+// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-arm64-NOT:   destroy_value [[ARG0]]
 // CHECK-arm64: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
