@@ -421,7 +421,9 @@ private:
       os << ", " << customName
          << ", \"" << ED->getName() << "\"";
     }
-    os << ") {\n";
+    os << ", " << (ED->isExhaustive(/*useDC*/nullptr) ? "closed" : "open")
+       << ") {\n";
+
     for (auto Elt : ED->getAllElements()) {
       printDocumentationComment(Elt);
 
@@ -2569,24 +2571,26 @@ public:
            "#if !defined(SWIFT_ENUM_ATTR)\n"
            "# if defined(__has_attribute) && "
              "__has_attribute(enum_extensibility)\n"
-           "#  define SWIFT_ENUM_ATTR "
-             "__attribute__((enum_extensibility(open)))\n"
+           "#  define SWIFT_ENUM_ATTR(_extensibility) "
+             "__attribute__((enum_extensibility(_extensibility)))\n"
            "# else\n"
-           "#  define SWIFT_ENUM_ATTR\n"
+           "#  define SWIFT_ENUM_ATTR(_extensibility)\n"
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
-           "# define SWIFT_ENUM(_type, _name) "
+           "# define SWIFT_ENUM(_type, _name, _extensibility) "
              "enum _name : _type _name; "
-             "enum SWIFT_ENUM_ATTR SWIFT_ENUM_EXTRA _name : _type\n"
+             "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA "
+             "_name : _type\n"
            "# if __has_feature(generalized_swift_name)\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
+             "_extensibility) "
              "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_ATTR "
-             "SWIFT_ENUM_EXTRA _name : _type\n"
+             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) "
+             "SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n"
            "# else\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
-             "SWIFT_ENUM(_type, _name)\n"
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
+             "_extensibility) SWIFT_ENUM(_type, _name, _extensibility)\n"
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_UNAVAILABLE)\n"

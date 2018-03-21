@@ -2653,7 +2653,8 @@ namespace {
         break;
       }
 
-      case EnumKind::Enum: {
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
         auto &C = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
@@ -2756,6 +2757,14 @@ namespace {
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
+
+        // Annotate as 'frozen' if appropriate.
+        assert((DeclAttribute::getOptions(DAK_Frozen) &
+                DeclAttribute::UserInaccessible) &&
+               "Once 'frozen' is supported, the attribute should not be "
+               "implicit (below)");
+        if (enumKind == EnumKind::FrozenEnum)
+          enumDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/true));
 
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
@@ -2860,7 +2869,8 @@ namespace {
         addEnumeratorsAsMembers = false;
         break;
       case EnumKind::Options:
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
         addEnumeratorsAsMembers = true;
         break;
       }
@@ -2870,7 +2880,8 @@ namespace {
                                        EnumElementDecl *>, 8,
                           APSIntRefDenseMapInfo> canonicalEnumConstants;
 
-      if (enumKind == EnumKind::Enum) {
+      if (enumKind == EnumKind::NonFrozenEnum ||
+          enumKind == EnumKind::FrozenEnum) {
         for (auto constant : decl->enumerators()) {
           if (Impl.isUnavailableInSwift(constant))
             continue;
@@ -2931,7 +2942,8 @@ namespace {
             return true;
           });
           break;
-        case EnumKind::Enum: {
+        case EnumKind::NonFrozenEnum:
+        case EnumKind::FrozenEnum: {
           auto canonicalCaseIter =
             canonicalEnumConstants.find(&constant->getInitVal());
 
@@ -3379,7 +3391,8 @@ namespace {
         return result;
       }
 
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
       case EnumKind::Options: {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available

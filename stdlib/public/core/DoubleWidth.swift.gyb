@@ -212,7 +212,7 @@ extension DoubleWidth : Numeric {
 extension DoubleWidth : FixedWidthInteger {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : Collection {
-    @_fixed_layout // FIXME(sil-serialize-all)
+    @_frozen // FIXME(sil-serialize-all)
     public enum _IndexValue {
       case low(Low.Words.Index)
       case high(High.Words.Index)

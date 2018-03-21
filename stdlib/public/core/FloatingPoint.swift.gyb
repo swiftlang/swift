@@ -1218,7 +1218,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 }
 
 /// The sign of a floating-point value.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public enum FloatingPointSign: Int {
   /// The sign for a positive value.
   case plus
@@ -1228,7 +1228,7 @@ public enum FloatingPointSign: Int {
 }
 
 /// The IEEE 754 floating-point classes.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public enum FloatingPointClassification {
   /// A signaling NaN ("not a number").
   ///
@@ -1267,7 +1267,6 @@ public enum FloatingPointClassification {
 }
 
 /// A rule for rounding a floating-point number.
-@_fixed_layout // FIXME(sil-serialize-all)
 public enum FloatingPointRoundingRule {
   /// Round to the closest allowed value; if two values are equally close, the
   /// one with greater magnitude is chosen.

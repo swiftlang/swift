@@ -1101,7 +1101,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 //===----------------------------------------------------------------------===//
 
 /// An error that occurs during the encoding of a value.
-@_fixed_layout // FIXME(sil-serialize-all)
 public enum EncodingError : Error {
   /// The context in which the error occurred.
   @_fixed_layout // FIXME(sil-serialize-all)
@@ -1190,7 +1189,6 @@ public enum EncodingError : Error {
 }
 
 /// An error that occurs during the decoding of a value.
-@_fixed_layout // FIXME(sil-serialize-all)
 public enum DecodingError : Error {
   /// The context in which the error occurred.
   @_fixed_layout // FIXME(sil-serialize-all)

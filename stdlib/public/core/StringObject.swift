@@ -24,7 +24,7 @@ struct _StringObject {
   // there are no free bits available to implement it.  We use a single-word
   // enum instead, with an additional word for holding tagged values and (in the
   // non-tagged case) spilled flags.
-  @_fixed_layout
+  @_frozen
   @_versioned
   internal enum _Variant {
     case strong(AnyObject) // _bits stores flags

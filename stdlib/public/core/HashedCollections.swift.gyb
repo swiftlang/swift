@@ -2831,7 +2831,7 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 @_versioned // FIXME(sil-serialize-all)
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 internal enum _MergeError : Error {
   case keyCollision
 }
@@ -4835,7 +4835,7 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
 #endif
 
 @_versioned
-@_fixed_layout
+@_frozen
 internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
   internal typealias NativeBuffer = _Native${Self}Buffer<${TypeParameters}>
@@ -5993,7 +5993,7 @@ extension _Cocoa${Self}Index {
 }
 #endif
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   typealias _Index = ${Self}Index<${TypeParameters}>
@@ -6266,7 +6266,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 #endif
 
 @_versioned
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Iterator = ${Self}Iterator<${TypeParameters}>
   internal typealias _NativeBuffer =
