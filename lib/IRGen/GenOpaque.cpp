@@ -109,7 +109,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false);
   }
   
-  /// int (*getEnumTag)(T *obj, M *self);
+  /// unsigned (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
@@ -131,7 +131,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
-  /// void (*destructiveInjectEnumTag)(T *obj, int tag, M *self);
+  /// void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
   case ValueWitness::DestructiveInjectEnumTag: {
     llvm::Type *voidTy = IGM.VoidTy;
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -143,8 +143,8 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
-  /// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
-  ///                                M *self)
+  /// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
+  ///                                     M *self)
   case ValueWitness::GetEnumTagSinglePayload: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *indexTy = IGM.Int32Ty;
@@ -154,7 +154,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(indexTy, args, false);
   }
 
-  /// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+  /// void (*storeEnumTagSinglePayload)(T* enum, UINT_TYPE whichCase,
   ///                                   UINT_TYPE emptyCases,
   ///                                   M *self)
   case ValueWitness::StoreEnumTagSinglePayload: {
@@ -721,7 +721,7 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
 }
 
 /// Emit a trampoline to call the getEnumTagSinglePayload witness. API:
-/// INT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
+/// UINT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
 static llvm::Constant *
 getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
 
@@ -751,7 +751,7 @@ getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
 }
 
 /// Emit a trampoline to call the storeEnumTagSinglePayload witness. API:
-/// VOID_TYPE (const T* enum, INT_TYPE whichCase, UINT_TYPE emptyCases,
+/// VOID_TYPE (const T* enum, UINT_TYPE whichCase, UINT_TYPE emptyCases,
 ///            M *self)
 static llvm::Constant *
 getStoreEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
@@ -849,13 +849,11 @@ void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
 /// The type must be dynamically known to have enum witnesses.
 void irgen::emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
                                              SILType T,
-                                             unsigned tag,
+                                             llvm::Value *tagValue,
                                              Address srcObject) {
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
                                       ValueWitness::DestructiveInjectEnumTag);
-  llvm::Value *tagValue =
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, tag);
   IGF.Builder.CreateCall(fn, {srcObject.getAddress(), tagValue, metadata});
 }
 

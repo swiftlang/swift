@@ -146,6 +146,9 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleProtocolConformanceDescriptor(
                      cast<NormalProtocolConformance>(getProtocolConformance()));
 
+    case Kind::EnumCase:
+      return mangler.mangleEnumCase(getDecl());
+
     case Kind::FieldOffset:
       return mangler.mangleFieldOffset(getDecl());
 

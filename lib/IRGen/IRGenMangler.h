@@ -143,6 +143,13 @@ public:
     return finalize();
   }
 
+  std::string mangleEnumCase(const ValueDecl *Decl) {
+    beginMangling();
+    appendEntity(Decl);
+    appendOperator("WC");
+    return finalize();
+  }
+
   std::string mangleDirectProtocolWitnessTable(const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WP");
   }
