@@ -10,8 +10,23 @@ import TensorFlow
 // file.
 
 
-public func testBatchNormLayer() {
+func testBatchNormLayer() {
   let a = Tensor<Float>([1,2])
   _ = BatchNormalizationLayer<Float>(axis: 0)
   _ = a+a
+}
+
+public struct NN {
+  public var w: Convolution2DLayer<Float>
+
+  @_inlineable
+  public init() {
+    w = Convolution2DLayer<Float>(filterShape: [3, 3, 3, 3],
+                                  strides: (1, 1, 1, 1),
+                                  padding: .same)
+  }
+}
+
+func testConvLayerInInlineable() {
+  _ = NN()
 }
