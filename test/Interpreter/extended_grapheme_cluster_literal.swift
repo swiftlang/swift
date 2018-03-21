@@ -2,6 +2,10 @@
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized
 // REQUIRES: executable_test
+// XFAIL: OS=ios
+// XFAIL: OS=tvos
+// XFAIL: OS=watchos
+// XFAIL: OS=osx
 
 import StdlibUnittest
 
