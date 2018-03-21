@@ -4207,7 +4207,7 @@ public:
 
         // Non-member observing properties need an initializer.
         if (var->getStorageKind() == VarDecl::StoredWithObservers &&
-            !isTypeContext) {
+            !isTypeContext && !var->isInvalid() && !PBD->isInvalid()) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
