@@ -1271,12 +1271,6 @@ public:
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
-      // Handle missing optional requirements.
-      if (entry.getKind() == SILWitnessTable::MissingOptional) {
-        Table.addNullPointer(IGM.Int8PtrTy);
-        return;
-      }
-
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");

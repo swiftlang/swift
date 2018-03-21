@@ -177,7 +177,6 @@ protected:
           break;
 
         case SILWitnessTable::Invalid:
-        case SILWitnessTable::MissingOptional:
         case SILWitnessTable::AssociatedType:
           break;
       }
