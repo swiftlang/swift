@@ -554,8 +554,13 @@ FindClosureResult swift::findClosureForAppliedArg(SILValue V) {
   if (auto *bbi = dyn_cast<BeginBorrowInst>(V))
     V = bbi->getOperand();
 
-  if (V->getType().getOptionalObjectType())
-    V = cast<EnumInst>(V)->getOperand();
+  if (V->getType().getOptionalObjectType()) {
+    auto *EI = dyn_cast<EnumInst>(V);
+    if (!EI || !EI->hasOperand())
+      return FindClosureResult(nullptr, false);
+
+    V = EI->getOperand();
+  }
 
   auto fnType = V->getType().getAs<SILFunctionType>();
   if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Block) {
