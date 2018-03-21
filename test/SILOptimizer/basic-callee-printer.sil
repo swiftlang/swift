@@ -677,7 +677,7 @@ struct SingleConformance : PublicProtocol {
 
 public func testit(p: PublicProtocol)
 
-sil private [transparent] [thunk] @$foo_impl : $@convention(witness_method: PublicProtocol) (@in_guaranteed SingleConformance) -> () {
+sil private [transparent] [thunk] @foo_impl : $@convention(witness_method: PublicProtocol) (@in_guaranteed SingleConformance) -> () {
 bb0(%0 : $*SingleConformance):
   %4 = tuple ()
   return %4 : $()
@@ -689,7 +689,7 @@ bb0(%0 : $*SingleConformance):
 // CHECK-NOWMO: Incomplete callee list? : Yes
 // CHECK-WMO: Incomplete callee list? : Yes
 // CHECK: Known callees:
-sil @$call_foo : $@convention(thin) (@in PublicProtocol) -> () {
+sil @call_foo : $@convention(thin) (@in PublicProtocol) -> () {
 bb0(%0 : $*PublicProtocol):
   %5 = open_existential_addr immutable_access %0 : $*PublicProtocol to $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol
   %6 = witness_method $@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol, #PublicProtocol.foo!1 : <Self where Self : PublicProtocol> (Self) -> () -> (), %5 : $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> ()
@@ -700,6 +700,6 @@ bb0(%0 : $*PublicProtocol):
 }
 
 sil_witness_table hidden SingleConformance: PublicProtocol module nix {
-  method #PublicProtocol.foo!1: <Self where Self : PublicProtocol> (Self) -> () -> () : @$foo_impl
+  method #PublicProtocol.foo!1: <Self where Self : PublicProtocol> (Self) -> () -> () : @foo_impl
 }
 
