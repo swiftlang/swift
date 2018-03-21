@@ -193,22 +193,33 @@ struct OverloadSignature {
   DeclName Name;
 
   /// The kind of unary operator.
-  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+  UnaryOperatorKind UnaryOperator;
 
   /// Whether this is an instance member.
-  bool IsInstanceMember = false;
+  unsigned IsInstanceMember : 1;
 
-  /// Whether this is a property.
-  bool IsProperty = false;
+  /// Whether this is a variable.
+  unsigned IsVariable : 1;
+
+  /// Whether this is a function.
+  unsigned IsFunction : 1;
 
   /// Whether this signature is part of a protocol extension.
-  bool InProtocolExtension = false;
+  unsigned InProtocolExtension : 1;
+
+  OverloadSignature()
+      : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
+        IsVariable(false), IsFunction(false), InProtocolExtension(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
+/// Determine whether two overload signatures and overload types conflict.
+bool conflicting(const OverloadSignature& sig1, CanType sig1Type,
+                 const OverloadSignature& sig2, CanType sig2Type,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
