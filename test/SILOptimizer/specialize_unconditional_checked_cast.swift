@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name specialize_unconditional_checked_cast -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -o - -O %s | %FileCheck %s
 

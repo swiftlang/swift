@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -emit-sil %s | %FileCheck %s
 

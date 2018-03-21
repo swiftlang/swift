@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name specialize_self_conforming -emit-sil -O -primary-file %s | %FileCheck %s
 

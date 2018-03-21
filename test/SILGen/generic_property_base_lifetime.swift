@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name generic_property_base_lifetime -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 

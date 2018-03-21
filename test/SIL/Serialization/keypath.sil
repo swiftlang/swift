@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)

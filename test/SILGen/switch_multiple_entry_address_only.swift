@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name switch_multiple_entry_address_only %s -emit-silgen | %FileCheck %s
 

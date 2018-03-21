@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library -module-name Swift -emit-silgen %s | %FileCheck %s
 

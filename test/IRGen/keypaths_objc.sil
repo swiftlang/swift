@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %utils/chex.py < %s > %t/keypaths_objc.sil

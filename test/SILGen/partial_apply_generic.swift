@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name partial_apply_generic -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

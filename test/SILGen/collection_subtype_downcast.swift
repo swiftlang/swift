@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name collection_subtype_downcast -emit-silgen -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
 

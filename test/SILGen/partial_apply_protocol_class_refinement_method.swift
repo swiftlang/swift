@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name partial_apply_protocol_class_refinement_method -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

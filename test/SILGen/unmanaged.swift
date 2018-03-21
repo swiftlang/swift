@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name unmanaged -enable-sil-ownership -emit-sil %s | %FileCheck %s
 
