@@ -86,16 +86,27 @@ sr590((1, 2))
 
 // SR-2657: Poor diagnostics when function arguments should be '@escaping'.
 private class SR2657BlockClass<T> {
+  // expected-note@-1 {{'T' declared as parameter to type 'SR2657BlockClass'}}
+  // expected-note@-2 {{'T' declared as parameter to type 'SR2657BlockClass'}}
   let f: T
   init(f: T) { self.f = f }
 }
 
-func foo(block: () -> ()) { // expected-note 2 {{parameter 'block' is implicitly non-escaping}}
-  let a = SR2657BlockClass(f: block) // No error
-  let b = SR2657BlockClass<()->()>(f: block)
+func takesAny(_: Any) {}
+
+func foo(block: () -> (), other: () -> Int) { // expected-note 2 {{parameter 'block' is implicitly non-escaping}}
+  let _ = SR2657BlockClass(f: block)
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  let _ = SR2657BlockClass<()->()>(f: block)
   // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
-  let c: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
-  // expected-error@-1 {{cannot convert value of type 'SR2657BlockClass<() -> ()>' to specified type 'SR2657BlockClass<() -> ()>'}}
-  let d: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
+  let _: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  let _: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
   // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
+  _ = SR2657BlockClass<Any>(f: block)  // expected-error{{function produces expected type '()'; did you mean to call it with '()'?}}
+  _ = SR2657BlockClass<Any>(f: other) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
+  takesAny(block)  // expected-error{{function produces expected type '()'; did you mean to call it with '()'?}}
+  takesAny(other) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 }
