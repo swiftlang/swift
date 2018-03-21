@@ -6925,55 +6925,8 @@ public:
       checkAccessControl(TC, EED);
       return;
     }
-    if (EED->hasInterfaceType() || EED->isBeingValidated())
-      return;
-    
-    TC.checkDeclAttributesEarly(EED);
-    TC.validateAccessControl(EED);
 
-    validateAttributes(TC, EED);
-      
-    if (!EED->getArgumentTypeLoc().isNull()) {
-      if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
-                          TypeResolutionFlags::EnumCase)) {
-        EED->setInterfaceType(ErrorType::get(TC.Context));
-        EED->setInvalid();
-        return;
-      }
-    }
-
-    // If we have a raw value, make sure there's a raw type as well.
-    if (auto *rawValue = EED->getRawValueExpr()) {
-      EnumDecl *ED = EED->getParentEnum();
-      if (!ED->hasRawType()) {
-        TC.diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
-        // Recover by setting the raw type as this element's type.
-        Expr *typeCheckedExpr = rawValue;
-        if (!TC.typeCheckExpression(typeCheckedExpr, ED)) {
-          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
-          TC.checkEnumElementErrorHandling(EED);
-        }
-      } else {
-        // Wait until the second pass, when all the raw value expressions
-        // can be checked together.
-      }
-    }
-
-    // Now that we have an argument type we can set the element's declared
-    // type.
-    if (!EED->computeType())
-      return;
-
-    // Require the carried type to be materializable.
-    if (auto argTy = EED->getArgumentInterfaceType()) {
-      assert(!argTy->hasLValueType() && "enum element cannot carry @lvalue");
-      
-      if (!argTy->isMaterializable()) {
-        TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
-        EED->setInterfaceType(ErrorType::get(TC.Context));
-        EED->setInvalid();
-      }
-    }
+    TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
   }
 
@@ -7877,9 +7830,65 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Accessor:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
-  case DeclKind::Destructor:
-  case DeclKind::EnumElement: {
+  case DeclKind::Destructor: {
     typeCheckDecl(D, true);
+    break;
+  }
+  case DeclKind::EnumElement: {
+    auto *EED = cast<EnumElementDecl>(D);
+
+    checkDeclAttributesEarly(EED);
+    validateAccessControl(EED);
+
+    validateAttributes(*this, EED);
+
+    EED->setIsBeingValidated(true);
+
+    if (!EED->getArgumentTypeLoc().isNull()) {
+      if (validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
+                       TypeResolutionFlags::EnumCase)) {
+        EED->setIsBeingValidated(false);
+        EED->setInterfaceType(ErrorType::get(Context));
+        EED->setInvalid();
+        break;
+      }
+    }
+
+    // If we have a raw value, make sure there's a raw type as well.
+    if (auto *rawValue = EED->getRawValueExpr()) {
+      EnumDecl *ED = EED->getParentEnum();
+      if (!ED->hasRawType()) {
+        diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
+        // Recover by setting the raw type as this element's type.
+        Expr *typeCheckedExpr = rawValue;
+        if (!typeCheckExpression(typeCheckedExpr, ED)) {
+          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+          checkEnumElementErrorHandling(EED);
+        }
+      } else {
+        // Wait until the second pass, when all the raw value expressions
+        // can be checked together.
+      }
+    }
+
+    EED->setIsBeingValidated(false);
+
+    // Now that we have an argument type we can set the element's declared
+    // type.
+    if (!EED->computeType())
+      break;
+
+    // Require the carried type to be materializable.
+    if (auto argTy = EED->getArgumentInterfaceType()) {
+      assert(!argTy->hasLValueType() && "enum element cannot carry @lvalue");
+
+      if (!argTy->isMaterializable()) {
+        diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
+        EED->setInterfaceType(ErrorType::get(Context));
+        EED->setInvalid();
+      }
+    }
+
     break;
   }
   }
