@@ -38,6 +38,10 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   // implementation.
   CanType Unimplemented;
 
+  // Always null. Used as a marker for places where there is no join
+  // of two types in our type system.
+  CanType Nonexistent;
+
   // For convenience, TheAnyType from ASTContext;
   CanType TheAnyType;
 
@@ -98,14 +102,13 @@ public:
     if (second->getOptionalObjectType())
       return TypeJoin(first).visit(second);
 
-    // Likewise, rather than making every visitor deal with Any, just
-    // handle it here.
-    // join with Any is always Any
+    // Likewise, rather than making every visitor deal with Any,
+    // always dispatch to the protocol composition side of the join.
     if (first->isAny())
-      return first;
+      return TypeJoin(second).visit(first);
 
     if (second->isAny())
-      return second;
+      return TypeJoin(first).visit(second);
 
     // Otherwise the first type might be an optional (or not), so
     // dispatch there.
@@ -301,14 +304,23 @@ CanType TypeJoin::visitDependentMemberType(CanType second) {
 CanType TypeJoin::visitFunctionType(CanType second) {
   assert(First != second);
 
-  if (First->getKind() != second->getKind())
-    return TheAnyType;
-
-  auto firstFnTy = First->castTo<FunctionType>();
   auto secondFnTy = second->castTo<FunctionType>();
 
+  if (First->getKind() != second->getKind()) {
+    if (secondFnTy->getExtInfo().isNoEscape()) {
+      return Nonexistent;
+    } else {
+      return TheAnyType;
+    }
+  }
+
+  auto firstFnTy = First->castTo<FunctionType>();
+
+  auto firstExtInfo = firstFnTy->getExtInfo();
+  auto secondExtInfo = secondFnTy->getExtInfo();
+
   // FIXME: Properly handle these attributes.
-  if (firstFnTy->getExtInfo() != secondFnTy->getExtInfo())
+  if (firstExtInfo.withNoEscape(false) != secondExtInfo.withNoEscape(false))
     return Unimplemented;
 
   // FIXME: Properly compute parameter types from getParams().
@@ -323,8 +335,12 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (!result)
     return Unimplemented;
 
+  auto extInfo = firstExtInfo;
+  if (secondFnTy->getExtInfo().isNoEscape())
+    extInfo = extInfo.withNoEscape(true);
+
   return FunctionType::get(firstFnTy->getInput(), result,
-                           firstFnTy->getExtInfo())->getCanonicalType();
+                           extInfo)->getCanonicalType();
 }
 
 CanType TypeJoin::visitGenericFunctionType(CanType second) {
@@ -337,8 +353,13 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
 }
 
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
-  if (second->isAny())
+  if (second->isAny()) {
+    auto *fnTy = First->getAs<AnyFunctionType>();
+    if (fnTy && fnTy->getExtInfo().isNoEscape())
+      return Nonexistent;
+
     return second;
+  }
 
   return Unimplemented;
 }
