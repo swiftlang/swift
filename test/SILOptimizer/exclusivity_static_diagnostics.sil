@@ -878,3 +878,14 @@ bb0(%0 : $Int):
   %10 = tuple ()
   return %10 : $()
 }
+
+sil hidden @passNilToNoEscape : $@convention(thin) (Int) -> () {
+bb0( %0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  %4 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.none!enumelt
+  %5 = function_ref @takesInoutAndNoEscapeOptionalBlockClosure : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
+  %6 = apply %5(%3, %4) : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
