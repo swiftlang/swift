@@ -1063,6 +1063,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
   // If the conformance is generic, the accessor takes the metatype plus
   // possible conditional conformances arguments.
   llvm::CallInst *call;
+  bool requiresMemoryArguments = false;
   if (conformance->witnessTableAccessorRequiresArguments()) {
     // Emit the source metadata if we haven't yet.
     if (!*srcMetadataCache) {
@@ -1074,13 +1075,14 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
     call = IGF.Builder.CreateCall(accessor,
                                   {*srcMetadataCache, conditionalTables});
-
+    requiresMemoryArguments = true;
   } else {
     call = IGF.Builder.CreateCall(accessor, {});
   }
 
   call->setCallingConv(IGF.IGM.DefaultCC);
-  call->setDoesNotAccessMemory();
+  if (!requiresMemoryArguments)
+    call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
 
   return call;
