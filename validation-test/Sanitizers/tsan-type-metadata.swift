@@ -1,6 +1,7 @@
 // RUN: %target-swiftc_driver -target %sanitizers-target-triple -sanitize=thread %s -o %t_binary
 // RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %target-run %t_binary
 // REQUIRES: executable_test
+// REQUIRES: stress_test
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
