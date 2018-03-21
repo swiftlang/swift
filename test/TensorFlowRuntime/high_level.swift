@@ -25,8 +25,8 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
   )
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
-  let (_, dParameters) = convLayer.gradient(for: input,
-                                            backpropagating: 1)
+  let (_, _) = convLayer.gradient(for: input,
+                                  backpropagating: Tensor(1).broadcast(to: output))
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5,
@@ -46,7 +46,7 @@ HighLevelTests.testAllBackends("FullyConnectedRelu") {
   let input = Tensor<Float>([[-0.5, 0.5]])
   let output = relu(denseLayer.applied(to: input))
   let (dInput, dParameters) = denseLayer.gradient(for: input,
-                                                  backpropagating: 1)
+                                                  backpropagating: [[1, 1, 1, 1]])
   let dWeight = dParameters.weight
   let dBias = dParameters.bias
   expectEqual(ShapedArray(shape: [1, 4], scalars: [0, 0.5, 0, 1.5]),
