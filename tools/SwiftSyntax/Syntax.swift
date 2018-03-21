@@ -152,6 +152,12 @@ extension Syntax {
     return raw.trailingTrivia
   }
 
+  /// When isImplicit is true, the syntax node doesn't include any
+  /// underlying tokens, e.g. an empty CodeBlockItemList.
+  public var isImplicit: Bool {
+    return leadingTrivia == nil
+  }
+
   /// The textual byte length of this node exluding leading and trailing trivia.
   public var byteSizeAfterTrimmingTrivia: Int {
     return data.byteSize - (leadingTrivia?.byteSize ?? 0) -

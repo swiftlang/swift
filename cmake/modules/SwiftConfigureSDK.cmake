@@ -23,6 +23,9 @@ function(_report_sdk prefix)
     endforeach()
   else()
     message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
+    foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
+      message(STATUS "  ${arch} Path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_PATH}")
+    endforeach()
   endif()
   message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
   message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
@@ -122,6 +125,9 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
   foreach(arch ${architectures})
+    # On Darwin, all archs share the same SDK path.
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${SWIFT_SDK_${prefix}_PATH}")
+
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
         "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endforeach()
@@ -137,8 +143,10 @@ macro(configure_sdk_unix
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
+  # Todo: this only supports building an SDK for one target arch only.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_PATH "${sdkpath}")
+  set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
@@ -186,6 +194,7 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
           "${arch}-unknown-windows-${environment}")
     endif()
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
   endforeach()
 
   # Add this to the list of known SDKs.

@@ -101,27 +101,30 @@ PositionTests.test("Recursion") {
   })
 }
 
-PositionTests.test("Trivias") {
-  expectDoesNotThrow({
-    let leading = Trivia(pieces: [
+func createSourceFile(_ count: Int) -> SourceFileSyntax {
+  let leading = Trivia(pieces: [
       .newlines(1),
       .backticks(1),
       .docLineComment("/// some comment")
       ])
-    let trailing = Trivia.docLineComment("/// This is comment\n")
-    let idx = 5
-    let items : [CodeBlockItemSyntax] =
-      [CodeBlockItemSyntax](repeating: CodeBlockItemSyntax {
-        $0.useItem(ReturnStmtSyntax {
-          $0.useReturnKeyword(
-            SyntaxFactory.makeReturnKeyword(
-              leadingTrivia: leading,
-              trailingTrivia: trailing))
-        })}, count: idx + 1)
-    let root = SyntaxFactory.makeSourceFile(
-      statements: SyntaxFactory.makeCodeBlockItemList(items),
-      eofToken: SyntaxFactory.makeToken(.eof, presence: .present))
+  let trailing = Trivia.docLineComment("/// This is comment\n")
+  let items : [CodeBlockItemSyntax] =
+    [CodeBlockItemSyntax](repeating: CodeBlockItemSyntax {
+      $0.useItem(ReturnStmtSyntax {
+        $0.useReturnKeyword(
+          SyntaxFactory.makeReturnKeyword(
+            leadingTrivia: leading,
+            trailingTrivia: trailing))
+      })}, count: count)
+  return SyntaxFactory.makeSourceFile(
+    statements: SyntaxFactory.makeCodeBlockItemList(items),
+    eofToken: SyntaxFactory.makeToken(.eof, presence: .present))
+}
 
+PositionTests.test("Trivias") {
+  expectDoesNotThrow({
+    let idx = 5
+    let root = createSourceFile(idx + 1)
     expectEqual(root.leadingTrivia!.count, 3)
     expectEqual(root.trailingTrivia!.count, 0)
     let state = root.statements[idx]
@@ -129,6 +132,14 @@ PositionTests.test("Trivias") {
     expectEqual(state.trailingTrivia!.count, 1)
     expectEqual(state.leadingTrivia!.byteSize + state.trailingTrivia!.byteSize
       + state.byteSizeAfterTrimmingTrivia, state.byteSize)
+    expectFalse(root.statements.isImplicit)
+  })
+}
+
+PositionTests.test("Implicit") {
+  expectDoesNotThrow({
+    let root = createSourceFile(0)
+    expectTrue(root.statements.isImplicit)
   })
 }
 
