@@ -304,4 +304,4 @@ protocol P5 {}
 struct SR7101<T> {}
 extension SR7101 : P5 where T == P4Typealias {}
 
-// CHECK: atttributes [[ATTRS]] = { nounwind }
+// CHECK: attributes [[ATTRS]] = { nounwind }
