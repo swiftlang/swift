@@ -106,6 +106,11 @@ namespace {
     ///     live-in values used within the loop (with no SILArgument specified).
     SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
 
+    /// If this graph has any side-effecting operations, this is the most
+    /// recently emitted operation that had side effects.  Otherwise, it is
+    /// null.
+    TF_Operation *controlDependenceValue = nullptr;
+
     /// This is a list of all of the operations that make up this function.
     std::vector<const TF_Operation*> operations;
 
@@ -117,9 +122,23 @@ namespace {
 
     /// "Finish" a tensorflow op under construction, and remember that it is
     /// part of this graph function.
-    TF_Operation *finishOp(TF_OperationDescription *desc, TF_Status *status) {
+    TF_Operation *finishOp(TF_OperationDescription *desc, bool hasSideEffects,
+                           TF_Status *status) {
+
+      // If this node has side effects and we've already emitted another node
+      // that does, make sure to connect them with control dependencies to
+      // preserve ordering.
+      if (hasSideEffects && controlDependenceValue)
+        TF_AddControlInput(desc, controlDependenceValue);
+
       auto result = TF_FinishOperation(desc, status);
       operations.push_back(result);
+
+      // If this op has side effects, remember it in case we need to chain it to
+      // another one later.
+      if (hasSideEffects)
+        controlDependenceValue = result;
+
       return result;
     }
   };
@@ -193,9 +212,13 @@ public:
   /// Note: `name` starts with _, where the name of a graph node cannot start
   /// with _.
   ///
+  /// This sets hasSideEffects to true if the body of the graph had any side
+  /// effecting operations.  This allows calls to the graph to set up control
+  /// dependence edges properly.
+  ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
-                          bool isTopLevelFunction = false);
+                          bool &hasSideEffects,bool isTopLevelFunction = false);
 
 private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
@@ -487,6 +510,12 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   auto *op = TF_NewOperation(graphFn.getGraph(), tfopInfo.opName.str().c_str(),
                              opLocString.c_str());
 
+  // TODO: We compute the "hasSideEffects" bit solely based on whether or not
+  // the op has Resource inputs.  This is a good starting point but is
+  // insufficient.  It would be much nicer to have a TensorFlow C function that
+  // returns the "SetIsStateful" bit from a TF_OperationDescription.
+  bool hasSideEffects = false;
+
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto opInfo = tfopInfo.operandClasses[i];
@@ -540,7 +569,11 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         while (i+1 < e && tfopInfo.operandClasses[i+1].second ==
                                    SILTensorOpInfo::OperandClass::InputElt) {
           auto eltValue = inst->getOperand(++i);
-          assert(isTensorFlowValue(eltValue->getType()) &&
+          auto valueKind = classifyTensorFlowValue(eltValue->getType());
+
+          // Keep track of whether we have any resource inputs.
+          hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+          assert(valueKind != TFValueKind::Nope &&
                  "all op inputs should be TensorFlow values");
           auto opValue = getOperandValue(eltValue);
           if (!opValue.oper) return;  // Error occurred.
@@ -550,7 +583,11 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         break;
       }
 
-      assert(isTensorFlowValue(operand->getType()) &&
+      auto valueKind = classifyTensorFlowValue(operand->getType());
+
+      // Keep track of whether we have any resource inputs.
+      hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+      assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
       if (!opValue.oper) return;  // Error occurred.
@@ -697,8 +734,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
   }
 
-
-  auto *result = graphFn.finishOp(op, status);
+  auto *result = graphFn.finishOp(op, hasSideEffects, status);
 
   // If the node builder failed, then the tfop definition is wrong, report an
   // error in a way that can hopefully be fixed - pointing to the op definition
@@ -849,7 +885,7 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
                              opLocString.c_str());
   TF_AddInput(op, input);
 
-  auto *result = graphFn.finishOp(op, lowering.status);
+  auto *result = graphFn.finishOp(op, /*side effects*/false, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
     return { nullptr, 0 };
   return { result, 0 };
@@ -997,13 +1033,15 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     inputTypes.push_back(getTensorFlowDataType(ty, input.value.first.getLoc()));
   }
 
+  bool hasSideEffects = false;
+
   // Create TF_Function's for our condition and body.
   auto loc = headerBr->getDebugLocation();
   auto loopBodyFnName = getUniqueName(loc, "whilebody");
-  if (buildGraphFunction(loopBodyFn, loopBodyFnName))
+  if (buildGraphFunction(loopBodyFn, loopBodyFnName, hasSideEffects))
     return;
   auto condFnName = getUniqueName(loc, "whilecond");
-  if (buildGraphFunction(condFn, condFnName))
+  if (buildGraphFunction(condFn, condFnName, hasSideEffects))
     return;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -1024,7 +1062,7 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   TF_SetAttrFuncName(op, "body",  loopBodyFnName.c_str(),
                      loopBodyFnName.size());
 
-  auto *result = graphFn.finishOp(op, status);
+  auto *result = graphFn.finishOp(op, hasSideEffects, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return;
 
@@ -1180,12 +1218,14 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     }
   }
 
+  bool hasSideEffects = false;
+
   // Create the graph functions for the true/false code.
   auto trueFnName = getUniqueName(loc, "true");
-  if (buildGraphFunction(trueCodeFn, trueFnName))
+  if (buildGraphFunction(trueCodeFn, trueFnName, hasSideEffects))
     return;
   auto falseFnName = getUniqueName(loc, "false");
-  if (buildGraphFunction(falseCodeFn, falseFnName))
+  if (buildGraphFunction(falseCodeFn, falseFnName, hasSideEffects))
     return;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -1211,7 +1251,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   TF_SetAttrFuncName(op, "else_branch",  falseFnName.c_str(),
                      falseFnName.size());
 
-  auto *result = graphFn.finishOp(op, status);
+  auto *result = graphFn.finishOp(op, hasSideEffects, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return;
 
@@ -1260,7 +1300,7 @@ createParameter(SILOpResult value, TF_Output passedValue,
   }
   TF_SetAttrType(desc, "dtype", type);
 
-  auto result = fn.finishOp(desc, status);
+  auto result = fn.finishOp(desc, /*side effects*/false, status);
   if (checkStatus(loc))
     return { nullptr, 0 };
 
@@ -1325,10 +1365,13 @@ lowerToFunction(const std::function<void()> &body) {
 ///
 /// This emits an error and returns true on error.
 bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
-                                         StringRef name,
+                                         StringRef name, bool &hasSideEffects,
                                          bool isTopLevelFunction) {
   if (errorOccurred)
     return true;
+
+  // Inform our callers whether this function contains side effects or not.
+  hasSideEffects = graphBody.controlDependenceValue != nullptr;
 
   SmallVector<TF_Output, 4> ins, outs;
   ins.reserve(graphBody.inputs.size());
@@ -1452,7 +1495,10 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   auto fnName = graphGen.SILFn->getName();
   if (fnName.startswith("$"))
     fnName = fnName.substr(1);
-  if (graphGen.buildGraphFunction(graphFnBody, fnName, /*isTopLevelFunction*/true))
+
+  bool hasSideEffects = false;
+  if (graphGen.buildGraphFunction(graphFnBody, fnName, hasSideEffects,
+                                  /*isTopLevelFunction*/true))
     return {};
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.
