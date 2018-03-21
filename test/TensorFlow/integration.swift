@@ -130,7 +130,7 @@ public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
   // expected-warning @+1 {{implicitly copied to the accelerator}}
-  if i == 0 { 
+  if i == 0 {
     return
   }
 
@@ -379,4 +379,48 @@ public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
  // [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
  // %53 = apply [[FINISHFN]]({{.*}}, [[RESULTMP]], {{.*}}) : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
 */
+
+/// This tests some operations using resources and variants.
+public func testResourceAndVariants() {
+  let values = Tensor<Float>([1,2,3,4,5,6])
+
+  // REGISTER_OP("TensorDataset")
+  //     .Input("components: Toutput_types")
+  //     .Output("handle: variant")
+  //     .Attr("Toutput_types: list(type) >= 1")
+  //     .Attr("output_shapes: list(shape) >= 1")
+
+  // FIXME: We don't support TensorShape attributes or lists thereof yet.  We also
+  // don't handle lists of types.
+  let dataset: VariantHandle =
+    // expected-error @+1 {{Op type not registered 'TensorDataSet'}}
+    #tfop("TensorDataSet", values/*, Toutput_types: [Float.self],
+          output_shapes: [TensorShape(1)]*/)
+
+  // REGISTER_OP("Iterator")
+  //     .Output("handle: resource")
+  //     .Attr("shared_name: string")
+  //     .Attr("container: string")
+  //     .Attr("output_types: list(type) >= 1")
+  //     .Attr("output_shapes: list(shape) >= 1")
+  //     .SetShapeFn(shape_inference::ScalarShape);
+  let iterator: ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar"/*,
+          output_types: [Float.self], output_shapes: TensorShape(1)*/)
+
+  // REGISTER_OP("MakeIterator")
+  //     .Input("dataset: variant")
+  //     .Input("iterator: resource")
+  //     .SetShapeFn(shape_inference::NoOutputs);
+  () = #tfop("MakeIterator", dataset, iterator)
+}
+
+/*
+CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
+CHECK:  [[values:%.*]] = builtin "__tfop_Const,value$tensor,$elt,$elt,$elt,$elt,$elt,$elt,shape$shape,$elt,dtype"(
+CHECK:  [[dataset:%.*]] = builtin "__tfop_TensorDataSet,$in"([[values]] : $TensorHandle<Float>) : $VariantHandle
+CHECK:  [[iterator:%.*]] = builtin "__tfop_Iterator,shared_name,container"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.RawPointer) : $ResourceHandle // user: %15
+CHECK:  builtin "__tfop_MakeIterator,$in,$in"([[dataset]] : $VariantHandle, [[iterator]] : $ResourceHandle) : $()
+ */
+
 

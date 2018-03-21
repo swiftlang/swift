@@ -32,6 +32,14 @@ namespace tf {
   /// "T".  If not, return a null type.
   bool isTensorHandle(SILType ty);
 
+  /// Determine whether the specified type is one of our well-known types, and
+  /// if so, which one it is.
+  TFValueKind classifyTensorFlowValue(SILType ty);
+
+  /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+  /// VariantHandle.
+  bool isTensorFlowValue(SILType ty);
+
   /// This function maps a Swift type (either a language type like Float or an
   /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
   unsigned convertSwiftTypeToTF(Type ty);
@@ -183,7 +191,7 @@ namespace tf {
   /// exposed after deabstraction.  This is a class instead of a simple function
   /// because we memoize state to avoid rechecking types over and over again.
   class TensorFunctionClassifier {
-    TypeContainsTensorHandle tcth;
+    TypeContainsTensorFlowValue tctfc;
   public:
     TensorFunctionClassifier() {}
 
@@ -194,21 +202,21 @@ namespace tf {
     /// clients that use them.
     bool shouldBePartitioned(SILFunction *fn);
 
-    /// Return true if the specified function type has TensorHandle's in its
+    /// Return true if the specified function type has TensorFlow values in its
     /// argument or result list, even if they are abstracted by structs or
     /// tuples.
-    bool containsTensorHandle(CanSILFunctionType fnType);
+    bool containsTensorFlowValue(CanSILFunctionType fnType);
 
-    /// Return true if the specified type contains a TensorHandle that will be
-    /// exposed after deabstraction.
-    bool containsTensorHandle(Type ty) {
-      return tcth.containsTensorHandle(ty);
+    /// Return true if the specified type contains a TensorFlow value type that
+    /// will be exposed after deabstraction.
+    bool containsTensorFlowValue(Type ty) {
+      return tctfc.containsTensorFlowValue(ty);
     }
 
-    /// Return true if the specified type contains a TensorHandle that will be
-    /// exposed after deabstraction.
-    bool containsTensorHandle(SILType ty) {
-      return containsTensorHandle(ty.getSwiftRValueType());
+    /// Return true if the specified type contains a TensorFlow value type that
+    /// will be exposed after deabstraction.
+    bool containsTensorFlowValue(SILType ty) {
+      return containsTensorFlowValue(ty.getSwiftRValueType());
     }
 
   };
