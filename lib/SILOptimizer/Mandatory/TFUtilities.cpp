@@ -92,6 +92,18 @@ bool tf::isTensorHandle(SILType ty) {
   return (bool)isTensorHandle(ty.getSwiftRValueType());
 }
 
+/// Determine whether the specified type is one of our well-known types, and
+/// if so, which one it is.
+TFValueKind tf::classifyTensorFlowValue(SILType ty) {
+  return classifyTensorFlowValue(ty.getSwiftRValueType());
+}
+
+/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+/// VariantHandle.
+bool tf::isTensorFlowValue(SILType ty) {
+  return (bool)isTensorFlowValue(ty.getSwiftRValueType());
+}
+
 /// If the specified type conforms to the TensorProtocol protocol, return the
 /// Scalar type for it.  Otherwise return a null type.
 static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
@@ -983,8 +995,8 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
     switch (opClass.second) {
     case OperandClass::Input: {
       auto opTy = operand->getType();
-      // TensorHandle and metatype inputs are ok.
-      if (isTensorHandle(opTy) || opTy.is<MetatypeType>())
+      // TensorFloat values and metatype inputs are ok.
+      if (isTensorFlowValue(opTy) || opTy.is<MetatypeType>())
         break;
 
       // If this is an Array of TensorHandle or TensorProtocol we're good.
@@ -1453,7 +1465,7 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   // takes TensorHandle values as arguments or results.  If so, then we know
   // that it will be inlined away by deabstraction, and we don't need to touch
   // it.
-  if (containsTensorHandle(fn->getLoweredFunctionType()))
+  if (containsTensorFlowValue(fn->getLoweredFunctionType()))
     return false;
 
   // If it contains no tensor inputs or results, then we are willing to
@@ -1464,13 +1476,14 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
 /// Return true if the specified function type has TensorHandle's in its
 /// argument or result list, even if they are abstracted by structs or
 /// tuples.
-bool TensorFunctionClassifier::containsTensorHandle(CanSILFunctionType fnType) {
+bool TensorFunctionClassifier::
+containsTensorFlowValue(CanSILFunctionType fnType) {
   for (auto &result : fnType->getResults())
-    if (containsTensorHandle(result.getType()))
+    if (containsTensorFlowValue(result.getType()))
       return true;
 
   for (auto &param : fnType->getParameters())
-    if (containsTensorHandle(param.getType()))
+    if (containsTensorFlowValue(param.getType()))
       return true;
 
   return false;

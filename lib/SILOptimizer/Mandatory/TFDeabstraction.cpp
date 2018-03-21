@@ -179,7 +179,7 @@ void TFDeabstraction::inlineCalls() {
       for (auto &bb : fn)
         for (auto &i : bb)
           if (auto *inst = dyn_cast<GlobalAddrInst>(&i)) {
-            if (tfc.containsTensorHandle(inst->getType().getSwiftRValueType()))
+            if (tfc.containsTensorFlowValue(inst->getType()))
               return true;
           }
       return false;
@@ -219,9 +219,9 @@ void TFDeabstraction::inlineCalls() {
     // at the call site.
     auto type = site.getSubstCalleeType();
 
-    // If the call we found is to something that processes TensorHandles,
+    // If the call we found is to something that processes TensorFlow values,
     // then we want it inlined.
-    if (!tfc.containsTensorHandle(type))
+    if (!tfc.containsTensorFlowValue(type))
       return false;
 
     // Recognize that we're about to change this function.
@@ -230,7 +230,7 @@ void TFDeabstraction::inlineCalls() {
   };
 
   // Use the mandatory inlining algorithm to expose call sites that contain
-  // TensorHandle values as their argument or result lists.
+  // TensorFlow values as their argument or result lists.
   inlineForTFDeabstraction(fn,
      [&](FullApplySite site, const SILFunction &callee) -> bool {
        if (!shouldInline(site))
@@ -358,16 +358,16 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   inst->replaceAllUsesPairwiseWith(newInst);
 
   // Remove the StructInst and other random values that we leave around in the
-  // program, now that we directly refer to the TensorHandle values.
+  // program, now that we directly refer to the TensorFlow values.
   deleteInstAndAbandonedUses(inst);
   return newInst;
 }
 
 /// If the specified instruction is an high-level aggregate operation like
 /// copy_addr or destroy_addr, and if it is working on a type that contains a
-/// TensorHandle, break it down into its more primitive operations and return
-/// true.  Otherwise, return false.  This leaves the input instruction in place
-/// and inserts the additional instructions immediately after the input
+/// TensorFlow value, break it down into its more primitive operations and
+/// return true.  Otherwise, return false.  This leaves the input instruction in
+/// place and inserts the additional instructions immediately after the input
 /// instruction that is exploded.
 static bool explodeAggregateInst(SILInstruction *inst,
                                  TensorFunctionClassifier &tfc) {
@@ -382,9 +382,9 @@ static bool explodeAggregateInst(SILInstruction *inst,
     return false;
 
   // Check to make sure that this operation is doing something on a value
-  // containing a TensorHandle.  If not, just leave it alone.
+  // containing a TensorFlow value.  If not, just leave it alone.
   auto type = inst->getOperand(0)->getType();
-  if (!tfc.containsTensorHandle(type))
+  if (!tfc.containsTensorFlowValue(type))
     return false;
 
   // TODO: This is currently just handling loadable types.  We should be able to
@@ -498,18 +498,18 @@ void TFDeabstraction::simplifyTensorOperands() {
         }
       }
 
-      // Find retain and release instructions that directly use TensorHandle
+      // Find retain and release instructions that directly use TensorFlow
       // values.  We treat them as tensorOps to ensure that their operands are
       // deabstracted.
       if (isa<StrongRetainInst>(inst) || isa<StrongReleaseInst>(inst)) {
-        if (isTensorHandle(inst->getOperand(0)->getType())) {
+        if (isTensorFlowValue(inst->getOperand(0)->getType())) {
           tensorOps.push_back(inst);
           continue;
         }
       }
 
       // Check to see if this is an aggregate operation (like a copy_addr, a
-      // retain or release, etc) that involves a TensorHandle value.  If so,
+      // retain or release, etc) that involves a TensorFlow value.  If so,
       // explode it out into its components and reprocess the components.  This
       // ensures that nothing later in deabstraction or partitioning have to
       // worry about them.
@@ -878,7 +878,7 @@ promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
   }
 }
 
-/// Scan the function looking for TensorHandle AllocStack instructions to
+/// Scan the function looking for TensorFlow value AllocStack instructions to
 /// promote.
 void TFDeabstraction::promoteToSSA(MutableArrayRef<AllocStackInst*> allocs) {
   // If there is nothing to promote, don't bother calculating dominator info.
@@ -1167,7 +1167,8 @@ propagateTensorOperand(SILValue v,
 
 /// Propagate the operand values for all tensors: this ensures that all tensor
 /// operands and results are directly linked together in the SSA graph at the
-/// TensorHandle level, without going through intervening struct/tuple wrappers.
+/// TensorFlow value level, without going through intervening struct/tuple
+/// wrappers.
 void TFDeabstraction::propagateTensorValues() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorValues");
 
@@ -1441,11 +1442,11 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
       // Dump anything that might be an attribute into the list without too much
-      // filtering.  We take out tensor values since they are the most obvious
-      // ones we don't care about later, but there may be other minor things we
-      // over-query on.
+      // filtering.  We take out TensorFlow values since they are the most
+      // obvious ones we don't care about later, but there may be other minor
+      // things we over-query on.
       auto value = operand.get();
-      if (!isTensorHandle(value->getType()))
+      if (!isTensorFlowValue(value->getType()))
         valuesToCheck.push_back({value, 0});
     }
   }
@@ -1581,7 +1582,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
 ///
 /// We currently make use of the following techniques to do this:
 ///   1) Inlining.  We look for direct calls to functions that take and return
-///      values of TensorHandle type, possibly wrapped by structs and tuples.
+///      values of TensorFlow values, possibly wrapped by structs and tuples.
 ///   2) Promotion of globals to stack allocations for Playgrounds, REPL, and
 ///      top level code in scripts.
 ///   3) SSA Promotion of stack values to registers.
