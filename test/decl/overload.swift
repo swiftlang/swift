@@ -149,8 +149,15 @@ func ovl_generic3<T : P2>(_ x: T) {} // OK
 struct X { }
 struct Y { }
 struct Z { 
-  var a : X, // expected-note{{previously declared here}}
-  a : Y // expected-error{{invalid redeclaration of 'a'}}
+  var a : X
+  // expected-note@-1{{previously declared here}}
+  // expected-note@-2{{previously declared here}}
+
+  var a : Y // expected-error{{invalid redeclaration of 'a'}}
+}
+
+extension Z {
+  var a: Int { return 0 } // expected-error{{invalid redeclaration of 'a'}}
 }
 
 struct X1 {
@@ -166,6 +173,29 @@ struct X3 {
   func f(a : Int) {} // expected-note{{previously declared here}}
   func f(a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
   typealias IntAlias = Int
+}
+struct X4 {
+  typealias i = Int
+  // expected-note@-1 {{previously declared}}
+  // expected-note@-2 {{previously declared}}
+
+  static var i: String { return "" } // expected-error{{invalid redeclaration of 'i'}}
+  static func i() {} // expected-error{{invalid redeclaration of 'i()'}}
+
+  var i: Int { return 0 }
+  func i(x: String) {}
+}
+
+// Generic Placeholders
+struct X5<t, u, v> {
+  static var t: Int { return 0 }
+  static func u() {}
+  typealias v = String
+
+  func foo<t>(_ t: t) {
+    let t = t
+    _ = t
+  }
 }
 
 // Subscripting
@@ -191,12 +221,25 @@ struct Subscript2 {
   subscript (a: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript'}}
     get { return a }
   }
+
+  var `subscript`: Int { return 0 }
+}
+
+struct Subscript3 {
+  typealias `subscript` = Int // expected-note{{previously declared here}}
+  static func `subscript`(x: Int) -> String { return "" } // expected-error{{invalid redeclaration of 'subscript(x:)'}}
+
+  func `subscript`(x: Int) -> String { return "" }
+  subscript(x x: Int) -> String { return "" }
 }
 
 // Initializers
 class Initializers {
   init(x: Int) { } // expected-note{{previously declared here}}
   convenience init(x: Int) { } // expected-error{{invalid redeclaration of 'init(x:)'}}
+
+  static func `init`(x: Int) -> Initializers { fatalError() }
+  func `init`(x: Int) -> Initializers { fatalError() }
 }
 
 // Default arguments
@@ -300,6 +343,26 @@ enum EnumWithMutating {
   func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
 }
 
+protocol ProtocolWithAssociatedTypes {
+  associatedtype t
+  // expected-note@-1 {{previously declared}}
+  // expected-note@-2 {{previously declared}}
+
+  static var t: Int { get } // expected-error{{invalid redeclaration of 't'}}
+  static func t() // expected-error{{invalid redeclaration of 't()'}}
+
+  associatedtype u
+  associatedtype v
+
+  // instance requirements are fine.
+  var t: Int { get }
+  func u()
+  mutating func v()
+
+  associatedtype W
+  func foo<W>(_ x: W)
+}
+
 // <rdar://problem/21783216> Ban members named Type and Protocol without backticks
 // https://twitter.com/jadengeller/status/619989059046240256
 protocol r21783216a {
@@ -317,5 +380,59 @@ protocol r21783216b {
   associatedtype `Protocol` // ok
 }
 
+struct SR7249<T> {
+  var x: T { fatalError() } // expected-note {{previously declared}}
+  var y: Int // expected-note {{previously declared}}
+  var z: Int // expected-note {{previously declared}}
+}
+
+extension SR7249 {
+  var x: Int { fatalError() } // expected-error{{invalid redeclaration of 'x'}}
+  var y: T { fatalError() } // expected-error{{invalid redeclaration of 'y'}}
+  var z: Int { fatalError() } // expected-error{{invalid redeclaration of 'z'}}
+}
+
+// A constrained extension is okay.
+extension SR7249 where T : P1 {
+  var x: Int { fatalError() }
+  var y: T { fatalError() }
+  var z: Int { fatalError() }
+}
+
+protocol P3 {
+  var i: Int { get }
+  subscript(i: Int) -> String { get }
+}
+
+extension P3 {
+  var i: Int { return 0 }
+  subscript(i: Int) -> String { return "" }
+}
+
+struct SR7250<T> : P3 {}
+
+extension SR7250 where T : P3 {
+  var i: Int { return 0 }
+  subscript(i: Int) -> String { return "" }
+}
+
+struct SR7251 {
+  static var i: Int { return 0 } // expected-note {{previously declared here}}
+  struct i {} // expected-error {{invalid redeclaration of 'i'}}
+}
+
+extension SR7251 {
+  static var j: Int { return 0 } // expected-note {{previously declared here}}
+  struct j {} // expected-error {{invalid redeclaration of 'j'}}
+}
+
+struct SR7251_generic<T> {
+  static var i: Int { return 0 } // expected-note {{previously declared here}}
+  struct i {} // expected-error {{invalid redeclaration of 'i'}}
+}
+extension SR7251_generic {
+  static var j: Int { return 0 } // expected-note {{previously declared here}}
+  struct j {} // expected-error {{invalid redeclaration of 'j'}}
+}
 
 
