@@ -362,7 +362,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       strides: strides,
       padding: padding,
       partial: primalValues.result,
-      seed: adjoint.broadcast(to: primalValues.result)
+      seed: adjoint
     )
     return (dInput, Parameters(filter: dFilter))
   }
@@ -438,8 +438,10 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     // compiler synthesized.
     @_inlineable @inline(__always)
     public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
-      self.weight = Tensor<Scalar>(shape: other.weight.shape, repeating: value)
-      self.bias = Tensor<Scalar>(shape: other.bias.shape, repeating: value)
+      self.weight = Tensor<Scalar>(shape: other.weight.shape,
+                                   repeating: value).toDevice()
+      self.bias = Tensor<Scalar>(shape: other.bias.shape,
+                                 repeating: value).toDevice()
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -504,12 +506,11 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     with primalValues: DifferentiationPrimalValues,
     backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
-    // NOTE: proper AD would require an `unbroadcast` op for _adjointAdd. There
-    // is a manual workaround here.
-    let dot = primalValues.dot
-    let dBias = adjoint.broadcast(to: bias)
-    let dDot = adjoint.broadcast(to: dot)
-    let (dInput, dWeight) = input._adjointDot(weight, partial: dot, seed: dDot)
+    let (dDot, dBias) = Tensor._adjointAdd(primalValues.dot, bias,
+                                           partial: primalValues.result,
+                                           seed: adjoint)
+    let (dInput, dWeight) = input._adjointDot(weight, partial: primalValues.dot,
+                                              seed: dDot)
     return (dInput, Parameters(weight: dWeight, bias: dBias))
   }
 }
@@ -602,8 +603,10 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     // compiler synthesized.
     @_inlineable @inline(__always)
     public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
-      self.offset = Tensor<Scalar>(shape: other.offset.shape, repeating: value)
-      self.scale = Tensor<Scalar>(shape: other.scale.shape, repeating: value)
+      self.offset = Tensor<Scalar>(shape: other.offset.shape,
+                                   repeating: value).toDevice()
+      self.scale = Tensor<Scalar>(shape: other.scale.shape,
+                                  repeating: value).toDevice()
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -669,9 +672,6 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     with primalValues: DifferentiationPrimalValues,
     backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
-    // NOTE: Adjoint is manually broadcasted to correct shape. AD should do this
-    // automatically when implemented.
-    let adjoint = adjoint.broadcast(to: primalValues.result)
     let (dInput, dOffset, dScale) = input._adjointBatchNormalized(
       alongAxis: axis, offset: offset, scale: scale, epsilon: epsilon,
       partial: primalValues.result, seed: adjoint
