@@ -85,6 +85,9 @@ NOTE(note_typo_candidate,none,
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
 
+ERROR(generic_signature_not_minimal,none,
+      "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

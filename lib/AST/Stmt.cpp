@@ -404,7 +404,8 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 #ifndef NDEBUG
   for (auto N : Cases)
     assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && isa<IfConfigDecl>(N.get<Decl*>())));
+           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
+                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
 #endif
 
   void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),

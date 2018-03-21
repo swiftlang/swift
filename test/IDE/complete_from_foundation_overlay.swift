@@ -11,7 +11,7 @@ import Foundation
 // REQUIRES: objc_interop
 
 // NO_STDLIB_PRIVATE: Begin completions
-// NO_STDLIB_PRIVATE-NOT: _convertStringToNSString
+// NO_STDLIB_PRIVATE-NOT: _convertErrorToNSError
 // NO_STDLIB_PRIVATE: End completions
 
 #^PLAIN_TOP_LEVEL_1^#

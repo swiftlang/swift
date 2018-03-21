@@ -39,6 +39,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenFunc.h"
@@ -53,18 +54,11 @@
 #include "HeapTypeInfo.h"
 #include "MemberAccessStrategy.h"
 #include "MetadataLayout.h"
+#include "MetadataRequest.h"
 
 
 using namespace swift;
 using namespace irgen;
-
-static ClassDecl *getRootClass(ClassDecl *theClass) {
-  while (theClass->hasSuperclass()) {
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
-    assert(theClass && "base type of class not a class?");
-  }
-  return theClass;
-}
 
 /// What reference counting mechanism does a class-like type have?
 ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
@@ -85,21 +79,6 @@ ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
 
   // Otherwise, it could be either one.
   return ReferenceCounting::Unknown;
-}
-
-/// What isa encoding mechanism does a type have?
-IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
-                                         CanType type) {
-  if (auto theClass = type->getClassOrBoundGenericClass()) {
-    // We can access the isas of pure Swift classes directly.
-    if (getRootClass(theClass)->hasKnownSwiftImplementation())
-      return IsaEncoding::Pointer;
-    // For ObjC or mixed classes, we need to use object_getClass.
-    return IsaEncoding::ObjC;
-  }
-  // Non-class heap objects should be pure Swift, so we can access their isas
-  // directly.
-  return IsaEncoding::Pointer;
 }
 
 namespace {
@@ -739,9 +718,10 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   return Alloca.getAddress();
 }
 
-llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
-                                                     llvm::Value *size,
-                                                     TailArraysRef TailArrays) {
+std::pair<llvm::Value *, llvm::Value *>
+irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                    llvm::Value *size, llvm::Value *alignMask,
+                                    TailArraysRef TailArrays) {
   for (const auto &TailArray : TailArrays) {
     SILType ElemTy = TailArray.first;
     llvm::Value *Count = TailArray.second;
@@ -750,16 +730,17 @@ llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
 
     // Align up to the tail-allocated array.
     llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
-    llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
-    size = IGF.Builder.CreateAdd(size, AlignMask);
-    llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+    llvm::Value *ElemAlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+    size = IGF.Builder.CreateAdd(size, ElemAlignMask);
+    llvm::Value *InvertedMask = IGF.Builder.CreateNot(ElemAlignMask);
     size = IGF.Builder.CreateAnd(size, InvertedMask);
 
     // Add the size of the tail allocated array.
     llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
     size = IGF.Builder.CreateAdd(size, AllocSize);
+    alignMask = IGF.Builder.CreateOr(alignMask, ElemAlignMask);
   }
-  return size;
+  return {size, alignMask};
 }
 
 
@@ -800,7 +781,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
   } else {
     // Allocate the object on the heap.
-    size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+    std::tie(size, alignMask)
+      = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
@@ -823,7 +805,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+  std::tie(size, alignMask)
+    = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
@@ -1943,7 +1926,7 @@ namespace {
       if (!prop->isSettable(prop->getDeclContext()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
-      else if (prop->getAttrs().hasAttribute<OwnershipAttr>())
+      else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
         outs << ",W";
       // If the property is @NSCopying, or is bridged to a value class, the
       // property is (copy).
@@ -2327,4 +2310,157 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 
   auto &layout = selfTI.getClassLayout(IGM, selfType);
   return layout.MetadataRequiresDynamicInitialization;
+}
+
+bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
+  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
+    return hasKnownSwiftMetadata(IGM, theClass);
+  }
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    if (auto superclass = archetype->getSuperclass()) {
+      return hasKnownSwiftMetadata(IGM, superclass->getCanonicalType());
+    }
+  }
+
+  // Class existentials, etc.
+  return false;
+}
+
+/// Is the given class known to have Swift-compatible metadata?
+bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
+  // For now, the fact that a declaration was not implemented in Swift
+  // is enough to conclusively force us into a slower path.
+  // Eventually we might have an attribute here or something based on
+  // the deployment target.
+  return theClass->hasKnownSwiftImplementation();
+}
+
+/// Given a reference to class metadata of the given type,
+/// load the fragile instance size and alignment of the class.
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                                ClassDecl *theClass,
+                                                llvm::Value *metadata) {
+  // FIXME: The below checks should capture this property already, but
+  // resilient class metadata layout is not fully implemented yet.
+  auto superClass = theClass;
+  do {
+    if (superClass->getParentModule() != IGF.IGM.getSwiftModule()) {
+      return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass,
+                                                        metadata);
+    }
+  } while ((superClass = superClass->getSuperclassDecl()));
+
+  // If the class has fragile fixed layout, return the constant size and
+  // alignment.
+  if (llvm::Constant *size
+        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
+    llvm::Constant *alignMask
+      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
+    assert(alignMask && "static size without static align");
+    return {size, alignMask};
+  }
+ 
+  // Otherwise, load it from the metadata.
+  return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                                  ClassDecl *theClass,
+                                                  llvm::Value *metadata) {
+  auto &layout = IGF.IGM.getClassMetadataLayout(theClass);
+
+  Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
+                          IGF.IGM.getPointerAlignment());
+
+  Address slot = IGF.Builder.CreateConstByteArrayGEP(
+      metadataAsBytes,
+      layout.getInstanceSizeOffset());
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  llvm::Value *size = IGF.Builder.CreateLoad(slot);
+  if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
+    size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
+
+  slot = IGF.Builder.CreateConstByteArrayGEP(
+      metadataAsBytes,
+      layout.getInstanceAlignMaskOffset());
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
+  alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
+
+  return {size, alignMask};
+}
+
+FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                                              llvm::Value *metadata,
+                                              SILDeclRef method,
+                                              CanSILFunctionType methodType) {
+  Signature signature = IGF.IGM.getSignature(methodType);
+
+  auto classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  // Find the vtable entry we're interested in.
+  auto methodInfo =
+    IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
+  auto offset = methodInfo.getOffset();
+
+  auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                      signature.getType()->getPointerTo(),
+                                      IGF.IGM.getPointerAlignment());
+  auto fnPtr = IGF.emitInvariantLoad(slot);
+
+  return FunctionPointer(fnPtr, signature);
+}
+
+FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                                              llvm::Value *base,
+                                              SILType baseType,
+                                              SILDeclRef method,
+                                              CanSILFunctionType methodType,
+                                              bool useSuperVTable) {
+  AbstractFunctionDecl *methodDecl
+    = cast<AbstractFunctionDecl>(method.getDecl());
+
+  // Find the vtable entry for this method.
+  SILDeclRef overridden = method.getOverriddenVTableEntry();
+
+  // Find the metadata.
+  llvm::Value *metadata;
+  if (useSuperVTable) {
+    auto instanceTy = baseType;
+    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
+      instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
+
+    if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
+                            ResilienceExpansion::Maximal)) {
+      // The derived type that is making the super call is resilient,
+      // for example we may be in an extension of a class outside of our
+      // resilience domain. So, we need to load the superclass metadata
+      // dynamically.
+
+      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+      auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+      metadata = IGF.Builder.CreateLoad(superField);
+    } else {
+      // Otherwise, we can directly load the statically known superclass's
+      // metadata.
+      auto superTy = instanceTy.getSuperclass();
+      metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+    }
+  } else {
+    if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
+        (isa<ConstructorDecl>(methodDecl) &&
+         method.kind == SILDeclRef::Kind::Allocator)) {
+      metadata = base;
+    } else {
+      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
+                                                  /*suppress cast*/ true);
+    }
+  }
+
+  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
 }

@@ -56,6 +56,6 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
       CheckResults(result == arrayCount)
     }
   }
-  a.deallocate(capacity: arrayCount)
+  a.deallocate()
 }
 

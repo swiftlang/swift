@@ -141,6 +141,8 @@ DeclBaseName SerializedSwiftName::toDeclBaseName(ASTContext &Context) const {
     return Context.getIdentifier(Name);
   case DeclBaseName::Kind::Subscript:
     return DeclBaseName::createSubscript();
+  case DeclBaseName::Kind::Constructor:
+    return DeclBaseName::createConstructor();
   case DeclBaseName::Kind::Destructor:
     return DeclBaseName::createDestructor();
   }
@@ -822,6 +824,9 @@ void SwiftLookupTable::dump() const {
     case DeclBaseName::Kind::Subscript:
       llvm::errs() << "  subscript:\n";
       break;
+    case DeclBaseName::Kind::Constructor:
+      llvm::errs() << "  init:\n";
+      break;
     case DeclBaseName::Kind::Destructor:
       llvm::errs() << "  deinit:\n";
       break;
@@ -1237,6 +1242,10 @@ namespace {
       }
       case (uint8_t)DeclBaseName::Kind::Subscript:
         return SerializedSwiftName(DeclBaseName::Kind::Subscript);
+      case (uint8_t)DeclBaseName::Kind::Constructor:
+        return SerializedSwiftName(DeclBaseName::Kind::Constructor);
+      case (uint8_t)DeclBaseName::Kind::Destructor:
+        return SerializedSwiftName(DeclBaseName::Kind::Destructor);
       default:
         llvm_unreachable("Unknown kind for DeclBaseName");
       }

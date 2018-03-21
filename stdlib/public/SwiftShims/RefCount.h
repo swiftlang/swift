@@ -192,8 +192,7 @@ namespace swift {
 
 // FIXME: HACK: copied from HeapObject.cpp
 extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_release_dealloc(swift::HeapObject *object)
-SWIFT_CC(RegisterPreservingCC_IMPL);
+void _swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
 
@@ -974,6 +973,18 @@ class RefCounts {
       return bits.getSideTable()->isDeiniting();
     else
       return bits.getIsDeiniting();
+  }
+
+  bool hasSideTable() const {
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    return bits.hasSideTable();
+  }
+
+  void *getSideTable() const {
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (!bits.hasSideTable())
+      return nullptr;
+    return bits.getSideTable();
   }
 
   /// Return true if the object can be freed directly right now.

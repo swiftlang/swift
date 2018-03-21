@@ -203,14 +203,12 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
   CanType OptionalTy;
-  OptionalTypeKind OTK;
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
     InOutOptionalParam = Tmp;
@@ -219,8 +217,14 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   (void)ParamTypes;
-  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
-         "Parameter should be @owned");
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    assert(ParamTypes[0].getConvention() ==
+               ParameterConvention::Direct_Guaranteed &&
+           "Parameter should be @owned");
+  } else {
+    assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
+           "Parameter should be @owned");
+  }
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -233,6 +237,13 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
 
   auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
+
+  // If we have guaranteed normal arguments, insert the destroy.
+  //
+  // TODO: Is it safe to just eliminate the initial retain?
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
+  }
 
   // If the source of a cast should be destroyed, emit a release.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -255,7 +266,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   if (isConditional) {
     // Copy the temporary into Dest.
     // Load from the optional.
-    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl(OTK);
+    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
     SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;

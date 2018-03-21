@@ -80,15 +80,13 @@ class Good: Foo {
   // CHECK:         store %0 to [init] [[PB_SELF_BOX]]
   // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[PB_SELF_BOX]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
-  // CHECK:         [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X_ADDR]] : $*Int
-  // CHECK:         assign {{.*}} to [[WRITE]] : $*Int
+  // CHECK:         assign {{.*}} to [[X_ADDR]] : $*Int
   // CHECK:         [[SELF_OBJ:%.*]] = load [take] [[PB_SELF_BOX]] : $*Good
   // CHECK:         [[SUPER_OBJ:%.*]] = upcast [[SELF_OBJ]] : $Good to $Foo
   // CHECK:         [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER_OBJ]]
   // CHECK:         [[DOWNCAST_BORROWED_SUPER:%.*]] = unchecked_ref_cast [[BORROWED_SUPER]] : $Foo to $Good
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[DOWNCAST_BORROWED_SUPER]] : $Good, #Good.x
-  // CHECK:         [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
-  // CHECK:         [[X:%.*]] = load [trivial] [[READ]] : $*Int
+  // CHECK:         [[X:%.*]] = load [trivial] [[X_ADDR]] : $*Int
   // CHECK:         end_borrow [[BORROWED_SUPER]] from [[SUPER_OBJ]]
   // CHECK:         [[SUPER_INIT:%.*]] = function_ref @$S22super_init_refcounting3FooCyACSicfc : $@convention(method) (Int, @owned Foo) -> @owned Foo
   // CHECK:         apply [[SUPER_INIT]]([[X]], [[SUPER_OBJ]])

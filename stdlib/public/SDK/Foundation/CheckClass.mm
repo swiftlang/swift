@@ -59,9 +59,9 @@ namespace {
     template <size_t N>
     StringRefLite(const char (&staticStr)[N]) : data(staticStr), length(N) {}
 
-    StringRefLite(swift::TwoWordPair<const char *, uintptr_t>::Return rawValue)
-        : data(swift::TwoWordPair<const char *, uintptr_t>(rawValue).first),
-          length(swift::TwoWordPair<const char *, uintptr_t>(rawValue).second){}
+    StringRefLite(swift::TypeNamePair rawValue)
+        : data(rawValue.data),
+          length(rawValue.length){}
 
     NS_RETURNS_RETAINED
     NSString *newNSStringNoCopy() const {
@@ -160,7 +160,7 @@ static StringRefLite findBaseName(StringRefLite demangledName) {
     return 0;
 
   // Is it a generic class?
-  if (theClass->getDescription()->GenericParams.isGeneric()) {
+  if (theClass->getDescription()->isGeneric()) {
     logIfFirstOccurrence(objcClass, ^{
       // Use actual NSStrings to force UTF-8.
       StringRefLite demangledName = swift_getTypeName(theClass,

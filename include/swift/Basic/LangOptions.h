@@ -157,10 +157,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the experimental constraint propagation in the
-    /// type checker.
-    bool EnableConstraintPropagation = false;
-
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 
@@ -223,6 +219,9 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
+    
+    /// Enables key path resilience.
+    bool EnableKeyPathResilience = false;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -252,9 +251,11 @@ namespace swift {
     /// This is used to guard preemptive testing for the fix-it.
     bool FixStringToSubstringConversions = false;
 
-    /// Whether to create and keep track of a libSyntax tree associated with
-    /// this source file.
-    bool KeepSyntaxInfoInSourceFile = false;
+    /// Whether collect tokens during parsing for syntax coloring.
+    bool CollectParsedToken = false;
+
+    /// Whether to parse syntax tree.
+    bool BuildSyntaxTree = false;
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;

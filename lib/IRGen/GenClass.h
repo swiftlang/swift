@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENCLASS_H
 #define SWIFT_IRGEN_GENCLASS_H
 
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -27,16 +28,16 @@ namespace llvm {
 }
 
 namespace swift {
-  class CanType;
   class ClassDecl;
   class ExtensionDecl;
   class ProtocolDecl;
+  struct SILDeclRef;
   class SILType;
-  class Type;
   class VarDecl;
 
 namespace irgen {
   class ConstantStructBuilder;
+  class FunctionPointer;
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
@@ -48,7 +49,6 @@ namespace irgen {
   class TypeInfo;
   
   enum class ReferenceCounting : unsigned char;
-  enum class IsaEncoding : unsigned char;
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
   
@@ -95,10 +95,12 @@ namespace irgen {
   typedef llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArraysRef;
 
   /// Adds the size for tail allocated arrays to \p size and returns the new
-  /// size value.
-  llvm::Value *appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
-                                                llvm::Value *size,
-                                                TailArraysRef TailArrays);
+  /// size value. Also updades the alignment mask to represent the alignment of
+  /// the largest element.
+  std::pair<llvm::Value *, llvm::Value *>
+  appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                   llvm::Value *size, llvm::Value *alignMask,
+                                   TailArraysRef TailArrays);
 
   /// Emit an allocation of a class.
   /// The \p StackAllocSize is an in- and out-parameter. The passed value
@@ -161,9 +163,6 @@ namespace irgen {
   ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
                                                 CanType type);
 
-  /// What isa-encoding mechanism does a type use?
-  IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
-  
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 
   /// Does the class metadata for the given class require dynamic
@@ -178,6 +177,48 @@ namespace irgen {
   /// the class object at compile time so we need to do runtime layout.
   bool classHasIncompleteLayout(IRGenModule &IGM,
                                 ClassDecl *theClass);
+
+  /// Load the fragile instance size and alignment mask from a reference to
+  /// class type metadata of the given type.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                           ClassDecl *theClass,
+                                           llvm::Value *metadata);
+
+  /// Load the instance size and alignment mask from a reference to
+  /// class type metadata of the given type.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                             ClassDecl *theClass,
+                                             llvm::Value *metadata);
+
+  /// Given a metadata pointer, emit the callee for the given method.
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType);
+
+  /// Given an instance pointer (or, for a static method, a class
+  /// pointer), emit the callee for the given method.
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *base,
+                                         SILType baseType,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType,
+                                         bool useSuperVTable);
+
+  /// Is the given class known to have Swift-compatible metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
+
+  inline bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
+    // For now, assume any class type defined in Clang might be tagged.
+    return hasKnownSwiftMetadata(IGM, theClass);
+  }
+
+  /// Is the given class-like type known to have Swift-compatible
+  /// metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
+
 } // end namespace irgen
 } // end namespace swift
 

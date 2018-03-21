@@ -62,5 +62,17 @@ DemangleToMetadataTests.test("Imported enum types") {
     _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
+class CG4<T: P1, U: P2> { }
+extension C : P1 { }
+extension C : P2 { }
+
+class D: P2 { }
+
+DemangleToMetadataTests.test("@objc protocol conformances") {
+  expectEqual(CG4<C, C>.self,
+    _typeByMangledName("4main3CG4CyAA1CCAA1CCG")!)
+  expectNil(_typeByMangledName("4main3CG4CyAA1DCAA1DCG"))
+}
+
 runAllTests()
 

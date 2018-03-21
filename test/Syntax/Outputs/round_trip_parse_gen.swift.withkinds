@@ -1,15 +1,22 @@
-<ImportDecl>// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
+<ImportDecl>// RUN: rm -rf %t
+// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 // RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -serialize-raw-tree -input-source-filename %s > %t.dump
+// RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
 import <AccessPathComponent>ABC</AccessPathComponent></ImportDecl><ImportDecl>
 import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B.</AccessPathComponent><AccessPathComponent>C</AccessPathComponent></ImportDecl><ImportDecl><Attribute>
 @objc </Attribute>import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><ImportDecl><Attribute>
 @objc </Attribute>import typealias <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><ImportDecl>
-import struct <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><IfConfigDecl>
+import struct <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><PoundWarningDecl>
+
+#warning(<StringLiteralExpr>"test warning"</StringLiteralExpr>)</PoundWarningDecl><PoundErrorDecl>
+#error(<StringLiteralExpr>"test error"</StringLiteralExpr>)</PoundErrorDecl><IfConfigDecl>
 
 #if <IdentifierExpr>Blah</IdentifierExpr><ClassDecl>
 class C <MemberDeclBlock>{<FunctionDecl>
@@ -27,7 +34,8 @@ class C <MemberDeclBlock>{<FunctionDecl>
     bar1</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<FloatLiteralExpr>1.1</FloatLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)</FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)</FunctionCallExpr><VariableDecl>
     var <PatternBinding><IdentifierPattern>f </IdentifierPattern><InitializerClause>= <PrefixOperatorExpr>/*comments*/+<FloatLiteralExpr>0.1</FloatLiteralExpr></PrefixOperatorExpr></InitializerClause></PatternBinding></VariableDecl><FunctionCallExpr><IdentifierExpr>/*comments*/
-    foo</IdentifierExpr>()</FunctionCallExpr>
+    foo</IdentifierExpr>()</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><StringLiteralExpr>"🙂🤗🤩🤔🤨"</StringLiteralExpr></SequenceExpr>
   }</CodeBlock></FunctionDecl><FunctionDecl>
 
   func foo1<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
@@ -37,11 +45,15 @@ class C <MemberDeclBlock>{<FunctionDecl>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a : <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a: <IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr></FunctionCallArgument>)</FunctionCallExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><FunctionCallExpr><IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><FunctionCallExpr><IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr></FunctionCallArgument>)</FunctionCallExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[:]</DictionaryExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<ArrayElement><IntegerLiteralExpr>1</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>2</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>3</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>4</IntegerLiteralExpr></ArrayElement>]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[<DictionaryElement><IntegerLiteralExpr>1</IntegerLiteralExpr>:<IntegerLiteralExpr>1</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>2</IntegerLiteralExpr>:<IntegerLiteralExpr>2</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>3</IntegerLiteralExpr>:<IntegerLiteralExpr>3</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>4</IntegerLiteralExpr>:<IntegerLiteralExpr>4</IntegerLiteralExpr></DictionaryElement>]</DictionaryExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr></ArrayElement>]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[<DictionaryElement><StringLiteralExpr>"a"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"b"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"c"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"d"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr></DictionaryElement>]</DictionaryExpr></SequenceExpr><FunctionCallExpr><IdentifierExpr>
-    foo</IdentifierExpr>(<FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr></FunctionCallArgument>)</FunctionCallExpr>
+    foo</IdentifierExpr>(<FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr></FunctionCallArgument>)</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DotSelfExpr><FunctionCallExpr><IdentifierExpr>type</IdentifierExpr>(<FunctionCallArgument>of: <IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>.self</DotSelfExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><IdentifierExpr>A </IdentifierExpr><ArrowExpr>-> </ArrowExpr><MemberAccessExpr><IdentifierExpr>B</IdentifierExpr>.C</MemberAccessExpr><BinaryOperatorExpr><</BinaryOperatorExpr><PostfixUnaryExpr><IdentifierExpr>Int</IdentifierExpr>></PostfixUnaryExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ArrayExpr>[<ArrayElement><SequenceExpr><TupleExpr>(<TupleElement><IdentifierExpr>A</IdentifierExpr></TupleElement>) </TupleExpr><ArrowExpr>throws -> </ArrowExpr><IdentifierExpr>B</IdentifierExpr></SequenceExpr></ArrayElement>]</ArrayExpr>()</FunctionCallExpr></SequenceExpr>
   }</CodeBlock></FunctionDecl><FunctionDecl>
   func boolAnd<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <SequenceExpr><BooleanLiteralExpr>true </BooleanLiteralExpr><BinaryOperatorExpr>&& </BinaryOperatorExpr><BooleanLiteralExpr>false </BooleanLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl>
   func boolOr<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <SequenceExpr><BooleanLiteralExpr>true </BooleanLiteralExpr><BinaryOperatorExpr>|| </BinaryOperatorExpr><BooleanLiteralExpr>false </BooleanLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl>
@@ -83,8 +95,30 @@ class C <MemberDeclBlock>{<FunctionDecl>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ImplicitMemberExpr>.foo </ImplicitMemberExpr><ClosureExpr>{ <IntegerLiteralExpr>12 </IntegerLiteralExpr>}</ClosureExpr></FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><SubscriptExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>[<FunctionCallArgument><IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>.bar</MemberAccessExpr></SequenceExpr>
-  }</CodeBlock></FunctionDecl>
-}</MemberDeclBlock></ClassDecl>
+  }</CodeBlock></FunctionDecl><InitializerDecl>
+
+  init<ParameterClause>() </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl><Attribute>
+  @objc </Attribute><DeclModifier>private </DeclModifier>init<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>)</ParameterClause></InitializerDecl><InitializerDecl>
+  init!<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl>
+  init?<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl><DeclModifier>
+  public </DeclModifier>init<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause>throws <CodeBlock>{}</CodeBlock></InitializerDecl><DeinitializerDecl><Attribute>
+
+  @objc </Attribute>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl><DeinitializerDecl><DeclModifier>
+  private </DeclModifier>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl><SubscriptDecl><DeclModifier>
+
+  internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl><SubscriptDecl>
+  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl>
+}</MemberDeclBlock></ClassDecl><ProtocolDecl>
+
+protocol PP <MemberDeclBlock>{<AssociatedtypeDecl>
+  associatedtype A</AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype B<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence</SimpleTypeIdentifier></InheritedType></TypeInheritanceClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype C <TypeInitializerClause>= <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeInitializerClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype D<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><TypeInitializerClause>= <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType></TypeInitializerClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype E<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><TypeInitializerClause>= <ArrayType>[<ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>] </ArrayType></TypeInitializerClause><GenericWhereClause>where <ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.Element </MemberTypeIdentifier>: <SimpleTypeIdentifier>Sequence</SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause></AssociatedtypeDecl><AssociatedtypeDecl><DeclModifier>
+  private </DeclModifier>associatedtype F</AssociatedtypeDecl><AssociatedtypeDecl><Attribute>
+  @objc </Attribute>associatedtype G</AssociatedtypeDecl>
+}</MemberDeclBlock></ProtocolDecl>
 
 #endif</IfConfigDecl><IfConfigDecl>
 
@@ -223,9 +257,13 @@ func postfix<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   foo</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>] <ClosureExpr>{}</ClosureExpr></SubscriptExpr><SubscriptExpr><SubscriptExpr><IdentifierExpr>
   foo</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr>[<FunctionCallArgument><IntegerLiteralExpr>2</IntegerLiteralExpr>,</FunctionCallArgument><FunctionCallArgument>x:<IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr><DotSelfExpr><FunctionCallExpr><ForcedValueExpr><MemberAccessExpr><PostfixUnaryExpr><OptionalChainingExpr><IdentifierExpr>
   foo</IdentifierExpr>?</OptionalChainingExpr>++</PostfixUnaryExpr>.bar</MemberAccessExpr>!</ForcedValueExpr>(<FunctionCallArgument><IdentifierExpr>baz</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>.self</DotSelfExpr><MemberAccessExpr><FunctionCallExpr><IdentifierExpr>
-  foo</IdentifierExpr>()</FunctionCallExpr>.0</MemberAccessExpr><FunctionCallExpr><IdentifierExpr>
+  foo</IdentifierExpr>()</FunctionCallExpr>.0</MemberAccessExpr><MemberAccessExpr><SpecializeExpr><IdentifierExpr>
+  foo</IdentifierExpr><GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SpecializeExpr>.bar</MemberAccessExpr><FunctionCallExpr><SpecializeExpr><IdentifierExpr>
+  foo</IdentifierExpr><GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SpecializeExpr>()</FunctionCallExpr><FunctionCallExpr><SpecializeExpr><MemberAccessExpr><IdentifierExpr>
+  foo</IdentifierExpr>.bar</MemberAccessExpr><GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SpecializeExpr>()</FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
 
-  foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></IdentifierExpr>()</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+  foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></IdentifierExpr>()</FunctionCallExpr><FunctionCallExpr><SpecializeExpr><IdentifierExpr>
+  foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument>)</DeclNameArguments></IdentifierExpr><GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></GenericArgument>> </GenericArgumentClause></SpecializeExpr><ClosureExpr>{ }</ClosureExpr></FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ImplicitMemberExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></ImplicitMemberExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>(<FunctionCallArgument><InOutExpr>&<IdentifierExpr>d</IdentifierExpr></InOutExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
@@ -286,7 +324,9 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
   } </CodeBlock></CatchClause><CatchClause>catch <CodeBlock>{
   }</CodeBlock></CatchClause></DoStmt><RepeatWhileStmt>
   repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>true</BooleanLiteralExpr></RepeatWhileStmt><RepeatWhileStmt>
-  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><DoStmt>
+  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><WhileStmt>
+  while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><WhileStmt>
+  LABEL: while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><DoStmt>
   LABEL: do <CodeBlock>{}</CodeBlock></DoStmt>
   LABEL: switch <IdentifierExpr>foo </IdentifierExpr>{
     case <ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>:<FallthroughStmt>

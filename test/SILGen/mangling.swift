@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
+// REQUIRES: plus_zero_runtime
+
+// RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -107,16 +109,16 @@ struct HasVarInit {
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
-// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXK_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: @autoclosure () -> Int) {}
-// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyc_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden @$S8mangling19autoClosureOverload1fySiyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden @$S8mangling24autoClosureOverloadCallsyyF : $@convention(thin) () -> () {
 func autoClosureOverloadCalls() {
   // CHECK: function_ref @$S8mangling19autoClosureOverload1fySiyXK_tF
   autoClosureOverload(f: 1)
-  // CHECK: function_ref @$S8mangling19autoClosureOverload1fySiyc_tF
+  // CHECK: function_ref @$S8mangling19autoClosureOverload1fySiyXE_tF
   autoClosureOverload {1}
 }
 
@@ -129,9 +131,9 @@ protocol HasAssocType {
   associatedtype Assoc
 }
 
-// CHECK-LABEL: sil hidden @$S8mangling4fooAyyxAA12HasAssocTypeRzlF : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling4fooAyyxAA12HasAssocTypeRzlF : $@convention(thin) <T where T : HasAssocType> (@in_guaranteed T) -> ()
 func fooA<T: HasAssocType>(_: T) {}
-// CHECK-LABEL: sil hidden @$S8mangling4fooByyxAA12HasAssocTypeRzAA0D4Reqt0D0RpzlF : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling4fooByyxAA12HasAssocTypeRzAA0D4Reqt0D0RpzlF : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in_guaranteed T) -> ()
 func fooB<T: HasAssocType>(_: T) where T.Assoc: AssocReqt {}
 
 // CHECK-LABEL: sil hidden @$S8mangling2qqoiyySi_SitF
@@ -180,11 +182,11 @@ func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySid_SStF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySid_SStF : $@convention(thin) (@guaranteed Array<Int>, @guaranteed String) -> ()
 func varargsVsArray(arr: Int..., n: String) { }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiG_SStF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiG_SStF : $@convention(thin) (@guaranteed Array<Int>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int], n: String) { }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@owned Array<Array<Int>>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@guaranteed Array<Array<Int>>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int]..., n: String) { }

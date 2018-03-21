@@ -143,8 +143,8 @@ ERROR(cannot_pass_rvalue_mutating_getter,none,
       (Type))
 
 ERROR(expression_too_complex,none,
-      "expression was too complex to be solved in reasonable time; "
-      "consider breaking up the expression into distinct sub-expressions", ())
+      "the compiler is unable to type-check this expression in reasonable time; "
+      "try breaking up the expression into distinct sub-expressions", ())
 
 ERROR(value_type_comparison_with_nil_illegal_did_you_mean,none,
       "value of type %0 cannot be compared by reference; "
@@ -613,12 +613,6 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
-WARNING(deprecated_redecl_by_optionality, none,
-        "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
-        (DeclName, Type, Type))
-NOTE(deprecated_redecl_by_optionality_note, none,
-     "overloading by kind of optional is deprecated and will be removed in a future release", ())
-
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,none,
@@ -637,7 +631,7 @@ ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
-      (Identifier, unsigned))
+      (DeclName, unsigned))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
@@ -694,9 +688,13 @@ ERROR(decl_does_not_exist_in_module,none,
       "%1 does not exist in module %2",
       (/*ImportKind*/ unsigned, Identifier, Identifier))
 ERROR(imported_decl_is_wrong_kind,none,
-      "%0 was imported as '%1', but is a "
-      "%select{%error|type|struct|class|enum|protocol|variable|function}2",
+      "%0 was imported as '%1', but is "
+      "%select{%error|a type|a struct|a class|an enum|a protocol|a variable|"
+      "a function}2",
       (Identifier, StringRef, /*ImportKind*/ unsigned))
+ERROR(imported_decl_is_wrong_kind_typealias,none,
+      "%0 %1 cannot be imported as '%2'",
+      (DescriptiveDeclKind, Type, StringRef))
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
@@ -968,6 +966,9 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+ERROR(type_invalid_dml,none,
+      "@dynamicMemberLookup attribute requires %0 to have a "
+      "'subscript(dynamicMember:)' member with a string index", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1006,6 +1007,9 @@ ERROR(enum_element_not_materializable,none,
 
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
+
+WARNING(pound_warning, none, "%0", (StringRef))
+ERROR(pound_error, none, "%0", (StringRef))
 
 // Attributes
 
@@ -1056,7 +1060,7 @@ ERROR(iboutlet_non_optional,none,
 NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
-      "add '!' to form the implicitly unwrapped optional type %0", (Type))
+      "add '!' to form an implicitly unwrapped optional", ())
 
 ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
@@ -1367,6 +1371,8 @@ ERROR(objc_generic_extension_using_type_parameter,none,
       "generic parameters at runtime", ())
 NOTE(objc_generic_extension_using_type_parameter_here,none,
      "generic parameter used here", ())
+NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
+     "add '@objc' to allow uses of 'self' within the function body", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1408,6 +1414,10 @@ NOTE(candidate_types_inheritance_requirement,none,
      (Type, Type, Type, Type, StringRef))
 NOTE(types_not_equal_requirement,none,
      "requirement specified as %0 == %1%2", (Type, Type, StringRef))
+ERROR(type_is_not_a_class,none,
+      "%0 requires that %1 be a class type", (Type, Type, Type))
+NOTE(anyobject_requirement,none,
+     "requirement specified as %0 : 'AnyObject'%2", (Type, Type, StringRef))
 ERROR(non_class_cannot_conform_to_class_protocol,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
@@ -1418,6 +1428,10 @@ ERROR(cf_class_cannot_conform_to_objc_protocol,none,
 ERROR(objc_runtime_visible_cannot_conform_to_objc_protocol,none,
       "class %0 cannot conform to @objc protocol %1 because "
       "the class is only visible via the Objective-C runtime",
+      (Type, Type))
+ERROR(objc_generics_cannot_conditionally_conform,none,
+      "type %0 cannot conditionally conform to protocol %1 because "
+      "the type uses the Objective-C generics model",
       (Type, Type))
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
@@ -1489,6 +1503,10 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(type_witness_objc_generic_parameter,none,
+      "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
+      "used for associated type %3 of protocol %4",
+      (Type, Type, bool, DeclName, DeclName))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
@@ -1694,7 +1712,7 @@ ERROR(requires_not_suitable_archetype,none,
       (TypeLoc))
 WARNING(requires_no_same_type_archetype,none,
         "neither type in same-type constraint (%0 or %1) refers to a "
-        "generic parameter  or associated type",
+        "generic parameter or associated type",
         (Type, Type))
 
 ERROR(requires_generic_params_made_equal,none,
@@ -1901,7 +1919,7 @@ ERROR(override_argument_name_mismatch,none,
 ERROR(override_ownership_mismatch,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
-      (/*Ownership*/unsigned, /*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned, /*ReferenceOwnership*/unsigned))
 ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
@@ -2082,10 +2100,11 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
-
 ERROR(cannot_synthesize_in_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension", (Type))
 
+ERROR(broken_case_iterable_requirement,none,
+      "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
@@ -2749,13 +2768,14 @@ WARNING(optional_pattern_match_promotion,none,
         "pattern match introduces an implicit promotion from %0 to %1",
         (Type, Type))
 WARNING(optional_to_any_coercion,none,
-        "expression implicitly coerced from %0 to Any", (Type))
+        "expression implicitly coerced from %0 to %1", (Type, Type))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
-     "explicitly cast to Any with 'as Any' to silence this warning", ())
+     "explicitly cast to %0 with '%1' to silence this warning",
+     (Type, StringRef))
 WARNING(optional_in_string_interpolation_segment,none,
         "string interpolation produces a debug description for an optional "
         "value; did you mean to make this explicit?",
@@ -2785,6 +2805,9 @@ ERROR(assigning_noescape_to_escaping,none,
 ERROR(general_noescape_to_escaping,none,
       "using non-escaping parameter %0 in a context expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noescape_to_type,none,
+      "converting non-escaping value to %0 may allow it to escape",
+      (Type))
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
@@ -2825,7 +2848,7 @@ ERROR(expression_unused_closure,none,
 ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,none,
-      "expression resolves to an unused l-value", ())
+      "expression resolves to an unused %select{variable|property|subscript}0", (unsigned))
 WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
 WARNING(expression_unused_result_operator,none,
@@ -2851,6 +2874,8 @@ ERROR(assignment_lhs_is_immutable_property,none,
       "cannot assign to property: %0", (StringRef))
 ERROR(assignment_subscript_has_immutable_base,none,
       "cannot assign through subscript: %0", (StringRef))
+ERROR(assignment_dynamic_property_has_immutable_base,none,
+      "cannot assign through dynamic lookup property: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
 
@@ -3125,53 +3150,32 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
-WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use an explicit type followed by '!'", ())
-
-WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
-
-WARNING(implicitly_unwrapped_optional_spelling_suggest_optional,none,
-        "using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead", ())
-
-WARNING(implicitly_unwrapped_optional_in_illegal_position_suggest_optional,none,
-        "using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead", ())
-
-ERROR(implicitly_unwrapped_optional_spelling_error,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use an explicit type followed by '!'", ())
-
-ERROR(implicitly_unwrapped_optional_spelling_error_with_bang_fixit,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
-
-ERROR(implicitly_unwrapped_optional_spelling_error_with_optional_fixit,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use 'Optional' instead", ())
-
-ERROR(implicitly_unwrapped_optional_spelling_in_illegal_position,none,
-        "'ImplicitlyUnwrappedOptional' is not allowed here; perhaps 'Optional' was intended?", ())
+WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
+        "using '!' is not allowed here; treating this as '?' instead", ())
 
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
-        "'!' is not allowed here; perhaps '?' was intended?", ())
+        "using '!' is not allowed here; perhaps '?' was intended?", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
       "'%select{strong|weak|unowned|unowned}0' may only be applied to "
       "class and class-bound protocol types, not %1",
-      (/*Ownership*/unsigned, Type))
+      (/*ReferenceOwnership*/unsigned, Type))
 ERROR(invalid_ownership_protocol_type,none,
       "'%select{strong|weak|unowned|unowned}0' must not be applied to "
       "non-class-bound %1; consider adding a protocol conformance that has a class bound",
-      (/*Ownership*/unsigned, Type))
+      (/*ReferenceOwnership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 ERROR(ownership_invalid_in_protocols,none,
       "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
-      (/*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned))
 WARNING(ownership_invalid_in_protocols_compat_warning,none,
       "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
       "in a protocol and will be disallowed in future versions",
-      (/*Ownership*/unsigned))
+      (/*ReferenceOwnership*/unsigned))
 
 // required
 ERROR(required_initializer_nonclass,none,
@@ -3186,7 +3190,9 @@ NOTE(required_initializer_here,none,
       "'required' initializer is declared in superclass here", ())
 
 ERROR(required_initializer_not_accessible,none,
-      "'required' initializer must be as accessible as its enclosing type", ())
+      "'required' initializer must be accessible wherever class %0 can be "
+      "subclassed",
+      (DeclName))
 ERROR(required_initializer_missing_keyword,none,
       "'required' modifier must be present on all overrides of a required "
       "initializer", ())
@@ -3591,22 +3597,23 @@ NOTE(availability_obsoleted, none,
     (DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: %5",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple,
+         StringRef))
 
 WARNING(availability_deprecated_rename, none,
-        "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: "
-        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
-        "'%7'",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, bool, unsigned,
-         StringRef))
+        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
+        "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
+        "'%8'",
+        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple, bool,
+         unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
@@ -3647,6 +3654,10 @@ WARNING(availability_query_useless_enclosing_scope, none,
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
+
+WARNING(availability_extension_platform_agnostic, none,
+        "'@available' without an OS is ignored on extensions; "
+        "apply the attribute to each member instead", ())
 
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "

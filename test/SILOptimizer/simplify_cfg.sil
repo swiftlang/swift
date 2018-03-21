@@ -1,10 +1,13 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
 
 import Builtin
 import Swift
-
-sil_stage canonical
 
 ///////////////////////
 // Type Declarations //
@@ -3017,3 +3020,30 @@ bb9(%6 : $Builtin.Int32):
   return %6 : $Builtin.Int32
 }
 
+sil @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+
+// CHECK-LABEL: sil @test_noescape
+// CHECK:  [[FN:%.*]] = function_ref @adder
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
+// CHECK-NOT: try_apply
+// CHECK:  apply [[PA]](%1)
+// CHECK: return
+sil @test_noescape : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %f = function_ref @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %conv = convert_function %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32) to $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  %ne = convert_escape_to_noescape %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error) to $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  try_apply %ne(%1) : $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error), normal bb1, error bb2
+
+bb1(%r : $Builtin.Int32):
+	br bb3(%r : $Builtin.Int32)
+
+bb2(%e : $Error):
+  %r1 = integer_literal $Builtin.Int32, 0
+	br bb3(%r1 : $Builtin.Int32)
+
+bb3(%res : $Builtin.Int32):
+  release_value %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32)
+  return  %res : $Builtin.Int32
+}

@@ -742,6 +742,10 @@ namespace {
       return true;
     }
 
+    bool visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *RHS) {
+      return true;
+    }
+
     bool visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *RHS) {
       return true;
     }
@@ -755,6 +759,10 @@ namespace {
     }
 
     bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
+      return true;
+    }
+
+    bool visitValueToBridgeObjectInst(ValueToBridgeObjectInst *i) {
       return true;
     }
 
@@ -1060,6 +1068,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
@@ -1134,9 +1143,6 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
-  if (isa<ThrowInst>(this))
-    return false;
-
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }
@@ -1144,7 +1150,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (ARI->canAllocOnStack())
       return false;
   }
-
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1161,6 +1166,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (MI->getMember().isForeign)
       return false;
   }
+  if (isa<ThrowInst>(this))
+    return false;
+
+  // BeginAccess defines the access scope entry point. All associated EndAccess
+  // instructions must directly operate on the BeginAccess.
+  if (isa<BeginAccessInst>(this))
+    return false;
 
   return true;
 }

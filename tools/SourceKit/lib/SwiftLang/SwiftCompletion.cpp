@@ -144,7 +144,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   if (Failed) {
     return false;
   }
-  if (!Invocation.getFrontendOptions().Inputs.hasInputs()) {
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
   }
@@ -156,10 +156,11 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   }
 
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
-  std::unique_ptr<llvm::MemoryBuffer> NewBuffer =
-      llvm::MemoryBuffer::getNewUninitMemBuffer(InputFile->getBufferSize() + 1,
+  std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
+      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+                                              InputFile->getBufferSize() + 1,
                                               InputFile->getBufferIdentifier());
-  char *NewBuf = const_cast<char*>(NewBuffer->getBufferStart());
+  char *NewBuf = NewBuffer->getBufferStart();
   char *NewPos = std::copy(InputFile->getBufferStart(), Position, NewBuf);
   *NewPos = '\0';
   std::copy(Position, InputFile->getBufferEnd(), NewPos+1);
@@ -1194,10 +1195,14 @@ void SwiftLangSupport::codeCompleteOpen(
 
   // Add any codecomplete.open specific flags.
   std::vector<const char *> extendedArgs(args.begin(), args.end());
-  if (CCOpts.addInitsToTopLevel)
+  if (CCOpts.addInitsToTopLevel) {
+    extendedArgs.push_back("-Xfrontend");
     extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
-  if (CCOpts.callPatternHeuristics)
+  }
+  if (CCOpts.callPatternHeuristics) {
+    extendedArgs.push_back("-Xfrontend");
     extendedArgs.push_back("-code-complete-call-pattern-heuristics");
+  }
 
   // Invoke completion.
   std::string error;

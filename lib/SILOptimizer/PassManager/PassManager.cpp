@@ -283,6 +283,16 @@ static bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT) {
     && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
 }
 
+void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
+                                  SILFunction *F) {
+  llvm::dbgs() << "  " << Title << " #" << NumPassesRun << ", stage "
+               << StageName << ", pass : " << Tr->getID()
+               << " (" << Tr->getTag() << ")";
+  if (F)
+    llvm::dbgs() << ", Function: " << F->getName();
+  llvm::dbgs() << '\n';
+}
+
 void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
                                   SILFunction *F) {
   SILTransform *Tr = Transformations[TransIdx];
@@ -538,6 +548,13 @@ SILPassManager::~SILPassManager() {
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
+  }
+}
+
+void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
+  if (doPrintAfter(T, F, SILPrintAll)) {
+    dumpPassInfo("*** New SIL function in ", T, F);
+    F->dump(getOptions().EmitVerboseSIL);
   }
 }
 

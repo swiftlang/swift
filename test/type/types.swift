@@ -51,8 +51,8 @@ func testInvalidUseOfParameterAttr() {
   var bad_is : (Int) -> (__shared Int, Int)  // expected-error {{'__shared' may only be used on parameters}}
   func bad_is2(_ a: (__shared Int, Int)) {}    // expected-error {{'__shared' may only be used on parameters}}
   
-  var bad_iow : (Int) -> (__owned Int, Int)
-  func bad_iow2(_ a: (__owned Int, Int)) {}
+  var bad_iow : (Int) -> (__owned Int, Int)  // expected-error {{'__owned' may only be used on parameters}}
+  func bad_iow2(_ a: (__owned Int, Int)) {}  // expected-error {{'__owned' may only be used on parameters}}
 }
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
@@ -152,7 +152,7 @@ let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
 // <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](repeating: nil, count: 2) // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
+let bb2 = [Int!](repeating: nil, count: 2) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{15-16=?}}
 
 // <rdar://problem/21560309> inout allowed on function return type
 func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' may only be used on parameters}}

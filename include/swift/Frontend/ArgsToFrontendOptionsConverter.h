@@ -37,7 +37,7 @@ private:
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
-  bool computeOutputFilenames();
+  bool computeMainAndSupplementaryOutputFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -50,34 +50,13 @@ private:
   void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
                                   unsigned &valueToSet);
 
-  FrontendOptions::ActionType determineRequestedAction() const;
-
   bool setUpForSILOrLLVM();
 
-  /// Determine the correct output filename when none was specified.
-  ///
-  /// Such an absence should only occur when invoking the frontend
-  /// without the driver,
-  /// because the driver will always pass -o with an appropriate filename
-  /// if output is required for the requested action.
-  bool deriveOutputFilenameFromInputFile();
+  bool checkUnusedSupplementaryOutputPaths() const;
 
-  /// Determine the correct output filename when a directory was specified.
-  ///
-  /// Such a specification should only occur when invoking the frontend
-  /// directly, because the driver will always pass -o with an appropriate
-  /// filename if output is required for the requested action.
-  bool deriveOutputFilenameForDirectory(StringRef outputDir);
-
-  std::string determineBaseNameOfOutput() const;
-
-  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
-
-  void determineSupplementaryOutputFilenames();
-
-  /// Returns the output filenames on the command line or in the output
-  /// filelist. If there
-  /// were neither -o's nor an output filelist, returns an empty vector.
+  /// \returns the output filenames on the command line or in the output
+  /// filelist, or an empty vector if there were neither -o's nor an output
+  /// filelist.
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
   bool checkForUnusedOutputPaths() const;
@@ -90,7 +69,16 @@ public:
                                  FrontendOptions &Opts)
       : Diags(Diags), Args(Args), Opts(Opts) {}
 
-  bool convert();
+  /// Populates the FrontendOptions the converter was initialized with.
+  ///
+  /// \param buffers If present, buffers read in the processing of the frontend
+  /// options will be saved here. These should only be used for debugging
+  /// purposes.
+  bool convert(
+      SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
+
+  static FrontendOptions::ActionType
+  determineRequestedAction(const llvm::opt::ArgList &);
 };
 
 } // namespace swift

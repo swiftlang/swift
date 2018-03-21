@@ -41,7 +41,8 @@ ArrayRef<Type> GenericEnvironment::getContextTypes() const {
                         Signature->getGenericParams().size());
 }
 
-ArrayRef<GenericTypeParamType *> GenericEnvironment::getGenericParams() const {
+TypeArrayView<GenericTypeParamType>
+GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
@@ -120,17 +121,18 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
   return env->mapTypeIntoContext(type);
 }
 
+Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
+  return cast<ArchetypeType>(type)->getInterfaceType();
+}
+
 Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
-  return Type(this).subst([&](SubstitutableType *t) -> Type {
-      return cast<ArchetypeType>(t)->getInterfaceType();
-    },
+  return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
     SubstFlags::AllowLoweredTypes);
 }
 
-Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
-                                                SubstitutableType *type) const {
+Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
   if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
@@ -145,7 +147,7 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      assert(self->Builder && "Missing generic signature builder for lazy query");
+      assert(self->Builder &&"Missing generic signature builder for lazy query");
       auto equivClass =
         self->Builder->resolveEquivalenceClass(
                                   type,

@@ -16,7 +16,7 @@
 
 %{
   # The sizes to generate code for.
-  sizes = [16]
+  sizes = [2, 8, 16]
 }%
 
 % for N in sizes:
@@ -56,7 +56,7 @@ extension _FixedArray${N} {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var count : Int {
+  internal var count: Int {
     @inline(__always) get { return Int(truncatingIfNeeded: _count) }
     @inline(__always) set { _count = Int8(newValue) }
   }
@@ -127,8 +127,8 @@ extension _FixedArray${N} {
   @_versioned
   internal mutating func append(_ newElement: T) {
     _sanityCheck(count < capacity)
-    self[count] = newElement
     _count += 1
+    self[count-1] = newElement
   }
 }
 

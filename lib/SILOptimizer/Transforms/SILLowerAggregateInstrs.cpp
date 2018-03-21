@@ -80,6 +80,9 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     return false;
 
   bool expand = shouldExpand(M, SrcType.getObjectType());
+  using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
+  auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
+                              : TypeExpansionKind::None;
 
   SILBuilderWithScope Builder(CA);
 
@@ -112,8 +115,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
-                              TypeLowering::getLoweringStyle(expand));
+      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New, expansionKind);
     }
 
     // If we are not initializing:
@@ -121,8 +123,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // release_value %old : $*T
     if (Old) {
-      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::getLoweringStyle(expand));
+      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old, expansionKind);
     }
   }
 
@@ -155,8 +156,10 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
                                       LoadOwnershipQualifier::Unqualified);
     auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::getLoweringStyle(expand));
+    using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
+    auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
+                                : TypeExpansionKind::None;
+    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI, expansionKind);
   }
 
   ++NumExpand;

@@ -53,8 +53,16 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
+  global ::= nominal-type 'Mr'           // generic type completion function
+  global ::= nominal-type 'Mi'           // generic type instantiation function
+  global ::= nominal-type 'MI'           // generic type instantiation cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= module 'MXM'                // module descriptor
+  global ::= context 'MXE'               // extension descriptor
+  global ::= context 'MXX'               // anonymous context descriptor
+  global ::= context identifier 'MXY'    // anonymous context descriptor
+  global ::= type assoc_type_path 'MXA'  // generic parameter ref
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
@@ -283,6 +291,15 @@ destructor, the non-allocating or non-deallocating variant is used.
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
 
+  context ::= entity identifier type-list 'XZ' // unknown runtime context
+
+The runtime produces manglings of unknown runtime contexts when a declaration
+context has no preserved runtime information, or when a declaration is encoded
+in runtime in a way that the current runtime does not understand. These
+manglings are unstable and may change between runs of the process.
+
+::
+
   known-module ::= 's'                       // Swift
   known-module ::= 'SC'                      // Clang-importer-synthesized
   known-module ::= 'So'                      // C and Objective-C
@@ -300,6 +317,7 @@ Types
   any-generic-type ::= context decl-name 'C'     // nominal class type
   any-generic-type ::= context decl-name 'O'     // nominal enum type
   any-generic-type ::= context decl-name 'V'     // nominal struct type
+  any-generic-type ::= context decl-name 'XY'    // unknown nominal type
   any-generic-type ::= protocol 'P'              // nominal protocol type
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
@@ -335,7 +353,7 @@ Types
   type ::= 'Bt'                              // Builtin.SILToken
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
-  type ::= function-signature 'c'            // function type
+  type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
   type ::= type 'Sg'                         // optional type, shortcut for: type 'ySqG'
@@ -354,14 +372,16 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
  
-  bound-generic-type ::= type 'y' (type* '_')* type* 'G'   // one type-list per nesting level of type
+  bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
-  FUNCTION-KIND ::= 'K'                      // @auto_closure function type
+  FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
+  FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
+  FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
   function-signature ::= params-type params-type throws? // results and parameters
 
@@ -376,7 +396,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'z'? 'h'? 'd'?   // type with optional label, inout convention, shared convention, and variadic specifier
+  list-type ::= type identifier? 'z'? 'h'? 'n'? 'd'?   // type with optional label, inout convention, shared convention, owned convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -543,6 +563,17 @@ values indicates a single generic parameter at the outermost depth::
 
 A generic signature must only precede an operator character which is different
 from any character in a ``<GENERIC-PARAM-COUNT>``.
+
+::
+
+  retroactive-conformance ::= protocol-conformance 'g' INDEX
+
+When a protocol conformance used to satisfy one of a bound generic type's
+generic requirements is retroactive (i.e., it is specified in a module other
+than the module of the conforming type or the conformed-to protocol), it is
+mangled with its offset into the set of conformance requirements, the
+root protocol conformance, and the suffix 'g'.
+
 
 Identifiers
 ~~~~~~~~~~~

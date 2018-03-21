@@ -169,8 +169,6 @@ extension Array : P5 {}
 // CHECK: extension <iStruct@>Array</iStruct> : <Protocol{{.*}}>P5</Protocol> {}
 extension Optional : P5 {}
 // CHECK: extension <iEnum@>Optional</iEnum> : <Protocol{{.*}}>P5</Protocol> {}
-extension ImplicitlyUnwrappedOptional : P5 {}
-// CHECK: extension <iEnum@>ImplicitlyUnwrappedOptional</iEnum> : <Protocol{{.*}}>P5</Protocol> {}
 
 class C6 {
   func meth() {
@@ -261,7 +259,7 @@ func test7(int x: Int, andThis y: Float) {}
 test7(int: 0, andThis: 0)
 
 func test8<T : Prot2>(_ x: T) {}
-// CHECK: func <Func>test8</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@71:10>Prot2</Protocol>>(_ <Param>x</Param>: <GenericTypeParam@263:12>T</GenericTypeParam>) {}{{$}}
+// CHECK: func <Func>test8</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@71:10>Prot2</Protocol>>(_ <Param>x</Param>: <GenericTypeParam@261:12>T</GenericTypeParam>) {}{{$}}
 
 class C11 {
   // CHECK: var <Var>a</Var>: <iStruct@>Int</iStruct> = { var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:22>tmp</Var> }()

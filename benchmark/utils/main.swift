@@ -28,6 +28,7 @@ import ArrayOfRef
 import ArraySetElement
 import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
+import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
@@ -35,18 +36,22 @@ import CString
 import CSVParsing
 import Calculator
 import CaptureProp
+import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import CharacterProperties
 import Chars
 import ClassArrayGetter
 import Combos
+import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
 import DictTest3
+import DictTest4
 import DictionaryBridge
+import DictionaryCopy
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
@@ -60,6 +65,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FloatingPointPrinting
 import Hanoi
 import Hash
 import HashQuadratic
@@ -101,6 +107,7 @@ import Prims
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
+import Queue
 import RC4
 import RGBHistogram
 import RangeAssignment
@@ -108,8 +115,10 @@ import RangeIteration
 import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
+import RemoveWhere
 import ReversedCollections
 import RomanNumbers
+import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -165,6 +174,9 @@ registerBenchmark(ArrayOfRef)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
 registerBenchmark(BinaryFloatingPointConversionFromBinaryInteger)
+registerBenchmark(BinaryFloatingPointPropertiesBinade)
+registerBenchmark(BinaryFloatingPointPropertiesNextUp)
+registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
@@ -174,6 +186,7 @@ registerBenchmark(CSVParsingAlt)
 registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
+registerBenchmark(ChainedFilterMap)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)
 registerBenchmark(CharacterPropertiesFetch)
@@ -183,12 +196,15 @@ registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
 registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
+registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
+registerBenchmark(Dictionary4)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
@@ -202,6 +218,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(HashQuadratic)
@@ -243,6 +260,8 @@ registerBenchmark(Prims)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
+registerBenchmark(QueueGeneric)
+registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
@@ -250,8 +269,10 @@ registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
+registerBenchmark(RemoveWhere)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
+registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
@@ -267,6 +288,8 @@ registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)
+registerBenchmark(StringInterpolationSmall)
+registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringTests)

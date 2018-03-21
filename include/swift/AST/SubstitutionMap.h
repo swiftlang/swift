@@ -60,7 +60,7 @@ class SubstitutionMap {
 
   // FIXME: Switch to a more efficient representation that corresponds to
   // the conformance requirements in the GenericSignature.
-  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
+  llvm::DenseMap<CanType, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
 
   /// Retrieve the array of replacement types, which line up with the
@@ -161,6 +161,10 @@ public:
                           unsigned baseDepthOrIndex,
                           unsigned origDepthOrIndex,
                           GenericSignature *genericSig);
+
+  /// Swap archetypes in the substitution map's replacement types with their
+  /// interface types.
+  SubstitutionMap mapReplacementTypesOutOfContext() const;
 
   /// Verify that this substitution map is valid.
   void verify() const;

@@ -246,6 +246,8 @@ public:
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
+  SILInstruction *
+  visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
@@ -281,6 +283,9 @@ private:
                                                SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
                                                ArchetypeType *OpenedArchetype);
+
+  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
+
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,

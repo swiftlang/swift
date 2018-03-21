@@ -100,15 +100,24 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         Kind = SyntaxNodeKind::Keyword;
         break;
 
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
-      case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
         LiteralStartLoc = Loc;
         continue;
 
+#define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
+#include "swift/Syntax/TokenKinds.def"
+        Kind = SyntaxNodeKind::BuildConfigKeyword;
+        break;
+
+#define POUND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
+#define POUND_COND_DIRECTIVE_KEYWORD(Name)
+#include "swift/Syntax/TokenKinds.def"
+        Kind = SyntaxNodeKind::PoundDirectiveKeyword;
+        break;
+
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg)
+#define POUND_DIRECTIVE_KEYWORD(Name)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;
@@ -816,17 +825,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     for (auto &Clause : ConfigD->getClauses()) {
-      unsigned TokLen;
-      if (&Clause == &*ConfigD->getClauses().begin())
-        TokLen = 3; // '#if'
-      else if (Clause.Cond == nullptr)
-        TokLen = 5; // '#else'
-      else
-        TokLen = 7; // '#elseif'
-      if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
-                            CharSourceRange(Clause.Loc, TokLen) }))
-        return false;
-      
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
@@ -841,11 +839,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         VisitedNodesInsideIfConfig.insert(Element);
       }
     }
-    
-    if (!ConfigD->hadMissingEnd())
-      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-            CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
-        return false;
 
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;

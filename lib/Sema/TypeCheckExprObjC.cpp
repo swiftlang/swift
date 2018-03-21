@@ -78,7 +78,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   Type currentType;
   auto updateState = [&](bool isProperty, Type newType) {
     // Strip off optionals.
-    newType = newType->lookThroughAllAnyOptionalTypes();
+    newType = newType->lookThroughAllOptionalTypes();
 
     // If updating to a type, just set the new type; there's nothing
     // more to do.

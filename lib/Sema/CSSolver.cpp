@@ -984,12 +984,6 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  // Disable the shrink pass when constraint propagation is
-  // enabled. They achieve similar effects, and the shrink pass is
-  // known to have bad behavior in some cases.
-  if (TC.Context.LangOpts.EnableConstraintPropagation)
-    return;
-
   typedef llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>> DomainMap;
 
   // A collection of original domains of all of the expressions,
@@ -1386,9 +1380,21 @@ ConstraintSystem::solve(Expr *&expr,
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
+    auto getTypeOfExpr = [&](const Expr *E) -> Type {
+      if (hasType(E))
+        return getType(E);
+      return Type();
+    };
+    auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+      if (hasType(TL))
+        return getType(TL);
+      return Type();
+    };
+
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
+
+    expr->print(log, getTypeOfExpr, getTypeOfTypeLoc);
     log << "\n";
     print(log);
   }
@@ -1420,11 +1426,6 @@ bool ConstraintSystem::solve(Expr *const expr,
   // solutions.
   if (failedConstraint || simplify())
     return true;
-
-  // If the experimental constraint propagation pass is enabled, run it.
-  if (TC.Context.LangOpts.EnableConstraintPropagation)
-    if (propagateConstraints())
-      return true;
 
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
@@ -1788,9 +1789,10 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
     // Let's skip generic overload choices only in case if
     // non-generic score indicates that there were no forced
     // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, and no fixes required.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0
-        && score[SK_Fix] == 0)
+    // choices present in the solution, no fixes required,
+    // and there are no non-trivial function conversions.
+    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
+        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
       return true;
   }
 

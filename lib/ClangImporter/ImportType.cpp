@@ -160,17 +160,6 @@ namespace {
     return OptKind;
   }
 
-  /// Wrap a type in the Optional type appropriate to the import kind.
-  static Type getOptionalType(Type payloadType, ImportTypeKind kind,
-                              OptionalTypeKind OptKind) {
-    OptKind = getOptionalKind(kind, OptKind);
-
-    if (OptKind == OTK_None)
-      return payloadType;
-
-    return OptionalType::get(OptKind, payloadType);
-  }
-
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
@@ -188,8 +177,6 @@ namespace {
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
       auto IR = Visit(type.getTypePtr());
-      assert(!IR.AbstractType ||
-             !IR.AbstractType->getImplicitlyUnwrappedOptionalObjectType());
       return IR;
     }
 
@@ -237,7 +224,7 @@ namespace {
 
       // FIXME: Types that can be mapped, but aren't yet.
       case clang::BuiltinType::Half:
-      case clang::BuiltinType::LongDouble:
+      case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
         return Type();
@@ -1172,10 +1159,6 @@ static ImportedType adjustTypeForConcreteImport(
     bool allowNSUIntegerAsInt, Bridgeability bridging, OptionalTypeKind optKind,
     bool resugarNSErrorPointer) {
 
-  // We never expect an IUO type to be passed in.
-  assert(!importedType ||
-         !importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   if (importKind == ImportTypeKind::Abstract) {
     return {importedType, false};
   }
@@ -1199,8 +1182,6 @@ static ImportedType adjustTypeForConcreteImport(
   if (!importedType)
     return {Type(), false};
 
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
   auto maybeImportNSErrorPointer = [&]() -> Type {
     if (importKind != ImportTypeKind::Parameter)
@@ -1211,7 +1192,7 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
       return Type();
 
-    auto elementObj = elementType->getAnyOptionalObjectType();
+    auto elementObj = elementType->getOptionalObjectType();
     if (!elementObj)
       return Type();
 
@@ -1243,7 +1224,6 @@ static ImportedType adjustTypeForConcreteImport(
   };
 
   if (Type result = maybeImportNSErrorPointer()) {
-    assert(!result->getImplicitlyUnwrappedOptionalObjectType());
     return {result, false};
   }
 
@@ -1258,8 +1238,8 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_UnsafeMutablePointer)
       return Type();
 
-    OptionalTypeKind OTK;
-    auto insideOptionalType = elementType->getAnyOptionalObjectType(OTK);
+    auto insideOptionalType = elementType->getOptionalObjectType();
+    bool isOptional = (bool) insideOptionalType;
     if (!insideOptionalType)
       insideOptionalType = elementType;
 
@@ -1275,10 +1255,8 @@ static ImportedType adjustTypeForConcreteImport(
            "signature of Unmanaged has changed");
 
     auto resultTy = boundGenericTy->getGenericArgs().front();
-    if (OTK != OTK_None) {
-      assert(OTK != OTK_ImplicitlyUnwrappedOptional);
-      resultTy = OptionalType::get(OTK, resultTy);
-    }
+    if (isOptional)
+      resultTy = OptionalType::get(resultTy);
 
     StringRef pointerName;
     if (importKind == ImportTypeKind::CFRetainedOutParameter)
@@ -1289,11 +1267,9 @@ static ImportedType adjustTypeForConcreteImport(
     resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                     pointerName,
                                                     resultTy);
-    assert(!resultTy->getImplicitlyUnwrappedOptionalObjectType());
     return resultTy;
   };
   if (Type outParamTy = maybeImportCFOutParameter()) {
-    assert(!outParamTy->getImplicitlyUnwrappedOptionalObjectType());
     importedType = outParamTy;
   }
 
@@ -1392,18 +1368,7 @@ static ImportedType adjustTypeForConcreteImport(
       importedType = OptionalType::get(importedType);
   }
 
-  // We do not expect to return actual IUO types.
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   return {importedType, isIUO};
-}
-
-static Type adjustOptionality(ImportedType importedType) {
-  if (!importedType.isImplicitlyUnwrapped())
-    return importedType.getType();
-
-  return ImplicitlyUnwrappedOptionalType::get(
-      importedType.getType()->getOptionalObjectType());
 }
 
 ImportedType ClangImporter::Implementation::importType(
@@ -1456,14 +1421,7 @@ ImportedType ClangImporter::Implementation::importType(
       *this, type, importResult.AbstractType, importKind, importResult.Hint,
       allowNSUIntegerAsInt, bridging, optionality, resugarNSErrorPointer);
 
-  // We should never get an actual IUO type back.
-  assert(!adjustedType ||
-         !adjustedType.getType()->getImplicitlyUnwrappedOptionalObjectType());
-
-  // Make an IUO type based on isIUO. This will be removed when IUOs
-  // are removed from the type system.
-  return {adjustOptionality(adjustedType),
-          adjustedType.isImplicitlyUnwrapped()};
+  return adjustedType;
 }
 
 Type ClangImporter::Implementation::importTypeIgnoreIUO(
@@ -1473,13 +1431,6 @@ Type ClangImporter::Implementation::importTypeIgnoreIUO(
 
   auto importedType = importType(type, importKind, allowNSUIntegerAsInt,
                                  bridging, optionality, resugarNSErrorPointer);
-
-  // We allow IUO types to be returned at the moment. At some point we
-  // will never generate them and this can be removed.
-  assert(!importedType || importedType.isImplicitlyUnwrapped() ==
-                              !importedType.getType()
-                                   ->getImplicitlyUnwrappedOptionalObjectType()
-                                   .isNull());
 
   return importedType.getType();
 }
@@ -1556,9 +1507,8 @@ ImportedType ClangImporter::Implementation::importPropertyType(
 /// Apply the @noescape attribute
 static Type applyNoEscape(Type type) {
   // Recurse into optional types.
-  OptionalTypeKind optKind;
-  if (Type objectType = type->getAnyOptionalObjectType(optKind)) {
-    return OptionalType::get(optKind, applyNoEscape(objectType));
+  if (Type objectType = type->getOptionalObjectType()) {
+    return OptionalType::get(applyNoEscape(objectType));
   }
 
   // Apply @noescape to function types.
@@ -1595,9 +1545,6 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t
-      assert(!SwiftContext.getIntDecl()
-                  ->getDeclaredType()
-                  ->getImplicitlyUnwrappedOptionalObjectType());
       return {SwiftContext.getIntDecl()->getDeclaredType(), false};
     default:
       break;
@@ -1714,7 +1661,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
         param, AccessLevel::Private,
-        VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), name,
+        VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
@@ -1732,7 +1679,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
                               {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::Owned,
+    auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default,
                                               SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
                                               name, paramTy,
@@ -1757,11 +1704,13 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    Identifier baseName, unsigned numParams, StringRef argumentLabel,
+    DeclBaseName baseName, unsigned numParams, StringRef argumentLabel,
     bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
+  auto baseNameStr = baseName.userFacingName();
+
   // Don't introduce a default argument for setters with only a single
   // parameter.
-  if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
+  if (numParams == 1 && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
@@ -1783,7 +1732,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
   }
 
   // Don't introduce an empty options default arguments for setters.
-  if (isFirstParameter && camel_case::getFirstWord(baseName.str()) == "set")
+  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Option sets default to "[]" if they have "Options" in their name.
@@ -1805,8 +1754,8 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
       if (objcClass->getName() == "NSDictionary") {
         StringRef searchStr = argumentLabel;
-        if (searchStr.empty() && !baseName.empty())
-          searchStr = baseName.str();
+        if (searchStr.empty() && !baseNameStr.empty())
+          searchStr = baseNameStr;
 
         auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
         if (clangOptionality == OTK_Optional)
@@ -1855,7 +1804,7 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
             false};
 
   case ForeignErrorConvention::NilResult:
-    if (Type unwrappedTy = importedType.getType()->getAnyOptionalObjectType())
+    if (Type unwrappedTy = importedType.getType()->getOptionalObjectType())
       return {unwrappedTy, false};
     // Check for a bad override.
     if (importedType.getType()->isVoid())
@@ -2001,8 +1950,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
       clangDecl->getMethodFamily() == clang::OMF_performSelector) {
     // performSelector methods that return 'id' should be imported into Swift
     // as returning Unmanaged<AnyObject>.
-    Type nonOptionalTy =
-        swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
+    Type nonOptionalTy = swiftResultTy->getOptionalObjectType();
+    bool resultIsOptional = (bool) nonOptionalTy;
     if (!nonOptionalTy)
       nonOptionalTy = swiftResultTy;
 
@@ -2012,8 +1961,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
     if (nonOptionalTy->isAnyClassReferenceType()) {
       swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
-      if (OptionalityOfReturn != OTK_None)
-        swiftResultTy = OptionalType::get(OptionalityOfReturn, swiftResultTy);
+      if (resultIsOptional)
+        swiftResultTy = OptionalType::get(swiftResultTy);
     }
   }
 
@@ -2033,7 +1982,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     // It doesn't actually matter which DeclContext we use, so just
     // use the imported header unit.
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
+    auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
@@ -2085,11 +2034,14 @@ ImportedType ClangImporter::Implementation::importMethodType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = getOptionalType(getNSCopyingType(),
-                                     ImportTypeKind::Parameter,
-                                     optionalityOfParam);
       auto optKind =
           getOptionalKind(ImportTypeKind::Parameter, optionalityOfParam);
+
+      if (optKind == OTK_None)
+        swiftParamTy = getNSCopyingType();
+      else
+        swiftParamTy = OptionalType::get(getNSCopyingType());
+
       paramIsIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
     } else {
       ImportTypeKind importKind = ImportTypeKind::Parameter;
@@ -2156,7 +2108,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     // Set up the parameter info.
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           VarDecl::Specifier::Owned,
+                                           VarDecl::Specifier::Default,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
@@ -2175,7 +2127,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseIdentifier(), numEffectiveParams,
+          importedName.getDeclName().getBaseName(), numEffectiveParams,
           name.empty() ? StringRef() : name.str(), paramIndex == 0,
           isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
@@ -2241,7 +2193,7 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
 
   // Determine if the method is a property getter or setter.
   bool isGetter;
-  if (clangDecl->parameters().size() == 0)
+  if (clangDecl->parameters().empty())
     isGetter = true;
   else if (clangDecl->parameters().size() == 1)
     isGetter = false;
@@ -2276,7 +2228,7 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           VarDecl::Specifier::Owned,
+                                           VarDecl::Specifier::Default,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,

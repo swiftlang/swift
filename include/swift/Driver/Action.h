@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,7 +117,7 @@ public:
   // Returns the index of the Input action's output file which is used as
   // (single) input to this action. Most actions produce only a single output
   // file, so we return 0 by default.
-  virtual int getInputIndex() const { return 0; }
+  virtual size_t getInputIndex() const { return 0; }
 
   static bool classof(const Action *A) {
     return (A->getKind() >= ActionClass::JobFirst &&
@@ -188,16 +188,16 @@ private:
   // In case of multi-threaded compilation, the compile-action produces multiple
   // output bitcode-files. For each bitcode-file a BackendJobAction is created.
   // This index specifies which of the files to select for the input.
-  int InputIndex;
+  size_t InputIndex;
 public:
-  BackendJobAction(const Action *Input, types::ID OutputType, int InputIndex)
+  BackendJobAction(const Action *Input, types::ID OutputType, size_t InputIndex)
       : JobAction(Action::BackendJob, Input, OutputType),
         InputIndex(InputIndex) {}
   static bool classof(const Action *A) {
     return A->getKind() == Action::BackendJob;
   }
   
-  virtual int getInputIndex() const { return InputIndex; }
+  virtual size_t getInputIndex() const { return InputIndex; }
 };
 
 class REPLJobAction : public JobAction {

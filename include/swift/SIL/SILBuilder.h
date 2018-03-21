@@ -47,6 +47,7 @@ class SILBuilder {
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
   const SILDebugScope *CurDebugScope = nullptr;
+  Optional<SILLocation> CurDebugLocOverride = None;
 
   /// If this pointer is non-null, then any inserted instruction is
   /// recorded in this list.
@@ -141,6 +142,18 @@ public:
   void setCurrentDebugScope(const SILDebugScope *DS) { CurDebugScope = DS; }
   const SILDebugScope *getCurrentDebugScope() const { return CurDebugScope; }
 
+  /// Apply a debug location override. If loc is None, the current override is
+  /// removed. Otherwise, newly created debug locations use the given location.
+  /// Note: the override location does not apply to debug_value[_addr].
+  void applyDebugLocOverride(Optional<SILLocation> loc) {
+    CurDebugLocOverride = loc;
+  }
+
+  /// Get the current debug location override.
+  Optional<SILLocation> getCurrentDebugLocOverride() const {
+    return CurDebugLocOverride;
+  }
+
   /// Convenience function for building a SILDebugLocation.
   SILDebugLocation getSILDebugLocation(SILLocation Loc) {
     // FIXME: Audit all uses and enable this assertion.
@@ -148,7 +161,8 @@ public:
     auto Scope = getCurrentDebugScope();
     if (!Scope && F)
         Scope = F->getDebugScope();
-    return SILDebugLocation(Loc, Scope);
+    auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
+    return SILDebugLocation(overriddenLoc, Scope);
   }
 
   //===--------------------------------------------------------------------===//
@@ -286,7 +300,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
-                                   SILDebugVariable Var = SILDebugVariable()) {
+                                   Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocStackInst::create(getSILDebugLocation(Loc),
                                          elementType, getFunction(),
@@ -327,7 +341,7 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                               SILDebugVariable Var = SILDebugVariable()) {
+                               Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        OpenedArchetypes, Var));
@@ -733,16 +747,9 @@ public:
   }
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   SILDebugVariable Var = SILDebugVariable()) {
-    return insert(DebugValueInst::create(getSILDebugLocation(Loc), src,
-                                         getModule(), Var));
-  }
-  DebugValueAddrInst *
-  createDebugValueAddr(SILLocation Loc, SILValue src,
-                       SILDebugVariable Var = SILDebugVariable()) {
-    return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
-                                             getModule(), Var));
-  }
+                                   SILDebugVariable Var);
+  DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
+                                           SILDebugVariable Var);
 
   LoadWeakInst *createLoadWeak(SILLocation Loc, SILValue src, IsTake_t isTake) {
     return insert(new (getModule())
@@ -787,6 +794,12 @@ public:
                                              SILType Ty) {
     return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
                                               getFunction(), OpenedArchetypes));
+  }
+
+  ConvertEscapeToNoEscapeInst *
+  createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty) {
+    return insert(ConvertEscapeToNoEscapeInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
   }
 
   ThinFunctionToPointerInst *
@@ -862,6 +875,13 @@ public:
                                                  SILType Ty) {
     return insert(new (getModule()) BridgeObjectToRefInst(
         getSILDebugLocation(Loc), Op, Ty));
+  }
+
+  ValueToBridgeObjectInst *createValueToBridgeObject(SILLocation Loc,
+                                                     SILValue value) {
+    auto Ty = SILType::getBridgeObjectType(getASTContext());
+    return insert(new (getModule()) ValueToBridgeObjectInst(
+        getSILDebugLocation(Loc), value, Ty));
   }
 
   BridgeObjectToWordInst *createBridgeObjectToWord(SILLocation Loc,
@@ -1525,6 +1545,12 @@ public:
     return insert(new (getModule()) IsUniqueOrPinnedInst(
         getSILDebugLocation(Loc), value, Int1Ty));
   }
+  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+                                                 SILValue operand) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (getModule()) IsEscapingClosureInst(
+        getSILDebugLocation(Loc), operand, Int1Ty));
+  }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
     return insert(new (getModule())
@@ -1602,7 +1628,14 @@ public:
   // Runtime failure
   //===--------------------------------------------------------------------===//
 
-  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand) {
+  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
+                               bool Inverted = false) {
+    if (Inverted) {
+      SILType Ty = Operand->getType();
+      SILValue True(createIntegerLiteral(Loc, Ty, 1));
+      Operand =
+          createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
+    }
     return insert(new (getModule())
                       CondFailInst(getSILDebugLocation(Loc), Operand));
   }
@@ -1910,6 +1943,8 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
+    if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
   }
@@ -2067,6 +2102,35 @@ public:
       Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
     }
   }
+};
+
+/// Apply a debug location override for the duration of the current scope.
+class DebugLocOverrideRAII {
+  SILBuilder &Builder;
+  Optional<SILLocation> oldOverride;
+#ifndef NDEBUG
+  Optional<SILLocation> installedOverride;
+#endif
+
+public:
+  DebugLocOverrideRAII(SILBuilder &B, Optional<SILLocation> Loc) : Builder(B) {
+    oldOverride = B.getCurrentDebugLocOverride();
+    Builder.applyDebugLocOverride(Loc);
+#ifndef NDEBUG
+    installedOverride = Loc;
+#endif
+  }
+
+  ~DebugLocOverrideRAII() {
+    assert(Builder.getCurrentDebugLocOverride() == installedOverride &&
+           "Restoring debug location override to an unexpected state");
+    Builder.applyDebugLocOverride(oldOverride);
+  }
+
+  DebugLocOverrideRAII(const DebugLocOverrideRAII &) = delete;
+  DebugLocOverrideRAII &operator=(const DebugLocOverrideRAII &) = delete;
+  DebugLocOverrideRAII(DebugLocOverrideRAII &&) = delete;
+  DebugLocOverrideRAII &operator=(DebugLocOverrideRAII &&) = delete;
 };
 
 } // end swift namespace

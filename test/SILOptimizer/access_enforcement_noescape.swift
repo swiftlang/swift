@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
+// REQUIRES: plus_zero_runtime
+
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
 // REQUIRES: asserts
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.
@@ -43,11 +45,11 @@ func nestedNoEscape(f: inout Frob) {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14nestedNoEscape1fyAA4FrobVz_tF'
 
 // closure #1 in nestedNoEscape(f:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape14nestedNoEscape1fyAA4FrobVz_tFyycfU_ : $@convention(thin) (@inout_aliasable Frob) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape14nestedNoEscape1fyAA4FrobVz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Frob) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Frob
 // CHECK: %{{.*}} = apply %{{.*}}([[ACCESS]]) : $@convention(method) (@inout Frob) -> ()
 // CHECK: end_access [[ACCESS]] : $*Frob
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14nestedNoEscape1fyAA4FrobVz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14nestedNoEscape1fyAA4FrobVz_tFyyXEfU_'
 
 // Allow aliased noescape reads.
 func readRead() {
@@ -63,18 +65,18 @@ func readRead() {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape8readReadyyF'
 
 // closure #1 in readRead()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape8readReadyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape8readReadyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: begin_access [read] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape8readReadyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape8readReadyyFyyXEfU_'
 
 // closure #2 in readRead()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape8readReadyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape8readReadyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: begin_access [read] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape8readReadyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape8readReadyyFyyXEfU0_'
 
 // Allow aliased noescape reads of an `inout` arg.
 func inoutReadRead(x: inout Int) {
@@ -83,26 +85,26 @@ func inoutReadRead(x: inout Int) {
 }
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape09inoutReadE01xySiz_tF : $@convention(thin) (@inout Int) -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape09inoutReadE01xySiz_tF'
 
 // closure #1 in inoutReadRead(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape09inoutReadE01xySiz_tFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape09inoutReadE01xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: begin_access [read] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape09inoutReadE01xySiz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape09inoutReadE01xySiz_tFyyXEfU_'
 
 // closure #2 in inoutReadRead(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape09inoutReadE01xySiz_tFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape09inoutReadE01xySiz_tFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: begin_access [read] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape09inoutReadE01xySiz_tFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape09inoutReadE01xySiz_tFyyXEfU0_'
 
 // Allow aliased noescape read + boxed read.
 func readBoxRead() {
@@ -115,9 +117,9 @@ func readBoxRead() {
 }
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape11readBoxReadyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape11readBoxReadyyF'
@@ -130,10 +132,10 @@ func readBoxRead() {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape11readBoxReadyyFyycfU_'
 
 // closure #2 in readBoxRead()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape11readBoxReadyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape11readBoxReadyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape11readBoxReadyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape11readBoxReadyyFyyXEfU0_'
 
 // Error: cannout capture inout.
 //
@@ -151,26 +153,26 @@ func readWrite() {
 }
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape9readWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape9readWriteyyF'
 
 // closure #1 in readWrite()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape9readWriteyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape9readWriteyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: [[ACCESS:%.*]] = begin_access [read] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape9readWriteyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape9readWriteyyFyyXEfU_'
 
 // closure #2 in readWrite()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape9readWriteyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape9readWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK-NOT: [[ACCESS:%.*]] = begin_access [modify] [dynamic]
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape9readWriteyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape9readWriteyyFyyXEfU0_'
 
 // Allow aliased noescape read + write of an `inout` arg.
 func inoutReadWrite(x: inout Int) {
@@ -181,23 +183,23 @@ func inoutReadWrite(x: inout Int) {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape14inoutReadWrite1xySiz_tF : $@convention(thin) (@inout Int) -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14inoutReadWrite1xySiz_tF'
 
 // closure #1 in inoutReadWrite(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU_'
 
 // closure #2 in inoutReadWrite(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU0_'
 
 
 func readBoxWrite() {
@@ -209,9 +211,9 @@ func readBoxWrite() {
 }
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape12readBoxWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readBoxWriteyyF'
@@ -224,10 +226,10 @@ func readBoxWrite() {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readBoxWriteyyFyycfU_'
 
 // closure #2 in readBoxWrite()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape12readBoxWriteyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape12readBoxWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readBoxWriteyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readBoxWriteyyFyyXEfU0_'
 
 // Error: cannout capture inout.
 // func inoutReadBoxWrite(x: inout Int) {
@@ -246,8 +248,8 @@ func readWriteBox() {
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape12readWriteBoxyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT2]], [[CVT1]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readWriteBoxyyF'
@@ -260,10 +262,10 @@ func readWriteBox() {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readWriteBoxyyFyycfU_'
 
 // closure #2 in readWriteBox()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape12readWriteBoxyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape12readWriteBoxyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readWriteBoxyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape12readWriteBoxyyFyyXEfU0_'
 
 // Error: cannout capture inout.
 // func inoutReadWriteBox(x: inout Int) {
@@ -283,17 +285,17 @@ func readWriteInout() {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape14readWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
 // CHECK: end_access [[ACCESS2]]
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14readWriteInoutyyF'
 
 // closure #1 in readWriteInout()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape14readWriteInoutyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape14readWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14readWriteInoutyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape14readWriteInoutyyFyyXEfU_'
 
 // Error: noescape read + write inout of an inout.
 func inoutReadWriteInout(x: inout Int) {
@@ -306,17 +308,17 @@ func inoutReadWriteInout(x: inout Int) {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tF : $@convention(thin) (@inout Int) -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
 // CHECK: end_access [[ACCESS2]]
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tF'
 
 // closure #1 in inoutReadWriteInout(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyyXEfU_'
 
 // Traps on boxed read + write inout.
 // Covered by Interpreter/enforce_exclusive_access.swift.
@@ -330,7 +332,7 @@ func readBoxWriteInout() {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape17readBoxWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %1 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS]])
 // CHECK: end_access [[ACCESS]]
@@ -361,24 +363,24 @@ func writeWrite() {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape10writeWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape10writeWriteyyF'
 
 // closure #1 in writeWrite()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape10writeWriteyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape10writeWriteyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape10writeWriteyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape10writeWriteyyFyyXEfU_'
 
 // closure #2 in writeWrite()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape10writeWriteyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape10writeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape10writeWriteyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape10writeWriteyyFyyXEfU0_'
 
   
 // Allow aliased noescape write + write of an `inout` arg.
@@ -390,24 +392,24 @@ func inoutWriteWrite(x: inout Int) {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape010inoutWriteE01xySiz_tF : $@convention(thin) (@inout Int) -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE01xySiz_tF'
 
 // closure #1 in inoutWriteWrite(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyyXEfU_'
 
 // closure #2 in inoutWriteWrite(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE01xySiz_tFyyXEfU0_'
 
 // Traps on aliased boxed write + noescape write.
 // Covered by Interpreter/enforce_exclusive_access.swift.
@@ -423,8 +425,8 @@ func writeWriteBox() {
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape13writeWriteBoxyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_function [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[CVT1:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[CVT2]], [[CVT1]])
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13writeWriteBoxyyF'
@@ -437,10 +439,10 @@ func writeWriteBox() {
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13writeWriteBoxyyFyycfU_'
 
 // closure #2 in writeWriteBox()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape13writeWriteBoxyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape13writeWriteBoxyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13writeWriteBoxyyFyycfU0_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13writeWriteBoxyyFyyXEfU0_'
 
 // Error: inout cannot be captured.
 // func inoutWriteWriteBox(x: inout Int) {
@@ -460,17 +462,17 @@ func writeWriteInout() {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape15writeWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
 // CHECK: end_access [[ACCESS2]]
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape15writeWriteInoutyyF'
 
 // closure #1 in writeWriteInout()
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape15writeWriteInoutyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape15writeWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape15writeWriteInoutyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape15writeWriteInoutyyFyyXEfU_'
 
 // Error: on noescape write + write inout.
 func inoutWriteWriteInout(x: inout Int) {
@@ -484,17 +486,17 @@ func inoutWriteWriteInout(x: inout Int) {
 // inoutWriteWriteInout(x:)
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tF : $@convention(thin) (@inout Int) -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
 // CHECK: end_access [[ACCESS2]]
 // CHECK-LABEL: // end sil function '$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tF'
 
 // closure #1 in inoutWriteWriteInout(x:)
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyyXEfU_'
 
 // Traps on boxed write + write inout.
 // Covered by Interpreter/enforce_exclusive_access.swift.
@@ -508,7 +510,7 @@ func writeBoxWriteInout() {
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape18writeBoxWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_function [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %1 : $*Int
 // CHECK: apply %{{.*}}([[CVT]], [[ACCESS]])
 // CHECK: end_access [[ACCESS]]
@@ -541,7 +543,7 @@ func readBlockWriteInout() {
 }
 
 // CHECK-LABEL: sil hidden @$S27access_enforcement_noescape19readBlockWriteInoutyyF : $@convention(thin) () -> () {
-// CHECK: [[F1:%.*]] = function_ref @$S27access_enforcement_noescape19readBlockWriteInoutyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
+// CHECK: [[F1:%.*]] = function_ref @$S27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[F1]](%0) : $@convention(thin) (@inout_aliasable Int) -> ()
 // CHECK-NOT: begin_access
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
@@ -549,9 +551,9 @@ func readBlockWriteInout() {
 // CHECK: end_access [[WRITE]] : $*Int
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19readBlockWriteInoutyyF'
 
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape19readBlockWriteInoutyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: begin_access [read] [static] %0 : $*Int
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19readBlockWriteInoutyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_'
 
 // Test AccessSummaryAnalysis.
 //
@@ -571,10 +573,10 @@ func noEscapeBlock() {
 // CHECK: apply
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyF'
 
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape13noEscapeBlockyyFyycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[F1:%.*]] = function_ref @$S27access_enforcement_noescape13noEscapeBlockyyFyycfU_yycfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK: [[F1:%.*]] = function_ref @$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[F1]](%0) : $@convention(thin) (@inout_aliasable Int) -> ()
-// CHECK: [[CVT:%.*]] = convert_function [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
 // CHECK: [[ADDR:%.*]] = project_block_storage [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> ()
 // CHECK: store [[CVT]] to [[ADDR]] : $*@noescape @callee_guaranteed () -> ()
@@ -582,12 +584,11 @@ func noEscapeBlock() {
 // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> (), invoke [[F2]] : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
 // CHECK: [[ARG:%.*]] = copy_block [[BLOCK]] : $@convention(block) @noescape () -> ()
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@owned @convention(block) @noescape () -> (), @inout Int) -> ()
+// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> (), @inout Int) -> ()
 // CHECK: end_access [[WRITE]] : $*Int
-// CHECK: destroy_addr [[ADDR]] : $*@noescape @callee_guaranteed () -> ()
 // CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> ()
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_'
 
-// CHECK-LABEL: sil private @$S27access_enforcement_noescape13noEscapeBlockyyFyycfU_yycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private @$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
 // CHECK: begin_access [read] [static] %0 : $*Int
-// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyycfU_yycfU_'
+// CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_'

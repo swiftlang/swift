@@ -1,10 +1,11 @@
 add_swift_library(swiftFrontend STATIC
   ArgsToFrontendInputsConverter.cpp
   ArgsToFrontendOptionsConverter.cpp
+  ArgsToFrontendOutputsConverter.cpp
   CompilerInvocation.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
-  FrontendInputs.cpp
+  FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp

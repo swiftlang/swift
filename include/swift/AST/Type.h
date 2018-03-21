@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -42,7 +43,6 @@ class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
-enum OptionalTypeKind : unsigned;
 class ProtocolConformanceRef;
 class ProtocolDecl;
 class ProtocolType;
@@ -64,6 +64,12 @@ typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 /// this substitutable type; otherwise, the replacement type.
 using TypeSubstitutionFn
   = llvm::function_ref<Type(SubstitutableType *dependentType)>;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// replaces archetypes with their interface types.
+struct MapTypeOutOfContext {
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c TypeSubstitutionMap.
@@ -362,15 +368,19 @@ public:
   /// class D { }
   /// \endcode
   ///
-  /// The join of B and C is A, the join of A and B is A. However, there is no
-  /// join of D and A (or D and B, or D and C) because there is no common
-  /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
-  /// to find a common type.
+  /// The join of B and C is A, the join of A and B is A.
+  ///
+  /// The Any type is considered the common supertype by default when no
+  /// closer common supertype exists.
+  ///
+  /// In unsupported cases where we cannot yet compute an accurate join,
+  /// we return None.
   ///
   /// \returns the join of the two types, if there is a concrete type
   /// that can express the join, or Any if the only join would be a
-  /// more-general existential type
-  static Type join(Type first, Type second);
+  /// more-general existential type, or None if we cannot yet compute a
+  /// correct join but one better than Any may exist.
+  static Optional<Type> join(Type first, Type second);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -388,8 +398,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getAnyOptionalObjectTypeImpl(CanType type,
-                                              OptionalTypeKind &kind);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -456,13 +465,8 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
-  CanType getAnyOptionalObjectType() const {
-    OptionalTypeKind kind;
-    return getAnyOptionalObjectTypeImpl(*this, kind);
-  }
-
-  CanType getAnyOptionalObjectType(OptionalTypeKind &kind) const {
-    return getAnyOptionalObjectTypeImpl(*this, kind);
+  CanType getOptionalObjectType() const {
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {
@@ -606,6 +610,18 @@ public:
   }
 };
 
+template <typename T>
+inline T *staticCastHelper(const Type &Ty) {
+  // The constructor of the ArrayRef<Type> must guarantee this invariant.
+  // XXX -- We use reinterpret_cast instead of static_cast so that files
+  // can avoid including Types.h if they want to.
+  return reinterpret_cast<T*>(Ty.getPointer());
+}
+/// TypeArrayView allows arrays of 'Type' to have a static type.
+template <typename T>
+using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
+                                   /*AllowOrigAccess*/true>;
+
 } // end namespace swift
 
 namespace llvm {
@@ -653,7 +669,7 @@ namespace llvm {
 
   // A Type is "pointer like".
   template<>
-  class PointerLikeTypeTraits<swift::Type> {
+  struct PointerLikeTypeTraits<swift::Type> {
   public:
     static inline void *getAsVoidPointer(swift::Type I) {
       return (void*)I.getPointer();
@@ -665,7 +681,7 @@ namespace llvm {
   };
   
   template<>
-  class PointerLikeTypeTraits<swift::CanType> :
+  struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
   public:
     static inline swift::CanType getFromVoidPointer(void *P) {
@@ -674,7 +690,7 @@ namespace llvm {
   };
 
   template<>
-  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
   public:
     static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
       return swift::CanGenericSignature((swift::GenericSignature*)P);

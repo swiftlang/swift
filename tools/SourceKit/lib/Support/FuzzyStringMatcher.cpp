@@ -496,7 +496,7 @@ CandidateSpecificMatcher::scoreCandidateTrial(unsigned firstPatternPos) {
   trialScore += patternLength / static_cast<double>(baseNameLength) * 0.25;
 
   // Exact matches are even better.
-  if (patternLength >= baseNameLength && runs.size() > 0 &&
+  if (patternLength >= baseNameLength && !runs.empty() &&
       runs[0].location == 0) {
     trialScore *= 1.1;
   }

@@ -28,6 +28,23 @@ public enum ParserError: Error {
 }
 
 extension Syntax {
+  fileprivate static func encodeSourceFileSyntaxInternal(_ url: URL) throws -> Data {
+    let swiftcRunner = try SwiftcRunner(sourceFile: url)
+    let result = try swiftcRunner.invoke()
+    guard result.wasSuccessful else {
+      throw ParserError.swiftcFailed(result.exitCode, result.stderr)
+    }
+    return result.stdoutData
+  }
+
+  /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
+  /// serialization format.
+  /// - Parameter url: The URL you wish to parse.
+  /// - Returns: The syntax tree in Json format string.
+  public static func encodeSourceFileSyntax(_ url: URL) throws -> String {
+    return String(data: try encodeSourceFileSyntaxInternal(url), encoding: .utf8)!
+  }
+
   /// Parses the Swift file at the provided URL into a full-fidelity `Syntax`
   /// tree.
   /// - Parameter url: The URL you wish to parse.
@@ -37,16 +54,27 @@ extension Syntax {
   ///           located, `ParseError.invalidFile` if the file is invalid.
   ///           FIXME: Fill this out with all error cases.
   public static func parse(_ url: URL) throws -> SourceFileSyntax {
-    let swiftcRunner = try SwiftcRunner(sourceFile: url)
-    let result = try swiftcRunner.invoke()
-    guard result.wasSuccessful else {
-      throw ParserError.swiftcFailed(result.exitCode, result.stderr)
-    }
+    return try decodeSourceFileSyntax(encodeSourceFileSyntaxInternal(url))
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
+  /// - Parameter content: The data of the serialized SourceFileSyntax.
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  fileprivate static func decodeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
     let decoder = JSONDecoder()
-    let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
+    let raw = try decoder.decode(RawSyntax.self, from: content)
     guard let file = makeSyntax(raw) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
     return file
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
+  /// - Parameter content: The string content of the serialized SourceFileSyntax.
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  public static func decodeSourceFileSyntax(_ content: String) throws -> SourceFileSyntax {
+    return try decodeSourceFileSyntax(content.data(using: .utf8)!)
   }
 }

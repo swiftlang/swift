@@ -8,7 +8,8 @@ class E : B { }
 
 // CHECK: sil @patatino : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = global_value @patatinoTv_ : $B
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   global_value @patatinoTv_ : $B
 // CHECK-NEXT:   strong_retain
 // CHECK-NEXT:   strong_release
 // CHECK-NEXT:   tuple ()
@@ -16,9 +17,10 @@ class E : B { }
 // CHECK-NEXT: }
 
 sil @patatino : $@convention(thin) () -> () {
-  %1 = alloc_ref [stack] $B
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $B
   set_deallocating %1 : $B
-  dealloc_ref [stack] %1 : $B
+  dealloc_ref %1 : $B
   %45 = tuple ()
   return %45 : $()
 }

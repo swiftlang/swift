@@ -60,7 +60,7 @@ if let p = cc as? P {
 
 // Test that 'as?' coercion fails.
 let strImplicitOpt: String! = nil
-_ = strImplicitOpt as? String // expected-warning{{conditional downcast from 'String!' to 'String' does nothing}}{{19-30=}}
+_ = strImplicitOpt as? String // expected-warning{{conditional downcast from 'String?' to 'String' does nothing}}{{19-30=}}
 
 class C3 {}
 class C4 : C3 {}

@@ -95,7 +95,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(!decl->hasClangNode());
 
   // This cannot be implemented correctly for Optional.Some.
-  assert(decl->getParentEnum()->classifyAsOptionalType() == OTK_None &&
+  assert(!decl->getParentEnum()->isOptionalDecl() &&
          "Optional.Some does not have a unique abstraction pattern because "
          "optionals are re-abstracted");
 
@@ -794,13 +794,13 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   llvm_unreachable("bad kind");
 }
 
-static CanType getAnyOptionalObjectType(CanType type) {
-  auto objectType = type.getAnyOptionalObjectType();
+static CanType getOptionalObjectType(CanType type) {
+  auto objectType = type.getOptionalObjectType();
   assert(objectType && "type was not optional");
   return objectType;
 }
 
-AbstractionPattern AbstractionPattern::getAnyOptionalObjectType() const {
+AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -825,16 +825,16 @@ AbstractionPattern AbstractionPattern::getAnyOptionalObjectType() const {
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
-                              ::getAnyOptionalObjectType(getType()));
+                              ::getOptionalObjectType(getType()));
 
   case Kind::Discard:
     return AbstractionPattern::getDiscard(getGenericSignature(),
-                                        ::getAnyOptionalObjectType(getType()));
+                                          ::getOptionalObjectType(getType()));
 
   case Kind::ClangType:
     // This is not reflected in clang types.
     return AbstractionPattern(getGenericSignature(),
-                              ::getAnyOptionalObjectType(getType()),
+                              ::getOptionalObjectType(getType()),
                               getClangType());
   }
   llvm_unreachable("bad kind");
@@ -1010,8 +1010,8 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
   }
 
   // Optionals must match, sortof.
-  auto lObject = l.getAnyOptionalObjectType();
-  auto rObject = r.getAnyOptionalObjectType();
+  auto lObject = l.getOptionalObjectType();
+  auto rObject = r.getOptionalObjectType();
   if (lObject && rObject) {
     return hasSameBasicTypeStructure(lObject, rObject);
   } else if (lObject || rObject) {

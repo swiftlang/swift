@@ -120,7 +120,8 @@ namespace irgen {
   Callee getSwiftFunctionPointerCallee(IRGenFunction &IGF,
                                        llvm::Value *fnPtr,
                                        llvm::Value *contextPtr,
-                                       CalleeInfo &&info);
+                                       CalleeInfo &&info,
+                                       bool castOpaqueToRefcountedContext);
 
   Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);

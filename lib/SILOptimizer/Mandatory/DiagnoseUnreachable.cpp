@@ -143,7 +143,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     }
 
     // After the first branch is processed, the arguments vector is populated.
-    assert(Args.size() > 0);
+    assert(!Args.empty());
     checkArgs = true;
   }
 
@@ -732,70 +732,73 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 /// diagnose any user code after it as being unreachable.  This pass happens
 /// before the definite initialization pass so that it doesn't see infeasible
 /// control flow edges.
-static void performNoReturnFunctionProcessing(SILModule *M,
-                                              SILModuleTransform *T) {
-  for (auto &Fn : *M) {
-    DEBUG(llvm::errs() << "*** No return function processing: "
-          << Fn.getName() << "\n");
-    
-    for (auto &BB : Fn) {
-      // Remove instructions from the basic block after a call to a noreturn
-      // function.
-      simplifyBlocksWithCallsToNoReturn(BB, nullptr);
-    }
-    T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
+static void performNoReturnFunctionProcessing(SILFunction &Fn,
+                                              SILFunctionTransform *T) {
+  DEBUG(llvm::errs() << "*** No return function processing: " << Fn.getName()
+                     << "\n");
+
+  for (auto &BB : Fn) {
+    // Remove instructions from the basic block after a call to a noreturn
+    // function.
+    simplifyBlocksWithCallsToNoReturn(BB, nullptr);
   }
+  T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 }
 
-void swift::performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T) {
-  for (auto &Fn : *M) {
-    DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
-          << Fn.getName() << "\n");
+static void diagnoseUnreachable(SILFunction &Fn) {
+  DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: " << Fn.getName()
+                     << "\n");
 
-    UnreachableUserCodeReportingState State;
+  UnreachableUserCodeReportingState State;
 
-    for (auto &BB : Fn) {
-      // Simplify the blocks with terminators that rely on constant conditions.
-      if (constantFoldTerminator(BB, &State))
-        continue;
+  for (auto &BB : Fn) {
+    // Simplify the blocks with terminators that rely on constant conditions.
+    if (constantFoldTerminator(BB, &State))
+      continue;
 
-      // Remove instructions from the basic block after a call to a noreturn
-      // function.
-      if (simplifyBlocksWithCallsToNoReturn(BB, &State))
-        continue;
-    }
-
-    // Remove unreachable blocks.
-    removeUnreachableBlocks(Fn, *M, &State);
-
-    for (auto &BB : Fn) {
-      propagateBasicBlockArgs(BB);
-    }
-
-    for (auto &BB : Fn) {
-      // Simplify the blocks with terminators that rely on constant conditions.
-      if (constantFoldTerminator(BB, &State)) {
-        continue;
-      }
-      // Remove instructions from the basic block after a call to a noreturn
-      // function.
-      if (simplifyBlocksWithCallsToNoReturn(BB, &State))
-        continue;
-    }
-
-    // Remove unreachable blocks.
-    removeUnreachableBlocks(Fn, *M, &State);
-
-    if (T)
-      T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
+    // Remove instructions from the basic block after a call to a noreturn
+    // function.
+    if (simplifyBlocksWithCallsToNoReturn(BB, &State))
+      continue;
   }
+
+  // Remove unreachable blocks.
+  removeUnreachableBlocks(Fn, Fn.getModule(), &State);
+
+  for (auto &BB : Fn) {
+    propagateBasicBlockArgs(BB);
+  }
+
+  for (auto &BB : Fn) {
+    // Simplify the blocks with terminators that rely on constant conditions.
+    if (constantFoldTerminator(BB, &State)) {
+      continue;
+    }
+    // Remove instructions from the basic block after a call to a noreturn
+    // function.
+    if (simplifyBlocksWithCallsToNoReturn(BB, &State))
+      continue;
+  }
+
+  // Remove unreachable blocks.
+  removeUnreachableBlocks(Fn, Fn.getModule(), &State);
+}
+
+// External entry point for other passes, which must do their own invalidation.
+void swift::performSILDiagnoseUnreachable(SILModule *M) {
+  for (auto &Fn : *M)
+    diagnoseUnreachable(Fn);
 }
 
 namespace {
-  class NoReturnFolding : public SILModuleTransform {
-    void run() override {
-      performNoReturnFunctionProcessing(getModule(), this);
-    }
+class NoReturnFolding : public SILFunctionTransform {
+  void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
+    performNoReturnFunctionProcessing(*getFunction(), this);
+  }
   };
 } // end anonymous namespace
 
@@ -805,10 +808,13 @@ SILTransform *swift::createNoReturnFolding() {
 
 
 namespace {
-  class DiagnoseUnreachable : public SILModuleTransform {
-    void run() override {
-      performSILDiagnoseUnreachable(getModule(), this);
-    }
+// This pass reruns on deserialized SIL because diagnostic constant propagation
+// can expose unreachable blocks which are then removed by this pass.
+class DiagnoseUnreachable : public SILFunctionTransform {
+  void run() override {
+    diagnoseUnreachable(*getFunction());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
   };
 } // end anonymous namespace
 

@@ -68,8 +68,8 @@ private:
     : SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
       IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>") {
-    }
+          LLVMContext, "<fake module name>", "<fake output filename>",
+          "<fake main input filename>") {}
 
 public:
   static std::unique_ptr<IRGenContext>
@@ -138,7 +138,7 @@ public:
 
     return createNominalTypeDecl(node);
   }
-
+  
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
 
   ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
@@ -332,6 +332,10 @@ public:
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
                                           /*throws*/ flags.throws());
+    if (flags.isEscaping())
+      einfo = einfo.withNoEscape(false);
+    else
+      einfo = einfo.withNoEscape(true);
 
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();
@@ -346,9 +350,11 @@ public:
 
       auto label = Ctx.getIdentifier(param.getLabel());
       auto flags = param.getFlags();
+      auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(flags.isInOut())
-                                .withShared(flags.isShared())
+                                .withInOut(ownership == ValueOwnership::InOut)
+                                .withShared(ownership == ValueOwnership::Shared)
+                                .withOwned(ownership == ValueOwnership::Owned)
                                 .withVariadic(flags.isVariadic());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
@@ -1107,8 +1113,8 @@ public:
   Result<MetadataKind>
   getKindForRemoteTypeMetadata(RemoteAddress metadata) override {
     auto result = Reader.readKindFromMetadata(metadata.getAddressData());
-    if (result.first)
-      return result.second;
+    if (result)
+      return *result;
     return getFailure<MetadataKind>();
   }
 
@@ -1145,7 +1151,7 @@ public:
   Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) override {
     auto result = Reader.readMetadataFromInstance(object.getAddressData());
-    if (result.first) return RemoteAddress(result.second);
+    if (result) return RemoteAddress(*result);
     return getFailure<RemoteAddress>();
   }
 };

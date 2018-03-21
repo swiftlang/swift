@@ -6,7 +6,7 @@ public class NSCoder : NSObject {}
 
 public class AClass : NSObject {
   // Ensure that the call to the type metadata accessor has a line number.
-  // CHECK: call %swift.type* @"$S11cleanupskip7NSCoderCMa"()
+  // CHECK: call swiftcc %swift.metadata_response @"$S11cleanupskip7NSCoderCMa"
   // CHECK-SAME:              !dbg ![[LINEZ:[0-9]+]]
   // CHECK: ![[LINEZ]] = {{.*}}line: 0
   public required init?(coder aDecoder: NSCoder) {

@@ -53,7 +53,7 @@ public struct AnyIterator<Element> {
   /// You can use `AnyIterator` to hide the type signature of a more complex
   /// iterator. For example, the `digits()` function in the following example
   /// creates an iterator over a collection that lazily maps the elements of a
-  /// `CountableRange<Int>` instance to strings. Instead of returning an
+  /// `Range<Int>` instance to strings. Instead of returning an
   /// iterator with a type that encapsulates the implementation of the
   /// collection, the `digits()` function first wraps the iterator in an
   /// `AnyIterator` instance.
@@ -61,7 +61,7 @@ public struct AnyIterator<Element> {
   ///     func digits() -> AnyIterator<String> {
   ///         let lazyStrings = (0..<10).lazy.map { String($0) }
   ///         let iterator:
-  ///             LazyMapIterator<IndexingIterator<CountableRange<Int>>, String>
+  ///             LazyMapIterator<IndexingIterator<Range<Int>>, String>
   ///             = lazyStrings.makeIterator()
   ///
   ///         return AnyIterator(iterator)

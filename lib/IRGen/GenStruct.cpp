@@ -164,7 +164,8 @@ namespace {
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed) {
+      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed
+          || fieldInfo.getKind() == ElementLayout::Kind::Empty) {
         return llvm::ConstantInt::get(IGM.SizeTy,
                                     fieldInfo.getFixedByteOffset().getValue());
       }
@@ -261,6 +262,14 @@ namespace {
         asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
       field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
                                           field.getType(IGF.IGM, structType));
+    }
+       
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      auto fields = asImpl().getFields();
+      if (fields.size() != 1)
+        return false;
+      return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
     
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -765,14 +774,22 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
-                         NextOffset, LLVMFields.size());
+    auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
+    if (isEmpty)
+      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),
+                           NextOffset);
+    else
+      layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
+                           NextOffset, LLVMFields.size());
 
     FieldInfos.push_back(
            ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
-    LLVMFields.push_back(fieldType.getStorageType());
-    NextOffset += fieldType.getFixedSize();
-    SpareBits.append(fieldType.getSpareBits());
+    
+    if (!isEmpty) {
+      LLVMFields.push_back(fieldType.getStorageType());
+      NextOffset += fieldType.getFixedSize();
+      SpareBits.append(fieldType.getSpareBits());
+    }
   }
 
   /// Add padding to get up to the given offset.
@@ -848,10 +865,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 
   if (shouldEmitOpaqueTypeMetadataRecord(st)) {
     emitOpaqueTypeMetadataRecord(st);
-    return;
-  }
-
-  emitFieldMetadataRecord(st);
+  } else {
+    emitFieldMetadataRecord(st);
+  }  
 }
 
 namespace {

@@ -789,8 +789,8 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &SGF,
   bool isDirect = (TheAccessSemantics != AccessSemantics::Ordinary);
 
   // Call the mutable addressor.
-  auto addressor = SGF.getAddressorDeclRef(WitnessStorage,
-                                           AccessKind::ReadWrite);
+  auto addressor = SGF.SGM.getAddressorDeclRef(WitnessStorage,
+                                               AccessKind::ReadWrite);
   std::pair<ManagedValue, ManagedValue> result;
   {
     FormalEvaluationScope Scope(SGF);
@@ -964,7 +964,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     }
 
     // The callback gets the address of 'self' at +0.
-    ManagedValue mSelf = ManagedValue::forLValue(self);
+    ManagedValue mSelf = ManagedValue::forUnmanaged(self);
 
     // That's enough to build the l-value.
     LValue lvalue = buildLValue(SGF, loc, mSelf, std::move(indices),

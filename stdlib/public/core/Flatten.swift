@@ -233,7 +233,14 @@ extension FlattenCollection.Index : Comparable {
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   public var hashValue: Int {
-    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
+    return _hashValue(for: self)
+  }
+
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(_outer)
+    if let inner = _inner {
+      hasher.append(inner)
+    }
   }
 }
 
@@ -517,47 +524,8 @@ extension Collection where Element : Collection {
   }
 }
 
-extension BidirectionalCollection where Element : BidirectionalCollection {
-  /// Returns the elements of this collection of collections, concatenated.
-  ///
-  /// In this example, an array of three ranges is flattened so that the
-  /// elements of each range can be iterated in turn.
-  ///
-  ///     let ranges = [0..<3, 8..<10, 15..<17]
-  ///
-  ///     // A for-in loop over 'ranges' accesses each range:
-  ///     for range in ranges {
-  ///       print(range)
-  ///     }
-  ///     // Prints "0..<3"
-  ///     // Prints "8..<10"
-  ///     // Prints "15..<17"
-  ///
-  ///     // Use 'joined()' to access each element of each range:
-  ///     for index in ranges.joined() {
-  ///         print(index, terminator: " ")
-  ///     }
-  ///     // Prints: "0 1 2 8 9 15 16"
-  ///
-  /// - Returns: A flattened view of the elements of this
-  ///   collection of collections.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func joined() -> FlattenCollection<Self> {
-    return FlattenCollection(self)
-  }
-}
-
 extension LazyCollectionProtocol
   where Self : Collection, Element : Collection {
-  /// A concatenation of the elements of `self`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func joined() -> LazyCollection<FlattenCollection<Elements>> {
-    return FlattenCollection(elements).lazy
-  }
-}
-
-extension LazyCollectionProtocol
-  where Self : BidirectionalCollection, Element : BidirectionalCollection {
   /// A concatenation of the elements of `self`.
   @_inlineable // FIXME(sil-serialize-all)
   public func joined() -> LazyCollection<FlattenCollection<Elements>> {

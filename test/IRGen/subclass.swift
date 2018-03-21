@@ -3,13 +3,13 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
-// CHECK: %swift.refcounted = type {
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[OBJC_CLASS:%objc_class]] = type {
-// CHECK: [[OPAQUE:%swift.opaque]] = type
-// CHECK: [[A:%T8subclass1AC]] = type <{ [[REF:%swift.refcounted]], %TSi, %TSi }>
-// CHECK: [[INT:%TSi]] = type <{ i64 }>
-// CHECK: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
+// CHECK-DAG: %swift.refcounted = type {
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[OBJC_CLASS:%objc_class]] = type {
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type
+// CHECK-DAG: [[A:%T8subclass1AC]] = type <{ [[REF:%swift.refcounted]], %TSi, %TSi }>
+// CHECK-DAG: [[INT:%TSi]] = type <{ i64 }>
+// CHECK-DAG: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{
 // CHECK: @"$S8subclass1ACMf" = internal global [[A_METADATA:<{.*i64 }>]] <{
@@ -59,7 +59,7 @@ class G<T> : A {
 
 // CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$S8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
-  // CHECK: call %swift.type* @"$S8subclass1GCySiGMa"()
+  // CHECK: call swiftcc %swift.metadata_response @"$S8subclass1GCySiGMa"(i64 0)
   // CHECK: call i8* @swift_dynamicCastClassUnconditional
   return a as! G<Int>
 }

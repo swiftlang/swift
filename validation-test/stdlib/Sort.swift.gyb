@@ -57,7 +57,7 @@ func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySl
 }
 
 class OffsetCollection : MutableCollection, RandomAccessCollection {
-  typealias Indices = CountableRange<Int>
+  typealias Indices = Range<Int>
 
   let offset: Int
   var data: [Int] = []
@@ -78,12 +78,12 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
     self.forward = forward
   }
   typealias Index = Int
-  subscript(bounds: Range<Int>) -> MutableRandomAccessSlice<OffsetCollection> {
+  subscript(bounds: Range<Int>) -> Slice<OffsetCollection> {
     get {
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
-      for i in CountableRange(bounds) {
+      for i in bounds {
         self[i] = newValue[i]
       }
     }
@@ -130,7 +130,7 @@ Algorithm.test("${t}/sorted/${name}") {
 
 Algorithm.test("sort/CollectionsWithUnusualIndices") {
   let count = 1000
-  var ary = randArray(count)
+  let ary = randArray(count)
 
   // Check if sorting routines work well on collections with startIndex != 0.
   var offsetAry = OffsetCollection(ary, offset: 500, forward: false)

@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
 
-// UNSUPPORTED: resilient_stdlib
-
 // REQUIRES: CPU=x86_64
-
 // REQUIRES: OS=macosx
 
 sil_stage canonical

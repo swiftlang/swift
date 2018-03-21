@@ -150,7 +150,7 @@ public:
 
   /// Returns true if there are any tasks that have been queued but have not
   /// yet been executed.
-  bool hasRemainingTasks() {
+  virtual bool hasRemainingTasks() {
     return !QueuedTasks.empty();
   }
 };
@@ -180,14 +180,20 @@ public:
   DummyTaskQueue(unsigned NumberOfParallelTasks = 0);
   virtual ~DummyTaskQueue();
 
-  virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                       ArrayRef<const char *> Env = llvm::None,
-                       void *Context = nullptr, bool SeparateErrors = false);
+  void addTask(const char *ExecPath, ArrayRef<const char *> Args,
+               ArrayRef<const char *> Env = llvm::None,
+               void *Context = nullptr, bool SeparateErrors = false) override;
 
-  virtual bool
+  bool
   execute(TaskBeganCallback Began = TaskBeganCallback(),
           TaskFinishedCallback Finished = TaskFinishedCallback(),
-          TaskSignalledCallback Signalled = TaskSignalledCallback());
+          TaskSignalledCallback Signalled = TaskSignalledCallback()) override;
+
+  bool hasRemainingTasks() override {
+    // Need to override here because QueuedTasks is redeclared.
+    return !QueuedTasks.empty();
+  }
+
 };
 
 } // end namespace sys

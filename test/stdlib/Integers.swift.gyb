@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/Integers.swift
 // RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -swift-version 4 -Onone -o %t/a.out
 // RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out
@@ -332,12 +332,24 @@ tests.test("${Type}/Add/Overflow") {
   _ = f(${Type}.max)
 }
 
+tests.test("${Type}/Add/MaskingOverflow") {
+  expectEqual(${Type}.min, ${Type}.max &+ 1)
+}
+
 tests.test("${Type}/Subtract/Underflow") {
   func f(_ x: ${Type}) -> ${Type} {
     return x - 1
   }
   expectCrashLater()
   _ = f(${Type}.min)
+}
+
+tests.test("${Type}/Subtract/MaskingUnderflow") {
+  expectEqual(${Type}.max, ${Type}.min &- 1)
+}
+
+tests.test("${Type}/Multiply/MaskingOverflow") {
+  expectEqual(${Type}.min, (${Type}.max / 2 + 1) &* 2)
 }
 
 tests.test("${Type}/AddInPlace/Overflow") {
@@ -349,6 +361,12 @@ tests.test("${Type}/AddInPlace/Overflow") {
   f(&x)
 }
 
+tests.test("${Type}/AddInPlace/MaskingOverflow") {
+  var x = ${Type}.max
+  x &+= 1
+  expectEqual(${Type}.min, x)
+}
+
 tests.test("${Type}/SubtractInPlace/Underflow") {
   func f(_ x: inout ${Type}) {
     x -= 1
@@ -356,6 +374,18 @@ tests.test("${Type}/SubtractInPlace/Underflow") {
   expectCrashLater()
   var x = ${Type}.min
   f(&x)
+}
+
+tests.test("${Type}/SubtractInPlace/MaskingUnderflow") {
+  var x = ${Type}.min
+  x &-= 1
+  expectEqual(${Type}.max, x)
+}
+
+tests.test("${Type}/MultiplyInPlace/MaskingOverflow") {
+  var x = ${Type}.max / 2 + 1
+  x &*= 2
+  expectEqual(${Type}.min, x)
 }
 %   end
 % end
@@ -738,6 +768,18 @@ tests.test("Remainder/DividingBy0") {
   }
   expectCrashLater()
   _ = f(42, 0)
+}
+
+tests.test("RemainderReportingOverflow/DividingByMinusOne") {
+  // Work around SR-5964.
+  func minusOne<T : SignedInteger>() -> T {
+    return -1 as T
+  }
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x.remainderReportingOverflow(dividingBy: y).partialValue
+  }
+  expectEqual(f(.max, minusOne()), 0)
+  expectEqual(f(.min, minusOne()), 0)
 }
 
 tests.test("Division/By0") {

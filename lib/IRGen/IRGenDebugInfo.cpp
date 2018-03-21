@@ -120,7 +120,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
-                     IRGenModule &IGM, llvm::Module &M, SourceFile *SF);
+                     IRGenModule &IGM, llvm::Module &M,
+                     StringRef MainOutputFilenameForDebugInfo);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
@@ -1250,14 +1251,15 @@ private:
     case TypeKind::BuiltinVector: {
       (void)MangledName; // FIXME emit the name somewhere.
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-      DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
-                              DbgTy.getGenericEnvironment(),
-                              BuiltinVectorTy->getElementType(),
-                              DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
-      auto Subscripts = nullptr;
-      return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
+      auto ElemTy = BuiltinVectorTy->getElementType();
+      auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), ElemTy,
+          IGM.getTypeInfoForUnlowered(ElemTy));
+      unsigned Count = BuiltinVectorTy->getNumElements();
+      auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
+      return DBuilder.createVectorType(SizeInBits,
                                        AlignInBits, getOrCreateType(ElemDbgTy),
-                                       Subscripts);
+                                       DBuilder.getOrCreateArray(Subscript));
     }
 
     // Reference storage types.
@@ -1298,8 +1300,7 @@ private:
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
-    case TypeKind::Optional:
-    case TypeKind::ImplicitlyUnwrappedOptional: {
+    case TypeKind::Optional: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
       auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
       return getOrCreateDesugaredType(CanTy, DbgTy);
@@ -1451,14 +1452,14 @@ private:
 
 IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
-                                       llvm::Module &M, SourceFile *SF)
+                                       llvm::Module &M,
+                                       StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
       IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
       LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
-  StringRef SourceFileName =
-      SF ? SF->getFilename() : StringRef(Opts.MainInputFilename);
+  StringRef SourceFileName = MainOutputFilenameForDebugInfo;
   llvm::SmallString<256> AbsMainFile;
   if (SourceFileName.empty())
     AbsMainFile = "<unknown>";
@@ -1951,7 +1952,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0)
+  if (Storage.empty())
     emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                      DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }
@@ -2040,12 +2041,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 } // anonymous namespace
 
-IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(const IRGenOptions &Opts,
-                                                     ClangImporter &CI,
-                                                     IRGenModule &IGM,
-                                                     llvm::Module &M,
-                                                     SourceFile *SF) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF);
+IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
+    const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
+    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
+  return new IRGenDebugInfoImpl(Opts, CI, IGM, M,
+                                MainOutputFilenameForDebugInfo);
 }
 
 

@@ -27,8 +27,8 @@ import Foundation
 /// as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
 public struct ${node.name}: _SyntaxBase {
-  var _root: SyntaxData
-  unowned var _data: SyntaxData
+  let _root: SyntaxData
+  unowned let _data: SyntaxData
 
   /// Creates a Syntax node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
@@ -46,7 +46,7 @@ public struct ${node.name}: _SyntaxBase {
   ///                     collection.
   /// - Returns: A new `${node.name}` with the new layout underlying it.
   internal func replacingLayout(
-    _ layout: [RawSyntax]) -> ${node.name} {
+    _ layout: [RawSyntax?]) -> ${node.name} {
     let newRaw = data.raw.replacingLayout(layout)
     let (newRoot, newData) = data.replacingSelf(newRaw)
     return ${node.name}(root: newRoot, data: newData)
@@ -90,6 +90,24 @@ public struct ${node.name}: _SyntaxBase {
     precondition((newLayout.startIndex...newLayout.endIndex).contains(index),
                  "inserting node at invalid index \(index)")
     newLayout.insert(syntax.raw, at: index)
+    return replacingLayout(newLayout)
+  }
+
+  /// Creates a new `${node.name}` by replacing the syntax element
+  /// at the provided index.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to replace the element in the collection.
+  ///   - syntax: The element to replace with.
+  ///
+  /// - Returns: A new `${node.name}` with the new element at the provided index.
+  public func replacing(childAt index: Int,
+                        with syntax: ${node.collection_element_type}) -> ${node.name} {
+    var newLayout = data.raw.layout
+    /// Make sure the index is a valid index for replacing
+    precondition((newLayout.startIndex..<newLayout.endIndex).contains(index),
+                 "replacing node at invalid index \(index)")
+    newLayout[index] = syntax.raw
     return replacingLayout(newLayout)
   }
 

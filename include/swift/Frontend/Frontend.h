@@ -34,7 +34,6 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -49,12 +48,13 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class SILModule;
 
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
 ///   - information about the build environment,
 ///   - information about the job being performed, and
-///   - lists of inputs.
+///   - lists of inputs and outputs.
 ///
 /// A CompilerInvocation can be built from a frontend command line
 /// using parseArgs.  It can then be used to build a CompilerInstance,
@@ -86,11 +86,19 @@ public:
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
   ///
+  /// Any configuration files loaded as a result of parsing arguments will be
+  /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
+  /// buffers should \e not be interpreted by the caller; they are only present
+  /// in order to make it possible to reproduce how these arguments were parsed
+  /// if the compiler ends up crashing or exhibiting other bad behavior.
+  ///
   /// If non-empty, relative search paths are resolved relative to
   /// \p workingDirectory.
   ///
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags,
+                 SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+                     *ConfigurationFileBuffers = nullptr,
                  StringRef workingDirectory = {});
 
   /// Sets specific options based on the given serialized Swift binary data.
@@ -174,13 +182,6 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.SerializedDiagnosticsPath = Path;
-  }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.SerializedDiagnosticsPath;
-  }
-
   LangOptions &getLangOptions() {
     return LangOpts;
   }
@@ -243,9 +244,8 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-
-  StringRef getOutputFilename() const {
-    return FrontendOpts.getSingleOutputFilename();
+  std::string getOutputFilename() const {
+    return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
@@ -299,6 +299,26 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
+
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
+
+  std::string getOutputFilenameForAtMostOnePrimary() const;
+  std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
+  std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getModuleOutputPathForAtMostOnePrimary() const;
+  std::string
+  getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
+  std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
+
+  /// TBDPath only makes sense in whole module compilation mode,
+  /// so return the TBDPath when in that mode and fail an assert
+  /// if not in that mode.
+  std::string getTBDPathForWholeModule() const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -317,7 +337,6 @@ class CompilerInstance {
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
-  ReferencedNameTracker *NameTracker = nullptr;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -364,6 +383,15 @@ class CompilerInstance {
   void createSILModule();
 
 public:
+  // Out of line to avoid having to import SILModule.h.
+  CompilerInstance();
+  ~CompilerInstance();
+
+  CompilerInstance(const CompilerInstance &) = delete;
+  void operator=(const CompilerInstance &) = delete;
+  CompilerInstance(CompilerInstance &&) = delete;
+  void operator=(CompilerInstance &&) = delete;
+
   SourceManager &getSourceMgr() { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
@@ -388,20 +416,10 @@ public:
     return DepTracker;
   }
 
-  void setReferencedNameTracker(ReferencedNameTracker *tracker) {
-    assert(PrimarySourceFiles.empty() && "must be called before performSema()");
-    NameTracker = tracker;
-  }
-  ReferencedNameTracker *getReferencedNameTracker() {
-    return NameTracker;
-  }
-
   /// Set the SIL module for this compilation instance.
   ///
   /// The CompilerInstance takes ownership of the given SILModule object.
-  void setSILModule(std::unique_ptr<SILModule> M) {
-    TheSILModule = std::move(M);
-  }
+  void setSILModule(std::unique_ptr<SILModule> M);
 
   SILModule *getSILModule() {
     return TheSILModule.get();
@@ -521,9 +539,10 @@ private:
                                 Optional<unsigned> BufferID);
 
 public:
-  /// Frees up the ASTContext and SILModule objects that this instance is
-  /// holding on.
-  void freeContextAndSIL();
+  void freeASTContext();
+
+  /// Frees up the SILModule that this instance is holding on to.
+  void freeSILModule();
 
 private:
   /// Load stdlib & return true if should continue, i.e. no error
@@ -575,6 +594,16 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+public:
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForWholeModuleOptimizationMode() const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForPrimary(StringRef filename) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 };
 
 } // namespace swift

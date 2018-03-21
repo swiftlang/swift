@@ -4,7 +4,7 @@
 
 // -- partial_apply context metadata
 
-// CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy, i8** null, %swift.type { i64 64 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift5_reflection_descriptor" to i8*) }
+// CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy, i8** null, %swift.type { i64 64 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift4_reflection_descriptor" to i8*) }
 
 func a(i i: Int) -> (Int) -> Int {
   return { x in i }
@@ -49,7 +49,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK-NOT: @swift_getTupleTypeMetadata2
-  // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
+  // CHECK: [[BOX:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
   // CHECK: bitcast %swift.opaque* [[ADDR]] to <{}>*
   return {x}

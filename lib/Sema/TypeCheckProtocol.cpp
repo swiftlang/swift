@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
@@ -133,81 +134,76 @@ namespace {
    };
 } // end anonymous namespace
 
-static std::tuple<Type,Type, OptionalAdjustmentKind> 
-getTypesToCompare(ValueDecl *reqt, 
-                  Type reqtType,
-                  Type witnessType,
-                  VarianceKind variance) {  
+static std::tuple<Type, Type, OptionalAdjustmentKind>
+getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
+                  Type witnessType, bool witnessTypeIsIUO,
+                  VarianceKind variance) {
+  // If the witness type is noescape but the requirement type is not,
+  // adjust the witness type to be escaping. This permits a limited form of
+  // covariance.
+  bool reqNoescapeToEscaping = false;
+  (void)adjustInferredAssociatedType(reqtType, reqNoescapeToEscaping);
+  bool witnessNoescapeToEscaping = false;
+  Type adjustedWitnessType =
+    adjustInferredAssociatedType(witnessType, witnessNoescapeToEscaping);
+  if (witnessNoescapeToEscaping && !reqNoescapeToEscaping)
+    witnessType = adjustedWitnessType;
+
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
   OptionalAdjustmentKind optAdjustment = OptionalAdjustmentKind::None;
-  if (reqt->isObjC()) {
-    OptionalTypeKind reqtOptKind;
-    if (Type reqtValueType
-          = reqtType->getAnyOptionalObjectType(reqtOptKind))
-      reqtType = reqtValueType;
-    OptionalTypeKind witnessOptKind;
-    if (Type witnessValueType 
-          = witnessType->getAnyOptionalObjectType(witnessOptKind))
-      witnessType = witnessValueType;
 
-    switch (reqtOptKind) {
-    case OTK_None:
-      switch (witnessOptKind) {
-      case OTK_None:
-        // Exact match is always okay.
-        break;
+  if (!reqt->isObjC())
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-      case OTK_Optional:
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
-          break;
+  bool reqtIsOptional = false;
+  if (Type reqtValueType = reqtType->getOptionalObjectType()) {
+    reqtIsOptional = true;
+    reqtType = reqtValueType;
+  }
+  bool witnessIsOptional = false;
+  if (Type witnessValueType = witnessType->getOptionalObjectType()) {
+    witnessIsOptional = true;
+    witnessType = witnessValueType;
+  }
 
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
-          break;
-        }
-        break;
+  // When the requirement is an IUO, all is permitted, because we
+  // assume that the user knows more about the signature than we
+  // have information in the protocol.
+  if (reqtTypeIsIUO)
+    return std::make_tuple(reqtType, witnessType, optAdjustment);
 
-      case OTK_ImplicitlyUnwrappedOptional:
-        optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-        break;
-      }
-      break;
-
-    case OTK_Optional:
-      switch (witnessOptKind) {
-      case OTK_None:
-        switch (variance) {
-        case VarianceKind::None:
-        case VarianceKind::Contravariant:
-          optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
-          break;
-
-        case VarianceKind::Covariant:
-          optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
-          break;
-        }
-        break;
-
-      case OTK_Optional:
-        // Exact match is always okay.
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
+  if (reqtIsOptional) {
+    if (witnessIsOptional) {
+      if (witnessTypeIsIUO)
         optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::ConsumesUnhandledNil;
+        break;
+
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverProduceNil;
         break;
       }
-      break;
+    }
+  } else if (witnessIsOptional) {
+    if (witnessTypeIsIUO) {
+      optAdjustment = OptionalAdjustmentKind::RemoveIUO;
+    } else {
+      switch (variance) {
+      case VarianceKind::None:
+      case VarianceKind::Covariant:
+        optAdjustment = OptionalAdjustmentKind::ProducesUnhandledNil;
+        break;
 
-    case OTK_ImplicitlyUnwrappedOptional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      break;
+      case VarianceKind::Contravariant:
+        optAdjustment = OptionalAdjustmentKind::WillNeverConsumeNil;
+        break;
+      }
     }
   }
 
@@ -341,6 +337,14 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   }
 
   return false;
+}
+
+static ParameterList *getParameterList(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    return func->getParameterList(func->getDeclContext()->isTypeContext());
+
+  auto subscript = cast<SubscriptDecl>(value);
+  return subscript->getIndices();
 }
 
 RequirementMatch
@@ -490,9 +494,13 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto types = getTypesToCompare(req, reqResultType, 
-                                     witnessResultType,
-                                     VarianceKind::Covariant);
+      auto reqTypeIsIUO =
+          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto witnessTypeIsIUO =
+          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto types =
+          getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
+                            witnessTypeIsIUO, VarianceKind::Covariant);
 
       // Record optional adjustment, if any.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -500,8 +508,10 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types)));
       }
 
-      if (auto result = matchTypes(std::get<0>(types), 
-                                   std::get<1>(types))) {
+      if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
+      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -517,6 +527,12 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, 
                               witnessType);
 
+    ParameterList *witnessParamList = getParameterList(witness);
+    assert(witnessParamList->size() == witnessParams.size());
+
+    ParameterList *reqParamList = getParameterList(req);
+    assert(reqParamList->size() == reqParams.size());
+
     // Match each of the parameters.
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
       // Variadic bits must match.
@@ -530,11 +546,22 @@ swift::matchWitness(
       if (reqParams[i].isInOut() != witnessParams[i].isInOut())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
+      auto reqParamDecl = reqParamList->get(i);
+      auto witnessParamDecl = witnessParamList->get(i);
+
+      auto reqParamTypeIsIUO =
+          reqParamDecl->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto witnessParamTypeIsIUO =
+          witnessParamDecl->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
-      auto types = getTypesToCompare(req, reqParams[i].getType(),
-                                     witnessParams[i].getType(),
-                                     VarianceKind::Contravariant);
+      auto types =
+          getTypesToCompare(req, reqParams[i].getType(), reqParamTypeIsIUO,
+                            witnessParams[i].getType(), witnessParamTypeIsIUO,
+                            VarianceKind::Contravariant);
 
       // Record any optional adjustment that occurred.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -542,9 +569,10 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types), i));
       }
 
-      // Check whether the parameter types match.
-      if (auto result = matchTypes(std::get<0>(types), 
-                                   std::get<1>(types))) {
+      if (!req->isObjC() && reqParamTypeIsIUO != witnessParamTypeIsIUO)
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
+      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -556,15 +584,21 @@ swift::matchWitness(
     }
 
   } else {
-    // Simple case: add the constraint.
-    auto types = getTypesToCompare(req, reqType, witnessType,
-                                   VarianceKind::None);
+    auto reqTypeIsIUO =
+        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto witnessTypeIsIUO =
+        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
+                                   witnessTypeIsIUO, VarianceKind::None);
 
     // Record optional adjustment, if any.
     if (std::get<2>(types) != OptionalAdjustmentKind::None) {
       optionalAdjustments.push_back(
         OptionalAdjustment(std::get<2>(types)));
     }
+
+    if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+      return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return std::move(result.getValue());
@@ -723,8 +757,8 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
   };
 
   // Match a type in the requirement to a type in the witness.
-  auto matchTypes = [&](Type reqType, Type witnessType) 
-                      -> Optional<RequirementMatch> {
+  auto matchTypes = [&](Type reqType,
+                        Type witnessType) -> Optional<RequirementMatch> {
     cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return None;
@@ -940,8 +974,14 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      if (!witness->hasInterfaceType())
+      if (!witness->hasValidSignature()) {
         TC.validateDecl(witness);
+
+        if (!witness->hasValidSignature()) {
+          doNotDiagnoseMatches = true;
+          continue;
+        }
+      }
 
       auto match = matchWitness(TC, Proto, conformance, DC,
                                 requirement, witness);
@@ -1303,6 +1343,27 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
         conformance->setInvalid();
         return conformance;
       }
+    }
+  }
+
+  // Not every protocol/type is compatible with conditional conformances.
+  if (!conformance->getConditionalRequirements().empty()) {
+    auto nestedType = canT;
+    // Obj-C generics cannot be looked up at runtime, so we don't support
+    // conditional conformances involving them. Check the full stack of nested
+    // types for any obj-c ones.
+    while (nestedType) {
+      if (auto clas = nestedType->getClassOrBoundGenericClass()) {
+        if (clas->usesObjCGenericsModel()) {
+          TC.diagnose(ComplainLoc,
+                      diag::objc_generics_cannot_conditionally_conform, T,
+                      Proto->getDeclaredType());
+          conformance->setInvalid();
+          return conformance;
+        }
+      }
+
+      nestedType = nestedType.getNominalParent();
     }
   }
 
@@ -1788,6 +1849,53 @@ void ConformanceChecker::recordInvalidWitness(ValueDecl *requirement) {
   Conformance->setWitness(requirement, Witness());
 }
 
+bool ConformanceChecker::checkObjCTypeErasedGenerics(
+                                                 AssociatedTypeDecl *assocType,
+                                                 Type type,
+                                                 TypeDecl *typeDecl) {
+  // Objective-C's type-erased generics don't allow the type arguments
+  // to be extracted from an instance (or a metatype), so we cannot refer to
+  // the type parameters from an associated type. Check that here.
+  auto &ctx = assocType->getASTContext();
+  if (!ctx.LangOpts.EnableObjCInterop && type->hasError())
+    return false;
+
+  auto classDecl = Adoptee->getClassOrBoundGenericClass();
+  if (!classDecl) return false;
+
+  if (!classDecl->usesObjCGenericsModel()) return false;
+
+  // Concrete types are okay.
+  if (!type->hasTypeParameter()) return false;
+
+  // Find one of the generic parameters named. It doesn't matter
+  // which one.
+  Type genericParam;
+  (void)type.findIf([&](Type type) {
+    if (auto gp = type->getAs<GenericTypeParamType>()) {
+      genericParam = gp;
+      return true;
+    }
+
+    return false;
+  });
+
+  // Diagnose the problem.
+  auto &diags = assocType->getASTContext().Diags;
+  if (typeDecl) {
+    diags.diagnose(typeDecl, diag::type_witness_objc_generic_parameter,
+                   type, genericParam, !genericParam.isNull(),
+                   assocType->getFullName(), Proto->getFullName());
+  } else {
+    diags.diagnose(Conformance->getLoc(),
+                   diag::type_witness_objc_generic_parameter,
+                   type, genericParam,  !genericParam.isNull(),
+                   assocType->getFullName(), Proto->getFullName());
+  }
+
+  return true;
+}
+
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl,
@@ -1801,6 +1909,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
+
+  if (checkObjCTypeErasedGenerics(assocType, type, typeDecl))
+    type = ErrorType::get(type);
 
   if (typeDecl) {
     // Check access.
@@ -2691,11 +2802,9 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     }
   }
 
-  if (genericSig->requiresClass(depTy)) {
-    if (!contextType->isObjCExistentialType() &&
-        !contextType->mayHaveSuperclass())
-      return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
-  }
+  if (genericSig->requiresClass(depTy) &&
+      !contextType->satisfiesClassConstraint())
+    return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
 
   // Success!
   return CheckTypeWitnessResult();
@@ -2962,7 +3071,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
-      { proto->getProtocolSelfType() },
+      { Type(proto->getProtocolSelfType()) },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(TC, DC),
@@ -3002,6 +3111,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
+                                  Conformance);
 
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
@@ -3428,8 +3540,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
     auto conditionalCheckResult =
       checkGenericArguments(DC, ComplainLoc, noteLoc, T,
-                            { lookupResult->getRequirement()
-                                ->getProtocolSelfType() },
+                            { Type(lookupResult->getRequirement()
+                                ->getProtocolSelfType()) },
                             lookupResult->getConditionalRequirements(),
                             [](SubstitutableType *dependentType) {
                               return Type(dependentType);
@@ -4015,6 +4127,11 @@ static bool shouldWarnAboutPotentialWitness(
       isUnlabeledInitializerOrSubscript(witness))
     return false;
 
+  // For non-@objc requirements, only warn if the witness comes from an
+  // extension.
+  if (!req->isObjC() && !isa<ExtensionDecl>(witness->getDeclContext()))
+    return false;
+
   // If the score is relatively high, don't warn: this is probably
   // unrelated.  Allow about one typo for every four properly-typed
   // characters, which prevents completely-wacky suggestions in many
@@ -4124,8 +4241,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
 
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl) &&
-      classDecl->getDeclContext()->isModuleScopeContext()) {
+  if (!hasGenericAncestry(classDecl)) {
     return;
   }
 
@@ -4652,17 +4768,25 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return nullptr;
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
+  if (Decl->isInvalid())
+    return nullptr;
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return DerivedConformance::deriveRawRepresentable(*this, Decl,
                                                       TypeDecl, Requirement);
 
+  case KnownProtocolKind::CaseIterable:
+    return DerivedConformance::deriveCaseIterable(*this, Decl,
+                                                  TypeDecl, Requirement);
+
   case KnownProtocolKind::Equatable:
-    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl,
+                                               Requirement);
   
   case KnownProtocolKind::Hashable:
-    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl,
+                                              Requirement);
     
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
@@ -4698,7 +4822,9 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::RawRepresentable:
     return DerivedConformance::deriveRawRepresentable(*this, Decl,
                                                       TypeDecl, AssocType);
-        
+  case KnownProtocolKind::CaseIterable:
+    return DerivedConformance::deriveCaseIterable(*this, Decl,
+                                                  TypeDecl, AssocType);
   default:
     return nullptr;
   }

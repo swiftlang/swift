@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,32 +13,36 @@
 #include "swift/Driver/OutputFileMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <system_error>
 
 using namespace swift;
 using namespace swift::driver;
 
-std::unique_ptr<OutputFileMap> OutputFileMap::loadFromPath(StringRef Path) {
+std::unique_ptr<OutputFileMap>
+OutputFileMap::loadFromPath(StringRef Path, StringRef workingDirectory) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
     llvm::MemoryBuffer::getFile(Path);
   if (!FileBufOrErr)
     return nullptr;
-  return loadFromBuffer(std::move(FileBufOrErr.get()));
-}
-
-std::unique_ptr<OutputFileMap> OutputFileMap::loadFromBuffer(StringRef Data) {
-  std::unique_ptr<llvm::MemoryBuffer> Buffer{
-    llvm::MemoryBuffer::getMemBuffer(Data)
-  };
-  return loadFromBuffer(std::move(Buffer));
+  return loadFromBuffer(std::move(FileBufOrErr.get()), workingDirectory);
 }
 
 std::unique_ptr<OutputFileMap>
-OutputFileMap::loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+OutputFileMap::loadFromBuffer(StringRef Data, StringRef workingDirectory) {
+  std::unique_ptr<llvm::MemoryBuffer> Buffer{
+    llvm::MemoryBuffer::getMemBuffer(Data)
+  };
+  return loadFromBuffer(std::move(Buffer), workingDirectory);
+}
+
+std::unique_ptr<OutputFileMap>
+OutputFileMap::loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                              StringRef workingDirectory) {
   std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
 
-  if (OFM->parse(std::move(Buffer)))
+  if (OFM->parse(std::move(Buffer), workingDirectory))
     return nullptr;
 
   return OFM;
@@ -52,8 +56,18 @@ const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
     return &iter->second;
 }
 
+TypeToPathMap &
+OutputFileMap::getOrCreateOutputMapForInput(StringRef Input) {
+  return InputToOutputsMap[Input];
+}
+
 const TypeToPathMap *OutputFileMap::getOutputMapForSingleOutput() const {
   return getOutputMapForInput(StringRef());
+}
+
+TypeToPathMap &
+OutputFileMap::getOrCreateOutputMapForSingleOutput() {
+  return InputToOutputsMap[StringRef()];
 }
 
 void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
@@ -94,7 +108,8 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   }
 }
 
-bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
+                          StringRef workingDirectory) {
   llvm::SourceMgr SM;
   llvm::yaml::Stream YAMLStream(Buffer->getMemBufferRef(), SM);
   auto I = YAMLStream.begin();
@@ -109,7 +124,27 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   if (!Map)
     return true;
 
-  for (auto Pair : *Map) {
+  auto resolvePath =
+      [workingDirectory](
+          llvm::yaml::ScalarNode *Path,
+          llvm::SmallVectorImpl<char> &PathStorage) -> StringRef {
+    StringRef PathStr = Path->getValue(PathStorage);
+    if (workingDirectory.empty() || PathStr.empty() || PathStr == "-" ||
+        llvm::sys::path::is_absolute(PathStr)) {
+      return PathStr;
+    }
+    // Copy the path to avoid making assumptions about how getValue deals with
+    // Storage.
+    SmallString<128> PathStrCopy(PathStr);
+    PathStorage.clear();
+    PathStorage.reserve(PathStrCopy.size() + workingDirectory.size() + 1);
+    PathStorage.insert(PathStorage.begin(), workingDirectory.begin(),
+                       workingDirectory.end());
+    llvm::sys::path::append(PathStorage, PathStrCopy);
+    return StringRef(PathStorage.data(), PathStorage.size());
+  };
+
+  for (auto &Pair : *Map) {
     llvm::yaml::Node *Key = Pair.getKey();
     llvm::yaml::Node *Value = Pair.getValue();
 
@@ -130,7 +165,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
 
     TypeToPathMap OutputMap;
 
-    for (auto OutputPair : *OutputMapNode) {
+    for (auto &OutputPair : *OutputMapNode) {
       llvm::yaml::Node *Key = OutputPair.getKey();
       llvm::yaml::Node *Value = OutputPair.getValue();
 
@@ -152,12 +187,13 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
         continue;
 
       llvm::SmallString<128> PathStorage;
-      OutputMap.insert(
-        std::pair<types::ID, std::string>(Kind, Path->getValue(PathStorage)));
+      OutputMap.insert(std::pair<types::ID, std::string>(
+          Kind, resolvePath(Path, PathStorage)));
     }
 
     llvm::SmallString<128> InputStorage;
-    InputToOutputsMap[InputPath->getValue(InputStorage)] = std::move(OutputMap);
+    InputToOutputsMap[resolvePath(InputPath, InputStorage)] =
+        std::move(OutputMap);
   }
 
   return false;

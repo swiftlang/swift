@@ -14,13 +14,21 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {
+
+/// A mangling string that includes embedded symbolic references.
+struct SymbolicMangling {
+  std::string String;
+  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+};
 
 /// The mangler for all kind of symbols produced in IRGen.
 class IRGenMangler : public Mangle::ASTMangler {
@@ -45,8 +53,12 @@ public:
     return mangleTypeSymbol(type, "Mf");
   }
 
-  std::string mangleTypeMetadataFull(Type type, bool isPattern) {
-    return mangleTypeSymbol(type, isPattern ? "MP" : "N");
+  std::string mangleTypeMetadataFull(Type type) {
+    return mangleTypeSymbol(type, "N");
+  }
+
+  std::string mangleTypeMetadataPattern(const NominalTypeDecl *decl) {
+    return mangleNominalTypeSymbol(decl, "MP");
   }
 
   std::string mangleClassMetaClass(const ClassDecl *Decl) {
@@ -61,6 +73,40 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
 
+  std::string mangleTypeMetadataInstantiationCache(const NominalTypeDecl *Decl){
+    return mangleNominalTypeSymbol(Decl, "MI");
+  }
+
+  std::string mangleTypeMetadataInstantiationFunction(
+                                                  const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mi");
+  }
+
+  std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
+    return mangleNominalTypeSymbol(Decl, "Mr");
+  }
+  
+  std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
+    beginMangling();
+    appendContext(Decl);
+    appendOperator("MXM");
+    return finalize();
+  }
+  
+  std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
+    beginMangling();
+    appendContext(Decl);
+    appendOperator("MXE");
+    return finalize();
+  }
+  
+  std::string mangleAnonymousDescriptor(const DeclContext *DC) {
+    beginMangling();
+    appendContext(DC);
+    appendOperator("MXX");
+    return finalize();
+  }
+  
   std::string mangleBareProtocol(const ProtocolDecl *Decl) {
     beginMangling();
     appendProtocolName(Decl);
@@ -80,6 +126,13 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
     appendOperator("Mc");
+    return finalize();
+  }
+  
+  std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
+    beginMangling();
+    appendEntity(storage);
+    appendOperator("MV");
     return finalize();
   }
 
@@ -142,6 +195,17 @@ public:
     return finalize();
   }
 
+  std::string mangleAssociatedTypeGenericParamRef(unsigned baseOrdinal,
+                                                  CanType member) {
+    beginMangling();
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendType(GenericTypeParamType::get(0, baseOrdinal,
+                                         member->getASTContext()));
+    appendAssociatedTypePath(member, isFirstAssociatedTypeIdentifier);
+    appendOperator("MXA");
+    return finalize();
+  }
+
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);
@@ -169,26 +233,32 @@ public:
     return mangleConformanceSymbol(Type(), C, "MA");
   }
 
-  std::string mangleOutlinedCopyFunction(const GenericTypeDecl *Decl) {
+  std::string mangleOutlinedCopyFunction(CanType ty,
+                                         CanGenericSignature sig) {
     beginMangling();
-    appendAnyGenericType(Decl);
+    appendType(ty);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("Wy");
     return finalize();
   }
-  std::string mangleOutlinedConsumeFunction(const GenericTypeDecl *Decl) {
+  std::string mangleOutlinedConsumeFunction(CanType ty,
+                                            CanGenericSignature sig) {
     beginMangling();
-    appendAnyGenericType(Decl);
+    appendType(ty);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("We");
     return finalize();
   }
 
-  std::string mangleOutlinedRetainFunction(const Type t) {
+  std::string mangleOutlinedRetainFunction(Type t) {
     beginMangling();
     appendType(t);
     appendOperator("Wr");
     return finalize();
   }
-  std::string mangleOutlinedReleaseFunction(const Type t) {
+  std::string mangleOutlinedReleaseFunction(Type t) {
     beginMangling();
     appendType(t);
     appendOperator("Ws");
@@ -266,11 +336,7 @@ public:
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
-
-  std::string mangleTypeForMetadata(Type type) {
-    return mangleTypeWithoutPrefix(type);
-  }
-
+  
   std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
     beginMangling();
     appendProtocolName(Proto->getDecl());
@@ -278,13 +344,21 @@ public:
     return finalize();
   }
 
-  std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
-                                      bool isSingleFieldOfBox);
+  std::string mangleTypeForForeignMetadataUniquing(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
+
+  SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
+                                           Type Ty,
+                                           ModuleDecl *Module,
+                                           bool isSingleFieldOfBox);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 
   std::string mangleProtocolForLLVMTypeName(ProtocolCompositionType *type);
 
+  std::string mangleSymbolNameForSymbolicMangling(
+                                              const SymbolicMangling &mangling);
 protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {

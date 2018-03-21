@@ -325,7 +325,7 @@ _swift_Foundation_TypePreservingNSNumberGetKind(
   } else if (CFGetTypeID(self_) == CFBooleanGetTypeID()) {
     result = SwiftBool;
   }
-  [self_ release];
+  SWIFT_CC_PLUSONE_GUARD([self_ release]);
   return result;
 }
 
@@ -339,7 +339,7 @@ _swift_Foundation_TypePreservingNSNumberGetKind(
     } \
     C_TYPE result; \
     memcpy(&result, self_->storage, sizeof(result)); \
-    [self_ release]; \
+    SWIFT_CC_PLUSONE_GUARD([self_ release]); \
     return result; \
   }
 

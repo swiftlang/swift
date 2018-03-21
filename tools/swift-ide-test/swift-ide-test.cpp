@@ -729,7 +729,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
-    Invocation.getFrontendOptions().Inputs.addInputFile(SecondSourceFileName);
+    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+        SecondSourceFileName);
   }
   CompilerInstance CI;
 
@@ -896,6 +897,7 @@ public:
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::AttributeId: Id = "attr-id"; break;
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
     case SyntaxNodeKind::EditorPlaceholder: Id = "placeholder"; break;
@@ -926,6 +928,7 @@ public:
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::AttributeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::EditorPlaceholder: Col = llvm::raw_ostream::YELLOW; break;
@@ -955,7 +958,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             bool RunTypeChecker,
                             bool Playground) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
   CompilerInstance CI;
@@ -964,7 +967,8 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   Invocation.getLangOptions().Playground = Playground;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
   if (CI.setup(Invocation))
     return 1;
   if (!RunTypeChecker)
@@ -998,7 +1002,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
   }
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
 
@@ -1177,8 +1181,9 @@ private:
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
 
@@ -1434,7 +1439,7 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
                                 StringRef SourceFilename,
                                 bool TerminalOutput) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
 
@@ -1499,7 +1504,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       StringRef MangledNameToFind,
                       StringRef DebugClientDiscriminator) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
 
@@ -1608,18 +1613,21 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Structure:
       case NodeKind::Class:
       case NodeKind::Enum:
+      case NodeKind::OtherNominalType:
         break;
 
       case NodeKind::BoundGenericStructure:
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericOtherNominalType:
         // Base type
         typeNode = node->getFirstChild();
         // Nominal type
         node = typeNode->getFirstChild();
         assert(node->getKind() == NodeKind::Structure ||
                node->getKind() == NodeKind::Class ||
-               node->getKind() == NodeKind::Enum);
+               node->getKind() == NodeKind::Enum ||
+               node->getKind() == NodeKind::OtherNominalType);
         break;
 
       default:
@@ -1699,18 +1707,18 @@ public:
       printDeclPost(D, None);
   }
 
-
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *NTD,
+                                    TypeOrExtensionDecl Target,
                                     Optional<BracketOptions> Bracket) override {
     if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
 
-  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *NTD,
-                                     Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                TypeOrExtensionDecl Target,
+                                Optional<BracketOptions> Bracket) override {
     if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
@@ -1930,7 +1938,8 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
                                      StringRef SourceFilename,
                                      bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addPrimaryInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -1960,7 +1969,8 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
                         const PrintOptions &Options,
                         bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addPrimaryInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2071,7 +2081,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
                         StringRef SourceFilename,
                         bool FullyQualifiedTypes) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2297,7 +2307,7 @@ public:
 static int doDumpComments(const CompilerInvocation &InitInvok,
                           StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2319,7 +2329,7 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
                            StringRef SourceFilename,
                            StringRef CommentsXMLSchema) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
@@ -2449,7 +2459,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   if (!Pair.hasValue())
     return 1;
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(FileName);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
   if (CI.setup(Invocation))
     return 1;
@@ -2495,7 +2505,7 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
                                           const StringRef FileName,
                                           const StringRef Usr) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(FileName);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
   if (CI.setup(Invocation))
     return 1;
@@ -2656,7 +2666,7 @@ private:
 static int doReconstructType(const CompilerInvocation &InitInvok,
                              StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
   CompilerInstance CI;
@@ -2690,9 +2700,10 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   auto StartLineCol = StartOp.getValue();
   auto EndLineCol = EndOp.getValue();
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFileName);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
 
   CompilerInstance CI;
 
@@ -2792,7 +2803,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
                                 StringRef SourceFileName, bool indexLocals) {
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFileName);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
   Invocation.getLangOptions().TypoCorrectionLimit = 0;
 
@@ -2857,7 +2868,7 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getFrontendOptions().Inputs.addInputFile(SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -2917,7 +2928,8 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -3004,7 +3016,7 @@ int main(int argc, char *argv[]) {
   CompilerInvocation InitInvok;
 
   for (auto &File : options::InputFilenames)
-    InitInvok.getFrontendOptions().Inputs.addInputFile(File);
+    InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
   if (!options::InputFilenames.empty())
     InitInvok.setInputKind(InputFileKind::IFK_Swift_Library);
 
@@ -3014,7 +3026,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
-  InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  InitInvok.getLangOptions().CollectParsedToken = true;
+  InitInvok.getLangOptions().BuildSyntaxTree = true;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {

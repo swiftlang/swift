@@ -19,6 +19,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -97,7 +98,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false),
+      HasCReferences(false), IsWeakLinked(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
   if (InsertBefore)
@@ -489,4 +490,33 @@ SubstitutionList SILFunction::getForwardingSubstitutions() {
 
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// SILFunctions, is defined here to avoid too much layering violation / circular
+// linkage dependency.
+
+struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const SILFunction *F = static_cast<const SILFunction *>(Entity);
+    OS << F->getName();
+  }
+
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const SILFunction *F = static_cast<const SILFunction *>(Entity);
+    F->getLocation().getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static SILFunctionTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SILFunction *>() {
+  return &TF;
 }

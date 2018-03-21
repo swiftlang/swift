@@ -38,19 +38,13 @@
   * EditorPlaceholderExpr
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
+  * SpecializeExpr
+  * UnresolvedPatternExpr
+  * IsExpr
+  * AsExpr
+  * ArrowExpr
 
 ### Not-started (UnknownExpr):
-  * UnresolvedSpecializeExpr
-  * KeyPathApplicationExpr
-  * CaptureListExpr
-  * AutoClosureExpr
-  * DynamicTypeExpr
-  * ForcedCheckedCastExpr
-  * ConditionalCheckedCastExpr
-  * IsExpr
-  * CoerceExpr
-  * ArrowExpr
-  * UnresolvedPatternExpr
   * ObjCSelectorExpr
 
 ## Declaration
@@ -62,11 +56,15 @@
   * FuncDecl
   * ProtocolDecl
   * ImportDecl
+  * AssociatedTypeDecl
   * TypeAliasDecl
   * IfConfigDecl
   * PatternBindingDecl
   * VarDecl
   * ExtensionDecl
+  * SubscriptDecl
+  * ConstructorDecl
+  * DestructorDecl
 
 ### In-progress (UnknownDecl):
 
@@ -76,11 +74,7 @@
   * InfixOperatorDecl
   * PrefixOperatorDecl
   * PostfixOperatorDecl
-  * AssociatedTypeDecl
   * EnumDecl
-  * SubscriptDecl
-  * ConstructorDecl
-  * DestructorDecl
   * EnumElementDecl
 
 ## Statement

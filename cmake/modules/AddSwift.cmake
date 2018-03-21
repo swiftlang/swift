@@ -100,25 +100,7 @@ function(_add_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  # MSVC and clang-cl don't understand -target.
-  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
-  endif()
-
   is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
-    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
-    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  endif()
-
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
-      # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
-  endif()
-
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
@@ -134,7 +116,27 @@ function(_add_variant_c_compile_link_flags)
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
       set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
     endif()
+  endif()
 
+  # MSVC and clang-cl don't understand -target.
+  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
+  endif()
+
+  if(IS_DARWIN)
+    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
+    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  endif()
+
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result
+      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
+      # Use the linker included in the Android NDK.
+      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
+  endif()
+
+  if(IS_DARWIN)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
@@ -183,12 +185,16 @@ function(_add_variant_c_compile_flags)
   if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
     list(APPEND result "-O2")
 
-    # Omit leaf frame pointers on x86.
-    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
-      if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-        list(APPEND result "-momit-leaf-frame-pointer")
-      else()
-        list(APPEND result "/Oy")
+    # Omit leaf frame pointers on x86 production builds (optimized, no debug
+    # info, and no asserts).
+    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
+    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
+      if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
+        if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+          list(APPEND result "-momit-leaf-frame-pointer")
+        else()
+          list(APPEND result "/Oy")
+        endif()
       endif()
     endif()
   else()
@@ -248,12 +254,23 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
+
+    # msvcprt's std::function requires RTTI, but we do not want RTTI data.
+    # Emulate /GR-
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result -frtti)
+      list(APPEND result -Xclang;-fno-rtti-data)
+    endif()
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
     list(APPEND result "-UNDEBUG")
   else()
     list(APPEND result "-DNDEBUG")
+  endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
@@ -282,16 +299,19 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
   endif()
 
-  if(BUILD_STANDALONE)
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND result
-        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   else()
     list(APPEND result
-        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
-        "-resource-dir" "${SWIFTLIB_DIR}")
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
   endif()
 
-  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(NOT BUILD_STANDALONE)
+    list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
+  endif()
+
   if(IS_DARWIN)
     list(APPEND result
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
@@ -316,6 +336,10 @@ function(_add_variant_swift_compile_flags
   if (SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
     list(APPEND result "-Xfrontend" "-enable-guaranteed-normal-arguments")
   endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -331,7 +355,7 @@ function(_add_variant_link_flags)
     ${ARGN})
 
   precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
-  precondition(LFLAGS_SDK MESSAGE "Should specify an architecture")
+  precondition(LFLAGS_ARCH MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
@@ -388,22 +412,23 @@ function(_add_variant_link_flags)
       endif()
   endif()
 
-  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_UC}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_UC}")
+  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC}")
   endif()
-  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
+  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(SWIFT_ENABLE_GOLD_LINKER AND
-       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      list(APPEND result "-fuse-ld=gold")
-    endif()
-    if(SWIFT_ENABLE_LLD_LINKER OR
+    find_program(LDLLD_PATH "ld.lld")
+    # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
+    elseif(SWIFT_ENABLE_GOLD_LINKER AND
+       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      list(APPEND result "-fuse-ld=gold")
     endif()
   endif()
 
@@ -843,17 +868,17 @@ function(_add_swift_library_single target name)
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}")
     endif()
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
+       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}")
     endif()
   endif()
 
@@ -1530,7 +1555,7 @@ function(add_swift_library name)
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
           if("${lib}" STREQUAL "ICU_UC")
             list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFT_${sdk}_ICU_UC}")
+                 "${SWIFT_${sdk}_${arch}_ICU_UC}")
             # temporary fix for atomic needing to be
             # after object files for libswiftCore.so
             if("${sdk}" STREQUAL "ANDROID")
@@ -1544,7 +1569,7 @@ function(add_swift_library name)
             endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFT_${sdk}_ICU_I18N}")
+                 "${SWIFT_${sdk}_${arch}_ICU_I18N}")
           elseif(TARGET "${lib}${VARIANT_SUFFIX}")
             list(APPEND swiftlib_private_link_libraries_targets
                 "${lib}${VARIANT_SUFFIX}")
@@ -1692,12 +1717,14 @@ function(add_swift_library name)
           set(codesign_arg CODESIGN)
         endif()
         precondition(THIN_INPUT_TARGETS)
-        _add_swift_lipo_target(
-            SDK ${sdk}
-            TARGET ${lipo_target}
-            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
-            ${codesign_arg}
-            ${THIN_INPUT_TARGETS})
+        _add_swift_lipo_target(SDK
+                                 ${sdk}
+                               TARGET
+                                 ${lipo_target}
+                               OUTPUT
+                                 ${UNIVERSAL_LIBRARY_NAME}
+                               ${codesign_arg}
+                               ${THIN_INPUT_TARGETS})
 
         # Cache universal libraries for dependency purposes
         set(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}
@@ -1743,11 +1770,13 @@ function(add_swift_library name)
               "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
           set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-          _add_swift_lipo_target(
-              SDK ${sdk}
-              TARGET ${lipo_target_static}
-              OUTPUT "${UNIVERSAL_LIBRARY_NAME}"
-              ${THIN_INPUT_TARGETS_STATIC})
+          _add_swift_lipo_target(SDK
+                                   ${sdk}
+                                 TARGET
+                                   ${lipo_target_static}
+                                 OUTPUT
+                                   "${UNIVERSAL_LIBRARY_NAME}"
+                                 ${THIN_INPUT_TARGETS_STATIC})
           swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
               FILES "${UNIVERSAL_LIBRARY_NAME}"
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}"
@@ -1760,14 +1789,18 @@ function(add_swift_library name)
         # Add Swift standard library targets as dependencies to the top-level
         # convenience target.
         if(SWIFTLIB_TARGET_LIBRARY)
+          set(FILTERED_UNITTESTS
+                swiftStdlibCollectionUnittest
+                swiftStdlibUnicodeUnittest)
+
           foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
             set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
+               TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                   ${lipo_target}
                   ${lipo_target_static})
-              if((NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest") AND
-                 (NOT "${name}" STREQUAL "swiftStdlibUnicodeUnittest"))
+              if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
                 add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
                     ${lipo_target}
                     ${lipo_target_static})
@@ -1974,7 +2007,7 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
+  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
   set_target_properties(${name}

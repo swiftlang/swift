@@ -526,7 +526,7 @@ struct SConforms7a : PConforms7 { }
 protocol PConforms8 {
   associatedtype Assoc
 
-  func method() -> Assoc // expected-note{{requirement 'method()' declared here}}
+  func method() -> Assoc
   var property: Assoc { get }
   subscript (i: Assoc) -> Assoc { get }
 }
@@ -551,10 +551,7 @@ func testSConforms8b() {
 }
 
 struct SConforms8c : PConforms8 { 
-  func method() -> String { return "" } // expected-warning{{instance method 'method()' nearly matches defaulted requirement 'method()' of protocol 'PConforms8'}}
-  // expected-note@-1{{candidate has non-matching type '() -> String' [with Assoc = Int]}}
-  // expected-note@-2{{move 'method()' to an extension to silence this warning}}
-  // expected-note@-3{{make 'method()' private to silence this warning}}
+  func method() -> String { return "" } // no warning in type definition
 }
 
 func testSConforms8c() {

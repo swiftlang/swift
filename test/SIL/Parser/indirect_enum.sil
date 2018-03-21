@@ -27,7 +27,7 @@ entry(%e : $TreeA<T>):
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <T>, 0
 
   %c = unchecked_enum_data %e : $TreeA<T>, #TreeA.Branch!enumelt.1
-  %d = project_box %c : $<τ_0_0> { var τ_0_0 } <(left: TreeA<T>, right: TreeA<T>)>, 0
+  %d = project_box %c : $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>, 0
 
   return undef : $()
 }
@@ -38,7 +38,7 @@ entry(%e : $*TreeB<T>):
   destroy_addr %a : $*T
 
   %c = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Branch!enumelt.1
-  %d = load [take] %c : $*<τ_0_0> { var τ_0_0 } <(left: TreeB<T>, right: TreeB<T>)>
+  %d = load [take] %c : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
 
   return undef : $()
 }
@@ -49,7 +49,7 @@ entry(%e : $TreeInt):
   store %a to [trivial] undef : $*Int
 
   %c = unchecked_enum_data %e : $TreeInt, #TreeInt.Branch!enumelt.1
-  %d = project_box %c : $<τ_0_0> { var τ_0_0 } <(left: TreeInt, right: TreeInt)>, 0
+  %d = project_box %c : ${ var (left: TreeInt, right: TreeInt) }, 0
 
   return undef : $()
 }

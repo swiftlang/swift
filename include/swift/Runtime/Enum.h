@@ -67,12 +67,10 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
 /// \returns -1 if the payload case is inhabited. If an empty case is inhabited,
 ///          returns a value greater than or equal to zero and less than
 ///          emptyCases.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                    const Metadata *payload,
-                                   unsigned emptyCases)
-  SWIFT_CC(RegisterPreservingCC);
-
+                                   unsigned emptyCases);
 
 
 /// \brief Store the tag value for the given case into a single-payload enum,
@@ -86,12 +84,11 @@ int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 ///                    case, or a value greater than or equal to zero and less
 ///                    than emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                      const Metadata *payload,
                                      int whichCase,
-                                     unsigned emptyCases)
-  SWIFT_CC(RegisterPreservingCC);
+                                     unsigned emptyCases);
 
 /// \brief Initialize the type metadata for a generic, multi-payload
 ///        enum instance.

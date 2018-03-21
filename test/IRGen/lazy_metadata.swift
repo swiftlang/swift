@@ -13,18 +13,11 @@
 // CHECK-DAG: @"$S4test7StructDVMF" =
 // CHECK-DAG: @"$S4test7StructEVMF" =
 
-// value witness tables
-// CHECK-DAG: @"$S4test7StructAVWV" =
-// CHECK-DAG: @"$S4test7StructBVWV" =
-// CHECK-DAG: @"$S4test7StructCVWV" =
-// CHECK-DEAD-NOT: @"$S4test7StructDVWV"
-// CHECK-DAG: @"$S4test7StructEVWV" =
-
 // nominal type descriptors
 // CHECK-DAG: @"$S4test7StructAVMn" =
 // CHECK-DAG: @"$S4test7StructBVMn" =
 // CHECK-DAG: @"$S4test7StructCVMn" =
-// CHECK-DEAD-NOT: @"$S4test7StructDVMn"
+// CHECK-DAG: @"$S4test7StructDVMn"
 // CHECK-DAG: @"$S4test7StructEVMn" =
 
 // full type metadata

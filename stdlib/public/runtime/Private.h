@@ -29,6 +29,52 @@
 
 namespace swift {
 
+class TypeReferenceOwnership {
+  enum : uint8_t {
+    Weak = 1 << 0,
+    Unowned = 1 << 1,
+    Unmanaged = 1 << 2,
+  };
+
+  uint8_t Data;
+
+  constexpr TypeReferenceOwnership(uint8_t Data) : Data(Data) {}
+
+public:
+  constexpr TypeReferenceOwnership() : Data(0) {}
+
+  bool isWeak() const { return Data & Weak; }
+  bool isUnowned() const { return Data & Unowned; }
+  bool isUnmanaged() const { return Data & Unmanaged; }
+
+  void setWeak() { Data |= Weak; }
+
+  void setUnowned() { Data |= Unowned; }
+
+  void setUnmanaged() { Data |= Unmanaged; }
+};
+
+/// Type information consists of metadata and its ownership info,
+/// such information is used by `_typeByMangledName` accessor
+/// since we don't represent ownership attributes in the metadata
+/// itself related info has to be bundled with it.
+class TypeInfo {
+  const Metadata *Type;
+  const TypeReferenceOwnership ReferenceOwnership;
+
+public:
+  TypeInfo() : Type(nullptr), ReferenceOwnership() {}
+
+  TypeInfo(const Metadata *type, TypeReferenceOwnership ownership)
+      : Type(type), ReferenceOwnership(ownership) {}
+
+  operator const Metadata *() { return Type; }
+
+  bool isWeak() const { return ReferenceOwnership.isWeak(); }
+  bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
+  bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+};
+
 #if SWIFT_HAS_ISA_MASKING
   SWIFT_RUNTIME_EXPORT
   uintptr_t swift_isaMask;
@@ -144,7 +190,7 @@ namespace swift {
   /// Check if a class has a formal superclass in the AST.
   static inline
   bool classHasSuperclass(const ClassMetadata *c) {
-    return (c->SuperClass && c->SuperClass != getRootSuperclass());
+    return  (c->Superclass && c->Superclass != getRootSuperclass());
   }
 
   /// Replace entries of a freshly-instantiated value witness table with more
@@ -157,11 +203,66 @@ namespace swift {
   /// Returns true if common value witnesses were used, false otherwise.
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
-  const NominalTypeDescriptor *
-  _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
+  const Metadata *
+  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
+                                  const Metadata *metadata,
+                                  const TypeContextDescriptor *ntd);
+
+  bool
+  _contextDescriptorMatchesMangling(const ContextDescriptor *context,
+                                    Demangle::NodePointer node);
+  
+  const TypeContextDescriptor *
+  _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
+
+  /// Callback used to provide the substitution for a generic parameter
+  /// referenced by a "flat" index (where all depths have been collapsed)
+  /// to its metadata.
+  using SubstFlatGenericParameterFn =
+    llvm::function_ref<const Metadata *(unsigned flatIndex)>;
+
+  /// Callback used to provide the substitution of a generic parameter
+  /// (described by depth/index) to its metadata.
+  using SubstGenericParameterFn =
+    llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
+
+  /// Retrieve the type metadata described by the given type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  TypeInfo _getTypeByMangledName(StringRef typeName,
+                                 SubstGenericParameterFn substGenericParam);
+
+  /// Gather generic parameter counts from a context descriptor.
+  ///
+  /// \returns true if the innermost descriptor is generic.
+  bool _gatherGenericParameterCounts(const ContextDescriptor *descriptor,
+                                     std::vector<unsigned> &genericParamCounts);
+
+  /// Map depth/index to a flat index.
+  llvm::Optional<unsigned> _depthIndexToFlatIndex(
+                                          unsigned depth, unsigned index,
+                                          llvm::ArrayRef<unsigned> paramCounts);
+
+  /// Check the given generic requirements using the given set of generic
+  /// arguments, collecting the key arguments (e.g., witness tables) for
+  /// the caller.
+  ///
+  /// \param requirements The set of requirements to evaluate.
+  ///
+  /// \param extraArguments The extra arguments determined while checking
+  /// generic requirements (e.g., those that need to be
+  /// passed to an instantiation function) will be added to this vector.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool _checkGenericRequirements(
+                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+                    std::vector<const void *> &extraArguments,
+                    SubstFlatGenericParameterFn substFlatGenericParam,
+                    SubstGenericParameterFn substGenericParam);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -190,6 +291,39 @@ namespace swift {
 
   void *allocateMetadata(size_t size, size_t align);
 
+  Demangle::NodePointer
+  _buildDemanglingForContext(const ContextDescriptor *context,
+                             llvm::ArrayRef<NodePointer> demangledGenerics,
+                             bool concretizedGenerics,
+                             Demangle::Demangler &Dem);
+  
+  /// Symbolic reference resolver that produces the demangling tree for the
+  /// referenced context.
+  class ResolveToDemanglingForContext {
+    Demangle::Demangler &Dem;
+  public:
+    explicit ResolveToDemanglingForContext(Demangle::Demangler &Dem)
+      : Dem(Dem) {}
+    
+    Demangle::NodePointer operator()(int32_t offset, const void *base) {
+      auto descriptor =
+        (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
+      
+      return _buildDemanglingForContext(descriptor, {}, false, Dem);
+    }
+  };
+
+  /// Check whether a type conforms to a protocol.
+  ///
+  /// \param value - can be null, in which case the question should
+  ///   be answered abstractly if possible
+  /// \param conformance - if non-null, and the protocol requires a
+  ///   witness table, and the type implements the protocol, the witness
+  ///   table will be placed here
+  bool _conformsToProtocol(const OpaqueValue *value,
+                           const Metadata *type,
+                           const ProtocolDescriptor *protocol,
+                           const WitnessTable **conformance);
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

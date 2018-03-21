@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1206,7 +1207,7 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 
   // If we have no other arguments, represent the trailing closure as a
   // parenthesized expression.
-  if (args.size() == 0) {
+  if (args.empty()) {
     auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
                                    /*hasTrailingClosure=*/true);
     computeSingleArgumentType(ctx, arg, implicit, getType);
@@ -2275,4 +2276,29 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Property:
     llvm_unreachable("no hashable conformances for this kind");
   }
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct ExprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    // Exprs don't have names.
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Expr *D = static_cast<const Expr *>(Entity);
+    D->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static ExprTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Expr *>() {
+  return &TF;
 }

@@ -69,38 +69,40 @@
 #endif
 
 // TODO: support using shims headers in overlays by parameterizing
-// SWIFT_RUNTIME_EXPORT on the library it's exported from, then setting
-// protected vs. default based on the current value of __SWIFT_CURRENT_DYLIB.
+// SWIFT_RUNTIME_EXPORT on the library it's exported from.
 
 /// Attribute used to export symbols from the runtime.
-#if __MACH__
-# define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
-#elif __ELF__
+#if defined(__MACH__)
 
-// Use protected visibility for ELF, since we don't want Swift symbols to be
-// interposable. The relative relocations we form to metadata aren't
-// valid in ELF shared objects, and leaving them relocatable at load time
-// defeats the purpose of the relative references.
-//
-// Protected visibility on a declaration is interpreted to mean that the
-// symbol is defined in the current dynamic library, so if we're building
-// something else, we need to fall back on using default visibility.
-#ifdef __SWIFT_CURRENT_DYLIB
-# define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("protected")))
-#else
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
-#endif
 
-#else  // FIXME: this #else should be some sort of #elif Windows
+#elif defined(__ELF__)
+
+// We make assumptions that the runtime and standard library can refer to each
+// other's symbols as DSO-local, which means we can't allow the dynamic linker
+// to relocate these symbols. We must give them protected visibility while
+// building the standard library and runtime.
+# if defined(swiftCore_EXPORTS)
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("protected")))
+# else
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
+# endif
+
+// FIXME: this #else should be some sort of #elif Windows
+#else // !__MACH__ && !__ELF__
+
 # if defined(__CYGWIN__)
 #  define SWIFT_EXPORT_ATTRIBUTE
 # else
+
 #  if defined(swiftCore_EXPORTS)
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllexport)
 #  else
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllimport)
 #  endif
+
 # endif
+
 #endif
 
 #if defined(__cplusplus)

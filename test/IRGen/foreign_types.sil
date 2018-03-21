@@ -3,21 +3,20 @@
 sil_stage canonical
 import c_layout
 
-// CHECK: [[HAS_NESTED_UNION_NAME:@.*]] = private constant [20 x i8] c"So14HasNestedUnionV\00"
+// CHECK: [[HAS_NESTED_UNION_NAME:@.*]] = private constant [15 x i8] c"HasNestedUnion\00"
 
 // CHECK-LABEL: @"$SSo14HasNestedUnionVMn" = linkonce_odr hidden constant
 // CHECK-SAME: [[HAS_NESTED_UNION_NAME]]
 // CHECK-SAME: @"$SSo14HasNestedUnionVMa"
 
-// CHECK: [[AMAZING_COLOR_NAME:@.*]] = private constant [18 x i8] c"So12AmazingColorV\00"
+// CHECK: [[AMAZING_COLOR_NAME:@.*]] = private constant [13 x i8] c"AmazingColor\00"
 
 // CHECK-LABEL: @"$SSo12AmazingColorVMn" = linkonce_odr hidden constant
 // CHECK-SAME: [[AMAZING_COLOR_NAME]]
 // CHECK-SAME: @"$SSo12AmazingColorVMa"
 
 // CHECK-LABEL: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden global
-// CHECK-SAME:  [[INT:i[0-9]+]] sub ([[INT]] ptrtoint
-// CHECK-SAME:  [[INT]] 0,
+// CHECK-SAME:  [[INT:i[0-9]+]] 0,
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVWV"
 // CHECK-SAME:  [[INT]] 1,
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVMn"
@@ -38,8 +37,8 @@ bb0:
   return %ret : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo14HasNestedUnionVMa
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo14HasNestedUnionVMa"(
 // CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}$SSo14HasNestedUnionVN
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo12AmazingColorVMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12AmazingColorVMa"(
 // CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}@"$SSo12AmazingColorVN"

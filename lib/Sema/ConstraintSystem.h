@@ -969,6 +969,7 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
+  llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1032,6 +1033,10 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
+  /// This is a cache that keeps track of whether a given type is known (or not)
+  /// to be a @dynamicMemberLookup type.
+  ///
+  llvm::DenseMap<CanType, bool> IsDynamicMemberLookupCache;
 private:
   /// \brief Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -1302,8 +1307,8 @@ private:
       if (ExcludeRoot && expr == RootExpr)
         return expr;
 
-      assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
-             && "Mismatched types!");
+      //assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
+      //       && "Mismatched types!");
       assert(!CS.getType(expr)->hasTypeVariable() &&
              "Should not write type variable into expression!");
       expr->setType(CS.getType(expr));
@@ -1593,16 +1598,21 @@ public:
     //        "Expected type to be invariant!");
 
     ExprTypes[E] = T.getPointer();
+  }
 
-    // FIXME: Temporary until all references to expression types are
-    //        updated.
-    E->setType(T);
+  void setType(TypeLoc &L, Type T) {
+    assert(T && "Expected non-null type!");
+    TypeLocTypes[&L] = T.getPointer();
   }
 
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
     return ExprTypes.find(E) != ExprTypes.end();
+  }
+
+  bool hasType(const TypeLoc &L) const {
+    return TypeLocTypes.find(&L) != TypeLocTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1613,6 +1623,11 @@ public:
     //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
     //           "Mismatched types!");
     return ExprTypes.find(E)->second;
+  }
+
+  Type getType(const TypeLoc &L) const {
+    assert(hasType(L) && "Expected type to have been set!");
+    return TypeLocTypes.find(&L)->second;
   }
 
   /// Cache the type of the expression argument and return that same
@@ -2016,8 +2031,7 @@ public:
   /// Call Expr::propagateLValueAccessKind on the given expression,
   /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E,
-                                 AccessKind accessKind,
+  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
                                  bool allowOverwrite = false);
 
   /// Call Expr::isTypeReference on the given expression, using a
@@ -2176,11 +2190,6 @@ public:
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
                       OverloadChoice *favored = nullptr);
-
-  /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
-  /// that should transparently look through ImplicitlyUnwrappedOptional types,
-  /// return T.
-  Type lookThroughImplicitlyUnwrappedOptionalType(Type type);
 
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
@@ -2385,8 +2394,7 @@ public:
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
     else
-      resultTy =
-          resultTy->getWithoutSpecifierType()->getAnyOptionalObjectType();
+      resultTy = resultTy->getWithoutSpecifierType()->getOptionalObjectType();
 
     assert(resultTy);
 
@@ -2415,8 +2423,7 @@ public:
     if (auto *fnTy = type->getAs<AnyFunctionType>())
       underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
     else
-      underlyingType =
-        type->getWithoutSpecifierType()->getAnyOptionalObjectType();
+      underlyingType = type->getWithoutSpecifierType()->getOptionalObjectType();
 
     assert(underlyingType);
 
@@ -2441,6 +2448,15 @@ public:
     auto *disjunctionLocator = getConstraintLocator(
         locator, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
     buildDisjunctionForOptionalVsUnderlying(boundTy, type, disjunctionLocator);
+  }
+
+  // Build a disjunction for dynamic lookup results, which are
+  // implicitly unwrapped if needed.
+  void buildDisjunctionForDynamicLookupResult(Type boundTy, Type type,
+                                              ConstraintLocator *locator) {
+    auto *dynamicLocator =
+        getConstraintLocator(locator, ConstraintLocator::DynamicLookupResult);
+    buildDisjunctionForOptionalVsUnderlying(boundTy, type, dynamicLocator);
   }
 
   /// \brief Resolve the given overload set to the given choice.
@@ -2649,7 +2665,7 @@ public:
 
 private:
   /// The kind of bindings that are permitted.
-  enum class AllowedBindingKind : unsigned char {
+  enum class AllowedBindingKind : uint8_t {
     /// Only the exact type.
     Exact,
     /// Supertypes of the specified type.
@@ -2659,7 +2675,7 @@ private:
   };
 
   /// The kind of literal binding found.
-  enum class LiteralBindingKind : unsigned char {
+  enum class LiteralBindingKind : uint8_t {
     None,
     Collection,
     Float,
@@ -2756,23 +2772,12 @@ private:
       if (!x.hasNonDefaultableBindings())
         return false;
 
-      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
-      llvm::set_intersect(intersection, y.Sources);
+      if (x.FullyBound || x.SubtypeOfExistentialType)
+        return false;
 
-      // Some relational constraints dictate certain
-      // ordering when it comes to attempting binding
-      // of type variables, where left-hand side is
-      // always more preferrable than right-hand side.
-      for (const auto *constraint : intersection) {
-        if (constraint->getKind() != ConstraintKind::Subtype)
-          continue;
-
-        auto lhs = constraint->getFirstType();
-        if (auto *typeVar = lhs->getAs<TypeVariableType>())
-          return x.TypeVar == typeVar;
-      }
-
-      return false;
+      // If the only difference is default types,
+      // prioritize bindings with fewer of them.
+      return x.NumDefaultableBindings < y.NumDefaultableBindings;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2860,6 +2865,12 @@ private:
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
   Optional<PotentialBindings> determineBestBindings();
+  Optional<ConstraintSystem::PotentialBinding>
+  getPotentialBindingForRelationalConstraint(
+      PotentialBindings &result, Constraint *constraint,
+      bool &hasDependentMemberRelationalConstraints,
+      bool &hasNonDependentMemberRelationalConstraints,
+      bool &addOptionalSupertypeBindings);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
@@ -3083,6 +3094,9 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(Expr *) LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
   void print(raw_ostream &out);
 };
 

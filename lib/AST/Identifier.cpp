@@ -22,6 +22,8 @@ using namespace swift;
 
 void *DeclBaseName::SubscriptIdentifierData =
     &DeclBaseName::SubscriptIdentifierData;
+void *DeclBaseName::ConstructorIdentifierData =
+    &DeclBaseName::ConstructorIdentifierData;
 void *DeclBaseName::DestructorIdentifierData =
     &DeclBaseName::DestructorIdentifierData;
 
@@ -157,7 +159,7 @@ llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
   if (skipEmptyArgumentNames) {
     // If there is more than one argument yet none of them have names,
     // we're done.
-    if (getArgumentNames().size() > 0) {
+    if (!getArgumentNames().empty()) {
       bool anyNonEmptyNames = false;
       for (auto c : getArgumentNames()) {
         if (!c.empty()) {

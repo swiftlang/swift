@@ -60,14 +60,12 @@ ${stringSubscriptComment}
     Builtin.unreachable()
   }
 
-% for Range in 'Range', 'ClosedRange', 'CountableRange', 'CountableClosedRange':
 ${stringSubscriptComment}
   @available(
     *, unavailable,
-    message: "cannot subscript String with a ${Range}<Int>, see the documentation comment for discussion")
-  public subscript(bounds: ${Range}<Int>) -> String {
+    message: "cannot subscript String with an integer range, see the documentation comment for discussion")
+  public subscript<R: RangeExpression>(bounds: R) -> String where R.Bound == Int {
     Builtin.unreachable()
   }
-% end
 }
 

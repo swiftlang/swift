@@ -47,6 +47,7 @@ namespace Lowering {
 }
   
 namespace irgen {
+  class DynamicMetadataRequest;
   class Explosion;
   class FunctionRef;
   class HeapLayout;
@@ -54,6 +55,7 @@ namespace irgen {
   class IRGenModule;
   class LinkEntity;
   class LocalTypeDataCache;
+  class MetadataResponse;
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -225,9 +227,10 @@ public:
   llvm::Value *emitAllocEmptyBoxCall();
 
   // Emit a call to the given generic type metadata access function.
-  llvm::CallInst *emitGenericTypeMetadataAccessFunctionCall(
+  MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
                                           llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args);
+                                          ArrayRef<llvm::Value *> args,
+                                          DynamicMetadataRequest request);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -235,6 +238,9 @@ public:
   // values in the maximally-abstracted representation of the type; this is
   // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
+
+  MetadataResponse emitTypeMetadataRef(CanType type,
+                                       DynamicMetadataRequest request);
 
   // Emit a reference to a type layout record for the given type. The referenced
   // data is enough to lay out an aggregate containing a value of the type, but
@@ -275,6 +281,9 @@ public:
   void setInvariantLoad(llvm::LoadInst *load);
   /// Mark a load as dereferenceable to `size` bytes.
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
+
+  /// Emit a non-mergeable trap call, optionally followed by a terminator.
+  void emitTrap(bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -432,6 +441,8 @@ public:
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
 
+  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc);
+
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
@@ -452,6 +463,9 @@ public:
     return tryGetLocalTypeData(LocalTypeDataKey{type, kind});
   }
   llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+
+  MetadataResponse tryGetLocalTypeMetadata(CanType type,
+                                           DynamicMetadataRequest request);
 
   /// Look up a local type data reference, returning null if no entry was
   /// found or if the only viable entries are abstract.  This will never
@@ -476,6 +490,7 @@ public:
     setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
   }
   void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
+  void setScopedLocalTypeMetadata(CanType type, MetadataResponse response);
 
   /// The same as tryGetLocalTypeData, just for the Layout metadata.
   ///

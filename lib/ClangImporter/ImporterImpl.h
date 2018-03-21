@@ -294,10 +294,10 @@ public:
       : type(ty), isIUO(implicitlyUnwrap) {
 #if !defined(NDEBUG)
     if (implicitlyUnwrap) {
-      assert(ty->getAnyOptionalObjectType() || ty->getAs<AnyFunctionType>());
-      if (!ty->getAnyOptionalObjectType()) {
+      assert(ty->getOptionalObjectType() || ty->getAs<AnyFunctionType>());
+      if (!ty->getOptionalObjectType()) {
         auto fnTy = ty->castTo<AnyFunctionType>();
-        assert(fnTy->getResult()->getAnyOptionalObjectType());
+        assert(fnTy->getResult()->getOptionalObjectType());
       }
     }
 #endif
@@ -336,7 +336,6 @@ public:
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
-  llvm::SmallVector<const clang::Module*, 2> DeferredHeaderImports;
 
   const Version CurrentVersion;
 
@@ -358,13 +357,19 @@ private:
 
   /// \brief The fake buffer used to import modules.
   ///
-  /// FIXME: Horrible hack for loadModule().
-  clang::FileID DummyImportBuffer;
+  /// \see getNextIncludeLoc
+  clang::FileID DummyIncludeBuffer;
 
   /// \brief A count of the number of load module operations.
   ///
-  /// FIXME: Horrible, horrible hack for \c loadModule().
-  unsigned ImportCounter = 0;
+  /// \see getNextIncludeLoc
+  unsigned IncludeCounter = 0;
+
+  /// Generate a dummy Clang source location for header includes and module
+  /// imports.
+  ///
+  /// These have to be unique and valid or Clang gets very confused.
+  clang::SourceLocation getNextIncludeLoc();
 
   /// \brief Used to avoid running the AST verifier over the same declarations.
   size_t VerifiedDeclsCounter = 0;
@@ -529,7 +534,7 @@ public:
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
   /// The modules re-exported by imported headers.
-  llvm::SmallVector<ModuleDecl::ImportedModule, 8> ImportedHeaderExports;
+  llvm::SmallVector<clang::Module *, 8> ImportedHeaderExports;
 
   /// The modules that requested imported headers.
   ///
@@ -639,12 +644,10 @@ public:
     }
 #endif
 
-    if (!isIUO) {
-      assert(!ty->getImplicitlyUnwrappedOptionalObjectType());
+    if (!isIUO)
       return;
-    } else {
-      assert(ty->getAnyOptionalObjectType());
-    }
+
+    assert(ty->getOptionalObjectType());
 
     auto *IUOAttr = new (SwiftContext)
         ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
@@ -1108,7 +1111,7 @@ public:
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
-                       Identifier baseName, unsigned numParams,
+                       DeclBaseName baseName, unsigned numParams,
                        StringRef argumentLabel, bool isFirstParameter,
                        bool isLastParameter, importer::NameImporter &);
 

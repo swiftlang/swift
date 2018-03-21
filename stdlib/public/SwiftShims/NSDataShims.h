@@ -14,7 +14,7 @@
 
 NS_BEGIN_DECLS
 
-typedef void (^NSDataDeallocator)(void *, NSUInteger);
+typedef void (^NSDataDeallocator)(void * _Null_unspecified, NSUInteger);
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorVM;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorUnmap;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorFree;
@@ -23,5 +23,7 @@ FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorNone;
 @interface NSData (FoundationSPI)
 - (BOOL)_isCompact;
 @end
+
+BOOL __NSDataWriteToURL(NS_NON_BRIDGED(NSData *) _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _Nonnull url NS_RELEASES_ARGUMENT, NSDataWritingOptions writingOptions, NSError **errorPtr);
 
 NS_END_DECLS

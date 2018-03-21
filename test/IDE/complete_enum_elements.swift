@@ -73,7 +73,7 @@
 
 //===--- Helper types.
 
-enum FooEnum {
+enum FooEnum: CaseIterable {
   case Foo1
   case Foo2
 }
@@ -86,11 +86,15 @@ enum FooEnum {
 // FOO_ENUM_NO_DOT: Begin completions
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal: .AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal: .allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT: Begin completions
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT_ELEMENTS: Begin completions, 2 items
@@ -201,8 +205,6 @@ enum BazEnum<T> {
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVarT[#_#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: == {#Any.Type?#}[#Bool#]; name=== Any.Type?
-// BAZ_T_ENUM_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#]; name=!= Any.Type?
 // BAZ_T_ENUM_NO_DOT-NEXT: End completions
 
 // BAZ_INT_ENUM_DOT: Begin completions, 6 items

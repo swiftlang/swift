@@ -14,18 +14,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTVisitor.h"
 #include "swift/Parse/Parser.h"
+
+#include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Syntax/SyntaxFactory.h"
+#include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 
 using namespace swift;
 using namespace swift::syntax;

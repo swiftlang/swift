@@ -90,7 +90,6 @@ namespace swift {
   class PrecedenceGroupDecl;
   class TupleTypeElt;
   class EnumElementDecl;
-  enum OptionalTypeKind : unsigned;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -106,6 +105,10 @@ namespace swift {
   class UnifiedStatsReporter;
 
   enum class KnownProtocolKind : uint8_t;
+
+namespace syntax {
+  class SyntaxArena;
+}
 
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
@@ -170,10 +173,6 @@ public:
 };
 
 class SILLayout; // From SIL
-/// \brief Describes either a nominal type declaration or an extension
-/// declaration.
-typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
-  TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
@@ -380,6 +379,9 @@ public:
                               setVector.size());
   }
 
+  /// Retrive the syntax node memory manager for this context.
+  syntax::SyntaxArena &getSyntaxArena() const;
+
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -403,23 +405,11 @@ public:
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
-  /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
-  EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
-
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalSomeDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
-
-  EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
-  EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;

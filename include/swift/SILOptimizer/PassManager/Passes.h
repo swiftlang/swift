@@ -50,7 +50,7 @@ namespace swift {
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
-  void performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T);
+  void performSILDiagnoseUnreachable(SILModule *M);
 
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
@@ -65,8 +65,8 @@ namespace swift {
   /// \brief Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
 
-  /// \brief Perform SIL Inst Count on M.
-  void performSILInstCount(SILModule *M);
+  /// \brief Perform SIL Inst Count on M if needed.
+  void performSILInstCountIfNeeded(SILModule *M);
 
   /// \brief Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.

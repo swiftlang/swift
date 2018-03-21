@@ -68,6 +68,17 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
 
+ERROR(pound_diagnostic_expected_string,none,
+      "expected string literal in %select{#warning|#error}0 directive",(bool))
+ERROR(pound_diagnostic_expected,none,
+      "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
+ERROR(pound_diagnostic_expected_parens,none,
+      "%select{#warning|#error}0 directive requires parentheses",(bool))
+ERROR(pound_diagnostic_interpolation,none,
+      "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
+ERROR(extra_tokens_pound_diagnostic_directive,none,
+      "extra tokens following %select{#warning|#error}0 directive", (bool))
+
 ERROR(sourceLocation_expected,none,
       "expected '%0' in #sourceLocation directive", (StringRef))
 
@@ -517,6 +528,8 @@ ERROR(expected_sil_instr_opcode,none,
       "expected SIL instruction opcode", ())
 ERROR(expected_tok_in_sil_instr,none,
       "expected '%0' in SIL instruction", (StringRef))
+ERROR(sil_property_generic_signature_mismatch,none,
+      "sil_property generic signature must match original declaration", ())
 ERROR(sil_string_no_encoding,none,
       "string_literal instruction requires an encoding", ())
 ERROR(sil_string_invalid_encoding,none,
@@ -587,6 +600,9 @@ ERROR(sil_keypath_unknown_component_kind,none,
 ERROR(sil_keypath_computed_property_missing_part,none,
       "keypath %select{gettable|settable}0_property component needs an "
       "%select{id and getter|id, getter, and setter}0", (bool))
+ERROR(sil_keypath_external_missing_part,none,
+      "keypath external component with indices needs an indices_equals and "
+      "indices_hash function", ())
 ERROR(sil_keypath_no_components,none,
       "keypath must have at least one component", ())
 ERROR(sil_keypath_no_root,none,
@@ -842,8 +858,8 @@ ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(inout_as_attr_disallowed,none,
-      "%0 before a parameter name is not allowed, place it before the parameter type instead",
+ERROR(parameter_specifier_as_attr_disallowed,none,
+      "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
       "parameter must not have multiple '__owned', 'inout', '__shared',"
@@ -1174,14 +1190,15 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_object_literal_identifier,none,
-      "expected identifier after '#' in object literal expression", ())
-ERROR(expected_arg_list_in_object_literal,none,
+ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(object_literal_legacy_name,none,
-      "'%0' has been renamed to '%1", (StringRef, StringRef))
-ERROR(legacy_object_literal_syntax,none,
-       "object literal syntax no longer uses '[# ... #]'", ())
+ERROR(legacy_object_literal,none,
+      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
+      (bool, StringRef, StringRef))
+
+// Unknown pound expression.
+ERROR(unknown_pound_expr,none,
+      "use of unknown directive '#%0'", (StringRef))
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
@@ -1508,7 +1525,7 @@ WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
-      "plaform condition appears to be testing for simulator environment; "
+      "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",
       ())
 

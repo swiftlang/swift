@@ -172,6 +172,6 @@ extension UnsafeMutableAudioBufferListPointer
     }
   }
 
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 }
 

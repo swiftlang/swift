@@ -9,14 +9,14 @@
 import local_types_helper
 
 public func singleFunc() {
-  // CHECK-DAG: @"$S11local_types10singleFuncyyF06SingleD6StructL_VWV" = internal constant
+  // CHECK-DAG: @"$S11local_types10singleFuncyyF06SingleD6StructL_VMf" = internal constant
   struct SingleFuncStruct {
     let i: Int
   }
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: @"$S11local_types13singleClosureyycvpfiyycfU_06SingleD6StructL_VWV" = internal constant
+  // CHECK-DAG: @"$S11local_types13singleClosureyycvpfiyycfU_06SingleD6StructL_VMf" = internal constant
   struct SingleClosureStruct {
     let i: Int
   }
@@ -24,7 +24,7 @@ public let singleClosure: () -> () = {
 
 public struct PatternStruct {
   public var singlePattern: Int = ({
-    // CHECK-DAG: @"$S11local_types13PatternStructV06singleC0SivpfiSiycfU_06SinglecD0L_VWV" = internal constant
+    // CHECK-DAG: @"$S11local_types13PatternStructV06singleC0SivpfiSiyXEfU_06SinglecD0L_VMf" = internal constant
     struct SinglePatternStruct {
       let i: Int
     }
@@ -33,7 +33,7 @@ public struct PatternStruct {
 }
 
 public func singleDefaultArgument(i: Int = {
-  // CHECK-DAG: @"$S11local_types21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_VWV" = internal constant
+  // CHECK-DAG: @"$S11local_types21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_VMf" = internal constant
   struct SingleDefaultArgumentStruct {
     let i: Int
   }

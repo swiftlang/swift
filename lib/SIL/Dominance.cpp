@@ -24,10 +24,8 @@ template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
 namespace llvm {
 namespace DomTreeBuilder {
-template void Calculate<SILDomTree, swift::SILFunction>(
-    SILDomTree &DT, swift::SILFunction &F);
-template void Calculate<SILPostDomTree, swift::SILFunction>(
-    SILPostDomTree &DT, swift::SILFunction &F);
+template void Calculate<SILDomTree>(SILDomTree &DT);
+template void Calculate<SILPostDomTree>(SILPostDomTree &DT);
 } // namespace DomTreeBuilder
 } // namespace llvm
 

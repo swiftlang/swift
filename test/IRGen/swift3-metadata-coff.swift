@@ -25,10 +25,10 @@ public func f(s : S) -> (() -> ()) {
   return { gg = s }
 }
 
-// CHECK-DAG: @"\01l__swift5_reflection_descriptor" = private constant {{.*}}, section ".sw5cptr$B"
-// CHECK-DAG: @{{[0-9]+}} = private constant [3 x i8] c"Sq\00", section ".sw5tyrf$B"
-// CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"none\00", section ".sw5rfst$B"
-// CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"some\00", section ".sw5rfst$B"
+// CHECK-DAG: @"\01l__swift4_reflection_descriptor" = private constant {{.*}}, section ".sw5cptr$B"
+// CHECK-DAG: @"{{.*}}" = {{.*}} c"Sq", {{.*}} section ".sw5tyrf$B"
+// CHECK-DAG: @{{[0-9]+}} = {{.*}} c"none\00", section ".sw5rfst$B"
+// CHECK-DAG: @{{[0-9]+}} = {{.*}} c"some\00", section ".sw5rfst$B"
 // CHECK-DAG: @"$SSqMF" = internal constant {{.*}}, section ".sw5flmd$B"
 // CHECK-DAG: @"$Ss1SVs1PsMA" = internal constant {{.*}}, section ".sw5asty$B"
 // CHECK-DAG: @"$SBoMB" = internal constant {{.*}}, section ".sw5bltn$B"

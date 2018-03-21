@@ -90,9 +90,8 @@ class LinkEntity {
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
-    // These fields appear in the TypeMetadata kind.
+    // This field appears in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
-    IsPatternShift = 10, IsPatternMask = 0x0400,
 
     // This field appears in associated type access functions.
     AssociatedTypeIndexShift = 8, AssociatedTypeIndexMask = ~KindMask,
@@ -140,10 +139,34 @@ class LinkEntity {
     /// The pointer is a ClassDecl*.
     ClassMetadataBaseOffset,
 
+    /// The property descriptor for a public property or subscript.
+    /// The pointer is an AbstractStorageDecl*.
+    PropertyDescriptor,
+
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
 
+    /// The metadata pattern for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataPattern,
+
+    /// The instantiation cache for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInstantiationCache,
+
+    /// The instantiation function for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInstantiationFunction,
+
+    /// The completion function for a generic or resilient nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataCompletionFunction,
+
+    /// The module descriptor for a module.
+    /// The pointer is a ModuleDecl*.
+    ModuleDescriptor,
+    
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
@@ -151,6 +174,15 @@ class LinkEntity {
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
+    /// The descriptor for an extension.
+    /// The pointer is an ExtensionDecl*.
+    ExtensionDescriptor,
+    
+    /// The descriptor for a runtime-anonymous context.
+    /// The pointer is the DeclContext* of a child of the context that should
+    /// be considered private.
+    AnonymousDescriptor,
+    
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -427,20 +459,42 @@ public:
   }
 
   static LinkEntity forTypeMetadata(CanType concreteType,
-                                    TypeMetadataAddress addr,
-                                    bool isPattern) {
+                                    TypeMetadataAddress addr) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
-                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr))
-                | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
+                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataPattern(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataPattern, decl);
     return entity;
   }
 
   static LinkEntity forTypeMetadataAccessFunction(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataAccessFunction, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInstantiationCache(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInstantiationCache, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataCompletionFunction(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataCompletionFunction, decl);
     return entity;
   }
 
@@ -465,6 +519,36 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::PropertyDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forModuleDescriptor(ModuleDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ModuleDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forExtensionDescriptor(ExtensionDecl *decl) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<void*>(static_cast<const void*>(decl));
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+      LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtensionDescriptor));
+    return entity;
+  }
+
+  static LinkEntity forAnonymousDescriptor(DeclContext *dc) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<void*>(static_cast<const void*>(dc));
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+      LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AnonymousDescriptor));
     return entity;
   }
 
@@ -624,6 +708,16 @@ public:
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
   
+  const ExtensionDecl *getExtension() const {
+    assert(getKind() == Kind::ExtensionDescriptor);
+    return reinterpret_cast<ExtensionDecl*>(Pointer);
+  }
+
+  const DeclContext *getDeclContext() const {
+    assert(getKind() == Kind::AnonymousDescriptor);
+    return reinterpret_cast<DeclContext*>(Pointer);
+  }
+
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
@@ -669,12 +763,11 @@ public:
     assert(getKind() == Kind::TypeMetadata);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
-  bool isMetadataPattern() const {
-    assert(getKind() == Kind::TypeMetadata);
-    return LINKENTITY_GET_FIELD(Data, IsPattern);
-  }
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
+  }
+  bool isObjCClassRef() const {
+    return getKind() == Kind::ObjCClassRef;
   }
 
   /// Determine whether this entity will be weak-imported.
@@ -683,9 +776,12 @@ public:
         getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
 
-    if (getKind() == Kind::SILFunction)
+    if (getKind() == Kind::SILFunction) {
       if (auto clangOwner = getSILFunction()->getClangNodeOwner())
         return clangOwner->isWeakImported(module);
+      if (getSILFunction()->isWeakLinked())
+        return getSILFunction()->isAvailableExternally();
+    }
 
     if (!isDeclKind(getKind()))
       return false;

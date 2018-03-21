@@ -93,7 +93,7 @@ public:
   /// in this module.
   bool hasKnownIndirectSubclasses(ClassDecl *C) {
     return IndirectSubclassesCache.count(C) &&
-           IndirectSubclassesCache[C].size() > 0;
+           !IndirectSubclassesCache[C].empty();
   }
 
   /// Returns true if the protocol is implemented by any class in this module.

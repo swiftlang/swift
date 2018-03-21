@@ -162,10 +162,12 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
   if (offset.isStatic())
     return Offset(offset.getStaticOffset());
 
-  Address offsetBaseAddr(
-    IGF.IGM.getAddrOfClassMetadataBaseOffset(cast<ClassDecl>(getDecl()),
-                                             NotForDefinition),
+  Address layoutAddr(
+    IGF.IGM.getAddrOfClassMetadataBounds(cast<ClassDecl>(getDecl()),
+                                         NotForDefinition),
     IGF.IGM.getPointerAlignment());
+
+  auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
   // FIXME: Should this be an invariant load?
   llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
@@ -478,6 +480,16 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
   return slot;
 }
 
+Address irgen::emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                         llvm::Value *metadata) {
+  // The superclass field in a class type is the first field past the isa.
+  unsigned index = 1;
+
+  Address addr(metadata, IGF.IGM.getPointerAlignment());
+  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
+  return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
+}
+
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
@@ -489,6 +501,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
     EnumMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfEnumTypeSpecificMetadataMembers());
+    }
 
     void addPayloadSize() {
       Layout.PayloadSizeOffset = getNextOffset();
@@ -526,6 +543,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     StructMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfStructTypeSpecificMetadataMembers());
+    }
 
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();

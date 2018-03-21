@@ -74,7 +74,11 @@ struct _StringObject {
 }
 
 extension _StringObject {
+#if arch(i386) || arch(arm)
   public typealias _RawBitPattern = UInt64
+#else
+  public typealias _RawBitPattern = UInt
+#endif
 
   @_versioned
   @_inlineable
@@ -96,13 +100,49 @@ extension _StringObject {
   @inline(__always)
   // TODO: private
   internal
-  init(rawBits: _RawBitPattern) {
+  init(taggedRawBits: _RawBitPattern) {
 #if arch(i386) || arch(arm)
     self.init(
-      Builtin.reinterpretCast(UInt(truncatingIfNeeded: rawBits)),
-      UInt(truncatingIfNeeded: rawBits &>> 32))
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: taggedRawBits)),
+      UInt(truncatingIfNeeded: taggedRawBits &>> 32))
 #else
-    self.init(Builtin.reinterpretCast(rawBits))
+    self.init(_bridgeObject(fromTagged: taggedRawBits))
+    _sanityCheck(self.isValue)
+#endif
+  }
+
+  @_versioned
+  @_inlineable
+  @inline(__always)
+  // TODO: private
+  internal
+  init(nonTaggedRawBits: _RawBitPattern) {
+#if arch(i386) || arch(arm)
+    self.init(
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: nonTaggedRawBits)),
+      UInt(truncatingIfNeeded: nonTaggedRawBits &>> 32))
+#else
+    self.init(Builtin.reinterpretCast(nonTaggedRawBits))
+    _sanityCheck(!self.isValue)
+#endif
+  }
+
+  // For when you need to hack around ARC. Note that by using this initializer,
+  // we are giving up on compile-time constant folding of ARC of values. Thus,
+  // this should only be called from the callee of a non-inlineable function
+  // that has no knowledge of the value-ness of the object.
+  @_versioned
+  @_inlineable
+  @inline(__always)
+  // TODO: private
+  internal
+  init(noReallyHereAreTheRawBits bits: _RawBitPattern) {
+#if arch(i386) || arch(arm)
+    self.init(
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: bits)),
+      UInt(truncatingIfNeeded: bits &>> 32))
+#else
+    self.init(Builtin.reinterpretCast(bits))
 #endif
   }
 }
@@ -221,7 +261,8 @@ extension _StringObject {
   internal
   static var _variantMask: UInt {
     @inline(__always)
-    get { return _isValueBit | _subVariantBit }
+    get { return UInt(Builtin.stringObjectOr_Int64(
+      _isValueBit._value, _subVariantBit._value)) }
   }
 
   @_versioned
@@ -240,7 +281,7 @@ extension _StringObject {
   var _variantBits: UInt {
     @inline(__always)
     get {
-      return UInt(truncatingIfNeeded: rawBits) & _StringObject._variantMask
+      return rawBits & _StringObject._variantMask
     }
   }
 #endif // arch(i386) || arch(arm)
@@ -258,7 +299,7 @@ extension _StringObject {
       return Builtin.reinterpretCast(object)
 #else
       _sanityCheck(isNative || isCocoa)
-      return _bitPattern(_object) & UInt(_StringObject._payloadMask)
+      return rawBits & _StringObject._payloadMask
 #endif
     }
   }
@@ -276,7 +317,7 @@ extension _StringObject {
       return _bits
 #else
       _sanityCheck(!isNative && !isCocoa)
-      return UInt(truncatingIfNeeded: rawBits) & _StringObject._payloadMask
+      return rawBits & _StringObject._payloadMask
 #endif
     }
   }
@@ -324,7 +365,8 @@ extension _StringObject {
   internal
   static var _emptyStringBitPattern: UInt {
     @inline(__always)
-    get { return _isValueBit | _emptyStringAddressBits }
+    get { return UInt(Builtin.stringObjectOr_Int64(
+      _isValueBit._value, _emptyStringAddressBits._value)) }
   }
 
   @_versioned
@@ -340,7 +382,7 @@ extension _StringObject {
   @inline(__always)
   internal
   init() {
-    self.init(rawBits: UInt64(_StringObject._emptyStringBitPattern))
+    self.init(taggedRawBits: _StringObject._emptyStringBitPattern)
   }
 #endif
 }
@@ -486,6 +528,24 @@ extension _StringObject {
   @_versioned
   @_inlineable
   internal
+  var isValue: Bool {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      switch _variant {
+      case .strong(_): return false
+      default:
+        return true
+      }
+#else
+      return rawBits & _StringObject._isValueBit != 0
+#endif
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
   var isUnmanaged: Bool {
     @inline(__always)
     get {
@@ -540,7 +600,7 @@ extension _StringObject {
         return false
       }
 #else
-      return UInt(truncatingIfNeeded: rawBits) & _StringObject._isOpaqueBit == 0
+      return rawBits & _StringObject._isOpaqueBit == 0
 #endif
     }
   }
@@ -584,7 +644,7 @@ extension _StringObject {
         return false
       }
 #else
-      return UInt(truncatingIfNeeded: rawBits) & _StringObject._twoByteBit == 0
+      return rawBits & _StringObject._twoByteBit == 0
 #endif
     }
   }
@@ -675,7 +735,7 @@ extension _StringObject {
     } else {
       fatalError("Unimplemented string form")
     }
-#endif
+#endif // INTERNAL_CHECKS_ENABLED
   }
 }
 
@@ -694,55 +754,72 @@ extension _StringObject {
     isOpaque: Bool,
     isTwoByte: Bool
   ) {
+#if INTERNAL_CHECKS_ENABLED
+    defer {
+      _sanityCheck(isSmall == (isValue && isSmallOrObjC))
+      _sanityCheck(isUnmanaged == (isValue && !isSmallOrObjC))
+      _sanityCheck(isCocoa == (!isValue && isSmallOrObjC))
+      _sanityCheck(isNative == (!isValue && !isSmallOrObjC))
+    }
+#endif
+
 #if arch(i386) || arch(arm)
-    var variant: _Variant
-    var bits: UInt
     if isValue {
       if isSmallOrObjC {
         _sanityCheck(isOpaque)
-        self.init(
-          isTwoByte ? .smallDoubleByte : .smallSingleByte,
-          _payloadBits)
+        self.init(isTwoByte ? .smallDoubleByte : .smallSingleByte, _payloadBits)
       } else {
         _sanityCheck(!isOpaque)
         self.init(
-          isTwoByte ? .unmanagedDoubleByte : .unmanagedSingleByte,
-          _payloadBits)
+          isTwoByte ? .unmanagedDoubleByte : .unmanagedSingleByte, _payloadBits)
       }
-    } else {
-      var bits: UInt = 0
-      if isSmallOrObjC {
-        bits |= _StringObject._isCocoaBit
-      }
-      if isOpaque {
-        bits |= _StringObject._isOpaqueBit
-      }
-      if isTwoByte {
-        bits |= _StringObject._twoByteBit
-      }
-      self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
+      return
     }
+
+    var bits: UInt = 0
+    if isSmallOrObjC {
+      bits |= _StringObject._isCocoaBit
+    }
+    if isOpaque {
+      bits |= _StringObject._isOpaqueBit
+    }
+    if isTwoByte {
+      bits |= _StringObject._twoByteBit
+    }
+    self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
     var rawBits = _payloadBits & _StringObject._payloadMask
     if isValue {
-      rawBits |= _StringObject._isValueBit
+      var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+        rawBits._value, _StringObject._isValueBit._value)
+      if isSmallOrObjC {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._subVariantBit._value)
+      }
+      if isOpaque {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._isOpaqueBit._value)
+      }
+      if isTwoByte {
+        rawBitsBuiltin = Builtin.stringObjectOr_Int64(
+          rawBitsBuiltin, _StringObject._twoByteBit._value)
+      }
+      rawBits = UInt(rawBitsBuiltin)
+      self.init(taggedRawBits: rawBits)
+    } else {
+      if isSmallOrObjC {
+        rawBits |= _StringObject._subVariantBit
+      }
+      if isOpaque {
+        rawBits |= _StringObject._isOpaqueBit
+      }
+      if isTwoByte {
+        rawBits |= _StringObject._twoByteBit
+      }
+      self.init(nonTaggedRawBits: rawBits)
     }
-    if isSmallOrObjC {
-      rawBits |= _StringObject._subVariantBit
-    }
-    if isOpaque {
-      rawBits |= _StringObject._isOpaqueBit
-    }
-    if isTwoByte {
-      rawBits |= _StringObject._twoByteBit
-    }
-    self.init(rawBits: UInt64(truncatingIfNeeded: rawBits))
 #endif
-    _sanityCheck(isSmall == (isValue && isSmallOrObjC))
-    _sanityCheck(isUnmanaged == (isValue && !isSmallOrObjC))
-    _sanityCheck(isCocoa == (!isValue && isSmallOrObjC))
-    _sanityCheck(isNative == (!isValue && !isSmallOrObjC))
   }
 
   @_versioned

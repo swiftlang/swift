@@ -6,12 +6,12 @@
 import Builtin
 import Swift
 
-// CHECK: [[REF:%swift.refcounted]] = type
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[OBJCCLASS:%objc_class]] = type
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C_CLASS:%T5class1CC]] = type
-// CHECK: [[OBJCOBJ:%objc_object]] = type
+// CHECK-DAG: [[REF:%swift.refcounted]] = type
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[OBJCCLASS:%objc_class]] = type
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK-DAG: [[C_CLASS:%T5class1CC]] = type
+// CHECK-DAG: [[OBJCOBJ:%objc_object]] = type
 
 class C {}
 sil_vtable C {}
@@ -100,7 +100,7 @@ bb0(%0 : $@thick C.Type):
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i16*
   // CHECK:   [[ALIGN16:%.*]] = load i16, i16* [[T1]], align 4
   // CHECK:   [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to i64
-  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
+  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
   %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
   return %1 : $C
 }

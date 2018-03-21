@@ -318,6 +318,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
 
   case SILInstructionKind::BridgeObjectToWordInst:
     return InlineCost::Free;
@@ -345,6 +346,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
     return InlineCost::Expensive;
 
   case SILInstructionKind::MetatypeInst:
@@ -471,6 +473,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::UnownedRetainInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::UnownedToRefInst:

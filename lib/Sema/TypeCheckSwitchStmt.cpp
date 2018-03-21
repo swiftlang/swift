@@ -1346,11 +1346,16 @@ namespace {
         auto *IP = cast<IsPattern>(item);
         switch (IP->getCastKind()) {
         case CheckedCastKind::Coercion:
-        case CheckedCastKind::BridgingCoercion:
-          // These coercions are irrefutable.  Project with the original type
-          // instead of the cast's target type to maintain consistency with the
+        case CheckedCastKind::BridgingCoercion: {
+          auto *subPattern = IP->getSubPattern();
+          if (subPattern)
+            return projectPattern(TC, subPattern, sawDowngradablePattern);
+
+          // With no subpattern coercions are irrefutable.  Project with the original
+          // type instead of the cast's target type to maintain consistency with the
           // scrutinee's type.
           return Space(IP->getType(), Identifier());
+        }
         case CheckedCastKind::Unresolved:
         case CheckedCastKind::ValueCast:
         case CheckedCastKind::ArrayDowncast:

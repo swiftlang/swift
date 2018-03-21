@@ -49,7 +49,7 @@ class Conversion;
 /// working with multiple ArgumentSources should document the order in
 /// which they plan to evaluate them.
 class ArgumentSource {
-  enum class Kind : unsigned char {
+  enum class Kind : uint8_t {
     Invalid,
     RValue,
     LValue,

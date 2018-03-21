@@ -113,8 +113,7 @@ private:
     asImpl().noteStartOfImmediateMembers(theClass);
 
     // Add space for the generic parameters, if applicable.
-    // Note that we only add references for the immediate parameters;
-    // parameters for the parent context are handled by the parent.
+    // This must always be the first item in the immediate members.
     asImpl().addGenericFields(theClass, type, theClass);
 
     // Add vtable entries.

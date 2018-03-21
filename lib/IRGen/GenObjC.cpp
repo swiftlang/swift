@@ -41,13 +41,13 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
-#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -487,21 +487,6 @@ namespace {
 
     static constexpr struct ForGetter_t { } ForGetter{};
     static constexpr struct ForSetter_t { } ForSetter{};
-
-#define FOREACH_FAMILY(FAMILY)         \
-    FAMILY(Alloc, "alloc")             \
-    FAMILY(Copy, "copy")               \
-    FAMILY(Init, "init")               \
-    FAMILY(MutableCopy, "mutableCopy") \
-    FAMILY(New, "new")
-
-    // Note that these are in parallel with 'prefixes', below.
-    enum class Family {
-      None,
-#define GET_LABEL(LABEL, PREFIX) LABEL,
-      FOREACH_FAMILY(GET_LABEL)
-#undef GET_LABEL
-    };
     
     Selector() = default;
 
@@ -571,31 +556,6 @@ namespace {
     StringRef str() const {
       return Text;
     }
-
-    /// Return the family string of this selector.
-    Family getFamily() const {
-      StringRef text = str();
-      while (!text.empty() && text[0] == '_') text = text.substr(1);
-
-#define CHECK_PREFIX(LABEL, PREFIX) \
-      if (hasPrefix(text, PREFIX)) return Family::LABEL;
-      FOREACH_FAMILY(CHECK_PREFIX)
-#undef CHECK_PREFIX
-
-      return Family::None;
-    }
-
-  private:
-    /// Does the given selector start with the given string as a
-    /// prefix, in the sense of the selector naming conventions?
-    static bool hasPrefix(StringRef text, StringRef prefix) {
-      if (!text.startswith(prefix)) return false;
-      if (text.size() == prefix.size()) return true;
-      assert(text.size() > prefix.size());
-      return !clang::isLowercase(text[prefix.size()]);
-    }
-
-#undef FOREACH_FAMILY
   };
 } // end anonymous namespace
 
@@ -1381,7 +1341,6 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
-                                  ResilienceExpansion::Minimal,
                                   1, 
                                   /*foreign*/ true);
   Selector selector(declRef);

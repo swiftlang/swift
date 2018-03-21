@@ -38,10 +38,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
       ->getForwardingSubstitutions();
       entityType = GFT->substGenericArgs(subs);
     } else {
-      if (auto objType =
-          entityType->getImplicitlyUnwrappedOptionalObjectType())
-        entityType = objType;
-      
+      // FIXME: look through unforced IUOs here?
+
       entityType = DC->mapTypeIntoContext(entityType);
     }
   }
@@ -665,7 +663,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseIdentifier().str();
+    declName = UDE->getName().getBaseName().userFacingName();
     uncurryLevel = 1;
     
     // If we actually resolved the member to use, return it.
@@ -685,7 +683,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // If we have useful information about the type we're
     // initializing, provide it.
-    if (UDE->getName().getBaseName() == CS.TC.Context.Id_init) {
+    if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
         declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
@@ -829,7 +827,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
         // Look through optional or IUO to get the underlying type the decl was
         // found in.
-        substType = substType->getAnyOptionalObjectType();
+        substType = substType->getOptionalObjectType();
       } else if (cand.getKind() != OverloadChoiceKind::Decl) {
         // Otherwise, if it is a remapping we can't handle, don't try to compute
         // a substitution.

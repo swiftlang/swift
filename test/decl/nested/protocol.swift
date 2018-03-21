@@ -52,12 +52,10 @@ protocol Racoon {
 }
 
 enum SillyRawEnum : SillyProtocol.InnerClass {}
-// expected-error@-1 {{reference to generic type 'SillyProtocol.InnerClass' requires arguments in <...>}}
-// expected-error@-2 {{type 'SillyRawEnum' does not conform to protocol 'RawRepresentable'}}
+// expected-error@-1 {{type 'SillyRawEnum' does not conform to protocol 'RawRepresentable'}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
-  // expected-note@-1 {{generic type 'InnerClass' declared here}}
 }
 
 enum OuterEnum {

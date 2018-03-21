@@ -163,17 +163,64 @@ func test_toplevelAPIVariants() {
   }
 }
 
+@available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+func test_unarchiveObjectOfClass() {
+  let topLevel = NSArray()
+  let data = NSKeyedArchiver.archivedData(withRootObject: topLevel)
+
+  // Should be able to decode an NSArray back out.
+  expectNoError {
+    guard let result = try NSKeyedUnarchiver.unarchivedObject(ofClass: NSArray.self, from: data) else {
+      expectUnreachable("Unable to decode top-level array.")
+      return
+    }
+
+    expectEqual(result, topLevel)
+  }
+
+  // Shouldn't be able to decode an NSString out of an NSArray.
+  expectError {
+    let _ = try NSKeyedUnarchiver.unarchivedObject(ofClass: NSString.self, from: data)
+  }
+}
+
+@available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+func test_unarchiveObjectOfClasses() {
+  let topLevel = NSArray()
+  let data = NSKeyedArchiver.archivedData(withRootObject: topLevel)
+
+  // Should be able to unarchive an array back out.
+  expectNoError {
+    guard let result = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self], from: data) as? NSArray else {
+      expectUnreachable("Unable to decode top-level array.")
+      return
+    }
+
+    expectEqual(result, topLevel)
+  }
+
+  // Shouldn't be able to decode an NSString out of an NSArray.
+  expectError {
+    let _ = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSString.self], from: data)
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
 if #available(OSX 10.11, iOS 9.0, *) {
   let NSKeyedArchiverTest = TestSuite("TestNSKeyedArchiver")
-  let tests = [
+  var tests = [
     "NSKeyedArchival.simpleCodableSupportInNSKeyedArchival": test_simpleCodableSupport,
     "NSKeyedArchival.encodableErrorHandling": test_encodableErrorHandling,
     "NSKeyedArchival.readingNonCodableFromDecodeDecodable": test_readingNonCodableFromDecodeDecodable,
     "NSKeyedArchival.toplevelAPIVariants": test_toplevelAPIVariants
   ]
+
+  if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+    tests["NSKeyedArchival.unarchiveObjectOfClass"] = test_unarchiveObjectOfClass
+    tests["NSKeyedArchival.unarchiveObjectOfClasses"] = test_unarchiveObjectOfClasses
+  }
   
   for (name, test) in tests {
     NSKeyedArchiverTest.test(name) { test() }

@@ -9,7 +9,7 @@
 
 // FIXME: index the bridging header!
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: echo 'import ClangModuleA' > %t/s2.swift
 // RUN: %target-swift-frontend -index-store-path %t/idx %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx > %t/both.txt

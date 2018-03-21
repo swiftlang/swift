@@ -114,7 +114,7 @@ updated without updating swift.py?")
 
     @property
     def _guaranteed_normal_arguments_flags(self):
-        if not self.args.enable_guaranteed_normal_arguments:
+        if self.args.disable_guaranteed_normal_arguments:
             return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE"]
         return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=TRUE"]
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
 import Builtin
 import Swift
@@ -30,11 +30,12 @@ sil_vtable BigClass {}
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @simple_promote
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S17class_stack_alloc9TestClassCMa"()
+// CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
+// CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
-// CHECK-NEXT: call {{.*}} @swift_rt_swift_release {{.*}} [[R]])
+// CHECK-NEXT: call {{.*}} @swift_release {{.*}} [[R]])
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
@@ -56,7 +57,7 @@ bb0:
 // CHECK: alloca {{.*}}TestStruct
 // CHECK-NOT: alloca
 // CHECK: call %swift.refcounted* @swift_initStackObject
-// CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK: call noalias %swift.refcounted* @swift_allocObject
 // CHECK: ret void
 sil @exceed_limit : $@convention(thin) () -> () {
 bb0:
@@ -81,7 +82,8 @@ bb0:
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S17class_stack_alloc9TestClassCMa"()
+// CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
+// CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
@@ -104,7 +106,8 @@ bb0:
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_inlined_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S17class_stack_alloc9TestClassCMa"()
+// CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
+// CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
@@ -124,7 +127,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @not_promoted_with_inlined_devirtualized_release
-// CHECK: [[O:%[0-9]+]] = call {{.*}} @swift_rt_swift_allocObject
+// CHECK: [[O:%[0-9]+]] = call {{.*}} @swift_allocObject
 // CHECK-NEXT: [[BC:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating {{.*}}({{.*}} [[BC]])
 // CHECK-NEXT: [[BC2:%[0-9]+]] = bitcast {{.*}} [[BC]] to %swift.refcounted*

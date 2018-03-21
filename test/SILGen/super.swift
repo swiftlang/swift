@@ -1,7 +1,9 @@
+// REQUIRES: plus_zero_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name super -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 
@@ -172,13 +174,13 @@ public class GenericBase<T> {
 
 public class GenericDerived<T> : GenericBase<T> {
   public override func method() {
-    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyFyycfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     {
       super.method()
     }()
-    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyFyycfU_'
+    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyFyyXEfU_'
 
     // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
@@ -189,7 +191,7 @@ public class GenericDerived<T> : GenericBase<T> {
     }
     localFunction()
 
-    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in U, @guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     func genericFunction<U>(_: U) {

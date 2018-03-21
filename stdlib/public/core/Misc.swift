@@ -14,13 +14,6 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public // @testable
-func _countLeadingZeros(_ value: Int64) -> Int64 {
-    return Int64(Builtin.int_ctlz_Int64(value._value, false._value))
-}
-
 /// Returns if `x` is a power of 2.
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent
@@ -131,26 +124,4 @@ func _typeByMangledName(_ name: String,
                                   parametersPerLevel,
                                   flatSubstitutions)
   }
-}
-
-/// Returns `floor(log(x))`.  This equals to the position of the most
-/// significant non-zero bit, or 63 - number-of-zeros before it.
-///
-/// The function is only defined for positive values of `x`.
-///
-/// Examples:
-///
-///      floorLog2(1) == 0
-///      floorLog2(2) == floorLog2(3) == 1
-///      floorLog2(9) == floorLog2(15) == 3
-///
-/// TODO: Implement version working on Int instead of Int64.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public // @testable
-func _floorLog2(_ x: Int64) -> Int {
-  _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
-  // Note: use unchecked subtraction because we this expression cannot
-  // overflow.
-  return 63 &- Int(_countLeadingZeros(x))
 }

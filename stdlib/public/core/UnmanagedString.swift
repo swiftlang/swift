@@ -116,7 +116,7 @@ extension _UnmanagedString : RandomAccessCollection {
   // integer subscripts as a convenience, in a separate extension below.
   internal typealias Index = UnsafePointer<CodeUnit>
   internal typealias IndexDistance = Int
-  internal typealias Indices = CountableRange<Index>
+  internal typealias Indices = Range<Index>
   internal typealias SubSequence = _UnmanagedString
 
   @_inlineable
@@ -172,6 +172,36 @@ extension _UnmanagedString : _StringVariant {
     return _UnmanagedString(
       start: start + offsetRange.lowerBound,
       count: offsetRange.count)
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.lowerBound >= 0)
+    return _UnmanagedString(
+      start: start + offsetRange.lowerBound, 
+      count: self.count - offsetRange.lowerBound
+    )
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= count)
+    return _UnmanagedString(
+      start: start, 
+      count: offsetRange.upperBound
+    )
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound < count)
+    return _UnmanagedString(
+      start: start, 
+      count: offsetRange.upperBound + 1
+    )
   }
 
   @_inlineable // FIXME(sil-serialize-all)

@@ -100,7 +100,7 @@ class T {
     func m1() {
         // FIXME: should apply nullary function fixit here. {{function produces expected type 'U'; did you mean to call it with '()'?}}
         // <rdar://problem/17741575>
-        let l = self.m2!.prop1 // expected-error{{cannot force unwrap value of non-optional type '() -> U!'}} {{24-25=}}
+        let l = self.m2!.prop1 // expected-error{{cannot force unwrap value of non-optional type '() -> U?'}} {{24-25=}}
     }
 
     func m2() -> U! {
@@ -116,13 +116,13 @@ var co: C? = nil
 var ciuo: C! = nil 
 
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
-if ciuo {} // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
+if ciuo {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
 co ? true : false // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{3-3= != nil)}}
 !co ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
-ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
-!ciuo ? false : true // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+ciuo ? true : false // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
+!ciuo ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
 !co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
-!ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+!ciuo // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
 
 // Forgotten ! or ?
 var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}
@@ -134,7 +134,7 @@ struct Q {
 let q = Q(s: nil)
 let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
 let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
-let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=!}}
+let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
 
 // SR-1116

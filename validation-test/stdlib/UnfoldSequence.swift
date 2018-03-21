@@ -20,7 +20,7 @@ UnfoldTests.test("sequence(state:next:)") {
   checkSequence([1, 1, 1], s1.prefix(3))
 
   let s2 = sequence(state: (1..<6).makeIterator(), next: {
-    (iter: inout CountableRange<Int>.Iterator) in
+    (iter: inout Range<Int>.Iterator) in
     iter.next()
   })
   checkSequence(1..<6, s2)

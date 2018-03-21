@@ -157,6 +157,7 @@ SYNTAX_TOKENS = [
     Token('FloatingLiteral', 'floating_literal'),
     Token('StringLiteral', 'string_literal'),
     Token('ContextualKeyword', 'contextual_keyword'),
+    Token('Unknown', 'unknown'),
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}

@@ -2367,9 +2367,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
                             DT, nullptr);
 
       DEBUG(getFunction()->viewCFG());
-    }
 
-    if (HasChanged) {
       // We preserve the dominator tree. Let's invalidate everything
       // else.
       DA->lockInvalidation();

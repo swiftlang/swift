@@ -72,70 +72,69 @@ getInitialProjectBox(MarkUninitializedInst *MUI,
 
 namespace {
 
-struct MarkUninitializedFixup : SILModuleTransform {
+struct MarkUninitializedFixup : SILFunctionTransform {
   void run() override {
+    // Don't rerun on deserialized functions. Nothing should have changed.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     bool MadeChange = false;
+    for (auto &BB : *getFunction()) {
+      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+        // Grab our given instruction and advance the iterator. This is
+        // important since we may be destroying the given instruction.
+        auto *MUI = dyn_cast<MarkUninitializedInst>(&*II);
+        ++II;
 
-    for (auto &F : *getModule()) {
-      for (auto &BB : F) {
-        for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-          // Grab our given instruction and advance the iterator. This is
-          // important since we may be destroying the given instruction.
-          auto *MUI = dyn_cast<MarkUninitializedInst>(&*II);
-          ++II;
+        // If we do not have a mark_uninitialized or we have a
+        // mark_uninitialized of an alloc_box, continue. These are not
+        // interesting to us.
+        if (!MUI)
+          continue;
 
-          // If we do not have a mark_uninitialized or we have a
-          // mark_uninitialized of an alloc_box, continue. These are not
-          // interesting to us.
-          if (!MUI)
-            continue;
+        auto *Box = dyn_cast<AllocBoxInst>(MUI->getOperand());
+        if (!Box)
+          continue;
 
-          auto *Box = dyn_cast<AllocBoxInst>(MUI->getOperand());
-          if (!Box)
-            continue;
-
-          // We expect there to be in most cases exactly one project_box. That
-          // being said, it is not impossible for there to be multiple. In such
-          // a case, we assume that the correct project_box is the one that is
-          // nearest to the mark_uninitialized in the same block. This preserves
-          // the existing behavior.
-          llvm::TinyPtrVector<ProjectBoxInst *> Projections;
-          for (auto *Op : MUI->getUses()) {
-            if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
-              Projections.push_back(PBI);
-            }
+        // We expect there to be in most cases exactly one project_box. That
+        // being said, it is not impossible for there to be multiple. In such
+        // a case, we assume that the correct project_box is the one that is
+        // nearest to the mark_uninitialized in the same block. This preserves
+        // the existing behavior.
+        llvm::TinyPtrVector<ProjectBoxInst *> Projections;
+        for (auto *Op : MUI->getUses()) {
+          if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+            Projections.push_back(PBI);
           }
-          assert(!Projections.empty() && "SILGen should never emit a "
-                                         "mark_uninitialized by itself");
-
-          // First replace all uses of the mark_uninitialized with the box.
-          MUI->replaceAllUsesWith(Box);
-
-          // That means now our project box now has the alloc_box as its
-          // operand. Grab that project_box.
-          auto *PBI = getInitialProjectBox(MUI, Projections);
-
-          // Then create the new mark_uninitialized and force all uses of the
-          // project_box to go through the new mark_uninitialized.
-          SILBuilder B(std::next(PBI->getIterator()));
-          SILValue Undef = SILUndef::get(PBI->getType(), PBI->getModule());
-          auto *NewMUI = B.createMarkUninitialized(PBI->getLoc(), Undef,
-                                                   MUI->getKind());
-          PBI->replaceAllUsesWith(NewMUI);
-          NewMUI->setOperand(PBI);
-
-          // Finally, remove the old mark_uninitialized.
-          MUI->eraseFromParent();
-          MadeChange = true;
         }
-      }
+        assert(!Projections.empty()
+               && "SILGen should never emit a "
+                  "mark_uninitialized by itself");
 
-      if (MadeChange) {
-        auto InvalidKind =
-            SILAnalysis::InvalidationKind::BranchesAndInstructions;
-        invalidateAnalysis(&F, InvalidKind);
+        // First replace all uses of the mark_uninitialized with the box.
+        MUI->replaceAllUsesWith(Box);
+
+        // That means now our project box now has the alloc_box as its
+        // operand. Grab that project_box.
+        auto *PBI = getInitialProjectBox(MUI, Projections);
+
+        // Then create the new mark_uninitialized and force all uses of the
+        // project_box to go through the new mark_uninitialized.
+        SILBuilder B(std::next(PBI->getIterator()));
+        SILValue Undef = SILUndef::get(PBI->getType(), PBI->getModule());
+        auto *NewMUI =
+            B.createMarkUninitialized(PBI->getLoc(), Undef, MUI->getKind());
+        PBI->replaceAllUsesWith(NewMUI);
+        NewMUI->setOperand(PBI);
+
+        // Finally, remove the old mark_uninitialized.
+        MUI->eraseFromParent();
+        MadeChange = true;
       }
     }
+    if (MadeChange)
+      invalidateAnalysis(
+          SILAnalysis::InvalidationKind::BranchesAndInstructions);
   }
 };
 

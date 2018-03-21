@@ -519,6 +519,19 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *Cvt) {
+  auto *OrigThinToThick =
+      dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
+  if (!OrigThinToThick)
+    return nullptr;
+  auto origFunType = OrigThinToThick->getType().getAs<SILFunctionType>();
+  auto NewTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
+
+  return Builder.createThinToThickFunction(
+      OrigThinToThick->getLoc(), OrigThinToThick->getOperand(),
+      SILType::getPrimitiveObjectType(NewTy));
+}
 /// Replace a convert_function that only has refcounting uses with its
 /// operand.
 SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {

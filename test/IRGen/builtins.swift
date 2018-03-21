@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// REQUIRES: plus_zero_runtime
+
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -152,7 +154,7 @@ func assign_test(_ value: Builtin.Int64, ptr: Builtin.RawPointer) {
 // CHECK: define hidden {{.*}}%swift.refcounted* @"$S8builtins16load_object_test{{[_0-9a-zA-Z]*}}F"
 func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
 }
@@ -160,7 +162,7 @@ func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK: define hidden {{.*}}%swift.refcounted* @"$S8builtins20load_raw_object_test{{[_0-9a-zA-Z]*}}F"
 func load_raw_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call [[REFCOUNT]]* @swift_rt_swift_retain([[REFCOUNT]]* returned [[T0]])
+  // CHECK: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.loadRaw(ptr)
 }
@@ -172,8 +174,9 @@ func assign_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) 
 
 // CHECK: define hidden {{.*}}void @"$S8builtins16init_object_test{{[_0-9a-zA-Z]*}}F"
 func init_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) {
-  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to %swift.refcounted**
-  // CHECK-NEXT: store [[REFCOUNT]]* {{%.*}}, [[REFCOUNT]]** [[DEST]]
+  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to [[REFCOUNT]]**
+  // CHECK-NEXT: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[SRC:%.*]])
+  // CHECK-NEXT: store [[REFCOUNT]]* [[SRC]], [[REFCOUNT]]** [[DEST]]
   Builtin.initialize(value, ptr)
 }
 
@@ -643,7 +646,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins8isUniqueyBi1_BozF"(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_rt_swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %1)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %1)
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -654,7 +657,7 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_rt_swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
@@ -664,7 +667,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BozF"(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
 // CHECK-NEXT: ret i1 %2
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
@@ -691,7 +694,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
 // CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
-// CHECK-native-NEXT: call i1 @swift_rt_swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* %1)
+// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* %1)
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -702,7 +705,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
-// CHECK-native-NEXT: call i1 @swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native([[UNKNOWN_OBJECT]]* %1)
+// CHECK-native-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native([[UNKNOWN_OBJECT]]* %1)
 // CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
 // CHECK-NEXT: ret i1 %2
 func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
@@ -734,7 +737,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_rt_swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique_native(&ref)
@@ -745,7 +748,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUniqueOrPinned_native(&ref)
@@ -799,9 +802,9 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
 // CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
-// CHECK:  call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned %0)
+// CHECK:  call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
 // CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
-// CHECK:  call void @swift_rt_swift_release(%swift.refcounted* %0)
+// CHECK:  call void @swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0
 func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
   var (g,t) = Builtin.unsafeGuaranteed(x)
@@ -838,6 +841,15 @@ func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: [[D1:%.*]] = bitcast float [[D]] to i32
   // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4
   Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
+}
+
+// CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
+// CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: %2 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %2
+func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
+  return UInt(Builtin.stringObjectOr_Int64(
+  x._value, y._value))
 }
 
 func createInt(_ fn: () -> ()) throws {}

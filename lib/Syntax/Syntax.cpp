@@ -26,7 +26,8 @@ SyntaxKind Syntax::getKind() const {
 }
 
 void Syntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
-  getRaw()->print(OS, Opts);
+  if (auto Raw = getRaw())
+    Raw->print(OS, Opts);
 }
 
 void Syntax::dump() const {
@@ -74,8 +75,8 @@ bool Syntax::isMissing() const {
 }
 
 llvm::Optional<Syntax> Syntax::getParent() const {
-  auto ParentData = getData().Parent;
-  if (ParentData == nullptr) return llvm::None;
+  auto ParentData = getData().getParent();
+  if (!ParentData) return llvm::None;
   return llvm::Optional<Syntax> {
     Syntax { Root, ParentData }
   };
@@ -89,8 +90,11 @@ size_t Syntax::getNumChildren() const {
   return Data->getNumChildren();
 }
 
-Syntax Syntax::getChild(const size_t N) const {
-  return Syntax { Root, Data->getChild(N).get() };
+llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
+  auto ChildData = Data->getChild(N);
+  if (!ChildData)
+    return llvm::None;
+  return Syntax {Root, ChildData.get()};
 }
 
 AbsolutePosition Syntax::getAbsolutePosition() const {

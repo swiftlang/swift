@@ -1661,7 +1661,7 @@ const TypeInfo *
 TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
   // The type may be optional.
   CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getAnyOptionalObjectType())
+  if (auto referentObj = referent.getOptionalObjectType())
     referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
@@ -1674,7 +1674,7 @@ const TypeInfo *
 TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
   // The type may be optional.
   CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getAnyOptionalObjectType())
+  if (auto referentObj = referent.getOptionalObjectType())
     referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
@@ -1686,7 +1686,7 @@ TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
 const TypeInfo *
 TypeConverter::convertWeakStorageType(WeakStorageType *refType) {
   CanType referent =
-    CanType(refType->getReferentType()->getAnyOptionalObjectType());
+      CanType(refType->getReferentType()->getOptionalObjectType());
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createWeakStorageType(*this);
@@ -2062,20 +2062,6 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   if (w.isPointerWidth())
     return getPointerSize().getValueInBits();
   llvm_unreachable("impossible width value");
-}
-
-llvm::Value *IRGenFunction::getLocalSelfMetadata() {
-  assert(LocalSelf && "no local self metadata");
-  switch (SelfKind) {
-  case SwiftMetatype:
-    return LocalSelf;
-  case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
-  case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
-  }
-
-  llvm_unreachable("Not a valid LocalSelfKind.");
 }
 
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,

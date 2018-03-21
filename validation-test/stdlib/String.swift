@@ -1,12 +1,21 @@
-// RUN: %target-run-simple-swift
-// REQUIRES: executable_test
+// RUN: %empty-directory(%t)
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN: else \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN: fi
 
+// RUN: %target-run %t/String
+// REQUIRES: executable_test
 // XFAIL: interpret
 
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 #if _runtime(_ObjC)
+import NSSlowString
 import Foundation  // For NSRange
 #endif
 
@@ -1138,7 +1147,7 @@ StringTests.test("growth") {
     s2 = s
   }
   expectEqual(s2, s)
-  expectLE(s.nativeCapacity, 34)
+  expectLE(s.nativeCapacity, 40)
 }
 
 StringTests.test("Construction") {
@@ -1165,24 +1174,6 @@ StringTests.test("Conversions") {
   }
 }
 
-// Check the internal functions are correct for ASCII values
-StringTests.test(
-  "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y")
-  .skip(.nativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
-  .code {
-#if _runtime(_ObjC)
-  let asciiValues: [(value: UInt8, string: String)] = (0..<128).map {
-    ($0, String(UnicodeScalar($0)))
-  }
-  for (v1, s1) in asciiValues {
-    for (v2, s2) in asciiValues {
-      expectEqual(s1 < s2, v1 < v2)
-    }
-  }
-#else
-  expectUnreachable()
-#endif
-}
 
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
@@ -1934,6 +1925,161 @@ for test in testCases {
     expectNotEqual(s1, s2)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity2, s2._rawIdentifier())
+  }
+}
+
+struct ComparisonTestCase {  
+  var strings: [String]
+  // var test: (String, String) -> Void
+  var comparison: _Ordering
+  
+  init(_ strings: [String], _ comparison: _Ordering) {
+    self.strings = strings
+    self.comparison = comparison
+  }
+  
+  func test() {
+    for pair in zip(strings, strings[1...]) {
+      switch comparison {
+      case .less:
+        expectLT(pair.0, pair.1)
+      case .greater:
+        expectGT(pair.0, pair.1)
+      case .equal:
+        expectEqual(pair.0, pair.1)
+      }
+    }
+  }
+  
+  func testOpaqueStrings() {
+#if _runtime(_ObjC)
+    let opaqueStrings = strings.map { NSSlowString(string: $0) as String }
+    for pair in zip(opaqueStrings, opaqueStrings[1...]) {
+      switch comparison {
+      case .less:
+        expectLT(pair.0, pair.1)
+      case .greater:
+        expectGT(pair.0, pair.1)
+      case .equal:
+        expectEqual(pair.0, pair.1)
+      }
+    }
+#endif
+  }
+  
+  func testOpaqueSubstrings() {
+#if _runtime(_ObjC)
+    for pair in zip(strings, strings[1...]) {
+      let string1 = pair.0.dropLast()
+      let string2 = pair.1
+      let opaqueString = (NSSlowString(string: pair.0) as String).dropLast()
+      
+      guard string1.count > 0 else { return }
+      
+      let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
+      let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
+      
+      expectEqual(opaqueResult, expectedResult)
+    }
+#endif
+  }
+}
+
+let comparisonTestCases = [
+  ComparisonTestCase(["a", "a"], .equal),
+  ComparisonTestCase(["abcdefg", "abcdefg"], .equal),
+  ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
+
+  ComparisonTestCase(["ábcdefg", "ábcdefgh", "ábcdefghi"], .less),
+  ComparisonTestCase(["abcdefg", "abcdefgh", "abcdefghi"], .less),
+
+  ComparisonTestCase(["á", "\u{0061}\u{0301}"], .equal),
+  ComparisonTestCase(["à", "\u{0061}\u{0301}", "â", "\u{e3}", "a\u{0308}"], .less),
+  
+  // Exploding scalars AND exploding segments
+  ComparisonTestCase(["\u{fa2}", "\u{fa1}\u{fb7}"], .equal),
+  ComparisonTestCase([
+    "\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+  ComparisonTestCase([
+    "\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+  ComparisonTestCase([
+    "a\u{fa2}\u{fa2}a\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "a\u{fa1}\u{fb7}\u{fa1}\u{fb7}a\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+
+  ComparisonTestCase(["a\u{301}\u{0301}", "\u{e1}"], .greater),
+  ComparisonTestCase(["😀", "😀"], .equal),
+  ComparisonTestCase(["\u{2f9df}", "\u{8f38}"], .equal),
+  ComparisonTestCase([
+    "a",
+    "\u{2f9df}", // D87E DDDF as written, but normalizes to 8f38
+    "\u{2f9df}\u{2f9df}", // D87E DDDF as written, but normalizes to 8f38
+    "👨🏻", // D83D DC68 D83C DFFB
+    "👨🏻‍⚕️", // D83D DC68 D83C DFFB 200D 2695 FE0F
+    "👩‍⚕️", // D83D DC69 200D 2695 FE0F
+    "👩🏾", // D83D DC69 D83C DFFE
+    "👩🏾‍⚕", // D83D DC69 D83C DFFE 200D 2695 FE0F
+    "😀", // D83D DE00
+    "😅", // D83D DE05
+    "🧀" // D83E DDC0 -- aka a really big scalar
+  ], .less),
+
+  
+  ComparisonTestCase(["f̛̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦ͘͜͟͢͝͞͠͡", "ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘"], .less),
+  ComparisonTestCase(["\u{f90b}", "\u{5587}"], .equal),
+  
+  ComparisonTestCase(["a\u{1D160}a", "a\u{1D158}\u{1D1C7}"], .less),
+  
+  ComparisonTestCase(["\u{212b}", "\u{00c5}"], .equal),
+  ComparisonTestCase([
+    "A",
+    "a",
+    "aa",
+    "ae",
+    "ae🧀",
+    "az",
+    "aze\u{300}",
+    "ae\u{301}",
+    "ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{302}",
+    "ae\u{302}{303}",
+    "ae\u{302}🧀",
+    "ae\u{303}",
+    "\u{f90b}\u{f90c}\u{f90d}", // Normalizes to BMP scalars
+    "🧀", // D83E DDC0 -- aka a really big scalar
+    "\u{FFEE}" // half width CJK dot
+  ], .less),
+  
+  ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
+  ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "aì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
+  ComparisonTestCase(["ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .equal)
+]
+
+for test in comparisonTestCases {
+  StringTests.test("Comparison.\(test.strings)") {
+    test.test()
+  }
+
+  StringTests.test("Comparison.OpaqueString.\(test.strings)")
+    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+    .code {
+    test.testOpaqueStrings()
+  }
+
+  StringTests.test("Comparison.OpaqueSubstring.\(test.strings)")
+    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+    .code {
+    test.testOpaqueSubstrings()
   }
 }
 

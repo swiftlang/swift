@@ -30,7 +30,7 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    Reflection.mm
+    ReflectionMirror.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
@@ -48,6 +48,7 @@ set(swift_runtime_sources
     Errors.cpp
     ErrorDefaultImpls.cpp
     Exclusivity.cpp
+    ExistentialContainer.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp
@@ -62,7 +63,6 @@ set(swift_runtime_sources
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
-    RuntimeEntrySymbols.cpp
     RuntimeInvocationsTracking.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
@@ -101,6 +101,10 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionShared PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+
+  swift_install_in_component(stdlib
+    TARGETS swiftImageInspectionShared
+    DESTINATION "lib/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")

@@ -27,7 +27,7 @@ func main() {
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  load
-// CHECK-NEXT:  swift_rt_swift_release
+// CHECK-NEXT:  swift_release
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]

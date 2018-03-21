@@ -136,9 +136,7 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    self.init(Unicode.Scalar(_builtinUnicodeScalarLiteral: value))
   }
 
   // Inlining ensures that the whole constructor can be folded away to a single
@@ -154,22 +152,22 @@ extension Character
     let utf8 = UnsafeBufferPointer(
       start: UnsafePointer<Unicode.UTF8.CodeUnit>(start),
       count: Int(utf8CodeUnitCount))
-    
+
     if utf8.count == 1 {
       _representation = .smallUTF16(
         Builtin.zext_Int8_Int63(utf8.first._unsafelyUnwrappedUnchecked._value))
       return
     }
 
-  FastPath: 
+  FastPath:
     repeat {
       var shift = 0
       let maxShift = 64 - 16
       var bits: UInt64 = 0
-      
+
       for s8 in Unicode._ParsingIterator(
         codeUnits: utf8.makeIterator(), parser: UTF8.ForwardParser()) {
-        
+
         let s16
           = UTF16.transcode(s8, from: UTF8.self)._unsafelyUnwrappedUnchecked
 
@@ -186,7 +184,7 @@ extension Character
       return
     }
     while false
-    
+
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
     self = Character(_largeRepresentationString:
@@ -227,11 +225,12 @@ extension Character
         | UInt64(utf16[3]) &<< 48
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
-      _representation = Character(
-        _largeRepresentationString: String(_StringGuts(utf16)))._representation
+      // TODO(SSO): small check
+      _representation = .large(
+        _StringGuts(_large: utf16)._extractNativeStorage())
     }
   }
-  
+
   /// Creates a character with the specified value.
   ///
   /// Do not call this initalizer directly. It is used by the compiler when
@@ -275,32 +274,19 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init(_unverified guts: _StringGuts) {
-    defer { _fixLifetime(guts) }
-    if _slowPath(guts._isOpaque) {
-      self.init(_unverified: guts._asOpaque())
-      return
-    }
-
-    if guts.isASCII {
-      let ascii = guts._unmanagedASCIIView
-      if _fastPath(ascii.count == 1) {
-        self.init(_singleCodeUnit: ascii[0])
-      } else {
+    self = _visitGuts(guts,
+      ascii: { ascii in
+        if _fastPath(ascii.count == 1) {
+          return Character(_singleCodeUnit: ascii[0])
+        }
         // The only multi-scalar ASCII grapheme cluster is CR/LF.
         _sanityCheck(ascii.count == 2)
         _sanityCheck(ascii.start[0] == _CR)
         _sanityCheck(ascii.start[1] == _LF)
-        self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
-      }
-      return
-    }
-
-    if guts._isNative {
-      self.init(_unverified:
-        guts._object.nativeStorage(of: UTF16.CodeUnit.self))
-    } else {
-      self.init(_unverified: guts._unmanagedUTF16View)
-    }
+        return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+      },
+      utf16: { utf16 in return Character(_unverified: utf16) },
+      opaque: { opaque in return Character(_unverified: opaque) })
   }
 
   /// Construct a Character from a slice of a _StringGuts, assuming
@@ -308,33 +294,20 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init(_unverified guts: _StringGuts, range: Range<Int>) {
-    defer { _fixLifetime(guts) }
-    if _fastPath(range.count == 1) {
-      let cu = guts.codeUnit(atCheckedOffset: range.lowerBound)
-      // Check for half a surrogate pair. (We may encounter these at boundaries
-      // of String slices or when the data itself has an invalid encoding.)
-      if _fastPath(UTF16._isScalar(cu)) {
-        self.init(_singleCodeUnit: cu)
-      } else {
-        self.init(_singleCodeUnit: UTF16._replacementCodeUnit)
-      }
-      return
-    }
-    if guts.isASCII {
-      let ascii = guts._unmanagedASCIIView
-      // The only multi-scalar ASCII grapheme cluster is CR/LF.
-      ascii._boundsCheck(offsetRange: range)
-      _sanityCheck(range.count == 2)
-      _sanityCheck(ascii.start[range.lowerBound] == _CR)
-      _sanityCheck(ascii.start[range.lowerBound + 1] == _LF)
-      self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
-    } else if guts._isContiguous {
-      let utf16 = guts._unmanagedUTF16View.checkedSlice(range)
-      self.init(_unverified: utf16)
-    } else {
-      let opaque = guts._asOpaque().checkedSlice(range)
-      self.init(_unverified: opaque._copyToNativeStorage())
-    }
+    self = _visitGuts(
+      guts, range: (range, performBoundsCheck: true),
+      ascii: { ascii in
+        if _fastPath(ascii.count == 1) {
+          return Character(_singleCodeUnit: ascii[0])
+        }
+        // The only multi-scalar ASCII grapheme cluster is CR/LF.
+        _sanityCheck(ascii.count == 2)
+        _sanityCheck(ascii.start[0] == _CR)
+        _sanityCheck(ascii.start[1] == _LF)
+        return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+      },
+      utf16: { utf16 in return Character(_unverified: utf16) },
+      opaque: { opaque in return Character(_unverified: opaque) })
   }
 
   @_inlineable
@@ -453,7 +426,8 @@ extension String {
       self = String(decoding: utf16, as: Unicode.UTF16.self)
     }
     else {
-      self = String(_StringGuts(c._largeUTF16!))
+      // TODO(SSO): small check
+      self = String(_StringGuts(_large: c._largeUTF16!))
     }
   }
 }
@@ -485,7 +459,7 @@ extension Character : Equatable {
         if l == r { return true }
       }
     }
-    
+
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
     return String(lhs) == String(rhs)

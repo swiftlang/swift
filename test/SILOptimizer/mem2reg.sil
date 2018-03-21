@@ -3,6 +3,29 @@
 import Builtin
 import Swift
 
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct SmallCodesizeStruct {
+  var cls1 : Klass
+  var cls2 : Klass
+}
+
+struct LargeCodesizeStruct {
+  var s1: SmallCodesizeStruct
+  var s2: SmallCodesizeStruct
+  var s3: SmallCodesizeStruct
+  var s4: SmallCodesizeStruct
+  var s5: SmallCodesizeStruct
+}
+
+///////////
+// Tests //
+///////////
+
 // CHECK-LABEL: sil @store_only_allocas
 // CHECK-NOT: alloc_stack
 // CHECK: return
@@ -355,4 +378,37 @@ bb0(%0 : $*Int64):
   dealloc_stack %2 : $*Int64
   %4 = tuple ()
   return %4 : $()
+}
+
+// Make sure that we do expand destroy_addr appropriately for code-size
+// trade-offs.
+// CHECK-LABEL: sil @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $LargeCodesizeStruct):
+// CHECK:   release_value [[ARG0]]
+// CHECK: } // end sil function 'large_struct_test'
+sil @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
+bb0(%0 : $LargeCodesizeStruct):
+  %1 = alloc_stack $LargeCodesizeStruct
+  store %0 to %1 : $*LargeCodesizeStruct
+  destroy_addr %1 : $*LargeCodesizeStruct
+  dealloc_stack %1 : $*LargeCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $SmallCodesizeStruct):
+// CHECK:   [[ARG0cls1:%.*]] = struct_extract [[ARG0]]
+// CHECK:   strong_release [[ARG0cls1]]
+// CHECK:   [[ARG0cls2:%.*]] = struct_extract [[ARG0]]
+// CHECK:   strong_release [[ARG0cls2]]
+// CHECK: } // end sil function 'small_struct_test'
+sil @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to %1 : $*SmallCodesizeStruct
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
 }

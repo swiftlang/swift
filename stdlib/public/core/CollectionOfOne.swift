@@ -57,7 +57,7 @@ public struct CollectionOfOne<Element> {
 extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// The position of the first element.
   @_inlineable // FIXME(sil-serialize-all)

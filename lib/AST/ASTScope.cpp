@@ -881,6 +881,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Param:
   case DeclKind::EnumElement:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     // These declarations do not introduce scopes.
     return nullptr;

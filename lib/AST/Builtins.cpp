@@ -160,10 +160,9 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 
   SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
-    auto PD = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                      Identifier(), SourceLoc(),
-                                      Identifier(), argType,
-                                      DC);
+    auto PD = new (Context)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), SourceLoc(), Identifier(), argType, DC);
     PD->setInterfaceType(argType);
     PD->setValidationStarted();
     PD->setImplicit();
@@ -221,8 +220,8 @@ getBuiltinGenericFunction(Identifier Id,
     auto paramType = ArgBodyTypes[i];
     auto paramIfaceType = ArgParamTypes[i].getType();
     auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
-                   ? VarDecl::Specifier::InOut
-                   : VarDecl::Specifier::Owned;
+                         ? VarDecl::Specifier::InOut
+                         : VarDecl::Specifier::Default;
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
@@ -265,6 +264,10 @@ static ValueDecl *getGepRawOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getStringObjectOrOperation(Identifier Id, Type ArgType) {
+  return getBuiltinFunction(Id, {ArgType, ArgType}, ArgType);
+}
+
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(Identifier Id, Type ArgType) {
   return getBuiltinFunction(Id, { ArgType, ArgType }, ArgType);
@@ -303,7 +306,7 @@ static ValueDecl *getBinaryPredicate(Identifier Id, Type ArgType) {
 static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
                                    BuiltinValueKind VK,
                                    ArrayRef<Type> Types) {
-  if (Types.size() == 0 || Types.size() > 2) return nullptr;
+  if (Types.empty() || Types.size() > 2) return nullptr;
   Type Input = Types[0];
   Type Output = Types.size() == 2 ? Types[1] : Type();
 
@@ -880,6 +883,13 @@ static ValueDecl *getClassifyBridgeObject(ASTContext &C, Identifier Id) {
   }, C);
 
   return getBuiltinFunction(Id, { C.TheBridgeObjectType }, resultTy);
+}
+
+static ValueDecl *getValueToBridgeObject(ASTContext &C, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(C);
+  builder.addParameter(makeGenericParam(0));
+  builder.setResult(makeConcrete(C.TheBridgeObjectType));
+  return builder.build(Id);
 }
 
 static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
@@ -1593,11 +1603,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
 
-  BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+  auto BV = BuiltinValueKind::None;
 #define BUILTIN(id, name, Attrs) \
-       .Case(name, BuiltinValueKind::id)
+  if (name == OperationName) { BV = BuiltinValueKind::id; } else
 #include "swift/AST/Builtins.def"
-       .Default(BuiltinValueKind::None);
+  /* final "else" */ {}
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
@@ -1620,6 +1630,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GepRaw:
     if (Types.size() != 1) return nullptr;
     return getGepRawOperation(Id, Types[0]);
+
+  case BuiltinValueKind::StringObjectOr:
+    if (Types.size() != 1)
+      return nullptr;
+    return getStringObjectOrOperation(Id, Types[0]);
 
   case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
@@ -1820,6 +1835,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ClassifyBridgeObject:
     if (!Types.empty()) return nullptr;
     return getClassifyBridgeObject(Context, Id);
+  case BuiltinValueKind::ValueToBridgeObject:
+    if (!Types.empty())
+      return nullptr;
+    return getValueToBridgeObject(Context, Id);
   case BuiltinValueKind::UnsafeGuaranteed:
     return getUnsafeGuaranteed(Context, Id);
 

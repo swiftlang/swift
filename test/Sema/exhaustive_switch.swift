@@ -786,3 +786,28 @@ func checkLiteralTuples() {
   default: break
   }
 }
+
+func sr6975() {
+  enum E {
+    case a, b
+  }
+
+  let e = E.b
+  switch e {
+  case .a as E: // expected-warning {{'as' test is always true}}
+    print("a")
+  case .b: // Valid!
+    print("b")
+  case .a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+    print("second a")
+  }
+
+  func foo(_ str: String) -> Int {
+    switch str { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{do you want to add a default clause?}}
+    case let (x as Int) as Any:
+      return x
+    }
+  }
+  _ = foo("wtf")
+}

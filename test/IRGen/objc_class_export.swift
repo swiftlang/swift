@@ -5,15 +5,15 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
-// CHECK: %swift.refcounted = type
-// CHECK: [[HOOZIT:%T17objc_class_export6HoozitC]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[FOO:%T17objc_class_export3FooC]] = type <{ [[REF]], %TSi }>
-// CHECK: [[INT:%TSi]] = type <{ i64 }>
-// CHECK: [[DOUBLE:%TSd]] = type <{ double }>
-// CHECK: [[NSRECT:%TSo6NSRectV]] = type <{ %TSo7NSPointV, %TSo6NSSizeV }>
-// CHECK: [[NSPOINT:%TSo7NSPointV]] = type <{ %TSd, %TSd }>
-// CHECK: [[NSSIZE:%TSo6NSSizeV]] = type <{ %TSd, %TSd }>
-// CHECK: [[OBJC:%objc_object]] = type opaque
+// CHECK-DAG: %swift.refcounted = type
+// CHECK-DAG: [[HOOZIT:%T17objc_class_export6HoozitC]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK-DAG: [[FOO:%T17objc_class_export3FooC]] = type <{ [[REF]], %TSi }>
+// CHECK-DAG: [[INT:%TSi]] = type <{ i64 }>
+// CHECK-DAG: [[DOUBLE:%TSd]] = type <{ double }>
+// CHECK-DAG: [[NSRECT:%TSo6NSRectV]] = type <{ %TSo7NSPointV, %TSo6NSSizeV }>
+// CHECK-DAG: [[NSPOINT:%TSo7NSPointV]] = type <{ %TSd, %TSd }>
+// CHECK-DAG: [[NSSIZE:%TSo6NSSizeV]] = type <{ %TSd, %TSd }>
+// CHECK-DAG: [[OBJC:%objc_object]] = type opaque
 
 // CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
 // CHECK:   %objc_class* @"OBJC_METACLASS_$__TtCs12_SwiftObject",
