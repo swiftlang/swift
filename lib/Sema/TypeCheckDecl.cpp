@@ -6990,8 +6990,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             validateAccessControl(aliasDecl);
 
             // Check generic parameters, if needed.
-            aliasDecl->setIsBeingValidated();
-            SWIFT_DEFER { aliasDecl->setIsBeingValidated(false); };
+            bool validated = aliasDecl->hasValidationStarted();
+            if (!validated)
+              aliasDecl->setIsBeingValidated();
+            SWIFT_DEFER {
+              if (!validated)
+                aliasDecl->setIsBeingValidated(false);
+            };
 
             validateTypealiasType(*this, aliasDecl);
           }
