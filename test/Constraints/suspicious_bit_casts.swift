@@ -2,7 +2,7 @@
 
 func escapeByBitCast(f: () -> ()) -> () -> () {
   return unsafeBitCast(f, to: (() -> ()).self)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
 }
 
 func changeFnRep(f: @escaping () -> ()) -> @convention(block) () -> () {

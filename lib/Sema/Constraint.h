@@ -232,7 +232,7 @@ enum RememberChoice_t : bool {
 enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
-    
+
   /// Introduce a '?.' to begin optional chaining.
   OptionalChaining,
 
@@ -241,9 +241,14 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-  
+
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
+
+  /// Mark function type as explicitly '@escaping'.
+  ExplicitlyEscaping,
+  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
+  ExplicitlyEscapingToAny,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -279,6 +284,8 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
                               LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
+
+  bool operator==(Fix const &b) { return Kind == b.Kind && Data == b.Data; }
 };
 
 

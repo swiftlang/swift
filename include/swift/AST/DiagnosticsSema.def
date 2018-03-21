@@ -2805,6 +2805,9 @@ ERROR(assigning_noescape_to_escaping,none,
 ERROR(general_noescape_to_escaping,none,
       "using non-escaping parameter %0 in a context expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noescape_to_type,none,
+      "converting non-escaping value to %0 may allow it to escape",
+      (Type))
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
