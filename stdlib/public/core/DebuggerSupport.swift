@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public enum _DebuggerSupport {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal enum CollectionStatus {
     case NotACollection

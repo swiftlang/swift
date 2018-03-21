@@ -807,7 +807,8 @@ namespace {
         // Import the underlying integer type.
         return Visit(clangDecl->getIntegerType());
       }
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
       case EnumKind::Unknown:
       case EnumKind::Options: {
         auto decl = dyn_cast_or_null<TypeDecl>(

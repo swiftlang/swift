@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum _Prespecialize {
   // Create specializations for the arrays of most

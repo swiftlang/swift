@@ -38,7 +38,7 @@ public struct Reference {
   public var n: Class
 }
 
-@_fixed_layout public enum Either {
+@_frozen public enum Either {
   case Left(Reference)
   case Right(Reference)
 }
@@ -57,7 +57,7 @@ enum InternalEither {
   public var n: Class
 }
 
-@_fixed_layout public enum EitherFast {
+@_frozen public enum EitherFast {
   case Left(ReferenceFast)
   case Right(ReferenceFast)
 }
@@ -278,6 +278,25 @@ extension ResilientMultiPayloadGenericEnum {
   public func getTypeParameter() -> T.Type {
     return T.self
   }
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%T14resilient_enum11SimpleShapeO* noalias nocapture sret)
+// CHECK: [[BUFFER:%.*]] = bitcast %T14resilient_enum11SimpleShapeO* %0 to %swift.opaque*
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
+// CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 0, i32 1, %swift.type* [[METADATA]])
+// CHECK-NEXT: ret void
+// CHECK-NEXT: {{^}$}}
+public func constructExhaustiveWithResilientMembers() -> SimpleShape {
+  return .KleinBottle
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i{{64|32}}, i8 } @"$S15enum_resilience19constructFullyFixed010resilient_A00dE6LayoutOyF"()
+// CHECK: ret { [[INT]], i8 } { [[INT]] 0, i8 1 }
+// CHECK-NEXT: {{^}$}}
+public func constructFullyFixed() -> FullyFixedLayout {
+  return .noPayload
 }
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)

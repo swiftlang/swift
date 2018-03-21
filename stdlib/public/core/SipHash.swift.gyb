@@ -24,7 +24,7 @@
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 }%
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned
 internal enum _SipHashDetail {
   @_versioned
