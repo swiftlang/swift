@@ -20,7 +20,7 @@ import CTensorFlow
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
-@_fixed_layout
+@_fixed_layout // required because the compiler accesses cTensorHandle directly.
 public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   /// This is the underlying "TF_TensorHandle*" which this TensorHandle
   /// represents.

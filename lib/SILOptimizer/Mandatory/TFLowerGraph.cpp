@@ -392,13 +392,25 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
 TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
                                                    SILLocation loc) {
   // Handle things like TensorHandle<Float>.
-  if (auto elt = tf::isTensorHandle(type.getSwiftRValueType())) {
+  switch (classifyTensorFlowValue(type)) {
+  case TFValueKind::TensorHandle: {
+    auto elt = getTensorHandleElementType(type.getSwiftRValueType());
+    assert(elt && "We know this is TensorHandle!");
     if (auto ty = (TF_DataType)convertSwiftTypeToTF(elt))
       return ty;
+    break;
+  }
+  case TFValueKind::ResourceHandle:
+    return TF_RESOURCE;
+  case TFValueKind::VariantHandle:
+    return TF_VARIANT;
+  case TFValueKind::Nope:
+    // Otherwise this must be a scalar type we're promoting to a tensor.
+    if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getSwiftRValueType()))
+      return ty;
+    break;
   }
 
-  if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getSwiftRValueType()))
-    return ty;
 
   internalError(loc, "Unknown Swift type to lower to TensorFlow: " +
                 type.getAsString());
@@ -528,8 +540,8 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         while (i+1 < e && tfopInfo.operandClasses[i+1].second ==
                                    SILTensorOpInfo::OperandClass::InputElt) {
           auto eltValue = inst->getOperand(++i);
-          assert(isTensorHandle(eltValue->getType()) &&
-                 "all op inputs should be tensors");
+          assert(isTensorFlowValue(eltValue->getType()) &&
+                 "all op inputs should be TensorFlow values");
           auto opValue = getOperandValue(eltValue);
           if (!opValue.oper) return;  // Error occurred.
           elements.push_back(opValue);
@@ -538,8 +550,8 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         break;
       }
 
-      assert(isTensorHandle(operand->getType()) &&
-             "all op inputs should be tensors");
+      assert(isTensorFlowValue(operand->getType()) &&
+             "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
       if (!opValue.oper) return;  // Error occurred.
       TF_AddInput(op, opValue);

@@ -32,11 +32,13 @@
 //     result = #tfop("Const", dtype: Float.self, value$tensor: 4.0)
 //
 // The first parameter to this syntax is the TensorFlow op name as a string.
-// After that, the inputs and attributes are specified as additional
-// arguments that follow.  Tensor and scalar inputs are specified first, without
-// keyword arguments, then attributes are specified next with their name as the
-// keyword argument.
+// After that, the inputs are specified, and then attributes are specified
+// with their name as the keyword argument.
 //
+// Inputs and outputs must be of TensorHandle, ResourceHandle, or VariantHandle
+// type.  These are magic types known to the compiler.
+//
+
 // Python PEP 465 makes a compelling argument that matrix multiplication should
 // not be spelled with the standard * operator, so we need a new one.  We'll use
 // this operator, though it is defensible to use a variety of other ones as

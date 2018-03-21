@@ -46,7 +46,7 @@ private:
   bool HighPerformance;
 
   // SWIFT_ENABLE_TENSORFLOW
-  tf::TypeContainsTensorHandle tcth;
+  tf::TypeContainsTensorFlowValue tctfv;
 
   bool shouldLogType(Type ty) {
     // Don't log any types that contain Tensor values, as this will cause
@@ -57,7 +57,7 @@ private:
     // If the TensorFlow module hasn't been imported, then don't do anything
     // complicated here.
     if (Context.getTensorHandleDecl() &&
-        tcth.containsTensorHandle(ty))
+        tctfv.containsTensorFlowValue(ty))
       return false;
 
     return true;
