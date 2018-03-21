@@ -6106,7 +6106,7 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
 
   emitFieldMetadataRecord(theEnum);
 
-  if (isResilient(theEnum, ResilienceExpansion::Maximal))
+  if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;
 
   // Emit resilient tag indices.
