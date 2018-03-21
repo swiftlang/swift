@@ -1107,22 +1107,20 @@ extension Sequence where Prefix == PrefixSequence<Self> {
     }
     return PrefixSequence(self, maxLength: i)
   }
-}
 
-extension Sequence {
-  @available(*, deprecated, message: "Sequence now has a separate Prefix type")
-  public func prefix(_ maxLength: Int) -> AnySequence<Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
-    return AnySequence(self.prefix(maxLength) as Prefix)
-  }
-
-  @_inlineable
-  @available(*, deprecated, message: "Sequence now has a separate Prefix type")
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> AnySequence<Element> {
-    return AnySequence(try self.prefix(while: predicate) as Prefix)
-  }
+  // @available(*, deprecated, message: "Sequence now has a separate Prefix type")
+  // public func prefix(_ maxLength: Int) -> AnySequence<Element> {
+  //   _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+  //   return AnySequence(self.prefix(maxLength) as Prefix)
+  // }
+  //
+  // @_inlineable
+  // @available(*, deprecated, message: "Sequence now has a separate Prefix type")
+  // public func prefix(
+  //   while predicate: (Element) throws -> Bool
+  // ) rethrows -> AnySequence<Element> {
+  //   return AnySequence(try self.prefix(while: predicate) as Prefix)
+  // }
 }
 
 extension Sequence where SubSequence == AnySequence<Element> {
