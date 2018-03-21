@@ -2321,6 +2321,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
       consumeToken(tok::kw_class);
       // Otherwise this is the start of a class declaration.
+      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
       DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       break;
