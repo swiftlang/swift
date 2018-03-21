@@ -6928,52 +6928,37 @@ public:
     TC.checkDeclAttributesEarly(EED);
     TC.validateAccessControl(EED);
 
-    // Only attempt to validate the argument type or raw value if the element
-    // is not currently being validated.
-    if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
-      EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
+    validateAttributes(TC, EED);
       
-      validateAttributes(TC, EED);
-      
-      if (!EED->getArgumentTypeLoc().isNull()) {
-        if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
-                            TypeResolutionFlags::EnumCase)) {
-          EED->setInterfaceType(ErrorType::get(TC.Context));
-          EED->setInvalid();
-          return;
-        }
+    if (!EED->getArgumentTypeLoc().isNull()) {
+      if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
+                          TypeResolutionFlags::EnumCase)) {
+        EED->setInterfaceType(ErrorType::get(TC.Context));
+        EED->setInvalid();
+        return;
       }
-
-      // If we have a raw value, make sure there's a raw type as well.
-      if (auto *rawValue = EED->getRawValueExpr()) {
-        EnumDecl *ED = EED->getParentEnum();
-        if (!ED->hasRawType()) {
-          TC.diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
-          // Recover by setting the raw type as this element's type.
-          Expr *typeCheckedExpr = rawValue;
-          if (!TC.typeCheckExpression(typeCheckedExpr, ED)) {
-            EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
-            TC.checkEnumElementErrorHandling(EED);
-          }
-        } else {
-          // Wait until the second pass, when all the raw value expressions
-          // can be checked together.
-        }
-      }
-    } else if (EED->getRecursiveness() ==
-                ElementRecursiveness::PotentiallyRecursive) {
-      EED->setRecursiveness(ElementRecursiveness::Recursive);
     }
-    
-    // If the element was not already marked as recursive by a re-entrant call,
-    // we can be sure it's not recursive.
-    if (EED->getRecursiveness() == ElementRecursiveness::PotentiallyRecursive) {
-      EED->setRecursiveness(ElementRecursiveness::NotRecursive);
+
+    // If we have a raw value, make sure there's a raw type as well.
+    if (auto *rawValue = EED->getRawValueExpr()) {
+      EnumDecl *ED = EED->getParentEnum();
+      if (!ED->hasRawType()) {
+        TC.diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
+        // Recover by setting the raw type as this element's type.
+        Expr *typeCheckedExpr = rawValue;
+        if (!TC.typeCheckExpression(typeCheckedExpr, ED)) {
+          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+          TC.checkEnumElementErrorHandling(EED);
+        }
+      } else {
+        // Wait until the second pass, when all the raw value expressions
+        // can be checked together.
+      }
     }
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->hasInterfaceType() && !EED->computeType())
+    if (!EED->computeType())
       return;
 
     // Require the carried type to be materializable.
