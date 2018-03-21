@@ -285,7 +285,7 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
-// CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 0, i32 1, %swift.type* [[METADATA]])
+// CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 1, i32 1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 // CHECK-NEXT: {{^}$}}
 public func constructExhaustiveWithResilientMembers() -> SimpleShape {
