@@ -26,14 +26,6 @@ public let QueueConcrete = BenchmarkInfo(
   setUpFunction: { buildWorkload() },
   tearDownFunction: nil)
  
-// TODO: remove when there is a native equivalent in the std lib
-extension RangeReplaceableCollection where Self: BidirectionalCollection {
-  public mutating func popLast() -> Element? {
-    if isEmpty { return nil}
-    else { return removeLast() }
-  }
-}
-
 public struct Queue<Storage: RangeReplaceableCollection>
 where Storage: BidirectionalCollection {
   public typealias Element = Storage.Element
