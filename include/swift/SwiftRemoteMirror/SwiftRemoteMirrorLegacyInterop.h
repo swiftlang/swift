@@ -28,6 +28,8 @@
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
 
+#include <CoreFoundation/CFDictionary.h>
+
 /// The "public" interface follows. All of these functions are the same
 /// as the corresponding swift_reflection_* functions, except for taking
 /// or returning _interop data types in some circumstances.
@@ -55,6 +57,13 @@ static inline int
 swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef,
                                      uintptr_t *outIsaMask);
 
+/// Look up a metadata pointer and return an interop structure that can
+/// be passed to other calls. Returns { 0, 0 } if the metadata pointer
+/// was not recognized.
+static inline swift_metadata_interop_t
+swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                       uintptr_t RemoteTyperef);
+
 static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                             swift_metadata_interop_t Metadata);
@@ -73,25 +82,25 @@ static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
-                                       swift_typeref_interop_t OpaqueTypeRef,
+                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index);
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index);
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object);
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index);
@@ -196,6 +205,8 @@ struct SwiftReflectionFunctions {
   
   int (*ownsObject)(SwiftReflectionContextRef ContextRef, uintptr_t Object);
   
+  int (*ownsAddress)(SwiftReflectionContextRef ContextRef, uintptr_t Address);
+  
   uintptr_t (*metadataForObject)(SwiftReflectionContextRef ContextRef, uintptr_t Object);
   
   swift_typeref_t (*typeRefForInstance)(SwiftReflectionContextRef ContextRef,
@@ -265,8 +276,8 @@ struct SwiftReflectionInteropContextFreeList {
   void *Context;
 };
 
-struct SwiftReflectionInteropContextLegacyDataSegmentList {
-  struct SwiftReflectionInteropContextLegacyDataSegmentList *Next;
+struct SwiftReflectionInteropContextLegacyImageRangeList {
+  struct SwiftReflectionInteropContextLegacyImageRangeList *Next;
   swift_addr_t Start, End;
 };
 
@@ -285,7 +296,9 @@ struct SwiftReflectionInteropContext {
   int LibraryCount;
   
   struct SwiftReflectionInteropContextFreeList *FreeList;
-  struct SwiftReflectionInteropContextLegacyDataSegmentList *LegacyDataSegmentList;
+  struct SwiftReflectionInteropContextLegacyImageRangeList *LegacyImageRangeList;
+  
+  CFMutableDictionaryRef AddressToLibraryCache;
 };
 
 #define FOREACH_LIBRARY \
@@ -297,37 +310,75 @@ struct SwiftReflectionInteropContext {
   struct SwiftReflectionInteropContextLibrary *Library = &ContextRef->Libraries[index]
 
 static inline int
-swift_reflection_interop_libraryOwnsObject(
+swift_reflection_interop_libraryOwnsAddress(
   struct SwiftReflectionInteropContext *ContextRef,
   struct SwiftReflectionInteropContextLibrary *Library,
-  uintptr_t Object) {
+  uintptr_t Address) {
   if (!Library->IsLegacy)
-    return Library->Functions.ownsObject(Library->Context, Object);
-  
-  // The legacy library doesn't have this. Do it ourselves if we can. We need
-  // metadataForObject from a non-legacy library to do it.
-  uintptr_t Metadata = 0;
-  FOREACH_LIBRARY {
-    if (Library->IsLegacy)
-      continue;
-    
-    Metadata = Library->Functions.metadataForObject(Library->Context, Object);
-    break;
-  }
-  
-  // If we couldn't retrieve metadata, assume it's ours.
-  if (Metadata == 0)
-    return 1;
-  
-  // Search the data segment list to see if the metadata is in one of them.
-  struct SwiftReflectionInteropContextLegacyDataSegmentList *Node =
-    ContextRef->LegacyDataSegmentList;
+    return Library->Functions.ownsAddress(Library->Context, Address);
+
+  // Search the images list to see if the address is in one of them.
+  struct SwiftReflectionInteropContextLegacyImageRangeList *Node =
+    ContextRef->LegacyImageRangeList;
   while (Node != NULL) {
-    if (Node->Start <= Metadata && Metadata < Node->End)
+    if (Node->Start <= Address && Address < Node->End)
       return 1;
     Node = Node->Next;
   }
   return 0;
+}
+
+static inline struct SwiftReflectionInteropContextLibrary *
+swift_reflection_interop_libraryForAddress(
+  struct SwiftReflectionInteropContext *ContextRef,
+  uintptr_t Address) {
+  uintptr_t cachedIndex;
+  if (CFDictionaryGetValueIfPresent(ContextRef->AddressToLibraryCache,
+                                    (void *)Address,
+                                    (const void **)&cachedIndex)) {
+    return &ContextRef->Libraries[cachedIndex];
+  }
+  
+  FOREACH_LIBRARY {
+    if (swift_reflection_interop_libraryOwnsAddress(ContextRef, Library, Address)) {
+      CFDictionarySetValue(ContextRef->AddressToLibraryCache,
+                           (void *)Address,
+                           (void *)LIBRARY_INDEX);
+      return Library;
+    }
+  }
+  return NULL;
+}
+
+static inline uintptr_t
+swift_reflection_interop_metadataForObject(
+  struct SwiftReflectionInteropContext *ContextRef,
+  uintptr_t Object) {
+  FOREACH_LIBRARY {
+    if (Library->IsLegacy)
+      continue;
+    uintptr_t Metadata = Library->Functions.metadataForObject(Library->Context, Object);
+    if (Metadata != 0)
+      return Metadata;
+  }
+  return 0;
+}
+
+static inline struct SwiftReflectionInteropContextLibrary *
+swift_reflection_interop_libraryForObject(
+  struct SwiftReflectionInteropContext *ContextRef,
+  uintptr_t Object) {
+  uintptr_t Metadata = swift_reflection_interop_metadataForObject(ContextRef, Object);
+  if (Metadata == 0) {
+    // If we couldn't retrieve metadata, assume it belongs to a legacy library.
+    FOREACH_LIBRARY {
+      if (Library->IsLegacy)
+        return Library;
+    }
+    return NULL;
+  }
+  
+  return swift_reflection_interop_libraryForAddress(ContextRef, Metadata);
 }
 
 static inline void
@@ -363,6 +414,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
     LOAD(addReflectionInfo);
     LOAD(addImage);
     LOAD(ownsObject);
+    LOAD(ownsAddress);
     LOAD(metadataForObject);
   }
   
@@ -479,6 +531,8 @@ swift_reflection_interop_createReflectionContext(
   ContextRef->GetStringLength = GetStringLength;
   ContextRef->GetSymbolAddress = GetSymbolAddress;
   
+  ContextRef->AddressToLibraryCache = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+  
   return ContextRef;
 }
 
@@ -488,13 +542,13 @@ swift_reflection_interop_destroyReflectionContext(
   FOREACH_LIBRARY {
     Library->Functions.destroyReflectionContext(Library->Context);
   }
-  struct SwiftReflectionInteropContextLegacyDataSegmentList *LegacyDataSegmentList
-    = ContextRef->LegacyDataSegmentList;
-  while (LegacyDataSegmentList != NULL) {
-    struct SwiftReflectionInteropContextLegacyDataSegmentList *Next
-      = LegacyDataSegmentList->Next;
-    free(LegacyDataSegmentList);
-    LegacyDataSegmentList = Next;
+  struct SwiftReflectionInteropContextLegacyImageRangeList *LegacyImageRangeList
+    = ContextRef->LegacyImageRangeList;
+  while (LegacyImageRangeList != NULL) {
+    struct SwiftReflectionInteropContextLegacyImageRangeList *Next
+      = LegacyImageRangeList->Next;
+    free(LegacyImageRangeList);
+    LegacyImageRangeList = Next;
   }
   struct SwiftReflectionInteropContextFreeList *FreeList = ContextRef->FreeList;
   while (FreeList != NULL) {
@@ -504,6 +558,9 @@ swift_reflection_interop_destroyReflectionContext(
     free(FreeList);
     FreeList = Next;
   }
+  
+  CFRelease(ContextRef->AddressToLibraryCache);
+  
   free(ContextRef);
 }
 
@@ -618,13 +675,14 @@ swift_reflection_interop_addImageLegacy(
   // Find the data segment and add it to our list.
   unsigned long DataSize;
   const uint8_t *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+  uintptr_t DataSegmentStart = DataSegment - (const uint8_t *)Buf + ImageStart;
   
-  struct SwiftReflectionInteropContextLegacyDataSegmentList *Node =
-    (struct SwiftReflectionInteropContextLegacyDataSegmentList *)malloc(sizeof(*Node));
-  Node->Next = ContextRef->LegacyDataSegmentList;
-  Node->Start = DataSegment - (const uint8_t *)Buf + ImageStart;
-  Node->End = Node->Start + DataSize;
-  ContextRef->LegacyDataSegmentList = Node;
+  struct SwiftReflectionInteropContextLegacyImageRangeList *Node =
+    (struct SwiftReflectionInteropContextLegacyImageRangeList *)malloc(sizeof(*Node));
+  Node->Next = ContextRef->LegacyImageRangeList;
+  Node->Start = ImageStart;
+  Node->End = DataSegmentStart + DataSize;
+  ContextRef->LegacyImageRangeList = Node;
   
   // If the buffer needs to be freed, save buffer and free context to free it when the
   //  reflection context is destroyed.
@@ -670,6 +728,19 @@ swift_reflection_interop_readIsaMask(SwiftReflectionInteropContextRef ContextRef
   return 0;
 }
 
+static inline swift_metadata_interop_t
+swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef ContextRef,
+                                       uintptr_t Metadata) {
+  swift_metadata_interop_t Result = {};
+  struct SwiftReflectionInteropContextLibrary *Library =
+    swift_reflection_interop_libraryForAddress(ContextRef, Metadata);
+  if (Library != NULL) {
+    Result.Metadata = Metadata;
+    Result.Library = LIBRARY_INDEX;
+  }
+  return Result;
+}
+
 static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                             swift_metadata_interop_t Metadata) {
@@ -684,22 +755,15 @@ swift_reflection_interop_typeRefForMetadata(SwiftReflectionInteropContextRef Con
 static inline swift_typeref_interop_t
 swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef ContextRef,
                                             uintptr_t Object) {
-  swift_typeref_interop_t Result;
-  FOREACH_LIBRARY {
-    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
-      continue;
+  swift_typeref_interop_t Result = {};
+  struct SwiftReflectionInteropContextLibrary *Library
+    = swift_reflection_interop_libraryForObject(ContextRef, Object);
+  if (Library != NULL) {
     swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
-                                                                     Object);
-    if (Typeref == 0)
-      continue;
-    
+                                                                    Object);
     Result.Typeref = Typeref;
     Result.Library = LIBRARY_INDEX;
-    return Result;
   }
-  
-  Result.Typeref = 0;
-  Result.Library = 0;
   return Result;
 }
 
@@ -732,63 +796,81 @@ swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef Context
   return Library->Functions.infoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
 }
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfTypeRef(SwiftReflectionInteropContextRef ContextRef,
-                                       swift_typeref_interop_t OpaqueTypeRef,
+                                        swift_typeref_interop_t OpaqueTypeRef,
                                         unsigned Index) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
-  return Library->Functions.childOfTypeRef(Library->Context,
-                                           OpaqueTypeRef.Typeref,
-                                           Index);
+  swift_childinfo_t LibResult = Library->Functions.childOfTypeRef(Library->Context,
+                                                                  OpaqueTypeRef.Typeref,
+                                                                  Index);
+  swift_childinfo_interop_t Result;
+  Result.Name = LibResult.Name;
+  Result.Offset = LibResult.Offset;
+  Result.Kind = LibResult.Kind;
+  Result.TR.Typeref = LibResult.TR;
+  Result.TR.Library = OpaqueTypeRef.Library;
+  return Result;
 }
 
-static inline swift_typeinfo_t
+static inline swift_typeinfo_interop_t
 swift_reflection_interop_infoForMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   return Library->Functions.infoForMetadata(Library->Context, Metadata.Metadata);
 }
 
-static inline swift_childinfo_t
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfMetadata(SwiftReflectionInteropContextRef ContextRef,
                                         swift_metadata_interop_t Metadata,
                                         unsigned Index) {
   DECLARE_LIBRARY(Metadata.Library);
-  return Library->Functions.childOfMetadata(Library->Context, Metadata.Metadata, Index);
-}
-
-static inline swift_typeinfo_t
-swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
-                                         uintptr_t Object) {
-  swift_typeinfo_t Result = {};
-  FOREACH_LIBRARY {
-    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
-      continue;
-    
-    Result = Library->Functions.infoForInstance(Library->Context, Object);
-    if (Result.Kind == SWIFT_UNKNOWN)
-      continue;
-    
-    return Result;
-  }
-  
-  Result.Kind = SWIFT_UNKNOWN;
+  swift_childinfo_t LibResult = Library->Functions.childOfMetadata(Library->Context,
+                                                                   Metadata.Metadata,
+                                                                   Index);
+  swift_childinfo_interop_t Result;
+  Result.Name = LibResult.Name;
+  Result.Offset = LibResult.Offset;
+  Result.Kind = LibResult.Kind;
+  Result.TR.Typeref = LibResult.TR;
+  Result.TR.Library = Metadata.Library;
   return Result;
 }
 
-static inline swift_childinfo_t
+static inline swift_typeinfo_interop_t
+swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef ContextRef,
+                                         uintptr_t Object) {
+  swift_typeinfo_t Result = {};
+  struct SwiftReflectionInteropContextLibrary *Library
+    = swift_reflection_interop_libraryForObject(ContextRef, Object);
+  
+  if (Library != NULL) {
+    Result = Library->Functions.infoForInstance(Library->Context, Object);
+  } else {
+    Result.Kind = SWIFT_UNKNOWN;
+  }
+  
+  return Result;
+}
+
+static inline swift_childinfo_interop_t
 swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef ContextRef,
                                          uintptr_t Object,
                                          unsigned Index) {
-  FOREACH_LIBRARY {
-    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
-      continue;
-    
-    return Library->Functions.childOfInstance(Library->Context, Object, Index);
+  swift_childinfo_interop_t Result = {};
+  struct SwiftReflectionInteropContextLibrary *Library
+    = swift_reflection_interop_libraryForObject(ContextRef, Object);
+  if (Library != NULL) {
+    swift_childinfo_t LibResult = Library->Functions.childOfInstance(Library->Context,
+                                                                     Object, Index);
+    Result.Name = LibResult.Name;
+    Result.Offset = LibResult.Offset;
+    Result.Kind = LibResult.Kind;
+    Result.TR.Typeref = LibResult.TR;
+    Result.TR.Library = LIBRARY_INDEX;
+  } else {
+    Result.Kind = SWIFT_UNKNOWN;
   }
-  
-  swift_childinfo_t Result = {};
-  Result.Kind = SWIFT_UNKNOWN;
   return Result;
 }
 
@@ -838,28 +920,26 @@ swift_reflection_interop_dumpTypeRef(SwiftReflectionInteropContextRef ContextRef
 }
 
 static inline void
-swift_reflection_interop_dumpInfoForTypeRef(
-  SwiftReflectionInteropContextRef ContextRef, swift_typeref_interop_t OpaqueTypeRef) {
+swift_reflection_interop_dumpInfoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
+                                            swift_typeref_interop_t OpaqueTypeRef) {
   DECLARE_LIBRARY(OpaqueTypeRef.Library);
   Library->Functions.dumpInfoForTypeRef(Library->Context, OpaqueTypeRef.Typeref);
 }
 
 static inline void
 swift_reflection_interop_dumpInfoForMetadata(SwiftReflectionInteropContextRef ContextRef,
-                                                  swift_metadata_interop_t Metadata) {
+                                             swift_metadata_interop_t Metadata) {
   DECLARE_LIBRARY(Metadata.Library);
   Library->Functions.dumpInfoForMetadata(Library->Context, Metadata.Metadata);
 }
 
 static inline void
 swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef ContextRef,
-                                                  uintptr_t Object) {
-  FOREACH_LIBRARY {
-    if (!swift_reflection_interop_libraryOwnsObject(ContextRef, Library, Object))
-      continue;
-    
+                                             uintptr_t Object) {
+  struct SwiftReflectionInteropContextLibrary *Library
+    = swift_reflection_interop_libraryForObject(ContextRef, Object);
+  if (Library != NULL) {
     Library->Functions.dumpInfoForInstance(Library->Context, Object);
-    return;
   }
 }
 
