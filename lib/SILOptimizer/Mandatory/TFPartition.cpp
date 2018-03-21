@@ -251,11 +251,11 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 }
 
-/// If the specified type is a TensorHandle<T> type, return it.  Otherwise, it
+/// If the specified type is a TensorFlow value type, return it.  Otherwise, it
 /// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
-static SILType convertToTensorHandleType(SILType ty) {
+static SILType convertToTensorValueType(SILType ty) {
   // If this is already TensorHandle<T>, return it.
-  if (isTensorHandle(ty.getSwiftRValueType()))
+  if (isTensorFlowValue(ty.getSwiftRValueType()))
     return ty;
 
   // Otherwise, this is a valid TensorFlow element type "T", like Builtin.Int32,
@@ -1121,9 +1121,9 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     return;
   }
 
-  // Otherwise, if this is a value of TensorHandle type, then we move it to the
-  // accelerator.  If it is also used on the host, it will be copied back.
-  if (isTensorHandle(arg->getType().getSwiftRValueType())) {
+  // Otherwise, if this is a value of TensorFlow value type, then we move it to
+  // the accelerator.  If it is also used on the host, it will be copied back.
+  if (isTensorFlowValue(arg->getType())) {
     // We cannot move over function arguments, but they should never be in the
     // dominated region anyway.
     assert(!isa<SILFunctionArgument>(arg) &&
@@ -1711,7 +1711,7 @@ public:
   }
 
   SILType remapType(SILType ty) {
-    return convertToTensorHandleType(ty);
+    return convertToTensorValueType(ty);
   }
 
   void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
@@ -1792,7 +1792,7 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
   // arguments.
   if (BB == FP.tensorStartPoint->getParent()) {
     for (auto arg : FP.tensorFnArguments) {
-      auto argTy = convertToTensorHandleType(arg->getType());
+      auto argTy = convertToTensorValueType(arg->getType());
       auto newArg = newBB->createFunctionArgument(argTy);
       ValueMap[arg] = SILValue(newArg);
     }
@@ -1828,8 +1828,9 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   B.setCurrentDebugScope(getOpScope(inst->getDebugScope()));
 
   auto cond = getOpValue(inst->getCondition());
+  auto condTy = cond->getType().getSwiftRValueType();
 
-  if (auto eltTy = isTensorHandle(cond->getType().getSwiftRValueType())) {
+  if (auto eltTy = getTensorHandleElementType(condTy)) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
     auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
@@ -1859,9 +1860,10 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
     assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
     // We just lower the result as the input, since the scalar input will have
     // been promoted to a tensor already.  It is possible that the input will
-    // have been lowered to something like TensorHandle<Int64> and we need a
-    // TensorHandle<Int>. If that is the case, we insert an UncheckedRefCast
-    // to get it to the right type.  These are treated as noops by GraphGen.
+    // have been lowered to something like TensorHandle<Builtin.Int32> and we
+    // need a TensorHandle<Int32>. If that is the case, we insert an
+    // UncheckedRefCast to get it to the right type.  These are treated as noops
+    // by GraphGen.
     auto result = remapValue(inst->getOperand(0));
     if (!inst->getType().getSwiftRValueType()
           ->isEqual(result->getType().getSwiftRValueType())) {
@@ -1884,7 +1886,7 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands();
        i != e; ++i) {
     auto opValue = inst->getOperand(i);
-    if (isTensorHandle(opValue->getType())) {
+    if (isTensorFlowValue(opValue->getType())) {
       // Tensor operands just become operands.
       args.push_back(remapValue(opValue));
     } else {
@@ -2226,7 +2228,7 @@ void PartitionCloner::finalizeOriginal() {
       SILBuilder BH(inst);  // Builder for the host.
       for (auto &operand : inst->getAllOperands()) {
         auto op = operand.get();
-        if (!isTensorHandle(op->getType().getSwiftRValueType()))
+        if (!isTensorFlowValue(op->getType()))
           continue;
 
         // def could be NULL, say if the operand is produced by argument passed
@@ -2873,7 +2875,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   // Calculate the parameter list for the new function.
   SmallVector<SILParameterInfo, 4> params;
   for (auto v : tensorFnArguments) {
-    auto argTy = convertToTensorHandleType(v->getType());
+    auto argTy = convertToTensorValueType(v->getType());
     params.push_back(SILParameterInfo(argTy.getSwiftRValueType(),
                                       ParameterConvention::Direct_Unowned));
   }
@@ -3018,11 +3020,6 @@ public:
     if (!tensorProgram.fn)
       return;
 
-#ifndef NDEBUG
-    // Verify that the generated function is ok.
-    tensorProgram.fn->verify();
-#endif
-
     // Our partitioning can leave around lots of unconditional branches between
     // blocks that formerly had control edges.  Go through and merge those to
     // make later passes simpler.
@@ -3041,6 +3038,11 @@ public:
       llvm::outs() << "----\n";
       llvm::outs().flush();
     }
+
+#ifndef NDEBUG
+    // Verify that the generated function is ok.
+    tensorProgram.fn->verify();
+#endif
 
     // If this is called from sil-opt, we currently just print out the results
     // and quit.  This allows writing regression tests for the tf-partition

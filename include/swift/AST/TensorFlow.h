@@ -29,26 +29,46 @@ namespace swift {
 namespace tf {
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
-  Type isTensorHandle(Type ty);
+  Type getTensorHandleElementType(Type ty);
+
+  /// This enum is for type queries to check to see whether a given type is one
+  /// of our known types that get moved to the graph.
+  enum class TFValueKind {
+    Nope,           ///< This is not a TensorFlow value.
+    TensorHandle,   ///< This is TensorHandle<T>
+    ResourceHandle, ///< This is ResourceHandle
+    VariantHandle,  ///< This is VariantHandle
+  };
+
+  /// Determine whether the specified type is one of our well-known types, and
+  /// if so, which one it is.
+  TFValueKind classifyTensorFlowValue(Type ty);
+
+  /// Return true if the specified type is a TensorHandle<T>.
+  bool isTensorHandle(Type ty);
+
+  /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+  /// VariantHandle.
+  bool isTensorFlowValue(Type ty);
 
   /// This class provides an efficient implementation of a predicate that
-  /// determines whether a type is or contains a TensorHandle that will be
+  /// determines whether a type is or contains a TensorFlow value that will be
   /// exposed after deabstraction.  This is a class instead of a simple function
   /// because we memoize state to avoid rechecking types over and over again.
-  class TypeContainsTensorHandle {
+  class TypeContainsTensorFlowValue {
     /// This map memoizes whether the specified type declaration is known to
-    /// contain a TensorHandle or not, used to accelerate queries against types
-    /// that are frequently referenced like Tensor.
-    llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+    /// contain an interesting type or not, used to accelerate queries against
+    /// types that are frequently referenced (like Tensor).
+    llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorFlowValue;
   public:
-    TypeContainsTensorHandle() {}
+    TypeContainsTensorFlowValue() {}
 
-    /// Return true if the specified type contains a TensorHandle that will be
-    /// exposed after deabstraction.
-    bool containsTensorHandle(Type ty);
+    /// Return true if the specified type contains a TensorFlow value type that
+    /// will be exposed after deabstraction.
+    bool containsTensorFlowValue(Type ty);
 
   private:
-    bool structContainsTensorHandle(StructDecl *decl);
+    bool structContainsTensorFlowValue(StructDecl *decl);
   };
 
 } // end namespace tf

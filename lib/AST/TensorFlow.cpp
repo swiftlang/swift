@@ -24,7 +24,8 @@ using namespace tf;
 
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.
-Type tf::isTensorHandle(Type ty) {
+Type tf::getTensorHandleElementType(Type ty) {
+  // TODO: Check that this type is declared in the TensorFlow module.
   if (auto *bgct = ty->getAs<BoundGenericClassType>()) {
     if (bgct->getDecl()->getNameStr() == "TensorHandle") {
       assert(bgct->getGenericArgs().size() == 1 && "Expected one generic arg");
@@ -34,61 +35,90 @@ Type tf::isTensorHandle(Type ty) {
   return Type();
 }
 
-/// Return true if the specified type contains a TensorHandle that will be
-/// exposed after deabstraction.
-bool TypeContainsTensorHandle::containsTensorHandle(Type ty) {
-  // If this type literally is TensorHandle, then yep, we contain it.  This is
+/// Determine whether the specified type is one of our well-known types, and
+/// if so, which one it is.
+TFValueKind tf::classifyTensorFlowValue(Type ty) {
+  // TODO: Check that these types are declared in the TensorFlow module.
+  if (auto *ct = ty->getAs<ClassType>()) {
+    auto name = ct->getDecl()->getNameStr();
+    if (name == "ResourceHandle")
+      return TFValueKind::ResourceHandle;
+    if (name == "VariantHandle")
+      return TFValueKind::VariantHandle;
+  }
+
+  if (getTensorHandleElementType(ty))
+    return TFValueKind::TensorHandle;
+  return TFValueKind::Nope;
+}
+
+/// Return true if the specified type is a TensorHandle<T>.
+bool tf::isTensorHandle(Type ty) {
+  return classifyTensorFlowValue(ty) == TFValueKind::TensorHandle;
+}
+
+/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+/// VariantHandle.
+bool tf::isTensorFlowValue(Type ty) {
+  return classifyTensorFlowValue(ty) != TFValueKind::Nope;
+}
+
+/// Return true if the specified type contains a TensorFlow value type that
+/// will be exposed after deabstraction.
+bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {
+  // If this type literally is a value type, then yep, we contain it.  This is
   // the base case.
-  if (isTensorHandle(ty))
+  if (isTensorFlowValue(ty))
     return true;
 
-  // Deabstraction flattens tuples, so if a tuple contains any tensor handles,
+  // Deabstraction flattens tuples, so if a tuple contains any tensor values,
   // then the tuple itself does.
   if (auto *tuple = ty->getAs<TupleType>()) {
     for (auto &elt : tuple->getElements())
-      if (containsTensorHandle(elt.getType()))
+      if (containsTensorFlowValue(elt.getType()))
         return true;
     return false;
   }
 
   // Deabstraction scalarizes structs.
   if (auto *st = ty->getAs<StructType>())
-    return structContainsTensorHandle(st->getDecl());
+    return structContainsTensorFlowValue(st->getDecl());
 
   // Deabstractions binds specialized generic structs.  Check if either the
-  // struct itself or one of the generic arguments contains a TensorHandle.
+  // struct itself or one of the generic arguments contains a tensor value.
   if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
     // Check the generic arguments.
     for (auto arg : bgst->getGenericArgs())
-      if (containsTensorHandle(arg))
+      if (containsTensorFlowValue(arg))
         return true;
 
-    return structContainsTensorHandle(bgst->getDecl());
+    return structContainsTensorFlowValue(bgst->getDecl());
   }
 
-  // Handle still-generic types that may contain a TensorHandle.
+  // Handle still-generic types that may contain a tensor value.
   if (auto *ugst = ty->getAs<UnboundGenericType>())
     if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
-      return structContainsTensorHandle(decl);
+      return structContainsTensorFlowValue(decl);
 
   // Otherwise we have a class or some other type that is opaque to
   // deabstraction.
   return false;
 }
 
-/// Determine whether the given struct contains a TensorHandle, caching the
-/// result.
-bool TypeContainsTensorHandle::structContainsTensorHandle(StructDecl *decl) {
-  auto it = declContainsTensorHandle.find(decl);
-  if (it != declContainsTensorHandle.end())
+/// Determine whether the given struct contains a TensorFlow value type, caching
+/// the result.
+bool TypeContainsTensorFlowValue::
+structContainsTensorFlowValue(StructDecl *decl) {
+  auto it = declContainsTensorFlowValue.find(decl);
+  if (it != declContainsTensorFlowValue.end())
     return it->second;
 
-  bool hasTensorHandle = false;
+  bool hasTensorFlowValue = false;
   for (auto p : decl->getStoredProperties())
-    if (containsTensorHandle(p->getType())) {
-      hasTensorHandle = true;
+    if (containsTensorFlowValue(p->getType())) {
+      hasTensorFlowValue = true;
       break;
     }
 
-  return declContainsTensorHandle[decl] = hasTensorHandle;
+  return declContainsTensorFlowValue[decl] = hasTensorFlowValue;
 }
