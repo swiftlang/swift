@@ -115,11 +115,14 @@ cmake -G "Ninja"^
  -DLLVM_TARGETS_TO_BUILD=X86^
  "%swift_source_dir%/llvm"
 popd
-cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
+cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"
 ```
-- store the llvm `bin` directory in an environment variable so it can be used to build swift
+- store the llvm `bin` directory in an environment variable so it can be used
+  to build swift. Assuming you followed the instructions exactly, the path
+  below is correct, but it may be different based on your build variant and
+  platform, so double check.
 ```cmd
-set llvm_bin_dir="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64/bin"
+set llvm_bin_dir="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin"
 ```
 
 ### 7. Build Swift
@@ -179,8 +182,8 @@ pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DSWIFT_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
- -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
- -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/src"^
+ -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
+ -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64/src"^
  -DSWIFT_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
  -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="%swift_source_dir%/llvm/tools/clang"^
