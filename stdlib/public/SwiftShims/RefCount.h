@@ -1277,11 +1277,6 @@ class RefCounts {
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
   
-  HeapObjectSideTableEntry *getSideTable() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    return bits.getSideTable();
-  }
-
   private:
   HeapObject *getHeapObject();
   
@@ -1469,7 +1464,7 @@ class HeapObjectSideTableEntry {
     return refCounts.getWeakCount();
   }
   
-  HeapObjectSideTableEntry *getSideTable() {
+  void *getSideTable() {
     return refCounts.getSideTable();
   }
 };

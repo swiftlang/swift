@@ -1078,7 +1078,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_urc_overflow_to_side) {
       swift_unownedRetain(object);
     }
 
-    side = object->refCounts.getSideTable();
+    side = reinterpret_cast<HeapObjectSideTableEntry *>(object->refCounts.getSideTable());
     EXPECT_ALLOCATED(side);
 
     for (uint64_t i = 0; i < urcOverflowCount; i++) {
