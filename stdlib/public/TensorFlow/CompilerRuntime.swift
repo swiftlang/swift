@@ -36,6 +36,7 @@ import Glibc
 #endif
 import CTensorFlow
 
+@_fixed_layout
 public enum _ExecutionMode : Equatable {
   /// Classical TF interpreter backend, on CPU.
   case cpu
@@ -57,6 +58,7 @@ public enum _ExecutionMode : Equatable {
 
 /// The configuration for the compiler runtime.
 /// TODO(hongm): Revisit the longer-term design.
+@_fixed_layout
 public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
@@ -89,6 +91,7 @@ public enum _RuntimeConfig {
   /// session, or a remote session with the specified server address (must start
   /// with "grpc://" in that case).
   /// Only defined when usesTFEagerAPI == false.
+  @_fixed_layout
   public enum RuntimeSession {
     case local
     case remote(grpcAddress: String)
@@ -614,6 +617,7 @@ extension TFState {
 ///     init -> terminate()
 ///     init -> finish()
 ///   The finish/terminate APIs may only be called once.
+@_fixed_layout
 public final class _TensorComputation {
   /// The status for checking TensorFlow errors.
   let status: CTFStatus = TF_NewStatus()
