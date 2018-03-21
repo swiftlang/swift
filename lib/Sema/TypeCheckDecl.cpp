@@ -3943,10 +3943,9 @@ public:
   // second pass over the global scope (or neither, if we're in a context where
   // we only visit each decl once).
   unsigned IsFirstPass : 1;
-  unsigned IsSecondPass : 1;
 
-  DeclChecker(TypeChecker &TC, bool IsFirstPass, bool IsSecondPass)
-      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
+  DeclChecker(TypeChecker &TC, bool IsFirstPass)
+      : TC(TC), IsFirstPass(IsFirstPass) {}
 
   void visit(Decl *decl) {
     FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
@@ -4138,7 +4137,7 @@ public:
 
     TC.checkDeclAttributesEarly(PBD);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
         // Type check each VarDecl that this PatternBinding handles.
         visitBoundVars(PBD->getPattern(i));
@@ -4254,7 +4253,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (IsSecondPass) {
+    if (!IsFirstPass) {
       checkAccessControl(TC, SD);
       return;
     }
@@ -4371,10 +4370,10 @@ public:
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessLevel(TAD);
 
-    if (!IsSecondPass)
+    if (IsFirstPass)
       TC.validateDecl(TAD);
 
-    if (IsSecondPass)
+    if (!IsFirstPass)
       checkAccessControl(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
@@ -4442,7 +4441,7 @@ public:
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessLevel(ED);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       checkUnsupportedNestedType(ED);
 
       TC.validateDecl(ED);
@@ -4503,7 +4502,7 @@ public:
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessLevel(SD);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
@@ -4632,7 +4631,7 @@ public:
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessLevel(CD);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       checkUnsupportedNestedType(CD);
 
       TC.validateDecl(CD);
@@ -4767,11 +4766,11 @@ public:
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessLevel(PD);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       checkUnsupportedNestedType(PD);
     }
 
-    if (IsSecondPass) {
+    if (!IsFirstPass) {
       checkAccessControl(TC, PD);
       for (auto member : PD->getMembers()) {
         TC.checkUnsupportedProtocolType(member);
@@ -5166,7 +5165,7 @@ public:
       }
     }
 
-    if (IsSecondPass) {
+    if (!IsFirstPass) {
       checkAccessControl(TC, FD);
       return;
     }
@@ -6919,7 +6918,7 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    if (IsSecondPass) {
+    if (!IsFirstPass) {
       checkAccessControl(TC, EED);
       return;
     }
@@ -6995,7 +6994,7 @@ public:
 
     TC.checkDeclAttributesEarly(ED);
 
-    if (!IsSecondPass) {
+    if (IsFirstPass) {
       if (auto extendedTy = ED->getExtendedType()) {
         if (!extendedTy->is<NominalType>() &&
             !extendedTy->is<BoundGenericType>() &&
@@ -7098,7 +7097,7 @@ public:
       }
     }
 
-    if (IsSecondPass) {
+    if (!IsFirstPass) {
       checkAccessControl(TC, CD);
       return;
     }
@@ -7336,7 +7335,7 @@ public:
         TC.definedFunctions.push_back(DD);
     }
 
-    if (IsSecondPass ||
+    if (!IsFirstPass ||
         DD->hasInterfaceType() ||
         DD->isBeingValidated()) {
       return;
@@ -7446,9 +7445,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   checkForForbiddenPrefix(D);
-  bool isSecondPass =
-    !isFirstPass && D->getDeclContext()->isModuleScopeContext();
-  DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
+  DeclChecker(*this, isFirstPass).visit(D);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has

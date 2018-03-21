@@ -1975,7 +1975,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   }
 
   // Type-check the constructor declaration.
-  tc.typeCheckDecl(ctor, /*isFirstPass=*/true);
+  tc.validateDecl(ctor);
 
   return ctor;
 }
