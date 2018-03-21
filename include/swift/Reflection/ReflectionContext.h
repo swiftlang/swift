@@ -79,7 +79,7 @@ class ReflectionContext
   /// All buffers we need to keep around long term. This will automatically free them
   /// when this object is destroyed.
   std::vector<MemoryReader::ReadBytesResult> savedBuffers;
-  std::vector<std::tuple<RemoteAddress, RemoteAddress>> dataSegments;
+  std::vector<std::tuple<RemoteAddress, RemoteAddress>> imageRanges;
 
 public:
   using super::getBuilder;
@@ -183,8 +183,7 @@ public:
       auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf.get())
                             + ImageStart.getAddressData();
       auto DataSegmentEnd = DataSegmentStart + DataSize;
-      dataSegments.push_back(std::make_tuple(RemoteAddress(DataSegmentStart),
-                                             RemoteAddress(DataSegmentEnd)));
+      imageRanges.push_back(std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
     }
     
     savedBuffers.push_back(std::move(Buf));
@@ -200,17 +199,21 @@ public:
   bool ownsObject(RemoteAddress ObjectAddress) {
     auto MetadataAddress = readMetadataFromInstance(ObjectAddress.getAddressData());
     if (!MetadataAddress)
-      return 0;
-
-    for (auto Segment : dataSegments) {
-      auto Start = std::get<0>(Segment);
-      auto End = std::get<1>(Segment);
-      if (Start.getAddressData() <= *MetadataAddress
-          && *MetadataAddress < End.getAddressData())
-        return 1;
+      return true;
+    return ownsAddress(RemoteAddress(*MetadataAddress));
+  }
+  
+  /// Returns true if the address falls within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    for (auto Range : imageRanges) {
+      auto Start = std::get<0>(Range);
+      auto End = std::get<1>(Range);
+      if (Start.getAddressData() <= Address.getAddressData()
+          && Address.getAddressData() < End.getAddressData())
+        return true;
     }
   
-    return 0;
+    return false;
   }
   
   /// Return a description of the layout of a class instance with the given
