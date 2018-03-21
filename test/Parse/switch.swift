@@ -351,70 +351,70 @@ func f1(x: String, y: Whichever) {
 }
 
 
-switch x {
-case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
+switch Whatever.Thing {
+case .Thing: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
 @unknown case _:
   x = 0
 }
 
-switch x {
-case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
+switch Whatever.Thing {
+case .Thing: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
 @unknown default:
   x = 0
 }
 
-switch x {
-case 0:
+switch Whatever.Thing {
+case .Thing:
   x = 0
 @unknown case _: // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
 }
 
-switch x {
-case 0:
+switch Whatever.Thing {
+case .Thing:
   x = 0
 @unknown default: // expected-error {{'default' label in a 'switch' should have at least one executable statement}} {{18-18= break}}
 }
 
 
-switch x {
+switch Whatever.Thing {
 @unknown default:
   x = 0
 default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
-case 1:
+case .Thing:
   x = 0
 }
 
-switch x {
+switch Whatever.Thing {
 default:
   x = 0
 @unknown case _: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
-case 1:
+case .Thing:
   x = 0
 }
 
-switch x {
+switch Whatever.Thing {
 default:
   x = 0
 @unknown default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
-case 1:
+case .Thing:
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch Whatever.Thing { // expected-error {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
 @unknown default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
 
-switch x {
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
 @unknown case _:
   fallthrough // expected-error{{'fallthrough' without a following 'case' or 'default' block}}
 }
 
-switch x {
-case 0:
+switch Whatever.Thing {
+case .Thing:
   x = 0
 #if true
 @unknown case _:

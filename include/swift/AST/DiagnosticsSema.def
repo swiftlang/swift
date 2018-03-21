@@ -3905,8 +3905,6 @@ WARNING(redundant_particular_literal_case,none,
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
-// HACK: Downgrades the above to warnings if any of the cases is marked
-// @_downgrade_exhaustivity_check.
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 
 #ifndef DIAG_NO_UNDEF

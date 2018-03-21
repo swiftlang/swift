@@ -189,24 +189,24 @@ namespace {
 
     public:
       explicit Space(Type T, Identifier NameForPrinting)
-        : Kind(SpaceKind::Type), TypeAndVal(T, false),
+        : Kind(SpaceKind::Type), TypeAndVal(T),
           Head(NameForPrinting), Spaces({}){}
       explicit Space(Type T, UnknownCase_t)
         : Kind(SpaceKind::UnknownCase), TypeAndVal(T, false),
           Head(Identifier()), Spaces({}) {}
       explicit Space(Type T, Identifier H, bool downgrade,
-                     SmallVectorImpl<Space> &SP)
+                     ArrayRef<Space> SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
           Spaces(SP.begin(), SP.end()) {}
       explicit Space(Type T, Identifier H, bool downgrade,
                      const std::forward_list<Space> &SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
           Spaces(SP.begin(), SP.end()) {}
-      explicit Space(SmallVectorImpl<Space> &SP)
-        : Kind(SpaceKind::Disjunct), TypeAndVal(Type(), false),
+      explicit Space(ArrayRef<Space> SP)
+        : Kind(SpaceKind::Disjunct), TypeAndVal(Type()),
           Head(Identifier()), Spaces(SP.begin(), SP.end()) {}
       explicit Space()
-        : Kind(SpaceKind::Empty), TypeAndVal(Type(), false), Head(Identifier()),
+        : Kind(SpaceKind::Empty), TypeAndVal(Type()), Head(Identifier()),
           Spaces({}) {}
       explicit Space(bool C)
         : Kind(SpaceKind::BooleanConstant), TypeAndVal(Type(), C),
@@ -456,8 +456,7 @@ namespace {
           return Space();
         }
 
-        llvm::function_ref<Space(SmallVectorImpl<Space> &)> examineDecomp
-          = [&](SmallVectorImpl<Space> &decomposition) -> Space {
+        auto examineDecomp = [](ArrayRef<Space> decomposition) -> Space {
           if (decomposition.empty()) {
             return Space();
           } else if (decomposition.size() == 1) {
@@ -639,8 +638,7 @@ namespace {
           return *this;
         }
 
-        llvm::function_ref<Space(SmallVectorImpl<Space> &)> examineDecomp
-          = [&](SmallVectorImpl<Space> &decomposition) -> Space {
+        auto examineDecomp = [](ArrayRef<Space> decomposition) -> Space {
           if (decomposition.empty()) {
             return Space();
           } else if (decomposition.size() == 1) {
@@ -806,7 +804,7 @@ namespace {
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::BooleanConstant):
-          return Space();
+          return *this;
         default:
           llvm_unreachable("Uncovered pair found while computing difference?");
         }
@@ -1148,6 +1146,7 @@ namespace {
 
       bool sawDowngradablePattern = false;
       bool sawRedundantPattern = false;
+      bool hasUnknownCase = false;
       SmallVector<Space, 4> spaces;
       for (auto *caseBlock : Switch->getCases()) {
         for (auto &caseItem : caseBlock->getCaseLabelItems()) {
@@ -1157,12 +1156,18 @@ namespace {
             continue;
 
           // Space is trivially covered with a default clause.
-          // FIXME: This is obviously not the right behavior for `unknown`.
           if (caseItem.isDefault())
             return;
 
-          auto projection = projectPattern(TC, caseItem.getPattern(),
-                                           sawDowngradablePattern);
+          Space projection;
+          if (caseBlock->hasUnknownAttr()) {
+            projection = Space(caseItem.getPattern()->getType(), UnknownCase);
+            hasUnknownCase = true;
+          } else {
+            projection = projectPattern(TC, caseItem.getPattern(),
+                                        sawDowngradablePattern);
+          }
+
           if (projection.isUseful()
                 && projection.isSubspace(Space(spaces), TC, DC)) {
             sawRedundantPattern |= true;
@@ -1185,10 +1190,6 @@ namespace {
           spaces.push_back(projection);
         }
       }
-      
-      bool isNonExhaustiveSubject = false;
-      if (auto *enumDecl = subjectType->getEnumOrBoundGenericEnum())
-        isNonExhaustiveSubject = !enumDecl->isExhaustive(DC);
 
       Space totalSpace(subjectType, Identifier());
       Space coveredSpace(spaces);
@@ -1232,14 +1233,8 @@ namespace {
         return;
       }
 
-      // If the space isn't a disjunct then make it one.
-      if (uncovered.getKind() != SpaceKind::Disjunct) {
-        SmallVector<Space, 1> spaces = { uncovered };
-        uncovered = Space(spaces);
-      }
-
       diagnoseMissingCases(RequiresDefault::No, uncovered,
-                           sawDowngradablePattern);
+                           sawDowngradablePattern, hasUnknownCase);
     }
     
     enum class RequiresDefault {
@@ -1250,7 +1245,8 @@ namespace {
     };
 
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
-                              bool sawDowngradablePattern = false) {
+                              bool sawDowngradablePattern = false,
+                              bool hasUnknownCase = false) {
       SourceLoc startLoc = Switch->getStartLoc();
       SourceLoc endLoc = Switch->getEndLoc();
       StringRef placeholder = getCodePlaceholder();
@@ -1259,10 +1255,28 @@ namespace {
 
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
+      // If the space isn't a disjunct then make it one. This simplifies logic
+      // down below that wants to iterate over all uncovered patterns.
+      if (!uncovered.isEmpty() && uncovered.getKind() != SpaceKind::Disjunct) {
+        uncovered = Space(llvm::makeArrayRef(uncovered));
+      }
+
       // Decide whether we want an error or a warning.
-      // FIXME: We should be able to emit more specific errors based on what's
-      // missing, and that /also/ needs to be either an error or a warning.
       auto mainDiagType = diag::non_exhaustive_switch;
+      if (!uncovered.isEmpty() && hasUnknownCase) {
+        assert(defaultReason == RequiresDefault::No);
+        // If everything left uncovered is a full case, it's okay for that to be
+        // handled by the unknown case. Downgrade to a warning.
+        bool allSpacesAreCases = llvm::all_of(uncovered.getSpaces(),
+                                              [](const Space &space) {
+          return space.getKind() == SpaceKind::Constructor &&
+                 llvm::all_of(space.getSpaces(), [](const Space &subspace) {
+            return subspace.getKind() == SpaceKind::Type;
+          });
+        });
+        if (allSpacesAreCases)
+          mainDiagType = diag::non_exhaustive_switch_warn;
+      }
       switch (uncovered.checkDowngradeToWarning()) {
       case DowngradeToWarning::No:
         break;
@@ -1539,9 +1553,8 @@ namespace {
           return Space(item->getType(), TC.Context.getIdentifier("some"),
                        /*canDowngrade*/false, subSpace.getSpaces());
         }
-        SmallVector<Space, 1> payload = {
-          projectPattern(TC, OSP->getSubPattern(), sawDowngradablePattern)
-        };
+        Space payload =
+            projectPattern(TC, OSP->getSubPattern(), sawDowngradablePattern);
         return Space(item->getType(), TC.Context.getIdentifier("some"),
                      /*canDowngrade*/false, payload);
       }
