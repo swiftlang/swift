@@ -302,6 +302,7 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   case 0:
     return None;
   case 1:
+  case 2:
     break;
   default:
     // We do not want to permit users requesting more precise effective language
@@ -326,6 +327,9 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   case 4:
     static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
+    // Version '4' on its own implies '4.1'.
+    if (size() == 1)
+      return Version{4, 1};
     return Version::getCurrentLanguageVersion();
   case 5:
     return Version{5, 0};
