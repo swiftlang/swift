@@ -102,7 +102,7 @@ public func single_concrete() {
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_T042conditional_conformance_basic_conformances4IsP2VAA0F0AAWP, i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 
-// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @_T042conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1)
+// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @_T042conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1) [[ATTRS:#[0-9]+]]
 // CHECK-NEXT:    store atomic i8** [[Single_P1]], i8*** @_T042conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -323,3 +323,5 @@ public func double_concrete_concrete() {
 func dynamicCastToP1(_ value: Any) -> P1? {
   return value as? P1
 }
+
+// CHECK: attributes [[ATTRS]] = { nounwind }
