@@ -5382,6 +5382,28 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
 
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
+  auto silFnTy = escapingFnTy.castTo<SILFunctionType>();
+
+  // Handle @convention(block). No withoutActuallyEscaping verification yet.
+  if (silFnTy->getExtInfo().getRepresentation() !=
+      SILFunctionTypeRepresentation::Thick) {
+    RValue rvalue;
+    auto escapingClosure =
+        SGF.emitManagedRValueWithCleanup(SGF.B.createConvertFunction(
+            E, functionValue.ensurePlusOne(SGF, E).forward(SGF), escapingFnTy));
+    // Bind the opaque value to the escaping function.
+    SILGenFunction::OpaqueValueState opaqueValue{
+        escapingClosure,
+        /*consumable*/ true,
+        /*hasBeenConsumed*/ false,
+    };
+    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
+                                                    opaqueValue);
+
+    // Emit the guarded expression.
+    rvalue = visit(E->getSubExpr(), C);
+    return rvalue;
+  }
 
   // Convert it to an escaping function value.
   auto escapingClosure =
