@@ -189,9 +189,23 @@ public func test75247714() {
 }
 
 // b/76058387: Deabstraction crasher
-func testPropagateScalarOperands() {
+public func testPropagateScalarOperands() {
   let bounds = 0..<10
   let scalars = bounds.map(Float.init)
-  let x = Tensor<Float>(shape: [2, 5], scalars: scalars)
+  let x = Tensor<Float>(shape: [2, 5], scalars: scalars).toDevice()
   _ = x * x
+}
+
+
+// b/76033645
+public func tensorEndPointComputation() -> Int {
+  let retval = 42
+  var i: Int32 = 0
+  var x = Tensor(1)
+  repeat {
+    x += x
+    i += 1
+  } while i < 10
+
+  return retval
 }

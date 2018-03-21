@@ -1395,10 +1395,16 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
 static SILBasicBlock *
 findNCAOfTensorOps(ArrayRef<SILInstruction*> tensorOps,
                    SmallPtrSet<SILInstruction*, 8> &ncaBBOps,
+                   ArrayRef<SILBasicBlock*> extraBlocks,
          std::function<SILBasicBlock*(SILBasicBlock*,SILBasicBlock*)> findNCA) {
   assert(!tensorOps.empty() && "expect at least one tensor op");
 
-  auto ncaBlock = tensorOps[0]->getParent(); // Arbitrary starting point.
+  // Pick an arbitrary starting point.
+  auto ncaBlock = tensorOps[0]->getParent();
+
+  // If there are extra blocks to consider, process them first.
+  for (auto extraBB : extraBlocks)
+    ncaBlock = findNCA(ncaBlock, extraBB);
 
   for (auto inst : tensorOps) {
     // If this op is in the ncaBlock, just remember it.
@@ -1582,7 +1588,7 @@ bool TFFunctionPartition::markFunction() {
   // point".  This is where we will start the tensor computation, sending over
   // argument values defined outside the scope of the computation.
   SmallPtrSet<SILInstruction*, 8> bbOps;
-  auto startBB = findNCAOfTensorOps(tensorOps, bbOps,
+  auto startBB = findNCAOfTensorOps(tensorOps, bbOps, /*no extra blocks*/{},
                                     [&] (SILBasicBlock *B1,
                                          SILBasicBlock *B2) -> SILBasicBlock* {
     return DI.findNearestCommonDominator(B1, B2);
@@ -1617,22 +1623,23 @@ bool TFFunctionPartition::markFunction() {
   // instructions.
   bbOps.clear();
   SmallVector<SILInstruction*, 16> instrsToCheck;
+  SmallVector<SILBasicBlock*, 16> extraBlocksToCheck;
   for (auto markInfo : markedInstructions) {
     // Ignore instructions that will be deleted.
     if (markInfo.second == Marking::Delete) continue;
     auto *inst = markInfo.first;
     instrsToCheck.push_back(inst);
 
-    // If the marked instruction is a terminator, then make sure that the first
-    // instruction in each successor is marked as well.  This ensures that we
+    // If the marked instruction is a terminator, then make sure that the
+    // successor blocks are considered as part of our NCA evaluation as well.  This ensures that we
     // have an "out of loop" use to put the end point outside of a loop if the
     // start point is also outside of it.
     if (auto *ti = dyn_cast<TermInst>(inst))
       for (auto &succ : ti->getSuccessors())
-        instrsToCheck.push_back(&succ.getBB()->front());
+        extraBlocksToCheck.push_back(succ.getBB());
   }
 
-  auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps,
+  auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps, extraBlocksToCheck,
                                   [&] (SILBasicBlock *B1,
                                          SILBasicBlock *B2) -> SILBasicBlock* {
     return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
@@ -1649,6 +1656,7 @@ bool TFFunctionPartition::markFunction() {
       tensorEndPoint = &inst;
     }
   }
+  assert(tensorEndPoint && "Failed to compute an end point");
 
   return true;
 }
