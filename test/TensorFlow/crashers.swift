@@ -188,3 +188,10 @@ public func test75247714() {
   let _ : () = #tfop("foo", bar: (1, 2))
 }
 
+// b/76058387: Deabstraction crasher
+func testPropagateScalarOperands() {
+  let bounds = 0..<10
+  let scalars = bounds.map(Float.init)
+  let x = Tensor<Float>(shape: [2, 5], scalars: scalars)
+  _ = x * x
+}

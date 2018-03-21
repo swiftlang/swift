@@ -1116,13 +1116,14 @@ propagateTensorOperand(SILValue v,
 
       // Otherwise simplify inputs in predecessor blocks.
       for (auto pi : arg->getParent()->getPredecessorBlocks()) {
-        auto *br = cast<BranchInst>(pi->getTerminator());
-        // We intentionally recalculate arg->getIndex() because its index can
-        // shift.  We know that recursive processing won't delete the bb arg
-        // though, as it is in checkedPhis.
-        auto incomingVal = br->getOperand(arg->getIndex());
-        incomingVal = propagateTensorOperand(incomingVal, checkedPhis);
-        br->setOperand(arg->getIndex(), incomingVal);
+        if (auto *br = dyn_cast<BranchInst>(pi->getTerminator())) {
+          // We intentionally recalculate arg->getIndex() because its index can
+          // shift.  We know that recursive processing won't delete the bb arg
+          // though, as it is in checkedPhis.
+          auto incomingVal = br->getOperand(arg->getIndex());
+          incomingVal = propagateTensorOperand(incomingVal, checkedPhis);
+          br->setOperand(arg->getIndex(), incomingVal);
+        }
       }
 
       continue;
