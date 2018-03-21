@@ -222,7 +222,7 @@ public:
   /// are supported. See the implementation.
   void createNodeInPlace(SyntaxKind Kind);
 
-  /// Squshing nodes from the back of the pending syntax list to a given syntax
+  /// Squashing nodes from the back of the pending syntax list to a given syntax
   /// collection kind. If there're no nodes can fit into the collection kind,
   /// this function does nothing. Otherwise, it creates a collection node in place
   /// to contain all sequential suitable nodes from back.
