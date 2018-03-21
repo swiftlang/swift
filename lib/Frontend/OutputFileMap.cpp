@@ -223,5 +223,8 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
         std::move(OutputMap);
   }
 
+  if (YAMLStream.failed())
+    return constructError("Output file map parse failed");
+
   return OFM;
 }
