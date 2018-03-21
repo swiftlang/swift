@@ -5482,47 +5482,35 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
   auto silFnTy = escapingFnTy.castTo<SILFunctionType>();
 
-  // Handle @convention(block). No withoutActuallyEscaping verification yet.
-  if (silFnTy->getExtInfo().getRepresentation() !=
-      SILFunctionTypeRepresentation::Thick) {
-    RValue rvalue;
-    auto escapingClosure =
-        SGF.emitManagedRValueWithCleanup(SGF.B.createConvertFunction(
-            E, functionValue.ensurePlusOne(SGF, E).forward(SGF), escapingFnTy));
+  auto visitSubExpr = [&](ManagedValue escapingClosure,
+                          bool isClosureConsumable) -> RValue {
     // Bind the opaque value to the escaping function.
     SILGenFunction::OpaqueValueState opaqueValue{
         escapingClosure,
-        /*consumable*/ true,
+        /*consumable*/ isClosureConsumable,
         /*hasBeenConsumed*/ false,
     };
     SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
                                                     opaqueValue);
 
     // Emit the guarded expression.
-    rvalue = visit(E->getSubExpr(), C);
-    return rvalue;
+    return visit(E->getSubExpr(), C);
+  };
+
+  // Handle @convention(block). No withoutActuallyEscaping verification yet.
+  if (silFnTy->getExtInfo().getRepresentation() !=
+      SILFunctionTypeRepresentation::Thick) {
+    auto escapingClosure =
+        SGF.B.createConvertFunction(E, functionValue, escapingFnTy);
+    return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
   }
 
   // Convert it to an escaping function value.
   auto escapingClosure =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
-
-  RValue rvalue;
   auto loc = SILLocation(E);
   auto borrowedClosure = escapingClosure.borrow(SGF, loc);
-  {
-    // Bind the opaque value to the escaping function.
-    SILGenFunction::OpaqueValueState opaqueValue{
-        borrowedClosure,
-        /*consumable*/ false,
-        /*hasBeenConsumed*/ false,
-    };
-    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
-                                                    opaqueValue);
-
-    // Emit the guarded expression.
-    rvalue = visit(E->getSubExpr(), C);
-  }
+  RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
   // Now create the verification of the withoutActuallyEscaping operand.
   // Either we fail the uniquenes check (which means the closure has escaped)
