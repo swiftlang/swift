@@ -1521,6 +1521,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::CoroutineContinuationPrototype:
     return SILLinkage::PublicExternal;
 
+
+  case Kind::EnumCase: {
+    auto *elementDecl = cast<EnumElementDecl>(getDecl());
+    return getSILLinkage(getDeclLinkage(elementDecl), forDefinition);
+  }
+
   case Kind::FieldOffset: {
     auto *varDecl = cast<VarDecl>(getDecl());
 
@@ -1642,6 +1648,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
+    return ::isAvailableExternally(IGM, getDecl());
+
+  case Kind::EnumCase:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::DirectProtocolWitnessTable:
@@ -3573,6 +3582,13 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
                                  forDefinition);
+}
+
+Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
+                                       ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forEnumCase(Case);
+  return getAddrOfSimpleVariable(*this, GlobalVars, entity, Int32Ty,
+                                 getPointerAlignment(), forDefinition);
 }
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {

@@ -131,9 +131,9 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   }
 }
 
-int swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                          const Metadata *payload,
-                                          unsigned emptyCases) {
+unsigned swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
+                                               const Metadata *payload,
+                                               unsigned emptyCases) {
 
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
@@ -149,7 +149,8 @@ int swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 
 void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                             const Metadata *payload,
-                                            int whichCase, unsigned emptyCases){
+                                            unsigned whichCase,
+                                            unsigned emptyCases) {
 
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();

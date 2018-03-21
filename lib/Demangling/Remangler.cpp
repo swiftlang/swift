@@ -884,6 +884,11 @@ void Remangler::mangleFieldOffset(Node *node) {
   mangleChildNode(node, 0); // directness
 }
 
+void Remangler::mangleEnumCase(Node *node) {
+  mangleSingleChildNode(node); // enum case
+  Buffer << "WC";
+}
+
 void Remangler::mangleFullTypeMetadata(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mf";

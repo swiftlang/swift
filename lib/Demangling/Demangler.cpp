@@ -2049,6 +2049,9 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind,
 
 NodePointer Demangler::demangleWitness() {
   switch (nextChar()) {
+    case 'C':
+      return createWithChild(Node::Kind::EnumCase,
+                             popNode(isEntity));
     case 'V':
       return createWithChild(Node::Kind::ValueWitnessTable,
                              popNode(Node::Kind::Type));

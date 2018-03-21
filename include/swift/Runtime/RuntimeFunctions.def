@@ -987,7 +987,7 @@ FUNCTION(GetEnumCaseMultiPayload,
          ATTRS(NoUnwind, ReadOnly))
 
 // void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
-//                                      int case_index,
+//                                      unsigned case_index,
 //                                      unsigned num_empty_cases);
 FUNCTION(StoreEnumTagSinglePayload,
          swift_storeEnumTagSinglePayload,
