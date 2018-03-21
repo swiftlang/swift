@@ -38,8 +38,10 @@ using namespace swift;
 struct OverrideSection {
   uintptr_t version;
   
-  GetTypeByMangledNameOverride mangledNameOverride;
-  DynamicCastOverride dynamicCastOverride;
+#define FIELD(typename) typename typename ## Fptr
+  FIELD(GetTypeByMangledNameOverride);
+  FIELD(DynamicCastOverride);
+  FIELD(ConformsToProtocolOverride);
 };
 
 static_assert(std::is_pod<OverrideSection>::value,
@@ -60,16 +62,14 @@ static OverrideSection *getOverrideSectionPtr() {
   return OverrideSectionPtr;
 }
 
-GetTypeByMangledNameOverride swift::getMangledNameOverride() {
-  auto *Section = getOverrideSectionPtr();
-  if (Section == nullptr)
-    return nullptr;
-  return Section->mangledNameOverride;
-}
+#define GETTER(typename)                     \
+  typename swift::get ## typename() {        \
+    auto *Section = getOverrideSectionPtr(); \
+    if (Section == nullptr)                  \
+      return nullptr;                        \
+    return Section->typename ## Fptr;        \
+  }
 
-DynamicCastOverride swift::getDynamicCastOverride() {
-  auto *Section = getOverrideSectionPtr();
-  if (Section == nullptr)
-    return nullptr;
-  return Section->dynamicCastOverride;
-}
+GETTER(GetTypeByMangledNameOverride)
+GETTER(DynamicCastOverride)
+GETTER(ConformsToProtocolOverride)

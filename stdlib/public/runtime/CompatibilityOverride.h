@@ -24,28 +24,40 @@
 
 namespace swift {
 
-typedef TypeInfo
-  (*GetTypeByMangledNameOriginal)(StringRef typeName,
-                                  SubstGenericParameterFn substGenericParam);
-
-typedef TypeInfo
-  (*GetTypeByMangledNameOverride)(StringRef typeName,
-                                  SubstGenericParameterFn substGenericParam,
+typedef const Metadata *
+  (*GetTypeByMangledNameOriginal)(const char *typeNameStart, size_t typeNameLength,
+                                  size_t numberOfLevels,
+                                  size_t *parametersPerLevel,
+                                  const Metadata * const *flatSubstitutions);
+typedef const Metadata *
+  (*GetTypeByMangledNameOverride)(const char *typeNameStart, size_t typeNameLength,
+                                  size_t numberOfLevels,
+                                  size_t *parametersPerLevel,
+                                  const Metadata * const *flatSubstitutions,
                                   GetTypeByMangledNameOriginal originalImpl);
 
 typedef bool (*DynamicCastOriginal)(OpaqueValue *dest, OpaqueValue *src,
                                     const Metadata *srcType,
                                     const Metadata *targetType,
                                     DynamicCastFlags flags);
-
 typedef bool (*DynamicCastOverride)(OpaqueValue *dest, OpaqueValue *src,
                                     const Metadata *srcType,
                                     const Metadata *targetType,
                                     DynamicCastFlags flags,
                                     DynamicCastOriginal originalImpl);
 
-GetTypeByMangledNameOverride getMangledNameOverride();
+typedef const WitnessTable *
+  (*ConformsToProtocolOriginal)(const Metadata * const type,
+                                const ProtocolDescriptor *protocol);
+typedef const WitnessTable *
+  (*ConformsToProtocolOverride)(const Metadata * const type,
+                                const ProtocolDescriptor *protocol,
+                                ConformsToProtocolOriginal originalImpl);
+
+
+GetTypeByMangledNameOverride getGetTypeByMangledNameOverride();
 DynamicCastOverride getDynamicCastOverride();
+ConformsToProtocolOverride getConformsToProtocolOverride();
 
 /// An implementation of an override point. Declare it `static` and
 /// parameterize the template with the appropriate `Override` typedef
@@ -55,8 +67,10 @@ DynamicCastOverride getDynamicCastOverride();
 /// functionality otherwise.
 template <typename OverrideFunc>
 struct CompatibilityOverride {
+#if defined(__APPLE__) && defined(__MACH__)
   OverrideFunc Func;
   swift_once_t Predicate;
+#endif
   
   template <typename GetterFunc, typename OriginalFunc, typename ...Args>
   typename std::result_of<OriginalFunc(Args...)>::type
@@ -78,7 +92,7 @@ struct CompatibilityOverride {
       return original(args...);
 #else
     // Compatibility overrides are currently only supported on MachO. If
-    // we implement them for others, change this #if accordingly. Don't
+    // we implement them for others, change these #ifs accordingly. Don't
     // waste time running code that will always do nothing on those
     // platforms.
     return original(args...);

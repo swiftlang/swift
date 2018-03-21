@@ -967,9 +967,9 @@ public:
 
 }
 
-static TypeInfo
-_getTypeByMangledNameImpl(StringRef typeName,
-                          SubstGenericParameterFn substGenericParam) {
+TypeInfo
+swift::_getTypeByMangledName(StringRef typeName,
+                             SubstGenericParameterFn substGenericParam) {
   auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
@@ -1026,17 +1026,8 @@ _getTypeByMangledNameImpl(StringRef typeName,
   return {type, builder.getReferenceOwnership()};
 }
 
-TypeInfo
-swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam) {
-  static CompatibilityOverride<GetTypeByMangledNameOverride> Override;
-  return Override.call(getMangledNameOverride, _getTypeByMangledNameImpl,
-                       typeName, substGenericParam);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+static const Metadata * _Nullable
+swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t numberOfLevels,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
@@ -1055,6 +1046,20 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
 
       return flatSubstitutions[flatIndex];
     });
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata * _Nullable
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+                           size_t numberOfLevels,
+                           size_t *parametersPerLevel,
+                           const Metadata * const *flatSubstitutions) {
+  static CompatibilityOverride<GetTypeByMangledNameOverride> Override;
+  return Override.call(getGetTypeByMangledNameOverride, swift_getTypeByMangledNameImpl,
+                       typeNameStart, typeNameLength,
+                       numberOfLevels,
+                       parametersPerLevel,
+                       flatSubstitutions);
 }
 
 void swift::swift_getFieldAt(

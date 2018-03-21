@@ -19,16 +19,24 @@
 
 using namespace swift;
 
-bool RanBefore;
-bool RanAfter;
+bool EnableOverride;
+bool Ran;
 
-TypeInfo GetTypeByMangledNameOverrideFunc(StringRef typeName,
-                                          SubstGenericParameterFn substGenericParam,
-                                          GetTypeByMangledNameOriginal originalImpl) {
-  RanBefore = true;
-  auto Result = originalImpl(typeName, substGenericParam);
-  RanAfter = true;
-  return Result;
+const Metadata *
+GetTypeByMangledNameOverrideFunc(const char *typeNameStart,
+                                 size_t typeNameLength,
+                                 size_t numberOfLevels,
+                                 size_t *parametersPerLevel,
+                                 const Metadata * const *flatSubstitutions,
+                                 GetTypeByMangledNameOriginal originalImpl) {
+  if (!EnableOverride)
+    return originalImpl(typeNameStart,
+                        typeNameLength,
+                        numberOfLevels,
+                        parametersPerLevel,
+                        flatSubstitutions);
+  Ran = true;
+  return nullptr;
 }
 
 bool DynamicCastOverrideFunc(OpaqueValue *dest, OpaqueValue *src,
@@ -36,10 +44,20 @@ bool DynamicCastOverrideFunc(OpaqueValue *dest, OpaqueValue *src,
                              const Metadata *targetType,
                              DynamicCastFlags flags,
                              DynamicCastOriginal originalImpl) {
-  RanBefore = true;
-  auto Result = originalImpl(dest, src, srcType, targetType, flags);
-  RanAfter = true;
-  return Result;
+  if (!EnableOverride)
+    return originalImpl(dest, src, srcType, targetType, flags);
+  Ran = true;
+  return true;
+}
+
+const WitnessTable *
+ConformsToProtocolOverrideFunc(const Metadata * const type,
+                               const ProtocolDescriptor *protocol,
+                               ConformsToProtocolOriginal originalImpl) {
+  if (!EnableOverride)
+    return originalImpl(type, protocol);
+  Ran = true;
+  return nullptr;
 }
 
 struct OverrideSection {
@@ -47,12 +65,14 @@ struct OverrideSection {
   
   GetTypeByMangledNameOverride mangledNameOverride;
   DynamicCastOverride dynamicCastOverride;
+  ConformsToProtocolOverride conformsToProtocolOverride;
 };
 
 OverrideSection Overrides __attribute__((section("__DATA,__swift_lite"))) = {
   0,
   GetTypeByMangledNameOverrideFunc,
-  DynamicCastOverrideFunc
+  DynamicCastOverrideFunc,
+  ConformsToProtocolOverrideFunc
 };
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -62,36 +82,39 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions);
 
-TEST(CompatibilityOverride, test_overrideSectionContents) {
-  // These checks are a bit pointless, as long as you trust the section
-  // attribute to work correctly, but they ensure that the override
-  // section actually gets linked into the test executable. If it's not
-  // used then it disappears and the real tests begin to fail.
-  ASSERT_EQ(Overrides.version, static_cast<uintptr_t>(0));
-  ASSERT_TRUE(Overrides.mangledNameOverride == GetTypeByMangledNameOverrideFunc);
-  ASSERT_TRUE(Overrides.dynamicCastOverride == DynamicCastOverrideFunc);
-}
-
-TEST(CompatibilityOverride, test_swift_getTypeByMangledName) {
-  RanBefore = false;
-  RanAfter = false;
-  auto Result = swift_getTypeByMangledName("Si", 2, 0, nullptr, nullptr);
-  ASSERT_TRUE(RanBefore);
-  ASSERT_TRUE(RanAfter);
-  ASSERT_NE(Result, nullptr);
-}
-
-TEST(CompatibilityOverride, test_swift_dynamicCast) {
-  auto Int = swift_getTypeByMangledName("Si", 2, 0, nullptr, nullptr);
-  intptr_t x = 0xdeadbeef;
-  intptr_t y;
+class CompatibilityOverrideTest : public ::testing::Test {
+protected:
+  virtual void SetUp() {
+    // These checks are a bit pointless, as long as you trust the section
+    // attribute to work correctly, but they ensure that the override
+    // section actually gets linked into the test executable. If it's not
+    // used then it disappears and the real tests begin to fail.
+    ASSERT_EQ(Overrides.version, static_cast<uintptr_t>(0));
+    ASSERT_TRUE(Overrides.mangledNameOverride == GetTypeByMangledNameOverrideFunc);
+    ASSERT_TRUE(Overrides.dynamicCastOverride == DynamicCastOverrideFunc);
+    
+    EnableOverride = true;
+    Ran = false;
+  }
   
-  RanBefore = false;
-  RanAfter = false;
-  auto Result = swift_dynamicCast(reinterpret_cast<OpaqueValue *>(&x),
-                                  reinterpret_cast<OpaqueValue *>(&y),
-                                  Int, Int, DynamicCastFlags::Default);
-  ASSERT_TRUE(RanBefore);
-  ASSERT_TRUE(RanAfter);
+  virtual void TearDown() {
+    EnableOverride = false;
+    ASSERT_TRUE(Ran);
+  }
+};
+
+TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
+  auto Result = swift_getTypeByMangledName("", 0, 0, nullptr, nullptr);
+  ASSERT_EQ(Result, nullptr);
+}
+
+TEST_F(CompatibilityOverrideTest, test_swift_dynamicCast) {
+  auto Result = swift_dynamicCast(nullptr, nullptr, nullptr, nullptr,
+                                  DynamicCastFlags::Default);
   ASSERT_TRUE(Result);
+}
+
+TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
+  auto Result = swift_conformsToProtocol(nullptr, nullptr);
+  ASSERT_EQ(Result, nullptr);  
 }
