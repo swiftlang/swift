@@ -6,6 +6,7 @@
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
 // REQUIRES: executable_test
+// REQUIRES: stress_test
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
