@@ -14,23 +14,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "ASTVisitor.h"
 #include "ArgumentSource.h"
 #include "Conversion.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
-#include "Initialization.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
-#include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -497,8 +498,12 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  SILValue base = findAccessedAddressBase(address);
-  if (!base || !isPossibleFormalAccessBase(base))
+  const AccessedStorage &storage = findAccessedStorage(address);
+  if (!storage) {
+    llvm::dbgs() << "Bad memory access source: " << address;
+    llvm_unreachable("Unexpected access source.");
+  }
+  if (!isPossibleFormalAccessBase(storage, &SGF.F))
     return address;
 
   auto BAI =
@@ -3443,7 +3448,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   auto destAddr = dest->getAddressForInPlaceInitialization(*this, loc);
   assert(src.getTypeOfRValue().getSwiftRValueType()
            == destAddr->getType().getSwiftRValueType());
-  
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
 
