@@ -1001,7 +1001,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         auto scalarType = opTy.getSwiftRValueType();
         if (convertSwiftTypeToTF(scalarType) == 0)
           return "scalarToTensor requires scalar value; unrecognized type '"
-             +scalarType->getString() + "' is not allowed";
+             + scalarType->getString() + "' is not allowed";
         break;
       }
 
