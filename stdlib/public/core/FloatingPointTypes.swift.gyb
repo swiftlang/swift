@@ -74,8 +74,8 @@ public struct ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public // @testable
-  init(_bits v: Builtin.FPIEEE${bits}) {
-    self._value = v
+  init(_ _value: Builtin.FPIEEE${bits}) {
+    self._value = _value
   }
 }
 
@@ -214,7 +214,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// - Parameter bitPattern: The integer encoding of a `${Self}` instance.
   @_inlineable // FIXME(sil-serialize-all)
   public init(bitPattern: UInt${bits}) {
-    self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
+    self.init(Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
   }
 
   /// The sign of the floating-point value.
@@ -1449,7 +1449,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   @_transparent
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
-    self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
   /// Creates a new value from the given integer literal.
@@ -1468,7 +1468,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(integerLiteral value: Int64) {
-    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
+    self = ${Self}(Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
 }
 
@@ -1483,9 +1483,9 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
-    self = ${Self}(_bits: value)
+    self = ${Self}(value)
 %   elif bits < builtinFloatLiteralBits:
-    self = ${Self}(_bits: Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
     self = ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
@@ -1503,10 +1503,10 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
-    self = ${Self}(_bits: value)
+    self = ${Self}(value)
 %   elif bits < builtinFloatLiteralBits:
     // FIXME: This can result in double rounding errors (SR-7124).
-    self = ${Self}(_bits: Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
     self = ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
@@ -1569,7 +1569,7 @@ extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var magnitude: ${Self} {
-    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
+    return ${Self}(Builtin.int_fabs_FPIEEE${bits}(_value))
   }
 }
 
@@ -1577,7 +1577,7 @@ extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func - (x: ${Self}) -> ${Self} {
-    return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
+    return ${Self}(Builtin.fneg_FPIEEE${bits}(x._value))
   }
 }
 
