@@ -19,6 +19,7 @@
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "TFCanonicalizeCFG.h"
 #include "tensorflow/c/c_api.h"
+#include "tensorflow/c/c_api_experimental.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
@@ -28,10 +29,15 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #endif
 using namespace swift;
 using namespace tf;
+
+static llvm::cl::opt<bool>
+TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
+            llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
@@ -1442,6 +1448,47 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
   // Serialize the graph into the buffer.
   TF_GraphToGraphDef(resultGraph, buffer, status);
   if (checkStatus(SILFn->getLocation())) return {};
+
+  // If the user wants a copy of the graph in /tmp, emit it now.
+  if (TFDumpGraph) {
+    int resultFD = -1;
+    SmallString<64> resultPath;
+    auto error = llvm::sys::fs::createTemporaryFile(
+        "tf-dump-graph-" + SILFn->getName().str(), "pb", resultFD, resultPath);
+    if (error) {
+      llvm::errs() << "error opening '" << resultPath.str()
+                   << "' for -tf-dump-graph emission!\n";
+    } else {
+      llvm::errs() << "wrote binary graph of " << buffer->length
+                   << " bytes to '" << resultPath.str() << "'\n";
+      llvm::raw_fd_ostream file(resultFD, /*shouldClose*/ true,
+                                /*unbuffered*/ false);
+      file.write((const char*)buffer->data, buffer->length);
+    }
+
+    // Also write in a textual format.
+    error = llvm::sys::fs::createTemporaryFile(
+        "tf-dump-graph-" + SILFn->getName().str(), "pbtxt", resultFD,
+        resultPath);
+    if (error) {
+      llvm::errs() << "error opening '" << resultPath.str()
+                   << "' for -tf-dump-graph emission!\n";
+    } else {
+      size_t len;
+      const char *content = TF_GraphDebugString(resultGraph, &len);
+      llvm::errs() << "wrote textual graph of " << len << " bytes to '"
+                   << resultPath.str() << "'\n";
+      llvm::raw_fd_ostream file(resultFD, /*shouldClose*/ true,
+                                /*unbuffered*/ false);
+      file.write(content, len);
+
+      // For debugging convenience, also write the graph proto to STDERR. If it
+      // gets too large, we can flag-protect this mode.
+      llvm::errs() << "The graph proto is: \n";
+      llvm::errs() << content << "\n";
+      free((void*)content);
+    }
+  }
 
   auto bufPtr = (const char*)buffer->data;
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
