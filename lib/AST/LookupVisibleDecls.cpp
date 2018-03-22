@@ -805,7 +805,8 @@ public:
           OtherSignatureType = CT->getCanonicalType();
       }
 
-      if (conflicting(FoundSignature, FoundSignatureType,
+      if (conflicting(VD->getDeclContext()->getASTContext(),
+                      FoundSignature, FoundSignatureType,
                       OtherSignature, OtherSignatureType,
                       /*skipProtocolExtensionCheck*/true)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {

@@ -220,9 +220,14 @@ struct OverloadSignature {
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
+  /// Whether this signature is of a member defined in an extension of a generic
+  /// type.
+  unsigned InExtensionOfGenericType : 1;
+
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
-        IsVariable(false), IsFunction(false), InProtocolExtension(false) {}
+        IsVariable(false), IsFunction(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
@@ -230,7 +235,8 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
 /// Determine whether two overload signatures and overload types conflict.
-bool conflicting(const OverloadSignature& sig1, CanType sig1Type,
+bool conflicting(ASTContext &ctx,
+                 const OverloadSignature& sig1, CanType sig1Type,
                  const OverloadSignature& sig2, CanType sig2Type,
                  bool skipProtocolExtensionCheck = false);
 

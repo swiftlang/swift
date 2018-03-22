@@ -553,6 +553,11 @@ public:
   /// underlying type.
   Type eraseDynamicSelfType();
 
+  /// Given a declaration context, returns a function type with the 'self'
+  /// type curried as the input if the declaration context describes a type.
+  /// Otherwise, returns the type itself.
+  Type addCurriedSelfType(DeclContext *dc);
+
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext();
 
