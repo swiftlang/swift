@@ -49,7 +49,7 @@ extension Float80 {
       Builtin.zextOrBitCast_Int64_Int80((64 as Int64)._value))
     result = Builtin.or_Int80(
       result, Builtin.zextOrBitCast_Int64_Int80(bitPattern.significand._value))
-    self = Float80(_bits: Builtin.bitcast_Int80_FPIEEE80(result))
+    self = Float80(Builtin.bitcast_Int80_FPIEEE80(result))
   }
 }
 
