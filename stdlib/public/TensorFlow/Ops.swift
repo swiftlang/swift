@@ -526,18 +526,22 @@ public extension Tensor where Scalar == Bool {
 public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
-  @_inlineable @inline(__always)
+  @_versioned @_inlineable @inline(__always)
   @differentiable(
     withRespectTo: (self),
     gradient: _adjointTransposed(_:partial:seed:)
   )
-  func transposed(withPermutations permutations: Tensor<Int32>) -> Self {
+  internal func transposed(
+    withPermutations permutations: Tensor<Int32>
+  ) -> Self {
     return #tfop("Transpose", handle, permutations, Tperm: Int32.self)
   }
 
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @_inlineable @inline(__always)
+  @available(*, deprecated,
+             message: "Pass permutation as variadic arguments instead.")
   func transposed(withPermutations permutations: [Int32]) -> Self {
     return transposed(withPermutations: Tensor<Int32>(permutations))
   }
