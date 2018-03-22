@@ -97,10 +97,11 @@ void registerConsumer(TraceConsumer *Consumer);
 
 // Class that utilizes the RAII idiom for the operations being traced
 class TracedOperation final {
+  OperationKind OpKind;
   llvm::Optional<uint64_t> OpId;
 
 public:
-  TracedOperation() {}
+  TracedOperation(OperationKind OpKind) : OpKind(OpKind) {}
   ~TracedOperation() {
     finish();
   }
@@ -110,10 +111,9 @@ public:
   TracedOperation(const TracedOperation &) = delete;
   TracedOperation &operator=(const TracedOperation &) = delete;
 
-  void start(OperationKind OpKind,
-             const SwiftInvocation &Inv,
+  void start(const SwiftInvocation &Inv,
              const StringPairs &OpArgs = StringPairs()) {
-    finish();
+    assert(!OpId.hasValue());
     OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
