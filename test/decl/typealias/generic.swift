@@ -77,7 +77,7 @@ let _ : D = D(a: 1, b: 2)  // expected-error {{cannot convert value of type 'MyT
 let _ : D<Int, Int, Float> = D<Int, Int, Float>(a: 1, b: 2)
 
 // FIXME: This is not a great error.
-// expected-error @+1 {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
+// expected-error @+1 {{cannot convert value of type 'D<Int, Int, Float>' (aka 'MyType<Int, Int>') to specified type 'D'}}
 let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 
 
@@ -147,10 +147,8 @@ class GenericClass<T> {
     return TAI(a: t, b: s)
   }
 
-  // FIXME: Would be nice to preserve sugar here
-
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>'}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'MyType<T, Int>'}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -267,11 +265,11 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)

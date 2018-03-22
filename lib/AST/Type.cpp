@@ -406,15 +406,18 @@ void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (hasTypeVariable()) {
-    // Use Type::findIf() to walk the types, finding type variables along the
-    // way.
-    getCanonicalType().findIf([&](Type type) -> bool {
+    auto addTypeVariables = [&](Type type) -> bool {
       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
         typeVariables.push_back(tv);
       }
 
       return false;
-    });
+    };
+
+    // Use Type::findIf() to walk the types, finding type variables along the
+    // way.
+    getCanonicalType().findIf(addTypeVariables);
+    Type(this).findIf(addTypeVariables);
     assert((!typeVariables.empty() || hasError()) &&
            "Did not find type variables!");
   }
@@ -1258,6 +1261,8 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Paren:
     llvm_unreachable("parenthesis are sugar, but not syntax sugar");
+  case TypeKind::BoundNameAlias:
+    llvm_unreachable("bound name alias types always have an underlying type");
   case TypeKind::NameAlias: {
     auto Ty = cast<NameAliasType>(this);
     auto UTy = Ty->getDecl()->getUnderlyingTypeLoc().getType().getPointer();
@@ -1291,6 +1296,34 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 
   // Record the implementation type.
   return UnderlyingType;
+}
+
+SubstitutionMap BoundNameAliasType::getSubstitutionMap() const {
+  if (auto genericSig = typealias->getGenericSignature())
+    return genericSig->getSubstitutionMap(getSubstitutionList());
+
+  return SubstitutionMap();
+}
+
+SmallVector<Type, 2> BoundNameAliasType::getInnermostGenericArgs() const {
+  SmallVector<Type, 2> result;
+
+  // If the typealias is not generic, there are no generic arguments
+  if (!typealias->isGeneric()) return result;
+
+  auto genericSig = typealias->getGenericSignature();
+  if (!genericSig) return result;
+
+  // Retrieve the substitutions for the generic parameters (only).
+  unsigned numAllGenericParams = genericSig->getGenericParams().size();
+  auto genericArgSubs = getSubstitutionList().slice(0, numAllGenericParams);
+
+  // Copy the replacement types for the innermost generic arguments.
+  unsigned numMyGenericParams = typealias->getGenericParams()->size();
+  for (const auto &sub : genericArgSubs.take_back(numMyGenericParams)) {
+    result.push_back(sub.getReplacement());
+  }
+  return result;
 }
 
 unsigned GenericTypeParamType::getDepth() const {
@@ -3634,6 +3667,45 @@ case TypeKind::Id:
       return *this;
 
     return transformedTy;
+  }
+
+  case TypeKind::BoundNameAlias: {
+    auto alias = cast<BoundNameAliasType>(base);
+    Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
+    Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
+    if (!newUnderlyingType) return Type();
+
+    Type oldParentType = alias->getParent();
+    Type newParentType;
+    if (oldParentType) {
+      newParentType = oldParentType.transformRec(fn);
+      if (!newParentType) return Type();
+    }
+
+    auto subMap = alias->getSubstitutionMap();
+    auto genericSig = alias->getDecl()->getGenericSignature();
+    if (genericSig) {
+      for (Type gp : genericSig->getGenericParams()) {
+        Type oldReplacementType = gp.subst(subMap);
+        if (!oldReplacementType)
+          return newUnderlyingType;
+
+        Type newReplacementType = oldReplacementType.transformRec(fn);
+        if (!newReplacementType)
+          return Type();
+
+        // If anything changed with the replacement type, we lose the sugar.
+        // FIXME: This is really unfortunate.
+        if (!newReplacementType->isEqual(oldReplacementType))
+          return newUnderlyingType;
+      }
+    }
+
+    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+      return *this;
+
+    return BoundNameAliasType::get(alias->getDecl(), newParentType, subMap,
+                                   newUnderlyingType);
   }
 
   case TypeKind::Paren: {

@@ -598,10 +598,28 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
   }
 
+  // For a typealias, use the underlying type. We'll wrap up the result
+  // later.
+  auto typealias = dyn_cast<TypeAliasDecl>(decl);
+  if (typealias) {
+    resultType = typealias->getUnderlyingTypeLoc().getType();
+  }
+
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
+
+  // Form a sugared typealias reference.
+  if (typealias) {
+    auto genericSig = typealias->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
+                                                 LookUpConformance(*this, dc));
+    if (!subMap.empty()) {
+      resultType = BoundNameAliasType::get(typealias, unboundType->getParent(),
+                                           subMap, resultType);
+    }
+  }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(

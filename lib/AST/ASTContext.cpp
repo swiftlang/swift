@@ -278,6 +278,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// arenas.
   struct Arena {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
+    llvm::FoldingSet<BoundNameAliasType> BoundNameAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -2885,6 +2886,88 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
+
+BoundNameAliasType::BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
+                                       const SubstitutionMap &substitutions,
+                                       Type underlying,
+                                       RecursiveTypeProperties properties)
+    : SugarType(TypeKind::BoundNameAlias, underlying, properties),
+      typealias(typealias) {
+  // Record the parent (or absence of a parent).
+  if (parent) {
+    Bits.BoundNameAliasType.HasParent = true;
+    *getTrailingObjects<Type>() = parent;
+  } else {
+    Bits.BoundNameAliasType.HasParent = false;
+  }
+
+  // Record the substitutions.
+  if (auto genericSig = typealias->getGenericSignature()) {
+    SmallVector<Substitution, 4> flatSubs;
+    genericSig->getSubstitutions(substitutions, flatSubs);
+    Bits.BoundNameAliasType.NumSubstitutions = flatSubs.size();
+    std::copy(flatSubs.begin(), flatSubs.end(),
+              getTrailingObjects<Substitution>());
+  } else {
+    Bits.BoundNameAliasType.NumSubstitutions = 0;
+  }
+}
+
+BoundNameAliasType *BoundNameAliasType::get(
+                                        TypeAliasDecl *typealias,
+                                        Type parent,
+                                        const SubstitutionMap &substitutions,
+                                        Type underlying) {
+  // Compute the recursive properties.
+  auto properties = underlying->getRecursiveProperties();
+  if (parent)
+    properties |= parent->getRecursiveProperties();
+  auto genericSig = typealias->getGenericSignature();
+  if (genericSig) {
+    for (Type gp : genericSig->getGenericParams()) {
+      properties |= gp.subst(substitutions, SubstFlags::UseErrorType)
+                      ->getRecursiveProperties();
+    }
+  }
+
+  // Figure out which arena this type will go into.
+  auto &ctx = underlying->getASTContext();
+  auto arena = getArena(properties);
+
+  // Profile the type.
+  llvm::FoldingSetNodeID id;
+  BoundNameAliasType::Profile(id, typealias, parent, substitutions);
+
+  // Did we already record this type?
+  void *insertPos;
+  auto &types = ctx.Impl.getArena(arena).BoundNameAliasTypes;
+  if (auto result = types.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new type.
+  unsigned numSubstitutions =
+    genericSig ? genericSig->getSubstitutionListSize() : 0;
+  auto size =
+    totalSizeToAlloc<Type, Substitution>(parent ? 1 : 0, numSubstitutions);
+  auto mem = ctx.Allocate(size, alignof(BoundNameAliasType), arena);
+  auto result = new (mem) BoundNameAliasType(typealias, parent, substitutions,
+                                             underlying, properties);
+  types.InsertNode(result, insertPos);
+  return result;
+}
+
+void BoundNameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
+  Profile(id, getDecl(), getParent(), getSubstitutionMap());
+}
+
+void BoundNameAliasType::Profile(
+                           llvm::FoldingSetNodeID &id,
+                           TypeAliasDecl *typealias,
+                           Type parent, const SubstitutionMap &substitutions) {
+  id.AddPointer(typealias);
+  id.AddPointer(parent.getPointer());
+  substitutions.profile(id);
+}
 
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
