@@ -101,39 +101,42 @@ bool FunctionAccessedStorage::updateUnidentifiedAccess(
 // that the merged access values will belong to this function.
 //
 // Note that we may have `this` == `other` for self-recursion. We still need to
-// propagate and merge in that case in care arguments are recursively dependent.
+// propagate and merge in that case in case arguments are recursively dependent.
 bool FunctionAccessedStorage::mergeAccesses(
     const FunctionAccessedStorage &other,
     std::function<AccessedStorage(const AccessedStorage &)> transformStorage) {
 
+  // Insertion in DenseMap invalidates the iterator in the rare case of
+  // self-recursion (`this` == `other`) that passes accessed storage though an
+  // argument. Rather than complicate the code, make a temporary copy of the
+  // AccessedStorage.
+  SmallVector<std::pair<AccessedStorage, StorageAccessInfo>, 8> otherAccesses;
+  otherAccesses.reserve(other.storageAccessMap.size());
+  otherAccesses.append(other.storageAccessMap.begin(),
+                       other.storageAccessMap.end());
+
   bool changed = false;
-  bool restart;
-  do {
-    restart = false;
-    for (auto &accessEntry : other.storageAccessMap) {
+  for (auto &accessEntry : otherAccesses) {
+    const AccessedStorage &storage = transformStorage(accessEntry.first);
+    // transformStorage() returns invalid storage object for local storage
+    // that should not be merged with the caller.
+    if (!storage)
+      continue;
 
-      const AccessedStorage &storage = transformStorage(accessEntry.first);
-      // transformStorage returns invalid storage object for local storage
-      // that should not be merged with the caller.
-      if (!storage)
-        continue;
-
-      if (storage.getKind() == AccessedStorage::Unidentified)
-        changed |= updateUnidentifiedAccess(accessEntry.second.accessKind);
-      else {
-        auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
-        if (result.second) {
-          changed = true;
-          // Insertion in DenseMap invalidates the iterator (if `this` ==
-          // `other`. Break out of the loop and start over.
-          restart = true;
-          break;
-        } else
-          changed |= result.first->second.mergeFrom(accessEntry.second);
-      }
+    if (storage.getKind() == AccessedStorage::Unidentified) {
+      changed |= updateUnidentifiedAccess(accessEntry.second.accessKind);
+      continue;
     }
-  } while (restart);
-
+    // Attempt to add identified AccessedStorage to this map.
+    auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
+    if (result.second) {
+      // A new AccessedStorage key was added to this map.
+      changed = true;
+      continue;
+    }
+    // Merge StorageAccessInfo into already-mapped AccessedStorage.
+    changed |= result.first->second.mergeFrom(accessEntry.second);
+  }
   if (other.unidentifiedAccess != None)
     changed |= updateUnidentifiedAccess(other.unidentifiedAccess.getValue());
 
@@ -226,6 +229,9 @@ bool FunctionAccessedStorage::mergeFromApply(
 
 template <typename B>
 void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
+  if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+    return;
+
   const AccessedStorage &storage =
       findAccessedStorageOrigin(beginAccess->getSource());
 
@@ -262,7 +268,7 @@ bool FunctionAccessedStorage::mayConflictWith(
     if (!accessKindMayConflict(otherAccessKind, accessInfo.accessKind))
       continue;
 
-    if (!otherStorage.isDistinct(storage))
+    if (!otherStorage.isDistinctFrom(storage))
       return true;
   }
   return false;

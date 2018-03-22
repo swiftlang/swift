@@ -43,8 +43,9 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
   }
 }
 
-AccessedStorage::AccessedStorage(SILValue base, Kind kind) : kind(kind) {
+AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   assert(base && "invalid storage base");
+  initKind(kind);
 
   switch (kind) {
   case Box:
@@ -81,7 +82,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) : kind(kind) {
 }
 
 const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
-  switch(kind) {
+  switch (getKind()) {
   case Box:
     return cast<AllocBoxInst>(value)->getLoc().getAsASTNode<VarDecl>();
 
@@ -125,8 +126,8 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
 }
 
 void AccessedStorage::print(raw_ostream &os) const {
-  os << getKindName(kind) << " ";
-  switch (kind) {
+  os << getKindName(getKind()) << " ";
+  switch (getKind()) {
   case Box:
   case Stack:
   case Nested:
