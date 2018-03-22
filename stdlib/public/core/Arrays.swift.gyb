@@ -1440,7 +1440,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   ///   unspecified.
   @_inlineable
   @_semantics("array.append_element")
-  public mutating func append(_ newElement: Element) {
+  public mutating func append(_ newElement: __owned Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
