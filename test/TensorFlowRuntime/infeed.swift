@@ -13,9 +13,6 @@ import StdlibUnittest
 
 var InfeedTests = TestSuite("Infeed")
 
-#if false
-// TODO(hongm): Re-enable after adding infeed support within TF compiler's TPU
-// graph generation.
 @inline(never)
 func testScalarInput() {
   func add(_ x: Float, _ y: Float) -> Float {
@@ -24,17 +21,16 @@ func testScalarInput() {
     return (x+y).array.scalars[0]
   }
 
-  _RuntimeConfig.executionMode = .tpu(usesInfeed: true)
+  _RuntimeConfig.executionMode = .tpu
   expectNearlyEqual(3.7, add(1.3, 2.4), byError: 0.1)
 }
 InfeedTests.testTPU("ScalarInput", testScalarInput)
-#endif
 
 #if false
 // TODO(hongm): Extend shape info support to make this test work.
 // TODO(hongm): Unify with TensorTests.ElementIndexing
 InfeedTests.testTPU("ElementIndexing") {
-  _RuntimeConfig.executionMode = .tpu(usesInfeed: true)
+  _RuntimeConfig.executionMode = .tpu
 
   // NOTE: This tests the `subscript(index:)` method, which is distinct from
   // the `subscript(indices:)` method.

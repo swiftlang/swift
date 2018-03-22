@@ -88,7 +88,7 @@ extension TestSuite {
 #if TPU && !CUDA
     test(name + "_TPU") {
       _RuntimeConfig.usesTFEagerAPI = false
-      _RuntimeConfig.executionMode = .tpu(usesInfeed: false)
+      _RuntimeConfig.executionMode = .tpu
       _RuntimeConfig.printsDebugLog = false
       body()
     }

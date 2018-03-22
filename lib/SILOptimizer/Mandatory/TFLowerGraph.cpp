@@ -43,6 +43,14 @@ static llvm::cl::opt<bool>
 TFTargetTPU("tf-target-tpu", llvm::cl::init(false),
             llvm::cl::desc("If true, target TPU in the generated TF graph"));
 
+// FIXME: Remove this flag by always enabling it -tf-target-tpu is enabled.
+static llvm::cl::opt<bool> TFUseTPUInfeed(
+    "tf-tpu-use-infeed", llvm::cl::init(false),
+    llvm::cl::desc(
+        "If true and tf-target-tpu is enabled, use infeed "
+        "enqueue/dequeue nodes in the the generated TF TPU graph, where the "
+        "infeed enqueue node is always named 'InfeedEnqueueTuple'"));
+
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -221,13 +229,8 @@ public:
   /// necessary to represent a tensorflow TF_Function, perform the final steps
   /// to generate the TF_Function itself and put it into the resultGraph.
   ///
-  /// When `isTopLevelFunction` is true, also adds a graph node corresponding to
-  /// this function, and a set of PlaceHolder nodes as the input parameters to
-  /// that function. Caller can call this function through the function node via
-  /// TF_SessionRun(). The graph node for the function is named
-  /// `tfc_func_<name>`, and the placeholder nodes are named
-  /// "tfc_input_<i>_<name>", where i denotes the i-th input parameter. This
-  /// naming convention is used by Swift run-time to locate these graph nodes.
+  /// When `isTopLevelFunction` is true, also adds a set of graph nodes to
+  /// support calling that function.
   ///
   /// Note: `name` starts with _, where the name of a graph node cannot start
   /// with _.
@@ -250,9 +253,11 @@ private:  // Helpers to create TensorFlow graph nodes.
   ///
   /// The created nodes follow this naming convention shared with the runtime:
   /// - The graph node for the function call has op type set <funcName>, and
-  /// name set to tfc_func_<funcName>.
+  ///   name set to tfc_func_<funcName>.
   /// - The i-th input node is named tfc_input_<i>_<funcName>
   /// - The j-th output node is named tfc_output_<j>_<funcName>
+  /// - If TPU infeed is enabled, the graph contains an 'InfeedEnqueueTuple'
+  ///   node for caller feed input tensors.
   ///
   /// Additional graph nodes may be added for TPU graph creation, but they are
   /// implementation details that runtime need not be aware of.
@@ -1465,11 +1470,16 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   //   -> F (with op type being F) -> O (Identity).
   //
   // - In the TPU case, create additional input and output nodes as follows:
-  //   - I feeds a TPUReplicatedInput node (both running on CPU), which in
-  //     turn feeds an Identity node IN, and IN feeds F (IN and F run on TPU).
-  //   - F outputs to an Identity node ON (running on TPU), which feeds
-  //     a TPUReplicatedOutput node, which in turn feeds another Identity
-  //     node. The last node is the output node to run the TF graph.
+  //  - Input rewrite:
+  //   a) Without infeed: I feeds a TPUReplicatedInput node (both running on
+  //     CPU), which in turn feeds an Identity node IN, and IN feeds F (IN and
+  //     F run on TPU).
+  //   b) With infeed: I feeds an InfeedEnqueueTuple node (both running on
+  //     CPU). Add a corresponding InfeedDequeueTuple, feeding F (both running
+  //     on TPU).
+  //  - Output rewrite: F outputs to an Identity node ON (running on TPU),
+  //     which feeds a TPUReplicatedOutput node, which in turn feeds another
+  //     Identity node. The last node is the output node to run the TF graph.
   //
   // Recall naming convention: The graph nodes corresponding to I, F and O above
   // are respectively named tfc_input_0_F, tfc_func_F and tfc_output_0_F.
@@ -1485,6 +1495,20 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     markNodeAsTPUReplicated(funcDesc);
   }
 
+  bool addTPUInfeedNodes = TFTargetTPU && TFUseTPUInfeed && !inputs.empty();
+  // These vectors are only used when addTPUInfeedNodes is true.
+  std::vector<TF_Output> infeedInputs;
+  infeedInputs.reserve(inputs.size());
+  std::vector<TF_DataType> infeedInputDtypes;
+  infeedInputDtypes.reserve(inputs.size());
+  std::vector<TF_Buffer *> infeedInputShapes;
+  infeedInputShapes.reserve(inputs.size());
+  SWIFT_DEFER {
+    for (auto *shape : infeedInputShapes) {
+      TF_DeleteBuffer(shape);
+    }
+  };
+
   // Handle inputs and finish constructing the function node.
   for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
     std::string inputNodeName =
@@ -1498,7 +1522,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     if (!TFTargetTPU) {
       // Feed I directly into F.
       TF_AddInput(funcDesc, inputNode);
-    } else {
+    } else if (!addTPUInfeedNodes) {
       // Add some intermediate nodes between I and F.
       TF_Operation *replicatedInput;
       {
@@ -1522,6 +1546,64 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_Operation *idInput = TF_FinishOperation(desc, status);
         if (checkStatus(SILFn->getLocation())) return true;
         TF_AddInput(funcDesc, {idInput, 0});
+      }
+    } else {
+      // Collect the input tensors' metadata, to be used for infeed node
+      // construction later.
+      assert(!inputs.empty());
+      const TF_Output inputPlaceholder = {placeholder, 0};
+      infeedInputs.push_back(inputPlaceholder);
+      infeedInputDtypes.push_back(TF_OperationOutputType(inputPlaceholder));
+      TF_Buffer *shapeProto = TF_NewBuffer();
+      TF_OperationGetAttrTensorShapeProto(placeholder, "shape", shapeProto,
+                                          status);
+      if (checkStatus(SILFn->getLocation())) return true;
+      infeedInputShapes.push_back(shapeProto);
+    }
+  }
+
+  if (addTPUInfeedNodes) {
+    // Create infeed enqueue and dequeue nodes.
+    std::vector<const void *> shapeProtos;
+    shapeProtos.reserve(inputs.size());
+    std::vector<size_t> shapeProtoLens;
+    shapeProtoLens.reserve(inputs.size());
+    for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+      shapeProtos.push_back(infeedInputShapes[i]->data);
+      shapeProtoLens.push_back(infeedInputShapes[i]->length);
+    }
+    // The enqueue node runs on CPU.
+    {
+      auto *desc = TF_NewOperation(resultGraph, "InfeedEnqueueTuple",
+                                   "InfeedEnqueueTuple");
+      TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
+      TF_SetDevice(desc, "/device:CPU:0");
+      TF_SetAttrInt(desc, "device_ordinal", 0);
+      TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
+                         infeedInputDtypes.size());
+      TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
+                                     shapeProtoLens.data(),
+                                     shapeProtos.size(), status);
+      if (checkStatus(SILFn->getLocation())) return true;
+      TF_FinishOperation(desc, status);
+      if (checkStatus(SILFn->getLocation())) return true;
+    }
+    // The enqueue node runs on TPU.
+    {
+      auto *desc = TF_NewOperation(resultGraph, "InfeedDequeueTuple",
+                                   "InfeedDequeueTuple");
+      TF_AddControlInput(desc, metadataNode);
+      markNodeAsTPUReplicated(desc);
+      TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
+                         infeedInputDtypes.size());
+      TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
+                                     shapeProtoLens.data(),
+                                     shapeProtos.size(), status);
+      if (checkStatus(SILFn->getLocation())) return true;
+      auto *dequeue = TF_FinishOperation(desc, status);
+      if (checkStatus(SILFn->getLocation())) return true;
+      for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+        TF_AddInput(funcDesc, {dequeue, static_cast<int>(i)});
       }
     }
   }
