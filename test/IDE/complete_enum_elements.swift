@@ -66,6 +66,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_INVALID_DOT_1 | %FileCheck %s -check-prefix=WITH_INVALID_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_1 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_2 | %FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 //===---
 //===--- Test that we can complete enum elements.
@@ -380,4 +382,17 @@ func testWithInvalid1() {
 // UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Qux1[#QuxEnum#]; name=Qux1
 // UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Qux2[#QuxEnum#]; name=Qux2
 // UNRESOLVED_1-NOT:  Okay
+}
+
+func testUnqualified1(x: QuxEnum) {
+  _ = x == .Qux1 || x == .#^UNRESOLVED_2^#Qux2
+  // UNRESOLVED_2: Begin completions, 2 items
+  // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific:     Qux1[#QuxEnum#]; name=Qux1
+  // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific:     Qux2[#QuxEnum#]; name=Qux2
+  // UNRESOLVED_2: End completions
+
+  _ = (x == .Qux1#^UNRESOLVED_3^#)
+  // UNRESOLVED_3: Begin completions
+  // UNRESOLVED_3: End completions
+
 }
