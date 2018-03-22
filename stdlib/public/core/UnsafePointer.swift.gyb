@@ -486,7 +486,7 @@ public struct ${Self}<Pointee>: _Pointer {
 
 %  if mutable:
   @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initialize(repeating:count:)")
-  public func initialize(to newValue: Pointee, count: Int = 1) { 
+  public func initialize(to newValue: __owned Pointee, count: Int = 1) { 
     initialize(repeating: newValue, count: count)
   }
 
@@ -524,7 +524,7 @@ public struct ${Self}<Pointee>: _Pointer {
   /// - Parameters:
   ///   - value: The instance to initialize this pointer's pointee to.
   @_inlineable
-  public func initialize(to value: Pointee) {
+  public func initialize(to value: __owned Pointee) {
     Builtin.initialize(value, self._rawValue)
   }
 
