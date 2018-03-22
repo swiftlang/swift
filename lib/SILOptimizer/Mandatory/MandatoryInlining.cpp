@@ -471,6 +471,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          ImmutableFunctionSet CurrentInliningSet,
                          ClassHierarchyAnalysis *CHA,
                          // SWIFT_ENABLE_TENSORFLOW
+                         SILInliner::InlineKind inlineKind,
                      const ShouldMandatoryInlineFnPred &shouldInlinePredicate) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
@@ -526,7 +527,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA,
                                     // SWIFT_ENABLE_TENSORFLOW
-                                    shouldInlinePredicate)) {
+                                    inlineKind, shouldInlinePredicate)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -557,8 +558,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
       }
 
-      SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline, Subs,
+      // SWIFT_ENABLE_TENSORFLOW
+      SILInliner Inliner(*F, *CalleeFunction, inlineKind, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
         // See comment above about casting when devirtualizing and how this
@@ -642,6 +643,7 @@ void swift::inlineForTFDeabstraction(SILFunction &fn,
                            FullyInlinedSet,
                            SetFactory, SetFactory.getEmptySet(),
                            /*CHA*/nullptr,
+                           SILInliner::InlineKind::PerformanceInline,
                            predicate);
 }
 
@@ -673,7 +675,8 @@ class MandatoryInlining : public SILModuleTransform {
                                FullApplySite(static_cast<ApplyInst*>(nullptr)),
                                FullyInlinedSet,
                                SetFactory, SetFactory.getEmptySet(), CHA,
-         // SWIFT_ENABLE_TENSORFLOW
+                               // SWIFT_ENABLE_TENSORFLOW
+                               SILInliner::InlineKind::MandatoryInline,
          [&](FullApplySite site, const SILFunction &callee) -> bool {
            return callee.isTransparent() == IsTransparent;
          }

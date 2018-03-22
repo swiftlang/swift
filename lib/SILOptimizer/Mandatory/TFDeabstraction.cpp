@@ -1012,6 +1012,7 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
 
   auto &M = arg->getFunction()->getModule();
   auto *argBB = arg->getParent();
+  auto fnLoc = argBB->getParent()->getLocation();
 
   // Collect all the fields and add new BB arguments to the block for each of
   // them.
@@ -1028,8 +1029,7 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
   // Now that we have created all of the BB arguments, we can create a new
   // struct inst, replace the old argument, and remove it.
   SILBuilder B(&argBB->front());
-  auto replacement = B.createStruct(argBB->front().getLoc(),
-                                    arg->getType(), newArgs);
+  auto replacement = B.createStruct(fnLoc, arg->getType(), newArgs);
   arg->replaceAllUsesWith(replacement);
   unsigned argNo = arg->getIndex();
   argBB->eraseArgument(argNo);
@@ -1043,14 +1043,12 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
       if (i != argNo)
         operands.push_back(br->getOperand(i));
 
-    auto origValue = br->getOperand(argNo);
-
     B.setInsertionPoint(br);
 
     // Add all of the extracted versions of the elements.
+    auto origValue = br->getOperand(argNo);
     for (auto fieldDecl : elementDecls)
-      operands.push_back(B.createStructExtract(br->getLoc(), origValue,
-                                               fieldDecl));
+      operands.push_back(B.createStructExtract(fnLoc, origValue, fieldDecl));
 
     // Replace the branch itself.
     SILBuilder(br).createBranch(br->getLoc(), br->getDestBB(), operands);
@@ -1669,6 +1667,18 @@ void TFDeabstractionPass::run() {
   auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
   if (!tfModule)
     return;
+
+  // If we are running on the TensorFlow module itself, do not perform
+  // deabstraction.  It contains a lot of code that processes TensorHandle and
+  // other types as host values, and we do not want to force inline all of these
+  // things together.
+  //
+  // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
+  // world, we would be lazy about inlining, and only inline calls due to actual
+  // inter-op value uses.
+  if (module->getSwiftModule() == tfModule)
+    return;
+
 
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator;
