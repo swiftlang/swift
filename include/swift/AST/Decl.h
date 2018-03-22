@@ -213,6 +213,12 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+  enum class ValidationState {
+    Unchecked,
+    Checking,
+    Checked,
+  };
+
 protected:
   union { uint64_t OpaqueBits;
 
@@ -235,12 +241,8 @@ protected:
     /// FIXME: This is ugly.
     EarlyAttrValidation : 1,
 
-    /// \brief Whether this declaration is currently being validated.
-    BeingValidated : 1,
-
-    /// \brief Whether we have started validating the declaration; this *isn't*
-    /// reset after finishing it.
-    ValidationStarted : 1,
+    /// \brief The validation state of this declaration.
+    ValidationState : 2,
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -609,8 +611,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EarlyAttrValidation = false;
-    Bits.Decl.BeingValidated = false;
-    Bits.Decl.ValidationStarted = false;
+    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -759,25 +760,32 @@ public:
   /// Whether the declaration has a valid interface type and
   /// generic signature.
   bool isBeingValidated() const {
-    return Bits.Decl.BeingValidated;
+    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
   }
 
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingValidated(bool ibv = true) {
-    assert(Bits.Decl.BeingValidated != ibv);
-    Bits.Decl.BeingValidated = ibv;
     if (ibv) {
-      Bits.Decl.ValidationStarted = true;
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
+    } else {
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
     }
   }
 
-  bool hasValidationStarted() const { return Bits.Decl.ValidationStarted; }
+  bool hasValidationStarted() const {
+    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+  }
 
   /// Manually indicate that validation has started for the declaration.
   ///
   /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
   /// and so rarely needs to be called directly.
-  void setValidationStarted() { Bits.Decl.ValidationStarted = true; }
+  void setValidationStarted() {
+    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+  }
 
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
