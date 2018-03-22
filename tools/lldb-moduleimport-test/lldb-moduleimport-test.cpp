@@ -62,8 +62,23 @@ static void printValidationInfo(llvm::StringRef data) {
   }
 }
 
+static void resolveDeclFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Decl *ResolvedDecl =
+        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
+    if (!ResolvedDecl) {
+      llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
+    } else {
+      ResolvedDecl->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
 static void resolveTypeFromMangledNameList(
-    swift::ASTContext &Ctx, llvm::SmallVector<std::string, 8> &MangledNames) {
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
   std::string Error;
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
@@ -78,8 +93,8 @@ static void resolveTypeFromMangledNameList(
 }
 
 static void
-collectMangledNames(std::string &FilePath,
-                    llvm::SmallVector<std::string, 8> &MangledNames) {
+collectMangledNames(const std::string &FilePath,
+                    llvm::SmallVectorImpl<std::string> &MangledNames) {
   std::string Name;
   std::ifstream InputStream(FilePath);
   while (std::getline(InputStream, Name)) {
@@ -117,8 +132,11 @@ int main(int argc, char **argv) {
   llvm::cl::list<std::string> FrameworkPaths(
     "F", llvm::cl::desc("add a directory to the framework search path"));
 
+  llvm::cl::opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
+
   llvm::cl::opt<std::string> DumpTypeFromMangled(
-      "type-from-mangled", llvm::cl::desc("dump type from mangled name"));
+      "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
@@ -268,6 +286,11 @@ int main(int argc, char **argv) {
       llvm::SmallVector<std::string, 8> MangledNames;
       collectMangledNames(DumpTypeFromMangled, MangledNames);
       resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+    }
+    if (!DumpDeclFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpDeclFromMangled, MangledNames);
+      resolveDeclFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;
