@@ -136,6 +136,9 @@ ERROR(error_underlying_module_not_found,none,
 ERROR(error_unable_to_load_supplementary_output_file_map, none,
       "unable to load supplementary output file map '%0': %1", (StringRef, StringRef))
 
+ERROR(error_missing_entry_in_supplementary_output_file_map, none,
+      "supplementary output file map '%0' is missing an entry for '%1' (this likely indicates a compiler issue; please file a bug report)", (StringRef, StringRef))
+
 ERROR(error_repl_requires_no_input_files,none,
   "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,none,
