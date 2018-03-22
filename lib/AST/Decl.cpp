@@ -1706,23 +1706,33 @@ bool swift::conflicting(const OverloadSignature& sig1,
   return sig1.Name == sig2.Name;
 }
 
-bool swift::conflicting(const OverloadSignature& sig1, CanType sig1Type,
+bool swift::conflicting(ASTContext &ctx,
+                        const OverloadSignature& sig1, CanType sig1Type,
                         const OverloadSignature& sig2, CanType sig2Type,
                         bool skipProtocolExtensionCheck) {
   // If the signatures don't conflict to begin with, we're done.
   if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
     return false;
 
-  // Variables always conflict with non-variables with the same signature.
-  // (e.g variables with zero argument functions, variables with type
-  //  declarations)
-  if (sig1.IsVariable != sig2.IsVariable)
-    return true;
-
   // Functions always conflict with non-functions with the same signature.
   // In practice, this only applies for zero argument functions.
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
+
+  // Variables always conflict with non-variables with the same signature.
+  // (e.g variables with zero argument functions, variables with type
+  //  declarations)
+  if (sig1.IsVariable != sig2.IsVariable) {
+    // Prior to Swift 5, we permitted redeclarations of variables as different
+    // declarations if the variable was declared in an extension of a generic
+    // type. Make sure we maintain this behaviour in versions < 5.
+    if (!ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(5))
+      if ((sig1.IsVariable && sig1.InExtensionOfGenericType) ||
+          (sig2.IsVariable && sig2.InExtensionOfGenericType))
+        return false;
+
+    return true;
+  }
 
   // Otherwise, the declarations conflict if the overload types are the same.
   return sig1Type == sig2Type;
@@ -1842,17 +1852,21 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
 
-  if (auto func = dyn_cast<FuncDecl>(this)) {
+  if (auto *func = dyn_cast<FuncDecl>(this)) {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
   }
 
+  if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
+    if (extension->getGenericSignature())
+      signature.InExtensionOfGenericType = true;
+
   return signature;
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     return mapSignatureFunctionType(
                            getASTContext(), getInterfaceType(),
                            /*topLevelFunction=*/true,
@@ -1862,8 +1876,6 @@ CanType ValueDecl::getOverloadSignatureType() const {
   }
 
   if (auto *asd = dyn_cast<AbstractStorageDecl>(this)) {
-    auto dc = getDeclContext();
-
     // First, get the default overload signature type for the decl. For vars,
     // this is the empty tuple type, as variables cannot be overloaded directly
     // by type. For subscripts, it's their interface type.
@@ -1874,34 +1886,12 @@ CanType ValueDecl::getOverloadSignatureType() const {
       defaultSignatureType = getInterfaceType()->getCanonicalType();
     }
 
-    // If we're not in a type context, we're done.
-    // Otherwise, we want to curry the default signature type with the 'self'
-    // type of the given context in order to ensure the overload signature type
+    // We want to curry the default signature type with the 'self' type of the
+    // given context (if any) in order to ensure the overload signature type
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
-    if (!dc->isTypeContext())
-      return defaultSignatureType;
-
-    // Treat the declared interface type of the context as the 'self' type to
-    // curry the signature with. Additionally, if the storage decl is static,
-    // work with a metatype.
-    auto selfTy = dc->getDeclaredInterfaceType();
-    if (asd->isStatic())
-      selfTy = MetatypeType::get(selfTy);
-
-    auto parentDecl = dc->getAsDeclOrDeclExtensionContext();
-    auto genericCtx = parentDecl->getAsGenericContext();
-
-    // If we're in a context with a generic signature, return a generic function
-    // type with that signature. Otherwise, return a non-generic type.
-    if (auto genericSig = genericCtx->getGenericSignature()) {
-      return GenericFunctionType::get(genericSig, selfTy, defaultSignatureType,
-                                      AnyFunctionType::ExtInfo())
-               ->getCanonicalType();
-    } else {
-      return FunctionType::get(selfTy, defaultSignatureType)
-               ->getCanonicalType();
-    }
+    return defaultSignatureType->addCurriedSelfType(getDeclContext())
+                               ->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the

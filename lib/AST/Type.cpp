@@ -402,6 +402,27 @@ Type TypeBase::eraseDynamicSelfType() {
   });
 }
 
+Type TypeBase::addCurriedSelfType(DeclContext *dc) {
+  if (!dc->isTypeContext())
+    return this;
+
+  auto *type = this;
+
+  GenericSignature *sig = dc->getGenericSignatureOfContext();
+  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
+    sig = genericFn->getGenericSignature();
+    type = FunctionType::get(genericFn->getInput(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
+
+  auto selfTy = dc->getDeclaredInterfaceType();
+  if (sig)
+    return GenericFunctionType::get(sig, selfTy, type,
+                                    AnyFunctionType::ExtInfo());
+  return FunctionType::get(selfTy, type);
+}
+
 void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
