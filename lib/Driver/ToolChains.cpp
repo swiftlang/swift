@@ -1061,7 +1061,8 @@ static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
 /// relative to the compiler.
 static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                                   const llvm::opt::ArgList &args,
-                                  const ToolChain &TC) {
+                                  const ToolChain &TC,
+                                  bool shared) {
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
   // library link path and the standard library module import path don't
   // need to be the same.
@@ -1073,7 +1074,7 @@ static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
     runtimeLibPath.append(programPath.begin(), programPath.end());
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
     llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift");
+    llvm::sys::path::append(runtimeLibPath, "lib", shared ? "swift" : "swift_static");
   }
   llvm::sys::path::append(runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
@@ -1083,34 +1084,12 @@ static void getClangLibraryPath(const ToolChain &TC, const ArgList &Args,
                                 SmallString<128> &LibPath) {
   const llvm::Triple &T = TC.getTriple();
 
-  getRuntimeLibraryPath(LibPath, Args, TC);
+  getRuntimeLibraryPath(LibPath, Args, TC, /*Shared=*/ true);
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
   llvm::sys::path::append(LibPath, "clang", "lib",
                           T.isOSDarwin() ? "darwin"
                                          : getPlatformNameForTriple(T));
-}
-
-/// Get the runtime library link path for static linking,
-/// which is platform-specific and found relative to the compiler.
-static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                                  const llvm::opt::ArgList &args,
-                                  const ToolChain &TC) {
-  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
-  // library link path and the standard library module import path don't
-  // need to be the same.
-  if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
-    StringRef value = A->getValue();
-    runtimeLibPath.append(value.begin(), value.end());
-  } else {
-    auto programPath = TC.getDriver().getSwiftProgramPath();
-    runtimeLibPath.append(programPath.begin(), programPath.end());
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift_static");
-  }
-  llvm::sys::path::append(runtimeLibPath,
-                          getPlatformNameForTriple(TC.getTriple()));
 }
 
 ToolChain::InvocationInfo
@@ -1119,7 +1098,7 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
   SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this, /*Shared=*/ true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
@@ -1224,7 +1203,7 @@ addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
                            StringRef LinuxLibName,
                            const ToolChain &TC) {
   SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
+  getRuntimeLibraryPath(Dir, Args, TC, /*Shared=*/ true);
   // Remove platform name.
   llvm::sys::path::remove_filename(Dir);
   llvm::sys::path::append(Dir, "clang", "lib", "linux");
@@ -1432,7 +1411,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   SmallString<128> RuntimeLibPath;
-  getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this);
+  getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this, /*Shared=*/ true);
 
   // Link the standard library.
   Arguments.push_back("-L");
@@ -1440,7 +1419,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                             options::OPT_no_static_stdlib,
                             false)) {
     SmallString<128> StaticRuntimeLibPath;
-    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, *this, /*Shared=*/ false);
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
     Arguments.push_back("-lc++");
     Arguments.push_back("-framework");
@@ -1539,7 +1518,7 @@ toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
   SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this, /*Shared=*/ true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
@@ -1673,10 +1652,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, *this);
+  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, *this, /*Shared=*/ true);
 
   SmallString<128> StaticRuntimeLibPath;
-  getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+  getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, *this, /*Shared=*/ false);
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
