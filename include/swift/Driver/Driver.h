@@ -22,8 +22,8 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
+#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/OutputFileMap.h"
-#include "swift/Frontend/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -78,7 +78,7 @@ public:
   Mode CompilerMode = Mode::StandardCompile;
 
   /// The output type which should be used for compile actions.
-  types::ID CompilerOutputType = types::ID::TY_INVALID;
+  file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
 
   /// Describes if and how the output of compile actions should be
   /// linked together.
