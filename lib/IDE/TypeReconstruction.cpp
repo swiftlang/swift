@@ -1217,7 +1217,7 @@ static void VisitLocalDeclVariableName(ASTContext *ast,
       name->getText());
 }
 
-// VisitNodeFunction gets used for Function, Variable and Allocator:
+// VisitNodeFunction gets used for Function and Variable.
 static void VisitNodeFunction(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1346,25 +1346,6 @@ static void VisitNodeFunction(
       break;
     }
   } while (0);
-
-  //                    if (node_kind == Demangle::Node::Kind::Allocator)
-  //                    {
-  //                        // For allocators we don't have an identifier for
-  //                        the name, we will
-  //                        // need to extract it from the class or struct in
-  //                        "identifier_result"
-  //                        //Find
-  //                        if (identifier_result.HasSingleType())
-  //                        {
-  //                            // This contains the class or struct
-  //                            StringRef init_name("init");
-  //
-  //                            if (FindFirstNamedDeclWithKind(ast, init_name,
-  //                            DeclKind::Constructor, identifier_result))
-  //                            {
-  //                            }
-  //                        }
-  //                    }
 
   if (identifier_result._types.size() == 1) {
     result._module = identifier_result._module;
@@ -2229,6 +2210,7 @@ static void VisitNode(
     VisitAllChildNodes(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Constructor:
     VisitNodeConstructor(ast, node, result);
     break;
@@ -2254,7 +2236,6 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Function:
-  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Variable:
   case Demangle::Node::Kind::Subscript: // Out of order on purpose
     VisitNodeFunction(ast, node, result);
