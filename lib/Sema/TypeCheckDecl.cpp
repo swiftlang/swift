@@ -4747,17 +4747,6 @@ public:
     // PatternBindingDecl.
   }
 
-  bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
-                             GenericTypeResolver &resolver) {
-    bool hadError = false;
-    for (auto paramList : fd->getParameterLists()) {
-      hadError |= TC.typeCheckParameterList(paramList, fd,
-                                            TypeResolutionOptions(), resolver);
-    }
-
-    return hadError;
-  }
-
   static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
     auto accessor = dyn_cast<AccessorDecl>(FD);
     if (!accessor) {
@@ -4789,7 +4778,7 @@ public:
       }
     }
 
-    badType |= semaFuncParamPatterns(FD, resolver);
+    badType |= TC.typeCheckParameterLists(FD, resolver);
 
     if (badType) {
       FD->setInterfaceType(ErrorType::get(TC.Context));
@@ -7027,7 +7016,7 @@ public:
 
     // Type check the constructor parameters.
     GenericTypeToArchetypeResolver resolver(CD);
-    if (semaFuncParamPatterns(CD, resolver) || CD->isInvalid()) {
+    if (TC.typeCheckParameterLists(CD, resolver) || CD->isInvalid()) {
       CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
@@ -7160,62 +7149,14 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext());
-    if (DD->isInvalid() ||
-        enclosingClass == nullptr) {
-      DD->setInterfaceType(ErrorType::get(TC.Context));
-      DD->setInvalid();
-      return;
-    }
-
     if (!IsFirstPass) {
       if (DD->getBody())
         TC.definedFunctions.push_back(DD);
-    }
 
-    if (!IsFirstPass ||
-        DD->hasInterfaceType() ||
-        DD->isBeingValidated()) {
       return;
     }
 
-    DD->setIsBeingValidated();
-
-    assert(DD->getDeclContext()->isTypeContext()
-           && "Decl parsing must prevent destructors outside of types!");
-
-    TC.checkDeclAttributesEarly(DD);
-    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
-
-    configureImplicitSelf(TC, DD);
-
-    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)TC.validateGenericFuncSignature(DD);
-      DD->setGenericEnvironment(
-          DD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Set the context type of 'self'.
-    recordSelfContextType(DD);
-
-    GenericTypeToArchetypeResolver resolver(DD);
-    if (semaFuncParamPatterns(DD, resolver)) {
-      DD->setInterfaceType(ErrorType::get(TC.Context));
-      DD->setInvalid();
-    }
-
-    if (!DD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(DD, DD->getGenericSignature());
-
-    DD->setIsBeingValidated(false);
-
-    // Do this before markAsObjC() to diagnose @nonobjc better
-    validateAttributes(TC, DD);
-
-    // Destructors are always @objc, because their Objective-C entry point is
-    // -dealloc.
-    markAsObjC(TC, DD, ObjCReason::ImplicitlyObjC);
-
+    TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
   }
 };
@@ -7725,9 +7666,59 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Func:
   case DeclKind::Accessor:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor: {
+  case DeclKind::Constructor: {
     typeCheckDecl(D, true);
+    break;
+  }
+
+  case DeclKind::Destructor: {
+    auto *DD = cast<DestructorDecl>(D);
+
+    auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext());
+    if (DD->isInvalid() ||
+        enclosingClass == nullptr) {
+      DD->setInterfaceType(ErrorType::get(Context));
+      DD->setInvalid();
+      return;
+    }
+
+    DD->setIsBeingValidated();
+
+    assert(DD->getDeclContext()->isTypeContext()
+           && "Decl parsing must prevent destructors outside of types!");
+
+    checkDeclAttributesEarly(DD);
+    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
+
+    configureImplicitSelf(*this, DD);
+
+    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
+      (void)validateGenericFuncSignature(DD);
+      DD->setGenericEnvironment(
+          DD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Set the context type of 'self'.
+    recordSelfContextType(DD);
+
+    GenericTypeToArchetypeResolver resolver(DD);
+    if (typeCheckParameterLists(DD, resolver)) {
+      DD->setInterfaceType(ErrorType::get(Context));
+      DD->setInvalid();
+    }
+
+    if (!DD->getGenericSignatureOfContext())
+      configureInterfaceType(DD, DD->getGenericSignature());
+
+    DD->setIsBeingValidated(false);
+
+    // Do this before markAsObjC() to diagnose @nonobjc better
+    validateAttributes(*this, DD);
+
+    // Destructors are always @objc, because their Objective-C entry point is
+    // -dealloc.
+    markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+
     break;
   }
 
