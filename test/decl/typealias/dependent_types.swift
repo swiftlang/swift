@@ -58,3 +58,15 @@ let _: GenericStruct.MetaAlias = metaFoo()
 // ... but if the typealias has a fully concrete underlying type,
 // we are OK.
 let _: GenericStruct.Concrete = foo()
+
+class SuperG<T, U> {
+  typealias Composed = (T, U)
+}
+
+class SubG<T> : SuperG<T, T> { }
+
+typealias SubGX<T> = SubG<T?>
+
+func checkSugar(gs: SubGX<Int>.Composed) {
+  let i4: Int = gs // expected-error{{cannot convert value of type 'SubGX<Int>.Composed' (aka '(Optional<Int>, Optional<Int>)') to specified type 'Int'}}
+}
