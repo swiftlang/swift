@@ -1032,6 +1032,19 @@ public extension TensorProtocol {
 }
 
 //===----------------------------------------------------------------------===//
+// Padding
+//===----------------------------------------------------------------------===//
+public extension Tensor where Scalar : Numeric {
+  @_inlineable @inline(__always)
+  func pad(padding: Array<Int32>, with value: Scalar) -> Tensor {
+    return #tfop("PadV2",
+                 input: self,
+                 paddings: padding,
+                 constant_values: value)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Indexing and slicing
 //===----------------------------------------------------------------------===//
 
