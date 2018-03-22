@@ -518,13 +518,23 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   }
 
   std::vector<SupplementaryOutputPaths> outputPaths;
+  bool hadError = false;
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         const TypeToPathMap *mapForInput =
             OFM->getOutputMapForInput(input.file());
+        if (!mapForInput) {
+          Diags.diagnose(
+              SourceLoc(),
+              diag::error_missing_entry_in_supplementary_output_file_map,
+              supplementaryFileMapPath, input.file());
+          hadError = true;
+        }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));
         return false;
       });
+  if (hadError)
+    return None;
 
   return outputPaths;
 }

@@ -24,6 +24,7 @@
 #include <vector>
 
 namespace swift {
+class OutputFileMap;
 
 /// Given the command line arguments and information about the inputs,
 /// Fill in all the information in FrontendInputsAndOutputs.
