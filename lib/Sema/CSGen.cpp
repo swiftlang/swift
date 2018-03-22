@@ -1984,40 +1984,52 @@ namespace {
         // Var doesn't affect the type.
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
                                  locator);
-      case PatternKind::Any:
-        // For a pattern of unknown type, create a new type variable.
+      case PatternKind::Any: {
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
+        //
+        // Otherwise, create a new type variable.
+        auto boundExpr = locator.trySimplifyToExpr();
+
+        if (boundExpr) {
+          auto boundExprTy = CS.getType(boundExpr);
+          if (!boundExprTy->is<InOutType>())
+            return boundExprTy->getRValueType();
+        }
+
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
                                      TVO_CanBindToInOut);
+      }
 
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
-        
-        auto boundExpr = locator.trySimplifyToExpr();
-        auto haveBoundCollectionLiteral = boundExpr &&
-                                            !var->hasNonPatternBindingInit() &&
-                                            (isa<ArrayExpr>(boundExpr) ||
-                                             isa<DictionaryExpr>(boundExpr));
+        auto isWeak = false;
+        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+          isWeak = OA->get() == ReferenceOwnership::Weak;
 
-        // For a named pattern without a type, create a new type variable
-        // and use it as the type of the variable.
+        auto boundExpr = locator.trySimplifyToExpr();
+        auto haveBoundExpr = boundExpr && !var->hasNonPatternBindingInit();
+
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
         //
-        // FIXME: For now, substitute in the bound type for literal collection
-        // exprs that would otherwise result in a simple conversion constraint
-        // being placed between two type variables. (The bound type and the
-        // collection type, which will always be the same in this case.)
-        // This will avoid exponential typecheck behavior in the case of nested
-        // array and dictionary literals.
-        Type ty = haveBoundCollectionLiteral ?
-                    CS.getType(boundExpr) :
-                    CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                          TVO_CanBindToInOut);
+        // Otherwise, create a new type variable.
+        if (!isWeak && haveBoundExpr) {
+          auto boundExprTy = CS.getType(boundExpr);
+          if (!boundExprTy->is<InOutType>())
+            return boundExprTy->getRValueType();
+        }
+
+        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                        TVO_CanBindToInOut);
 
         // For weak variables, use Optional<T>.
-        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-          if (OA->get() == ReferenceOwnership::Weak) {
-            ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
-            if (!ty) return Type();
-          }
+        if (isWeak)
+          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
 
         return ty;
       }
