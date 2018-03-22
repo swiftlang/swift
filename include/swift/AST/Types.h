@@ -373,6 +373,16 @@ protected:
     GenericArgCount : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(BoundNameAliasType, SugarType, 1+16,
+    : NumPadBits,
+
+    /// Whether we have a parent type.
+    HasParent : 1,
+
+    /// The number of substitutions.
+    NumSubstitutions : 16
+  );
+
   } Bits;
 
 protected:
@@ -1557,6 +1567,81 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
+  }
+};
+
+/// A reference to a type alias that is somehow generic, along with the
+/// set of substitutions to apply to make the type concrete.
+class BoundNameAliasType final
+  : public SugarType, public llvm::FoldingSetNode,
+    llvm::TrailingObjects<BoundNameAliasType, Type, Substitution>
+{
+  TypeAliasDecl *typealias;
+
+  friend class ASTContext;
+  friend TrailingObjects;
+
+  BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
+                     const SubstitutionMap &substitutions, Type underlying,
+                     RecursiveTypeProperties properties);
+
+  unsigned getNumSubstitutions() const {
+    return Bits.BoundNameAliasType.NumSubstitutions;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Bits.BoundNameAliasType.HasParent ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return getNumSubstitutions();
+  }
+
+  /// Retrieve the set of substitutions to be applied to the declaration to
+  /// produce the underlying type.
+  SubstitutionList getSubstitutionList() const {
+    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+  }
+
+public:
+  static BoundNameAliasType *get(TypeAliasDecl *typealias, Type parent,
+                                 const SubstitutionMap &substitutions,
+                                 Type underlying);
+
+  /// \brief Returns the declaration that declares this type.
+  TypeAliasDecl *getDecl() const {
+    // Avoid requiring the definition of TypeAliasDecl.
+    return typealias;
+  }
+
+  /// Retrieve the parent of this type as written, e.g., the part that was
+  /// written before ".", if provided.
+  Type getParent() const {
+    return Bits.BoundNameAliasType.HasParent ? *getTrailingObjects<Type>()
+                                             : Type();
+  }
+
+  /// Retrieve the substitution map applied to the declaration's underlying
+  /// to produce the described type.
+  SubstitutionMap getSubstitutionMap() const;
+
+  /// Get the innermost generic arguments, which correspond to the generic
+  /// arguments that are directly applied to the typealias declaration in
+  /// produced by \c getDecl().
+  ///
+  /// The result can be empty, if the declaration itself is non-generic but
+  /// the parent is generic.
+  SmallVector<Type, 2> getInnermostGenericArgs() const;
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
+                      Type parent, const SubstitutionMap &substitutions);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundNameAlias;
   }
 };
 

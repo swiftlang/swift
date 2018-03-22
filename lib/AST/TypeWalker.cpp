@@ -36,6 +36,20 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitNameAliasType(NameAliasType *ty) { return false; }
+  bool visitBoundNameAliasType(BoundNameAliasType *ty) {
+    if (auto parent = ty->getParent())
+      if (doIt(parent)) return true;
+
+    if (doIt(ty->getSinglyDesugaredType()))
+      return true;
+
+    for (auto arg : ty->getInnermostGenericArgs())
+      if (doIt(arg))
+        return true;
+    
+    return false;
+
+  }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitParenType(ParenType *ty) {

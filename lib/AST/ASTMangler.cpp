@@ -746,6 +746,13 @@ void ASTMangler::appendType(Type type) {
       // unless the type alias references a builtin type.
       return appendAnyGenericType(decl);
     }
+    case TypeKind::BoundNameAlias: {
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      auto boundAliasTy = cast<BoundNameAliasType>(tybase);
+
+      // FIXME: Mangle as a generic type.
+      return appendType(boundAliasTy->getSinglyDesugaredType());
+    }
 
     case TypeKind::Paren:
       return appendSugaredType<ParenType>(type);

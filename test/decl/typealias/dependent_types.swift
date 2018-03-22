@@ -33,14 +33,14 @@ struct GenericStruct<T> { // expected-note 2{{generic type 'GenericStruct' decla
   func methodTwo() -> MetaAlias {}
 
   func methodOne() -> Alias.BadType {}
-  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct.Alias'}}
+  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct<T>.Alias'}}
   func methodTwo() -> MetaAlias.BadType {}
-  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct.MetaAlias'}}
+  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct<T>.MetaAlias'}}
 
   var propertyOne: Alias.BadType
-  // expected-error@-1 {{'BadType' is not a member type of 'T'}}
+  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct<T>.Alias' (aka 'T')}}
   var propertyTwo: MetaAlias.BadType
-  // expected-error@-1 {{'BadType' is not a member type of 'T.Type'}}
+  // expected-error@-1 {{'BadType' is not a member type of 'GenericStruct<T>.MetaAlias' (aka 'T.Type')}}
 }
 
 // This was accepted in Swift 3.0 and sort of worked... but we can't

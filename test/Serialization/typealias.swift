@@ -52,4 +52,4 @@ func check(_: BaseAlias) {
 }
 
 let x: GG<Int> = 0
-
+let x2: GInt = 1

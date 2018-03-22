@@ -598,10 +598,28 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
   }
 
+  // For a typealias, use the underlying type. We'll wrap up the result
+  // later.
+  auto typealias = dyn_cast<TypeAliasDecl>(decl);
+  if (typealias) {
+    resultType = typealias->getUnderlyingTypeLoc().getType();
+  }
+
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
+
+  // Form a sugared typealias reference.
+  if (typealias) {
+    auto genericSig = typealias->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
+                                                 LookUpConformance(*this, dc));
+    if (!subMap.empty()) {
+      resultType = BoundNameAliasType::get(typealias, unboundType->getParent(),
+                                           subMap, resultType);
+    }
+  }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(
@@ -3161,7 +3179,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+  auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
+  if (aliasDecl) {
     // FIXME: If this is a protocol typealias and we haven't built the
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
@@ -3183,7 +3202,15 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   auto subs = baseTy->getContextSubstitutionMap(
       module, member->getDeclContext());
-  return memberType.subst(subs, SubstFlags::UseErrorType);
+  Type resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+
+  // If we're referring to a typealias within a generic context, build
+  // a sugared alias type.
+  if (aliasDecl && aliasDecl->getGenericSignature()) {
+    resultType = BoundNameAliasType::get(aliasDecl, baseTy, subs, resultType);
+  }
+
+  return resultType;
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

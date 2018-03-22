@@ -660,6 +660,9 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
         *type = typeAlias->getSinglyDesugaredType();
+      else if (auto boundTypeAlias =
+                 dyn_cast<BoundNameAliasType>(type->getPointer()))
+        *type = boundTypeAlias->getSinglyDesugaredType();
     }
   }
 

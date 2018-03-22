@@ -3035,6 +3035,17 @@ namespace {
       OS << ")";
     }
 
+    void visitBoundNameAliasType(BoundNameAliasType *T, StringRef label) {
+      printCommon(label, "bound_name_alias_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+
+      for (auto arg : T->getInnermostGenericArgs())
+        printRec(arg);
+      OS << ")";
+    }
+
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(label, "paren_type");
       dumpParameterFlags(T->getParameterFlags());

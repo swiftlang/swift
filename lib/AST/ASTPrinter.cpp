@@ -3283,6 +3283,21 @@ public:
     printTypeDeclName(T);
   }
 
+  void visitBoundNameAliasType(BoundNameAliasType *T) {
+    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
+      visit(T->getSinglyDesugaredType());
+      return;
+    }
+
+    if (auto parent = T->getParent()) {
+      visit(parent);
+      Printer << ".";
+    }
+
+    printTypeDeclName(T);
+    printGenericArgs(T->getInnermostGenericArgs());
+  }
+
   void visitParenType(ParenType *T) {
     Printer << "(";
     printParameterFlags(Printer, Options, T->getParameterFlags());
