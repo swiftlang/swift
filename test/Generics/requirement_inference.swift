@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -verify
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -460,3 +460,41 @@ func conditionalNested1<U>(_: [ConditionalNested<U>.Inner?]) {}
 // CHECK: Generic signature: <U where U : P35, U : P36>
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P35, τ_0_0 : P36>
 func conditionalNested2<U>(_: [ConditionalNested<U>.Inner.Inner2?]) {}
+
+//
+// Generate typalias adds requirements that can be inferred
+//
+typealias X1WithP2<T: P2> = X1<T>
+
+// Inferred requirement T: P2 from the typealias
+func testX1WithP2<T>(_: X1WithP2<T>) {
+  _ = X5<T>() // requires P2
+}
+
+// Overload based on the inferred requirement.
+func testX1WithP2Overloading<T>(_: X1<T>) {
+  _ = X5<T>() // expected-error{{type 'T' does not conform to protocol 'P2'}}
+}
+
+func testX1WithP2Overloading<T>(_: X1WithP2<T>) {
+  _ = X5<T>() // requires P2
+}
+
+// Extend using the inferred requirement.
+// FIXME: Currently broken.
+extension X1WithP2 {
+  func f() {
+    _ = X5<T>() // FIXME: expected-error{{type 'T' does not conform to protocol 'P2'}}
+  }
+}
+
+// Inference from protocol inheritance clauses.
+typealias ExistentialP4WithP2Assoc<T: P4> = P4 where T.P4Assoc : P2
+
+protocol P37 : ExistentialP4WithP2Assoc<Self> { }
+
+extension P37 {
+  func f() {
+    _ = X5<P4Assoc>() // requires P2
+  }
+}

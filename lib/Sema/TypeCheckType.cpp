@@ -3154,6 +3154,8 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy) {
+  Type sugaredBaseTy = baseTy;
+
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
@@ -3207,7 +3209,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
   if (aliasDecl && aliasDecl->getGenericSignature()) {
-    resultType = BoundNameAliasType::get(aliasDecl, baseTy, subs, resultType);
+    resultType = BoundNameAliasType::get(aliasDecl, sugaredBaseTy, subs,
+                                         resultType);
   }
 
   return resultType;
