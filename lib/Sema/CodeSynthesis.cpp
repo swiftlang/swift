@@ -2146,6 +2146,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Wire up the overrides.
   ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
+  ctor->setValidationStarted();
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
