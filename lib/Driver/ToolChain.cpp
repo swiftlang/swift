@@ -21,24 +21,23 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-ToolChain::JobContext::JobContext(Compilation &C,
-                                  ArrayRef<const Job *> Inputs,
+ToolChain::JobContext::JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+    : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output), OI(OI),
+      Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
