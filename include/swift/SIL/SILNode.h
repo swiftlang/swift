@@ -262,14 +262,17 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
-                        NumSILAccessKindBits+NumSILAccessEnforcementBits,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits
+                        + 1,
     AccessKind : NumSILAccessKindBits,
-    Enforcement : NumSILAccessEnforcementBits
+    Enforcement : NumSILAccessEnforcementBits,
+    NoNestedConflict : 1
   );
   SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
                         NumSILAccessKindBits + NumSILAccessEnforcementBits + 1,
                         AccessKind : NumSILAccessKindBits,
-                        Enforcement : NumSILAccessEnforcementBits);
+                        Enforcement : NumSILAccessEnforcementBits,
+                        NoNestedConflict : 1);
 
   SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
     Aborting : 1

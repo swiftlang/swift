@@ -672,9 +672,11 @@ public:
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
-                                     SILAccessEnforcement enforcement) {
+                                     SILAccessEnforcement enforcement,
+                                     bool noNestedConflict) {
     return insert(new (getModule()) BeginAccessInst(
-        getSILDebugLocation(loc), address, accessKind, enforcement));
+        getSILDebugLocation(loc), address, accessKind, enforcement,
+        noNestedConflict));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -686,9 +688,11 @@ public:
   BeginUnpairedAccessInst *
   createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
                             SILAccessKind accessKind,
-                            SILAccessEnforcement enforcement) {
+                            SILAccessEnforcement enforcement,
+                            bool noNestedConflict) {
     return insert(new (getModule()) BeginUnpairedAccessInst(
-        getSILDebugLocation(loc), address, buffer, accessKind, enforcement));
+        getSILDebugLocation(loc), address, buffer, accessKind, enforcement,
+        noNestedConflict));
   }
 
   EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
