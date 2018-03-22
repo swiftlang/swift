@@ -39,11 +39,28 @@ static llvm::cl::opt<bool>
 TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
             llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
+static llvm::cl::opt<bool>
+TFTargetTPU("tf-target-tpu", llvm::cl::init(false),
+            llvm::cl::desc("If true, target TPU in the generated TF graph"));
+
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+static const char *const DEVICE_TPU_REPLICATED_CORE = "TPU_REPLICATED_CORE";
+static const char *const DEVICE_TPU_SYSTEM = "TPU_SYSTEM";
+
+/// When generating a TF TPU graph, call this function to place an eligible TF
+/// graph node onto TPU device. Some nodes such as Placeholder and
+/// Dataset/Iterator nodes are not eligible for TPU.
+static void markNodeAsTPUReplicated(TF_OperationDescription *desc) {
+  static const char *const TPU_CLUSTER_ATTR_NAME = "_tpu_replicate";
+  static const char *const TPU_CLUSTER_ATTR_VALUE = "TPUReplicate/cluster";
+  TF_SetAttrString(desc, TPU_CLUSTER_ATTR_NAME, TPU_CLUSTER_ATTR_VALUE,
+                   strlen(TPU_CLUSTER_ATTR_VALUE));
 }
 
 namespace {
@@ -52,13 +69,6 @@ namespace {
   /// SILOpResult holds this, allowing us to refer to each result of a
   /// multi-output op.
   typedef std::pair<SILValue, unsigned> SILOpResult;
-
-  /// Get the SILType for the specified SILOpResult.
-  SILType getOpResultType(SILOpResult r) {
-    if (auto *inst = dyn_cast<SILInstruction>((SILNode*)r.first))
-      return inst->getResults()[r.second]->getType();
-    return r.first->getType();
-  }
 
   /// As we lower SIL instructions to tensorflow graph nodes, we traverse the
   /// SESE region tree.  Nodes that produce while loops and conditions turn into
@@ -129,13 +139,17 @@ namespace {
     /// "Finish" a tensorflow op under construction, and remember that it is
     /// part of this graph function.
     TF_Operation *finishOp(TF_OperationDescription *desc, bool hasSideEffects,
-                           TF_Status *status) {
-
+                           bool isEligibleForTPU, TF_Status *status) {
       // If this node has side effects and we've already emitted another node
       // that does, make sure to connect them with control dependencies to
       // preserve ordering.
       if (hasSideEffects && controlDependenceValue)
         TF_AddControlInput(desc, controlDependenceValue);
+
+      // If this node should be put onto TPU, mark it with an attribute.
+      if (TFTargetTPU && isEligibleForTPU) {
+        markNodeAsTPUReplicated(desc);
+      }
 
       auto result = TF_FinishOperation(desc, status);
       operations.push_back(result);
@@ -229,7 +243,32 @@ public:
 private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
   llvm::StringSet<> usedOpNames;
-public:  // Lowering functionality.
+
+  /// Builds TF graph nodes for the top level TF function call, where `funcName`
+  /// is the function name. `inputs` specifies the inputs to the function, and
+  /// `numOutputs` specifies the number of outputs.
+  ///
+  /// The created nodes follow this naming convention shared with the runtime:
+  /// - The graph node for the function call has op type set <funcName>, and
+  /// name set to tfc_func_<funcName>.
+  /// - The i-th input node is named tfc_input_<i>_<funcName>
+  /// - The j-th output node is named tfc_output_<j>_<funcName>
+  ///
+  /// Additional graph nodes may be added for TPU graph creation, but they are
+  /// implementation details that runtime need not be aware of.
+  ///
+  /// This emits an error and returns true on error.
+  bool buildGraphNodesForTopLevelFunctionCall(StringRef funcName,
+                                              ArrayRef<TF_Output> inputs,
+                                              unsigned numOutputs);
+
+  /// Adds TPU config-related nodes to the graph, and sets `*metadataNode` to
+  /// the created TPUReplicateMetadata node.
+  ///
+  /// This emits an error and returns true on error.
+  bool addTopLevelTPUConfigLogic(TF_Operation **metadataNode);
+
+ public:  // Lowering functionality.
   std::string getUniqueName(SILDebugLocation loc, const char *baseName);
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
@@ -740,7 +779,8 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
   }
 
-  auto *result = graphFn.finishOp(op, hasSideEffects, status);
+  auto *result =
+      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
 
   // If the node builder failed, then the tfop definition is wrong, report an
   // error in a way that can hopefully be fixed - pointing to the op definition
@@ -891,10 +931,18 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
                              opLocString.c_str());
   TF_AddInput(op, input);
 
-  auto *result = graphFn.finishOp(op, /*side effects*/false, lowering.status);
+  auto *result = graphFn.finishOp(op, /*side effects*/ false,
+                                  /*isEligibleForTPU*/ true, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
     return { nullptr, 0 };
   return { result, 0 };
+}
+
+/// Get the SILType for the specified SILOpResult.
+static SILType getOpResultType(SILOpResult r) {
+  if (auto *inst = dyn_cast<SILInstruction>((SILNode *)r.first))
+    return inst->getResults()[r.second]->getType();
+  return r.first->getType();
 }
 
 // Our WhileLoopSESERegion has been structurized into a canonical form that
@@ -1068,7 +1116,8 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   TF_SetAttrFuncName(op, "body",  loopBodyFnName.c_str(),
                      loopBodyFnName.size());
 
-  auto *result = graphFn.finishOp(op, hasSideEffects, status);
+  auto *result =
+      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return;
 
@@ -1257,7 +1306,8 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   TF_SetAttrFuncName(op, "else_branch",  falseFnName.c_str(),
                      falseFnName.size());
 
-  auto *result = graphFn.finishOp(op, hasSideEffects, status);
+  auto *result =
+      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return;
 
@@ -1306,7 +1356,9 @@ createParameter(SILOpResult value, TF_Output passedValue,
   }
   TF_SetAttrType(desc, "dtype", type);
 
-  auto result = fn.finishOp(desc, /*side effects*/false, status);
+  // Placeholder nodes are never placed on TPU.
+  auto result = fn.finishOp(desc, /*side effects*/ false,
+                            /*isEligibleForTPU*/ false, status);
   if (checkStatus(loc))
     return { nullptr, 0 };
 
@@ -1364,6 +1416,161 @@ lowerToFunction(const std::function<void()> &body) {
   return result;
 }
 
+bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
+  {
+    auto *desc = TF_NewOperation(resultGraph, "TPUReplicateMetadata",
+                                 "TPUReplicate/TPUReplicateMetadata");
+    TF_SetAttrInt(desc, "num_replicas", 1);
+    markNodeAsTPUReplicated(desc);
+    *metadataNode = TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn->getLocation()))
+      return true;
+  }
+
+  {
+    auto *desc = TF_NewOperation(resultGraph, "ConfigureDistributedTPU",
+                                 "ConfigureDistributedTPU");
+    TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
+    TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn->getLocation()))
+      return true;
+  }
+
+  {
+    auto *desc = TF_NewOperation(resultGraph, "ShutdownDistributedTPU",
+                                 "ShutdownDistributedTPU");
+    TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
+    TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn->getLocation()))
+      return true;
+  }
+
+  return false;
+}
+
+bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
+    StringRef funcName, ArrayRef<TF_Output> inputs, unsigned numOutputs) {
+  TF_Operation *metadataNode = nullptr;
+  if (TFTargetTPU) {
+    if (addTopLevelTPUConfigLogic(&metadataNode)) {
+      // An error has occurred. Abort graph generation.
+      return true;
+    }
+  }
+
+  // Now we create top level graph nodes to invoke the function.
+  // Say the function F takes 1 input I and produces 1 output O:
+  //
+  // - In the non-TPU case, create the following 3 nodes: I (Placeholder)
+  //   -> F (with op type being F) -> O (Identity).
+  //
+  // - In the TPU case, create additional input and output nodes as follows:
+  //   - I feeds a TPUReplicatedInput node (both running on CPU), which in
+  //     turn feeds an Identity node IN, and IN feeds F (IN and F run on TPU).
+  //   - F outputs to an Identity node ON (running on TPU), which feeds
+  //     a TPUReplicatedOutput node, which in turn feeds another Identity
+  //     node. The last node is the output node to run the TF graph.
+  //
+  // Recall naming convention: The graph nodes corresponding to I, F and O above
+  // are respectively named tfc_input_0_F, tfc_func_F and tfc_output_0_F.
+  //
+  // The above discussion generalizes to multiple inputs and/or outputs.
+  // FIXME: Lift the current restriction that the # TPU replicas is always 1.
+  std::string funcNameStr = funcName.str();
+  std::string funcNodeName = "tfc_func_" + funcNameStr;
+  TF_OperationDescription *funcDesc =
+      TF_NewOperation(resultGraph, /*op_type*/ funcNameStr.c_str(),
+                      /*op_name*/ funcNodeName.c_str());
+  if (TFTargetTPU) {
+    markNodeAsTPUReplicated(funcDesc);
+  }
+
+  // Handle inputs and finish constructing the function node.
+  for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+    std::string inputNodeName =
+        "tfc_input_" + std::to_string(i) + "_" + funcNameStr;
+    TF_OperationDescription *inputDesc =
+        TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
+    TF_SetAttrType(inputDesc, "dtype", TF_OperationOutputType(inputs[i]));
+    TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
+    if (checkStatus(SILFn->getLocation())) return true;
+    TF_Output inputNode{placeholder, 0};
+    if (!TFTargetTPU) {
+      // Feed I directly into F.
+      TF_AddInput(funcDesc, inputNode);
+    } else {
+      // Add some intermediate nodes between I and F.
+      TF_Operation *replicatedInput;
+      {
+        const std::string nodeName = "TPUReplicate/input" + std::to_string(i);
+        auto *desc = TF_NewOperation(resultGraph, "TPUReplicatedInput",
+                                     nodeName.c_str());
+        SmallVector<TF_Output, 1> input;
+        input.push_back(inputNode);
+        // This node requires an input list.
+        TF_AddInputList(desc, input.data(), input.size());
+        replicatedInput = TF_FinishOperation(desc, status);
+        if (checkStatus(SILFn->getLocation())) return true;
+      }
+      {
+        const std::string nodeName =
+            "TPUReplicate/replicated_input_" + std::to_string(i);
+        auto *desc = TF_NewOperation(resultGraph, "Identity", nodeName.c_str());
+        TF_AddControlInput(desc, metadataNode);
+        TF_AddInput(desc, {replicatedInput, 0});
+        markNodeAsTPUReplicated(desc);
+        TF_Operation *idInput = TF_FinishOperation(desc, status);
+        if (checkStatus(SILFn->getLocation())) return true;
+        TF_AddInput(funcDesc, {idInput, 0});
+      }
+    }
+  }
+  TF_Operation *funcNode = TF_FinishOperation(funcDesc, status);
+  if (checkStatus(SILFn->getLocation())) return true;
+
+  // Now handle outputs.
+  for (unsigned i = 0; i != numOutputs; ++i) {
+    std::string outputNodeName =
+        "tfc_output_" + std::to_string(i) + "_" + funcNameStr;
+    TF_OperationDescription *outputDesc =
+        TF_NewOperation(resultGraph, "Identity", outputNodeName.c_str());
+    TF_Output funcOutputNode{funcNode, static_cast<int>(i)};
+    if (!TFTargetTPU) {
+      // Feed F directly into O.
+      TF_AddInput(outputDesc, funcOutputNode);
+    } else {
+      // Add some intermediate nodes between F and O.
+      TF_Operation *outputIdNode;
+      {
+        const std::string nodeName =
+            "TPUReplicate/Identity_" + std::to_string(i);
+        auto *desc = TF_NewOperation(resultGraph, "Identity", nodeName.c_str());
+        TF_AddInput(desc, funcOutputNode);
+        const auto deviceName =
+            std::string("/device:") + DEVICE_TPU_REPLICATED_CORE;
+        TF_SetDevice(desc, deviceName.c_str());
+        markNodeAsTPUReplicated(desc);
+        outputIdNode = TF_FinishOperation(desc, status);
+        if (checkStatus(SILFn->getLocation())) return true;
+      }
+      {
+        const std::string nodeName = "TPUReplicate/output" + std::to_string(i);
+        auto *desc = TF_NewOperation(resultGraph, "TPUReplicatedOutput",
+                                     nodeName.c_str());
+        TF_AddInput(desc, {outputIdNode, 0});
+        TF_SetAttrInt(desc, "num_replicas", 1);
+        TF_Operation *replicatedOutputNode = TF_FinishOperation(desc, status);
+        if (checkStatus(SILFn->getLocation())) return true;
+        TF_AddInput(outputDesc, {replicatedOutputNode, 0});
+      }
+    }
+    TF_Operation *outputNode = TF_FinishOperation(outputDesc, status);
+    if (checkStatus(SILFn->getLocation())) return true;
+  }
+
+  // Everything is good!
+  return false;
+}
 
 /// Given a GraphFunctionBody, which encapsulates all the information
 /// necessary to represent a tensorflow TF_Function, perform the final steps
@@ -1411,26 +1618,8 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
     return true;
 
   if (isTopLevelFunction) {
-    std::string funcName = name.str();
-    std::string funcNodeName = "tfc_func_" + funcName;
-    TF_OperationDescription *funcDesc =
-        TF_NewOperation(resultGraph, /*op_type*/ funcName.c_str(),
-                        /*op_name*/ funcNodeName.c_str());
-
-    for (unsigned i = 0, e = ins.size(); i != e; ++i) {
-      const std::string inputNodeName =
-        "tfc_input_" + std::to_string(i) + "_" + funcName;
-      TF_OperationDescription *inputDesc =
-          TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
-      TF_SetAttrType(inputDesc, "dtype", TF_OperationOutputType(ins[i]));
-      TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
-      if (checkStatus(SILFn->getLocation()))
-        return true;
-      TF_AddInput(funcDesc, {placeholder, 0});
-    }
-    TF_FinishOperation(funcDesc, status);
-    if (checkStatus(SILFn->getLocation()))
-      return true;
+    return buildGraphNodesForTopLevelFunctionCall(name.str(), ins,
+                                                  outs.size());
   }
 
   // Everything is good!
