@@ -36,7 +36,9 @@ class ClassTest {
   // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
   var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
   let b = Tensor<Float>(zeros: [1, 2])
-  var c : Tensor<Float> { return w }
+
+  // expected-error @+1 {{GraphGen cannot lower a 'receive}}
+  var c : Tensor<Float> { return w } // expected-warning {{properties in classes always cause a copy to the accelerator}}
 
   func infer(input: Tensor<Float>) -> Tensor<Float> {
     return input
@@ -47,8 +49,8 @@ public func f() {
   let x = ClassTest()
   let y = x.infer(input: Tensor<Float>(ones: [2, 1]))
   _ = y+y
-  // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
-  _ = x.c+x.b+x.w  // expected-warning 3 {{properties in classes always cause a copy to the accelerator}}
+  // expected-note @+1 {{value used here}}
+  _ = x.c+x.b+x.w  // expected-warning 2 {{properties in classes always cause a copy to the accelerator}}
 
 }
 
