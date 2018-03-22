@@ -4747,170 +4747,6 @@ public:
     // PatternBindingDecl.
   }
 
-  static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor) {
-      return FD->getBodyResultTypeLoc();
-    }
-
-    assert(accessor->isGetter());
-    auto *storage = accessor->getStorage();
-    assert(isa<VarDecl>(storage) || isa<SubscriptDecl>(storage));
-
-    if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
-      return subscript->getElementTypeLoc();
-
-    return cast<VarDecl>(storage)->getTypeLoc();
-  }
-
-  bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
-    TC.checkForForbiddenPrefix(FD);
-
-    bool badType = false;
-    if (!FD->getBodyResultTypeLoc().isNull()) {
-      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
-      if (FD->hasDynamicSelf())
-        options |= TypeResolutionFlags::DynamicSelfResult;
-
-      if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,
-                          &resolver)) {
-        badType = true;
-      }
-    }
-
-    badType |= TC.typeCheckParameterLists(FD, resolver);
-
-    if (badType) {
-      FD->setInterfaceType(ErrorType::get(TC.Context));
-      FD->setInvalid();
-      return true;
-    }
-
-    if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
-      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
-      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-        auto &C = FD->getASTContext();
-        FD->getAttrs().add(
-            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-      }
-    }
-
-    return false;
-  }
-
-  /// Bind the given function declaration, which declares an operator, to
-  /// the corresponding operator declaration.
-  void bindFuncDeclToOperator(FuncDecl *FD) {
-    OperatorDecl *op = nullptr;
-    auto operatorName = FD->getFullName().getBaseIdentifier();
-
-    // Check for static/final/class when we're in a type.
-    auto dc = FD->getDeclContext();
-    if (dc->isTypeContext()) {
-      if (!FD->isStatic()) {
-        TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
-                    operatorName,
-                    dc->getDeclaredInterfaceType())
-          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                       "static ");
-
-        FD->setStatic();
-      } else if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
-        // For a class, we also need the function or class to be 'final'.
-        if (!classDecl->isFinal() && !FD->isFinal() &&
-            FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
-          TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
-                      operatorName, dc->getDeclaredInterfaceType())
-            .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                         "final ");
-          FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-        }
-      }
-    } else if (!dc->isModuleScopeContext()) {
-      TC.diagnose(FD, diag::operator_in_local_scope);
-    }
-
-    SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
-    if (FD->isUnaryOperator()) {
-      if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-        op = SF.lookupPrefixOperator(operatorName,
-                                     FD->isCascadingContextForLookup(false),
-                                     FD->getLoc());
-      } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-        op = SF.lookupPostfixOperator(operatorName,
-                                      FD->isCascadingContextForLookup(false),
-                                      FD->getLoc());
-      } else {
-        auto prefixOp =
-            SF.lookupPrefixOperator(operatorName,
-                                    FD->isCascadingContextForLookup(false),
-                                    FD->getLoc());
-        auto postfixOp =
-            SF.lookupPostfixOperator(operatorName,
-                                     FD->isCascadingContextForLookup(false),
-                                     FD->getLoc());
-
-        // If we found both prefix and postfix, or neither prefix nor postfix,
-        // complain. We can't fix this situation.
-        if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
-          TC.diagnose(FD, diag::declared_unary_op_without_attribute);
-
-          // If we found both, point at them.
-          if (prefixOp) {
-            TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
-              .fixItInsert(FD->getLoc(), "prefix ");
-            TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
-              .fixItInsert(FD->getLoc(), "postfix ");
-          } else {
-            // FIXME: Introduce a Fix-It that adds the operator declaration?
-          }
-
-          // FIXME: Errors could cascade here, because name lookup for this
-          // operator won't find this declaration.
-          return;
-        }
-
-        // We found only one operator declaration, so we know whether this
-        // should be a prefix or a postfix operator.
-
-        // Fix the AST and determine the insertion text.
-        const char *insertionText;
-        auto &C = FD->getASTContext();
-        if (postfixOp) {
-          insertionText = "postfix ";
-          op = postfixOp;
-          FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
-        } else {
-          insertionText = "prefix ";
-          op = prefixOp;
-          FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
-        }
-
-        // Emit diagnostic with the Fix-It.
-        TC.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
-                    static_cast<bool>(postfixOp))
-          .fixItInsert(FD->getFuncLoc(), insertionText);
-        TC.diagnose(op, diag::unary_operator_declaration_here,
-                    static_cast<bool>(postfixOp));
-      }
-    } else if (FD->isBinaryOperator()) {
-      op = SF.lookupInfixOperator(operatorName,
-                                  FD->isCascadingContextForLookup(false),
-                                  FD->getLoc());
-    } else {
-      TC.diagnose(FD, diag::invalid_arg_count_for_operator);
-      return;
-    }
-
-    if (!op) {
-      // FIXME: Add Fix-It introducing an operator declaration?
-      TC.diagnose(FD, diag::declared_operator_without_operator_decl);
-      return;
-    }
-
-    FD->setOperatorDecl(op);
-  }
-
   /// Determine whether the given declaration requires a definition.
   ///
   /// Only valid for declarations that can have definitions, i.e.,
@@ -4939,110 +4775,6 @@ public:
     return true;
   }
 
-  /// Check for methods that return 'DynamicResult'.
-  bool checkDynamicSelfReturn(FuncDecl *func) {
-    // Check whether we have a specified result type.
-    auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
-    if (!typeRepr)
-      return false;
-
-    // 'Self' on a free function is not dynamic 'Self'.
-    if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
-        !isa<ProtocolDecl>(func->getDeclContext()))
-      return false;
-
-    // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
-    // property. We could implement it as such in the future.
-    if (isa<AccessorDecl>(func))
-      return false;
-
-    return checkDynamicSelfReturn(func, typeRepr, 0);
-  }
-
-  bool checkDynamicSelfReturn(FuncDecl *func, TypeRepr *typeRepr,
-                              unsigned optionalDepth) {
-    // Look through parentheses.
-    if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
-      if (!parenRepr->isParenType()) return false;
-      return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
-                                    optionalDepth);
-    }
-
-    // Look through attributes.
-    if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-      TypeAttributes attrs = attrRepr->getAttrs();
-      if (!attrs.empty())
-        return false;
-      return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
-                                    optionalDepth);
-    }
-
-    // Look through optional types.
-    TypeRepr *base = nullptr;
-    if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
-      base = optRepr->getBase();
-    else if (auto *optRepr =
-                 dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
-      base = optRepr->getBase();
-
-    if (base) {
-      // But only one level.
-      if (optionalDepth != 0) return false;
-      return checkDynamicSelfReturn(func, base, optionalDepth + 1);
-    }
-
-    // Check whether we have a simple identifier type.
-    auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
-    if (!simpleRepr)
-      return false;
-
-    // Check whether it is 'Self'.
-    if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
-      return false;
-
-    // Note that the function has a dynamic Self return type and set
-    // the return type component to the dynamic self type.
-    func->setDynamicSelf(true);
-    return false;
-  }
-
-  void checkMemberOperator(FuncDecl *FD) {
-    // Check that member operators reference the type of 'Self'.
-    if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
-
-    auto *DC = FD->getDeclContext();
-    auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-    if (!selfNominal) return;
-
-    // Check the parameters for a reference to 'Self'.
-    bool isProtocol = isa<ProtocolDecl>(selfNominal);
-    for (auto param : *FD->getParameterList(1)) {
-      auto paramType = param->getInterfaceType();
-      if (!paramType) break;
-
-      // Look through 'inout'.
-      paramType = paramType->getInOutObjectType();
-      // Look through a metatype reference, if there is one.
-      if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
-        paramType = metatypeType->getInstanceType();
-
-      // Is it the same nominal type?
-      if (paramType->getAnyNominal() == selfNominal) return;
-
-      if (isProtocol) {
-        // For a protocol, is it the 'Self' type parameter?
-        if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-          if (genericParam->isEqual(DC->getSelfInterfaceType()))
-            return;
-      }
-    }
-
-    // We did not find 'Self'. Complain.
-    TC.diagnose(FD, diag::operator_in_unrelated_type,
-                FD->getDeclContext()->getDeclaredInterfaceType(),
-                isProtocol, FD->getFullName());
-  }
-
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->hasBody()) {
@@ -5059,354 +4791,9 @@ public:
       return;
     }
 
-    TC.checkDeclAttributesEarly(FD);
-    TC.computeAccessLevel(FD);
-
-    if (FD->hasInterfaceType() || FD->isBeingValidated())
-      return;
-
-    FD->setIsBeingValidated();
-
-    SWIFT_DEFER {
-      assert(FD->hasInterfaceType() && "didn't assign interface type");
-    };
-
-    // Bind operator functions to the corresponding operator declaration.
-    if (FD->isOperator())
-      bindFuncDeclToOperator(FD);
-
-    // Validate 'static'/'class' on functions in extensions.
-    auto StaticSpelling = FD->getStaticSpelling();
-    if (StaticSpelling != StaticSpellingKind::None &&
-        FD->getDeclContext()->isExtensionContext()) {
-      if (auto *NTD = FD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-        if (!isa<ClassDecl>(NTD)) {
-          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            TC.diagnose(FD, diag::class_func_not_in_class)
-                .fixItReplace(FD->getStaticLoc(), "static");
-            TC.diagnose(NTD, diag::extended_type_declared_here);
-          }
-        }
-      }
-    }
-
-    validateSelfAccessKind(TC, FD);
-
-    // Check whether the return type is dynamic 'Self'.
-    if (checkDynamicSelfReturn(FD))
-      FD->setInvalid();
-
-    // Accessors should pick up various parts of their type signatures
-    // directly from the storage declaration instead of re-deriving them.
-    // FIXME: should this include the generic signature?
-    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-      auto storage = accessor->getStorage();
-      TC.validateDecl(storage);
-
-      // Note that it's important for correctness that we're filling in
-      // empty TypeLocs, because otherwise revertGenericFuncSignature might
-      // erase the types we set, causing them to be re-validated in a later
-      // pass.  That later validation might be incorrect even if the TypeLocs
-      // are a clone of the type locs from which we derived the value type,
-      // because the rules for interpreting types in parameter contexts
-      // are sometimes different from the rules elsewhere; for example,
-      // function types default to non-escaping.
-
-      auto valueParams =
-        accessor->getParameterList(accessor->getParent()->isTypeContext());
-
-      // Determine the value type.
-      Type valueIfaceTy, valueTy;
-      if (auto VD = dyn_cast<VarDecl>(storage)) {
-        valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-        valueTy = VD->getType()->getReferenceStorageReferent();
-      } else {
-        auto SD = cast<SubscriptDecl>(storage);
-        valueIfaceTy = SD->getElementInterfaceType();
-        valueTy = SD->mapTypeIntoContext(valueIfaceTy);
-
-        // Copy the index types instead of re-validating them.
-        auto indices = SD->getIndices();
-        for (size_t i = 0, e = indices->size(); i != e; ++i) {
-          auto subscriptParam = indices->get(i);
-          if (!subscriptParam->hasInterfaceType())
-            continue;
-
-          Type paramIfaceTy = subscriptParam->getInterfaceType();
-          Type paramTy = SD->mapTypeIntoContext(paramIfaceTy);
-
-          auto accessorParam = valueParams->get(valueParams->size() - e + i);
-          accessorParam->setType(paramTy);
-          accessorParam->setInterfaceType(paramIfaceTy);
-          accessorParam->getTypeLoc().setType(paramTy);
-        }
-      }
-
-      // Propagate the value type into the correct position.
-      switch (accessor->getAccessorKind()) {
-      // For getters, set the result type to the value type.
-      case AccessorKind::IsGetter:
-        accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
-        break;
-
-      // For setters and observers, set the old/new value parameter's type
-      // to the value type.
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsSetter: {
-        auto newValueParam = valueParams->get(0);
-        newValueParam->setType(valueTy);
-        newValueParam->setInterfaceType(valueIfaceTy);
-        newValueParam->getTypeLoc().setType(valueTy);
-        break;
-      }
-
-      // Addressor result types can get complicated because of the owner.
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
-        if (Type resultType =
-              buildAddressorResultType(accessor, valueIfaceTy)) {
-          accessor->getBodyResultTypeLoc().setType(resultType, true);
-        }
-        break;
-
-      // These don't mention the value types directly.
-      case AccessorKind::IsMaterializeForSet:
-        break;
-      }
-    }
-
-    // Before anything else, set up the 'self' argument correctly if present.
-    if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(TC, FD);
-
-    // If we have generic parameters, check the generic signature now.
-    if (auto gp = FD->getGenericParams()) {
-      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
-
-      auto *sig = TC.validateGenericFuncSignature(FD);
-
-      GenericEnvironment *env;
-      if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        env = cast<SubscriptDecl>(AD->getStorage())->getGenericEnvironment();
-        assert(env && "accessor has generics but subscript is not generic");
-      } else {
-        env = sig->createGenericEnvironment();
-      }
-      FD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      TC.revertGenericFuncSignature(FD);
-    } else if (auto genericSig =
-                 FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (!isa<AccessorDecl>(FD)) {
-        (void)TC.validateGenericFuncSignature(FD);
-
-        // Revert all of the types within the signature of the function.
-        TC.revertGenericFuncSignature(FD);
-      } else {
-        // We've inherited all of the type information already.
-        TC.configureInterfaceType(FD, genericSig);
-      }
-
-      FD->setGenericEnvironment(
-          FD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Set the context type of 'self'.
-    if (FD->getDeclContext()->isTypeContext())
-      recordSelfContextType(FD);
-
-    // Type check the parameters and return type again, now with archetypes.
-    GenericTypeToArchetypeResolver resolver(FD);
-    if (semaFuncDecl(FD, resolver)) {
-      FD->setIsBeingValidated(false);
-      return;
-    }
-
-    if (!FD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(FD, FD->getGenericSignature());
-
-    // We want the function to be available for name lookup as soon
-    // as it has a valid interface type.
-    FD->setIsBeingValidated(false);
-
-    if (FD->isInvalid())
-      return;
-
-    validateAttributes(TC, FD);
-
-    // Member functions need some special validation logic.
-    if (FD->getDeclContext()->isTypeContext()) {
-      if (!checkOverrides(TC, FD)) {
-        // If a method has an 'override' keyword but does not
-        // override anything, complain.
-        if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
-          if (!FD->getOverriddenDecl()) {
-            TC.diagnose(FD, diag::method_does_not_override)
-              .highlight(OA->getLocation());
-            OA->setInvalid();
-          }
-        }
-      }
-
-      if (FD->isOperator())
-        checkMemberOperator(FD);
-
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
-      auto accessor = dyn_cast<AccessorDecl>(FD);
-
-      auto *protocolContext = dyn_cast<ProtocolDecl>(
-          FD->getDeclContext());
-      if (protocolContext && accessor) {
-        if (isObjC)
-          isObjC = ObjCReason::Accessor;
-      }
-
-      if (accessor && accessor->isGetterOrSetter()) {
-        // If the property decl is an instance property, its accessors will
-        // be instance methods and the above condition will mark them ObjC.
-        // The only additional condition we need to check is if the var decl
-        // had an @objc or @iboutlet property.
-
-        AbstractStorageDecl *storage = accessor->getStorage();
-        // Validate the subscript or property because it might not be type
-        // checked yet.
-        TC.validateDecl(storage);
-
-        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
-          isObjC = None;
-        else if (storage->isObjC()) {
-          if (!isObjC) {
-            // Make this accessor @objc because its property is @objc.
-            isObjC = ObjCReason::Accessor;
-          } else {
-            // If @objc on the storage declaration was inferred using a
-            // deprecated rule, but this accessor is @objc in its own right,
-            // complain.
-            auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
-            if (storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC, TC.Context)) {
-              TC.diagnose(storage, diag::accessor_swift3_objc_inference,
-                          storage->getDescriptiveKind(), storage->getFullName(),
-                          isa<SubscriptDecl>(storage), accessor->isSetter())
-                .fixItInsert(storage->getAttributeInsertionLoc(
-                                                      /*forModifier=*/false),
-                             "@objc ");
-            }
-          }
-        }
-
-        // If the storage is dynamic or final, propagate to this accessor.
-        if (isObjC &&
-            storage->isDynamic())
-          makeDynamic(TC.Context, FD);
-
-        if (storage->isFinal())
-          makeFinal(TC.Context, FD);
-      }
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (FD->isInvalid() || !TC.isRepresentableInObjC(FD, *isObjC,
-                                                        errorConvention)))
-        isObjC = None;
-      markAsObjC(TC, FD, isObjC, errorConvention);
-    }
-    
-    // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      Optional<ForeignErrorConvention> errorConvention;
-      if (TC.isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                   errorConvention)) {
-        if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      }
-    }
-    
-    inferDynamic(TC.Context, FD);
-
-    TC.checkDeclAttributes(FD);
-
-    // If this is a class member, mark it final if the class is final.
-    if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (cls->isFinal() && !FD->isFinal()) {
-        makeFinal(TC.Context, FD);
-      }
-      // static func declarations in classes are synonyms
-      // for `class final func` declarations.
-      if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
-        auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
-        if (finalAttr) {
-          auto finalRange = finalAttr->getRange();
-          if (finalRange.isValid())
-            TC.diagnose(finalRange.Start, diag::decl_already_final)
-            .highlight(finalRange)
-            .fixItRemove(finalRange);
-        }
-        makeFinal(TC.Context, FD);
-      }
-    }
+    TC.validateDecl(FD);
   }
 
-  Type buildAddressorResultType(AccessorDecl *addressor, Type valueType) {
-    assert(addressor->getAccessorKind() == AccessorKind::IsAddressor ||
-           addressor->getAccessorKind() == AccessorKind::IsMutableAddressor);
-
-    Type pointerType =
-      (addressor->getAccessorKind() == AccessorKind::IsAddressor)
-        ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
-        : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
-    if (!pointerType) return Type();
-
-    switch (addressor->getAddressorKind()) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("addressor without addressor kind");
-
-    // For unsafe addressors, it's just the pointer type.
-    case AddressorKind::Unsafe:
-      return pointerType;
-
-    // For non-native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
-    case AddressorKind::Owning: {
-      TupleTypeElt elts[] = {
-        pointerType,
-        TC.Context.getAnyObjectType()
-      };
-      return TupleType::get(elts, TC.Context);
-    }
-
-    // For native owning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-    case AddressorKind::NativeOwning: {
-      TupleTypeElt elts[] = {
-        pointerType,
-        TC.Context.TheNativeObjectType
-      };
-      return TupleType::get(elts, TC.Context);
-    }
-
-    // For native pinning addressors, the return type is actually
-    //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-    case AddressorKind::NativePinning: {
-      Type pinTokenType =
-        TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
-      if (!pinTokenType) return Type();
-
-      TupleTypeElt elts[] = {
-        pointerType,
-        pinTokenType
-      };
-      return TupleType::get(elts, TC.Context);
-    }
-    }
-    llvm_unreachable("bad addressor kind");
-  }
 
   void visitModuleDecl(ModuleDecl *) { }
 
@@ -5457,17 +4844,17 @@ public:
     // Determine the input and result types of this function.
     auto fnType = type->castTo<AnyFunctionType>();
     Type inputType = fnType->getInput();
-    Type resultType = dropResultOptionality(fnType->getResult(), 
+    Type resultType = dropResultOptionality(fnType->getResult(),
                                             uncurryLevel - 1);
-    
+
     // Produce the resulting function type.
     if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
       return GenericFunctionType::get(genericFn->getGenericSignature(),
                                       inputType, resultType,
                                       fnType->getExtInfo());
     }
-    
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());    
+
+    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
   }
 
   static bool
@@ -7113,6 +6500,298 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 }
 
+
+/// Bind the given function declaration, which declares an operator, to
+/// the corresponding operator declaration.
+void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
+  OperatorDecl *op = nullptr;
+  auto operatorName = FD->getFullName().getBaseIdentifier();
+
+  // Check for static/final/class when we're in a type.
+  auto dc = FD->getDeclContext();
+  if (dc->isTypeContext()) {
+    if (!FD->isStatic()) {
+      TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
+                  operatorName,
+                  dc->getDeclaredInterfaceType())
+        .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                     "static ");
+
+      FD->setStatic();
+    } else if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+      // For a class, we also need the function or class to be 'final'.
+      if (!classDecl->isFinal() && !FD->isFinal() &&
+          FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
+        TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
+                    operatorName, dc->getDeclaredInterfaceType())
+          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "final ");
+        FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+      }
+    }
+  } else if (!dc->isModuleScopeContext()) {
+    TC.diagnose(FD, diag::operator_in_local_scope);
+  }
+
+  SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
+  if (FD->isUnaryOperator()) {
+    if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
+      op = SF.lookupPrefixOperator(operatorName,
+                                   FD->isCascadingContextForLookup(false),
+                                   FD->getLoc());
+    } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
+      op = SF.lookupPostfixOperator(operatorName,
+                                    FD->isCascadingContextForLookup(false),
+                                    FD->getLoc());
+    } else {
+      auto prefixOp =
+          SF.lookupPrefixOperator(operatorName,
+                                  FD->isCascadingContextForLookup(false),
+                                  FD->getLoc());
+      auto postfixOp =
+          SF.lookupPostfixOperator(operatorName,
+                                   FD->isCascadingContextForLookup(false),
+                                   FD->getLoc());
+
+      // If we found both prefix and postfix, or neither prefix nor postfix,
+      // complain. We can't fix this situation.
+      if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
+        TC.diagnose(FD, diag::declared_unary_op_without_attribute);
+
+        // If we found both, point at them.
+        if (prefixOp) {
+          TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
+            .fixItInsert(FD->getLoc(), "prefix ");
+          TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+            .fixItInsert(FD->getLoc(), "postfix ");
+        } else {
+          // FIXME: Introduce a Fix-It that adds the operator declaration?
+        }
+
+        // FIXME: Errors could cascade here, because name lookup for this
+        // operator won't find this declaration.
+        return;
+      }
+
+      // We found only one operator declaration, so we know whether this
+      // should be a prefix or a postfix operator.
+
+      // Fix the AST and determine the insertion text.
+      const char *insertionText;
+      auto &C = FD->getASTContext();
+      if (postfixOp) {
+        insertionText = "postfix ";
+        op = postfixOp;
+        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+      } else {
+        insertionText = "prefix ";
+        op = prefixOp;
+        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+      }
+
+      // Emit diagnostic with the Fix-It.
+      TC.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
+                  static_cast<bool>(postfixOp))
+        .fixItInsert(FD->getFuncLoc(), insertionText);
+      TC.diagnose(op, diag::unary_operator_declaration_here,
+                  static_cast<bool>(postfixOp));
+    }
+  } else if (FD->isBinaryOperator()) {
+    op = SF.lookupInfixOperator(operatorName,
+                                FD->isCascadingContextForLookup(false),
+                                FD->getLoc());
+  } else {
+    TC.diagnose(FD, diag::invalid_arg_count_for_operator);
+    return;
+  }
+
+  if (!op) {
+    // FIXME: Add Fix-It introducing an operator declaration?
+    TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+    return;
+  }
+
+  FD->setOperatorDecl(op);
+}
+
+void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
+  // Check that member operators reference the type of 'Self'.
+  if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
+
+  auto *DC = FD->getDeclContext();
+  auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!selfNominal) return;
+
+  // Check the parameters for a reference to 'Self'.
+  bool isProtocol = isa<ProtocolDecl>(selfNominal);
+  for (auto param : *FD->getParameterList(1)) {
+    auto paramType = param->getInterfaceType();
+    if (!paramType) break;
+
+    // Look through 'inout'.
+    paramType = paramType->getInOutObjectType();
+    // Look through a metatype reference, if there is one.
+    if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
+      paramType = metatypeType->getInstanceType();
+
+    // Is it the same nominal type?
+    if (paramType->getAnyNominal() == selfNominal) return;
+
+    if (isProtocol) {
+      // For a protocol, is it the 'Self' type parameter?
+      if (auto genericParam = paramType->getAs<GenericTypeParamType>())
+        if (genericParam->isEqual(DC->getSelfInterfaceType()))
+          return;
+    }
+  }
+
+  // We did not find 'Self'. Complain.
+  TC.diagnose(FD, diag::operator_in_unrelated_type,
+              FD->getDeclContext()->getDeclaredInterfaceType(),
+              isProtocol, FD->getFullName());
+}
+
+bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
+                            TypeRepr *typeRepr,
+                            unsigned optionalDepth) {
+  // Look through parentheses.
+  if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
+    if (!parenRepr->isParenType()) return false;
+    return checkDynamicSelfReturn(TC, func, parenRepr->getElementType(0),
+                                  optionalDepth);
+  }
+
+  // Look through attributes.
+  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    TypeAttributes attrs = attrRepr->getAttrs();
+    if (!attrs.empty())
+      return false;
+    return checkDynamicSelfReturn(TC, func, attrRepr->getTypeRepr(),
+                                  optionalDepth);
+  }
+
+  // Look through optional types.
+  TypeRepr *base = nullptr;
+  if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
+    base = optRepr->getBase();
+  else if (auto *optRepr =
+               dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
+    base = optRepr->getBase();
+
+  if (base) {
+    // But only one level.
+    if (optionalDepth != 0) return false;
+    return checkDynamicSelfReturn(TC, func, base, optionalDepth + 1);
+  }
+
+  // Check whether we have a simple identifier type.
+  auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
+  if (!simpleRepr)
+    return false;
+
+  // Check whether it is 'Self'.
+  if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
+    return false;
+
+  // Note that the function has a dynamic Self return type and set
+  // the return type component to the dynamic self type.
+  func->setDynamicSelf(true);
+  return false;
+}
+
+/// Check for methods that return 'DynamicResult'.
+bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
+  // Check whether we have a specified result type.
+  auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
+  if (!typeRepr)
+    return false;
+
+  // 'Self' on a free function is not dynamic 'Self'.
+  if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      !isa<ProtocolDecl>(func->getDeclContext()))
+    return false;
+
+  // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
+  // property. We could implement it as such in the future.
+  if (isa<AccessorDecl>(func))
+    return false;
+
+  return checkDynamicSelfReturn(TC, func, typeRepr, 0);
+}
+
+Type buildAddressorResultType(TypeChecker &TC,
+                              AccessorDecl *addressor,
+                              Type valueType) {
+  assert(addressor->getAccessorKind() == AccessorKind::IsAddressor ||
+         addressor->getAccessorKind() == AccessorKind::IsMutableAddressor);
+
+  Type pointerType =
+    (addressor->getAccessorKind() == AccessorKind::IsAddressor)
+      ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
+      : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
+  if (!pointerType) return Type();
+
+  switch (addressor->getAddressorKind()) {
+  case AddressorKind::NotAddressor:
+    llvm_unreachable("addressor without addressor kind");
+
+  // For unsafe addressors, it's just the pointer type.
+  case AddressorKind::Unsafe:
+    return pointerType;
+
+  // For non-native owning addressors, the return type is actually
+  //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
+  case AddressorKind::Owning: {
+    TupleTypeElt elts[] = {
+      pointerType,
+      TC.Context.getAnyObjectType()
+    };
+    return TupleType::get(elts, TC.Context);
+  }
+
+  // For native owning addressors, the return type is actually
+  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
+  case AddressorKind::NativeOwning: {
+    TupleTypeElt elts[] = {
+      pointerType,
+      TC.Context.TheNativeObjectType
+    };
+    return TupleType::get(elts, TC.Context);
+  }
+
+  // For native pinning addressors, the return type is actually
+  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
+  case AddressorKind::NativePinning: {
+    Type pinTokenType =
+      TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
+    if (!pinTokenType) return Type();
+
+    TupleTypeElt elts[] = {
+      pointerType,
+      pinTokenType
+    };
+    return TupleType::get(elts, TC.Context);
+  }
+  }
+  llvm_unreachable("bad addressor kind");
+}
+
+static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
+  auto accessor = dyn_cast<AccessorDecl>(FD);
+  if (!accessor) {
+    return FD->getBodyResultTypeLoc();
+  }
+
+  assert(accessor->isGetter());
+  auto *storage = accessor->getStorage();
+  assert(isa<VarDecl>(storage) || isa<SubscriptDecl>(storage));
+
+  if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+    return subscript->getElementTypeLoc();
+
+  return cast<VarDecl>(storage)->getTypeLoc();
+}
+
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -7492,7 +7171,321 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Func:
   case DeclKind::Accessor: {
-    typeCheckDecl(D, true);
+    auto *FD = cast<FuncDecl>(D);
+    assert(!FD->hasInterfaceType());
+
+    checkDeclAttributesEarly(FD);
+    computeAccessLevel(FD);
+
+    FD->setIsBeingValidated();
+
+    // Bind operator functions to the corresponding operator declaration.
+    if (FD->isOperator())
+      bindFuncDeclToOperator(*this, FD);
+
+    // Validate 'static'/'class' on functions in extensions.
+    auto StaticSpelling = FD->getStaticSpelling();
+    if (StaticSpelling != StaticSpellingKind::None &&
+        FD->getDeclContext()->isExtensionContext()) {
+      if (auto *NTD = FD->getDeclContext()
+              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        if (!isa<ClassDecl>(NTD)) {
+          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+            diagnose(FD, diag::class_func_not_in_class)
+                .fixItReplace(FD->getStaticLoc(), "static");
+            diagnose(NTD, diag::extended_type_declared_here);
+          }
+        }
+      }
+    }
+
+    validateSelfAccessKind(*this, FD);
+
+    // Check whether the return type is dynamic 'Self'.
+    if (checkDynamicSelfReturn(*this, FD))
+      FD->setInvalid();
+
+    // Accessors should pick up various parts of their type signatures
+    // directly from the storage declaration instead of re-deriving them.
+    // FIXME: should this include the generic signature?
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      auto storage = accessor->getStorage();
+      validateDecl(storage);
+
+      // Note that it's important for correctness that we're filling in
+      // empty TypeLocs, because otherwise revertGenericFuncSignature might
+      // erase the types we set, causing them to be re-validated in a later
+      // pass.  That later validation might be incorrect even if the TypeLocs
+      // are a clone of the type locs from which we derived the value type,
+      // because the rules for interpreting types in parameter contexts
+      // are sometimes different from the rules elsewhere; for example,
+      // function types default to non-escaping.
+
+      auto valueParams =
+        accessor->getParameterList(accessor->getParent()->isTypeContext());
+
+      // Determine the value type.
+      Type valueIfaceTy, valueTy;
+      if (auto VD = dyn_cast<VarDecl>(storage)) {
+        valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
+        valueTy = VD->getType()->getReferenceStorageReferent();
+      } else {
+        auto SD = cast<SubscriptDecl>(storage);
+        valueIfaceTy = SD->getElementInterfaceType();
+        valueTy = SD->mapTypeIntoContext(valueIfaceTy);
+
+        // Copy the index types instead of re-validating them.
+        auto indices = SD->getIndices();
+        for (size_t i = 0, e = indices->size(); i != e; ++i) {
+          auto subscriptParam = indices->get(i);
+          if (!subscriptParam->hasInterfaceType())
+            continue;
+
+          Type paramIfaceTy = subscriptParam->getInterfaceType();
+          Type paramTy = SD->mapTypeIntoContext(paramIfaceTy);
+
+          auto accessorParam = valueParams->get(valueParams->size() - e + i);
+          accessorParam->setType(paramTy);
+          accessorParam->setInterfaceType(paramIfaceTy);
+          accessorParam->getTypeLoc().setType(paramTy);
+        }
+      }
+
+      // Propagate the value type into the correct position.
+      switch (accessor->getAccessorKind()) {
+      // For getters, set the result type to the value type.
+      case AccessorKind::IsGetter:
+        accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+        break;
+
+      // For setters and observers, set the old/new value parameter's type
+      // to the value type.
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsSetter: {
+        auto newValueParam = valueParams->get(0);
+        newValueParam->setType(valueTy);
+        newValueParam->setInterfaceType(valueIfaceTy);
+        newValueParam->getTypeLoc().setType(valueTy);
+        break;
+      }
+
+      // Addressor result types can get complicated because of the owner.
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+        if (Type resultType =
+              buildAddressorResultType(*this, accessor, valueIfaceTy)) {
+          accessor->getBodyResultTypeLoc().setType(resultType, true);
+        }
+        break;
+
+      // These don't mention the value types directly.
+      case AccessorKind::IsMaterializeForSet:
+        break;
+      }
+    }
+
+    // Before anything else, set up the 'self' argument correctly if present.
+    if (FD->getDeclContext()->isTypeContext())
+      configureImplicitSelf(*this, FD);
+
+    // If we have generic parameters, check the generic signature now.
+    if (auto gp = FD->getGenericParams()) {
+      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
+
+      auto *sig = validateGenericFuncSignature(FD);
+
+      GenericEnvironment *env;
+      if (auto AD = dyn_cast<AccessorDecl>(FD)) {
+        env = cast<SubscriptDecl>(AD->getStorage())->getGenericEnvironment();
+        assert(env && "accessor has generics but subscript is not generic");
+      } else {
+        env = sig->createGenericEnvironment();
+      }
+      FD->setGenericEnvironment(env);
+
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      revertGenericFuncSignature(FD);
+    } else if (auto genericSig =
+                 FD->getDeclContext()->getGenericSignatureOfContext()) {
+      if (!isa<AccessorDecl>(FD)) {
+        (void)validateGenericFuncSignature(FD);
+
+        // Revert all of the types within the signature of the function.
+        revertGenericFuncSignature(FD);
+      } else {
+        // We've inherited all of the type information already.
+        configureInterfaceType(FD, genericSig);
+      }
+
+      FD->setGenericEnvironment(
+          FD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Set the context type of 'self'.
+    if (FD->getDeclContext()->isTypeContext())
+      recordSelfContextType(FD);
+
+    // Type check the parameters and return type again, now with archetypes.
+    GenericTypeToArchetypeResolver resolver(FD);
+
+    bool badType = false;
+    if (!FD->getBodyResultTypeLoc().isNull()) {
+      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
+      if (FD->hasDynamicSelf())
+        options |= TypeResolutionFlags::DynamicSelfResult;
+
+      if (validateType(FD->getBodyResultTypeLoc(), FD, options,
+                       &resolver)) {
+        badType = true;
+      }
+    }
+
+    badType |= typeCheckParameterLists(FD, resolver);
+
+    if (badType) {
+      FD->setInterfaceType(ErrorType::get(Context));
+      FD->setInvalid();
+      FD->setIsBeingValidated(false);
+      break;
+    }
+
+    if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
+      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
+      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+        auto &C = FD->getASTContext();
+        FD->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      }
+    }
+
+    if (!FD->getGenericSignatureOfContext())
+      configureInterfaceType(FD, FD->getGenericSignature());
+
+    // We want the function to be available for name lookup as soon
+    // as it has a valid interface type.
+    FD->setIsBeingValidated(false);
+
+    if (FD->isInvalid())
+      break;
+
+    validateAttributes(*this, FD);
+
+    // Member functions need some special validation logic.
+    if (FD->getDeclContext()->isTypeContext()) {
+      if (!checkOverrides(*this, FD)) {
+        // If a method has an 'override' keyword but does not
+        // override anything, complain.
+        if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
+          if (!FD->getOverriddenDecl()) {
+            diagnose(FD, diag::method_does_not_override)
+              .highlight(OA->getLocation());
+            OA->setInvalid();
+          }
+        }
+      }
+
+      if (FD->isOperator())
+        checkMemberOperator(*this, FD);
+
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, FD);
+      auto accessor = dyn_cast<AccessorDecl>(FD);
+
+      auto *protocolContext = dyn_cast<ProtocolDecl>(
+          FD->getDeclContext());
+      if (protocolContext && accessor) {
+        if (isObjC)
+          isObjC = ObjCReason::Accessor;
+      }
+
+      if (accessor && accessor->isGetterOrSetter()) {
+        // If the property decl is an instance property, its accessors will
+        // be instance methods and the above condition will mark them ObjC.
+        // The only additional condition we need to check is if the var decl
+        // had an @objc or @iboutlet property.
+
+        AbstractStorageDecl *storage = accessor->getStorage();
+        // Validate the subscript or property because it might not be type
+        // checked yet.
+        validateDecl(storage);
+
+        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
+          isObjC = None;
+        else if (storage->isObjC()) {
+          if (!isObjC) {
+            // Make this accessor @objc because its property is @objc.
+            isObjC = ObjCReason::Accessor;
+          } else {
+            // If @objc on the storage declaration was inferred using a
+            // deprecated rule, but this accessor is @objc in its own right,
+            // complain.
+            auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
+            if (storageObjCAttr->isSwift3Inferred() &&
+                shouldDiagnoseObjCReason(*isObjC, Context)) {
+              diagnose(storage, diag::accessor_swift3_objc_inference,
+                       storage->getDescriptiveKind(), storage->getFullName(),
+                       isa<SubscriptDecl>(storage), accessor->isSetter())
+                .fixItInsert(storage->getAttributeInsertionLoc(
+                                                      /*forModifier=*/false),
+                             "@objc ");
+            }
+          }
+        }
+
+        // If the storage is dynamic or final, propagate to this accessor.
+        if (isObjC &&
+            storage->isDynamic())
+          makeDynamic(Context, FD);
+
+        if (storage->isFinal())
+          makeFinal(Context, FD);
+      }
+
+      Optional<ForeignErrorConvention> errorConvention;
+      if (isObjC &&
+          (FD->isInvalid() || !isRepresentableInObjC(FD, *isObjC,
+                                                     errorConvention)))
+        isObjC = None;
+      markAsObjC(*this, FD, isObjC, errorConvention);
+    }
+
+    // If the function is exported to C, it must be representable in (Obj-)C.
+    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignErrorConvention> errorConvention;
+      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
+                                errorConvention)) {
+        if (FD->hasThrows()) {
+          FD->setForeignErrorConvention(*errorConvention);
+          diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
+        }
+      }
+    }
+
+    inferDynamic(Context, FD);
+
+    // If this is a class member, mark it final if the class is final.
+    if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (cls->isFinal() && !FD->isFinal()) {
+        makeFinal(Context, FD);
+      }
+      // static func declarations in classes are synonyms
+      // for `class final func` declarations.
+      if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
+        auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
+        if (finalAttr) {
+          auto finalRange = finalAttr->getRange();
+          if (finalRange.isValid())
+            diagnose(finalRange.Start, diag::decl_already_final)
+              .highlight(finalRange)
+              .fixItRemove(finalRange);
+        }
+        makeFinal(Context, FD);
+      }
+    }
+
+    checkDeclAttributes(FD);
+
     break;
   }
 
