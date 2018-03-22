@@ -43,7 +43,7 @@ public enum _ExecutionMode : Equatable {
   /// Classical TF interpreter backend, on GPU.
   case gpu
   /// TPU backend.
-  case tpu(usesInfeed: Bool)
+  case tpu
   /// XLA jit-compilation backend (will use GPU when available, and otherwise
   /// CPU).
   case xla
@@ -138,7 +138,7 @@ private func configureRuntimeFromEnvironment() {
 
   if let value = getenv("SWIFT_TENSORFLOW_USE_TPU_INFEED"),
     String(cString: value).lowercased() == "true" {
-      _RuntimeConfig.executionMode = .tpu(usesInfeed: true)
+      _RuntimeConfig.executionMode = .tpu
       debugLog("Setting TPU execution with infeed from env.")
   }
 
@@ -534,19 +534,16 @@ extension TFState {
                                           count: returnValues.count)
     if returnValues.count > 0 {
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
-      if case .tpu(let usesInfeed) = _RuntimeConfig.executionMode {
+      if _RuntimeConfig.executionMode.isTPU {
         debugLog("Enable TPU execution.")
-        // "var infeedEnqueueNode: OpaquePointer" does not work for the
-        // TF_SessionRun() call below, where the `target_opers` parameter is
-        // marked const, and cannot take an in/out parameter.
-        let infeedEnqueueNode =
-          UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: 1)
         debugLog("Rewriting graph and initializing TPU.")
         TF_InitializeTPU(cSession, status)
         checkOk(status)
         // When infeed is enabled, run it along with the output tensor nodes
         // below.
-        let numTargets: Int32 = usesInfeed && inputTensors.count > 0 ? 1 : 0;
+        var infeedEnqueueNode = TF_GraphOperationByName(graph,
+                                                        "InfeedEnqueueTuple")
+        let numTargets: Int32 = infeedEnqueueNode == nil ? 0 : 1;
         if numTargets > 0 {
           debugLog("Running enqueue with \(inputTensors.count) input tensors.")
         }
@@ -557,7 +554,7 @@ extension TFState {
           inputNodeSpecs, inputTensors, Int32(inputTensors.count),
           // output related parameters
           outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-          /*targets*/infeedEnqueueNode, numTargets,
+          /*targets*/&infeedEnqueueNode, numTargets,
           /*run_metadata*/nil, status
         )
         checkOk(status)
