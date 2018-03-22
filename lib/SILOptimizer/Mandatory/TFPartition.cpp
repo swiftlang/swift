@@ -1623,9 +1623,9 @@ bool TFFunctionPartition::markFunction() {
     instrsToCheck.push_back(inst);
 
     // If the marked instruction is a terminator, then make sure that the
-    // successor blocks are considered as part of our NCA evaluation as well.  This ensures that we
-    // have an "out of loop" use to put the end point outside of a loop if the
-    // start point is also outside of it.
+    // successor blocks are considered as part of our NCA evaluation as well.
+    // This ensures that we have a block to put the end point outside of a loop
+    // if the start point is also outside of it.
     if (auto *ti = dyn_cast<TermInst>(inst))
       for (auto &succ : ti->getSuccessors())
         extraBlocksToCheck.push_back(succ.getBB());
