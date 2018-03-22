@@ -92,6 +92,7 @@ namespace swift {
   struct SILDeclRef;
   class SILGlobalVariable;
   class SILModule;
+  class SILProperty;
   class SILType;
   class SILWitnessTable;
   class SourceLoc;
@@ -1095,6 +1096,7 @@ public:
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
+  void emitSILProperty(SILProperty *prop);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const NormalProtocolConformance *conformance);

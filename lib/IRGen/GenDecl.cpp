@@ -1089,6 +1089,12 @@ void IRGenerator::emitGlobalTopLevel() {
     }
   }
   
+  // Emit property descriptors.
+  for (auto &prop : PrimaryIGM->getSILModule().getPropertyList()) {
+    CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
+    IGM->emitSILProperty(&prop);
+  }
+  
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
