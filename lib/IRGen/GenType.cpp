@@ -1070,6 +1070,10 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
   IGM.getSILTypes().pushGenericContext(signature);
+
+  // Clear the dependent type info cache since we have a new active signature
+  // now.
+  Types.DependentCache.clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
