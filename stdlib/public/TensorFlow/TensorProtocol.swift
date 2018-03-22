@@ -50,13 +50,23 @@ public protocol TensorProtocol {
   init(handle: TensorHandle<Scalar>)
 }
 
-public extension TensorProtocol where Scalar : Numeric {
-  /// Perform an element-wise type conversion from a Bool tensor.
+//===----------------------------------------------------------------------===//
+// Memory transfer markers
+//===----------------------------------------------------------------------===//
+
+/// TODO: Remove when send/receive semantics gets revisited.
+public extension TensorProtocol {
   @_inlineable @inline(__always)
-  init(_ other: BoolTensor) {
-    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
+  func toDevice() -> Self {
+    return Self(handle: _TFSend(handle))
+  }
+
+  @_inlineable @inline(__always)
+  func toHost() -> Self {
+    return Self(handle: _TFReceive(handle))
   }
 }
+
 
 public protocol ParameterAggregate {
   associatedtype Parameter : TensorProtocol

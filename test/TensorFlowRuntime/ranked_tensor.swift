@@ -278,6 +278,19 @@ RankedTensorTests.testAllBackends("Flatten") {
   expectEqual(Array(0..<6), flattened.scalars)
 }
 
+RankedTensorTests.testAllBackends("Padding") {
+  // XLA compilation error under TPU.
+  guard !_RuntimeConfig.executionMode.isTPU else { return }
+  let matrix: Tensor<Float> = [[1, 2, 3], [4, 5, 6]] + 1
+  let padded = matrix.padded(forSizes: [(before: 1, after: 1),
+                                        (before: 2, after: 2)])
+  expectEqual(ShapedArray(shape: [4, 7], scalars: [0, 0, 0, 0, 0, 0, 0,
+                                                   0, 0, 2, 3, 4, 0, 0,
+                                                   0, 0, 5, 6, 7, 0, 0,
+                                                   0, 0, 0, 0, 0, 0, 0]),
+              padded.array)
+}
+
 // FIXME: Partitioner bug (b/72997202)
 #if false // Remove #if when fixed.
 // FIXME: The While op doesn't work on the CPU.
