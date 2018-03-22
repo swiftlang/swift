@@ -46,6 +46,118 @@ typedef bool (*DynamicCastOverride)(OpaqueValue *dest, OpaqueValue *src,
                                     DynamicCastFlags flags,
                                     DynamicCastOriginal originalImpl);
 
+typedef const void *(*DynamicCastClassOriginal)(const void *object,
+                                                const ClassMetadata *targetType);
+typedef const void *(*DynamicCastClassOverride)(const void *object,
+                                                const ClassMetadata *targetType,
+                                                DynamicCastClassOriginal originalImpl);
+
+typedef const void *
+  (*DynamicCastClassUnconditionalOriginal)(const void *object,
+                                           const ClassMetadata *targetType);
+typedef const void *
+  (*DynamicCastClassUnconditionalOverride)(const void *object,
+                                           const ClassMetadata *targetType,
+                                           DynamicCastClassUnconditionalOriginal
+                                             originalImpl);
+
+typedef const void *
+  (*DynamicCastObjCClassOriginal)(const void *object,
+                                  const ClassMetadata *targetType);
+typedef const void *
+  (*DynamicCastObjCClassOverride)(const void *object,
+                                  const ClassMetadata *targetType,
+                                  DynamicCastObjCClassOriginal originalImpl);
+
+typedef const void *
+  (*DynamicCastObjCClassUnconditionalOriginal)(const void *object,
+                                               const ClassMetadata *targetType);
+typedef const void *
+  (*DynamicCastObjCClassUnconditionalOverride)(const void *object,
+                                               const ClassMetadata *targetType,
+                                               DynamicCastObjCClassUnconditionalOriginal
+                                                 originalImpl);
+typedef const void *
+  (*DynamicCastForeignClassOriginal)(const void *object,
+                                     const ForeignClassMetadata *targetType);
+typedef const void *
+  (*DynamicCastForeignClassOverride)(const void *object,
+                                     const ForeignClassMetadata *targetType,
+                                     DynamicCastForeignClassOriginal originalImpl);
+
+typedef const void *
+  (*DynamicCastForeignClassUnconditionalOriginal)(const void *object,
+                                                  const ForeignClassMetadata *
+                                                    targetType);
+typedef const void *
+  (*DynamicCastForeignClassUnconditionalOverride)(
+    const void *object, const ForeignClassMetadata *targetType,
+    DynamicCastForeignClassUnconditionalOriginal originalImpl);
+
+typedef const void *(*DynamicCastUnknownClassOriginal)(const void *object,
+                                                       const Metadata *targetType);
+typedef const void *(*DynamicCastUnknownClassOverride)(const void *object,
+                                                       const Metadata *targetType,
+                                                       DynamicCastUnknownClassOriginal
+                                                         originalImpl);
+
+typedef const void *(*DynamicCastUnknownClassUnconditionalOriginal)(
+  const void *object, const Metadata *targetType);
+typedef const void *(*DynamicCastUnknownClassUnconditionalOverride)(
+  const void *object, const Metadata *targetType,
+  DynamicCastUnknownClassUnconditionalOriginal originalImpl);
+
+typedef const Metadata *
+  (*DynamicCastMetatypeOriginal)(const Metadata *sourceType,
+                                 const Metadata *targetType);
+typedef const Metadata *
+  (*DynamicCastMetatypeOverride)(const Metadata *sourceType,
+                                 const Metadata *targetType,
+                                 DynamicCastMetatypeOriginal originalImpl);
+
+typedef const Metadata *
+  (*DynamicCastMetatypeUnconditionalOriginal)(const Metadata *sourceType,
+                                              const Metadata *targetType);
+typedef const Metadata *
+  (*DynamicCastMetatypeUnconditionalOverride)(const Metadata *sourceType,
+                                              const Metadata *targetType,
+                                              DynamicCastMetatypeUnconditionalOriginal
+                                                originalImpl);
+
+typedef const ClassMetadata *
+  (*DynamicCastObjCClassMetatypeOriginal)(const ClassMetadata *sourceType,
+                                          const ClassMetadata *targetType);
+typedef const ClassMetadata *
+  (*DynamicCastObjCClassMetatypeOverride)(const ClassMetadata *sourceType,
+                                          const ClassMetadata *targetType,
+                                          DynamicCastObjCClassMetatypeOriginal
+                                            originalImpl);
+
+typedef const ClassMetadata *
+  (*DynamicCastObjCClassMetatypeUnconditionalOriginal)(const ClassMetadata *sourceType,
+                                                       const ClassMetadata *targetType);
+typedef const ClassMetadata *
+  (*DynamicCastObjCClassMetatypeUnconditionalOverride)(
+    const ClassMetadata *sourceType, const ClassMetadata *targetType,
+    DynamicCastObjCClassMetatypeUnconditionalOriginal originalImpl);
+
+typedef const ClassMetadata *
+  (*DynamicCastForeignClassMetatypeOriginal)(const ClassMetadata *sourceType,
+                                             const ClassMetadata *targetType);
+typedef const ClassMetadata *
+  (*DynamicCastForeignClassMetatypeOverride)(const ClassMetadata *sourceType,
+                                             const ClassMetadata *targetType,
+                                             DynamicCastForeignClassMetatypeOriginal
+                                               originalImpl);
+
+typedef const ClassMetadata *
+  (*DynamicCastForeignClassMetatypeUnconditionalOriginal)(
+    const ClassMetadata *sourceType, const ClassMetadata *targetType);
+typedef const ClassMetadata *
+  (*DynamicCastForeignClassMetatypeUnconditionalOverride)(
+    const ClassMetadata *sourceType, const ClassMetadata *targetType,
+    DynamicCastForeignClassMetatypeUnconditionalOriginal originalImpl);
+
 typedef const WitnessTable *
   (*ConformsToProtocolOriginal)(const Metadata * const type,
                                 const ProtocolDescriptor *protocol);
@@ -57,6 +169,24 @@ typedef const WitnessTable *
 
 GetTypeByMangledNameOverride getGetTypeByMangledNameOverride();
 DynamicCastOverride getDynamicCastOverride();
+DynamicCastClassOverride getDynamicCastClassOverride();
+DynamicCastClassUnconditionalOverride getDynamicCastClassUnconditionalOverride();
+DynamicCastObjCClassOverride getDynamicCastObjCClassOverride();
+DynamicCastObjCClassUnconditionalOverride getDynamicCastObjCClassUnconditionalOverride();
+DynamicCastForeignClassOverride getDynamicCastForeignClassOverride();
+DynamicCastForeignClassUnconditionalOverride
+  getDynamicCastForeignClassUnconditionalOverride();
+DynamicCastUnknownClassOverride getDynamicCastUnknownClassOverride();
+DynamicCastUnknownClassUnconditionalOverride
+  getDynamicCastUnknownClassUnconditionalOverride();
+DynamicCastMetatypeOverride getDynamicCastMetatypeOverride();
+DynamicCastMetatypeUnconditionalOverride getDynamicCastMetatypeUnconditionalOverride();
+DynamicCastObjCClassMetatypeOverride getDynamicCastObjCClassMetatypeOverride();
+DynamicCastObjCClassMetatypeUnconditionalOverride
+  getDynamicCastObjCClassMetatypeUnconditionalOverride();
+DynamicCastForeignClassMetatypeOverride getDynamicCastForeignClassMetatypeOverride();
+DynamicCastForeignClassMetatypeUnconditionalOverride
+  getDynamicCastForeignClassMetatypeUnconditionalOverride();
 ConformsToProtocolOverride getConformsToProtocolOverride();
 
 /// An implementation of an override point. Declare it `static` and

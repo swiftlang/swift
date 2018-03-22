@@ -270,8 +270,8 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 }
 
 /// Dynamically cast a class instance to a Swift class type.
-const void *swift::swift_dynamicCastClass(const void *object,
-                                          const ClassMetadata *targetType) {
+static const void *swift_dynamicCastClassImpl(const void *object,
+                                              const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
 
@@ -288,14 +288,30 @@ const void *swift::swift_dynamicCastClass(const void *object,
   return nullptr;
 }
 
+const void *swift::swift_dynamicCastClass(const void *object,
+                                          const ClassMetadata *targetType) {
+  static CompatibilityOverride<DynamicCastClassOverride> Override;
+  return Override.call(getDynamicCastClassOverride, swift_dynamicCastClassImpl,
+                       object, targetType);
+}
+
 /// Dynamically cast a class object to a Swift class type.
-const void *
-swift::swift_dynamicCastClassUnconditional(const void *object,
-                                           const ClassMetadata *targetType) {
+static const void *
+swift_dynamicCastClassUnconditionalImpl(const void *object,
+                                        const ClassMetadata *targetType) {
   auto value = swift_dynamicCastClass(object, targetType);
   if (value) return value;
 
   swift_dynamicCastFailure(_swift_getClass(object), targetType);
+}
+
+const void *
+swift::swift_dynamicCastClassUnconditional(const void *object,
+                                           const ClassMetadata *targetType) {
+  static CompatibilityOverride<DynamicCastClassUnconditionalOverride> Override;
+  return Override.call(getDynamicCastClassUnconditionalOverride,
+                       swift_dynamicCastClassUnconditionalImpl,
+                       object, targetType);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -995,9 +1011,9 @@ _dynamicCastUnknownClassToExistential(const void *object,
 
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
-const void *
-swift::swift_dynamicCastUnknownClass(const void *object,
-                                     const Metadata *targetType) {
+static const void *
+swift_dynamicCastUnknownClassImpl(const void *object,
+                                  const Metadata *targetType) {
   switch (targetType->getKind()) {
   case MetadataKind::Class: {
     auto targetClassType = static_cast<const ClassMetadata *>(targetType);
@@ -1043,10 +1059,19 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   _failCorruptType(targetType);
 }
 
+const void *
+swift::swift_dynamicCastUnknownClass(const void *object,
+                                     const Metadata *targetType) {
+  static CompatibilityOverride<DynamicCastUnknownClassOverride> Override;
+  return Override.call(getDynamicCastUnknownClassOverride,
+                       swift_dynamicCastUnknownClassImpl,
+                       object, targetType);
+}
+
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
-const void *
-swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
+static const void *
+swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
                                                   const Metadata *targetType) {
   switch (targetType->getKind()) {
   case MetadataKind::Class: {
@@ -1099,13 +1124,22 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
   _failCorruptType(targetType);
 }
 
+const void *
+swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
+                                                  const Metadata *targetType) {
+  static CompatibilityOverride<DynamicCastUnknownClassUnconditionalOverride> Override;
+  return Override.call(getDynamicCastUnknownClassUnconditionalOverride,
+                       swift_dynamicCastUnknownClassUnconditionalImpl,
+                       object, targetType);
+}
+
 /******************************************************************************/
 /********************************* Metatypes **********************************/
 /******************************************************************************/
 
-const Metadata *
-swift::swift_dynamicCastMetatype(const Metadata *sourceType,
-                                 const Metadata *targetType) {
+static const Metadata *
+swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
+                              const Metadata *targetType) {
   auto origSourceType = sourceType;
 
   switch (targetType->getKind()) {
@@ -1216,8 +1250,17 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
 }
 
 const Metadata *
-swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
-                                              const Metadata *targetType) {
+swift::swift_dynamicCastMetatype(const Metadata *sourceType,
+                                 const Metadata *targetType) {
+  static CompatibilityOverride<DynamicCastMetatypeOverride> Override;
+  return Override.call(getDynamicCastMetatypeOverride,
+                       swift_dynamicCastMetatypeImpl,
+                       sourceType, targetType);
+}
+
+static const Metadata *
+swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
+                                           const Metadata *targetType) {
   auto origSourceType = sourceType;
 
   switch (targetType->getKind()) {
@@ -1325,6 +1368,15 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   }
 
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+}
+
+const Metadata *
+swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
+                                              const Metadata *targetType) {
+  static CompatibilityOverride<DynamicCastMetatypeUnconditionalOverride> Override;
+  return Override.call(getDynamicCastMetatypeUnconditionalOverride,
+                       swift_dynamicCastMetatypeUnconditionalImpl,
+                       sourceType, targetType);
 }
 
 /******************************************************************************/
