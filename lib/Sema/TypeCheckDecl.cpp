@@ -4261,110 +4261,7 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType() || SD->isBeingValidated())
-      return;
-
-    SD->setIsBeingValidated();
-
-    auto dc = SD->getDeclContext();
-
-    if (auto gp = SD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(dc->getGenericParamsOfContext());
-
-      auto *sig = TC.validateGenericSubscriptSignature(SD);
-      auto *env = sig->createGenericEnvironment();
-      SD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      TC.revertGenericSubscriptSignature(SD);
-    } else if (dc->getGenericSignatureOfContext()) {
-      (void)TC.validateGenericSubscriptSignature(SD);
-
-      // Revert all of the types within the signature of the subscript.
-      TC.revertGenericSubscriptSignature(SD);
-
-      SD->setGenericEnvironment(
-          SD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Type check the subscript parameters.
-    GenericTypeToArchetypeResolver resolver(SD);
-
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), SD,
-                                     TypeResolutionFlags::AllowIUO,
-                                     &resolver);
-    TypeResolutionOptions options;
-    options |= TypeResolutionFlags::SubscriptParameters;
-
-    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
-                                           options,
-                                           resolver);
-
-    if (isInvalid || SD->isInvalid()) {
-      SD->setInterfaceType(ErrorType::get(TC.Context));
-      SD->setInvalid();
-    } else {
-      if (!SD->getGenericSignatureOfContext())
-        TC.configureInterfaceType(SD, SD->getGenericSignature());
-    }
-
-    SD->setIsBeingValidated(false);
-
-    TC.checkDeclAttributesEarly(SD);
-    TC.computeAccessLevel(SD);
-
-    validateAttributes(TC, SD);
-
-    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = SD->getASTContext();
-      SD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
-    if (!checkOverrides(TC, SD)) {
-      // If a subscript has an override attribute but does not override
-      // anything, complain.
-      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!SD->getOverriddenDecl()) {
-          TC.diagnose(SD, diag::subscript_does_not_override)
-              .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
-    }
-
-    // Member subscripts need some special validation logic.
-    if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      // If this is a class member, mark it final if the class is final.
-      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
-        if (cls->isFinal() && !SD->isFinal()) {
-          makeFinal(TC.Context, SD);
-        }
-      }
-
-      // A subscript is ObjC-compatible if it's explicitly @objc, or a
-      // member of an ObjC-compatible class or protocol.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, SD);
-
-      if (isObjC && !TC.isRepresentableInObjC(SD, *isObjC))
-        isObjC = None;
-      markAsObjC(TC, SD, isObjC);
-
-      // Infer 'dynamic' before touching accessors.
-      inferDynamic(TC.Context, SD);
-    }
-
-    // Perform accessor-related validation.
-    validateAbstractStorageDecl(TC, SD);
-
-    // If this is a get+mutableAddress property, synthesize the setter body.
-    if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
-        !SD->getSetter()->getBody()) {
-      synthesizeSetterForMutableAddressedStorage(SD, TC);
-    }
+    TC.validateDecl(SD);
 
     TC.checkDeclAttributes(SD);
   }
@@ -7828,12 +7725,120 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Func:
   case DeclKind::Accessor:
-  case DeclKind::Subscript:
   case DeclKind::Constructor:
   case DeclKind::Destructor: {
     typeCheckDecl(D, true);
     break;
   }
+
+  case DeclKind::Subscript: {
+    auto *SD = cast<SubscriptDecl>(D);
+
+    SD->setIsBeingValidated();
+
+    auto dc = SD->getDeclContext();
+
+    if (auto gp = SD->getGenericParams()) {
+      // Write up generic parameters and check the generic parameter list.
+      gp->setOuterParameters(dc->getGenericParamsOfContext());
+
+      auto *sig = validateGenericSubscriptSignature(SD);
+      auto *env = sig->createGenericEnvironment();
+      SD->setGenericEnvironment(env);
+
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      revertGenericSubscriptSignature(SD);
+    } else if (dc->getGenericSignatureOfContext()) {
+      (void)validateGenericSubscriptSignature(SD);
+
+      // Revert all of the types within the signature of the subscript.
+      revertGenericSubscriptSignature(SD);
+
+      SD->setGenericEnvironment(
+          SD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Type check the subscript parameters.
+    GenericTypeToArchetypeResolver resolver(SD);
+
+    bool isInvalid = validateType(SD->getElementTypeLoc(), SD,
+                                  TypeResolutionFlags::AllowIUO,
+                                  &resolver);
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::SubscriptParameters;
+
+    isInvalid |= typeCheckParameterList(SD->getIndices(), SD,
+                                        options,
+                                        resolver);
+
+    if (isInvalid || SD->isInvalid()) {
+      SD->setInterfaceType(ErrorType::get(Context));
+      SD->setInvalid();
+    } else {
+      if (!SD->getGenericSignatureOfContext())
+        configureInterfaceType(SD, SD->getGenericSignature());
+    }
+
+    SD->setIsBeingValidated(false);
+
+    checkDeclAttributesEarly(SD);
+    computeAccessLevel(SD);
+
+    validateAttributes(*this, SD);
+
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
+    if (!checkOverrides(*this, SD)) {
+      // If a subscript has an override attribute but does not override
+      // anything, complain.
+      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!SD->getOverriddenDecl()) {
+          diagnose(SD, diag::subscript_does_not_override)
+              .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
+
+    // Member subscripts need some special validation logic.
+    if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      // If this is a class member, mark it final if the class is final.
+      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
+        if (cls->isFinal() && !SD->isFinal()) {
+          makeFinal(Context, SD);
+        }
+      }
+
+      // A subscript is ObjC-compatible if it's explicitly @objc, or a
+      // member of an ObjC-compatible class or protocol.
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, SD);
+
+      if (isObjC && !isRepresentableInObjC(SD, *isObjC))
+        isObjC = None;
+      markAsObjC(*this, SD, isObjC);
+
+      // Infer 'dynamic' before touching accessors.
+      inferDynamic(Context, SD);
+    }
+
+    // Perform accessor-related validation.
+    validateAbstractStorageDecl(*this, SD);
+
+    // If this is a get+mutableAddress property, synthesize the setter body.
+    if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
+        !SD->getSetter()->getBody()) {
+      synthesizeSetterForMutableAddressedStorage(SD, *this);
+    }
+
+    break;
+  }
+
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
 
