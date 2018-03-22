@@ -1327,6 +1327,12 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
     ValueDecl *VD;
     if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
       VD = TAD->getDecl();
+    else if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
+      if (CanonicalizeParentTypes)
+        VD = nullptr;
+      else
+        VD = BNAD->getDecl();
+    }
     else if (auto *NTD = T->getAnyNominal())
       VD = NTD;
     else
@@ -1345,6 +1351,11 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       nominalParentTy = genericTy->getParent();
       for (auto genericArg : genericTy->getGenericArgs())
         genericArg.walk(*this);
+    } else if (auto boundNameAliasTy =
+                 dyn_cast<BoundNameAliasType>(T.getPointer())) {
+      // The parent type would have been lost previously, so look right through
+      // this type.
+      Type(boundNameAliasTy->getSinglyDesugaredType()).walk(*this);
     } else {
       return Action::Continue;
     }

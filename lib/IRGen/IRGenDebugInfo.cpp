@@ -1292,6 +1292,22 @@ private:
                                     File, L.Line, File);
     }
 
+    case TypeKind::BoundNameAlias: {
+      // FIXME: Cloned from the above.
+      auto *NameAliasTy = cast<BoundNameAliasType>(BaseTy);
+      auto *Decl = NameAliasTy->getDecl();
+      auto L = getDebugLoc(*this, Decl);
+      auto AliasedTy = NameAliasTy->getSinglyDesugaredType();
+      auto File = getOrCreateFile(L.Filename);
+      // For NameAlias types, the DeclContext for the aliasED type is
+      // in the decl of the alias type.
+      DebugTypeInfo AliasedDbgTy(
+         DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
+         DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
+      return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
+                                    File, L.Line, File);
+    }
+
     case TypeKind::Paren: {
       auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
       return getOrCreateDesugaredType(Ty, DbgTy);

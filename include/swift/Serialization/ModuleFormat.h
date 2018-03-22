@@ -647,6 +647,14 @@ namespace decls_block {
     TypeIDField  // canonical type (a fallback)
   >;
 
+  using BoundNameAliasTypeLayout = BCRecordLayout<
+    BOUND_NAME_ALIAS_TYPE,
+    DeclIDField, // typealias decl
+    TypeIDField, // parent type
+    TypeIDField  // underlying type
+    // trailing substitutions
+  >;
+
   using GenericTypeParamTypeLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_TYPE,
     DeclIDField, // generic type parameter decl or depth

@@ -327,6 +327,9 @@ static void formatSelectionArgument(StringRef ModifierArguments,
 }
 
 static bool isInterestingTypealias(Type type) {
+  // Bound name alias types are always interesting.
+  if (isa<BoundNameAliasType>(type.getPointer())) return true;
+
   auto aliasTy = dyn_cast<NameAliasType>(type.getPointer());
   if (!aliasTy)
     return false;

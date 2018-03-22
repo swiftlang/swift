@@ -3622,6 +3622,25 @@ void Serializer::writeType(Type ty) {
                                     addTypeRef(ty->getCanonicalType()));
     break;
   }
+  case TypeKind::BoundNameAlias: {
+    auto boundAlias = cast<BoundNameAliasType>(ty.getPointer());
+    const TypeAliasDecl *typeAlias = boundAlias->getDecl();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[BoundNameAliasTypeLayout::Code];
+    BoundNameAliasTypeLayout::emitRecord(
+                             Out, ScratchRecord, abbrCode,
+                             addDeclRef(typeAlias,
+                                        /*forceSerialization*/false,
+                                        /*allowTypeAliasXRef*/true),
+                             addTypeRef(boundAlias->getParent()),
+                             addTypeRef(boundAlias->getSinglyDesugaredType()));
+    // Write the set of substitutions.
+    SmallVector<Substitution, 4> flatSubs;
+    if (auto genericSig = typeAlias->getGenericSignature())
+      genericSig->getSubstitutions(boundAlias->getSubstitutionMap(), flatSubs);
+    writeSubstitutions(flatSubs, DeclTypeAbbrCodes);
+    break;
+  }
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
@@ -3976,6 +3995,7 @@ void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
   using namespace decls_block;
   registerDeclTypeAbbr<NameAliasTypeLayout>();
+  registerDeclTypeAbbr<BoundNameAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
   registerDeclTypeAbbr<NominalTypeLayout>();

@@ -533,3 +533,24 @@ void SubstitutionMap::dump(llvm::raw_ostream &out) const {
 void SubstitutionMap::dump() const {
   return dump(llvm::errs());
 }
+
+void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
+  if (empty() || !genericSig) return;
+
+  // Replacement types.
+  for (Type gp : genericSig->getGenericParams()) {
+    id.AddPointer(gp.subst(*this).getPointer());
+  }
+
+  // Conformance requirements.
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto conformance =
+      lookupConformance(req.getFirstType()->getCanonicalType(),
+                        req.getSecondType()->castTo<ProtocolType>()->getDecl());
+    id.AddPointer(conformance ? conformance->getOpaqueValue() : nullptr);
+  }
+}
+

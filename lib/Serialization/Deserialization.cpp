@@ -4180,6 +4180,37 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
+  case decls_block::BOUND_NAME_ALIAS_TYPE: {
+    DeclID typealiasID;
+    TypeID parentTypeID;
+    TypeID underlyingTypeID;
+    decls_block::BoundNameAliasTypeLayout::readRecord(scratch, typealiasID,
+                                                      parentTypeID,
+                                                      underlyingTypeID);
+    auto aliasOrError = getDeclChecked(typealiasID);
+    if (!aliasOrError)
+      return aliasOrError.takeError();
+    auto alias = cast<TypeAliasDecl>(aliasOrError.get());
+
+    Type parentType = getType(parentTypeID);
+    Type underlyingType = getType(underlyingTypeID);
+
+    // Read the substitutions.
+    SubstitutionMap subMap;
+    if (auto genericSig = alias->getGenericSignature()) {
+      SmallVector<Substitution, 4> substitutions;
+      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
+        (void)i;
+        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
+      }
+
+      subMap = genericSig->getSubstitutionMap(substitutions);
+    }
+
+    typeOrOffset = BoundNameAliasType::get(alias, parentType, subMap,
+                                           underlyingType);
+    break;
+  }
   case decls_block::NOMINAL_TYPE: {
     DeclID declID;
     TypeID parentID;
