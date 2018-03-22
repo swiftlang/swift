@@ -28,6 +28,9 @@ function usage() {
     echo "Run tests."
     echo ""
   fi
+  echo "-nt --no-test"
+  echo "Don't run tests."
+  echo ""
 }
 
 cd "$(dirname $0)/.." || exit
@@ -62,6 +65,13 @@ while [ $# -ne 0 ]; do
       else
         echo "--test is not supported on \"$(uname -s)\". See --help"
         exit 1
+      fi
+  ;;
+    -nt|--no-test)
+      if [ "$(uname -s)" == "Linux" ]; then
+        SWIFT_PACKAGE=buildbot_linux,no_test
+      else
+        SWIFT_PACKAGE=buildbot_osx_package,no_test
       fi
   ;;
   -h|--help)
