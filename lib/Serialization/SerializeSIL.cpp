@@ -264,6 +264,8 @@ namespace {
     void writeOneOperandLayout(SILInstructionKind valueKind,
                                unsigned attrs,
                                SILValue operand);
+    void writeOneOperandExtraAttributeLayout(SILInstructionKind valueKind,
+                                             unsigned attrs, SILValue operand);
 
     void writeKeyPathPatternComponent(
                     const KeyPathPatternComponent &component,
@@ -545,6 +547,21 @@ void SILSerializer::writeOneOperandLayout(SILInstructionKind valueKind,
         unsigned(valueKind), attrs,
         operandTypeRef, unsigned(operandType.getCategory()),
         operandRef);
+}
+
+void SILSerializer::
+writeOneOperandExtraAttributeLayout(SILInstructionKind valueKind,
+                                    unsigned attrs,
+                                    SILValue operand) {
+
+  auto operandType = operand->getType();
+  auto operandTypeRef = S.addTypeRef(operandType.getSwiftRValueType());
+  auto operandRef = addValueRef(operand);
+
+  SILOneOperandExtraAttributeLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code],
+      unsigned(valueKind), attrs, operandTypeRef,
+      unsigned(operandType.getCategory()), operandRef);
 }
 
 void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
@@ -1219,7 +1236,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::LoadUnownedInst:
   case SILInstructionKind::LoadWeakInst:
-  case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -1247,8 +1263,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = LWI->isTake();
     else if (auto *LUI = dyn_cast<LoadUnownedInst>(&SI))
       Attr = LUI->isTake();
-    else if (auto *MUI = dyn_cast<MarkUninitializedInst>(&SI))
-      Attr = (unsigned)MUI->getKind();
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
@@ -1259,6 +1273,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::MarkUninitializedInst: {
+    unsigned Attr = (unsigned)cast<MarkUninitializedInst>(&SI)->getKind();
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
   case SILInstructionKind::YieldInst: {
@@ -1556,14 +1575,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::BeginAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code];
     auto *BAI = cast<BeginAccessInst>(&SI);
-    unsigned attr =
-         unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 2);
+    unsigned attr = unsigned(BAI->getAccessKind())
+                    + (unsigned(BAI->getEnforcement()) << 2)
+                    + (BAI->hasNoNestedConflict() << 4);
     SILValue operand = BAI->getOperand();
 
-    SILOneOperandLayout::emitRecord(
+    SILOneOperandExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(operand->getType().getSwiftRValueType()),
         (unsigned)operand->getType().getCategory(),
@@ -1586,15 +1605,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::BeginUnpairedAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsExtraAttributeLayout::Code];
     auto *BAI = cast<BeginUnpairedAccessInst>(&SI);
-    unsigned attr =
-         unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 2);
+    unsigned attr = unsigned(BAI->getAccessKind())
+                    + (unsigned(BAI->getEnforcement()) << 2)
+                    + (unsigned(BAI->hasNoNestedConflict()) << 4);
     SILValue source = BAI->getSource();
     SILValue buffer = BAI->getBuffer();
 
-    SILTwoOperandsLayout::emitRecord(
+    SILTwoOperandsExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(source->getType().getSwiftRValueType()),
         (unsigned)source->getType().getCategory(),
@@ -1606,13 +1625,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::EndUnpairedAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code];
     auto *EAI = cast<EndUnpairedAccessInst>(&SI);
     unsigned attr = unsigned(EAI->isAborting())
                   + (unsigned(EAI->getEnforcement()) << 1);
     SILValue operand = EAI->getOperand();
 
-    SILOneOperandLayout::emitRecord(
+    SILOneOperandExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(operand->getType().getSwiftRValueType()),
         (unsigned)operand->getType().getCategory(),
@@ -2373,13 +2392,17 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOneValueOneOperandLayout>();
   registerSILAbbr<SILOneTypeLayout>();
   registerSILAbbr<SILOneOperandLayout>();
+  registerSILAbbr<SILOneOperandExtraAttributeLayout>();
   registerSILAbbr<SILOneTypeOneOperandLayout>();
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILTwoOperandsExtraAttributeLayout>();
   registerSILAbbr<SILTailAddrLayout>();
   registerSILAbbr<SILInstApplyLayout>();
   registerSILAbbr<SILInstNoOperandLayout>();
+  registerSILAbbr<SILOneOperandLayout>();
+  registerSILAbbr<SILTwoOperandsLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
