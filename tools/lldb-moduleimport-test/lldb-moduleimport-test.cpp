@@ -62,6 +62,33 @@ static void printValidationInfo(llvm::StringRef data) {
   }
 }
 
+static void resolveTypeFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::SmallVector<std::string, 8> &MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Type ResolvedType =
+        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+    if (!ResolvedType) {
+      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+    } else {
+      ResolvedType->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+static void
+collectMangledNames(std::string &FilePath,
+                    llvm::SmallVector<std::string, 8> &MangledNames) {
+  std::string Name;
+  std::ifstream InputStream(FilePath);
+  while (std::getline(InputStream, Name)) {
+    if (Name.empty())
+      continue;
+    MangledNames.push_back(Name);
+  }
+}
+
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -238,28 +265,9 @@ int main(int argc, char **argv) {
       }
     }
     if (!DumpTypeFromMangled.empty()) {
-      std::string Error;
-      std::string Name;
-      swift::ASTContext &Ctx = CI.getASTContext();
       llvm::SmallVector<std::string, 8> MangledNames;
-
-      std::ifstream InputStream(DumpTypeFromMangled);
-      while (std::getline(InputStream, Name)) {
-        if (Name.empty())
-          continue;
-        MangledNames.push_back(Name);
-      }
-
-      for (auto &Mangled : MangledNames) {
-        swift::Type ResolvedType = swift::ide::getTypeFromMangledSymbolname(
-            Ctx, Mangled, Error);
-        if (!ResolvedType) {
-          llvm::errs() << "Can't resolve type of " << Mangled << "\n";
-        } else {
-          ResolvedType->print(llvm::errs());
-          llvm::errs() << "\n";
-        }
-      }
+      collectMangledNames(DumpTypeFromMangled, MangledNames);
+      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;
