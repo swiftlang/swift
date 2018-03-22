@@ -6183,12 +6183,12 @@ public:
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, EED);
       return;
     }
 
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
+    checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
