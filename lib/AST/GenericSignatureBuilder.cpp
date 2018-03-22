@@ -4171,7 +4171,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
-                               /*inferForModule=*/nullptr);
+                               proto->getModuleContext());
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
@@ -4187,7 +4187,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
           source, proto, &req, /*inferred=*/false);
       addRequirement(&req, innerSource, &protocolSubMap,
-                     /*inferForModule=*/nullptr);
+                     proto->getModuleContext());
     }
   }
 

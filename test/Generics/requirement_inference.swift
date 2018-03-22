@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -verify
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -485,5 +485,16 @@ func testX1WithP2Overloading<T>(_: X1WithP2<T>) {
 extension X1WithP2 {
   func f() {
     _ = X5<T>() // FIXME: expected-error{{type 'T' does not conform to protocol 'P2'}}
+  }
+}
+
+// Inference from protocol inheritance clauses.
+typealias ExistentialP4WithP2Assoc<T: P4> = P4 where T.P4Assoc : P2
+
+protocol P37 : ExistentialP4WithP2Assoc<Self> { }
+
+extension P37 {
+  func f() {
+    _ = X5<P4Assoc>() // requires P2
   }
 }
