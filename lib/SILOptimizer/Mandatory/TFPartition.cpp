@@ -586,7 +586,6 @@ enum class Marking {
 class TFFunctionPartition {
 public:
   SILFunction &fn;
-  ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -645,10 +644,8 @@ public:
   /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
 public:
-  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule)
-    : fn(Fn), tensorFlowModule(tensorFlowModule),
-      DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
+  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM)
+    : fn(Fn), DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
       tensorCodeBlocks(Fn) {
   }
 
@@ -2991,7 +2988,7 @@ public:
     if (!tfc.shouldBePartitioned(fn))
       return;
 
-    TFFunctionPartition partitioner(*fn, PM, *tfModule);
+    TFFunctionPartition partitioner(*fn, PM);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
 
