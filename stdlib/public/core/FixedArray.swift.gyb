@@ -125,7 +125,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
 extension _FixedArray${N} {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal mutating func append(_ newElement: T) {
+  internal mutating func append(_ newElement: __owned T) {
     _sanityCheck(count < capacity)
     _count += 1
     self[count-1] = newElement

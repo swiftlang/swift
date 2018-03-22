@@ -1407,7 +1407,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
-    newElement: Element
+    newElement: __owned Element
   ) {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)

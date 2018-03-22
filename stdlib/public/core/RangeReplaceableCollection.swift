@@ -175,7 +175,7 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
-  mutating func append(_ newElement: Element)
+  mutating func append(_ newElement: __owned Element)
 
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.

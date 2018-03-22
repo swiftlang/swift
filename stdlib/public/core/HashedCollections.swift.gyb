@@ -230,7 +230,7 @@ internal protocol _HashBuffer {
   func maybeGet(_ key: Key) -> Value?
 
   @discardableResult
-  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+  mutating func updateValue(_ value: __owned Value, forKey key: Key) -> Value?
 
   @discardableResult
   mutating func insert(
@@ -2223,7 +2223,7 @@ extension Dictionary {
   @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func updateValue(
-    _ value: Value, forKey key: Key
+    _ value: __owned Value, forKey key: Key
   ) -> Value? {
     return _variantBuffer.updateValue(value, forKey: key)
   }
@@ -3809,7 +3809,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @_transparent
-  internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
+  internal func initializeKey(_ k: Key, value v: __owned Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -4082,7 +4082,7 @@ extension _Native${Self}Buffer
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal func unsafeAddNew(key newKey: Key, value: Value) {
+  internal func unsafeAddNew(key newKey: Key, value: __owned Value) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
@@ -5270,7 +5270,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func nativeUpdateValue(
-    _ value: Value, forKey key: Key
+    _ value: __owned Value, forKey key: Key
   ) -> Value? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
@@ -5311,7 +5311,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_versioned // FIXME(sil-serialize-all)
   @discardableResult
   internal mutating func updateValue(
-    _ value: Value, forKey key: Key
+    _ value: __owned Value, forKey key: Key
   ) -> Value? {
 
     if _fastPath(guaranteedNative) {
