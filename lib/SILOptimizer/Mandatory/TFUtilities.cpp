@@ -995,6 +995,16 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
     switch (opClass.second) {
     case OperandClass::Input: {
       auto opTy = operand->getType();
+
+      // If this is tfc.scalarToTensor, then the input must be a valid scalar.
+      if (opName == "tfc.scalarToTensor") {
+        auto scalarType = opTy.getSwiftRValueType();
+        if (convertSwiftTypeToTF(scalarType) == 0)
+          return "scalarToTensor requires scalar value; unrecognized type '"
+             +scalarType->getString() + "' is not allowed";
+        break;
+      }
+
       // TensorFloat values and metatype inputs are ok.
       if (isTensorFlowValue(opTy) || opTy.is<MetatypeType>())
         break;
@@ -1014,12 +1024,9 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         break;
       }
 
-      // If it isn't a TensorHandle or metatype, it must be a scalar.
-      auto scalarType = operand->getType().getSwiftRValueType();
-      if (convertSwiftTypeToTF(scalarType) == 0)
-        return "operand has unrecognized type '" +
-               operand->getType().getSwiftRValueType()->getString() + "'";
-      break;
+      // Otherwise, this is an error.
+      return "operand has unrecognized type '" +
+             opTy.getSwiftRValueType()->getString() + "'";
     }
     case OperandClass::InputElt: // InputList elements must be TensorHandle's.
       if (!isTensorHandle(operand->getType()))
