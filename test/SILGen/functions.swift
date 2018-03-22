@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

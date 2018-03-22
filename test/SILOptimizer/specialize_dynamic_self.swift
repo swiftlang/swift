@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-inline-generics -emit-sil -O -primary-file %s | %FileCheck %s
 

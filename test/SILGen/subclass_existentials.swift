@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name subclass_existentials -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -primary-file %s -verify | %FileCheck %s
 // RUN: %target-swift-frontend -module-name subclass_existentials -emit-ir -parse-as-library -primary-file %s

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED

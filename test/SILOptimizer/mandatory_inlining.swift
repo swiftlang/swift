@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -enable-sil-ownership -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
 

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name implicitly_unwrapped_optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

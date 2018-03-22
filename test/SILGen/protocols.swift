@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name protocols -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

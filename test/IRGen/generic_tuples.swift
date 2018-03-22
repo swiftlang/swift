@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name generic_tuples -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
 

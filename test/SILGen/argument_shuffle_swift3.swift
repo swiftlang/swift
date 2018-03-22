@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name argument_shuffle_swift3 -emit-silgen -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
 

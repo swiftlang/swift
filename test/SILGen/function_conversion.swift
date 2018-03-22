@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name function_conversion -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name function_conversion -emit-ir -enable-sil-ownership -primary-file %s

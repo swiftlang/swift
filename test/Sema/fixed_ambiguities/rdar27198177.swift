@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -emit-sil -verify %s -swift-version 4 | %FileCheck %s
 
