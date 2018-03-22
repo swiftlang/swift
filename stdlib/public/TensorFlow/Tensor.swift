@@ -122,30 +122,13 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 }
 
 //===----------------------------------------------------------------------===//
-// Memory transfer markers
-//===----------------------------------------------------------------------===//
-
-/// TODO: Remove when send/receive semantics gets revisited.
-public extension Tensor {
-  @_inlineable @inline(__always)
-  func toDevice() -> Tensor {
-    return Tensor(handle: _TFSend(handle))
-  }
-
-  @_inlineable @inline(__always)
-  func toHost() -> Tensor {
-    return Tensor(handle: _TFReceive(handle))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Initialization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Numeric {
-  /// Perform an element-wise conversion from a Tensor<U>.
+public extension Tensor where Scalar : Numeric {
+  /// Perform an element-wise conversion from another `Tensor`.
   @_inlineable @inline(__always)
-  public init<FromType : Numeric>(_ other: Tensor<FromType>) {
+  init<OtherScalar : Numeric>(_ other: Tensor<OtherScalar>) {
     self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
   }
 }

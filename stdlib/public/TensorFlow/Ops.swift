@@ -52,6 +52,18 @@ infix operator ++ : AdditionPrecedence
 //   scalarization and rank getter are implemented.
 
 //===----------------------------------------------------------------------===//
+// Scalar type cast
+//===----------------------------------------------------------------------===//
+
+public extension TensorProtocol where Scalar : Numeric {
+  /// Perform an element-wise type conversion from a Bool tensor.
+  @_inlineable @inline(__always)
+  init(_ other: BoolTensor) {
+    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Elementwise binary arithmetics
 //===----------------------------------------------------------------------===//
 
@@ -540,17 +552,8 @@ public extension TensorProtocol {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @_inlineable @inline(__always)
-  @available(*, deprecated,
-             message: "Pass permutation as variadic arguments instead.")
-  func transposed(withPermutations permutations: [Int32]) -> Self {
-    return transposed(withPermutations: Tensor<Int32>(permutations))
-  }
-
-  /// Returns a transposed tensor, with dimensions permuted in the specified
-  /// order.
-  @_inlineable @inline(__always)
   func transposed(withPermutations permutations: Int32...) -> Self {
-    return transposed(withPermutations: permutations)
+    return transposed(withPermutations: Tensor(permutations))
   }
 
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
@@ -559,7 +562,7 @@ public extension TensorProtocol {
     let defaultPermutations = rankTensor - 1 - Tensor<Int32>(
       rangeFrom: 0, to: rank, stride: 1
     )
-    return transposed(withPermutations: defaultPermutations)
+    return transposed(withPermutations: Tensor(defaultPermutations))
   }
 
   /// Concatenates tensors along the first dimension.
@@ -1010,8 +1013,8 @@ public extension TensorProtocol {
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Self {
-    let rankDifference = (rankTensor - otherShape.scalarCountTensor).rankLifted()
-    let ones: Tensor<Int32> = #tfop("Fill", rankDifference, Tensor<Int32>(1))
+    let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
+    let ones: Tensor<Int32> = #tfop("Fill", rankDiff, Tensor<Int32>(1))
     let paddedShape = ones ++ otherShape
     let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
     let broadcastIndices = Tensor<Int64>(
@@ -1038,13 +1041,22 @@ public extension TensorProtocol {
 //===----------------------------------------------------------------------===//
 // Padding
 //===----------------------------------------------------------------------===//
-public extension Tensor where Scalar : Numeric {
+
+public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
-  func pad(padding: Array<Int32>, with value: Scalar) -> Tensor {
-    return #tfop("PadV2",
-                 input: self,
-                 paddings: padding,
-                 constant_values: value)
+  func padded(
+    forSizes sizes: @autoclosure () -> [(before: Int32, after: Int32)],
+    with value: Scalar = 0
+  ) -> Self {
+    let paddings: TensorHandle<Int32> = _TFHoistable {
+      let sizes = sizes()
+      return Tensor(
+        shape: [Int32(sizes.count), 2],
+        scalars: sizes.flatMap { [$0.before, $0.after] }
+      ).handle
+    }
+    return #tfop("PadV2", self, _TFSend(paddings), Tensor(value),
+                 T: Scalar.self, Tpaddings: Int32.self)
   }
 }
 
@@ -1149,7 +1161,8 @@ public extension Tensor {
     }
   }
 
-  // TODO(danielzheng): Add strided slices? (increment by something different than 1)
+  // TODO(danielzheng): Add strided slices? (increment by something different
+  // than 1)
   // Ideas for strided slice API: it could be another subscript method, or it
   // be a top level `stride` function like Swift's `stride(from:to:by:)`.
 

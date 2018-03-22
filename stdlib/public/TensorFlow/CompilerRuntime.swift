@@ -899,8 +899,8 @@ public func _TFCStartTensorComputation(
                             resultCount: resultCount)
 }
 
-/// Waits for completion of the computation as given by `computation`, and returns
-/// results.
+/// Waits for completion of the computation as given by `computation`, and
+/// returns results.
 ///
 /// - Parameters:
 ///   - computation: The tensor computation to finish.
