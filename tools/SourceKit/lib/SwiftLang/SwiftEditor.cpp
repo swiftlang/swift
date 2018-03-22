@@ -657,13 +657,13 @@ public:
   void parse() {
     auto &P = Parser->getParser();
 
-    trace::TracedOperation TracedOp;
+    trace::TracedOperation TracedOp(trace::OperationKind::SimpleParse);
     if (trace::enabled()) {
       trace::SwiftInvocation Info;
       initArgsAndPrimaryFile(Info);
       auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)->getBuffer();
       Info.Files.push_back(std::make_pair(PrimaryFile, Text));
-      TracedOp.start(trace::OperationKind::SimpleParse, Info);
+      TracedOp.start(Info);
     }
 
     bool Done = false;
@@ -956,13 +956,13 @@ public:
     }
     unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
-    trace::TracedOperation TracedOp;
+    trace::TracedOperation TracedOp(trace::OperationKind::AnnotAndDiag);
     if (trace::enabled()) {
       trace::SwiftInvocation SwiftArgs;
       SemaInfoRef->getInvocation()->raw(SwiftArgs.Args.Args,
                                         SwiftArgs.Args.PrimaryFile);
       trace::initTraceFiles(SwiftArgs, CompIns);
-      TracedOp.start(trace::OperationKind::AnnotAndDiag, SwiftArgs);
+      TracedOp.start(SwiftArgs);
     }
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
@@ -1784,11 +1784,11 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
 void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  trace::TracedOperation TracedOp;
+  trace::TracedOperation TracedOp(trace::OperationKind::ReadSyntaxInfo);
   if (trace::enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSyntaxInfo, Info);
+    TracedOp.start(Info);
   }
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
@@ -1836,11 +1836,11 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
-  trace::TracedOperation TracedOp;
+  trace::TracedOperation TracedOp(trace::OperationKind::ReadSemanticInfo);
   if (trace::enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSemanticInfo, Info);
+    TracedOp.start(Info);
   }
 
   std::vector<SwiftSemanticToken> SemaToks;
@@ -1899,7 +1899,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   SourceManager &SM = SyntaxInfo->getSourceManager();
   unsigned BufID = SyntaxInfo->getBufferID();
 
-  trace::TracedOperation TracedOp;
+  trace::TracedOperation TracedOp(trace::OperationKind::FormatText);
   if (trace::enabled()) {
     trace::SwiftInvocation SwiftArgs;
     // Compiler arguments do not matter
@@ -1915,7 +1915,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
                      std::to_string(Impl.FormatOptions.TabWidth)),
       std::make_pair("UseTabs",
                      std::to_string(Impl.FormatOptions.UseTabs))};
-    TracedOp.start(trace::OperationKind::FormatText, SwiftArgs, OpArgs);
+    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   LineRange inputRange = LineRange(Line, Length);
@@ -1949,7 +1949,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     return;
   }
 
-  trace::TracedOperation TracedOp;
+  trace::TracedOperation TracedOp(trace::OperationKind::ExpandPlaceholder);
   if (trace::enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SyntaxInfo->initArgsAndPrimaryFile(SwiftArgs);
@@ -1958,7 +1958,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     trace::StringPairs OpArgs = {
       std::make_pair("Offset", std::to_string(Offset)),
       std::make_pair("Length", std::to_string(Length))};
-    TracedOp.start(trace::OperationKind::ExpandPlaceholder, SwiftArgs, OpArgs);
+    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   PlaceholderExpansionScanner Scanner(SM);
