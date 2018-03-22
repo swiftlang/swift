@@ -126,7 +126,7 @@ extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to 
 #if !ACCESS_DISABLED
 private func privateInBothFiles() {} // no-warning
 private func privateInPrimaryFile() {} // expected-error {{invalid redeclaration}}
-func privateInOtherFile() {} // expected-note {{previously declared here}}
+func privateInOtherFile() {}
 #endif
 
 

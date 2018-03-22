@@ -768,6 +768,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   }
 
   encodeDecl->setInterfaceType(interfaceType);
+  encodeDecl->setValidationStarted();
   encodeDecl->setAccess(target->getFormalAccess());
 
   // If the type was not imported, the derived conformance is either from the
@@ -1109,6 +1110,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   }
 
   initDecl->setInterfaceType(interfaceType);
+  initDecl->setValidationStarted();
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->setAccess(target->getFormalAccess());
 

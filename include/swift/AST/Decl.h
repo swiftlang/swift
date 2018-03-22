@@ -180,18 +180,6 @@ enum class AssociatedValueCheck {
   HasAssociatedValues,
 };
 
-/// Describes if an enum element constructor directly or indirectly references
-/// its enclosing type.
-enum class ElementRecursiveness {
-  /// The element does not reference its enclosing type.
-  NotRecursive,
-  /// The element is currently being validated, and may references its enclosing
-  /// type.
-  PotentiallyRecursive,
-  /// The element does not reference its enclosing type.
-  Recursive
-};
-
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
@@ -339,13 +327,9 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 3,
+  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
     /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1,
-
-    /// \brief Whether or not this element directly or indirectly references
-    /// the enum type.
-    Recursiveness : 2
+    HasArgumentType : 1
   );
   
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
@@ -5769,8 +5753,6 @@ public:
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    Bits.EnumElementDecl.Recursiveness =
-        static_cast<unsigned>(ElementRecursiveness::NotRecursive);
     Bits.EnumElementDecl.HasArgumentType = HasArgumentType;
   }
 
@@ -5815,15 +5797,6 @@ public:
   }
   SourceRange getSourceRange() const;
   
-  ElementRecursiveness getRecursiveness() const {
-    return
-      static_cast<ElementRecursiveness>(Bits.EnumElementDecl.Recursiveness);
-  }
-  
-  void setRecursiveness(ElementRecursiveness recursiveness) {
-    Bits.EnumElementDecl.Recursiveness = static_cast<unsigned>(recursiveness);
-  }
-
   bool hasAssociatedValues() const {
     return Bits.EnumElementDecl.HasArgumentType;
   }

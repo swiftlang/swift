@@ -1822,6 +1822,10 @@ public:
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
 
+  /// Type check all parameter lists of a function.
+  bool typeCheckParameterLists(AbstractFunctionDecl *fd,
+                               GenericTypeResolver &resolver);
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
