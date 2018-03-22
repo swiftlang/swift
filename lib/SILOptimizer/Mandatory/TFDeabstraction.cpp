@@ -189,6 +189,12 @@ void TFDeabstraction::inlineCalls() {
   /// This predicate decides whether we should mandatory inline the specified
   /// call site.
   auto shouldInline = [&](FullApplySite site) -> bool {
+    // If this is a call of an explicitly noinline function, don't inline it!
+    if (auto *apply = dyn_cast<ApplyInst>(site.getInstruction()))
+      if (auto *callee = apply->getCalleeFunction())
+        if (callee->getInlineStrategy() == NoInline)
+          return false;
+
     // Check for array internals which we could be inlined, but prefer to
     // leave in abstracted form for easier analysis.  For things like
     // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array

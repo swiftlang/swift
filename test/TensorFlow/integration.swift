@@ -424,3 +424,32 @@ CHECK:  builtin "__tfop_MakeIterator,$in,$in"([[dataset]] : $VariantHandle, [[it
  */
 
 
+// b/76117368
+// This function is explicit marked inline(never) so it shouldn't be inlined,
+// even though it has tensor operands.
+@inline(never)
+func shouldntInline(_ a: Tensor<Float>) -> Tensor<Float> {
+  let b = a.toDevice()
+  return (b*b).toHost()
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}shouldntInline
+// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK:  %1 = builtin "__tfop_Mul,$in,$in"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %2
+// CHECK:  return %1 : $TensorHandle<Float>
+// CHECK-LABEL: ----
+
+public func testNotInlined() {
+  let a = Tensor<Float>([1,2])+1
+  _ = shouldntInline(a.toHost())
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testNotInlined
+// CHECK: = builtin "__tfop_Const,
+// CHECK: [[RESULT:%.*]] = builtin "__tfop_Add,
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: ---
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNotInlined
+// CHECK: [[FN:%.*]] = function_ref @{{.*}}shouldntInline
+// CHECK: = apply [[FN]](

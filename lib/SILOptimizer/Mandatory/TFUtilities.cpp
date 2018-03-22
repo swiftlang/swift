@@ -1445,6 +1445,11 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   if (fn->getLinkage() == SILLinkage::Public)
     return true;
 
+  // If the function is explicitly marked @noinline, then it should be
+  // partitioned, even if it otherwise looks like it shouldn't be.
+  if (fn->getInlineStrategy() == NoInline)
+    return true;
+
   // If this is a function that was inlined from some other module but only
   // exists so we can see into it, don't transform it.  It won't be a canonical
   // declaration for anything anyway.
