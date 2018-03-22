@@ -5382,27 +5382,37 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
 
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
+  auto silFnTy = escapingFnTy.castTo<SILFunctionType>();
 
-  // Convert it to an escaping function value.
-  auto escapingClosure =
-      SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
-
-  RValue rvalue;
-  auto loc = SILLocation(E);
-  auto borrowedClosure = escapingClosure.borrow(SGF, loc);
-  {
+  auto visitSubExpr = [&](ManagedValue escapingClosure,
+                          bool isClosureConsumable) -> RValue {
     // Bind the opaque value to the escaping function.
     SILGenFunction::OpaqueValueState opaqueValue{
-        borrowedClosure,
-        /*consumable*/ false,
+        escapingClosure,
+        /*consumable*/ isClosureConsumable,
         /*hasBeenConsumed*/ false,
     };
     SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
                                                     opaqueValue);
 
     // Emit the guarded expression.
-    rvalue = visit(E->getSubExpr(), C);
+    return visit(E->getSubExpr(), C);
+  };
+
+  // Handle @convention(block). No withoutActuallyEscaping verification yet.
+  if (silFnTy->getExtInfo().getRepresentation() !=
+      SILFunctionTypeRepresentation::Thick) {
+    auto escapingClosure =
+        SGF.B.createConvertFunction(E, functionValue, escapingFnTy);
+    return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
   }
+
+  // Convert it to an escaping function value.
+  auto escapingClosure =
+      SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
+  auto loc = SILLocation(E);
+  auto borrowedClosure = escapingClosure.borrow(SGF, loc);
+  RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
   // Now create the verification of the withoutActuallyEscaping operand.
   // Either we fail the uniquenes check (which means the closure has escaped)
