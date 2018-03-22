@@ -1205,6 +1205,9 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
+  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
+    return;
+  
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
