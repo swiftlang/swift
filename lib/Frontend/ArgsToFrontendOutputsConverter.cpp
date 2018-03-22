@@ -467,16 +467,16 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
   SupplementaryOutputPaths paths;
   if (!map)
     return paths;
-  const std::pair<types::ID, std::string &> typesAndStrings[] = {
-      {types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
-      {types::TY_SwiftModuleFile, paths.ModuleOutputPath},
-      {types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
-      {types::TY_Dependencies, paths.DependenciesFilePath},
-      {types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
-      {types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
-      {types::TY_ModuleTrace, paths.LoadedModuleTracePath},
-      {types::TY_TBD, paths.TBDPath}};
-  for (const std::pair<types::ID, std::string &> &typeAndString :
+  const std::pair<file_types::ID, std::string &> typesAndStrings[] = {
+      {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
+      {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
+      {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
+      {file_types::TY_Dependencies, paths.DependenciesFilePath},
+      {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
+      {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
+      {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
+      {file_types::TY_TBD, paths.TBDPath}};
+  for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
     auto const out = map->find(typeAndString.first);
     typeAndString.second = out == map->end() ? "" : out->second;
