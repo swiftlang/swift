@@ -921,8 +921,11 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Validate the declaration.
-    tc.validateDecl(other);
+    // Validate the declaration but only if it came from a different context.
+    if (other->getDeclContext() != current->getDeclContext())
+      tc.validateDecl(other);
+
+    // Skip invalid or not yet seen declarations.
     if (other->isInvalid() || !other->hasInterfaceType())
       continue;
 
