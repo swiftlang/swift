@@ -5430,9 +5430,25 @@ public:
   }
 
   Action walkToTypePost(Type ty) override {
-    auto decl = ty->getAnyNominal();
-    if (!decl)
+    // Infer from generic typealiases.
+    if (auto boundNameAlias = dyn_cast<BoundNameAliasType>(ty.getPointer())) {
+      auto decl = boundNameAlias->getDecl();
+      auto genericSig = decl->getGenericSignature();
+      if (!genericSig)
+        return Action::Continue;
+
+      auto subMap = boundNameAlias->getSubstitutionMap();
+      for (const auto &rawReq : genericSig->getRequirements()) {
+        if (auto req = rawReq.subst(subMap))
+          Builder.addRequirement(*req, source, nullptr);
+      }
+
       return Action::Continue;
+    }
+
+    // Infer from generic nominal types.
+    auto decl = ty->getAnyNominal();
+    if (!decl) return Action::Continue;
 
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
