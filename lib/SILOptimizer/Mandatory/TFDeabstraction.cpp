@@ -235,6 +235,8 @@ void TFDeabstraction::inlineCalls() {
     return true;
   };
 
+  SmallPtrSet<SILFunction*, 16> inlinedCallees;
+
   // Use the mandatory inlining algorithm to expose call sites that contain
   // TensorFlow values as their argument or result lists.
   inlineForTFDeabstraction(fn,
@@ -244,9 +246,48 @@ void TFDeabstraction::inlineCalls() {
 
        // Recognize that we're about to change this function.
        aboutToChangeFunction();
+       inlinedCallees.insert(const_cast<SILFunction*>(&callee));
        return true;
      }
   );
+
+  auto &module = fn.getModule();
+  module.invalidateSILLoaderCaches();
+
+  // Now that we've inlined some functions, clean them up to avoid burning
+  // compile time in later passes.  We do this with a simple linear scan,
+  // because functions that reference each other have already been flattened
+  // so there should be no interdependencies.
+  for (auto *callee : inlinedCallees) {
+    // We shouldn't be trying to delete the thing we're inlining into, doing so
+    // would invalidate iterators.
+    assert(callee != &fn && "inlining self into self??");
+
+    passManager->invalidateAnalysis(callee,
+                                    SILAnalysis::InvalidationKind::Everything);
+
+    // We can't delete this function if something is still using it.  That could
+    // be because there is some other tensor program in this module that is
+    // using it or (most likely) that there is a now-dead witness table.
+    //
+    // TODO: Build infra to find unused witness tables and remove them.
+    if (callee->getRefCount() != 0)
+      continue;
+
+    // If this is a public function then we can't remove it either.
+    if (callee->isPossiblyUsedExternally())
+      continue;
+
+    // ObjC functions are called through the runtime and are therefore alive
+    // even if not referenced inside SIL.
+    if (callee->getRepresentation() ==SILFunctionTypeRepresentation::ObjCMethod)
+      continue;
+
+    passManager->notifyDeleteFunction(callee);
+
+    // Okay, erase the function from the module.
+    module.eraseFunction(callee);
+  }
 }
 
 /// If the specified value is a StructInst that has one operand, or potentially
@@ -1678,7 +1719,6 @@ void TFDeabstractionPass::run() {
   // inter-op value uses.
   if (module->getSwiftModule() == tfModule)
     return;
-
 
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator;
