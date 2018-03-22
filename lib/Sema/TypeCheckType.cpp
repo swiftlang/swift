@@ -3179,7 +3179,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+  auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
+  if (aliasDecl) {
     // FIXME: If this is a protocol typealias and we haven't built the
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
@@ -3201,7 +3202,15 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   auto subs = baseTy->getContextSubstitutionMap(
       module, member->getDeclContext());
-  return memberType.subst(subs, SubstFlags::UseErrorType);
+  Type resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+
+  // If we're referring to a typealias within a generic context, build
+  // a sugared alias type.
+  if (aliasDecl && aliasDecl->getGenericSignature()) {
+    resultType = BoundNameAliasType::get(aliasDecl, baseTy, subs, resultType);
+  }
+
+  return resultType;
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

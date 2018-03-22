@@ -417,3 +417,18 @@ takesInt(10)
 
 func failsRequirementCheck(_: Element<Int>) {}
 // expected-error@-1 {{type 'Int' does not conform to protocol 'Sequence'}}
+
+//
+// Sugar in base types of a typealias.
+//
+struct X<T, U> {
+  typealias GY<V> = [V]
+}
+
+typealias GX<T> = X<T, T>
+
+func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.Element) {
+  let i: Int = gx   // expected-error{{cannot convert value of type 'GX<Int>' (aka 'X<Int, Int>') to specified type 'Int'}}
+  let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
+  let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
+}
