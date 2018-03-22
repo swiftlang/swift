@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name property_abstraction -enable-sil-ownership -emit-silgen %s | %FileCheck %s
 

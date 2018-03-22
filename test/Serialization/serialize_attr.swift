@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend  -module-name serialize_attr -emit-module -parse-as-library -o %t %s

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name devirt_value_metatypes -emit-sil -O %s | %FileCheck %s
 

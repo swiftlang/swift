@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name constrained_extensions -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name constrained_extensions -emit-sil -O -primary-file %s > /dev/null

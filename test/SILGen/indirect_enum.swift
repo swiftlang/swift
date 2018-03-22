@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name indirect_enum -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
 

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
 

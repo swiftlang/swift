@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name switch_isa -emit-silgen %s | %FileCheck %s
 

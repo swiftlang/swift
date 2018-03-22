@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name switch_abstraction -emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
