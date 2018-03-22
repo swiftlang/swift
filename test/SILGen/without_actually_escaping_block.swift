@@ -8,15 +8,14 @@ typealias Callback = @convention(block) () -> Void
 
 // CHECK-LABEL: sil {{.*}} @$S25without_actually_escaping9testBlock5blockyyyXB_tF
 // CHECK: bb0([[ARG:%.*]] : @owned $@convention(block) @noescape () -> ()):
-// CHECK:  [[B1:%.*]] = begin_borrow [[ARG]]
+// CHECK:  [[C1:%.*]] = copy_block [[ARG]]
+// CHECK:  [[B1:%.*]] = begin_borrow [[C1]]
 // CHECK:  [[C2:%.*]] = copy_value [[B1]]
 // CHECK:  [[CVT:%.*]] = convert_function [[C2]] : $@convention(block) @noescape () -> () to $@convention(block) () -> ()
-// CHECK:  [[B2:%.*]] = begin_borrow [[CVT]]
 // CHECK:  [[FN:%.*]] = function_ref @$S25without_actually_escaping9testBlock5blockyyyXB_tFyyyXBXEfU_
-// CHECK:  apply [[FN]]([[B2]])
-// CHECK:  end_borrow [[B2]] from [[CVT]]
-// CHECK:  destroy_value [[CVT]]
-// CHECK:  end_borrow [[B1]] from [[ARG]]
+// CHECK:  apply [[FN]]([[CVT]])
+// CHECK:  end_borrow [[B1]] from [[C1]]
+// CHECK:  destroy_value [[C1]]
 // CHECK:  destroy_value [[ARG]]
 // CHECK:  return
 
