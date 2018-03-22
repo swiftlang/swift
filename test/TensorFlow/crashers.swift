@@ -130,7 +130,7 @@ public func testStraightLineXORTraining() {
 
 
 // This testcase exposed bb argument and source location manipulation problems.
-public func testEagerLoop() -> Int32 { // expected-note 5 {{value used here}}
+public func testEagerLoop() -> Int32 { // expected-note 6 {{value used here}}
   var a = Tensor<Int32>(6)
   // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
   var count = Tensor<Int32>(0)  // expected-warning 7 {{value implicitly copied to the host}}
@@ -140,7 +140,7 @@ public func testEagerLoop() -> Int32 { // expected-note 5 {{value used here}}
     } else {
       a = 3 * a + 1
     }
-    count += 1 // expected-note {{value used here}}
+    count += 1
   }
   return count.scalar!  // expected-note {{value used here}}
 }
@@ -170,13 +170,13 @@ public extension Tensor {
   // attribute.
   @_inlineable @inline(__always)
   func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
+    // expected-error @+1 {{Op type not registered 'ExampleOp'}}
     return #tfop("ExampleOp", handle, axis: axis, axisType: T.self)
   }
 }
 
 public func testGenericThing() {
   let a = Tensor<Float>(zeros: [1,2])
-  // expected-error @+1 {{Op type not registered 'ExampleOp'}}
   let b = a.genericAttr(axis: 42)
   _ = b+b
 }
@@ -213,11 +213,11 @@ public func tensorEndPointComputation() -> Int {
 
 // b/76115311
 func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
+  // expected-error @+1 {{operand has unrecognized type}}
   return #tfop("FooOp", value)
 }
 
 public func b76115311() {
-  // expected-error @+1 {{operand has unrecognized type}}
   let matrix: Tensor<Float> = genericMethod76115311()
   _ = matrix+matrix
 }
