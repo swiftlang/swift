@@ -638,6 +638,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           Type paramType1 = getAdjustedParamType(param1);
           Type paramType2 = getAdjustedParamType(param2);
 
+          // Any? is never better than Any.
+          if (auto objType = paramType1->getOptionalObjectType()) {
+            if (objType->isAny() && paramType2->isAny())
+              return false;
+          }
+
           // Check whether the first parameter is a subtype of the second.
           cs.addConstraint(ConstraintKind::Subtype,
                            paramType1, paramType2, locator);
