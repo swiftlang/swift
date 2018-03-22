@@ -6928,174 +6928,8 @@ public:
       checkAccessControl(TC, CD);
       return;
     }
-    if (CD->hasInterfaceType() || CD->isBeingValidated())
-      return;
 
-    CD->setIsBeingValidated();
-
-    TC.checkDeclAttributesEarly(CD);
-    TC.computeAccessLevel(CD);
-
-    // convenience initializers are only allowed on classes and in
-    // extensions thereof.
-    if (CD->isConvenienceInit()) {
-      if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
-        auto extClass = extType->getClassOrBoundGenericClass();
-
-        // Forbid convenience inits on Foreign CF types, as Swift does not yet
-        // support user-defined factory inits.
-        if (extClass &&
-            extClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-          TC.diagnose(CD->getLoc(), diag::cfclass_convenience_init);
-        }
-
-        if (!extClass && !extType->hasError()) {
-          auto ConvenienceLoc =
-            CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
-
-          // Produce a tailored diagnostic for structs and enums.
-          bool isStruct = extType->getStructOrBoundGenericStruct() != nullptr;
-          if (isStruct || extType->getEnumOrBoundGenericEnum()) {
-            TC.diagnose(CD->getLoc(), diag::enumstruct_convenience_init,
-                        isStruct ? "structs" : "enums")
-              .fixItRemove(ConvenienceLoc);
-          } else {
-            TC.diagnose(CD->getLoc(), diag::nonclass_convenience_init, extType)
-              .fixItRemove(ConvenienceLoc);
-          }
-          CD->setInitKind(CtorInitializerKind::Designated);
-        }
-      }
-    } else if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
-      // A designated initializer for a class must be written within the class
-      // itself.
-      //
-      // This is because designated initializers of classes get a vtable entry,
-      // and extensions cannot add vtable entries to the extended type.
-      //
-      // If we implement the ability for extensions defined in the same module
-      // (or the same file) to add vtable entries, we can re-evaluate this
-      // restriction.
-      if (extType->getClassOrBoundGenericClass() &&
-          isa<ExtensionDecl>(CD->getDeclContext())) {
-        TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
-          .fixItInsert(CD->getLoc(), "convenience ");
-        CD->setInitKind(CtorInitializerKind::Convenience);
-      } else if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
-        CD->setInitKind(CtorInitializerKind::Convenience);
-      }
-    }
-
-    if (CD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(TC, CD);
-
-    if (auto gp = CD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
-
-      auto *sig = TC.validateGenericFuncSignature(CD);
-      auto *env = sig->createGenericEnvironment();
-      CD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      TC.revertGenericFuncSignature(CD);
-    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)TC.validateGenericFuncSignature(CD);
-
-      // Revert all of the types within the signature of the constructor.
-      TC.revertGenericFuncSignature(CD);
-
-      CD->setGenericEnvironment(
-          CD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Set the context type of 'self'.
-    if (CD->getDeclContext()->isTypeContext())
-      recordSelfContextType(CD);
-
-    // Type check the constructor parameters.
-    GenericTypeToArchetypeResolver resolver(CD);
-    if (TC.typeCheckParameterLists(CD, resolver) || CD->isInvalid()) {
-      CD->setInterfaceType(ErrorType::get(TC.Context));
-      CD->setInvalid();
-    } else {
-      if (!CD->getGenericSignatureOfContext())
-        TC.configureInterfaceType(CD, CD->getGenericSignature());
-    }
-
-    // We want the constructor to be available for name lookup as soon
-    // as it has a valid interface type.
-    CD->setIsBeingValidated(false);
-
-    validateAttributes(TC, CD);
-
-    // Check whether this initializer overrides an initializer in its
-    // superclass.
-    if (!checkOverrides(TC, CD)) {
-      // If an initializer has an override attribute but does not override
-      // anything or overrides something that doesn't need an 'override'
-      // keyword (e.g., a convenience initializer), complain.
-      // anything, or overrides something that complain.
-      if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!CD->getOverriddenDecl()) {
-          TC.diagnose(CD, diag::initializer_does_not_override)
-            .highlight(attr->getLocation());
-          attr->setInvalid();
-        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
-          // Special case: we are overriding a 'required' initializer, so we
-          // need (only) the 'required' keyword.
-          if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
-            if (CD->getAttrs().hasAttribute<RequiredAttr>()) {
-              TC.diagnose(CD, diag::required_initializer_override_keyword)
-                .fixItRemove(attr->getLocation());
-            } else {
-              TC.diagnose(CD, diag::required_initializer_override_wrong_keyword)
-                .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(
-                new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
-            }
-
-            TC.diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
-                        diag::overridden_required_initializer_here);
-          } else {
-            // We tried to override a convenience initializer.
-            TC.diagnose(CD, diag::initializer_does_not_override)
-              .highlight(attr->getLocation());
-            TC.diagnose(CD->getOverriddenDecl(),
-                        diag::convenience_init_override_here);
-          }
-        }
-      }
-
-      // A failable initializer cannot override a non-failable one.
-      // This would normally be diagnosed by the covariance rules;
-      // however, those are disabled so that we can provide a more
-      // specific diagnostic here.
-      if (CD->getFailability() != OTK_None &&
-          CD->getOverriddenDecl() &&
-          CD->getOverriddenDecl()->getFailability() == OTK_None) {
-        TC.diagnose(CD, diag::failable_initializer_override,
-                    CD->getFullName());
-        TC.diagnose(CD->getOverriddenDecl(), 
-                    diag::nonfailable_initializer_override_here,
-                    CD->getOverriddenDecl()->getFullName());
-      }
-    }
-
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
-    // of an ObjC-compatible class.
-    if (CD->getDeclContext()->isTypeContext()) {
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, CD,
-          /*allowImplicit=*/true);
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (CD->isInvalid() ||
-           !TC.isRepresentableInObjC(CD, *isObjC, errorConvention)))
-        isObjC = None;
-      markAsObjC(TC, CD, isObjC, errorConvention);
-    }
+    TC.validateDecl(CD);
 
     // If this initializer overrides a 'required' initializer, it must itself
     // be marked 'required'.
@@ -7135,14 +6969,6 @@ public:
           fixItAccess(diag, CD, requiredAccess);
         }
       }
-    }
-
-    inferDynamic(TC.Context, CD);
-
-    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-      auto &C = CD->getASTContext();
-      CD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
     }
 
     TC.checkDeclAttributes(CD);
@@ -7665,9 +7491,188 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
-  case DeclKind::Accessor:
-  case DeclKind::Constructor: {
+  case DeclKind::Accessor: {
     typeCheckDecl(D, true);
+    break;
+  }
+
+  case DeclKind::Constructor: {
+    auto *CD = cast<ConstructorDecl>(D);
+
+    CD->setIsBeingValidated();
+
+    checkDeclAttributesEarly(CD);
+    computeAccessLevel(CD);
+
+    // convenience initializers are only allowed on classes and in
+    // extensions thereof.
+    if (CD->isConvenienceInit()) {
+      if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
+        auto extClass = extType->getClassOrBoundGenericClass();
+
+        // Forbid convenience inits on Foreign CF types, as Swift does not yet
+        // support user-defined factory inits.
+        if (extClass &&
+            extClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+          diagnose(CD->getLoc(), diag::cfclass_convenience_init);
+        }
+
+        if (!extClass && !extType->hasError()) {
+          auto ConvenienceLoc =
+            CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
+
+          // Produce a tailored diagnostic for structs and enums.
+          bool isStruct = extType->getStructOrBoundGenericStruct() != nullptr;
+          if (isStruct || extType->getEnumOrBoundGenericEnum()) {
+            diagnose(CD->getLoc(), diag::enumstruct_convenience_init,
+                     isStruct ? "structs" : "enums")
+              .fixItRemove(ConvenienceLoc);
+          } else {
+            diagnose(CD->getLoc(), diag::nonclass_convenience_init, extType)
+              .fixItRemove(ConvenienceLoc);
+          }
+          CD->setInitKind(CtorInitializerKind::Designated);
+        }
+      }
+    } else if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
+      // A designated initializer for a class must be written within the class
+      // itself.
+      //
+      // This is because designated initializers of classes get a vtable entry,
+      // and extensions cannot add vtable entries to the extended type.
+      //
+      // If we implement the ability for extensions defined in the same module
+      // (or the same file) to add vtable entries, we can re-evaluate this
+      // restriction.
+      if (extType->getClassOrBoundGenericClass() &&
+          isa<ExtensionDecl>(CD->getDeclContext())) {
+        diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
+          .fixItInsert(CD->getLoc(), "convenience ");
+        CD->setInitKind(CtorInitializerKind::Convenience);
+      } else if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
+        CD->setInitKind(CtorInitializerKind::Convenience);
+      }
+    }
+
+    if (CD->getDeclContext()->isTypeContext())
+      configureImplicitSelf(*this, CD);
+
+    if (auto gp = CD->getGenericParams()) {
+      // Write up generic parameters and check the generic parameter list.
+      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
+
+      auto *sig = validateGenericFuncSignature(CD);
+      auto *env = sig->createGenericEnvironment();
+      CD->setGenericEnvironment(env);
+
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      revertGenericFuncSignature(CD);
+    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
+      (void)validateGenericFuncSignature(CD);
+
+      // Revert all of the types within the signature of the constructor.
+      revertGenericFuncSignature(CD);
+
+      CD->setGenericEnvironment(
+          CD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Set the context type of 'self'.
+    if (CD->getDeclContext()->isTypeContext())
+      recordSelfContextType(CD);
+
+    // Type check the constructor parameters.
+    GenericTypeToArchetypeResolver resolver(CD);
+    if (typeCheckParameterLists(CD, resolver) || CD->isInvalid()) {
+      CD->setInterfaceType(ErrorType::get(Context));
+      CD->setInvalid();
+    } else {
+      if (!CD->getGenericSignatureOfContext())
+        configureInterfaceType(CD, CD->getGenericSignature());
+    }
+
+    // We want the constructor to be available for name lookup as soon
+    // as it has a valid interface type.
+    CD->setIsBeingValidated(false);
+
+    validateAttributes(*this, CD);
+
+    // Check whether this initializer overrides an initializer in its
+    // superclass.
+    if (!checkOverrides(*this, CD)) {
+      // If an initializer has an override attribute but does not override
+      // anything or overrides something that doesn't need an 'override'
+      // keyword (e.g., a convenience initializer), complain.
+      // anything, or overrides something that complain.
+      if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!CD->getOverriddenDecl()) {
+          diagnose(CD, diag::initializer_does_not_override)
+            .highlight(attr->getLocation());
+          attr->setInvalid();
+        } else if (!DeclChecker::overrideRequiresKeyword(CD->getOverriddenDecl())) {
+          // Special case: we are overriding a 'required' initializer, so we
+          // need (only) the 'required' keyword.
+          if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
+            if (CD->getAttrs().hasAttribute<RequiredAttr>()) {
+              diagnose(CD, diag::required_initializer_override_keyword)
+                .fixItRemove(attr->getLocation());
+            } else {
+              diagnose(CD, diag::required_initializer_override_wrong_keyword)
+                .fixItReplace(attr->getLocation(), "required");
+              CD->getAttrs().add(
+                new (Context) RequiredAttr(/*IsImplicit=*/true));
+            }
+
+            diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
+                     diag::overridden_required_initializer_here);
+          } else {
+            // We tried to override a convenience initializer.
+            diagnose(CD, diag::initializer_does_not_override)
+              .highlight(attr->getLocation());
+            diagnose(CD->getOverriddenDecl(),
+                     diag::convenience_init_override_here);
+          }
+        }
+      }
+
+      // A failable initializer cannot override a non-failable one.
+      // This would normally be diagnosed by the covariance rules;
+      // however, those are disabled so that we can provide a more
+      // specific diagnostic here.
+      if (CD->getFailability() != OTK_None &&
+          CD->getOverriddenDecl() &&
+          CD->getOverriddenDecl()->getFailability() == OTK_None) {
+        diagnose(CD, diag::failable_initializer_override,
+                 CD->getFullName());
+        diagnose(CD->getOverriddenDecl(),
+                 diag::nonfailable_initializer_override_here,
+                 CD->getOverriddenDecl()->getFullName());
+      }
+    }
+
+    // An initializer is ObjC-compatible if it's explicitly @objc or a member
+    // of an ObjC-compatible class.
+    if (CD->getDeclContext()->isTypeContext()) {
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD,
+          /*allowImplicit=*/true);
+
+      Optional<ForeignErrorConvention> errorConvention;
+      if (isObjC &&
+          (CD->isInvalid() ||
+           !isRepresentableInObjC(CD, *isObjC, errorConvention)))
+        isObjC = None;
+      markAsObjC(*this, CD, isObjC, errorConvention);
+    }
+
+    inferDynamic(Context, CD);
+
+    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto &C = CD->getASTContext();
+      CD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     break;
   }
 
