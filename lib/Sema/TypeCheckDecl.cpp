@@ -4260,10 +4260,10 @@ public:
       });
     }
 
-    if (!IsFirstPass)
-      checkAccessControl(TC, PBD);
-
     TC.checkDeclAttributes(PBD);
+
+    if (IsFirstPass)
+      checkAccessControl(TC, PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -4289,17 +4289,22 @@ public:
     checkAccessControl(TC, TAD);
   }
   
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    if (!assocType->hasValidationStarted())
-      TC.validateDecl(assocType);
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
+    if (!IsFirstPass) {
+      return;
+    }
 
-    auto *proto = assocType->getProtocol();
+    TC.validateDecl(AT);
+
+    auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
-      TC.diagnose(assocType->getLoc(),
+      TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
-                  assocType->getName(),
+                  AT->getName(),
                   proto->getName());
     }
+
+    checkAccessControl(TC, AT);
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -4651,25 +4656,14 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessLevel(PD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(PD);
-    }
-
-    if (!IsFirstPass) {
-      checkAccessControl(TC, PD);
-      for (auto member : PD->getMembers()) {
-        TC.checkUnsupportedProtocolType(member);
-        checkAccessControl(TC, member);
-      }
-      TC.checkInheritanceClause(PD);
-
-      GenericTypeToArchetypeResolver resolver(PD);
-      TC.validateWhereClauses(PD, &resolver);
-      return;
-    }
+    checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
     if (!PD->hasValidSignature())
@@ -4705,6 +4699,15 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(PD);
+
+    checkAccessControl(TC, PD);
+    for (auto member : PD->getMembers()) {
+      TC.checkUnsupportedProtocolType(member);
+    }
+    TC.checkInheritanceClause(PD);
+
+    GenericTypeToArchetypeResolver resolver(PD);
+    TC.validateWhereClauses(PD, &resolver);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -4772,14 +4775,12 @@ public:
         // Complain if we should have a body.
         TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
       }
-    }
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, FD);
       return;
     }
 
     TC.validateDecl(FD);
+    checkAccessControl(TC, FD);
   }
 
 
@@ -6300,7 +6301,6 @@ public:
     }
 
     if (!IsFirstPass) {
-      checkAccessControl(TC, CD);
       return;
     }
 
@@ -6347,6 +6347,7 @@ public:
     }
 
     TC.checkDeclAttributes(CD);
+    checkAccessControl(TC, CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
