@@ -1451,6 +1451,8 @@ public:
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
+    llvm::SmallVector<Constraint *, 4> FavoredChoices;
+
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;
 
@@ -3246,30 +3248,37 @@ public:
                     Constraint *choice)
       : CS(cs), Disjunction(disjunction), Choice(choice) {}
 
-  Constraint *operator&() const { return Choice; }
-
-  Constraint *getConstraint() const { return Choice; }
-
   Constraint *operator->() const { return Choice; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
-  // FIXME: Both of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
+  bool isUnavailable() const {
+    if (auto *decl = getDecl(Choice))
+      return decl->getAttrs().isUnavailable(decl->getASTContext());
 
-  bool isGenericOperatorOrUnavailable() const;
-  bool isSymmetricOperator() const;
+    return false;
+  }
+
+  ValueDecl *getOperatorDecl() const {
+    auto *decl = getDecl(Choice);
+    if (!decl)
+      return nullptr;
+
+    return decl->isOperator() ? decl : nullptr;
+  }
 
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables);
+
+  operator Constraint *() { return Choice; }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo() const;
 
-  static ValueDecl *getOperatorDecl(Constraint *constraint) {
+  static ValueDecl *getDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
       return nullptr;
 
@@ -3277,8 +3286,7 @@ private:
     if (choice.getKind() != OverloadChoiceKind::Decl)
       return nullptr;
 
-    auto *decl = choice.getDecl();
-    return decl->isOperator() ? decl : nullptr;
+    return choice.getDecl();
   }
 };
 

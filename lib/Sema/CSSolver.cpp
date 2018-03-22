@@ -538,6 +538,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
 
+  for (auto *favored : FavoredChoices)
+    favored->setFavored(false);
+
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
@@ -1345,7 +1348,8 @@ ConstraintSystem::solve(Expr *&expr,
   // Try to shrink the system by reducing disjunction domains. This
   // goes through every sub-expression and generate its own sub-system, to
   // try to reduce the domains of those subexpressions.
-  shrink(expr);
+
+  //shrink(expr);
 
   // Generate constraints for the main system.
   if (auto generatedExpr = generateConstraints(expr))
@@ -1759,46 +1763,6 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-/// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
-                                        DisjunctionChoice &choice,
-                                        Optional<Score> &bestNonGenericScore) {
-  if (choice->isDisabled()) {
-    auto &TC = cs.TC;
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(cs.solverState->depth)
-      << "(skipping ";
-      choice->print(log, &TC.Context.SourceMgr);
-      log << '\n';
-    }
-
-    return true;
-  }
-
-  // Don't attempt to solve for generic operators if we already have
-  // a non-generic solution.
-
-  // FIXME: Less-horrible but still horrible hack to attempt to
-  //        speed things up. Skip the generic operators if we
-  //        already have a solution involving non-generic operators,
-  //        but continue looking for a better non-generic operator
-  //        solution.
-  if (bestNonGenericScore && choice.isGenericOperatorOrUnavailable()) {
-    auto &score = bestNonGenericScore->Data;
-    // Let's skip generic overload choices only in case if
-    // non-generic score indicates that there were no forced
-    // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return true;
-  }
-
-  return false;
-}
-
 Constraint *ConstraintSystem::selectDisjunction(
     SmallVectorImpl<Constraint *> &disjunctions) {
   if (disjunctions.empty())
@@ -1828,6 +1792,27 @@ Constraint *ConstraintSystem::selectDisjunction(
     return nullptr;
 
   return disjunction;
+}
+
+static void
+favorLinkedChoices(ConstraintSystem &cs, const ValueDecl *op,
+                   llvm::function_ref<void(const Constraint *)> callback) {
+  for (const auto &constraint : cs.getConstraints()) {
+    if (constraint.getKind() != ConstraintKind::Disjunction)
+      continue;
+
+    auto *choice = constraint.getNestedConstraints()[0];
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      continue;
+
+    auto overload = choice->getOverloadChoice();
+    if (!overload.isDecl())
+      continue;
+
+    auto *decl = overload.getDecl();
+    if (decl->isOperator() && decl->getBaseName() == op->getBaseName())
+      callback(&constraint);
+  }
 }
 
 bool ConstraintSystem::solveSimplified(
@@ -1884,66 +1869,39 @@ bool ConstraintSystem::solveSimplified(
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
-  // Check if selected disjunction has a representative
-  // this might happen when there are multiple binary operators
-  // chained together. If so, disable choices which differ
-  // from currently selected representative.
-  auto pruneOverloadSet = [&](Constraint *disjunction) -> bool {
-    auto *choice = disjunction->getNestedConstraints().front();
-    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
-    if (!typeVar)
-      return false;
-
-    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
-    if (!repr || repr == typeVar)
-      return false;
-
-    bool isPruned = false;
-    for (auto resolved = resolvedOverloadSets; resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
-        continue;
-
-      auto &representative = resolved->Choice;
-      if (!representative.isDecl())
-        return false;
-
-      // Disable all of the overload choices which are different from
-      // the one which is currently picked for representative.
-      for (auto *constraint : disjunction->getNestedConstraints()) {
-        auto choice = constraint->getOverloadChoice();
-        if (!choice.isDecl())
-          continue;
-
-        if (choice.getDecl() != representative.getDecl()) {
-          constraint->setDisabled();
-          isPruned = true;
-        }
-      }
-      break;
-    }
-
-    return isPruned;
-  };
-
-  bool hasDisabledChoices = pruneOverloadSet(disjunction);
-
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
-  Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
-  auto constraints = disjunction->getNestedConstraints();
-  // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, disjunction, constraints[index]);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
+  llvm::SmallVector<DisjunctionChoice, 8> choices;
+  choices.reserve(disjunction->countActiveNestedConstraints());
+  for (auto *constraint : disjunction->getNestedConstraints()) {
+    DisjunctionChoice choice(this, disjunction, constraint);
+
+    if (choice.isDisabled())
       continue;
+
+    // Attempt unavailable choices only if fixes are allowed
+    // because even if such choice forms a solution it would
+    // result in error regardless.
+    if (!shouldAttemptFixes() && choice.isUnavailable())
+      continue;
+
+    choices.push_back(std::move(choice));
+  }
+
+  std::sort(choices.begin(), choices.end(),
+            [](const DisjunctionChoice &a, const DisjunctionChoice &b) {
+              return a->isFavored();
+            });
+
+  // Try each of the constraints within the disjunction.
+  for (auto index : indices(choices)) {
+    auto currentChoice = choices[index];
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->first.getConstraint();
+      Constraint *lastChoice = lastSolvedChoice->first;
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
       bool hasFixes = score.Data[SK_Fix] > 0;
@@ -1952,8 +1910,7 @@ bool ConstraintSystem::solveSimplified(
       // that there are no unavailable overload choices present in the
       // solution, and the solution does not involve fixes.
       if (!hasUnavailableOverloads && !hasFixes &&
-          shortCircuitDisjunctionAt(&currentChoice, lastChoice,
-                                    getASTContext()))
+          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
         break;
     }
 
@@ -1980,22 +1937,16 @@ bool ConstraintSystem::solveSimplified(
       DisjunctionChoices.push_back({locator, index});
     }
 
-    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!currentChoice.isGenericOperatorOrUnavailable() &&
-          currentChoice.isSymmetricOperator()) {
-        if (!bestNonGenericScore || score < bestNonGenericScore)
-          bestNonGenericScore = score;
-      }
-
-      lastSolvedChoice = {currentChoice, *score};
-
-      // If we see a tuple-to-tuple conversion that succeeded, we're done.
-      // FIXME: This should be more general.
-      if (auto restriction = currentChoice->getRestriction()) {
-        if (*restriction == ConversionRestrictionKind::TupleToTuple)
-          break;
-      }
+    if (auto *op = currentChoice.getOperatorDecl()) {
+      favorLinkedChoices(*this, op, [&](const Constraint *relatedDisjunction) {
+        auto favoredChoice = relatedDisjunction->getNestedConstraints()[index];
+        favoredChoice->setFavored();
+        scope.FavoredChoices.push_back(favoredChoice);
+      });
     }
+
+    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables))
+      lastSolvedChoice = {currentChoice, *score};
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -2006,14 +1957,6 @@ bool ConstraintSystem::solveSimplified(
   // Put the disjunction constraint back in its place.
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
-
-  if (hasDisabledChoices) {
-    // Re-enable previously disabled overload choices.
-    for (auto *choice : disjunction->getNestedConstraints()) {
-      if (choice->isDisabled())
-        choice->setEnabled();
-    }
-  }
 
   // If we are exiting due to an expression that is too complex, do
   // not allow our caller to continue as if we have been successful.
@@ -2044,37 +1987,6 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
   }
 
   return bestScore;
-}
-
-bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {
-  auto *decl = getOperatorDecl(Choice);
-  if (!decl)
-    return false;
-
-  auto &ctx = decl->getASTContext();
-  if (decl->getAttrs().isUnavailable(ctx))
-    return true;
-
-  auto interfaceType = decl->getInterfaceType();
-  return interfaceType->is<GenericFunctionType>();
-}
-
-bool DisjunctionChoice::isSymmetricOperator() const {
-  auto *decl = getOperatorDecl(Choice);
-  if (!decl)
-    return false;
-
-  auto func = dyn_cast<FuncDecl>(decl);
-  auto paramList =
-      func->getParameterList(func->getDeclContext()->isTypeContext());
-  if (paramList->size() != 2)
-    return true;
-
-  auto firstType =
-      paramList->get(0)->getInterfaceType()->getWithoutSpecifierType();
-  auto secondType =
-      paramList->get(1)->getInterfaceType()->getWithoutSpecifierType();
-  return firstType->isEqual(secondType);
 }
 
 void DisjunctionChoice::propagateConversionInfo() const {

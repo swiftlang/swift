@@ -20,6 +20,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
@@ -96,419 +98,6 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
 }
 
 namespace {
-  
-  /// Internal struct for tracking information about types within a series
-  /// of "linked" expressions. (Such as a chain of binary operator invocations.)
-  struct LinkedTypeInfo {
-    unsigned haveIntLiteral : 1;
-    unsigned haveFloatLiteral : 1;
-    unsigned haveStringLiteral : 1;
-
-    llvm::SmallSet<TypeBase*, 16> collectedTypes;
-
-    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
-
-    llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
-
-    // TODO: manage as a set of lists, to speed up addition of binding
-    // constraints.
-    llvm::SmallVector<DeclRefExpr *, 16> anonClosureParams;
-    
-    LinkedTypeInfo() {
-      haveIntLiteral = false;
-      haveFloatLiteral = false;
-      haveStringLiteral = false;
-    }
-
-    bool hasLiteral() {
-      return haveIntLiteral || haveFloatLiteral || haveStringLiteral;
-    }
-  };
-
-  /// Walks an expression sub-tree, and collects information about expressions
-  /// whose types are mutually dependent upon one another.
-  class LinkedExprCollector : public ASTWalker {
-    
-    llvm::SmallVectorImpl<Expr*> &LinkedExprs;
-
-  public:
-    
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
-        LinkedExprs(linkedExprs) {}
-    
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
-      // Store top-level binary exprs for further analysis.
-      if (isa<BinaryExpr>(expr) ||
-          
-          // Literal exprs are contextually typed, so store them off as well.
-          isa<LiteralExpr>(expr) ||
-
-          // We'd like to take a look at implicit closure params, so store
-          // them.
-          isa<ClosureExpr>(expr) ||
-
-          // We'd like to look at the elements of arrays and dictionaries.
-          isa<ArrayExpr>(expr) ||
-          isa<DictionaryExpr>(expr) ||
-
-          // assignment expression can involve anonymous closure parameters
-          // as source and destination, so it's beneficial for diagnostics if
-          // we look at the assignment.
-          isa<AssignExpr>(expr)) {
-        LinkedExprs.push_back(expr);
-        return {false, expr};
-      }
-      
-      return { true, expr };
-    }
-    
-    Expr *walkToExprPost(Expr *expr) override {
-      return expr;
-    }
-    
-    /// \brief Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-    
-    /// \brief Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-  
-  /// Given a collection of "linked" expressions, analyzes them for
-  /// commonalities regarding their types. This will help us compute a
-  /// "best common type" from the expression types.
-  class LinkedExprAnalyzer : public ASTWalker {
-    
-    LinkedTypeInfo &LTI;
-    ConstraintSystem &CS;
-    
-  public:
-    
-    LinkedExprAnalyzer(LinkedTypeInfo &lti, ConstraintSystem &cs) :
-        LTI(lti), CS(cs) {}
-    
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
-      if (isa<IntegerLiteralExpr>(expr)) {
-        LTI.haveIntLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.intLiteralTyvars.push_back(tyvar);
-        }
-        
-        return { false, expr };
-      }
-      
-      if (isa<FloatLiteralExpr>(expr)) {
-        LTI.haveFloatLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.floatLiteralTyvars.push_back(tyvar);
-        }
-
-        return { false, expr };
-      }
-      
-      if (isa<StringLiteralExpr>(expr)) {
-        LTI.haveStringLiteral = true;
-
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.stringLiteralTyvars.push_back(tyvar);
-        }
-
-        return { false, expr };
-      }
-
-      if (isa<CollectionExpr>(expr)) {
-        return { true, expr };
-      }
-      
-      if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-        
-        if (CS.hasType(UDE))
-          LTI.collectedTypes.insert(CS.getType(UDE).getPointer());
-        
-        // Don't recurse into the base expression.
-        return { false, expr };
-      }
-
-
-      if (isa<ClosureExpr>(expr)) {
-        return { true, expr };
-      }
-
-      if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
-        LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
-        return { false, expr };
-      }
-
-      if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (varDecl->isAnonClosureParam()) {
-            LTI.anonClosureParams.push_back(DRE);
-          } else if (CS.hasType(DRE)) {
-            LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
-          }
-          return { false, expr };
-        } 
-      }             
-
-      // In the case of a function application, we would have already captured
-      // the return type during constraint generation, so there's no use in
-      // looking any further.
-      if (isa<ApplyExpr>(expr) &&
-          !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
-            isa<PostfixUnaryExpr>(expr))) {      
-        return { false, expr };
-      }
-
-      if (isa<BinaryExpr>(expr)) {
-        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
-      }  
-      
-      if (auto favoredType = CS.getFavoredType(expr)) {
-        LTI.collectedTypes.insert(favoredType);
-
-        return { false, expr };
-      }
-
-      // Optimize branches of a conditional expression separately.
-      if (auto IE = dyn_cast<IfExpr>(expr)) {
-        CS.optimizeConstraints(IE->getCondExpr());
-        CS.optimizeConstraints(IE->getThenExpr());
-        CS.optimizeConstraints(IE->getElseExpr());
-        return { false, expr };
-      }      
-
-      // TODO: The systems that we need to solve for interpolated string expressions
-      // require bespoke logic that don't currently work with this approach.
-      if (isa<InterpolatedStringLiteralExpr>(expr)) {
-        return { false, expr };
-      }
-
-      // For exprs of a structural type that are not modeling argument lists,
-      // avoid merging the type variables. (We need to allow for cases like
-      // (Int, Int32).)
-      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
-        return { false, expr };
-      }
-
-      // Coercion exprs have a rigid type, so there's no use in gathering info
-      // about them.
-      if (isa<CoerceExpr>(expr)) {
-        LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-
-        return { false, expr };
-      }
-
-      // Don't walk into subscript expressions - to do so would risk factoring
-      // the index expression into edge contraction. (We don't want to do this
-      // if the index expression is a literal type that differs from the return
-      // type of the subscript operation.)
-      if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
-        return { false, expr };
-      }
-      
-      return { true, expr };
-    }
-    
-    /// \brief Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-    
-    /// \brief Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-  
-  /// For a given expression, given information that is global to the
-  /// expression, attempt to derive a favored type for it.
-  bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
-    LinkedTypeInfo lti;
-    
-    expr->walk(LinkedExprAnalyzer(lti, CS));
-
-    // Link anonymous closure params of the same index.
-    // TODO: As stated above, we should bucket these whilst collecting the
-    // exprs to avoid quadratic behavior.
-    for (auto acp1 : lti.anonClosureParams) {
-      for (auto acp2 : lti.anonClosureParams) {
-        if (acp1 == acp2)
-          continue;
-
-        if (acp1->getDecl()->getBaseName() == acp2->getDecl()->getBaseName()) {
-
-          auto tyvar1 = CS.getType(acp1)->getAs<TypeVariableType>();
-          auto tyvar2 = CS.getType(acp2)->getAs<TypeVariableType>();
-
-          mergeRepresentativeEquivalenceClasses(CS, tyvar1, tyvar2);
-        }
-      }
-    }
-
-    // Link integer literal tyvars.
-    if (lti.intLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
-
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    // Link float literal tyvars.
-    if (lti.floatLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
-        
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    // Link string literal tyvars.
-    if (lti.stringLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
-
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    if (lti.collectedTypes.size() == 1) {
-      // TODO: Compute the BCT.
-
-      // It's only useful to favor the type instead of
-      // binding it directly to arguments/result types,
-      // which means in case it has been miscalculated
-      // solver can still make progress.
-      auto favoredTy = (*lti.collectedTypes.begin())->getWithoutSpecifierType();
-      CS.setFavoredType(expr, favoredTy.getPointer());
-
-      // If we have a chain of identical binop expressions with homogeneous
-      // argument types, we can directly simplify the associated constraint
-      // graph.
-      auto simplifyBinOpExprTyVars = [&]() {
-        // Don't attempt to do linking if there are
-        // literals intermingled with other inferred types.
-        if (lti.hasLiteral())
-          return;
-
-        for (auto binExp1 : lti.binaryExprs) {
-          for (auto binExp2 : lti.binaryExprs) {
-            if (binExp1 == binExp2)
-              continue;
-
-            auto fnTy1 = CS.getType(binExp1)->getAs<TypeVariableType>();
-            auto fnTy2 = CS.getType(binExp2)->getAs<TypeVariableType>();
-
-            if (!(fnTy1 && fnTy2))
-              return;
-
-            auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
-            auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
-
-            if (!(ODR1 && ODR2))
-              return;
-
-            // TODO: We currently limit this optimization to known arithmetic
-            // operators, but we should be able to broaden this out to
-            // logical operators as well.
-            if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
-              return;
-
-            if (ODR1->getDecls()[0]->getBaseName() !=
-                ODR2->getDecls()[0]->getBaseName())
-              return;
-
-            // All things equal, we can merge the tyvars for the function
-            // types.
-            auto rep1 = CS.getRepresentative(fnTy1);
-            auto rep2 = CS.getRepresentative(fnTy2);
-
-            if (rep1 != rep2) {
-              CS.mergeEquivalenceClasses(rep1, rep2,
-                                         /*updateWorkList*/ false);
-            }
-
-            auto odTy1 = CS.getType(ODR1)->getAs<TypeVariableType>();
-            auto odTy2 = CS.getType(ODR2)->getAs<TypeVariableType>();
-
-            if (odTy1 && odTy2) {
-              auto odRep1 = CS.getRepresentative(odTy1);
-              auto odRep2 = CS.getRepresentative(odTy2);
-
-              // Since we'll be choosing the same overload, we can merge
-              // the overload tyvar as well.
-              if (odRep1 != odRep2)
-                CS.mergeEquivalenceClasses(odRep1, odRep2,
-                                           /*updateWorkList*/ false);
-            }
-          }
-        }
-      };
-
-      simplifyBinOpExprTyVars();       
-
-      return true;
-    }    
-    
-    if (lti.haveFloatLiteral) {
-      if (auto floatProto =
-            CS.TC.Context.getProtocol(
-                                  KnownProtocolKind::ExpressibleByFloatLiteral)) {
-        if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defaultType.getPointer());
-          }
-          return true;
-        }
-      }
-    }
-    
-    if (lti.haveIntLiteral) {
-      if (auto intProto =
-            CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-        if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defaultType.getPointer());
-          }
-          return true;
-        }
-      }
-    }
-    
-    if (lti.haveStringLiteral) {
-      if (auto stringProto =
-          CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByStringLiteral)) {
-        if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defaultType.getPointer());
-          }
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  }
   
   /// Determine whether the given parameter type and argument should be
   /// "favored" because they match exactly.
@@ -3341,6 +2930,84 @@ namespace {
 
 } // end anonymous namespace
 
+static void simplifyDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
+  auto &TC = CS.TC;
+
+  // Collects all of the protocol requirement choices we have
+  // in this overload set, this would allow us to hide their
+  // witnesses until the requirement itself matches.
+  llvm::SmallVector<std::pair<Constraint *, ValueDecl *>, 8> requirements;
+
+  auto isValidChoice = [](Constraint *choice) -> bool {
+    return choice->getKind() == ConstraintKind::BindOverload &&
+           choice->getOverloadChoice().isDecl();
+  };
+
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (!isValidChoice(choice))
+      continue;
+
+    auto *decl = choice->getOverloadChoice().getDecl();
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (decl->isProtocolRequirement())
+        requirements.push_back({choice, decl});
+    }
+  }
+
+  // Try to hide witness choices under the main requirement
+  // choice, that helps to significately reduce the number
+  // of choices we consider blindly.
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (!isValidChoice(choice))
+      continue;
+
+    auto *decl = choice->getOverloadChoice().getDecl();
+    auto *nominal =
+        decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!nominal)
+      continue;
+
+    auto type = nominal->getDeclaredType();
+    for (auto &req : requirements) {
+      auto *requirementChoice = req.first;
+      const auto &requirement = req.second;
+      auto *protocol = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
+      assert(protocol && "requirement has to have protocol context!");
+
+      // If the declaration context of this overload choice
+      // is the same as requirement we identified, it might
+      // mean that this is a default witness for this requirement,
+      // if so, but we have no way to reliably prove that because
+      // default witnesses are calculated later.
+      if (nominal == protocol)
+        continue;
+
+      ConformanceCheckOptions options;
+      options |= ConformanceCheckFlags::InExpression;
+      options |= ConformanceCheckFlags::SuppressDependencyTracking;
+      options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+      auto result = TC.conformsToProtocol(type, protocol,
+                                          decl->getDeclContext(), options);
+
+      if (!result || !result->isConcrete())
+        continue;
+
+      auto conformance = result->getConcrete();
+      auto wintess = conformance->getWitnessDecl(req.second, &TC);
+      if (wintess == decl) {
+        // Looks like this choice satisfies protocol requirement
+        // already present in the overload set, let's record and
+        // hide the witness.
+        if (choice->isFavored())
+          requirementChoice->setFavored();
+
+        choice->setDisabled();
+      }
+    }
+  }
+}
+
 Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
@@ -3356,6 +3023,11 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   
   if (result)
     this->optimizeConstraints(result);
+
+  for (auto &constraint : getConstraints()) {
+    if (constraint.getKind() == ConstraintKind::Disjunction)
+      simplifyDisjunction(*this, &constraint);
+  }
 
   return result;
 }
@@ -3387,18 +3059,6 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  
-  SmallVector<Expr *, 16> linkedExprs;
-  
-  // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs);
-  e->walk(collector);
-  
-  // Favor types, as appropriate.
-  for (auto linkedExpr : linkedExprs) {
-    computeFavoredTypeForExpr(linkedExpr, *this);
-  }
-  
   // Optimize the constraints.
   ConstraintOptimizer optimizer(*this);
   e->walk(optimizer);
