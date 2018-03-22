@@ -513,7 +513,7 @@ extension TFState {
     // Prepare input related parameters for TF_SessionRun().
     var inputNodeSpecs: [TF_Output] = []
     for i in 0..<inputTensors.count {
-      let inputNodeName = String("tfc_input_\(i)_\(entryFuncName)")
+      let inputNodeName = "tfc_input_\(i)_\(entryFuncName)"
       let inputNode = TF_GraphOperationByName(graph, inputNodeName)
       internalConsistencyCheck(inputNode != nil,
         "Cannot find input node name \(inputNodeName)")
@@ -521,32 +521,29 @@ extension TFState {
     }
 
     // Prepare output related parameters for TF_SessionRun().
-    var outputNodeSpecs = (0..<Int32(returnValues.count)).map { i in
-      TF_Output(oper: funcNode, index: i)
+    var outputNodeSpecs: [TF_Output] = []
+    for i in 0..<returnValues.count {
+      let outputNodeName = "tfc_output_\(i)_\(entryFuncName)"
+      let outputNode = TF_GraphOperationByName(graph, outputNodeName)
+      internalConsistencyCheck(outputNode != nil,
+                               "Cannot find output node name \(outputNodeName)")
+      outputNodeSpecs.append(TF_Output(oper: outputNode, index: 0))
     }
+
     var outputTensors: [CTensor?] = Array(repeating: nil,
                                           count: returnValues.count)
     if returnValues.count > 0 {
-      var shutdownNode = TF_Output(oper: nil, index: -1)
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
-      var inputTensorCount = Int32(inputTensors.count)
       if case .tpu(let usesInfeed) = _RuntimeConfig.executionMode {
         debugLog("Enable TPU execution.")
-        var tpuRewrittenSpecs: [TF_Output] = Array(
-          repeating: TF_Output(oper: nil, index: -1),
-          count: returnValues.count)
         // "var infeedEnqueueNode: OpaquePointer" does not work for the
         // TF_SessionRun() call below, where the `target_opers` parameter is
         // marked const, and cannot take an in/out parameter.
         let infeedEnqueueNode =
           UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: 1)
         debugLog("Rewriting graph and initializing TPU.")
-        shutdownNode = TF_SetupTPUExecution(
-          cSession, Int32(inputNodeSpecs.count), inputNodeSpecs,
-          Int32(outputNodeSpecs.count), outputNodeSpecs,
-          &tpuRewrittenSpecs, usesInfeed ? infeedEnqueueNode : nil, status)
+        TF_InitializeTPU(cSession, status)
         checkOk(status)
-        outputNodeSpecs = tpuRewrittenSpecs
         // When infeed is enabled, run it along with the output tensor nodes
         // below.
         let numTargets: Int32 = usesInfeed && inputTensors.count > 0 ? 1 : 0;
@@ -557,7 +554,7 @@ extension TFState {
         TF_SessionRun(
           cSession, nil,
           // input related parameters
-          inputNodeSpecs, inputTensors, inputTensorCount,
+          inputNodeSpecs, inputTensors, Int32(inputTensors.count),
           // output related parameters
           outputNodeSpecs, &outputTensors, Int32(returnValues.count),
           /*targets*/infeedEnqueueNode, numTargets,
@@ -566,7 +563,7 @@ extension TFState {
         checkOk(status)
 
         debugLog("Shutting down TPU.")
-        TF_ShutdownTPUExecution(cSession, shutdownNode, status)
+        TF_ShutdownTPU(cSession, status)
         checkOk(status)
       } else {
         TF_SessionRun(

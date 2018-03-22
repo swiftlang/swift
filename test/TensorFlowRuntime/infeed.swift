@@ -13,6 +13,9 @@ import StdlibUnittest
 
 var InfeedTests = TestSuite("Infeed")
 
+#if false
+// TODO(hongm): Re-enable after adding infeed support within TF compiler's TPU
+// graph generation.
 @inline(never)
 func testScalarInput() {
   func add(_ x: Float, _ y: Float) -> Float {
@@ -25,6 +28,7 @@ func testScalarInput() {
   expectNearlyEqual(3.7, add(1.3, 2.4), byError: 0.1)
 }
 InfeedTests.testTPU("ScalarInput", testScalarInput)
+#endif
 
 #if false
 // TODO(hongm): Extend shape info support to make this test work.
