@@ -167,6 +167,7 @@ private func configureRuntimeFromEnvironment() {
 }
 
 /// The host of any tensor computation.
+@_fixed_layout
 public final class _ExecutionContext {
   /// Global context storing all available devices, loaded functions, etc.
   public static let global: _ExecutionContext = _ExecutionContext()
@@ -194,7 +195,8 @@ public final class _ExecutionContext {
   private var mutex: pthread_mutex_t = pthread_mutex_t()
 
   /// Initializes a new execution context by initializing available devices.
-  private init() {
+  @_versioned
+  init() {
     configureRuntimeFromEnvironment()
 
     debugLog("Initializing global context.")
