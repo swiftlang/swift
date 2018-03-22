@@ -3964,6 +3964,21 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     return AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic);
   }
 
+  // A 'public' typealias can have an 'internal' type.
+  if (auto *BNAT = dyn_cast<BoundNameAliasType>(Ty.getPointer())) {
+    auto *AliasDecl = BNAT->getDecl();
+    if (auto parent = BNAT->getParent()) {
+      if (parent.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic))
+        return true;
+    }
+
+    if (AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
+      return true;
+
+    return Type(BNAT->getSinglyDesugaredType()).isPrivateStdlibType(
+                                            treatNonBuiltinProtocolsAsPublic);
+  }
+
   if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
     Type Underlying = Paren->getUnderlyingType();
     return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
