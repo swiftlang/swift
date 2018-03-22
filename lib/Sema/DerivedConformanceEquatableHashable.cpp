@@ -671,6 +671,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   }
   eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  eqDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -1062,6 +1063,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                                       AnyFunctionType::ExtInfo());
 
   getterDecl->setInterfaceType(interfaceType);
+  getterDecl->setValidationStarted();
   getterDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
@@ -1073,6 +1075,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setValidationStarted();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
   hashValueDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);

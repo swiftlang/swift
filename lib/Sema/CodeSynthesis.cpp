@@ -1397,6 +1397,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   Parameter->setGenericEnvironment(genericEnv);
+  Parameter->setValidationStarted();
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
