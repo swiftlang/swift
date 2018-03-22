@@ -209,3 +209,15 @@ public func tensorEndPointComputation() -> Int {
 
   return retval
 }
+
+
+// b/76115311
+func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
+  return #tfop("FooOp", value)
+}
+
+public func b76115311() {
+  // expected-error @+1 {{operand has unrecognized type}}
+  let matrix: Tensor<Float> = genericMethod76115311()
+  _ = matrix+matrix
+}
