@@ -4268,13 +4268,12 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
       return;
     }
 
     TC.validateDecl(SD);
-
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
