@@ -43,8 +43,8 @@ TensorTests.testAllBackends("NumericInitializers") {
 }
 
 TensorTests.testAllBackends("RandomInitializer") {
-  let uniform = Tensor<Float>(randomUniform: [3, 4])
-  let normal = Tensor<Float>(randomNormal: [3, 4])
+  let _ = Tensor<Float>(randomUniform: [3, 4])
+  let _ = Tensor<Float>(randomNormal: [3, 4])
 }
 
 TensorTests.testAllBackends("ScalarToTensorConversion") {
@@ -238,7 +238,7 @@ TensorTests.testAllBackends("SimpleMath") {
 }
 
 TensorTests.testAllBackends("ReductionToScalar") {
-  let x: Tensor<Float> = [1, 2, 3, 4, 5]
+  let _: Tensor<Float> = [1, 2, 3, 4, 5]
   // expectEqual(x.mean(), 3)
   // TODO: Test other reduction ops here. Currently code motion isn't
   // smart enough to avoid send/receive.

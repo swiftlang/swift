@@ -63,3 +63,8 @@ public func invalidAttributeArg() -> TensorHandle<Int32> {
   return #tfop("bar", someAttr: X.A)
 }
 
+public func invalidAttrTensor(a: Tensor<Float>) {
+   // expected-error @+1 {{attribute 'someAttr' requires a constant argument}}
+   () = #tfop("foo", someAttr: a)
+}
+
