@@ -162,7 +162,7 @@ public extension DifferentiableModule {
 ///             from expected: Tensor2D<Float>
 ///         ) -> Float {
 ///             return (predicted - expected).squared()
-///                 .mean(alongAxes: [0, 1]).scalarized()
+///                 .mean(alongAxes: 0, 1).scalarized()
 ///         }
 ///     }
 ///

@@ -58,10 +58,10 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
 
     // Backward pass
     let dz2 = pred - y
-    let dw2 = h1.transposed(withPermutations: [1, 0]).dot(dz2)
+    let dw2 = h1.transposed(withPermutations: 1, 0).dot(dz2)
     let db2 = dz2.sum(squeezingAxes: 0)
-    let dz1 = dz2.dot(w2.transposed(withPermutations: [1, 0])) * h1 * (1 - h1)
-    let dw1 = x.transposed(withPermutations: [1, 0]).dot(dz1)
+    let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+    let dw1 = x.transposed(withPermutations: 1, 0).dot(dz1)
     let db1 = dz1.sum(squeezingAxes: 0)
 
     // Gradient descent
@@ -136,10 +136,10 @@ ModelTests.testAllBackends("XORClassifierTraining") {
         let pred = sigmoid(z2)
 
         let dz2 = pred - y
-        let dw2 = h1.transposed(withPermutations: [1, 0]) ⊗ dz2
+        let dw2 = h1.transposed(withPermutations: 1, 0) ⊗ dz2
         let db2 = dz2.sum(squeezingAxes: 0)
-        let dz1 = dz2 ⊗ w2.transposed(withPermutations: [1, 0]) * h1 * (1 - h1)
-        let dw1 = x.transposed(withPermutations: [1, 0]) ⊗ dz1
+        let dz1 = dz2 ⊗ w2.transposed(withPermutations: 1, 0) * h1 * (1 - h1)
+        let dw1 = x.transposed(withPermutations: 1, 0) ⊗ dz1
         let db1 = dz1.sum(squeezingAxes: 0)
 
         // Gradient descent
