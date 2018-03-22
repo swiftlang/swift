@@ -4277,16 +4277,16 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessLevel(TAD);
 
-    if (IsFirstPass)
-      TC.validateDecl(TAD);
-
-    if (!IsFirstPass)
-      checkAccessControl(TC, TAD);
-
+    TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
+    checkAccessControl(TC, TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
