@@ -805,7 +805,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  ArrayRef<const char *> Args,
                                                  bool UsingSwiftArgs,
                                                  bool SynthesizedExtensions,
-                                              Optional<unsigned> swiftVersion) {
+                                                 StringRef swiftVersion) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -838,9 +838,12 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  if (swiftVersion.hasValue()) {
-    auto swiftVer = version::Version({swiftVersion.getValue()});
-    Invocation.getLangOptions().EffectiveLanguageVersion = swiftVer;
+  if (!swiftVersion.empty()) {
+    auto swiftVer = version::Version::parseVersionString(swiftVersion,
+                                                         SourceLoc(), nullptr);
+    if (swiftVer.hasValue())
+      Invocation.getLangOptions().EffectiveLanguageVersion =
+          swiftVer.getValue();
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,
