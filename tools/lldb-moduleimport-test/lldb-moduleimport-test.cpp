@@ -63,7 +63,7 @@ static void printValidationInfo(llvm::StringRef data) {
 }
 
 static void resolveTypeFromMangledNameList(
-    swift::ASTContext &Ctx, llvm::SmallVector<std::string, 8> &MangledNames) {
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
   std::string Error;
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
@@ -78,8 +78,8 @@ static void resolveTypeFromMangledNameList(
 }
 
 static void
-collectMangledNames(std::string &FilePath,
-                    llvm::SmallVector<std::string, 8> &MangledNames) {
+collectMangledNames(const std::string &FilePath,
+                    llvm::SmallVectorImpl<std::string> &MangledNames) {
   std::string Name;
   std::ifstream InputStream(FilePath);
   while (std::getline(InputStream, Name)) {
