@@ -1910,8 +1910,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
 
-  if (checkObjCTypeErasedGenerics(assocType, type, typeDecl))
-    type = ErrorType::get(type);
+  checkObjCTypeErasedGenerics(assocType, type, typeDecl);
 
   if (typeDecl) {
     // Check access.
