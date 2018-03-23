@@ -67,7 +67,7 @@ def TypedUnaryIntrinsicFunctions():
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func _${ufunc}(_ x: ${T}) -> ${T} {
-  return ${T}(Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
+  return ${T}(_bits: Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
 }
 %  if bits == 80:
 #endif
