@@ -138,6 +138,10 @@ int main(int argc, char **argv) {
   llvm::cl::opt<std::string> DumpTypeFromMangled(
       "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
 
+  // FIXME: we should infer this from the module.
+  llvm::cl::opt<std::string> TargetTriple(
+      "target-triple", llvm::cl::desc("specify target triple"));
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
@@ -148,6 +152,7 @@ int main(int argc, char **argv) {
   DumpTypeFromMangled.removeArgument();
   SDK.removeArgument();
   InputNames.removeArgument();
+  TargetTriple.removeArgument();
 
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
   if (SDK.getNumOccurrences() == 0) {
@@ -166,7 +171,13 @@ int main(int argc, char **argv) {
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setSDKPath(SDK);
-  Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
+  // FIXME: we should infer this from the module.
+  if (!TargetTriple.empty())
+    Invocation.setTargetTriple(TargetTriple);
+  else
+    Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setImportSearchPaths(ImportPaths);
