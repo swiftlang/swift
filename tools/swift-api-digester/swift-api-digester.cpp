@@ -511,9 +511,12 @@ bool SDKNodeType::classof(const SDKNode *N) {
 }
 
 class SDKNodeTypeNominal : public SDKNodeType {
+  StringRef USR;
 public:
   SDKNodeTypeNominal(SDKNodeInitInfo Info) : SDKNodeType(Info,
-    SDKNodeKind::TypeNominal) {}
+    SDKNodeKind::TypeNominal), USR(Info.USR) {}
+  // Get the usr of the correspoding nominal type decl.
+  StringRef getUsr() const { return USR; }
   static bool classof(const SDKNode *N);
 };
 
@@ -1286,6 +1289,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
     TypeInfo(TypeInfo) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
+  // If this is a nominal type, get its Usr.
+  if (auto *ND = Ty->getAnyNominal()) {
+    USR = calculateUsr(Ctx, ND);
+  }
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
@@ -1759,6 +1766,12 @@ namespace swift {
           if (bool HasDefault = T->hasDefaultArgument()) {
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasDefaultArg).data(),
                             HasDefault);
+          }
+          // Serialize nominal type's USR.
+          if (auto NT = dyn_cast<SDKNodeTypeNominal>(value)) {
+            auto Usr = NT->getUsr();
+            if (!Usr.empty())
+              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
           }
         }
         if (!value->isLeaf()) {
@@ -3424,7 +3437,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 
   llvm::errs() << "Dumping diff to " << DiffPath << '\n';
   std::vector<OverloadedFuncInfo> Overloads;
-  OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
+  // OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
 
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);

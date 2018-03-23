@@ -1,3 +1,4 @@
+#import <objc_generics.h>
 extern int ANTGlobalValue;
 
 @interface NewType
@@ -13,4 +14,10 @@ extern int ANTGlobalValue;
 
 @protocol ObjcProt
   -(void) ProtMemberFunc;
+@end
+
+typedef NSString * AnimalAttributeName NS_STRING_ENUM;
+
+@interface AnimalStatusDescriptor
+- (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingAttributes:(nonnull NSDictionary<AnimalAttributeName, id> *)attributes;
 @end
