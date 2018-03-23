@@ -75,8 +75,8 @@ VsDevCmd -arch=x86
 ```
 
 - Then adapt the following command and run it. Make sure to use forward slashes 
-  (`/`) instead of backslashes (`\`) as the path seperators. `clang` breaks 
-  with backslashed paths
+  (`/`) instead of backslashes (`\`) as the path separators. `clang` breaks 
+  with backslashed paths.
 ```cmd
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
@@ -117,8 +117,8 @@ cmake -G "Ninja"^
 popd
 cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"
 ```
-- store the llvm `bin` directory in an environment variable so it can be used
-  to build swift. Assuming you followed the instructions exactly, the path
+- Store the LLVM `bin` directory in an environment variable so it can be used
+  to build Swift. Assuming you followed the instructions exactly, the path
   below is correct, but it may be different based on your build variant and
   platform, so double check.
 ```cmd
