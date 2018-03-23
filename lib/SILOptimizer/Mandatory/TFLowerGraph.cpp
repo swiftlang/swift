@@ -247,6 +247,58 @@ private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
   llvm::StringSet<> usedOpNames;
 
+  /// Provides the context for creating the dataset / iterator node stack, along
+  /// with an infeed enqueue node consuming the output of the iterator.
+  struct DatasetCreationContext {
+    /// The instruction corresponding to the builtin
+    /// tfc.makeIteratorGetNextWithDatasets.
+    BuiltinInst *dataset_inst = nullptr;
+
+    /// Metadata for the infeed enqueue node creation.
+    std::vector<TF_DataType> infeedInputDtypes;
+    std::vector<TF_Buffer *> infeedInputShapes;
+    std::vector<const void *> shapeProtos;
+    std::vector<size_t> shapeProtoLens;
+
+   public:
+    DatasetCreationContext(BuiltinInst *dataset_inst)
+        : dataset_inst(dataset_inst) {
+      assert(dataset_inst);
+    }
+
+    ~DatasetCreationContext() {
+      for (auto *shape : infeedInputShapes) {
+        TF_DeleteBuffer(shape);
+      }
+    }
+
+    /// `shape` is owned by the callee.
+    void AddInputTypeAndShape(TF_DataType dtype, TF_Buffer* shape) {
+        infeedInputDtypes.push_back(dtype);
+        infeedInputShapes.push_back(shape);
+        shapeProtos.push_back(shape->data);
+        shapeProtoLens.push_back(shape->length);
+    }
+
+    /// `desc` can be the partially constructed infeed enqueue or dequeue node.
+    void SetInfeedTypeAndShapeList(TF_OperationDescription *desc,
+                                   TF_Status *status) {
+      TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
+                         infeedInputDtypes.size());
+      TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
+                                     shapeProtoLens.data(), shapeProtos.size(),
+                                     status);
+    }
+  };
+
+  /// When non-NULL, uses TF dataset / iterators mechanism to feed input
+  /// data. Current requirements / restrictions:
+  /// 1. Only supported in the TPU TF graph generation mode with infeed support.
+  /// 2. All input tensors of the TF graph must be supplied via this mechanism
+  /// (in other words, the generated TF graph should require 0 input from other
+  /// Placeholders, etc).
+  std::unique_ptr<DatasetCreationContext> dataset_creation_context;
+
   /// Builds TF graph nodes for the top level TF function call, where `funcName`
   /// is the function name. `inputs` specifies the inputs to the function, and
   /// `numOutputs` specifies the number of outputs.
@@ -375,6 +427,13 @@ private:  // Helpers to create TensorFlow graph nodes.
     internalError(inst->getLoc(),
                   "GraphGen cannot lower a 'receive' from the host yet");
   }
+  /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
+  ///
+  /// FIXME: Dissolve this builtin into a set of finer-grained, composer
+  /// features.
+  void visitTFDataset(BuiltinInst *inst);
+  bool createDatasetIteratorNodesWithInfeedEnqueue();
+
   void visitTFOpInst(BuiltinInst *inst);
   void visitTupleInst(TupleInst *inst);
   void visitTupleExtractInst(TupleExtractInst *inst);
@@ -541,10 +600,131 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
     return visitBuiltinTFReceiveInst(inst);
   if (inst->getName().str().startswith("tensorflowSend_"))
     return visitBuiltinTFSendInst(inst);
+  if (inst->getName().str().startswith(
+          "__tfop_tfc.makeIteratorGetNextWithDatasets"))
+    return visitTFDataset(inst);
   if (inst->getName().str().startswith("__tfop_"))
     return visitTFOpInst(inst);
 
   assert(0 && "Unhandled builtin instruction");
+}
+
+bool TFGraphLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
+  assert(dataset_creation_context);
+  auto *dataset_inst = dataset_creation_context->dataset_inst;
+
+  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(dataset_inst).getValue();
+  assert(dataset_inst->getNumOperands() == 1 &&
+         "__tfop_tfc.makeIteratorGetNextWithDatasets should have a single "
+         "attribute operand on filenames.");
+  auto operand = dataset_inst->getOperand(0);
+  auto opInfo = tfopInfo.operandClasses[0];
+
+  assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
+  auto *sli = dyn_cast<StringLiteralInst>(operand);
+  assert(sli && sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+         "The attribute must be string");
+  auto value = sli->getValue();
+
+  // FIXME: We could change the C API below to delete `datasetFn` before it
+  // returns, as it turns out the caller need not use it. Will do so once the
+  // code structure stabilizes more.
+  TF_Function *datasetFn = nullptr;
+  TF_Operation *get_next_op = TF_MakeIteratorGetNextWithDatasets(
+    resultGraph, value.str().c_str(), &datasetFn, status);
+
+  // If the node builder failed, then the tfop definition is wrong, report
+  // an error in a way that can hopefully be fixed - pointing to the op
+  // definition in the Swift code, and emitting the TensorFlow error
+  // information.
+  if (checkStatus(getUserSourceLocation(dataset_inst->getDebugLocation()),
+                  diag::tfop_incorrect_definition))
+    return true;
+
+  TF_DeleteFunction(datasetFn);
+
+  // Add infeed enqueue to consume the output of the iterator.
+  {
+    auto *desc = TF_NewOperation(resultGraph, "InfeedEnqueueTuple",
+                                 "InfeedEnqueueTuple");
+    // FIXME: Support multiple inputs.
+    std::vector<TF_Output> infeedInputs;
+    infeedInputs.reserve(1);
+    infeedInputs.push_back({get_next_op, 0});
+    TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrInt(desc, "device_ordinal", 0);
+    dataset_creation_context->SetInfeedTypeAndShapeList(desc, status);
+    if (checkStatus(SILFn->getLocation())) return true;
+    TF_Operation* enqueue = TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn->getLocation())) return true;
+  }
+
+  return false;
+}
+
+void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
+  // FIXME: Also support dataset/iterator outside of TPU context.
+  if(!TFTargetTPU || !TFUseTPUInfeed) {
+    internalError(
+        getUserSourceLocation(inst->getDebugLocation()),
+        "Builtin tfc.makeIteratorGetNextWithDatasets can only be used when "
+        "generating TPU TF graphs with infeed support.",
+        diag::tfop_invalid_tfop);
+    return;
+  }
+
+  // Defer the creation of the dataset / iterator related nodes, along with
+  // the associated infeed enqueue till the creation of top level function
+  // nodes. Here we create an infeed dequeue node to feed the user(s) of
+  // `inst`.
+  dataset_creation_context.reset(new DatasetCreationContext(inst));
+
+  // FIXME: support multiple output tensors produced by an iterator stack.
+  if (inst->getNumResults() != 1) {
+    internalError(getUserSourceLocation(inst->getDebugLocation()),
+                  "Dataset / iterator stack must produce a single tensor.",
+                  diag::tfop_invalid_tfop);
+    return;
+  }
+  auto outputValue = inst->getResults()[0];
+  // This type looks like Tensor<T> or TensorHandle<T>, and we want to get the
+  // element type T.
+  auto outputType = outputValue->getType().getSwiftRValueType();
+  auto *genTy = outputType->getAs<BoundGenericType>();
+  if (!genTy || genTy->getGenericArgs().size() != 1) {
+    internalError(
+        getUserSourceLocation(inst->getDebugLocation()),
+        "The returned datatype of builtin tfc.makeIteratorGetNextWithDatasets "
+        "should be Tensor<T> or TensorHandle<T>.",
+        diag::tfop_invalid_tfop);
+    return;
+  }
+  TF_DataType dtype = static_cast<TF_DataType>(
+      convertSwiftTypeToTF(genTy->getGenericArgs()[0]));
+
+  TF_Buffer *shapeProto = TF_NewBuffer();
+  // FIXME: The shape may need to be passed in from user. For nowe we hard-code
+  // a scalar shape.
+  TF_GetAttrScalarTensorShapeProto(shapeProto, status);
+  if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+
+  dataset_creation_context->AddInputTypeAndShape(dtype, shapeProto);
+
+  {
+    auto &graphFn = getCurrentGraphFunction();
+    auto *desc = TF_NewOperation(graphFn.getGraph(), "InfeedDequeueTuple",
+                                 "InfeedDequeueTuple");
+    markNodeAsTPUReplicated(desc);
+    dataset_creation_context->SetInfeedTypeAndShapeList(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+    auto *dequeue = TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+
+    // FIXME: Support multiple inputs. When the iterator stack produces K
+    // output tensors, we'll be adding K map entries here.
+    addValueMapping({inst, 0}, {dequeue, 0});
+  }
 }
 
 /// Lower a builtin for a TFOp instruction into a TensorFlow op node.
@@ -1648,6 +1828,11 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     }
     TF_Operation *outputNode = TF_FinishOperation(outputDesc, status);
     if (checkStatus(SILFn->getLocation())) return true;
+  }
+
+  if (dataset_creation_context) {
+    assert(inputs.empty());
+    if (createDatasetIteratorNodesWithInfeedEnqueue()) return true;
   }
 
   // Everything is good!
