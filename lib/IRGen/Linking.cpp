@@ -166,6 +166,9 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
                                                       getProtocolConformance());
 
+    case Kind::ResilientProtocolWitnessTable:
+      return mangler.mangleResilientProtocolWitnessTable(getProtocolConformance());
+
     case Kind::ProtocolWitnessTableAccessFunction:
       return mangler.mangleProtocolWitnessTableAccessFunction(
                                                       getProtocolConformance());

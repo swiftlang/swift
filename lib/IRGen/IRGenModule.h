@@ -1208,6 +1208,9 @@ public:
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);
+  llvm::Constant *
+  getAddrOfResilientWitnessTable(const NormalProtocolConformance *C,
+                                 ConstantInit definition);
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
@@ -1229,6 +1232,10 @@ public:
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
        llvm::Type *defaultType,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+
+  ConstantReference
+  getFunctionGOTEquivalent(LinkEntity entity,
+                           llvm::Function *func);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

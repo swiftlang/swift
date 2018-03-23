@@ -1167,6 +1167,7 @@ public:
     IRGenModule &IGM;
     ConstantArrayBuilder &Table;
     unsigned TableSize = ~0U; // will get overwritten unconditionally
+    SILWitnessTable *SILWT;
     CanType ConcreteType;
     const NormalProtocolConformance &Conformance;
     const ProtocolConformance &ConformanceInContext;
@@ -1184,11 +1185,12 @@ public:
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
     bool RequiresSpecialization = false;
+    bool ResilientConformance = false;
 
   public:
     WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
                         SILWitnessTable *SILWT)
-        : IGM(IGM), Table(table),
+        : IGM(IGM), Table(table), SILWT(SILWT),
           ConcreteType(SILWT->getConformance()->getDeclContext()
                          ->mapTypeIntoContext(
                            SILWT->getConformance()->getType())
@@ -1201,8 +1203,10 @@ public:
           SILConditionalConformances(SILWT->getConditionalConformances()),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol())) {
       // If the conformance is resilient, we require runtime instantiation.
-      if (isResilientConformance(&Conformance))
+      if (isResilientConformance(&Conformance)) {
         RequiresSpecialization = true;
+        ResilientConformance = true;
+      }
     }
 
     /// The top-level entry point.
@@ -1266,6 +1270,10 @@ public:
     void addMethod(SILDeclRef requirement) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
@@ -1790,6 +1798,53 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
     resultState->addIncoming(completedState, cachingBB);
 }
 
+static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
+                                                 SILWitnessTable *wtable) {
+  unsigned count = 0;
+  for (auto &entry : wtable->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
+
+    count++;
+  }
+
+  if (count == 0)
+    return nullptr;
+
+  ConstantInitBuilder B(IGM);
+
+  auto table = B.beginStruct();
+
+  table.addInt(IGM.Int32Ty, count);
+
+  for (auto &entry : wtable->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
+
+    auto declRef = entry.getMethodWitness().Requirement;
+    auto entity = LinkEntity::forDispatchThunk(declRef);
+    auto *func = IGM.getAddrOfDispatchThunk(declRef,
+                                            NotForDefinition);
+    auto requirement = IGM.getFunctionGOTEquivalent(entity, func);
+
+    table.addIndirectRelativeAddress(requirement);
+
+    auto *witness = IGM.getAddrOfSILFunction(
+        entry.getMethodWitness().Witness,
+        NotForDefinition);
+    table.addRelativeAddress(witness);
+  }
+
+  auto *result =
+    cast<llvm::GlobalVariable>(
+      IGM.getAddrOfResilientWitnessTable(wtable->getConformance(),
+                                         table.finishAndCreateFuture()));
+  result->setConstant(true);
+  IGM.setTrueConstGlobal(result);
+
+  return result;
+}
+
 /// Emit the access function for this witness table.
 void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   llvm::Function *fn =
@@ -1872,6 +1927,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
                 LinkEntity::forProtocolDescriptor(Conformance.getProtocol()),
                 IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
 
+  llvm::Constant *resilientWitnessTable = nullptr;
+  if (ResilientConformance)
+    resilientWitnessTable = emitResilientWitnessTable(IGM, SILWT);
+
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
   ConstantInitBuilder cacheInitBuilder(IGM);
@@ -1885,7 +1944,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   // RelativePointer<WitnessTable>
   cacheData.addRelativeAddress(wtable);
   // RelativePointer<ResilientWitnesses>
-  cacheData.addInt(IGM.Int32Ty, 0);
+  cacheData.addRelativeAddressOrNull(resilientWitnessTable);
   // Instantiation function
   cacheData.addRelativeAddressOrNull(instantiationFn);
   // Private data
@@ -2080,11 +2139,6 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   auto wtableContents = builder.beginArray(Int8PtrTy);
   WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
   wtableBuilder.build();
-  
-  assert((getProtocolInfo(wt->getConformance()->getProtocol())
-           .getNumWitnesses() + WitnessTableFirstRequirementOffset)
-          == wtableContents.size()
-         && "witness table size doesn't match ProtocolInfo");
 
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
