@@ -733,10 +733,17 @@ extension Tensor : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion
+// Xcode Playground display conversion.
 extension Tensor : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension Tensor : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 
