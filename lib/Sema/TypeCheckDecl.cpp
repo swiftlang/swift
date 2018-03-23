@@ -4392,29 +4392,31 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+    if (!IsFirstPass) {
+      for (Decl *Member : SD->getMembers())
+        visit(Member);
+
+      return;
+    }
+
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessLevel(SD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(SD);
+    checkUnsupportedNestedType(SD);
 
-      TC.validateDecl(SD);
-      TC.DeclsToFinalize.remove(SD);
-      TC.addImplicitConstructors(SD);
-    }
+    TC.validateDecl(SD);
+    TC.DeclsToFinalize.remove(SD);
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
+    TC.addImplicitConstructors(SD);
 
-      if (!SD->isInvalid())
-        TC.checkConformancesInContext(SD, SD);
-    }
-
-    // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
+
+    if (!SD->isInvalid())
+      TC.checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
