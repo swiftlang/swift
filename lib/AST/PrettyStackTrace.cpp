@@ -167,6 +167,9 @@ namespace {
     Decl *visitNameAliasType(NameAliasType *type) {
       return type->getDecl();
     }
+    Decl *visitBoundNameAliasType(BoundNameAliasType *type) {
+      return type->getDecl();
+    }
   };
 } // end anonymous namespace
 

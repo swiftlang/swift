@@ -4190,10 +4190,28 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
-    auto alias = cast<TypeAliasDecl>(aliasOrError.get());
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+
+    Type underlyingType;
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType.get();
+          break;
+        }
+      }
+
+      underlyingType = expectedType.get();
+    } else {
+      underlyingType = getType(underlyingTypeID);
+    }
 
     Type parentType = getType(parentTypeID);
-    Type underlyingType = getType(underlyingTypeID);
 
     // Read the substitutions.
     SubstitutionMap subMap;

@@ -750,8 +750,17 @@ void ASTMangler::appendType(Type type) {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       auto boundAliasTy = cast<BoundNameAliasType>(tybase);
 
-      // FIXME: Mangle as a generic type.
-      return appendType(boundAliasTy->getSinglyDesugaredType());
+      // It's not possible to mangle the context of the builtin module.
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      TypeAliasDecl *decl = boundAliasTy->getDecl();
+      if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+        return appendType(boundAliasTy->getSinglyDesugaredType());
+      }
+
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
+      return appendAnyGenericType(decl);
     }
 
     case TypeKind::Paren:

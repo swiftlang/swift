@@ -197,6 +197,8 @@ namespace {
         return Type();
       if (auto *NAT = dyn_cast<NameAliasType>(T.getPointer()))
         return NAT->getSinglyDesugaredType();
+      if (auto *BNAT = dyn_cast<BoundNameAliasType>(T.getPointer()))
+        return BNAT->getSinglyDesugaredType();
       return T;
     }
     
