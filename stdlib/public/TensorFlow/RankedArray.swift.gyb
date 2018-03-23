@@ -83,6 +83,7 @@ fileprivate extension ArraySlice1D {
 %   arrayLiteral = '[' + elementArrayLiteral + ']'
 
 /// A ${rankName(rank)}-dimensional array.
+@_fixed_layout
 public struct ${ArrayXD}<Scalar> {
   /// The underlying ShapedArray of the ${ArrayXD}.
   @_versioned
@@ -276,8 +277,8 @@ extension ${ArrayXD} : RandomAccessCollection, MutableCollection {
 
 /// ${TensorXD} conversion
 public extension ${ArrayXD} where Scalar : AccelerableByTensorFlow {
-  init(_ other: ${TensorXD}<Scalar>) {
-    self = other.array
+  init(_ tensor: ${TensorXD}<Scalar>) {
+    self = tensor.array
   }
 }
 
@@ -288,7 +289,7 @@ extension ${ArrayXD} : Equatable where Scalar : Equatable {
   }
 }
 
-/// String conversion
+/// String conversion.
 extension ${ArrayXD} : CustomStringConvertible {
   /// A textual representation of this ${ArrayXD}.
   public var description: String {
@@ -296,13 +297,21 @@ extension ${ArrayXD} : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion
+// Xcode Playground display conversion.
 extension ${ArrayXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
+// Mirror representation, used by debugger/REPL.
+extension ${ArrayXD} : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
+  }
+}
+
+@_fixed_layout
 public struct ${SliceXD}<Scalar>  {
   /// The underlying ShapedArraySlice of the ${SliceXD}.
   fileprivate var base: ShapedArraySlice<Scalar>
@@ -460,8 +469,8 @@ extension ${SliceXD} : RandomAccessCollection, MutableCollection {
 
 /// ${TensorXD} conversion
 public extension ${SliceXD} where Scalar : AccelerableByTensorFlow {
-  init(_ other: ${TensorXD}<Scalar>) {
-    self.init(base: ShapedArraySlice<Scalar>(other.base))
+  init(_ tensor: ${TensorXD}<Scalar>) {
+    self.init(base: ShapedArraySlice<Scalar>(tensor.base))
   }
 }
 
@@ -472,7 +481,7 @@ extension ${SliceXD} : Equatable where Scalar : Equatable {
   }
 }
 
-/// String conversion
+/// String conversion.
 extension ${SliceXD} : CustomStringConvertible {
   /// A textual representation of this ${SliceXD}.
   public var description: String {
@@ -480,10 +489,17 @@ extension ${SliceXD} : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion
+// Xcode Playground display conversion.
 extension ${SliceXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension ${SliceXD} : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 % end

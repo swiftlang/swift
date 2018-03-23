@@ -746,7 +746,6 @@ public final class _TensorComputation {
     debugLog("Starting TF graph execution.")
 
     // If it's asynchronous, we start a pthread that calls execute().
-    // NOTE: Currently, asynchronous execution is only supported on Linux.
     if !_RuntimeConfig.usesSynchronousExecution {
       // The function to launch in the parallel thread.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

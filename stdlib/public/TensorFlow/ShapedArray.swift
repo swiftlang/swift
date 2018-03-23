@@ -535,8 +535,8 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
 
 /// Tensor conversion
 public extension Tensor where Scalar : AccelerableByTensorFlow {
-  init(_ other: ShapedArray<Scalar>) {
-    self.init(handle: other.makeTensorHandle())
+  init(_ array: ShapedArray<Scalar>) {
+    self.init(handle: array.makeTensorHandle())
   }
 }
 
@@ -554,7 +554,7 @@ extension ShapedArray : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion
+// Xcode Playground display conversion.
 // NOTE: The new "CustomPlaygroundDisplayConvertible" API causes Xcode
 // Playgrounds to crash on Mac.
 #if false
@@ -567,6 +567,13 @@ extension ShapedArray : CustomPlaygroundDisplayConvertible {
 extension ShapedArray : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension ShapedArray : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 
@@ -837,8 +844,8 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
 
 /// Tensor conversion
 public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
-  init(_ other: Tensor<Scalar>) {
-    self.init(base: other.array)
+  init(_ tensor: Tensor<Scalar>) {
+    self.init(base: tensor.array)
   }
 }
 
@@ -870,5 +877,12 @@ extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
 extension ShapedArraySlice : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension ShapedArraySlice : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }

@@ -253,8 +253,8 @@ public extension ${TensorXD} {
   /// Creates a ${TensorXD} from a ShapedArray. Returns nil if the ShapedArray
   /// does not have rank ${rank}.
   @_inlineable @inline(__always)
-  init?(_ other: ShapedArray<Scalar>) {
-    self.init(Tensor(other))
+  init?(_ array: ShapedArray<Scalar>) {
+    self.init(Tensor(array))
   }
 
   /// Creates a ${TensorXD} from a ShapedArray.
@@ -267,8 +267,8 @@ public extension ${TensorXD} {
 % if rank != 1:
   /// Creates a ${TensorXD} from an ${ArrayXD}.
   @_inlineable @inline(__always)
-  init(_ other: ${ArrayXD}<Scalar>) {
-    self.init(base: Tensor(other.base))
+  init(_ array: ${ArrayXD}<Scalar>) {
+    self.init(base: Tensor(array.base))
   }
 % end
 
@@ -661,10 +661,17 @@ extension ${TensorXD} : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion
+// Xcode Playground display conversion.
 extension ${TensorXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension ${TensorXD} : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 
