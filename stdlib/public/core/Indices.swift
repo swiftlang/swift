@@ -83,7 +83,7 @@ extension DefaultIndices: Collection {
     return self
   }
   
-  public func contains(_ element: Element) -> Bool {
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     guard element < endIndex else { return false }
     for index in self {
       if !(index < element) {
