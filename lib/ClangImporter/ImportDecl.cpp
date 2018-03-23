@@ -2840,7 +2840,7 @@ namespace {
                          AccessLevel::Public, loc, SourceLoc(),
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
-          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setUnderlyingType(Impl.getSugaredTypeReference(errorWrapper));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4975,7 +4975,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
 
@@ -5198,7 +5198,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     if (underlyingAlias->isGeneric())
       underlyingType = underlyingAlias->getUnboundGenericType();
     else
-      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
   } else {
     underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }

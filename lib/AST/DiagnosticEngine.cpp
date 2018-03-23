@@ -342,7 +342,8 @@ static bool isInterestingTypealias(Type type) {
   // The 'Swift.AnyObject' typealias is not 'interesting'.
   if (aliasDecl->getName() ==
         aliasDecl->getASTContext().getIdentifier("AnyObject") &&
-      aliasDecl->getParentModule()->isStdlibModule()) {
+      (aliasDecl->getParentModule()->isStdlibModule() ||
+       aliasDecl->getParentModule()->isBuiltinModule())) {
     return false;
   }
 

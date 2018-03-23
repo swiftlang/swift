@@ -4201,7 +4201,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
         if (!alias ||
             !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
           // Fall back to the canonical type.
-          typeOrOffset = expectedType.get();
+          typeOrOffset = expectedType.get()->getCanonicalType();
           break;
         }
       }
@@ -4223,6 +4223,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       }
 
       subMap = genericSig->getSubstitutionMap(substitutions);
+    }
+
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      break;
     }
 
     typeOrOffset = BoundNameAliasType::get(alias, parentType, subMap,

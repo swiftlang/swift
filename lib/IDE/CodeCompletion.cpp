@@ -2731,10 +2731,22 @@ public:
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasInterfaceType()) {
       auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
-      if (underlyingType->hasError())
-        addTypeAnnotation(Builder, TAD->getDeclaredInterfaceType());
-      else
+      if (underlyingType->hasError()) {
+        Type parentType;
+        if (auto nominal =
+              TAD->getDeclContext()
+                ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+          parentType = nominal->getDeclaredInterfaceType();
+        }
+        addTypeAnnotation(
+                      Builder,
+                      BoundNameAliasType::get(const_cast<TypeAliasDecl *>(TAD),
+                                         parentType, SubstitutionMap(),
+                                         underlyingType));
+
+      } else {
         addTypeAnnotation(Builder, underlyingType);
+      }
     }
   }
 

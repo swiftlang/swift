@@ -3899,24 +3899,34 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // The protocol concrete type has an underlying type written in terms
   // of the protocol's 'Self' type.
-  auto type = concreteDecl->getDeclaredInterfaceType();
+  auto typealias = dyn_cast<TypeAliasDecl>(concreteDecl);
+  auto type = typealias ? typealias->getUnderlyingTypeLoc().getType()
+                        : concreteDecl->getDeclaredInterfaceType();
 
+  Type parentType;
+  SubstitutionMap subMap;
   if (proto) {
     // Substitute in the type of the current PotentialArchetype in
     // place of 'Self' here.
-    Type parentType = basePA->getDependentType(builder.getGenericParams());
+    parentType = basePA->getDependentType(builder.getGenericParams());
 
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+    subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
 
     type = type.subst(subMap, SubstFlags::UseErrorType);
   } else {
     // Substitute in the superclass type.
-    auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
-    auto superclassDecl = superclass->getClassOrBoundGenericClass();
-    type = superclass->getTypeOfMember(
-        superclassDecl->getParentModule(), concreteDecl,
-        concreteDecl->getDeclaredInterfaceType());
+    parentType = basePA->getEquivalenceClassIfPresent()->superclass;
+    auto superclassDecl = parentType->getClassOrBoundGenericClass();
+
+    subMap = parentType->getMemberSubstitutionMap(
+                           superclassDecl->getParentModule(), concreteDecl);
+    type = type.subst(subMap, SubstFlags::UseErrorType);
+  }
+
+  // If we had a typealias, form a sugared type.
+  if (typealias) {
+    type = BoundNameAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;

@@ -750,7 +750,7 @@ namespace {
       if (!decl)
         return nullptr;
 
-      return decl->getDeclaredInterfaceType();
+      return getAdjustedTypeDeclReferenceType(decl);
     }
 
     /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
@@ -778,15 +778,15 @@ namespace {
     }
 
     /// Retrieve the adjusted type of a reference to the given type declaration.
-    static Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
+    Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
       // If the imported declaration is a bridged NSError, dig out
       // the Code nested type. References to the enum type from C
       // code need to map to the code type (which is ABI compatible with C),
       // and the bridged error type is used elsewhere.
       if (auto codeDecl = getBridgedNSErrorCode(type))
-        return codeDecl->getDeclaredInterfaceType();
+        return Impl.getSugaredTypeReference(codeDecl);
 
-      return type->getDeclaredInterfaceType();
+      return Impl.getSugaredTypeReference(type);
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -2466,6 +2466,25 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   }
 
   return Type();
+}
+
+Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
+  // For typealiases, build a sugared type.
+  if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
+    // If this typealias is nested, retrieve the parent type.
+    Type parentType;
+    if (auto nominal =
+          typealias->getDeclContext()
+            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (!nominal->getGenericSignature())
+        parentType = nominal->getDeclaredInterfaceType();
+    }
+
+    return BoundNameAliasType::get(typealias, parentType, SubstitutionMap(),
+                                   typealias->getUnderlyingTypeLoc().getType());
+  }
+
+  return type->getDeclaredInterfaceType();
 }
 
 Type ClangImporter::Implementation::getNSCopyingType() {

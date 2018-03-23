@@ -1314,6 +1314,9 @@ SmallVector<Type, 2> BoundNameAliasType::getInnermostGenericArgs() const {
   auto genericSig = typealias->getGenericSignature();
   if (!genericSig) return result;
 
+  // If the substitution list was empty, bail out.
+  if (getSubstitutionList().empty()) return result;
+
   // Retrieve the substitutions for the generic parameters (only).
   unsigned numAllGenericParams = genericSig->getGenericParams().size();
   auto genericArgSubs = getSubstitutionList().slice(0, numAllGenericParams);
