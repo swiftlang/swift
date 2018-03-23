@@ -108,11 +108,7 @@ void SwitchEnumBuilder::emit() && {
     }
   }
 
-  // If we are asked to create a default block and it is specified that the
-  // default block should be emitted before normal cases, emit it now.
-  if (defaultBlockData &&
-      defaultBlockData->dispatchTime ==
-          DefaultDispatchTime::BeforeNormalCases) {
+  auto emitDefaultBlock = [&]() {
     SILBasicBlock *defaultBlock = defaultBlockData->block;
     SwitchCaseBranchDest branchDest = defaultBlockData->branchDest;
     DefaultCaseHandler handler = defaultBlockData->handler;
@@ -123,10 +119,21 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(defaultBlock);
     ManagedValue input = optional;
     if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
+      if (optional.isPlusOne(getSGF()))
+        input = builder.createOwnedPHIArgument(optional.getType());
+      else
+        input = builder.createGuaranteedPHIArgument(optional.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
+  };
+
+  // If we are asked to create a default block and it is specified that the
+  // default block should be emitted before normal cases, emit it now.
+  if (defaultBlockData &&
+      defaultBlockData->dispatchTime ==
+          DefaultDispatchTime::BeforeNormalCases) {
+    emitDefaultBlock();
   }
 
   for (NormalCaseData &caseData : caseDataArray) {
@@ -148,7 +155,10 @@ void SwitchEnumBuilder::emit() && {
           optional.getType().getEnumElementType(decl, builder.getModule());
       input = optional;
       if (!isAddressOnly) {
-        input = builder.createOwnedPHIArgument(inputType);
+        if (optional.isPlusOne(getSGF()))
+          input = builder.createOwnedPHIArgument(inputType);
+        else
+          input = builder.createGuaranteedPHIArgument(inputType);
       }
     }
     handler(input, std::move(presentScope));
@@ -159,19 +169,6 @@ void SwitchEnumBuilder::emit() && {
   // default block should be emitted after normal cases, emit it now.
   if (defaultBlockData &&
       defaultBlockData->dispatchTime == DefaultDispatchTime::AfterNormalCases) {
-    SILBasicBlock *defaultBlock = defaultBlockData->block;
-    auto branchDest = defaultBlockData->branchDest;
-    DefaultCaseHandler handler = defaultBlockData->handler;
-
-    // Don't allow cleanups to escape the conditional block.
-    SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
-    builder.emitBlock(defaultBlock);
-    ManagedValue input = optional;
-    if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
-    }
-    handler(input, std::move(presentScope));
-    builder.clearInsertionPoint();
+    emitDefaultBlock();
   }
 }

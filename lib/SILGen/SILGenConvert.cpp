@@ -393,9 +393,6 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
 
-  // All conversions happen at +1.
-  input = input.ensurePlusOne(*this, loc);
-
   SwitchEnumBuilder SEBuilder(B, loc, input);
   SILType noOptResultTy = resultTy.getOptionalObjectType();
   assert(noOptResultTy);
