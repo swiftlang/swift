@@ -12,10 +12,10 @@
 import resilient_enum
 import resilient_struct
 
-// ENUM_RES: @"$S14resilient_enum6MediumO8PamphletyA2CcACmFWC" = constant i32 0
-// ENUM_RES: @"$S14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC" = constant i32 1
-// ENUM_RES: @"$S14resilient_enum6MediumO5PaperyA2CmFWC" = constant i32 2
-// ENUM_RES: @"$S14resilient_enum6MediumO6CanvasyA2CmFWC" = constant i32 3
+// ENUM_RES: @"$S14resilient_enum6MediumO8PamphletyA2CcACmFWC" = {{.*}}constant i32 0
+// ENUM_RES: @"$S14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC" = {{.*}}constant i32 1
+// ENUM_RES: @"$S14resilient_enum6MediumO5PaperyA2CmFWC" = {{.*}}constant i32 2
+// ENUM_RES: @"$S14resilient_enum6MediumO6CanvasyA2CmFWC" = {{.*}}constant i32 3
 
 // ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO8PamphletyA2CcACmFWC" =
 // ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC" =
