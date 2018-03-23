@@ -776,8 +776,7 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
-
-typedef std::function<void(InputArgList &, unsigned)> RemainingArgsHandler;
+using RemainingArgsHandler = std::function<void(InputArgList &, unsigned)>;
 
 std::unique_ptr<InputArgList>
 parseArgsUntil(const llvm::opt::OptTable& Opts,
