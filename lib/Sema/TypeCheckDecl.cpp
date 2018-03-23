@@ -4366,28 +4366,6 @@ public:
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
-      {
-        // Check for duplicate enum members.
-        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
-        bool hasErrors = false;
-        for (auto *EED : ED->getAllElements()) {
-          auto Res = Elements.insert({ EED->getName(), EED });
-          if (!Res.second) {
-            EED->setInvalid();
-
-            auto PreviousEED = Res.first->second;
-            TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
-            TC.diagnose(PreviousEED->getLoc(),
-                        diag::previous_decldef, true, EED->getName());
-            hasErrors = true;
-          }
-        }
-
-        // If one of the cases is invalid, let's mark
-        // whole enum as invalid as well.
-        if (hasErrors)
-          ED->setInvalid();
-      }
     }
 
     if (!IsFirstPass) {
@@ -4401,7 +4379,7 @@ public:
 
       TC.checkConformancesInContext(ED, ED);
     }
-    
+
     for (Decl *member : ED->getMembers())
       visit(member);
     

@@ -2163,10 +2163,6 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
 
-// Duplicate declarations
-ERROR(duplicate_enum_element,none,
-      "duplicate definition of enum element",())
-
 // Property behaviors
 ERROR(property_behavior_not_protocol,none,
       "property behavior name must refer to a protocol", ())
