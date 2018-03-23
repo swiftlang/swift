@@ -169,7 +169,7 @@ struct MagicKingdom<K> : Kingdom {
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
+  return Victory(magify(pair)) // ok (tuple-to-tuple) conversion on `pair`
 }
 
 
