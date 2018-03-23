@@ -3290,6 +3290,14 @@ ${assignmentOperatorComment('%', True)}
     self._value = _value
   }
 
+  // FIXME(integers): in order to remove this, the simd.swift.gyb should be
+  // updated
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public init(_bits: Builtin.Int${bits}) {
+    self._value = _bits
+  }
+
 % for x in binaryBitwise:
 ${assignmentOperatorComment(x.operator, True)}
   @_inlineable // FIXME(sil-serialize-all)
