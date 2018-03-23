@@ -39,6 +39,7 @@ public typealias OwnedPyObject = UnsafeMutablePointer<PyObject>
 ///
 /// - TODO: It sure would be nice to be able to express this as a Swift struct
 ///   with C++ style user-defined copy ctors, move operators, etc.
+@_versioned @_fixed_layout
 final class PyRef {
   private var state: OwnedPyObject
 
@@ -73,10 +74,12 @@ final class PyRef {
 /// returned from Python calls and member references, and is overloaded to
 /// support the standard operations that Python supports.
 @dynamicMemberLookup
+@_fixed_layout
 public struct PyValue {
   /// This is the actual handle to a Python value that we represent.
   fileprivate var state: PyRef
 
+  @_versioned
   init(_ value: PyRef) {
     state = value
   }
@@ -183,6 +186,7 @@ public extension PyValue {
 
 /// This represents the result of a failable operation when working with
 /// Python values.
+@_fixed_layout
 public enum PythonError : Error {
   /// This represents an exception thrown out of a Python API.  This can occur
   /// on calls.
@@ -248,6 +252,7 @@ private func throwPythonErrorIfPresent() throws {
 /// This type is a PyValue produced when the user cares about getting an
 /// exception out of a call.  We wrap this up and reflect it back as a thrown
 /// Swift error.
+@_fixed_layout
 public struct ThrowingPyValue {
   private var state: PyValue
 
@@ -382,6 +387,7 @@ public extension PyValue {
 /// operation (like a member lookup or subscript) into a failable operation that
 /// returns an optional.
 @dynamicMemberLookup
+@_fixed_layout
 public struct CheckingPyValue {
   private var state: PyValue
 
@@ -593,6 +599,7 @@ public extension PyValue {
 /// The Python interface.
 public let Python = PythonInterface()
 
+@_fixed_layout
 public struct PythonInterface {
   /// A hash table of the builtins provided by the Python language.
   public let builtins: PyValue
