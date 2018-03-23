@@ -53,7 +53,7 @@ public extension IndexPath {
 
 public extension URLResourceValues {
     /// Returns all thumbnails as a single NSImage.
-    @available(OSX 10.10, *)
+    @available(macOS 10.10, *)
     public var thumbnail : NSImage? {
         return allValues[URLResourceKey.thumbnailKey] as? NSImage
     }
@@ -74,7 +74,7 @@ public extension URLResourceValues {
     }
     
     /// Returns a dictionary of NSImage objects keyed by size.
-    @available(OSX 10.10, *)
+    @available(macOS 10.10, *)
     public var thumbnailDictionary : [URLThumbnailDictionaryItem : NSImage]? {
         return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailDictionaryItem : NSImage]
     }
