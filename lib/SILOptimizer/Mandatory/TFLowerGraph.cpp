@@ -901,11 +901,58 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
       break;
     }
+    case SILTensorOpInfo::OperandClass::ShapeArray: {
+      auto numShapes = (int)cast<IntegerLiteralInst>(operand)
+                                ->getValue().getLimitedValue();
+
+      SmallVector<int64_t, 8> dims;
+      SmallVector<int, 3> numDims;
+
+      for (int shape = 0; shape != numShapes; ++shape) {
+        auto prevNumDims = dims.size();
+        ++i;  // We consumed an operand.
+        auto nextOperand = inst->getOperand(i);
+        assert(tfopInfo.operandClasses[i].second ==
+                                        SILTensorOpInfo::OperandClass::Shape &&
+               "expected a shape value");
+
+        decodeShapeElements(nextOperand, dims);
+        numDims.push_back(int(dims.size()-prevNumDims));
+      }
+
+      // Now that we've build the array of dimensions, convert it to the array
+      // of pointers that TensorFlow needs.  This is safe now that the vector
+      // has finished its resizing.
+      SmallVector<int64_t*, 8> dimPtrs;
+      auto dimPtr = dims.data();
+      for (int shape = 0; shape != numShapes; ++shape) {
+        dimPtrs.push_back(dimPtr);
+        dimPtr += numDims[shape];
+      }
+
+      TF_SetAttrShapeList(op, name.c_str(), dimPtrs.data(), numDims.data(),
+                          numShapes);
+      break;
+    }
     case SILTensorOpInfo::OperandClass::Array: {
       // Get all of the elements that contribute to this array value.
       Type eltType;
       SmallVector<SingleValueInstruction*, 4> elements;
       collectArrayElements(operand, eltType, elements);
+
+      if (eltType->is<MetatypeType>()) {
+        SmallVector<TF_DataType, 4> types;
+        for (auto elt : elements) {
+          auto *mti = cast<MetatypeInst>(elt);
+          auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
+          auto dtype = convertSwiftTypeToTF(ty);
+          assert(dtype && "expected a valid tensorflow type");
+          types.push_back((TF_DataType)dtype);
+        }
+
+        TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
+        break;
+      }
 
       if (eltType->getString() == "String") {
         SmallVector<const void*, 4> pointers;
@@ -954,8 +1001,6 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         break;
       }
 
-      // TODO: TF_SetAttrShapeList
-      // TODO: TF_SetAttrTypeList
       llvm_unreachable(("unknown attribute array type: " + typeName).c_str());
     }
     case SILTensorOpInfo::OperandClass::ArrayElement:
