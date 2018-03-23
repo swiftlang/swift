@@ -103,6 +103,9 @@
 // CHECK-SWIFT-3: var multiVersionedGlobal345Both_4: Int32
 // CHECK-SWIFT-3: @available(swift, introduced: 5, renamed: "multiVersionedGlobal345Both_3")
 // CHECK-SWIFT-3: var multiVersionedGlobal345Both_5: Int32
+// CHECK-SWIFT-3: @available(swift, obsoleted: 3, renamed: "multiVersionedGlobal34_4_2_not_5")
+// CHECK-SWIFT-3: var multiVersionedGlobal34_4_2: Int32
+// CHECK-SWIFT-3: var multiVersionedGlobal34_4_2_not_5: Int32
 
 
 // CHECK-SWIFT-4: @available(swift, obsoleted: 3, renamed: "multiVersionedGlobal4_4")
@@ -200,6 +203,9 @@
 // CHECK-SWIFT-4: var multiVersionedGlobal345Both_4: Int32
 // CHECK-SWIFT-4: @available(swift, introduced: 5, renamed: "multiVersionedGlobal345Both_4")
 // CHECK-SWIFT-4: var multiVersionedGlobal345Both_5: Int32
+// CHECK-SWIFT-4: @available(swift, obsoleted: 3, renamed: "multiVersionedGlobal34_4_2_not_5")
+// CHECK-SWIFT-4: var multiVersionedGlobal34_4_2: Int32
+// CHECK-SWIFT-4: var multiVersionedGlobal34_4_2_not_5: Int32
 
 // CHECK-SWIFT-4-2: @available(swift, obsoleted: 3, renamed: "multiVersionedGlobal4_4_2")
 // CHECK-SWIFT-4-2: var multiVersionedGlobal4: Int32
@@ -296,6 +302,10 @@
 // CHECK-SWIFT-4-2: var multiVersionedGlobal345Both_4: Int32
 // CHECK-SWIFT-4-2: @available(swift, introduced: 5, renamed: "multiVersionedGlobal345Both_4_2")
 // CHECK-SWIFT-4-2: var multiVersionedGlobal345Both_5: Int32
+// CHECK-SWIFT-4-2: @available(swift, obsoleted: 3, renamed: "multiVersionedGlobal34_4_2_not_5")
+// CHECK-SWIFT-4-2: var multiVersionedGlobal34_4_2: Int32
+// CHECK-SWIFT-4-2: var multiVersionedGlobal34_4_2_not_5: Int32
+
 
 // CHECK-SWIFT-5: var multiVersionedGlobal4: Int32
 // CHECK-SWIFT-5: @available(swift, obsoleted: 5, renamed: "multiVersionedGlobal4")
@@ -392,3 +402,5 @@
 // CHECK-SWIFT-5: @available(swift, obsoleted: 5, renamed: "multiVersionedGlobal345Both_5")
 // CHECK-SWIFT-5: var multiVersionedGlobal345Both_4: Int32
 // CHECK-SWIFT-5: var multiVersionedGlobal345Both_5: Int32
+// CHECK-SWIFT-5: @available(swift, obsoleted: 5, renamed: "multiVersionedGlobal34_4_2")
+// CHECK-SWIFT-5: var multiVersionedGlobal34_4_2_not_5: Int32

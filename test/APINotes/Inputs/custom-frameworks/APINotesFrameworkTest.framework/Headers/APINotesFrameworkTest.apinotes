@@ -327,3 +327,5 @@ SwiftVersions:
         SwiftName: multiVersionedGlobal45Notes_4_2
       - Name: multiVersionedGlobal45Both
         SwiftName: multiVersionedGlobal45Both_4_2
+      - Name: multiVersionedGlobal34_4_2
+        SwiftName: multiVersionedGlobal34_4_2_not_5
