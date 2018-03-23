@@ -28,6 +28,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -707,18 +708,13 @@ public:
           // The current basic block must be a successor of the dbg.value().
           continue;
 
-        auto It = llvm::BasicBlock::iterator(Var);
-        for (auto I = std::next(It), E = BB->end(); I != E; ++I) {
-          auto *DVI = dyn_cast<llvm::DbgValueInst>(I);
-          if (DVI && DVI->getValue() == Var)
+        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
+        llvm::findDbgValues(DbgValues, Var);
+        for (auto *DVI : DbgValues)
+          if (DVI->getParent() == BB)
             IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
                 DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
                 DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
-          else
-            // Found all dbg.value intrinsics describing this location.
-            // FIXME: How do we know that there aren't more dbg.values?
-            break;
-        }
       }
     }
   }
@@ -772,10 +768,18 @@ public:
     if (ArgNo == 0)
       // Otherwise only if debug value range extension is not feasible.
       if (!needsShadowCopy(Storage)) {
-        // Mark for debug value range extension unless this is a constant.
-        if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
-          if (ValueVariables.insert(Value).second)
-            ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+        // Mark for debug value range extension unless this is a constant, or
+        // unless it's not possible to emit lifetime-extending uses for this.
+        if (auto *Value = dyn_cast<llvm::Instruction>(Storage)) {
+          // Emit a use at the start of the storage lifetime to force early
+          // materialization. This makes variables available for inspection as
+          // soon as they are defined.
+          bool ExtendedLifetime = emitLifetimeExtendingUse(Value);
+          if (ExtendedLifetime)
+            if (ValueVariables.insert(Value).second)
+              ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+        }
+
         return Storage;
       }
     return emitShadowCopy(Storage, Scope, Name, ArgNo, Align);
