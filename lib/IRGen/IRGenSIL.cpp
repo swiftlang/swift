@@ -28,6 +28,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -646,6 +647,41 @@ public:
     return Name;
   }
 
+  /// Try to emit an inline assembly gadget which extends the lifetime of
+  /// \p Var. Returns whether or not this was successful.
+  bool emitLifetimeExtendingUse(llvm::Value *Var) {
+    llvm::Type *ArgTys;
+    auto *Ty = Var->getType();
+    // Vectors, Pointers and Floats are expected to fit into a register.
+    if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
+      ArgTys = {Ty};
+    else {
+      // If this is not a scalar or vector type, we can't handle it.
+      if (isa<llvm::CompositeType>(Ty))
+        return false;
+      // The storage is guaranteed to be no larger than the register width.
+      // Extend the storage so it would fit into a register.
+      llvm::Type *IntTy;
+      switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
+      case 64:
+        IntTy = IGM.Int64Ty;
+        break;
+      case 32:
+        IntTy = IGM.Int32Ty;
+        break;
+      default:
+        llvm_unreachable("unsupported register width");
+      }
+      ArgTys = {IntTy};
+      Var = Builder.CreateZExtOrBitCast(Var, IntTy);
+    }
+    // Emit an empty inline assembler expression depending on the register.
+    auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
+    auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
+    Builder.CreateAsmCall(InlineAsm, Var);
+    return true;
+  }
+
   /// At -Onone, forcibly keep all LLVM values that are tracked by
   /// debug variables alive by inserting an empty inline assembler
   /// expression depending on the value in the blocks dominated by the
@@ -654,53 +690,31 @@ public:
     if (IGM.IRGen.Opts.shouldOptimize())
       return;
     for (auto &Variable : ValueDomPoints) {
-      auto VarDominancePoint = Variable.second;
-      llvm::Value *Storage = Variable.first;
+      llvm::Instruction *Var = Variable.first;
+      DominancePoint VarDominancePoint = Variable.second;
       if (getActiveDominancePoint() == VarDominancePoint ||
           isActiveDominancePointDominatedBy(VarDominancePoint)) {
-        llvm::Type *ArgTys;
-        auto *Ty = Storage->getType();
-        // Vectors, Pointers and Floats are expected to fit into a register.
-        if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
-          ArgTys = { Ty };
-        else {
-          // If this is not a scalar or vector type, we can't handle it.
-          if (isa<llvm::CompositeType>(Ty))
-            continue;
-          // The storage is guaranteed to be no larger than the register width.
-          // Extend the storage so it would fit into a register.
-          llvm::Type *IntTy;
-          switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
-          case 64: IntTy = IGM.Int64Ty; break;
-          case 32: IntTy = IGM.Int32Ty; break;
-          default: llvm_unreachable("unsupported register width");
-          }
-          ArgTys = { IntTy };
-          Storage = Builder.CreateZExtOrBitCast(Storage, IntTy);
-        }
-        // Emit an empty inline assembler expression depending on the register.
-        auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
-        auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
-        Builder.CreateAsmCall(InlineAsm, Storage);
-        // Propagate the dbg.value intrinsics into the later basic blocks.  Note
+        bool ExtendedLifetime = emitLifetimeExtendingUse(Var);
+        if (!ExtendedLifetime)
+          continue;
+
+        // Propagate dbg.values for Var into the current basic block. Note
         // that this shouldn't be necessary. LiveDebugValues should be doing
         // this but can't in general because it currently only tracks register
         // locations.
-        llvm::Instruction *Value = Variable.first;
-        auto It = llvm::BasicBlock::iterator(Value);
-        auto *BB = Value->getParent();
-        auto *CurBB = Builder.GetInsertBlock();
-        if (BB != CurBB)
-          for (auto I = std::next(It), E = BB->end(); I != E; ++I) {
-            auto *DVI = dyn_cast<llvm::DbgValueInst>(I);
-            if (DVI && DVI->getValue() == Value)
-              IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                  DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                  DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
-            else
-              // Found all dbg.value intrinsics describing this location.
-              break;
-        }
+        llvm::BasicBlock *BB = Var->getParent();
+        llvm::BasicBlock *CurBB = Builder.GetInsertBlock();
+        if (BB == CurBB)
+          // The current basic block must be a successor of the dbg.value().
+          continue;
+
+        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
+        llvm::findDbgValues(DbgValues, Var);
+        for (auto *DVI : DbgValues)
+          if (DVI->getParent() == BB)
+            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
+                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
+                DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
       }
     }
   }
@@ -754,10 +768,18 @@ public:
     if (ArgNo == 0)
       // Otherwise only if debug value range extension is not feasible.
       if (!needsShadowCopy(Storage)) {
-        // Mark for debug value range extension unless this is a constant.
-        if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
-          if (ValueVariables.insert(Value).second)
-            ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+        // Mark for debug value range extension unless this is a constant, or
+        // unless it's not possible to emit lifetime-extending uses for this.
+        if (auto *Value = dyn_cast<llvm::Instruction>(Storage)) {
+          // Emit a use at the start of the storage lifetime to force early
+          // materialization. This makes variables available for inspection as
+          // soon as they are defined.
+          bool ExtendedLifetime = emitLifetimeExtendingUse(Value);
+          if (ExtendedLifetime)
+            if (ValueVariables.insert(Value).second)
+              ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+        }
+
         return Storage;
       }
     return emitShadowCopy(Storage, Scope, Name, ArgNo, Align);
