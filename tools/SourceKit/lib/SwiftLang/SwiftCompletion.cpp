@@ -112,7 +112,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                                   std::string &Error) {
 
   trace::TracedOperation TracedInit(trace::OperationKind::CodeCompletionInit);
-  if (trace::enabled()) {
+  if (TracedInit.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs,
                          UnresolvedInputFile->getBufferIdentifier(),
@@ -190,7 +190,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
 
 
   trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
     trace::initTraceFiles(SwiftArgs, CI);

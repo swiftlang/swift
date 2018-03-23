@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_SUPPORT_TRACING_H
 
 #include "SourceKit/Support/UIdent.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/Optional.h"
 
 #include <vector>
@@ -27,30 +28,33 @@ struct SwiftArguments {
 };
 
 enum class OperationKind : uint64_t {
-  SimpleParse,
-  PerformSema,
-  AnnotAndDiag,
+  SimpleParse = 1 << 0,
+  PerformSema = 1 << 1,
+  AnnotAndDiag = 1 << 2,
 
-  ReadSyntaxInfo,
-  ReadDiagnostics,
-  ReadSemanticInfo,
+  ReadSyntaxInfo = 1 << 3,
+  ReadDiagnostics = 1 << 4,
+  ReadSemanticInfo = 1 << 5,
 
-  IndexModule,
-  IndexSource,
+  IndexModule = 1 << 6,
+  IndexSource = 1 << 7,
 
-  CursorInfoForIFaceGen,
-  CursorInfoForSource,
+  CursorInfoForIFaceGen = 1 << 8,
+  CursorInfoForSource = 1 << 9,
 
-  ExpandPlaceholder,
-  FormatText,
-  RelatedIdents,
-  CodeCompletion,
-  OpenInterface,
-  OpenHeaderInterface,
+  ExpandPlaceholder = 1 << 10,
+  FormatText = 1 << 11,
+  RelatedIdents = 1 << 12,
+  CodeCompletion = 1 << 13,
+  OpenInterface = 1 << 14,
+  OpenHeaderInterface = 1 << 15,
 
-  CodeCompletionInit,
+  CodeCompletionInit = 1 << 16,
+
+  Last = CodeCompletionInit,
+  All = (Last << 1) - 1
 };
-  
+
 typedef std::vector<std::pair<std::string, std::string>> StringPairs;
 
 struct SwiftInvocation {
@@ -68,40 +72,51 @@ public:
 
   // Trace start of SourceKit operation
   virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
-                                 const SwiftInvocation &Inv,
-                                 const StringPairs &OpArgs) = 0;
-  
+                                const SwiftInvocation &Inv,
+                                const StringPairs &OpArgs) = 0;
+
   // Operation previously started with startXXX has finished
-  virtual void operationFinished(uint64_t OpId) = 0;
+  virtual void operationFinished(uint64_t OpId, OperationKind OpKind) = 0;
+
+  /// Returns the set of operations this consumer is interested in.
+  ///
+  /// Note: this is only a hint. Implementations should check the operation kind
+  /// if they need to.
+  virtual swift::OptionSet<OperationKind> desiredOperations() {
+    return OperationKind::All;
+  }
 };
 
 // Is tracing enabled
-bool enabled();
+bool anyEnabled();
 
-// Enable tracing
-void enable();
+// Is tracing enabled for \p op.
+bool enabled(OperationKind op);
 
-// Disable tracing
-void disable();
-  
 // Trace start of SourceKit operation, returns OpId
 uint64_t startOperation(OperationKind OpKind,
                         const SwiftInvocation &Inv,
                         const StringPairs &OpArgs = StringPairs());
 
 // Operation previously started with startXXX has finished
-void operationFinished(uint64_t OpId);
+void operationFinished(uint64_t OpId, OperationKind OpKind);
 
 // Register trace consumer.
 void registerConsumer(TraceConsumer *Consumer);
+
+// Register trace consumer.
+void unregisterConsumer(TraceConsumer *Consumer);
 
 // Class that utilizes the RAII idiom for the operations being traced
 class TracedOperation final {
   OperationKind OpKind;
   llvm::Optional<uint64_t> OpId;
+  bool Enabled;
 
 public:
-  TracedOperation(OperationKind OpKind) : OpKind(OpKind) {}
+  TracedOperation(OperationKind OpKind) : OpKind(OpKind) {
+    Enabled = trace::enabled(OpKind);
+  }
   ~TracedOperation() {
     finish();
   }
@@ -111,6 +126,8 @@ public:
   TracedOperation(const TracedOperation &) = delete;
   TracedOperation &operator=(const TracedOperation &) = delete;
 
+  bool enabled() const { return Enabled; }
+
   void start(const SwiftInvocation &Inv,
              const StringPairs &OpArgs = StringPairs()) {
     assert(!OpId.hasValue());
@@ -119,7 +136,7 @@ public:
 
   void finish() {
     if (OpId.hasValue()) {
-      operationFinished(OpId.getValue());
+      operationFinished(OpId.getValue(), OpKind);
       OpId.reset();
     }
   }

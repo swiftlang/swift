@@ -159,7 +159,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
   trace::TracedOperation TracedOp(trace::OperationKind::IndexModule);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     SwiftArgs.Args.PrimaryFile = Input->getBufferIdentifier();
@@ -293,7 +293,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
 
   trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile, Args);
     trace::initTraceFiles(SwiftArgs, CI);

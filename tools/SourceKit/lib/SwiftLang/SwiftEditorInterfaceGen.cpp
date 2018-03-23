@@ -708,7 +708,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
   }
 
   trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
@@ -784,7 +784,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     return;
   }
   trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
@@ -827,7 +827,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
 
   trace::TracedOperation TracedOp(trace::OperationKind::OpenHeaderInterface);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file

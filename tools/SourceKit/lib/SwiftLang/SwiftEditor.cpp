@@ -658,7 +658,7 @@ public:
     auto &P = Parser->getParser();
 
     trace::TracedOperation TracedOp(trace::OperationKind::SimpleParse);
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation Info;
       initArgsAndPrimaryFile(Info);
       auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)->getBuffer();
@@ -957,7 +957,7 @@ public:
     unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
     trace::TracedOperation TracedOp(trace::OperationKind::AnnotAndDiag);
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation SwiftArgs;
       SemaInfoRef->getInvocation()->raw(SwiftArgs.Args.Args,
                                         SwiftArgs.Args.PrimaryFile);
@@ -1785,7 +1785,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   trace::TracedOperation TracedOp(trace::OperationKind::ReadSyntaxInfo);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
     TracedOp.start(Info);
@@ -1837,7 +1837,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
   trace::TracedOperation TracedOp(trace::OperationKind::ReadSemanticInfo);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
     TracedOp.start(Info);
@@ -1900,7 +1900,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   unsigned BufID = SyntaxInfo->getBufferID();
 
   trace::TracedOperation TracedOp(trace::OperationKind::FormatText);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     // Compiler arguments do not matter
     auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
@@ -1950,7 +1950,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
   }
 
   trace::TracedOperation TracedOp(trace::OperationKind::ExpandPlaceholder);
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SyntaxInfo->initArgsAndPrimaryFile(SwiftArgs);
     auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);

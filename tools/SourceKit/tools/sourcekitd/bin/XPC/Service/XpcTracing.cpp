@@ -92,13 +92,13 @@ class XpcTraceConsumer : public SourceKit::trace::TraceConsumer {
 public:
   virtual ~XpcTraceConsumer() = default;
 
-  // Operation previously started with startXXX has finished
-  virtual void operationFinished(uint64_t OpId) override;
-
   // Trace start of SourceKit operation
-  virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
-                                const SwiftInvocation &Inv,
-                                const StringPairs &OpArgs) override;
+  void operationStarted(uint64_t OpId, OperationKind OpKind,
+                        const SwiftInvocation &Inv,
+                        const StringPairs &OpArgs) override;
+
+  // Operation previously started with startXXX has finished
+  void operationFinished(uint64_t OpId, OperationKind OpKind) override;
 };
 
 // Trace start of SourceKit operation
@@ -117,7 +117,7 @@ void XpcTraceConsumer::operationStarted(uint64_t OpId,
 }
 
 // Operation previously started with startXXX has finished
-void XpcTraceConsumer::operationFinished(uint64_t OpId) {
+void XpcTraceConsumer::operationFinished(uint64_t OpId, OperationKind OpKind) {
   xpc_object_t Contents = xpc_array_create(nullptr, 0);
   append(Contents, trace::ActionKind::OperationFinished);
   append(Contents, OpId);
@@ -126,7 +126,10 @@ void XpcTraceConsumer::operationFinished(uint64_t OpId) {
 
 static XpcTraceConsumer Instance;
 
-void trace::initialize() {
+void trace::enableXPCTracing() {
   SourceKit::trace::registerConsumer(&Instance);
 }
 
+void trace::disableXPCTracing() {
+  SourceKit::trace::unregisterConsumer(&Instance);
+}
