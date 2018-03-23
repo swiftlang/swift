@@ -170,7 +170,7 @@ func bridgeNonnullBlockResult() {
 }
 
 // CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tF
-func bridgeNoescapeBlock(fn: () -> ()) {
+func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU_
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
@@ -240,6 +240,8 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock(fn)
+
+  noescapeBlock(optFn)
 
   noescapeBlockAlias { }
   noescapeBlockAlias(fn)
