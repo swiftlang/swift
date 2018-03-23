@@ -83,6 +83,13 @@ enum class PartitioningClass {
   /// Scalar instructions that check for overflow like "sadd.with.overflow" and
   /// friends.
   OverflowCheckingInst,
+
+  /// This is an explicit send to the device, which is sugared as '.toDevice()'.
+  ExplicitSend,
+
+  /// This is an explicit receive from the device, which is sugared as
+  /// '.toHost()'.
+  ExplicitReceive,
 };
 
 static PartitioningClass classifyInst(SILInstruction *inst) {
@@ -106,6 +113,10 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
         return PartitioningClass::GetScalarOrDie;
       if (fn->getName().startswith("__tf_hoistable_"))
         return PartitioningClass::Hoistable;
+      if (fn->getName() == "__tf_send")
+        return PartitioningClass::ExplicitSend;
+      if (fn->getName() == "__tf_receive")
+        return PartitioningClass::ExplicitReceive;
     }
   }
 
@@ -695,11 +706,10 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
-    if (auto *callee = dyn_cast<FunctionRefInst>(apply->getCallee()))
-      if (callee->getReferencedFunction()->getName().contains("__tf_send")) {
-        explicitCopyMarkers.insert(apply);
-        return;
-      }
+    if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
+      explicitCopyMarkers.insert(apply);
+      return;
+    }
 
   // If we are running this in the context of an expression run in the REPL or
   // playgrounds, or script mode, then we should never emit a warning: we know
@@ -806,12 +816,10 @@ bool TFFunctionPartition::
 diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
-  if (auto *apply = dyn_cast<ApplyInst>(user))
-    if (auto *fn = dyn_cast<FunctionRefInst>(apply->getCallee()))
-      if (fn->getReferencedFunction()->getName().contains("__tf_receive")) {
-        explicitCopyMarkers.insert(apply);
-        return false;
-      }
+  if (classifyInst(user) == PartitioningClass::ExplicitReceive) {
+    explicitCopyMarkers.insert(user);
+    return false;
+  }
 
   // If we are running this in the context of an expression run in the REPL or
   // playgrounds, or script mode, then we should never emit a warning: we know
@@ -1172,6 +1180,8 @@ static bool canMoveInstruction(SILInstruction *inst) {
   switch (classifyInst(inst)) {
   case PartitioningClass::GetScalarOrDie:
   case PartitioningClass::Hoistable:
+  case PartitioningClass::ExplicitSend:
+  case PartitioningClass::ExplicitReceive:
     return true;
   default:
     return false;
