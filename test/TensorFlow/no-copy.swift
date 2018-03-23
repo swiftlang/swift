@@ -90,9 +90,10 @@ public func testConstantArray() -> TensorHandle<Float> {
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-  let a = sigmoid(x.toDevice()).toHost()
+  let a = sigmoid(x.toDevice())
   let b = sigmoid(y.toDevice()).toHost()
-  return (a, b)
+  // FIXME: b/76177896 the toHost() call should be movable up.
+  return (a.toHost(), b)
 }
 
 // Likewise, mean and max shouldn't cause send/receive errors.
