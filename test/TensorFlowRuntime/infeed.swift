@@ -21,10 +21,25 @@ func testScalarInput() {
     return (x+y).array.scalars[0]
   }
 
-  _RuntimeConfig.executionMode = .tpu
   expectNearlyEqual(3.7, add(1.3, 2.4), byError: 0.1)
 }
 InfeedTests.testTPU("ScalarInput", testScalarInput)
+
+InfeedTests.testTPU("JustDataset") {
+  let result: Tensor<Int32> = #tfop(
+    "tfc.makeIteratorGetNextWithDatasets",
+    filepath: "dummy_path")
+  // 1 is the magic output currently hard-coded.
+  expectEqual(result.array.scalars[0], 1)
+}
+
+InfeedTests.testTPU("DatasetWithOtherNodes") {
+  // 1 is the magic output of the iterator currently hard-coded.
+  let x: Tensor<Int32> = #tfop("tfc.makeIteratorGetNextWithDatasets",
+    filepath: "dummy_path")
+  let result = x + 1
+  expectEqual(result.array.scalars[0], 2)
+}
 
 #if false
 // TODO(hongm): Extend shape info support to make this test work.
