@@ -1076,6 +1076,12 @@ public:
     if (!F->shouldOptimize())
       return;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // FIXME: This pass is incredibly slow with large functions.  Disable it
+    // when EnableARCOptimizations is disabled.
+    if (!F->getModule().getOptions().EnableARCOptimizations)
+      return;
+
     // Return if there is critical edge and we are disabling critical edge
     // splitting.
     if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))

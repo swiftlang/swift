@@ -12,7 +12,7 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test3Adds{{.*}}
-// CHECK: sil [thunk] [always_inline] @{{.*}}test3Adds{{.*}} : $@convention(thin) (@owned Tensor<Int32>, @owned Tensor<Int32>, @owned Tensor<Int32>) -> () {
+// CHECK: sil shared @{{.*}}test3Adds{{.*}} : $@convention(thin)
 
 // CHECK-NOT: retain
 // CHECK-NOT: release
@@ -20,9 +20,12 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 // These 3 retains are the for x, y, z to make sure they are live across the
 // start call.
 //
-// CHECK: retain_value %0 : $Tensor<Int32>
-// CHECK: retain_value %1 : $Tensor<Int32>
-// CHECK: retain_value %2 : $Tensor<Int32>
+// CHECK: [[X:%.*]] = struct_extract %0 : $Tensor<Int32>, #Tensor.handle
+// CHECK: strong_retain [[X]] : $TensorHandle<Int32>
+// CHECK: [[Y:%.*]] = struct_extract %1 : $Tensor<Int32>, #Tensor.handle
+// CHECK: strong_retain [[Y]] : $TensorHandle<Int32>
+// CHECK: [[Z:%.*]] = struct_extract %2 : $Tensor<Int32>, #Tensor.handle
+// CHECK: strong_retain [[Z]] : $TensorHandle<Int32>
 //
 // We're passing 3 TensorHandle's into the StartTensorComputation call.
 // CHECK: alloc_stack $(OpaquePointer, OpaquePointer, OpaquePointer)
@@ -39,7 +42,6 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 // CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
-// CHECK: release_value {{.*}} : $Tensor<Int32>
 // CHECK-LABEL: ---
 
 
@@ -49,7 +51,7 @@ public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorSingleUse{{.*}}
-// CHECK: sil [thunk] [always_inline] @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) (@owned Tensor<Int32>) -> () {
+// CHECK: sil shared @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) (@guaranteed Tensor<Int32>) -> () {
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
@@ -66,8 +68,7 @@ public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
 // CHECK: strong_release [[H]] : $TensorHandle<Int32>
 //
 // For the input arg c to the second add, compiler has cancelled out the pair of
-// retain and release. There should be no more retain instructions.
-// CHECK-NOT: strong_retain [[H]] : $TensorHandle<Int32>
+// retain and release.
 //
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 //
@@ -83,7 +84,7 @@ public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorMultiUses{{.*}}
-// CHECK: sil [thunk] [always_inline] @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin)
+// CHECK: sil shared @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin)
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
@@ -99,10 +100,9 @@ public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
 // CHECK: strong_release [[H]] : $TensorHandle<Int32>
 // CHECK: strong_release [[H]] : $TensorHandle<Int32>
 //
-// No more retain instructions.
-// CHECK-NOT: strong_retain [[H]] : $TensorHandle<Int32>
 //
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 //
 // This final release balances the original instruction that generated H.
 // CHECK: strong_release [[H]] : $TensorHandle<Int32>
+// CHECK-LABEL: ---

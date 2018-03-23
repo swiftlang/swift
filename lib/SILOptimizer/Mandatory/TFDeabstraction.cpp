@@ -271,8 +271,19 @@ void TFDeabstraction::inlineCalls() {
     // using it or (most likely) that there is a now-dead witness table.
     //
     // TODO: Build infra to find unused witness tables and remove them.
-    if (callee->getRefCount() != 0)
+    if (callee->getRefCount() != 0) {
+
+      // FIXME: As a super hack, disable all optimization of the inlined
+      // methods that are defined and kept alive by the DifferentiableModule
+      // abstraction in the TensorFlow module.  These don't get removed because
+      // of the witness tables for DifferentiableModule, but we know that they
+      // don't matter.  Don't burn time optimizing them.
+      if (callee->getName().contains("adjoint3for4with") || //adjoint(for:with:
+          callee->getName().contains("6primal3for")) // primal(for:)
+        callee->setOptimizationMode(OptimizationMode::NoOptimization);
+
       continue;
+    }
 
     // If this is a public function then we can't remove it either.
     if (callee->isPossiblyUsedExternally())
@@ -1687,6 +1698,13 @@ void TFDeabstraction::doIt() {
   checkAndCanonicalizeAttributes();
 
   logCurrentState("Result", /*detailed*/false);
+
+  // We're currently relying on the performance optimizer to do some stuff, but
+  // for large testcacses it is doing bad stuff.
+  // FIXME: Should be eliminated when partitioning happens as part of
+  // deabstraction, because then the optimizer won't be seeing all of our tensor
+  // stuff.
+  fn.getModule().getOptions().EnableARCOptimizations = false;
 }
 
 

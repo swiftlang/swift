@@ -370,7 +370,7 @@ public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
 
 /*
  CHECK-LABEL: --- TFPartition Host Result: {{.*}}liveOutTest{{.*}}
- CHECK: sil  [thunk] [always_inline] @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@owned Tensor2D<Float>, @owned Tensor2D<Float>, @owned Tensor2D<Float>) -> @owned Tensor2D<Float> {
+ CHECK: sil shared @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@guaranteed Tensor2D<Float>, @guaranteed Tensor2D<Float>, @guaranteed Tensor2D<Float>) -> @owned Tensor2D<Float> {
 
  // [[RESULTBUF:%.*]] = alloc_stack $OpaquePointer
  // [[RESULTACCESS:%.*]] = begin_access [modify] [static] [[RESULTBUF]] : $*OpaquePointer
