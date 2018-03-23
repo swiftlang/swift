@@ -188,6 +188,7 @@ private:
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
     friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
+    friend void TypeConverter::pushGenericContext(CanGenericSignature signature);
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
