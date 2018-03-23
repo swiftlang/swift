@@ -2111,13 +2111,17 @@ static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
         // Walk the base expression to ensure we erase any existentials within
         // it.
         base = base->walk(*this);
-        
-        bool inserted = OpenExistentials.insert({archetypeVal, base}).second;
-        assert(inserted && "OpaqueValue appears multiple times?");
-        (void)inserted;
+
+        registerOpaqueValue(archetypeVal, base);
         return { true, OOE->getSubExpr() };
       }
-      
+
+      if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
+        registerOpaqueValue(MTEE->getOpaqueValue(),
+                            MTEE->getNonescapingClosureValue());
+        return {true, MTEE->getSubExpr()};
+      }
+
       if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
         auto value = OpenExistentials.find(OVE);
         assert(value != OpenExistentials.end() &&
@@ -2165,6 +2169,12 @@ static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
     // non-single-expr closures, so we don't walk into their body.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
+    }
+
+    void registerOpaqueValue(OpaqueValueExpr *opaque, Expr *base) {
+      bool inserted = OpenExistentials.insert({opaque, base}).second;
+      assert(inserted && "OpaqueValue appears multiple times?");
+      (void)inserted;
     }
   };
 
