@@ -60,6 +60,12 @@ public:
     return DynamicRequest;
   }
 
+  /// If a function call taking this request returns a MetadataResponse,
+  /// can the status of a MetadataResponse be generally ignored?
+  bool canResponseStatusBeIgnored() const {
+    return isStatic() && StaticRequest.isBlocking();
+  }
+
   /// Is this request statically known to be blocking on success?
   ///
   /// This is a useful query because the result of such a request is
@@ -79,18 +85,24 @@ class MetadataResponse {
 public:
   MetadataResponse() : Metadata(nullptr) {}
 
-  /// A metadata response that's known to be complete.
-  explicit MetadataResponse(llvm::Value *metadata)
-      : Metadata(metadata), State(nullptr) {
-    assert(metadata && "must be valid");
-  }
-
   /// A metadata response that might not be dynamically complete.
   explicit MetadataResponse(llvm::Value *metadata, llvm::Value *state)
       : Metadata(metadata), State(state) {
     assert(metadata && "must be valid");
     assert(state && "must be valid");
   }
+
+  /// A metadata response that's known to be complete.
+  static MetadataResponse forComplete(llvm::Value *metadata) {
+    assert(metadata && "must be valid");
+    MetadataResponse result;
+    result.Metadata = metadata;
+    result.State = nullptr;
+    return result;
+  }
+
+  /// An undef metadata response.
+  static MetadataResponse getUndef(IRGenFunction &IGF);
 
   bool isValid() const { return Metadata != nullptr; }
   explicit operator bool() const { return isValid(); }
@@ -106,16 +118,54 @@ public:
   }
   llvm::Value *getDynamicState(IRGenFunction &IGF) const;
 
-  static MetadataResponse split(IRGenFunction &IGF,
-                                DynamicMetadataRequest request,
-                                llvm::Value *responsePair);
-  static MetadataResponse split(IRGenFunction &IGF,
-                                llvm::Value *responsePair);
+  static MetadataResponse handle(IRGenFunction &IGF,
+                                 DynamicMetadataRequest request,
+                                 llvm::Value *responsePair);
   llvm::Value *combine(IRGenFunction &IGF) const;
 
   /// Return a constant value representing the fully-completed state
   /// (MetadataRequest::Complete).
   static llvm::Constant *getCompletedState(IRGenModule &IGM);
+};
+
+/// A dependency that is blocking a metadata initialization from completing.
+class MetadataDependency {
+  llvm::Value *RequiredMetadata;
+  MetadataRequest::BasicKind RequiredState;
+public:
+  /// Construct the null dependency, i.e. the initialization is not blocked.
+  MetadataDependency() : RequiredMetadata(nullptr) {}
+
+  /// Construct a non-trivial dependency.
+  MetadataDependency(llvm::Value *requiredMetadata,
+                     MetadataRequest::BasicKind requiredState)
+      : RequiredMetadata(requiredMetadata), RequiredState(requiredState) {
+    assert(requiredMetadata != nullptr);
+    assert(requiredState != MetadataRequest::Abstract &&
+           "cannot have trivial requirement on abstract state!");
+  }
+
+  bool isTrivial() const { return RequiredMetadata == nullptr; }
+  bool isNonTrivial() const { return RequiredMetadata != nullptr; }
+  explicit operator bool() const { return isNonTrivial(); }
+
+  /// Return the metadata that the initialization depends on.
+  llvm::Value *getRequiredMetadata() const {
+    assert(isNonTrivial());
+    return RequiredMetadata;
+  }
+
+  /// Return the state that the metadata needs to reach before the
+  /// initialization is unblocked.
+  MetadataRequest::BasicKind getRequiredState() const {
+    assert(isNonTrivial());
+    return RequiredState;
+  }
+  llvm::Constant *getRequiredState(IRGenFunction &IGF) const;
+
+  static llvm::Constant *getTrivialDependency(IRGenModule &IGM);
+
+  llvm::Value *combine(IRGenFunction &IGF) const;
 };
 
 enum class MetadataAccessStrategy {

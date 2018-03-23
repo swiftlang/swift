@@ -239,6 +239,11 @@ public:
   // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
 
+  /// Emit a reference to the canonical type metadata record for the given
+  /// formal type.  The metadata is only required to be abstract; that is,
+  /// you cannot use the result for layout.
+  llvm::Value *emitAbstractTypeMetadataRef(CanType type);
+
   MetadataResponse emitTypeMetadataRef(CanType type,
                                        DynamicMetadataRequest request);
 
@@ -258,8 +263,9 @@ public:
   // here, since for some types it's easier to get a shared reference to one
   // than a metadata reference, and it would be more type-safe.
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
+  llvm::Value *emitTypeMetadataRefForLayout(SILType type,
+                                            DynamicMetadataRequest request);
   
-  llvm::Value *emitValueWitnessTableRef(CanType type);
   llvm::Value *emitValueWitnessTableRef(SILType type,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
@@ -490,7 +496,8 @@ public:
     setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
   }
   void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-  void setScopedLocalTypeMetadata(CanType type, MetadataResponse response);
+  void setScopedLocalTypeMetadata(CanType type, DynamicMetadataRequest request,
+                                  MetadataResponse response);
 
   /// The same as tryGetLocalTypeData, just for the Layout metadata.
   ///
@@ -501,6 +508,13 @@ public:
                                             LocalTypeDataKind kind) {
     return tryGetLocalTypeData(type.getSwiftRValueType(), kind);
   }
+
+  MetadataResponse
+  tryGetLocalTypeMetadataForLayout(SILType type,
+                                   DynamicMetadataRequest request);
+  void setScopedLocalTypeMetadataForLayout(SILType type,
+                                           DynamicMetadataRequest request,
+                                           MetadataResponse response);
 
   /// Add a local type-metadata reference, which is valid for the containing
   /// block.

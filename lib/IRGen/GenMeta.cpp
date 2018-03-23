@@ -1152,9 +1152,9 @@ namespace {
 
     void emitCompletionFunction() {
       // using MetadataCompleter =
-      //   MetadataResponse(Metadata *type,
-      //                    MetadataCompletionContext *context,
-      //                    const GenericMetadataPattern *pattern);
+      //   MetadataDependency(Metadata *type,
+      //                      MetadataCompletionContext *context,
+      //                      const GenericMetadataPattern *pattern);
       llvm::Function *f =
         IGM.getAddrOfTypeMetadataCompletionFunction(Target, ForDefinition);
       f->setAttributes(IGM.constructInitialAttributes());
@@ -1194,8 +1194,7 @@ namespace {
       }
       
       // The metadata is now complete.  Return null to indicate success.
-      auto nullDependency =
-        llvm::ConstantAggregateZero::get(IGM.TypeMetadataResponseTy);
+      auto nullDependency = MetadataDependency::getTrivialDependency(IGF.IGM);
       IGF.Builder.CreateRet(nullDependency);
     }
 
@@ -2065,8 +2064,8 @@ namespace {
 
           auto type = Target->getDeclaredType()->getCanonicalType();
           auto metadata = IGF.IGM.getAddrOfTypeMetadata(type);
-          return MetadataResponse(
-                    emitFinishIdempotentInitialization(IGF, metadata));
+          return MetadataResponse::forComplete(
+                   emitFinishIdempotentInitialization(IGF, metadata));
         }
 
         // Otherwise, use the generic path.
@@ -2440,22 +2439,6 @@ emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                             suffix);
   IGF.setInvariantLoad(result);
   return result;
-}
-
-/// Given an AST type, load its value witness table.
-llvm::Value *
-IRGenFunction::emitValueWitnessTableRef(CanType type) {
-  // See if we have a cached projection we can use.
-  if (auto cached = tryGetLocalTypeData(type,
-                                  LocalTypeDataKind::forValueWitnessTable())) {
-    return cached;
-  }
-  
-  auto metadata = emitTypeMetadataRef(type);
-  auto vwtable = emitValueWitnessTableRefForMetadata(metadata);
-  setScopedLocalTypeData(type, LocalTypeDataKind::forValueWitnessTable(),
-                         vwtable);
-  return vwtable;
 }
 
 /// Given a type metadata pointer, load its value witness table.

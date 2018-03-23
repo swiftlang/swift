@@ -1080,8 +1080,9 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF, Explosion &params) {
     llvm::Value *conformingMetadataCache = nullptr;
-    return MetadataResponse(emitWitnessTableAccessorCall(IGF, conformance,
-                                                     &conformingMetadataCache));
+    return MetadataResponse::forComplete(
+             emitWitnessTableAccessorCall(IGF, conformance,
+                                          &conformingMetadataCache));
   });
 
   return accessor;
@@ -1483,7 +1484,7 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
     llvm::Value *metadata =
       fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, self,
                                                /*cache*/ nullptr);
-    auto returnValue = MetadataResponse(metadata).combine(IGF);
+    auto returnValue = MetadataResponse::forComplete(metadata).combine(IGF);
     IGF.Builder.CreateRet(returnValue);
     return accessor;
   }
@@ -1655,7 +1656,7 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   emitReturnOfCheckedLoadFromCache(IGF, destTable, self,
                                    [&]() -> MetadataResponse {
     // Pretend that we have a response here.
-    return MetadataResponse(
+    return MetadataResponse::forComplete(
              conformanceI->getTable(IGF, &associatedTypeMetadata));
   });
 
@@ -2132,7 +2133,7 @@ MetadataPath::followFromTypeMetadata(IRGenFunction &IGF,
                                      Map<llvm::Value*> *cache) const {
   LocalTypeDataKey key = {
     sourceType,
-    LocalTypeDataKind::forTypeMetadata()
+    LocalTypeDataKind::forFormalTypeMetadata()
   };
   return follow(IGF, key, source, Path.begin(), Path.end(), cache);
 }
@@ -2270,7 +2271,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
-    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
+    assert(sourceKey.Kind == LocalTypeDataKind::forFormalTypeMetadata());
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
       type = archetypeTy->getSuperclass()->getCanonicalType();
@@ -3153,7 +3154,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                        parentMetadata,
                                        wtable });
 
-  return MetadataResponse::split(IGF, request, call);
+  return MetadataResponse::handle(IGF, request, call);
 }
 
 Signature

@@ -213,6 +213,7 @@ struct MetadataResponse {
   /// given metadata needs to be in before initialization can continue.
   MetadataRequest::BasicKind State;
 };
+using MetadataDependency = MetadataResponse;
 
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
@@ -3060,9 +3061,9 @@ struct MetadataCompletionContext {
 ///   some other type
 using MetadataCompleter =
   SWIFT_CC(swift)
-  MetadataResponse(const Metadata *type,
-                   MetadataCompletionContext *context,
-                   const TargetGenericMetadataPattern<InProcess> *pattern);
+  MetadataDependency(const Metadata *type,
+                     MetadataCompletionContext *context,
+                     const TargetGenericMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
@@ -3277,7 +3278,7 @@ struct TargetTypeGenericContextDescriptorHeader {
 };
 using TypeGenericContextDescriptorHeader =
   TargetTypeGenericContextDescriptorHeader<InProcess>;
-  
+
 /// Wrapper class for the pointer to a metadata access function that provides
 /// operator() overloads to call it with the right calling convention.
 class MetadataAccessFunction {

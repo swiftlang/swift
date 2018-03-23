@@ -73,7 +73,7 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
 
   setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
 
-  IGF.setScopedLocalTypeMetadata(archetype, response);
+  IGF.setScopedLocalTypeMetadata(archetype, request, response);
 
   return response;
 }
@@ -381,7 +381,7 @@ static void setMetadataRef(IRGenFunction &IGF,
                            llvm::Value *metadata) {
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeDataKind::forTypeMetadata(),
+                               LocalTypeDataKind::forFormalTypeMetadata(),
                                metadata);
 }
 

@@ -1442,6 +1442,7 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
                                 isNonBlocking,
                                 setIsNonBlocking)
+  bool isBlocking() const { return !isNonBlocking(); }
 };
 using MetadataRequest =
   TargetMetadataRequest<size_t>;

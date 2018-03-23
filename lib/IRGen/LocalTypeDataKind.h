@@ -47,7 +47,8 @@ private:
   /// to distinguish different kinds of pointer; we just assume that e.g. a
   /// ProtocolConformance will never have the same address as a Decl.
   enum : RawType {
-    TypeMetadata,
+    FormalTypeMetadata,
+    RepresentationTypeMetadata,
     ValueWitnessTable,
     // <- add more special cases here
 
@@ -65,17 +66,24 @@ public:
   
   // The magic values are all odd and so do not collide with pointer values.
   
-  /// A reference to the type metadata.
-  static LocalTypeDataKind forTypeMetadata() {
-    return LocalTypeDataKind(TypeMetadata);
+  /// A reference to the formal type metadata.
+  static LocalTypeDataKind forFormalTypeMetadata() {
+    return LocalTypeDataKind(FormalTypeMetadata);
   }
 
-  /// A reference to the value witness table.
+  /// A reference to type metadata for a representation-compatible type.
+  static LocalTypeDataKind forRepresentationTypeMetadata() {
+    return LocalTypeDataKind(RepresentationTypeMetadata);
+  }
+
+  /// A reference to the value witness table for a representation-compatible
+  /// type.
   static LocalTypeDataKind forValueWitnessTable() {
     return LocalTypeDataKind(ValueWitnessTable);
   }
 
-  /// A reference to a specific value witness.
+  /// A reference to a specific value witness for a representation-compatible
+  /// type.
   static LocalTypeDataKind forValueWitness(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessBase + (unsigned)witness);
   }
@@ -180,11 +188,11 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
   static inline LocalTypeDataKey getEmptyKey() {
     return { CanTypeInfo::getEmptyKey(),
-             swift::irgen::LocalTypeDataKind::forTypeMetadata() };
+             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
   }
   static inline LocalTypeDataKey getTombstoneKey() {
     return { CanTypeInfo::getTombstoneKey(),
-             swift::irgen::LocalTypeDataKind::forTypeMetadata() };
+             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
   }
   static unsigned getHashValue(const LocalTypeDataKey &key) {
     return combineHashValue(CanTypeInfo::getHashValue(key.Type),

@@ -78,24 +78,63 @@ void LocalTypeDataCache::CacheEntry::erase() const {
   llvm_unreachable("bad cache entry kind");
 }
 
-MetadataResponse
-IRGenFunction::tryGetLocalTypeMetadata(CanType type,
-                                       DynamicMetadataRequest request) {
-  // For now, forTypeMetadata always means *complete* type metadata.
-  auto localDataKind = LocalTypeDataKind::forTypeMetadata();
-  if (auto metadata = tryGetLocalTypeData(type, localDataKind))
-    return MetadataResponse(metadata);
+static MetadataResponse
+tryGetLocalTypeMetadata(IRGenFunction &IGF, CanType type,
+                        DynamicMetadataRequest request,
+                        LocalTypeDataKind localDataKind) {
+  // For now, these kinds always means *complete* type metadata.
+  if (auto metadata = IGF.tryGetLocalTypeData(type, localDataKind))
+    return MetadataResponse::forComplete(metadata);
 
   return MetadataResponse();
 }
 
-void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
-                                               MetadataResponse response) {
+MetadataResponse
+IRGenFunction::tryGetLocalTypeMetadataForLayout(SILType layoutType,
+                                                DynamicMetadataRequest request){
+  auto type = layoutType.getSwiftRValueType();
+
+  // Check under the formal type first.
+  if (type->isLegalFormalType()) {
+    if (auto response = tryGetLocalTypeMetadata(type, request))
+      return response;
+  }
+
+  return ::tryGetLocalTypeMetadata(*this, type, request,
+                            LocalTypeDataKind::forRepresentationTypeMetadata());
+}
+
+MetadataResponse
+IRGenFunction::tryGetLocalTypeMetadata(CanType type,
+                                       DynamicMetadataRequest request) {
+  return ::tryGetLocalTypeMetadata(*this, type, request,
+                                   LocalTypeDataKind::forFormalTypeMetadata());
+}
+
+static void setScopedLocalTypeMetadata(IRGenFunction &IGF, CanType type,
+                                       DynamicMetadataRequest request,
+                                       MetadataResponse response,
+                                       LocalTypeDataKind localDataKind) {
   // For now, forTypeMetadata always means *complete* type metadata.
   if (response.isStaticallyKnownComplete()) {
-    auto localDataKind = LocalTypeDataKind::forTypeMetadata();
-    setScopedLocalTypeData(type, localDataKind, response.getMetadata());
+    IGF.setScopedLocalTypeData(type, localDataKind, response.getMetadata());
   }
+}
+
+void
+IRGenFunction::setScopedLocalTypeMetadataForLayout(SILType type,
+                                               DynamicMetadataRequest request,
+                                               MetadataResponse response) {
+  ::setScopedLocalTypeMetadata(*this, type.getSwiftRValueType(),
+                               request, response,
+                            LocalTypeDataKind::forRepresentationTypeMetadata());
+}
+
+void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
+                                               DynamicMetadataRequest request,
+                                               MetadataResponse response) {
+  ::setScopedLocalTypeMetadata(*this, type, request, response,
+                               LocalTypeDataKind::forFormalTypeMetadata());
 }
 
 llvm::Value *IRGenFunction::getLocalTypeData(CanType type,
@@ -207,7 +246,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo) return;
 
   // Only for type metadata.
-  if (key.Kind != LocalTypeDataKind::forTypeMetadata()) return;
+  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata()) return;
 
   // Only for archetypes, and not for opened archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
@@ -260,7 +299,8 @@ void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
   // Remember that we have this type metadata concretely.
   if (isExact) {
     if (!metadata->hasName()) setTypeMetadataName(IGM, metadata, type);
-    setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), metadata);
+    setScopedLocalTypeData(type, LocalTypeDataKind::forFormalTypeMetadata(),
+                           metadata);
   }
 
   // Don't bother adding abstract fulfillments at a conditional dominance
@@ -380,7 +420,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
         continue;
       }
 
-      localDataKind = LocalTypeDataKind::forTypeMetadata();
+      localDataKind = LocalTypeDataKind::forFormalTypeMetadata();
     }
 
     // Find the chain for the key.
@@ -512,8 +552,10 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "AbstractConformance("
         << getAbstractProtocolConformance()->getName()
         << ")";
-  } else if (Value == TypeMetadata) {
-    out << "TypeMetadata";
+  } else if (Value == FormalTypeMetadata) {
+    out << "FormalTypeMetadata";
+  } else if (Value == RepresentationTypeMetadata) {
+    out << "RepresentationTypeMetadata";
   } else if (Value == ValueWitnessTable) {
     out << "ValueWitnessTable";
   } else {
