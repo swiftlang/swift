@@ -208,10 +208,14 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 }
 
 /// If the specified value is a single-element struct_inst wrapper, look through
-/// them.
+/// them.  We special case arrays, and return Array<T> values as themselves.
 static SILValue getValueInsideStructInst(SILValue value) {
   // Dig through one-argument struct insts.
   while (auto structVal = dyn_cast<StructInst>(value)) {
+    // If this is an ArrayType, don't dig in.
+    if (getArrayElementType(structVal->getType().getSwiftRValueType()))
+      break;
+
     if (structVal->getNumOperands() != 1)
       break;
     value = structVal->getOperand(0);
@@ -716,23 +720,44 @@ static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
   SILBuilder B(forInst);
 
   // Add the first operand, which is the metatype for the element.  If it was
-  // a 'Normal' operand, change it to an Array so we can distinguish it in the
-  // case of an empty array.
-  if (attrKind == OperandClass::Normal)
+  // a 'Normal' operand, change it to an Array or TensorShape, allowing us to
+  // distinguish it in the case of an empty array.
+  if (attrKind == OperandClass::Normal) {
     attrKind = OperandClass::Array;
+    if (auto nominal = elementType->getNominalOrBoundGenericNominal())
+      if (auto sd = nominal->getAsStructOrStructExtensionContext())
+        if (sd->getName().str() == "TensorShape")
+          attrKind = OperandClass::ShapeArray;
+  }
   name += ","+attrName.str();
   name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
 
-  auto metatypeType =
-    MetatypeType::get(elementType, MetatypeRepresentation::Thin)
-      ->getCanonicalType();
-  operands.push_back(B.createMetatype(forInst->getLoc(),
-                              SILType::getPrimitiveObjectType(metatypeType)));
+  // If this is a ShapeArray, add the element count, otherwise add the element
+  // type.
+  if (attrKind != OperandClass::ShapeArray) {
+    auto metatypeType =
+      MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+        ->getCanonicalType();
+    operands.push_back(B.createMetatype(forInst->getLoc(),
+                                SILType::getPrimitiveObjectType(metatypeType)));
+  } else {
+    auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
+    operands.push_back(B.createIntegerLiteral(forInst->getLoc(), int64Ty,
+                                              elements.size()));
+  }
 
   // Add all of the operands as explicit values.  If the instructions came
   // from an out of line array initializer, make sure to clone them over to
   // our function.
   for (auto eltVal : elements) {
+    // If this is a shape array, recursively decompose the elements into shapes.
+    if (attrKind == OperandClass::ShapeArray) {
+      if (!expandArrayAttribute(eltVal, "", OperandClass::Shape,
+                                name, operands, forInst))
+        return false;
+      continue;
+    }
+
     auto elt = cast<SingleValueInstruction>(eltVal);
     if (elt->getFunction() != forInst->getFunction()) {
       // Make a copy of the instruction.  We can't even use the normal cloning
@@ -954,6 +979,7 @@ getOperandClassSuffix(OperandClass opClass) {
   case OperandClass::Shape: return "$shape";
   case OperandClass::Array: return "$array";
   case OperandClass::ArrayElement: return "$elt";
+  case OperandClass::ShapeArray: return "$shapearray";
   }
 }
 
@@ -969,6 +995,7 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
                   .Case("dtype", OperandClass::DType)
                   .Case("array", OperandClass::Array)
                   .Case("elt", OperandClass::ArrayElement)
+                  .Case("shapearray", OperandClass::ShapeArray)
                   .Default(None);
 }
 
@@ -1048,6 +1075,14 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         break;
       return "attribute '" + opClass.first.str() +
         "' requires a constant integer or floating point constant";
+
+    case OperandClass::ShapeArray:
+      // Shape arrays contain an integer count of # elements, and are followed
+      // by that many shapes.
+      if (isa<IntegerLiteralInst>(operand))
+          break;
+      return "attribute '" + opClass.first.str() +
+        "' requires a constant integer count";
 
     case OperandClass::ArrayElement:
       // Integer and float elements work.

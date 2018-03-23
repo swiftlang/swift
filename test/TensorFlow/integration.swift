@@ -389,13 +389,10 @@ public func testResourceAndVariants() {
   //     .Output("handle: variant")
   //     .Attr("Toutput_types: list(type) >= 1")
   //     .Attr("output_shapes: list(shape) >= 1")
-
-  // FIXME: We don't support TensorShape attributes or lists thereof yet.  We also
-  // don't handle lists of types.
   let dataset: VariantHandle =
     // expected-error @+1 {{Op type not registered 'TensorDataSet'}}
-    #tfop("TensorDataSet", values/*, Toutput_types: [Float.self],
-          output_shapes: [TensorShape(1)]*/)
+    #tfop("TensorDataSet", values, Toutput_types: [Float.self],
+          output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("Iterator")
   //     .Output("handle: resource")
@@ -405,8 +402,9 @@ public func testResourceAndVariants() {
   //     .Attr("output_shapes: list(shape) >= 1")
   //     .SetShapeFn(shape_inference::ScalarShape);
   let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar"/*,
-          output_types: [Float.self], output_shapes: TensorShape(1)*/)
+    // FIXME: String attributes not getting inlined.
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+          output_types: [Float.self], output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("MakeIterator")
   //     .Input("dataset: variant")
@@ -418,10 +416,11 @@ public func testResourceAndVariants() {
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
 CHECK:  [[values:%.*]] = builtin "__tfop_Const,value$tensor,$elt,$elt,$elt,$elt,$elt,$elt,shape$shape,$elt,dtype"(
-CHECK:  [[dataset:%.*]] = builtin "__tfop_TensorDataSet,$in"([[values]] : $TensorHandle<Float>) : $VariantHandle
-CHECK:  [[iterator:%.*]] = builtin "__tfop_Iterator,shared_name,container"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.RawPointer) : $ResourceHandle // user: %15
+CHECK:  [[dataset:%.*]] = builtin "__tfop_TensorDataSet,$in,Toutput_types$array,$elt,output_shapes$shapearray,$shape,$elt"([[values]] : $TensorHandle<Float>
+CHECK:  [[iterator:%.*]] = builtin "__tfop_Iterator,shared_name,container,output_types$array,$elt,output_shapes$shapearray,$shape,$elt"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.RawPointer
 CHECK:  builtin "__tfop_MakeIterator,$in,$in"([[dataset]] : $VariantHandle, [[iterator]] : $ResourceHandle) : $()
- */
+CHECK-LABEL: ----
+*/
 
 
 // b/76117368
