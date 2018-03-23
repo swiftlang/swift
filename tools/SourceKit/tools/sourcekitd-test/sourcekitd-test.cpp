@@ -743,9 +743,18 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
                                             *Opts.CancelOnSubsequentRequest);
   }
 
-  if (Opts.SwiftVersion.hasValue()) {
-    sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion,
-                                             Opts.SwiftVersion.getValue());
+  if (!Opts.SwiftVersion.empty()) {
+    if (Opts.PassVersionAsString) {
+      sourcekitd_request_dictionary_set_string(Req, KeySwiftVersion,
+                                               Opts.SwiftVersion.c_str());
+    } else {
+      unsigned ver;
+      if (StringRef(Opts.SwiftVersion).getAsInteger(10, ver)) {
+        llvm::errs() << "error: expected integer for 'swift-version'\n";
+        return true;
+      }
+      sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion, ver);
+    }
   }
 
   if (Opts.PrintRequest)
