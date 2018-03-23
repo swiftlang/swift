@@ -78,7 +78,8 @@ struct TestOptions {
   unsigned EndCol = 0;
   unsigned Offset = 0;
   unsigned Length = 0;
-  llvm::Optional<unsigned> SwiftVersion;
+  std::string SwiftVersion;
+  bool PassVersionAsString = false;
   llvm::Optional<std::string> ReplaceText;
   std::string ModuleName;
   std::string HeaderPath;
