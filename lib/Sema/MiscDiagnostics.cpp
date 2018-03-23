@@ -3981,23 +3981,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);
