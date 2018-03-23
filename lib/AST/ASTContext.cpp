@@ -2919,14 +2919,21 @@ BoundNameAliasType *BoundNameAliasType::get(
                                         const SubstitutionMap &substitutions,
                                         Type underlying) {
   // Compute the recursive properties.
+  //
   auto properties = underlying->getRecursiveProperties();
-  if (parent)
+  auto storedProperties = properties;
+  if (parent) {
     properties |= parent->getRecursiveProperties();
+    if (parent->hasTypeVariable())
+      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+  }
   auto genericSig = typealias->getGenericSignature();
   if (genericSig) {
     for (Type gp : genericSig->getGenericParams()) {
-      properties |= gp.subst(substitutions, SubstFlags::UseErrorType)
-                      ->getRecursiveProperties();
+      auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
+      properties |= substGP->getRecursiveProperties();
+      if (substGP->hasTypeVariable())
+        storedProperties |= RecursiveTypeProperties::HasTypeVariable;
     }
   }
 
@@ -2951,7 +2958,7 @@ BoundNameAliasType *BoundNameAliasType::get(
     totalSizeToAlloc<Type, Substitution>(parent ? 1 : 0, numSubstitutions);
   auto mem = ctx.Allocate(size, alignof(BoundNameAliasType), arena);
   auto result = new (mem) BoundNameAliasType(typealias, parent, substitutions,
-                                             underlying, properties);
+                                             underlying, storedProperties);
   types.InsertNode(result, insertPos);
   return result;
 }
