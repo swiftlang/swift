@@ -2927,9 +2927,10 @@ public:
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
             if (!CD->getInterfaceType()->is<ErrorType>() &&
-                isa<NameAliasType>(AT.getPointer()) &&
-                AT->getDesugaredType() ==
-                    CD->getResultInterfaceType().getPointer())
+                ((isa<NameAliasType>(AT.getPointer()) ||
+                  isa<BoundNameAliasType>(AT.getPointer())) &&
+                  AT->getDesugaredType() ==
+                    CD->getResultInterfaceType().getPointer()))
               Result = AT;
           }
           addConstructorCall(CD, Reason, None, Result);
