@@ -1231,7 +1231,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       }
 
       trace::TracedOperation TracedOp(trace::OperationKind::CursorInfoForSource);
-      if (trace::enabled()) {
+      if (TracedOp.enabled()) {
         trace::SwiftInvocation SwiftArgs;
         ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
         trace::initTraceFiles(SwiftArgs, CompIns);
@@ -1425,7 +1425,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       }
 
       trace::TracedOperation TracedOp(trace::OperationKind::CursorInfoForSource);
-      if (trace::enabled()) {
+      if (TracedOp.enabled()) {
         trace::SwiftInvocation SwiftArgs;
         ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
         trace::initTraceFiles(SwiftArgs, CompIns);
@@ -1508,9 +1508,7 @@ static void resolveRange(SwiftLangSupport &Lang,
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      if (trace::enabled()) {
-        // FIXME: Implement tracing
-      }
+      // FIXME: Implement tracing
       RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
       ResolvedRangeInfo Info = Resolver.resolve();
 
@@ -1585,7 +1583,7 @@ void SwiftLangSupport::getCursorInfo(
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     trace::TracedOperation TracedOp(trace::OperationKind::CursorInfoForIFaceGen);
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation SwiftArgs;
       trace::initTraceInfo(SwiftArgs, InputFile, Args);
       // Do we need to record any files? If yes -- which ones?
@@ -1666,7 +1664,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     trace::TracedOperation TracedOp(trace::OperationKind::CursorInfoForIFaceGen);
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation SwiftArgs;
       trace::initTraceInfo(SwiftArgs, InputFile, Args);
       // Do we need to record any files? If yes -- which ones?
@@ -1761,7 +1759,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
           AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
       trace::TracedOperation TracedOp(trace::OperationKind::CursorInfoForSource);
-      if (trace::enabled()) {
+      if (TracedOp.enabled()) {
         trace::SwiftInvocation SwiftArgs;
         ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
         trace::initTraceFiles(SwiftArgs, CompIns);
@@ -1958,7 +1956,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
       auto Action = [&]() {
         trace::TracedOperation TracedOp(trace::OperationKind::RelatedIdents);
-        if (trace::enabled()) {
+        if (TracedOp.enabled()) {
           trace::SwiftInvocation SwiftArgs;
           Invok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
           trace::initTraceFiles(SwiftArgs, CompInst);
