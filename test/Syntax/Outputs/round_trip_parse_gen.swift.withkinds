@@ -407,3 +407,5 @@ func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></Fu
   #function</PoundFunctionExpr><PoundDsohandleExpr>
   #dsohandle</PoundDsohandleExpr>
 }</CodeBlock></FunctionDecl>
+
+<ClassDecl><DeclModifier>private</DeclModifier><DeclModifier>final</DeclModifier>class FinalC <MemberDeclBlock>{}</MemberDeclBlock></ClassDecl>

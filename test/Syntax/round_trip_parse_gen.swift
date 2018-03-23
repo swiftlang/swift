@@ -407,3 +407,5 @@ func objectLiterals() {
   #function
   #dsohandle
 }
+
+private final class C {}
