@@ -4262,47 +4262,51 @@ public:
       });
     }
 
-    if (!IsFirstPass)
-      checkAccessControl(TC, PBD);
-
     TC.checkDeclAttributes(PBD);
+
+    if (IsFirstPass)
+      checkAccessControl(TC, PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
       return;
     }
 
     TC.validateDecl(SD);
-
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessLevel(TAD);
 
-    if (IsFirstPass)
-      TC.validateDecl(TAD);
-
-    if (!IsFirstPass)
-      checkAccessControl(TC, TAD);
-
+    TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
+    checkAccessControl(TC, TAD);
   }
   
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    if (!assocType->hasValidationStarted())
-      TC.validateDecl(assocType);
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
+    if (!IsFirstPass) {
+      return;
+    }
 
-    auto *proto = assocType->getProtocol();
+    TC.validateDecl(AT);
+
+    auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
-      TC.diagnose(assocType->getLoc(),
+      TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
-                  assocType->getName(),
+                  AT->getName(),
                   proto->getName());
     }
+
+    checkAccessControl(TC, AT);
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -4368,28 +4372,6 @@ public:
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
-      {
-        // Check for duplicate enum members.
-        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
-        bool hasErrors = false;
-        for (auto *EED : ED->getAllElements()) {
-          auto Res = Elements.insert({ EED->getName(), EED });
-          if (!Res.second) {
-            EED->setInvalid();
-
-            auto PreviousEED = Res.first->second;
-            TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
-            TC.diagnose(PreviousEED->getLoc(),
-                        diag::previous_decldef, true, EED->getName());
-            hasErrors = true;
-          }
-        }
-
-        // If one of the cases is invalid, let's mark
-        // whole enum as invalid as well.
-        if (hasErrors)
-          ED->setInvalid();
-      }
     }
 
     if (!IsFirstPass) {
@@ -4403,7 +4385,7 @@ public:
 
       TC.checkConformancesInContext(ED, ED);
     }
-    
+
     for (Decl *member : ED->getMembers())
       visit(member);
     
@@ -4412,29 +4394,31 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+    if (!IsFirstPass) {
+      for (Decl *Member : SD->getMembers())
+        visit(Member);
+
+      return;
+    }
+
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessLevel(SD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(SD);
+    checkUnsupportedNestedType(SD);
 
-      TC.validateDecl(SD);
-      TC.DeclsToFinalize.remove(SD);
-      TC.addImplicitConstructors(SD);
-    }
+    TC.validateDecl(SD);
+    TC.DeclsToFinalize.remove(SD);
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
+    TC.addImplicitConstructors(SD);
 
-      if (!SD->isInvalid())
-        TC.checkConformancesInContext(SD, SD);
-    }
-
-    // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
+
+    if (!SD->isInvalid())
+      TC.checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4676,25 +4660,14 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessLevel(PD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(PD);
-    }
-
-    if (!IsFirstPass) {
-      checkAccessControl(TC, PD);
-      for (auto member : PD->getMembers()) {
-        TC.checkUnsupportedProtocolType(member);
-        checkAccessControl(TC, member);
-      }
-      TC.checkInheritanceClause(PD);
-
-      GenericTypeToArchetypeResolver resolver(PD);
-      TC.validateWhereClauses(PD, &resolver);
-      return;
-    }
+    checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
     if (!PD->hasValidSignature())
@@ -4730,6 +4703,15 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(PD);
+
+    checkAccessControl(TC, PD);
+    for (auto member : PD->getMembers()) {
+      TC.checkUnsupportedProtocolType(member);
+    }
+    TC.checkInheritanceClause(PD);
+
+    GenericTypeToArchetypeResolver resolver(PD);
+    TC.validateWhereClauses(PD, &resolver);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -4797,14 +4779,12 @@ public:
         // Complain if we should have a body.
         TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
       }
-    }
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, FD);
       return;
     }
 
     TC.validateDecl(FD);
+    checkAccessControl(TC, FD);
   }
 
 
@@ -6208,90 +6188,92 @@ public:
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, EED);
       return;
     }
 
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
+    checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    if (!IsFirstPass) {
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
+      return;
+    }
+
     TC.validateExtension(ED);
 
     TC.checkDeclAttributesEarly(ED);
 
-    if (IsFirstPass) {
-      if (auto extendedTy = ED->getExtendedType()) {
-        if (!extendedTy->is<NominalType>() &&
-            !extendedTy->is<BoundGenericType>() &&
-            !extendedTy->hasError()) {
-          // FIXME: Redundant diagnostic test here?
-          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                      extendedTy);
-          // FIXME: It would be nice to point out where we found the named type
-          // declaration, if any.
-          ED->setInvalid();
-        }
+    if (auto extendedTy = ED->getExtendedType()) {
+      if (!extendedTy->is<NominalType>() &&
+          !extendedTy->is<BoundGenericType>() &&
+          !extendedTy->hasError()) {
+        // FIXME: Redundant diagnostic test here?
+        TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
+                    extendedTy);
+        // FIXME: It would be nice to point out where we found the named type
+        // declaration, if any.
+        ED->setInvalid();
       }
-
-      TC.checkInheritanceClause(ED);
-      if (auto extendedTy = ED->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          TC.validateDecl(nominal);
-          if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-            TC.requestNominalLayout(classDecl);
-
-          // Check the raw values of an enum, since we might synthesize
-          // RawRepresentable while checking conformances on this extension.
-          if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-            if (enumDecl->hasRawType())
-              checkEnumRawValues(TC, enumDecl);
-          }
-        }
-      }
-
-      validateAttributes(TC, ED);
     }
 
-    // Check conformances before visiting members, since we might
-    // synthesize bodies for derived conformances
-    if (!IsFirstPass) {
-      TC.computeDefaultAccessLevel(ED);
-      if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
-        const auto access = AA->getAccess();
-        AccessScope desiredAccessScope = AccessScope::getPublic();
-        switch (access) {
-        case AccessLevel::Private:
-          assert((ED->isInvalid() ||
-                  ED->getDeclContext()->isModuleScopeContext()) &&
-                 "non-top-level extensions make 'private' != 'fileprivate'");
-          LLVM_FALLTHROUGH;
-        case AccessLevel::FilePrivate: {
-          const DeclContext *DC = ED->getModuleScopeContext();
-          bool isPrivate = access == AccessLevel::Private;
-          desiredAccessScope = AccessScope(DC, isPrivate);
-          break;
+    TC.checkInheritanceClause(ED);
+    if (auto extendedTy = ED->getExtendedType()) {
+      if (auto nominal = extendedTy->getAnyNominal()) {
+        TC.validateDecl(nominal);
+        if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+          TC.requestNominalLayout(classDecl);
+
+        // Check the raw values of an enum, since we might synthesize
+        // RawRepresentable while checking conformances on this extension.
+        if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+          if (enumDecl->hasRawType())
+            checkEnumRawValues(TC, enumDecl);
         }
-        case AccessLevel::Internal:
-          desiredAccessScope = AccessScope(ED->getModuleContext());
-          break;
-        case AccessLevel::Public:
-        case AccessLevel::Open:
-          break;
-        }
-        checkGenericParamAccess(TC, ED->getGenericParams(), ED,
-                                desiredAccessScope, access);
       }
-      TC.checkConformancesInContext(ED, ED);
     }
+
+    validateAttributes(TC, ED);
+
+    TC.computeDefaultAccessLevel(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
+    TC.checkConformancesInContext(ED, ED);
+
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
- }
+
+    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
+      const auto access = AA->getAccess();
+      AccessScope desiredAccessScope = AccessScope::getPublic();
+      switch (access) {
+      case AccessLevel::Private:
+        assert((ED->isInvalid() ||
+                ED->getDeclContext()->isModuleScopeContext()) &&
+               "non-top-level extensions make 'private' != 'fileprivate'");
+        LLVM_FALLTHROUGH;
+      case AccessLevel::FilePrivate: {
+        const DeclContext *DC = ED->getModuleScopeContext();
+        bool isPrivate = access == AccessLevel::Private;
+        desiredAccessScope = AccessScope(DC, isPrivate);
+        break;
+      }
+      case AccessLevel::Internal:
+        desiredAccessScope = AccessScope(ED->getModuleContext());
+        break;
+      case AccessLevel::Public:
+      case AccessLevel::Open:
+        break;
+      }
+      checkGenericParamAccess(TC, ED->getGenericParams(), ED,
+                              desiredAccessScope, access);
+    }
+  }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
@@ -6325,7 +6307,6 @@ public:
     }
 
     if (!IsFirstPass) {
-      checkAccessControl(TC, CD);
       return;
     }
 
@@ -6372,6 +6353,7 @@ public:
     }
 
     TC.checkDeclAttributes(CD);
+    checkAccessControl(TC, CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
