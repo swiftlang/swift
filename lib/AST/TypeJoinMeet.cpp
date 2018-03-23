@@ -73,9 +73,10 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   CanType visitProtocolCompositionType(CanType second);
   CanType visitLValueType(CanType second);
   CanType visitInOutType(CanType second);
+  CanType visitBuiltinType(CanType second);
 
   CanType visitType(CanType second) {
-    llvm_unreachable("Unimplemented type visitor!");
+    return Unimplemented;
   }
 
 public:
@@ -367,6 +368,13 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
 CanType TypeJoin::visitLValueType(CanType second) { return Unimplemented; }
 
 CanType TypeJoin::visitInOutType(CanType second) { return Unimplemented; }
+
+CanType TypeJoin::visitBuiltinType(CanType second) {
+  assert(First != second);
+
+  // BuiltinType with any non-equal type results in Any.
+  return TheAnyType;
+}
 
 } // namespace
 
