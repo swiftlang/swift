@@ -1147,13 +1147,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       bool allowConcreteGenericParams,
                       ExtensionDecl *ext,
                       llvm::function_ref<void(GenericSignatureBuilder &)>
-                        inferRequirements) {
+                        inferRequirements,
+                      bool mustInferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
     genericParams->getOuterParameters() && !parentSig;
 
   GenericSignature *sig;
-  if (!ext || ext->getTrailingWhereClause() ||
+  if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
       getExtendedTypeGenericDepth(ext) != genericParams->getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;

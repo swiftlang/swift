@@ -8279,7 +8279,8 @@ bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
 /// extension's list of generic parameters.
 static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
                                        Type type,
-                                       GenericParamList *genericParams) {
+                                       GenericParamList *genericParams,
+                                       bool &mustInferRequirements) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   GenericTypeDecl *genericDecl;
@@ -8301,7 +8302,8 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
                                  ? genericParams->getOuterParameters()
                                  : genericParams;
     parentType =
-      formExtensionInterfaceType(tc, ext, parentType, parentGenericParams);
+      formExtensionInterfaceType(tc, ext, parentType, parentGenericParams,
+                                 mustInferRequirements);
   }
 
   // Find the nominal type.
@@ -8345,6 +8347,8 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
 
       resultType = BoundNameAliasType::get(typealias, parentType,
                                            subMap, resultType);
+
+      mustInferRequirements = true;
     } else {
       resultType = typealias->getDeclaredInterfaceType();
     }
@@ -8372,8 +8376,10 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   assert(!ext->getGenericEnvironment());
 
   // Form the interface type of the extension.
+  bool mustInferRequirements = false;
   Type extInterfaceType =
-    formExtensionInterfaceType(tc, ext, type, genericParams);
+    formExtensionInterfaceType(tc, ext, type, genericParams,
+                               mustInferRequirements);
 
   // Prepare all of the generic parameter lists for generic signature
   // validation.
@@ -8395,7 +8401,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   auto *env = tc.checkGenericEnvironment(genericParams,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs);
+                                         ext, inferExtendedTypeReqs,
+                                         mustInferRequirements);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
