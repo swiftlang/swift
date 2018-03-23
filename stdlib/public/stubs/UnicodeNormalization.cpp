@@ -28,6 +28,7 @@ typedef struct UBreakIterator UBreakIterator;
 typedef struct UBreakIterator UNormalizer2;
 typedef enum UBreakIteratorType {} UBreakIteratorType;
 typedef enum UErrorCode {} UErrorCode;
+typedef enum UCharNameChoice {} UCharNameChoice;
 typedef uint16_t UChar;
 typedef int32_t UChar32;
 typedef int8_t UBool;
@@ -55,6 +56,7 @@ UBool u_hasBinaryProperty(UChar32, UProperty);
 UBool u_isdefined(UChar32);
 void u_charAge(UChar32, UVersionInfo);
 int32_t u_getIntPropertyValue(UChar32, UProperty);
+int32_t u_charName(UChar32, UCharNameChoice, char *, int32_t, UErrorCode *);
 }
 
 #else
@@ -339,6 +341,15 @@ __swift_int32_t
 swift::__swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32 c,
                                             __swift_stdlib_UProperty p) {
   return u_getIntPropertyValue(c, static_cast<UProperty>(p));
+}
+
+__swift_int32_t swift::__swift_stdlib_u_charName(
+    __swift_stdlib_UChar32 code, __swift_stdlib_UCharNameChoice nameChoice,
+    char *buffer, __swift_int32_t bufferLength,
+    __swift_stdlib_UErrorCode *pErrorCode) {
+  return u_charName(code, static_cast<UCharNameChoice>(nameChoice),
+                    buffer, bufferLength,
+                    ptr_cast<UErrorCode>(pErrorCode));
 }
 
 

@@ -956,3 +956,92 @@ extension Unicode.Scalar.Properties {
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }
+
+/// Executes a block that will attempt to store text in the memory owned by the
+/// given string storage object, returning the length of the text.
+///
+/// The closure is assumed to return an `Int32` value (the convention of ICU's C
+/// functions) that is equal to the length of the string being stored. If the
+/// storage object is not large enough to hold the string, it is replaced by one
+/// that is exactly the required size and the closure is executed one more time
+/// to populate it.
+@_inlineable
+@_versioned
+internal func _expandingStorageIfNeeded<
+  CodeUnit: UnsignedInteger & FixedWidthInteger
+>(
+  _ storage: inout _SwiftStringStorage<CodeUnit>,
+  body: (_SwiftStringStorage<CodeUnit>) throws -> Int32
+) rethrows -> Int {
+  let z = try body(storage)
+  let correctSize = Int(z)
+  if correctSize > storage.capacity {
+    // If the buffer wasn't large enough, replace it with one that is the
+    // correct size and execute the closure again.
+    storage = _SwiftStringStorage<CodeUnit>.create(
+      capacity: correctSize,
+      count: correctSize)
+    return Int(try body(storage))
+  } else {
+    // Otherwise, the buffer has been populated; update its count to the correct
+    // value.
+    storage.count = correctSize
+    return correctSize
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  internal func _scalarName(
+    _ choice: __swift_stdlib_UCharNameChoice
+  ) -> String? {
+    let initialCapacity = 256
+
+    var storage = _SwiftStringStorage<UTF8.CodeUnit>.create(
+      capacity: initialCapacity,
+      count: 0)
+    var err = __swift_stdlib_U_ZERO_ERROR
+
+    let correctSize = _expandingStorageIfNeeded(&storage) { storage in
+      return storage.start.withMemoryRebound(
+        to: Int8.self,
+        capacity: storage.capacity
+      ) { storagePtr in
+        err = __swift_stdlib_U_ZERO_ERROR
+        return __swift_stdlib_u_charName(
+          _value, choice, storagePtr, Int32(storage.capacity), &err)
+      }
+    }
+
+    guard err.isSuccess && correctSize > 0 else {
+      return nil
+    }
+    return String(_storage: storage)
+  }
+
+  /// The published name of the scalar.
+  ///
+  /// Some scalars, such as control characters, do not have a value for this
+  /// property in the UCD. For such scalars, this property will be nil.
+  ///
+  /// This property corresponds to the `Name` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var name: String? {
+    return _scalarName(__swift_stdlib_U_UNICODE_CHAR_NAME)
+  }
+
+  /// The normative formal alias of the scalar, or nil if it has no alias.
+  ///
+  /// The name of a scalar is immutable and never changed in future versions of
+  /// the Unicode Standard. The `nameAlias` property is provided to issue
+  /// corrections if a name was issued erroneously. For example, the `name` of
+  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRAKCET"
+  /// (note that "BRACKET" is misspelled). The `nameAlias` property then
+  /// contains the corrected name.
+  ///
+  /// This property corresponds to the `Name_Alias` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var nameAlias: String? {
+    return _scalarName(__swift_stdlib_U_CHAR_NAME_ALIAS)
+  }
+}

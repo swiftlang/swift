@@ -424,6 +424,18 @@ typedef enum __swift_stdlib_UCharCategory {
   __swift_stdlib_U_CHAR_CATEGORY_COUNT
 } __swift_stdlib_UCharCategory;
 
+typedef enum __swift_stdlib_UCharNameChoice {
+  __swift_stdlib_U_UNICODE_CHAR_NAME,
+#ifndef U_HIDE_DEPRECATED_API
+  __swift_stdlib_U_UNICODE_10_CHAR_NAME,
+#endif
+  __swift_stdlib_U_EXTENDED_CHAR_NAME = __swift_stdlib_U_UNICODE_CHAR_NAME + 2,
+  __swift_stdlib_U_CHAR_NAME_ALIAS,
+#ifndef U_HIDE_DEPRECATED_API
+  __swift_stdlib_U_CHAR_NAME_CHOICE_COUNT
+#endif
+} __swift_stdlib_UCharNameChoice;
+
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_int8_t __swift_stdlib_UBool;
@@ -503,6 +515,12 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t
     __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32,
                                          __swift_stdlib_UProperty);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t __swift_stdlib_u_charName(
+    __swift_stdlib_UChar32 code, __swift_stdlib_UCharNameChoice nameChoice,
+    char *buffer, __swift_int32_t bufferLength,
+    __swift_stdlib_UErrorCode *pErrorCode);
 
 
 #ifdef __cplusplus
