@@ -30,6 +30,7 @@
 using namespace swift;
 
 namespace {
+
 /// Optimize the placement of global initializers.
 ///
 /// TODO:
@@ -53,31 +54,31 @@ class SILGlobalOpt {
   // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   typedef SmallVector<LoadInst *, 4> GlobalLoads;
-  llvm::MapVector<SILFunction*, GlobalInitCalls> GlobalInitCallMap;
+  llvm::MapVector<SILFunction *, GlobalInitCalls> GlobalInitCallMap;
 
   // The following mappings are used if this is a compilation
   // in scripting mode and global variables are accessed without
   // addressors.
 
   // Map each global let variable to a set of loads from it.
-  llvm::MapVector<SILGlobalVariable*, GlobalLoads> GlobalLoadMap;
+  llvm::MapVector<SILGlobalVariable *, GlobalLoads> GlobalLoadMap;
   // Map each global let variable to the store instruction which initializes it.
-  llvm::MapVector<SILGlobalVariable*, StoreInst *> GlobalVarStore;
+  llvm::MapVector<SILGlobalVariable *, StoreInst *> GlobalVarStore;
   // Variables in this set should not be processed by this pass
   // anymore.
-  llvm::SmallPtrSet<SILGlobalVariable*, 16> GlobalVarSkipProcessing;
+  llvm::SmallPtrSet<SILGlobalVariable *, 16> GlobalVarSkipProcessing;
 
   // Mark any block that this pass has determined to be inside a loop.
-  llvm::DenseSet<SILBasicBlock*> LoopBlocks;
+  llvm::DenseSet<SILBasicBlock *> LoopBlocks;
   // Mark any functions for which loops have been analyzed.
-  llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
+  llvm::DenseSet<SILFunction *> LoopCheckedFunctions;
   // Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
 
   // Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
   // Record number of times a globalinit_func is called by "once".
-  llvm::DenseMap<SILFunction*, unsigned> InitializerCount;
+  llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
       : Module(M), DA(DA), ColdBlocks(DA) {}
@@ -92,7 +93,7 @@ protected:
 
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
   bool isInLoop(SILBasicBlock *CurBB);
-  void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst*> Calls);
+  void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst *> Calls);
 
   // Update UnhandledOnceCallee and InitializerCount by going through all "once"
   // calls.
@@ -417,12 +418,12 @@ static bool isAvailabilityCheckOnDomPath(SILBasicBlock *From, SILBasicBlock *To,
 /// The current heuristic hoists all initialization points within a function to
 /// a single dominating call in the outer loop preheader.
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
-                                     ArrayRef<ApplyInst*> Calls) {
+                                     ArrayRef<ApplyInst *> Calls) {
   DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
         << Demangle::demangleSymbolAsString(InitF->getName())
         << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
-  llvm::DenseMap<SILFunction*, ApplyInst*> ParentFuncs;
+  llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
     assert(AI->getNumArguments() == 0 && "ill-formed global init call");
     assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
