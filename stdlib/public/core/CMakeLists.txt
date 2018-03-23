@@ -48,7 +48,6 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   Dictionary.swift
-  DoubleWidth.swift.gyb
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
