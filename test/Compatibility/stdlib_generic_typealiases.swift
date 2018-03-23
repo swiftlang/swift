@@ -9,3 +9,10 @@ extension CountableRange { // expected-warning{{'CountableRange' is deprecated: 
   }
 }
 
+struct RequiresHashable<T: Hashable> { }
+
+extension DictionaryIndex {
+  func testHashable() {
+    _ = RequiresHashable<Key>()
+  }
+}
