@@ -90,6 +90,9 @@ namespace tf {
 
       Array,        // This marks a normal array value, the value is a metatype.
       ArrayElement, // This is a continuation element of an attribute array.
+
+      // This is the start of a shape array.  The value is the # elements.
+      ShapeArray,
     };
 
     /// Return the string suffix for the specified attribute modifier.
