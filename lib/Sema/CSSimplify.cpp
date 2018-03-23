@@ -3527,9 +3527,7 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
         addConstraint(ConstraintKind::Conversion, optTy, memberTy, locator);
       } else {
         // If we are starting a new chain, it may or may not be valid. Add a disjunction
-        // with the optional and non-optional result. Later when we generate the fixit
-        // we'll check the disjunction and fall back on force unwrapping if the
-        // non-optional result is the solution.
+        // with the optional and non-optional result.
         SmallVector<Constraint *, 4> optionalities;
         auto optionalResult = Constraint::createFixed(*this, ConstraintKind::Conversion,
                                                       FixKind::OptionalChaining,
