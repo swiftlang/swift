@@ -1045,8 +1045,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       // If the client can't handle a +0 result, retain it to get a +1.
       // This is a 'let', so we can make guarantees.
       return RValue(*this, loc, refType,
-                    C.isGuaranteedPlusZeroOk()
-                      ? Result : Result.copyUnmanaged(*this, loc));
+                    Result); /*C.isGuaranteedPlusZeroOk()
+                               ? Result : Result.copyUnmanaged(*this, loc));*/
     }
 
     assert(var->hasAccessorFunctions() && "Unknown rvalue case");
@@ -4940,7 +4940,8 @@ void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
 ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
                                               ManagedValue optValue,
                                               unsigned depth) {
-  assert(optValue.isPlusOne(*this) && "Can only bind plus one values");
+  bool isPlusOne = optValue.isPlusOne(*this);
+
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
@@ -4974,8 +4975,12 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
   // If optValue was loadable, we emitted a switch_enum. In such a case, return
   // the argument from hasValueBB.
   if (optValue.getType().isLoadable(F.getModule())) {
-    return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
+    if (isPlusOne)
+      return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
+    return ManagedValue::forUnmanaged(hasValueBB->getArgument(0));
   }
+
+  optValue = optValue.ensurePlusOne(*this, loc);
 
   // Otherwise, if we had an address only value, we emitted the value at +0. In
   // such a case, since we want to model this as a consuming operation. Use
