@@ -27,6 +27,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/ASTMangler.h"
+
 using namespace swift;
 
 namespace {
@@ -48,7 +49,7 @@ namespace {
 ///   constant propagation in case of statically initialized "lets".
 class SILGlobalOpt {
   SILModule *Module;
-  DominanceAnalysis* DA;
+  DominanceAnalysis *DA;
   bool HasChanged = false;
 
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
@@ -909,16 +910,14 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG->getDecl())
     return;
 
-  SILValue V = GAI;
-  for (auto Use : getNonDebugUses(V)) {
-
-    if (auto *SI = dyn_cast<StoreInst>(Use->getUser())) {
+  for (auto *Op : getNonDebugUses(GAI)) {
+    if (auto *SI = dyn_cast<StoreInst>(Op->getUser())) {
       if (SI->getDest() == GAI)
         collectGlobalStore(SI, SILG);
       continue;
     }
 
-    if (auto *Load = getValidLoad(Use->getUser(), GAI)) {
+    if (auto *Load = getValidLoad(Op->getUser(), GAI)) {
       collectGlobalLoad(Load, SILG);
       continue;
     }
@@ -959,7 +958,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // inside each function that loads from the global. This
   // invocation should happen at the common dominator of all
   // loads inside this function.
-  for (auto *Load: GlobalLoadMap[SILG]) {
+  for (auto *Load : GlobalLoadMap[SILG]) {
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
@@ -981,30 +980,26 @@ bool SILGlobalOpt::run() {
     ColdBlockInfo ColdBlocks(DA);
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
-      auto Iter = BB.begin();
-
-      // We can't remove instructions willy-nilly as we iterate because
-      // that might cause a pointer to the next instruction to become
-      // garbage, causing iterator invalidations (and crashes).
-      // Instead, we collect in a list the instructions we want to remove
-      // and erase the BB they belong to at the end of the loop, once we're
-      // sure it's safe to do so.
-      llvm::SmallVector<SILInstruction *, 4> ToRemove;
-
-      while (Iter != BB.end()) {
-        SILInstruction *I = &*Iter;
-        Iter++;
-        if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+      for (auto &I : BB) {
+        if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
           collectOnceCall(BI);
-        } else if (auto *AI = dyn_cast<ApplyInst>(I)) {
-          if (!IsCold)
-            collectGlobalInitCall(AI);
-        } else if (auto *GAI = dyn_cast<GlobalAddrInst>(I)) {
-          collectGlobalAccess(GAI);
+          continue;
         }
+
+        if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+          if (!IsCold) {
+            collectGlobalInitCall(AI);
+          }
+          continue;
+        }
+
+        auto *GAI = dyn_cast<GlobalAddrInst>(&I);
+        if (!GAI) {
+          continue;
+        }
+
+        collectGlobalAccess(GAI);
       }
-      for (auto *I : ToRemove)
-        I->eraseFromParent();
     }
   }
 
@@ -1022,17 +1017,21 @@ bool SILGlobalOpt::run() {
   return HasChanged;
 }
 
+//===----------------------------------------------------------------------===//
+//                           Top Level Entry Point
+//===----------------------------------------------------------------------===//
+
 namespace {
-class SILGlobalOptPass : public SILModuleTransform
-{
+
+class SILGlobalOptPass : public SILModuleTransform {
   void run() override {
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
     if (SILGlobalOpt(getModule(), DA).run()) {
       invalidateAll();
     }
   }
-
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createGlobalOpt() {
