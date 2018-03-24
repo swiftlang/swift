@@ -982,30 +982,26 @@ bool SILGlobalOpt::run() {
     ColdBlockInfo ColdBlocks(DA);
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
-      auto Iter = BB.begin();
-
-      // We can't remove instructions willy-nilly as we iterate because
-      // that might cause a pointer to the next instruction to become
-      // garbage, causing iterator invalidations (and crashes).
-      // Instead, we collect in a list the instructions we want to remove
-      // and erase the BB they belong to at the end of the loop, once we're
-      // sure it's safe to do so.
-      llvm::SmallVector<SILInstruction *, 4> ToRemove;
-
-      while (Iter != BB.end()) {
-        SILInstruction *I = &*Iter;
-        Iter++;
-        if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+      for (auto &I : BB) {
+        if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
           collectOnceCall(BI);
-        } else if (auto *AI = dyn_cast<ApplyInst>(I)) {
-          if (!IsCold)
-            collectGlobalInitCall(AI);
-        } else if (auto *GAI = dyn_cast<GlobalAddrInst>(I)) {
-          collectGlobalAccess(GAI);
+          continue;
         }
+
+        if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+          if (!IsCold) {
+            collectGlobalInitCall(AI);
+          }
+          continue;
+        }
+
+        auto *GAI = dyn_cast<GlobalAddrInst>(&I);
+        if (!GAI) {
+          continue;
+        }
+
+        collectGlobalAccess(GAI);
       }
-      for (auto *I : ToRemove)
-        I->eraseFromParent();
     }
   }
 
