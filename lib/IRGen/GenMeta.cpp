@@ -3623,6 +3623,7 @@ namespace {
                                          llvm::GlobalVariable::InternalLinkage);
       global->setUnnamedAddr(llvm::GlobalVariable::UnnamedAddr::Global);
       B.addRelativeOffset(IGM.Int32Ty, global);
+      IGM.setTrueConstGlobal(global);
     }
 
     struct RequirementInfo {
