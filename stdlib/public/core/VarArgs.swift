@@ -93,7 +93,7 @@ internal let _registerSaveWords = _countGPRegisters
 // of three memory locations depending on its type and position in the argument 
 // list :
 // 1. GP register save area x0 - x7
-// 2. FP/SIMD register save area q0 - q7
+// 2. 128-bit FP/SIMD register save area q0 - q7
 // 3. Stack argument area
 
 @_versioned
@@ -103,8 +103,7 @@ internal let _countGPRegisters = 8
 internal let _countFPRegisters = 8
 
 @_versioned
-internal let _fpRegisterWords = 
-  MemoryLayout<Double>.size / MemoryLayout<Int>.size
+internal let _fpRegisterWords = 16 /  MemoryLayout<Int>.size
 
 @_versioned
 internal let _registerSaveWords = 
