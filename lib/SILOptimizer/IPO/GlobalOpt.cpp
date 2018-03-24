@@ -196,10 +196,10 @@ void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
   GlobalInitCallMap[F].push_back(AI);
 }
 
-// If this is a read from a global let variable, map it.
+// Map the load if this load is a read from a global variable that is either a
+// let or a global variable that can not be changed externally
 void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
   assert(SILG);
-  //assert(SILG->isLet());
 
   // This is read from a let variable.
   // Figure out if the value of this variable is statically known.
