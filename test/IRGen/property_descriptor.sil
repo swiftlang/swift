@@ -39,13 +39,13 @@ public struct ExternalReabstractions<T> {
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2roxvpMV" ={{( protected)?}}{{( protected)?}} constant
 // CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 32 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2roxvpMV" ={{( protected)?}}{{( protected)?}} constant
-// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 16 }>, align 8
+// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 16 }>, align 4
 sil_property #ExternalGeneric.ro <T: Comparable> (
   stored_property #ExternalGeneric.ro : $T)
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" ={{( protected)?}}{{( protected)?}} constant
 // CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 40 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" ={{( protected)?}} constant
-// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 20 }>, align 8
+// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 20 }>, align 4
 sil_property #ExternalGeneric.rw <T: Comparable> (
   stored_property #ExternalGeneric.rw : $T)
 
@@ -93,7 +93,8 @@ sil_property #ExternalGeneric.subscript <T: Comparable><U: Hashable> (
     setter @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ())
 
 // CHECK: @"$S19property_descriptor8ExternalV2roSivpMV" ={{( protected)?}} constant <{ i32 }> zeroinitializer, align 4
-// CHECK: @"$S19property_descriptor8ExternalV2rwSivpMV" ={{( protected)?}} constant <{ i32 }> <{ i32 8 }>, align 4
+// CHECK-64: @"$S19property_descriptor8ExternalV2rwSivpMV" ={{( protected)?}} constant <{ i32 }> <{ i32 8 }>, align 4
+// CHECK-32: @"$S19property_descriptor8ExternalV2rwSivpMV" ={{( protected)?}} constant <{ i32 }> <{ i32 4 }>, align 4
 sil_property #External.ro (stored_property #External.ro : $Int)
 sil_property #External.rw (stored_property #External.rw : $Int)
 sil_property #External.computedRO (
