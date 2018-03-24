@@ -402,7 +402,7 @@ Type TypeBase::eraseDynamicSelfType() {
   });
 }
 
-Type TypeBase::addCurriedSelfType(DeclContext *dc) {
+Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
 
