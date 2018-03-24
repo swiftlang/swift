@@ -578,6 +578,8 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
   if (!bestSoFar.empty() && bestSoFar <= info.Version)
     return VersionedSwiftNameAction::Ignore;
 
+  auto requestedClangVersion = requestedVersion.asClangVersionTuple();
+
   if (info.IsReplacedByActive) {
     // We know that there are no versioned names between the active version and
     // a replacement version, because otherwise /that/ name would be active.
@@ -586,7 +588,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     // new value that is now active. (Special case: replacement = 0 means that
     // a header annotation was replaced by an unversioned API notes annotation.)
     if (info.Version.empty() ||
-        info.Version.getMajor() >= requestedVersion.majorVersionNumber()) {
+        info.Version >= requestedClangVersion) {
       return VersionedSwiftNameAction::ResetToActive;
     }
     if (bestSoFar.empty())
@@ -594,7 +596,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     return VersionedSwiftNameAction::Ignore;
   }
 
-  if (info.Version.getMajor() < requestedVersion.majorVersionNumber())
+  if (info.Version < requestedClangVersion)
     return VersionedSwiftNameAction::Ignore;
   return VersionedSwiftNameAction::Use;
 }
