@@ -2081,7 +2081,10 @@ public:
     if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
       OS << " default_args_owner=";
       defaultArgsOwner.dump(OS);
-      dump(defaultArgsOwner.getSubstitutions());
+      // FIXME: This doesn't dump to the correct stream, and can be infinite in
+      // depth.
+      // SWIFT_ENABLE_TENSORFLOW.
+      //dump(defaultArgsOwner.getSubstitutions());
     }
 
     OS << "\n";
