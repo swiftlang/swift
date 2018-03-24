@@ -276,6 +276,28 @@ func patternVarDiffType(x: Int, y: Double) {
   }
 }
 
+func patternVarDiffMutability(x: Int, y: Double) {
+  switch x {
+  case let a where a < 5, var a where a > 10: // expected-error {{'var' pattern binding must match previous 'let' pattern binding}}{{27-30=let}}
+    break
+  default:
+    break
+  }
+  switch (x, y) {
+  // Would be nice to have a fixit in the following line if we detect that all bindings in the same pattern have the same problem.
+  case let (a, b) where a < 5, var (a, b) where a > 10: // expected-error 2{{'var' pattern binding must match previous 'let' pattern binding}}{{none}}
+    break
+  case (let a, var b) where a < 5, (let a, let b) where a > 10: // expected-error {{'let' pattern binding must match previous 'var' pattern binding}}{{44-47=var}}
+    break
+  case (let a, let b) where a < 5, (var a, let b) where a > 10, (let a, var b) where a == 8:
+    // expected-error@-1 {{'var' pattern binding must match previous 'let' pattern binding}}{{37-40=let}}
+    // expected-error@-2 {{'var' pattern binding must match previous 'let' pattern binding}}{{73-76=let}}
+    break
+  default:
+    break
+  }
+}
+
 func test_label(x : Int) {
 Gronk: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   switch x {
