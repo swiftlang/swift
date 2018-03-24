@@ -511,36 +511,41 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     ApplyInst *HoistAI =
         getHoistedApplyForInitializer(AI, DT, InitF, ParentF, ParentFuncs);
 
-    if (HoistAI) {
-      // Move this call to the outermost loop preheader.
-      SILBasicBlock *BB = HoistAI->getParent();
-      typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
-      DomTreeNode *Node = DT->getNode(BB);
-      while (Node) {
-        SILBasicBlock *DomParentBB = Node->getBlock();
-        if (isAvailabilityCheck(DomParentBB)) {
-          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
-                             << DomParentBB->getDebugID() << "\n");
-          break;
-        }
-        BB = DomParentBB;
-        if (!isInLoop(BB))
-          break;
-        Node = Node->getIDom();
-      }
-      if (BB == HoistAI->getParent()) {
-        // BB is either unreachable or not in a loop.
-        DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
-              << "  in " << HoistAI->getFunction()->getName() << "\n");
-      }
-      else {
-        DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI
-              << "  in " << HoistAI->getFunction()->getName() << "\n");
-        HoistAI->moveBefore(&*BB->begin());
-        placeFuncRef(HoistAI, DT);
-        HasChanged = true;
-      }
+    // If we were unable to find anything, just go onto the next apply.
+    if (!HoistAI) {
+      continue;
     }
+
+    // Otherwise, move this call to the outermost loop preheader.
+    SILBasicBlock *BB = HoistAI->getParent();
+    typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
+    DomTreeNode *Node = DT->getNode(BB);
+    while (Node) {
+      SILBasicBlock *DomParentBB = Node->getBlock();
+      if (isAvailabilityCheck(DomParentBB)) {
+        DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
+                           << DomParentBB->getDebugID() << "\n");
+        break;
+      }
+      BB = DomParentBB;
+      if (!isInLoop(BB))
+        break;
+      Node = Node->getIDom();
+    }
+
+    if (BB == HoistAI->getParent()) {
+      // BB is either unreachable or not in a loop.
+      DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
+                         << "  in " << HoistAI->getFunction()->getName()
+                         << "\n");
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI << "  in "
+                       << HoistAI->getFunction()->getName() << "\n");
+    HoistAI->moveBefore(&*BB->begin());
+    placeFuncRef(HoistAI, DT);
+    HasChanged = true;
   }
 }
 
