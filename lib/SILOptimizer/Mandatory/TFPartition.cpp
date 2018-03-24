@@ -1099,7 +1099,7 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   for (unsigned i = 0, e = inst.getNumOperands(); i != e; ++i) {
     // Tensor and scalar input operands are recursively marked.
     if (tfopInfo.isInput(i) &&
-        // Don't mark the array designator.
+        // Don't mark array designators.
         !inst.getOperand(i)->getType().is<MetatypeType>())
       markValue(inst.getOperand(i), &inst);
   }
@@ -1109,9 +1109,6 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // If we've already marked this argument, there is nothing more to do.
   if (markedBBArguments.count(arg))
     return;
-
-  // Make sure the argument's block is marked as being copied.
-  markBlock(arg->getParent());
 
   // If this BB argument is outside the region dominated by the start point,
   // then we pass its value in as an argument to the tensor function.
@@ -1124,8 +1121,12 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     return;
   }
 
-  // Otherwise, if this is a value of TensorFlow value type, then we move it to
-  // the accelerator.  If it is also used on the host, it will be copied back.
+  // Ok, since we're marking it, we need to make sure the argument's block is
+  // marked as being copied.
+  markBlock(arg->getParent());
+
+  // If this is a value of TensorFlow value type, then we move it to the
+  // accelerator.  If it is also used on the host, it will be copied back.
   if (isTensorFlowValue(arg->getType())) {
     // We cannot move over function arguments, but they should never be in the
     // dominated region anyway.
