@@ -4666,6 +4666,9 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (!IsFirstPass) {
+      for (auto Member : PD->getMembers())
+        visit(Member);
+
       return;
     }
 
@@ -4710,9 +4713,6 @@ public:
     TC.checkDeclAttributes(PD);
 
     checkAccessControl(TC, PD);
-    for (auto member : PD->getMembers()) {
-      TC.checkUnsupportedProtocolType(member);
-    }
     TC.checkInheritanceClause(PD);
 
     GenericTypeToArchetypeResolver resolver(PD);
@@ -4755,6 +4755,10 @@ public:
     // Invalid, implicit, and Clang-imported declarations never
     // require a definition.
     if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+      return false;
+
+    // Protocol requirements do not require definitions.
+    if (isa<ProtocolDecl>(decl->getDeclContext()))
       return false;
 
     // Functions can have _silgen_name, semantics, and NSManaged attributes.
