@@ -2927,7 +2927,7 @@ BoundNameAliasType *BoundNameAliasType::get(
     if (parent->hasTypeVariable())
       storedProperties |= RecursiveTypeProperties::HasTypeVariable;
   }
-  auto genericSig = typealias->getGenericSignature();
+  auto genericSig = substitutions.getGenericSignature();
   if (genericSig) {
     for (Type gp : genericSig->getGenericParams()) {
       auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
