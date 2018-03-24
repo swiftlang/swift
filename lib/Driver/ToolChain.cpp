@@ -74,8 +74,9 @@ ToolChain::constructJob(const JobAction &JA,
 
   auto invocationInfo = [&]() -> InvocationInfo {
     switch (JA.getKind()) {
-  #define CASE(K) case Action::K: \
-      return constructInvocation(cast<K##Action>(JA), context);
+#define CASE(K)                                                                \
+  case Action::Kind::K:                                                        \
+    return constructInvocation(cast<K##Action>(JA), context);
     CASE(CompileJob)
     CASE(InterpretJob)
     CASE(BackendJob)
@@ -88,7 +89,7 @@ ToolChain::constructJob(const JobAction &JA,
     CASE(AutolinkExtractJob)
     CASE(REPLJob)
 #undef CASE
-    case Action::Input:
+    case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
     }
 
