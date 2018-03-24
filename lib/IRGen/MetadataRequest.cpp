@@ -75,7 +75,7 @@ llvm::Value *MetadataResponse::getDynamicState(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *MetadataResponse::getCompletedState(IRGenModule &IGM) {
-  return IGM.getSize(Size(MetadataRequest::Complete));
+  return IGM.getSize(Size(size_t(MetadataState::Complete)));
 }
 
 llvm::Value *MetadataDependency::combine(IRGenFunction &IGF) const {
@@ -90,7 +90,7 @@ llvm::Value *MetadataDependency::combine(IRGenFunction &IGF) const {
 
 llvm::Constant *MetadataDependency::getRequiredState(IRGenFunction &IGF) const {
   assert(isNonTrivial());
-  return IGF.IGM.getSize(Size(RequiredState));
+  return IGF.IGM.getSize(Size(size_t(RequiredState)));
 }
 
 llvm::Constant *MetadataDependency::getTrivialDependency(IRGenModule &IGM) {
@@ -583,7 +583,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
 
   // FIXME: at least propagate dependency failure here.
   // FIXME: allow abstract creation when the runtime supports that.
-  DynamicMetadataRequest eltRequest = MetadataRequest::Complete;
+  DynamicMetadataRequest eltRequest = MetadataState::Complete;
 
   switch (type->getNumElements()) {
   case 0:
@@ -1535,14 +1535,14 @@ emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // We only take this path for non-generic nominal types.
   auto typeDecl = type->getAnyNominal();
   if (!typeDecl)
-    return emitDirectTypeMetadataRef(IGF, type, MetadataRequest::Complete)
+    return emitDirectTypeMetadataRef(IGF, type, MetadataState::Complete)
              .getMetadata();
 
   if (typeDecl->isGenericContext() &&
       !(isa<ClassDecl>(typeDecl) &&
         isa<ClangModuleUnit>(typeDecl->getModuleScopeContext()))) {
     // This is a metadata accessor for a fully substituted generic type.
-    return emitDirectTypeMetadataRef(IGF, type, MetadataRequest::Complete)
+    return emitDirectTypeMetadataRef(IGF, type, MetadataState::Complete)
              .getMetadata();
   }
 
@@ -1720,12 +1720,12 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 }
 
 llvm::Value *IRGenFunction::emitAbstractTypeMetadataRef(CanType type) {
-  return emitTypeMetadataRef(type, MetadataRequest::Abstract).getMetadata();
+  return emitTypeMetadataRef(type, MetadataState::Abstract).getMetadata();
 }
 
 /// Produce the type metadata pointer for the given type.
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
-  return emitTypeMetadataRef(type, MetadataRequest::Complete).getMetadata();
+  return emitTypeMetadataRef(type, MetadataState::Complete).getMetadata();
 }
 
 /// Produce the type metadata pointer for the given type.
@@ -1924,7 +1924,7 @@ namespace {
 } // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
-  return emitTypeMetadataRefForLayout(type, MetadataRequest::Complete);
+  return emitTypeMetadataRefForLayout(type, MetadataState::Complete);
 }
 
 llvm::Value *

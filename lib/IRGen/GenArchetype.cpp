@@ -300,7 +300,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata =
-    emitArchetypeTypeMetadataRef(IGF, origin, MetadataRequest::Complete)
+    emitArchetypeTypeMetadataRef(IGF, origin, MetadataState::Complete)
       .getMetadata();
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
@@ -427,7 +427,7 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
 
   // Acquire the archetype's static metadata.
   llvm::Value *metadata =
-    emitArchetypeTypeMetadataRef(IGF, archetype, MetadataRequest::Complete)
+    emitArchetypeTypeMetadataRef(IGF, archetype, MetadataState::Complete)
       .getMetadata();
   return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
                                 {addr.getAddress(), metadata,

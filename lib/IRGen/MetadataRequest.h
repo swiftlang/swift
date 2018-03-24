@@ -42,7 +42,7 @@ class DynamicMetadataRequest {
   MetadataRequest StaticRequest;
   llvm::Value *DynamicRequest = nullptr;
 public:
-  DynamicMetadataRequest(MetadataRequest::BasicKind request)
+  DynamicMetadataRequest(MetadataState request)
     : DynamicMetadataRequest(MetadataRequest(request)) {}
   DynamicMetadataRequest(MetadataRequest request)
     : StaticRequest(request), DynamicRequest(nullptr) {}
@@ -71,7 +71,7 @@ public:
   /// This is a useful query because the result of such a request is
   /// always statically-known complete.
   bool isStaticallyBlockingComplete() const {
-    return isStatic() && StaticRequest == MetadataRequest::Complete;
+    return isStatic() && StaticRequest == MetadataState::Complete;
   }
 
   llvm::Value *get(IRGenFunction &IGF) const;
@@ -124,24 +124,25 @@ public:
   llvm::Value *combine(IRGenFunction &IGF) const;
 
   /// Return a constant value representing the fully-completed state
-  /// (MetadataRequest::Complete).
+  /// (MetadataState::Complete).
   static llvm::Constant *getCompletedState(IRGenModule &IGM);
 };
 
 /// A dependency that is blocking a metadata initialization from completing.
 class MetadataDependency {
   llvm::Value *RequiredMetadata;
-  MetadataRequest::BasicKind RequiredState;
+  MetadataState RequiredState;
 public:
   /// Construct the null dependency, i.e. the initialization is not blocked.
-  MetadataDependency() : RequiredMetadata(nullptr) {}
+  MetadataDependency()
+      : RequiredMetadata(nullptr), RequiredState(MetadataState::Complete) {}
 
   /// Construct a non-trivial dependency.
   MetadataDependency(llvm::Value *requiredMetadata,
-                     MetadataRequest::BasicKind requiredState)
+                     MetadataState requiredState)
       : RequiredMetadata(requiredMetadata), RequiredState(requiredState) {
     assert(requiredMetadata != nullptr);
-    assert(requiredState != MetadataRequest::Abstract &&
+    assert(requiredState != MetadataState::Abstract &&
            "cannot have trivial requirement on abstract state!");
   }
 
@@ -157,7 +158,7 @@ public:
 
   /// Return the state that the metadata needs to reach before the
   /// initialization is unblocked.
-  MetadataRequest::BasicKind getRequiredState() const {
+  MetadataState getRequiredState() const {
     assert(isNonTrivial());
     return RequiredState;
   }

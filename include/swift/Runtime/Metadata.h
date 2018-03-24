@@ -211,7 +211,7 @@ struct MetadataResponse {
   ///
   /// For metadata initialization functions, this is the state that the
   /// given metadata needs to be in before initialization can continue.
-  MetadataRequest::BasicKind State;
+  MetadataState State;
 };
 using MetadataDependency = MetadataResponse;
 

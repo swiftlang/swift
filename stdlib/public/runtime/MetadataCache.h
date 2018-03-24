@@ -390,7 +390,7 @@ public:
   }
 };
 
-class MetadataState {
+class MetadataPrivateState {
 public:
   using RawType = uint8_t;
 
@@ -420,8 +420,8 @@ private:
   uint8_t Data;
 
 public:
-  explicit MetadataState(RawType data) : Data(data) {}
-  /*implicit*/ MetadataState(BasicKind kind) : Data(kind) {}
+  explicit MetadataPrivateState(RawType data) : Data(data) {}
+  /*implicit*/ MetadataPrivateState(BasicKind kind) : Data(kind) {}
 
   BasicKind getBasicKind() const {
     return BasicKind(Data & BasicKindMask);
@@ -437,47 +437,47 @@ public:
   }
 
   bool hasWaiters() const { return Data & HasWaiters; }
-  MetadataState addWaiters() const {
+  MetadataPrivateState addWaiters() const {
     assert(!isComplete() && "adding waiters to completed state");
-    return MetadataState(Data | HasWaiters);
+    return MetadataPrivateState(Data | HasWaiters);
   }
-  MetadataState removeWaiters() const {
-    return MetadataState(Data & ~HasWaiters);
+  MetadataPrivateState removeWaiters() const {
+    return MetadataPrivateState(Data & ~HasWaiters);
   }
 
-  MetadataRequest::BasicKind getAccomplishedRequestState() const {
+  MetadataState getAccomplishedRequestState() const {
     switch (getBasicKind()) {
     case Allocating:
       swift_runtime_unreachable("cannot call on allocating state");
     case Abstract:
-      return MetadataRequest::Abstract;
+      return MetadataState::Abstract;
     case LayoutComplete:
-      return MetadataRequest::LayoutComplete;
+      return MetadataState::LayoutComplete;
     case Complete:
-      return MetadataRequest::Complete;
+      return MetadataState::Complete;
     }
     swift_runtime_unreachable("bad state");
   }
 
-  static MetadataState forRequestState(MetadataRequest::BasicKind state) {
+  static MetadataPrivateState forRequestState(MetadataState state) {
     switch (state) {
-    case MetadataRequest::Abstract:
+    case MetadataState::Abstract:
       return Abstract;
-    case MetadataRequest::LayoutComplete:
+    case MetadataState::LayoutComplete:
       return LayoutComplete;
-    case MetadataRequest::Complete:
+    case MetadataState::Complete:
       return Complete;
     }
     swift_runtime_unreachable("bad state");    
   }
 
-  bool satisfies(MetadataRequest::BasicKind requirement) {
+  bool satisfies(MetadataState requirement) {
     switch (requirement) {
-    case MetadataRequest::Abstract:
+    case MetadataState::Abstract:
       return getBasicKind() >= Abstract;
-    case MetadataRequest::LayoutComplete:
+    case MetadataState::LayoutComplete:
       return getBasicKind() >= LayoutComplete;
-    case MetadataRequest::Complete:
+    case MetadataState::Complete:
       return getBasicKind() >= Complete;
     }
     swift_runtime_unreachable("unsupported requirement kind");
@@ -494,7 +494,7 @@ public:
     if (request.isNonBlocking())
       return false;
 
-    return !satisfies(request.getBasicKind());
+    return !satisfies(request.getState());
   }
 
   RawType getRawValue() const { return Data; }
@@ -512,7 +512,7 @@ struct MetadataCompletionQueueEntry {
   MetadataCompletionContext CompletionContext;
 
   Metadata *Dependency = nullptr;
-  MetadataRequest::BasicKind DependencyRequirement = MetadataRequest::Abstract;
+  MetadataState DependencyRequirement = MetadataState::Abstract;
 
   MetadataCompletionQueueEntry(Metadata *value,
                                const MetadataCompletionContext &context)
@@ -525,7 +525,7 @@ struct MetadataCompletionQueueEntry {
 ///   has already reached the desired requirement
 bool addToMetadataQueue(std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
                         const Metadata *dependency,
-                        MetadataRequest::BasicKind dependencyRequirement);
+                        MetadataState dependencyRequirement);
 
 
 void resumeMetadataCompletion(
@@ -602,12 +602,12 @@ private:
 
   /// The current state of this metadata cache entry.
   ///
-  /// This has to be stored as a MetadataState::RawType instead of a
-  /// MetadataState because some of our targets don't support interesting
+  /// This has to be stored as a MetadataPrivateState::RawType instead of a
+  /// MetadataPrivateState because some of our targets don't support interesting
   /// structs as atomic types.
-  std::atomic<MetadataState::RawType> State;
+  std::atomic<MetadataPrivateState::RawType> State;
 
-  /// Valid if State.getBasicKind() >= MetadataState::Abstract.
+  /// Valid if State.getBasicKind() >= MetadataPrivateState::Abstract.
   ValueType Value;
 
   /// Additional storage that is only ever accessed under the lock.
@@ -625,7 +625,7 @@ private:
 public:
   MetadataCacheEntryBase(const MetadataCacheKey &key)
       : Hash(key.Hash), KeyLength(key.KeyData.size()),
-        State(MetadataState(MetadataState::Allocating).getRawValue()) {
+        State(MetadataPrivateState(MetadataPrivateState::Allocating).getRawValue()) {
     LockedStorageKind = LSK::AllocatingThread;
     LockedStorage.AllocatingThread = std::this_thread::get_id();
     memcpy(this->template getTrailingObjects<const void*>(),
@@ -667,7 +667,7 @@ public:
   template <class... Args>
   Status await(ConcurrencyControl &concurrency, MetadataRequest request,
                Args &&...extraArgs) {
-    auto state = MetadataState(State.load(std::memory_order_acquire));
+    auto state = MetadataPrivateState(State.load(std::memory_order_acquire));
 
     if (state.shouldWait(request)) {
       awaitSatisfyingState(concurrency, request, state);
@@ -690,11 +690,11 @@ public:
 
     // Publish the value.
     Value = const_cast<ValueType>(allocationResult.Value);
-    auto newState = MetadataState::forRequestState(allocationResult.State);
-    publishMetadataState(concurrency, newState);
+    auto newState = MetadataPrivateState::forRequestState(allocationResult.State);
+    publishMetadataPrivateState(concurrency, newState);
 
     // If allocation gave us completed metadata, short-circuit initialization.
-    if (allocationResult.State == MetadataRequest::Complete) {
+    if (allocationResult.State == MetadataState::Complete) {
       return Status{allocationResult.Value, allocationResult.State};
     }
 
@@ -720,8 +720,8 @@ public:
 protected:
   /// The expected return type of tryInitialize.
   struct TryInitializeResult {
-    MetadataRequest::BasicKind NewState;
-    MetadataRequest::BasicKind DependencyRequirement;
+    MetadataState NewState;
+    MetadataState DependencyRequirement;
     const Metadata *Dependency;
   };
 
@@ -738,7 +738,7 @@ private:
     // that were processing the initialization, so a relaxed load is fine
     // here.  (This ordering is achieved by the locking which occurs as part
     // of queuing and dequeuing metadata.)
-    auto curState = MetadataState(State.load(std::memory_order_relaxed));
+    auto curState = MetadataPrivateState(State.load(std::memory_order_relaxed));
     assert(curState.hasAllocatedMetadata());
     assert(!curState.isComplete());
 
@@ -762,7 +762,7 @@ private:
       TryInitializeResult tryInitializeResult =
         asImpl().tryInitialize(value, context, args...);
       auto newState =
-        MetadataState::forRequestState(tryInitializeResult.NewState);
+        MetadataPrivateState::forRequestState(tryInitializeResult.NewState);
 
       assert(curState.getBasicKind() <= newState.getBasicKind() &&
              "initialization regressed to an earlier state");
@@ -773,7 +773,7 @@ private:
       if (curState.getBasicKind() < newState.getBasicKind()) {
         hasProgress = true;
         curState = newState;
-        publishMetadataState(concurrency, newState);
+        publishMetadataPrivateState(concurrency, newState);
       }
 
       // If we don't have a dependency, we're finished.
@@ -837,7 +837,7 @@ private:
   /// Claim all the satisfied completion queue entries, given that
   /// we're holding the lock.
   std::unique_ptr<MetadataCompletionQueueEntry>
-  claimSatisfiedQueueEntriesWithLock(MetadataState newState) {
+  claimSatisfiedQueueEntriesWithLock(MetadataPrivateState newState) {
     // Collect anything in the metadata's queue whose target state has been
     // reached to the queue in result.  Note that we repurpose the Next field
     // in the collected entries.
@@ -878,12 +878,12 @@ private:
   }
 
   /// Publish a new metadata state.  Wake waiters if we had any.
-  void publishMetadataState(ConcurrencyControl &concurrency,
-                            MetadataState newState) {
+  void publishMetadataPrivateState(ConcurrencyControl &concurrency,
+                            MetadataPrivateState newState) {
     assert(newState.hasAllocatedMetadata());
     assert(!newState.hasWaiters());
 
-    auto oldState = MetadataState(State.exchange(newState.getRawValue(),
+    auto oldState = MetadataPrivateState(State.exchange(newState.getRawValue(),
                                                  std::memory_order_release));
     assert(!oldState.isComplete());
 
@@ -899,12 +899,12 @@ private:
 
   /// Wait for the request to be satisfied by the current state.
   void awaitSatisfyingState(ConcurrencyControl &concurrency,
-                            MetadataRequest request, MetadataState &state) {
+                            MetadataRequest request, MetadataPrivateState &state) {
     concurrency.Lock.withLockOrWait(concurrency.Queue, [&] {
       // Re-load the state now that we have the lock.  If we don't
       // need to wait, we're done.  Otherwise, flag the existence of a
       // waiter; if that fails, start over with the freshly-loaded state.
-      state = MetadataState(State.load(std::memory_order_acquire));
+      state = MetadataPrivateState(State.load(std::memory_order_acquire));
       while (true) {
         if (!state.shouldWait(request))
           return true;
@@ -946,7 +946,7 @@ public:
     assert(!queueEntry->Next);
 
     return concurrency.Lock.withLock([&] {
-      auto curState = MetadataState(State.load(std::memory_order_acquire));
+      auto curState = MetadataPrivateState(State.load(std::memory_order_acquire));
       if (curState.satisfies(queueEntry->DependencyRequirement))
         return false;
 

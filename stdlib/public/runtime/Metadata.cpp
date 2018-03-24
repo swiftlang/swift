@@ -185,21 +185,21 @@ namespace {
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
 
-      MetadataRequest::BasicKind state;
+      MetadataState state;
       if (pattern->CompletionFunction.isNull()) {
-        state = MetadataRequest::Complete;
+        state = MetadataState::Complete;
       } else {
         state = inferStateForMetadata(metadata);
       }
       return { metadata, state };
     }
 
-    MetadataRequest::BasicKind inferStateForMetadata(Metadata *metadata) {
+    MetadataState inferStateForMetadata(Metadata *metadata) {
       if (metadata->getValueWitnesses()->isIncomplete())
-        return MetadataRequest::Abstract;
+        return MetadataState::Abstract;
 
       // TODO: internal vs. external layout-complete?
-      return MetadataRequest::LayoutComplete;
+      return MetadataState::LayoutComplete;
     }
 
     // Note that we have to pass 'arguments' separately here instead of
@@ -217,7 +217,7 @@ namespace {
       auto dependency = pattern->CompletionFunction(metadata, context, pattern);
 
       auto state = dependency.Value == nullptr
-                     ? MetadataRequest::Complete
+                     ? MetadataState::Complete
                      : inferStateForMetadata(metadata);
 
       return { state, dependency.State, dependency.Value };
@@ -3259,7 +3259,7 @@ static Result performOnMetadataCache(const Metadata *metadata,
 bool swift::addToMetadataQueue(
                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
                   const Metadata *dependency,
-                  MetadataRequest::BasicKind dependencyRequirement) {
+                  MetadataState dependencyRequirement) {
   struct EnqueueCallbacks {
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
@@ -3283,7 +3283,7 @@ void swift::resumeMetadataCompletion(
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
     static MetadataRequest getRequest() {
-      return MetadataRequest(MetadataRequest::Complete,
+      return MetadataRequest(MetadataState::Complete,
                              /*non-blocking*/ true);
     }
 
