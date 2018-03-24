@@ -3162,8 +3162,10 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
-  if (baseTy->is<ModuleType>())
+  if (baseTy->is<ModuleType>()) {
     baseTy = Type();
+    sugaredBaseTy = Type();
+  }
 
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
