@@ -204,6 +204,8 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
   case SILFunctionType::Representation::CFunctionPointer: return "c";
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionType::Representation::TensorFlow: return "tensorflow";
   case SILFunctionType::Representation::Thin: return "thin";
   case SILFunctionType::Representation::Method: return "method";
   case SILFunctionType::Representation::ObjCMethod: return "objc_method";
