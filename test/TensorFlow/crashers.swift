@@ -222,3 +222,13 @@ public func b76115311() {
   let matrix: Tensor<Float> = genericMethod76115311()
   _ = matrix+matrix
 }
+
+
+// This was a crash marking arguments outside the tensor region.
+public func argumentCrash() {
+  for i : Int8 in 1...10 {  // expected-warning {{implicitly copied to the accelerator}}
+    let x = Tensor(i)  // expected-note {{value used here}}
+    print(x+x)
+  }
+}
+
