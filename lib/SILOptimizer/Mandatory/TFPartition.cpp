@@ -634,7 +634,9 @@ public:
   /// The instructions that are to be run on the accelerator.
   DenseMap<SILInstruction*, Marking> markedInstructions;
 
-  /// BB Arguments that are marked as being moved, copied, or used as arguments.
+  /// BB Arguments that are marked as being moved, deleted, copied, or used as
+  /// arguments.
+  ///
   /// If a marked argument is moved over, it is deleted from the host program.
   /// If the host also uses the argument, then a copy will have to be inserted
   /// back from the accelerator to the host.
@@ -689,6 +691,7 @@ private:
   void sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   void promoteCopyToMove();
+  void markTensorBBArgumentsForDeletion();
 
   // Rewriting the host function.
   PartitionedTensorProgram
@@ -1129,7 +1132,7 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     assert(!isa<SILFunctionArgument>(arg) &&
            "Cannot move function parameters!");
     markedBBArguments.insert({
-      arg, {Marking::Move, getUserSourceLocation(arg)}
+      arg, { Marking::Move, getUserSourceLocation(arg) }
     });
   } else {
     markedBBArguments.insert({
@@ -1509,6 +1512,122 @@ void TFFunctionPartition::promoteCopyToMove() {
   }
 }
 
+/// Scan over all of the unmarked tensor basic block arguments in the function,
+/// to see if any of them can be removed.  BB arguments can be removed when
+/// they are only (possibly transitively) used by retain/release instructions.
+/// If this is the case, we want to delete them to avoid spurious copies back
+/// to the host.
+void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
+  // We use an optimistic algorithm where we assume that all tensor BB arguments
+  // are deletable until we find evidence otherwise.  When/if we find such
+  // evidence, we mark them as live, which propagates this liveness upwards,
+  // marking other BB arguments potentially live.
+  SmallPtrSet<SILArgument*, 16> potentiallyDeadArguments;
+  for (auto *block : llvm::depth_first(&fn)) {
+    for (auto *arg : block->getArguments()) {
+      // Ignore non-tensor arguments.
+      if (!isTensorFlowValue(arg->getType()))
+        continue;
+      // Ignore tensor arguments that are already marked.
+      if (markedBBArguments.count(arg))
+        continue;
+
+      // If this argument is fed by a terminator other than an unconditional
+      // branch then we can't delete it.
+      bool hasAnyNonBranchPredecessors = false;
+      for (auto pred : block->getPredecessorBlocks()) {
+        if (!isa<BranchInst>(pred->getTerminator())) {
+          hasAnyNonBranchPredecessors = true;
+          break;
+        }
+      }
+
+      if (hasAnyNonBranchPredecessors)
+        continue;
+
+      // Otherwise, this could be dead!
+      potentiallyDeadArguments.insert(arg);
+    }
+  }
+
+  // Early exit in the common case that we didn't find anything.
+  if (potentiallyDeadArguments.empty())
+    return;
+
+  SmallVector<SILArgument*, 16> worklist(potentiallyDeadArguments.begin(),
+                                         potentiallyDeadArguments.end());
+  while (!worklist.empty()) {
+    auto *arg = worklist.pop_back_val();
+
+    // If we already know that this argument is live, don't revisit it.
+    if (!potentiallyDeadArguments.count(arg))
+      continue;
+
+    // Check the use list of the specified argument.  If it contains any
+    // users other than retain/release instructions or uncond branches feeding
+    // other blocks, then it must be live.
+    bool hasImportantUser = false;
+    for (auto *operand : arg->getUses()) {
+      auto user = operand->getUser();
+      // debug_value and retain/release instructions can be deleted if the
+      // argument is deleted.
+      if (isUserIgnoredByPartitioning(user))
+        continue;
+
+      // Deleted instructions won't make this value live.
+      auto it = markedInstructions.find(user);
+      if (it != markedInstructions.end() && it->second == Marking::Delete)
+        continue;
+
+      // Unconditional branches mark the value live if the successor argument
+      // makes it live.
+      if (auto *branch = dyn_cast<BranchInst>(user)) {
+        auto opNumber = operand->getOperandNumber();
+        auto arg = branch->getDestBB()->getArgument(opNumber);
+
+        if (potentiallyDeadArguments.count(arg))
+          continue;
+      }
+      hasImportantUser = true;
+    }
+
+    // If we have no important users, then this argument appears dead for now.
+    if (!hasImportantUser)
+      continue;
+
+    // Otherwise, this argument became live.  Remove it from our potentially
+    // dead list and mark any arguments that feed it as needing to be revisited,
+    // since they aren't dead either.
+    potentiallyDeadArguments.erase(arg);
+
+    // If any of the values fed into this argument from predecessors were
+    // derived from potentially dead arguments, then they are live: revisit them
+    // to propagate liveness upwards.
+    for (auto pred : arg->getParent()->getPredecessorBlocks()) {
+      auto branch = cast<BranchInst>(pred->getTerminator());
+      auto argVal = branch->getOperand(arg->getIndex());
+      if (auto *argValArg = dyn_cast<SILArgument>(argVal))
+        if (potentiallyDeadArguments.count(argValArg))
+          worklist.push_back(argValArg);
+    }
+  }
+
+  // If we have any dead arguments, go ahead and mark them as such now.
+  for (auto arg : potentiallyDeadArguments) {
+    markedBBArguments.insert({
+      arg, { Marking::Delete, getUserSourceLocation(arg) }
+    });
+
+    // Mark trivial users as being deleted.
+    for (auto *operand : arg->getUses()) {
+      auto user = operand->getUser();
+      // debug_value and retain/release instructions can be deleted if the
+      // argument is deleted.
+      if (isUserIgnoredByPartitioning(user))
+        markedInstructions[user] = Marking::Delete;
+    }
+  }
+}
 
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
@@ -1619,6 +1738,12 @@ bool TFFunctionPartition::markFunction() {
   // users are known to be moved or deleted.
   promoteCopyToMove();
 
+  // Scan over all of the unmarked tensor basic block arguments in the function,
+  // to see if any of them can be removed.  BB arguments can be removed when
+  // they are only (possibly transitively) used by retain/release instructions.
+  // If this is the case, we want to delete them to avoid spurious copies back
+  // to the host.
+  markTensorBBArgumentsForDeletion();
 
   // Not that we know all of the instructions we'll be moving over, find the end
   // point by finding the nearest common post dominating ancestor of the marked
@@ -2282,7 +2407,7 @@ void PartitionCloner::finalizeOriginal() {
   for (auto argInfo : FP.markedBBArguments) {
     // We delete arguments that are moved over to the accelerator.
     auto marking = argInfo.second.first;
-    if (marking != Marking::Move) {
+    if (marking != Marking::Move && marking != Marking::Delete) {
       assert((marking == Marking::Copy || marking == Marking::Argument) &&
              "Only move/copy/argument supported for arguments right now");
       continue;
@@ -2304,7 +2429,8 @@ void PartitionCloner::finalizeOriginal() {
     for (auto arg : bb->getArguments()) {
       auto it = FP.markedBBArguments.find(arg);
       if (it != FP.markedBBArguments.end() &&
-          it->second.first == Marking::Move) {
+          (it->second.first == Marking::Move ||
+           it->second.first == Marking::Delete)) {
         argsToRemoveMask[argNo] = true;
       }
       ++argNo;
@@ -2329,7 +2455,7 @@ void PartitionCloner::finalizeOriginal() {
   // now delete the defining instruction/argument.
   for (auto argInfo : FP.markedBBArguments) {
     auto marking = argInfo.second.first;
-    if (marking != Marking::Move)
+    if (marking != Marking::Move && marking != Marking::Delete)
       continue;
 
     auto arg = argInfo.first;
@@ -2845,14 +2971,15 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
           continue;
 
         // If the user is an unconditional branch instruction, and the value is
-        // feeding a basic block argument that is being moved, then we can
-        // ignore it.
+        // feeding a basic block argument that is being moved or deleted, then
+        // we can ignore it.
         if (auto *branch = dyn_cast<BranchInst>(user)) {
           auto opNumber = operand->getOperandNumber();
           auto arg = branch->getDestBB()->getArgument(opNumber);
           auto argInfo = markedBBArguments.find(arg);
           if (argInfo != markedBBArguments.end() &&
-              argInfo->second.first == Marking::Move)
+              (argInfo->second.first == Marking::Move ||
+               argInfo->second.first == Marking::Delete))
             continue;
         }
 
