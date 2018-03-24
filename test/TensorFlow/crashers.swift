@@ -158,10 +158,9 @@ public func sinkTensorToScalarCrash() {
   let w1 = Tensor<Float>(shape: [4, 1], repeating: 0.1)
   var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
 
-  // expected-error @+1 {{cannot lower a 'receive' from the host}}
-  for _ in 0...10000 {  // expected-warning {{implicitly copied}}
+  for _ in 0...10000 {
     w2 -= w1
-    loss = w2.mean() // expected-warning {{implicitly copied}}
+    loss = w2.mean()
   }
 
   opaqueGenericFunction(loss)

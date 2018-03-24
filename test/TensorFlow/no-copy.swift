@@ -149,6 +149,15 @@ public func paddingTuplesHoistable() {
   _ = padded.array
 }
 
+// b/76184126
+public func rangeLiteral() -> Tensor<Float> {
+  var x = Tensor<Float>(33)
+  for _ in 1...10 {
+    x += 1
+  }
+  return x.toHost()
+}
+
 /// b/76222306
 struct Classifier {
   // Parameters
