@@ -1810,9 +1810,8 @@ namespace {
         break;
       }
       case FieldAccess::ConstantIndirect:
-        // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
-        // the Objective-C runtime into the field offset vector of the
-        // instantiated metadata.
+        // Otherwise, swift_initClassMetadata() will point the Objective-C
+        // runtime into the field offset vector of the instantiated metadata.
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
         break;
