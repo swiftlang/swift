@@ -57,9 +57,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     return FormalLinkage::HiddenUnique;
   case AccessLevel::FilePrivate:
   case AccessLevel::Private:
-    // Why "hidden" instead of "private"? Because the debugger may need to
-    // access these symbols.
-    return FormalLinkage::HiddenUnique;
+    return FormalLinkage::Private;
   }
 
   llvm_unreachable("Unhandled access level in switch.");
