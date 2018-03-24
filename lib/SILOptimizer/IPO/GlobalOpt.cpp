@@ -85,10 +85,8 @@ class SILGlobalOpt {
   /// The set of functions that have had their loops analyzed.
   llvm::DenseSet<SILFunction *> LoopCheckedFunctions;
 
-  /// Keep track of cold blocks.
-  ColdBlockInfo ColdBlocks;
-
-  /// Whether we see a "once" call to callees that we currently don't handle.
+  /// Whether we have seen any "once" calls to callees that we currently don't
+  /// handle.
   bool UnhandledOnceCallee = false;
 
   /// A map from a globalinit_func to the number of times "once" has called the
@@ -96,7 +94,7 @@ class SILGlobalOpt {
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
-      : Module(M), DA(DA), ColdBlocks(DA) {}
+      : Module(M), DA(DA) {}
 
   bool run();
 
