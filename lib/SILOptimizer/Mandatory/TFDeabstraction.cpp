@@ -188,12 +188,11 @@ void TFDeabstraction::inlineCalls() {
 
   /// This predicate decides whether we should mandatory inline the specified
   /// call site.
-  auto shouldInline = [&](FullApplySite site) -> bool {
+  auto shouldInline = [&](FullApplySite site,
+                          const SILFunction &callee) -> bool {
     // If this is a call of an explicitly noinline function, don't inline it!
-    if (auto *apply = dyn_cast<ApplyInst>(site.getInstruction()))
-      if (auto *callee = apply->getCalleeFunction())
-        if (callee->getInlineStrategy() == NoInline)
-          return false;
+    if (callee.getInlineStrategy() == NoInline)
+      return false;
 
     // Check for array internals which we could be inlined, but prefer to
     // leave in abstracted form for easier analysis.  For things like
@@ -201,6 +200,20 @@ void TFDeabstraction::inlineCalls() {
     // construction calls beacuse we end up removing them anyway.
     if (isArrayUninitialized(site.getInstruction()))
       return false;
+
+    // FIXME: This is a specific hack to inline literal conversion operations
+    // that prevent SSA promotion and bloat code.  This should be eliminated
+    // when we have a proper constexpr model and can just constant fold through
+    // the memory indirections.
+    if (callee.getName().contains("ExpressibleByBuiltinIntegerLiteral") ||
+        callee.getName().contains("ExpressibleByIntegerLiteral") ||
+        callee.getName().contains("SSfs13FloatingPoint") ||
+        callee.getName().contains("S10TensorFlow0A0VAAs13FloatingPointRzrlE12"
+                                  "randomNormal4mean6stddev5s") ||
+        callee.getName().contains("S10TensorFlow0A5ShapeV12arrayLiteral"
+                                  "ACs5Int32Vd_tcfC") ||
+        callee.getName().contains("_allocateUninitializedArray"))
+      return true;
 
     // If we're forcibly flattening code into the top level function, and if the
     // callee is in the same source file as that top-level function (and thus
@@ -211,11 +224,8 @@ void TFDeabstraction::inlineCalls() {
           // FIXME: We will miscompile functions that use variables in top level
           // code right now.  We need to implement this properly.
 #if 0
-          if (shouldBeForciblyFlattened(*callee)) {
-            // Recognize that we're about to change this function.
-            aboutToChangeFunction();
+          if (shouldBeForciblyFlattened(*callee))
             return true;
-          }
 #endif
         }
       }
@@ -230,8 +240,6 @@ void TFDeabstraction::inlineCalls() {
     if (!tfc.containsTensorFlowValue(type))
       return false;
 
-    // Recognize that we're about to change this function.
-    aboutToChangeFunction();
     return true;
   };
 
@@ -241,7 +249,7 @@ void TFDeabstraction::inlineCalls() {
   // TensorFlow values as their argument or result lists.
   inlineForTFDeabstraction(fn,
      [&](FullApplySite site, const SILFunction &callee) -> bool {
-       if (!shouldInline(site))
+       if (!shouldInline(site, callee))
          return false;
 
        // Recognize that we're about to change this function.
@@ -422,13 +430,16 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
 }
 
 /// If the specified instruction is an high-level aggregate operation like
-/// copy_addr or destroy_addr, and if it is working on a type that contains a
-/// TensorFlow value, break it down into its more primitive operations and
-/// return true.  Otherwise, return false.  This leaves the input instruction in
-/// place and inserts the additional instructions immediately after the input
-/// instruction that is exploded.
+/// copy_addr or destroy_addr, break it down into its more primitive operations
+/// and return true.  Otherwise, return false.
+///
+/// If 'tfc' is non-null, this will only promote ops working on a type that
+/// contains a TensorFlow value.
+///
+/// This leaves the input instruction in place and inserts the additional
+/// instructions immediately after the input instruction that is exploded.
 static bool explodeAggregateInst(SILInstruction *inst,
-                                 TensorFunctionClassifier &tfc) {
+                                 TensorFunctionClassifier *tfc) {
   // Check to see if this is an instruction we can handle below, early exiting
   // if not.
   if (!isa<CopyAddrInst>(inst) &&
@@ -442,7 +453,7 @@ static bool explodeAggregateInst(SILInstruction *inst,
   // Check to make sure that this operation is doing something on a value
   // containing a TensorFlow value.  If not, just leave it alone.
   auto type = inst->getOperand(0)->getType();
-  if (!tfc.containsTensorFlowValue(type))
+  if (tfc && !tfc->containsTensorFlowValue(type))
     return false;
 
   // TODO: This is currently just handling loadable types.  We should be able to
@@ -571,7 +582,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // explode it out into its components and reprocess the components.  This
       // ensures that nothing later in deabstraction or partitioning have to
       // worry about them.
-      if (explodeAggregateInst(inst, tfc)) {
+      if (explodeAggregateInst(inst, &tfc)) {
         logIfFirstChange();
 
         // Reset our iterator to the first instruction we just produced so we
@@ -598,6 +609,81 @@ void TFDeabstraction::simplifyTensorOperands() {
   // working on the host-side tensor operation.
   if (!containsOpBuiltin)
     tensorOps.clear();
+}
+
+// Return true if this is a standard LLVM arithmetic operation.  We often see
+// silly allocas in the way of them.
+// FIXME: This is only necessary because we don't have a constexpr model.
+// When that is in place and working well, this should be removed.
+static bool isSimpleBuiltinArithmeticOp(BuiltinInst *builtin) {
+  switch (builtin->getBuiltinInfo().ID) {
+  default: return false;
+  case BuiltinValueKind::Trunc:
+  case BuiltinValueKind::ZExt:
+  case BuiltinValueKind::SExt:
+  case BuiltinValueKind::FPToUI:
+  case BuiltinValueKind::FPToSI:
+  case BuiltinValueKind::UIToFP:
+  case BuiltinValueKind::SIToFP:
+  case BuiltinValueKind::FPTrunc:
+  case BuiltinValueKind::FPExt:
+  case BuiltinValueKind::TruncOrBitCast:
+  case BuiltinValueKind::ZExtOrBitCast:
+  case BuiltinValueKind::SExtOrBitCast:
+  case BuiltinValueKind::Add:
+  case BuiltinValueKind::FAdd:
+  case BuiltinValueKind::And:
+  case BuiltinValueKind::AShr:
+  case BuiltinValueKind::LShr:
+  case BuiltinValueKind::Or:
+  case BuiltinValueKind::FDiv:
+  case BuiltinValueKind::Mul:
+  case BuiltinValueKind::FMul:
+  case BuiltinValueKind::SDiv:
+  case BuiltinValueKind::ExactSDiv:
+  case BuiltinValueKind::Shl:
+  case BuiltinValueKind::SRem:
+  case BuiltinValueKind::Sub:
+  case BuiltinValueKind::FSub:
+  case BuiltinValueKind::UDiv:
+  case BuiltinValueKind::ExactUDiv:
+  case BuiltinValueKind::URem:
+  case BuiltinValueKind::FRem:
+  case BuiltinValueKind::Xor:
+  case BuiltinValueKind::SAddOver:
+  case BuiltinValueKind::UAddOver:
+  case BuiltinValueKind::SSubOver:
+  case BuiltinValueKind::USubOver:
+  case BuiltinValueKind::SMulOver:
+  case BuiltinValueKind::UMulOver:
+  case BuiltinValueKind::FNeg:
+  case BuiltinValueKind::AssumeNonNegative:
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_SLE:
+  case BuiltinValueKind::ICMP_SLT:
+  case BuiltinValueKind::ICMP_SGE:
+  case BuiltinValueKind::ICMP_SGT:
+  case BuiltinValueKind::ICMP_ULE:
+  case BuiltinValueKind::ICMP_ULT:
+  case BuiltinValueKind::ICMP_UGE:
+  case BuiltinValueKind::ICMP_UGT:
+  case BuiltinValueKind::FCMP_OEQ:
+  case BuiltinValueKind::FCMP_OGT:
+  case BuiltinValueKind::FCMP_OGE:
+  case BuiltinValueKind::FCMP_OLT:
+  case BuiltinValueKind::FCMP_OLE:
+  case BuiltinValueKind::FCMP_ONE:
+  case BuiltinValueKind::FCMP_ORD:
+  case BuiltinValueKind::FCMP_UEQ:
+  case BuiltinValueKind::FCMP_UGT:
+  case BuiltinValueKind::FCMP_UGE:
+  case BuiltinValueKind::FCMP_ULT:
+  case BuiltinValueKind::FCMP_ULE:
+  case BuiltinValueKind::FCMP_UNE:
+  case BuiltinValueKind::FCMP_UNO:
+    return true;
+  }
 }
 
 namespace {
@@ -630,6 +716,7 @@ namespace {
 /// order to find promotable stack and global references.
 void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
+  auto &fn = *tensorOps.front()->getFunction();
 
   // Find all the promotable memory reachable from tensor ops.  This ensures
   // we can directly connect their use-def edges together.
@@ -641,7 +728,6 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   // If we're in the main function processing top level code, scan the function
   // to collect any global_addr instructions.  We want to promote tensor-related
   // globals and the values that feed into them.
-  auto &fn = *tensorOps.front()->getFunction();
   if (fn.getName() != SWIFT_ENTRY_POINT_FUNCTION)
     return;
 
@@ -753,6 +839,15 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
       findPromotableMemoryFromValue(operand.get());
     return;
   }
+
+
+  // Look through standard LLVM arithmetic operations.  We often see silly
+  // allocas in the way of them.
+  // FIXME: This is only necessary because we don't have a constexpr model.
+  // When that is in place and working well, this should be removed.
+  if (auto builtin = dyn_cast<BuiltinInst>(inst))
+    if (isSimpleBuiltinArithmeticOp(builtin))
+      findPromotableMemoryFromValue(builtin->getOperand(0));
 
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
@@ -961,15 +1056,39 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   // we have tensor values mixed in with other random values that shouldn't
   // (or can't) be loaded.  For now, we can just fail to deabstract these
   // cases.
-  SmallVector<SILInstruction*, 4> users;
-
   for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto inst = (*UI++)->getUser();
+    auto inst = (*UI)->getUser();
+
+    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
+      if (auto *use = sea->getSingleUse()) {
+        // If we have a load(struct_element_addr(alloc)) turn it into
+        // struct_extract(load(alloc)).
+        if (auto *load = dyn_cast<LoadInst>(use->getUser())) {
+          SILBuilder B(load);
+          auto *newLoad = B.createLoad(load->getLoc(), sea->getOperand(),
+                                       load->getOwnershipQualifier());
+          auto *newVal = B.createStructExtract(load->getLoc(), newLoad,
+                                               sea->getField(),
+                                               load->getType());
+          load->replaceAllUsesWith(newVal);
+          load->eraseFromParent();
+          ++UI;
+          sea->eraseFromParent();
+          continue;
+        }
+      }
+
+    // Explode aggregate by-address instructions like copy-addr.
+    if (explodeAggregateInst(inst, /*all types*/nullptr)) {
+      ++UI;
+      inst->eraseFromParent();
+      continue;
+    }
 
     // If we have an instruction other than begin_access, remember it.
     auto *begin = dyn_cast<BeginAccessInst>(inst);
     if (!begin) {
-      users.push_back(inst);
+      ++UI;
       continue;
     }
 
@@ -982,17 +1101,12 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
       if (isa<EndAccessInst>(inst)) {
         inst->eraseFromParent();
       } else {
-        use->set(begin->getOperand());
-        users.push_back(inst);
+        use->set(alloc);
       }
     }
 
+    ++UI;
     begin->eraseFromParent();
-  }
-
-  for (auto user : users) {
-    if (isa<EndAccessInst>(user))
-      user->eraseFromParent();
   }
 }
 
@@ -1197,6 +1311,18 @@ propagateTensorOperand(SILValue v,
       accessPath.push_back(extract->getFieldNo());
       v = extract->getOperand();
       continue;
+    }
+
+    // Look through standard LLVM arithmetic operations.  We often see silly
+    // allocas in the way of them.
+    // FIXME: This is only necessary because we don't have a constexpr model.
+    // When that is in place and working well, this should be removed.
+    if (auto builtin = dyn_cast<BuiltinInst>(inst)) {
+      if (isSimpleBuiltinArithmeticOp(builtin) &&
+          inst->getOperand(0)->getType() == builtin->getType()) {
+        v = inst->getOperand(0);
+        continue;
+      }
     }
 
     // Constructions provide values to extract from if we have an access inside
