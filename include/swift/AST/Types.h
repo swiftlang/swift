@@ -1637,7 +1637,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, const SubstitutionMap &substitutions);
+                      Type parent, const SubstitutionMap &substitutions,
+                      Type underlying);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

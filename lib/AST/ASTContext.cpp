@@ -2902,7 +2902,7 @@ BoundNameAliasType::BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 
   // Record the substitutions.
-  if (auto genericSig = typealias->getGenericSignature()) {
+  if (auto genericSig = substitutions.getGenericSignature()) {
     SmallVector<Substitution, 4> flatSubs;
     genericSig->getSubstitutions(substitutions, flatSubs);
     Bits.BoundNameAliasType.NumSubstitutions = flatSubs.size();
@@ -2943,7 +2943,8 @@ BoundNameAliasType *BoundNameAliasType::get(
 
   // Profile the type.
   llvm::FoldingSetNodeID id;
-  BoundNameAliasType::Profile(id, typealias, parent, substitutions);
+  BoundNameAliasType::Profile(id, typealias, parent, substitutions,
+                              underlying);
 
   // Did we already record this type?
   void *insertPos;
@@ -2964,16 +2965,19 @@ BoundNameAliasType *BoundNameAliasType::get(
 }
 
 void BoundNameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
-  Profile(id, getDecl(), getParent(), getSubstitutionMap());
+  Profile(id, getDecl(), getParent(), getSubstitutionMap(),
+          Type(getSinglyDesugaredType()));
 }
 
 void BoundNameAliasType::Profile(
                            llvm::FoldingSetNodeID &id,
                            TypeAliasDecl *typealias,
-                           Type parent, const SubstitutionMap &substitutions) {
+                           Type parent, const SubstitutionMap &substitutions,
+                           Type underlying) {
   id.AddPointer(typealias);
   id.AddPointer(parent.getPointer());
   substitutions.profile(id);
+  id.AddPointer(underlying.getPointer());
 }
 
 // Simple accessors.
