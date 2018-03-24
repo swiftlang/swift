@@ -1299,7 +1299,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 }
 
 SubstitutionMap BoundNameAliasType::getSubstitutionMap() const {
-  if (auto genericSig = typealias->getGenericSignature())
+  if (auto genericSig = getGenericSignature())
     return genericSig->getSubstitutionMap(getSubstitutionList());
 
   return SubstitutionMap();
