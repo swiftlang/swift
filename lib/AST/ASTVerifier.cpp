@@ -583,7 +583,7 @@ public:
       }
 
       bool foundError = type->hasArchetype() &&
-      type.findIf([&](Type type) -> bool {
+      type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
