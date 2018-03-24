@@ -1,2 +1,2 @@
 $S12DeclReconstr8patatinoSiyF ---> func patatino() -> Int
-$S12DeclReconstr1SVACycfC ---> Can't resolve decl of $S12DeclReconstr1SVACycfC
+$S12DeclReconstr1SVACycfC ---> init()
