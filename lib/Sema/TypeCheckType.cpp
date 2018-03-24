@@ -611,7 +611,8 @@ Type TypeChecker::applyUnboundGenericArguments(
                                 SubstFlags::UseErrorType);
 
   // Form a sugared typealias reference.
-  if (typealias) {
+  Type parentType = unboundType->getParent();
+  if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
                                                  LookUpConformance(*this, dc));
@@ -3209,7 +3210,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
-  if (aliasDecl && aliasDecl->getGenericSignature()) {
+  if (aliasDecl && aliasDecl->getGenericSignature() &&
+      (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
     resultType = BoundNameAliasType::get(aliasDecl, sugaredBaseTy, subs,
                                          resultType);
   }
