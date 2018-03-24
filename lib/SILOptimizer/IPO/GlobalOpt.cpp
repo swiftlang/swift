@@ -117,6 +117,15 @@ protected:
 
   /// Returns true if we think that \p CurBB is inside a loop.
   bool isInLoop(SILBasicBlock *CurBB);
+
+  /// Given that we are trying to place initializers in new locations, see if
+  /// we can hoist the passed in apply \p AI out of any loops that it is
+  /// currently within.
+  ApplyInst *getHoistedApplyForInitializer(
+      ApplyInst *AI, DominanceInfo *DT, SILFunction *InitF,
+      SILFunction *ParentF,
+      llvm::DenseMap<SILFunction *, ApplyInst *> &ParentFuncs);
+
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst *> Calls);
 
   /// Update UnhandledOnceCallee and InitializerCount by going through all
@@ -438,6 +447,48 @@ static bool isAvailabilityCheckOnDomPath(SILBasicBlock *From, SILBasicBlock *To,
   }
 }
 
+ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
+    ApplyInst *AI, DominanceInfo *DT, SILFunction *InitF, SILFunction *ParentF,
+    llvm::DenseMap<SILFunction *, ApplyInst *> &ParentFuncs) {
+  auto PFI = ParentFuncs.find(ParentF);
+  if (PFI == ParentFuncs.end()) {
+    ParentFuncs[ParentF] = AI;
+
+    // It's the first time we found a call to InitF in this function, so we
+    // try to hoist it out of any loop.
+    return AI;
+  }
+
+  // Found a replacement for this init call. Ensure the replacement dominates
+  // the original call site.
+  ApplyInst *CommonAI = PFI->second;
+  assert(
+      cast<FunctionRefInst>(CommonAI->getCallee())->getReferencedFunction() ==
+          InitF &&
+      "ill-formed global init call");
+  SILBasicBlock *DomBB =
+      DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
+
+  // We must not move initializers around availability-checks.
+  if (isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT))
+    return nullptr;
+
+  ApplyInst *Result = nullptr;
+  if (DomBB != CommonAI->getParent()) {
+    CommonAI->moveBefore(&*DomBB->begin());
+    placeFuncRef(CommonAI, DT);
+
+    // Try to hoist the existing AI again if we move it to another block,
+    // e.g. from a loop exit into the loop.
+    Result = CommonAI;
+  }
+
+  AI->replaceAllUsesWith(CommonAI);
+  AI->eraseFromParent();
+  HasChanged = true;
+  return Result;
+}
+
 /// Optimize placement of initializer calls given a list of calls to the
 /// same initializer. All original initialization points must be dominated by
 /// the final initialization calls.
@@ -455,42 +506,11 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     assert(AI->getNumArguments() == 0 && "ill-formed global init call");
     assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
            == InitF && "wrong init call");
-
     SILFunction *ParentF = AI->getFunction();
     DominanceInfo *DT = DA->get(ParentF);
-    auto PFI = ParentFuncs.find(ParentF);
-    ApplyInst *HoistAI = nullptr;
-    if (PFI != ParentFuncs.end()) {
-      // Found a replacement for this init call.
-      // Ensure the replacement dominates the original call site.
-      ApplyInst *CommonAI = PFI->second;
-      assert(cast<FunctionRefInst>(CommonAI->getCallee())
-             ->getReferencedFunction() == InitF &&
-             "ill-formed global init call");
-      SILBasicBlock *DomBB =
-        DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
-      
-      // We must not move initializers around availability-checks.
-      if (!isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT)) {
-        if (DomBB != CommonAI->getParent()) {
-          CommonAI->moveBefore(&*DomBB->begin());
-          placeFuncRef(CommonAI, DT);
-          
-          // Try to hoist the existing AI again if we move it to another block,
-          // e.g. from a loop exit into the loop.
-          HoistAI = CommonAI;
-        }
-        AI->replaceAllUsesWith(CommonAI);
-        AI->eraseFromParent();
-        HasChanged = true;
-      }
-    } else {
-      ParentFuncs[ParentF] = AI;
-      
-      // It's the first time we found a call to InitF in this function, so we
-      // try to hoist it out of any loop.
-      HoistAI = AI;
-    }
+    ApplyInst *HoistAI =
+        getHoistedApplyForInitializer(AI, DT, InitF, ParentF, ParentFuncs);
+
     if (HoistAI) {
       // Move this call to the outermost loop preheader.
       SILBasicBlock *BB = HoistAI->getParent();
