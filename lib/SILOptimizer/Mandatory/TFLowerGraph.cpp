@@ -481,10 +481,13 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
   // file:line:col.
   for (auto ds = loc.getScope(); ds; ds = ds->InlinedCallSite) {
     // If the call site location is invalid, stop scanning.
-    if (ds->Loc.isNull())
+    if (!ds->Loc.getSourceLoc().isValid())
       break;
 
     if (SILFunction *F = ds->getInlinedFunction()) {
+      if (!F->getLocation().getSourceLoc().isValid())
+        break;
+
       auto lineCol = SM.getLineAndColumn(ds->Loc.getSourceLoc());
       auto fnName = F->getName();
 
@@ -504,14 +507,15 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
 
   // If the debug location didn't have any other information, produce something
   // with the raw location.
-  if (!loc.getScope() || loc.getScope()->Loc.isNull())
-    if (!loc.getLocation().isNull()) {
-      auto sourceLoc = loc.getLocation().getSourceLoc();
+  if (!loc.getScope() || loc.getScope()->Loc.isNull()) {
+    auto sourceLoc = loc.getLocation().getSourceLoc();
+    if (sourceLoc.isValid()) {
       auto lineCol = SM.getLineAndColumn(sourceLoc);
       auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
       name += "."+bufferID.str()+"."+llvm::utostr(lineCol.first);
       name += "."+llvm::utostr(lineCol.second);
     }
+  }
 
   // If we've already used this name, rename it to make it unique.
   while (!usedOpNames.insert(name).second) {
