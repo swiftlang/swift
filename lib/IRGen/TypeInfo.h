@@ -388,13 +388,6 @@ public:
                                     Address dest,
                                     SILType T) const = 0;
   
-  /// Initialize a freshly instantiated value witness table. Should be a no-op
-  /// for fixed-size types.
-  virtual void initializeMetadata(IRGenFunction &IGF,
-                                  llvm::Value *metadata,
-                                  bool isVWTMutable,
-                                  SILType T) const = 0;
-
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,

@@ -1365,7 +1365,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                             SILType T,
                                             llvm::Value *metadata,
                                             bool isVWTMutable) {
@@ -2497,8 +2497,13 @@ emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
   SILType loweredType = IGF.IGM.getLoweredType(AbstractionPattern(type), type);
   auto &ti = IGF.IGM.getTypeInfo(loweredType);
   if (!ti.isFixedSize()) {
-    // Initialize the metadata.
-    ti.initializeMetadata(IGF, metadata, true, loweredType.getAddressType());
+    loweredType = loweredType.getAddressType();
+    if (isa<StructType>(type)) {
+      emitInitializeFieldOffsetVector(IGF, loweredType, metadata, true);
+    } else if (isa<EnumType>(type)) {
+      auto &strategy = getEnumImplStrategy(IGF.IGM, loweredType);
+      strategy.initializeMetadata(IGF, metadata, true, loweredType);
+    }
   }
 
   return metadata;
@@ -2729,10 +2734,11 @@ namespace {
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 bool isVWTMutable) {
-      // Nominal types are always preserved through SIL lowering.
       auto loweredTy = getLoweredType();
-      IGM.getTypeInfo(loweredTy)
-        .initializeMetadata(IGF, metadata, isVWTMutable, loweredTy);
+      auto &fixedTI = IGM.getTypeInfo(loweredTy);
+      if (isa<FixedTypeInfo>(fixedTI)) return;
+
+      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable);
     }
   };
 } // end anonymous namespace
@@ -2932,8 +2938,9 @@ namespace {
                                 bool isVWTMutable) {
       // Nominal types are always preserved through SIL lowering.
       auto enumTy = getLoweredType();
-      IGM.getTypeInfo(enumTy)
-        .initializeMetadata(IGF, metadata, isVWTMutable, enumTy);
+
+      auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
+      strategy.initializeMetadata(IGF, metadata, isVWTMutable, enumTy);
     }
   };
 

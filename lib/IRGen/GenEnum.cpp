@@ -5379,12 +5379,6 @@ namespace {
                         SILType T, bool isOutlined) const override {
       return Strategy.assignWithTake(IGF, dest, src, T, isOutlined);
     }
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      return Strategy.initializeMetadata(IGF, metadata, isVWTMutable, T);
-    }
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return Strategy.mayHaveExtraInhabitants(IGM);
     }
