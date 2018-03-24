@@ -148,3 +148,61 @@ public func paddingTuplesHoistable() {
   let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toDevice()
   _ = padded.array
 }
+
+/// b/76222306
+struct Classifier {
+  // Parameters
+  var w1 = Tensor<Float>(randomUniform: [784, 30])
+  var w2 = Tensor<Float>(randomUniform: [30, 10])
+  var b1 = Tensor<Float>(zeros: [1, 30])
+  var b2 = Tensor<Float>(zeros: [1, 10])
+
+  func prediction(for input: Tensor<Float>) -> Tensor<Float> {
+    let h1 = sigmoid(input ⊗ w1 + b1)
+    return sigmoid(h1 ⊗ w2 + b2)
+  }
+
+  mutating func train(images: Tensor<Float>, labels: Tensor<Float>,
+                      learningRate: Float, epochCount: Int) -> Float {
+    var loss: Float
+    var epochCount = epochCount
+    repeat {
+      // Forward pass
+      let z1 = images ⊗ w1 + b1
+      let h1 = sigmoid(z1)
+      let z2 = h1 ⊗ w2 + b2
+      let pred = sigmoid(z2)
+
+      // Backward pass
+      let dz2 = pred - labels
+      let dw2 = h1.transposed(withPermutations: 1, 0) ⊗ dz2
+      let db2 = dz2.sum(squeezingAxes: 0)
+      let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+      let dw1 = images.transposed(withPermutations: 1, 0) ⊗ dz1
+      let db1 = dz1.sum(squeezingAxes: 0)
+
+      // Gradient descent
+      w1 -= dw1 * learningRate
+      b1 -= db1 * learningRate
+      w2 -= dw2 * learningRate
+      b2 -= db2 * learningRate
+
+      loss = dz2.squared().mean(squeezingAxes: 1, 0).scalarized()
+
+      epochCount -= 1
+    } while epochCount > 0
+
+    return loss
+  }
+}
+
+public func mnist() {
+  // Training data
+  let images = Tensor<Float>(randomNormal: [10, 784])
+  let labels = Tensor<Float>(randomNormal: [10, 10])
+  var classifier = Classifier()
+  let loss = classifier.train(images: images, labels: labels,
+                              learningRate: 0.3, epochCount: 100)
+  print(loss)
+}
+
