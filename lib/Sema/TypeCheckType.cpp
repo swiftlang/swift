@@ -1042,13 +1042,12 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     SmallVector<ValueDecl *, 4> decls;
     if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
                             comp->getIdentifier(),
-                            NL_QualifiedDefault|NL_ProtocolMembers,
+                            NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
                             &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
-        auto typeDecl = dyn_cast<TypeDecl>(decl);
-        if (!typeDecl) continue;
+        auto typeDecl = cast<TypeDecl>(decl);
 
         if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
 
