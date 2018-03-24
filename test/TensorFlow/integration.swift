@@ -287,7 +287,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
   // expected-warning @-1 {{value implicitly copied to the accelerator}}
 
-  let z = Tensor<Float>(y)
+  let z = Tensor<Float>(y)  // expected-note {{value used here}}
   return z+z
 }
 
@@ -302,14 +302,10 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 
 // CHECK-NEXT:  %6 = builtin "__tfop_Add,$in,$in"(%1 : $TensorHandle<Float>, %5 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:  %7 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%6 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:  %8 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
-// CHECK-NEXT:  %9 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  %10 = builtin "__tfop_Const,dtype$dtype,value$tensor"(%9 : $Builtin.Int32, %8 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %11 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %12 = builtin "__tfop_Add,$in,$in"(%11 : $TensorHandle<Builtin.FPIEEE32>, %10 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %13 = unchecked_ref_cast %12 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK-NEXT:  %14 = builtin "__tfop_Add,$in,$in"(%13 : $TensorHandle<Float>, %13 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  return %14 : $TensorHandle<Float>
+// CHECK-NEXT:  %8 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>()
+// CHECK-NEXT:  %9 = unchecked_ref_cast %8 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK-NEXT:  %10 = builtin "__tfop_Add,$in,$in"(%9 : $TensorHandle<Float>, %9 : $TensorHandle<Float>)
+// CHECK-NEXT:  return %10 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 
