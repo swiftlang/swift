@@ -1633,8 +1633,15 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
-  case Kind::DispatchThunkAllocator:
+  case Kind::DispatchThunkAllocator: {
+    auto *decl = getDecl();
+
+    // Protocol requirements don't have their own access control
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+      decl = proto;
+
     return ::isAvailableExternally(IGM, getDecl());
+  }
 
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
