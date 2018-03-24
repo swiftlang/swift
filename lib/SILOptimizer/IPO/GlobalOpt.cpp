@@ -51,33 +51,47 @@ class SILGlobalOpt {
   DominanceAnalysis* DA;
   bool HasChanged = false;
 
-  // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   typedef SmallVector<LoadInst *, 4> GlobalLoads;
+
+  /// A map from each visited global initializer call to a list of call sites.
   llvm::MapVector<SILFunction *, GlobalInitCalls> GlobalInitCallMap;
 
   // The following mappings are used if this is a compilation
   // in scripting mode and global variables are accessed without
   // addressors.
 
-  // Map each global let variable to a set of loads from it.
+  /// A map from each visited global let variable to its set of loads.
   llvm::MapVector<SILGlobalVariable *, GlobalLoads> GlobalLoadMap;
-  // Map each global let variable to the store instruction which initializes it.
+
+  /// A map from each visited global let variable to the store instructions
+  /// which initialize it.
   llvm::MapVector<SILGlobalVariable *, StoreInst *> GlobalVarStore;
-  // Variables in this set should not be processed by this pass
-  // anymore.
+
+  /// A set of visited global variables that for some reason we have decided is
+  /// not able to be optimized safely or for which we do not know how to
+  /// optimize safely.
+  ///
+  /// Once a global variable is in this set, we no longer will process it.
   llvm::SmallPtrSet<SILGlobalVariable *, 16> GlobalVarSkipProcessing;
 
-  // Mark any block that this pass has determined to be inside a loop.
+  /// The set of blocks that this pass has determined to be inside a loop.
+  ///
+  /// This is used to mark any block that this pass has determined to be inside
+  /// a loop.
   llvm::DenseSet<SILBasicBlock *> LoopBlocks;
-  // Mark any functions for which loops have been analyzed.
+
+  /// The set of functions that have had their loops analyzed.
   llvm::DenseSet<SILFunction *> LoopCheckedFunctions;
-  // Keep track of cold blocks.
+
+  /// Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
 
-  // Whether we see a "once" call to callees that we currently don't handle.
+  /// Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
-  // Record number of times a globalinit_func is called by "once".
+
+  /// A map from a globalinit_func to the number of times "once" has called the
+  /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
@@ -86,23 +100,40 @@ public:
   bool run();
 
 protected:
+  /// If this is a call to a global initializer, map it.
   void collectGlobalInitCall(ApplyInst *AI);
+
+  /// If this load is a read from a global let variable, add the load to
+  /// GlobalLoadMap[SILG].
   void collectGlobalLoad(LoadInst *SI, SILGlobalVariable *SILG);
+
+  /// If this store is a write to a global let variable, add the store to
+  /// GlobalStoreMap[SILG].
   void collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG);
+
+  /// This is the main entrypoint for collecting global accesses.
   void collectGlobalAccess(GlobalAddrInst *GAI);
 
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
+
+  /// Returns true if we think that \p CurBB is inside a loop.
   bool isInLoop(SILBasicBlock *CurBB);
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst *> Calls);
 
-  // Update UnhandledOnceCallee and InitializerCount by going through all "once"
-  // calls.
+  /// Update UnhandledOnceCallee and InitializerCount by going through all
+  /// "once" calls.
   void collectOnceCall(BuiltinInst *AI);
-  // Set the static initializer and remove "once" from addressor if a global can
-  // be statically initialized.
+
+  /// Set the static initializer and remove "once" from addressor if a global
+  /// can be statically initialized.
   void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
+
+  /// Optimize access to the global variable, which is known to have a constant
+  /// value. Replace all loads from the global address by invocations of a
+  /// getter that returns the value of this variable.
   void optimizeGlobalAccess(SILGlobalVariable *SILG, StoreInst *SI);
-  // Replace loads from a global variable by the known value.
+
+  /// Replace loads from a global variable by the known value.
   void replaceLoadsByKnownValue(BuiltinInst *CallToOnce,
                                 SILFunction *AddrF,
                                 SILFunction *InitF,
@@ -119,11 +150,11 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
   ArrayRef<SILInstruction *> Insns;
 
-  protected:
+protected:
   SILBasicBlock *FromBB, *DestBB;
 
-  public:
-  // A map of old to new available values.
+public:
+  /// A map of old to new available values.
   SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
 
   InstructionsCloner(SILFunction &F,
@@ -148,7 +179,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
       AvailVals.push_back(std::make_pair(origResults[i], clonedResults[i]));
   }
 
-  // Clone all instructions from Insns into DestBB
+  /// Clone all instructions from Insns into DestBB
   void clone() {
     for (auto I : Insns)
       process(I);
@@ -157,7 +188,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
 } // end anonymous namespace
 
-/// If this is a call to a global initializer, map it.
+// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
   SILFunction *F = AI->getReferencedFunction();
   if (!F || !F->isGlobalInit())
@@ -166,7 +197,7 @@ void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
   GlobalInitCallMap[F].push_back(AI);
 }
 
-/// If this is a read from a global let variable, map it.
+// If this is a read from a global let variable, map it.
 void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
   assert(SILG);
   //assert(SILG->isLet());
@@ -238,8 +269,8 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
       IsBare, IsNotTransparent, Serialized);
 }
 
-/// Generate getter from the initialization code whose
-/// result is stored by a given store instruction.
+/// Generate getter from the initialization code whose result is stored by a
+/// given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
@@ -300,7 +331,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   return GetterF;
 }
 
-/// If this is a read from a global let variable, map it.
+// If this is a write to a global let variable, map it.
 void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
 
   if (GlobalVarStore.count(SILG)) {
@@ -328,8 +359,8 @@ static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
   return nullptr;
 }
 
-/// Update UnhandledOnceCallee and InitializerCount by going through all "once"
-/// calls.
+// Update UnhandledOnceCallee and InitializerCount by going through all "once"
+// calls.
 void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
   if (UnhandledOnceCallee)
     return;
@@ -902,10 +933,9 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   }
 }
 
-/// Optimize access to the global variable, which is known
-/// to have a constant value. Replace all loads from the
-/// global address by invocations of a getter that returns
-/// the value of this variable.
+// Optimize access to the global variable, which is known to have a constant
+// value. Replace all loads from the global address by invocations of a getter
+// that returns the value of this variable.
 void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
                                         StoreInst *SI) {
   DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
