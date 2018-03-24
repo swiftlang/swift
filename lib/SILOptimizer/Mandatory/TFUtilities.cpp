@@ -590,13 +590,6 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
 /// SILTensorOpInfo's are created.
 Optional<SILTensorOpInfo>
 SILTensorOpInfo::decode(SILInstruction *inst) {
-  // Tuple extracts of tensor ops are considered to be themselves Tensor
-  // operations, since they are part of the core representation of nodes that
-  // produce multiple results.
-  if (auto *ti = dyn_cast<TupleExtractInst>(inst))
-    if (auto *ai = dyn_cast<BuiltinInst>(ti->getOperand()))
-      inst = ai;
-
   // Tensor operations are builtin instructions and apply instructions.
   if (auto *builtin = dyn_cast<BuiltinInst>(inst)) {
     SILTensorOpInfo toiInfo(builtin);
@@ -1535,5 +1528,3 @@ containsTensorFlowValue(CanSILFunctionType fnType) {
 
   return false;
 }
-
-
