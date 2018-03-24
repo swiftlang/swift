@@ -280,17 +280,14 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
 
   auto V = Store->getSrc();
 
-  SmallVector<SILInstruction *, 8> ReverseInsns;
-  SmallVector<SILInstruction *, 8> Insns;
-  ReverseInsns.push_back(Store);
-  ReverseInsns.push_back(dyn_cast<SingleValueInstruction>(Store->getDest()));
-  if (!analyzeStaticInitializer(V, ReverseInsns))
+  SmallVector<SILInstruction *, 8> Insts;
+  Insts.push_back(Store);
+  Insts.push_back(cast<SingleValueInstruction>(Store->getDest()));
+  if (!analyzeStaticInitializer(V, Insts))
     return nullptr;
 
   // Produce a correct order of instructions.
-  while (!ReverseInsns.empty()) {
-    Insns.push_back(ReverseInsns.pop_back_val());
-  }
+  std::reverse(Insts.begin(), Insts.end());
 
   auto *GetterF = getGlobalGetterFunction(Store->getModule(),
                                           Store->getLoc(),
@@ -302,7 +299,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   auto *EntryBB = GetterF->createBasicBlock();
 
   // Copy instructions into GetterF
-  InstructionsCloner Cloner(*GetterF, Insns, EntryBB);
+  InstructionsCloner Cloner(*GetterF, Insts, EntryBB);
   Cloner.clone();
   GetterF->setInlined();
 
