@@ -1709,6 +1709,7 @@ bool swift::conflicting(const OverloadSignature& sig1,
 bool swift::conflicting(ASTContext &ctx,
                         const OverloadSignature& sig1, CanType sig1Type,
                         const OverloadSignature& sig2, CanType sig2Type,
+                        bool *wouldConflictInSwift5,
                         bool skipProtocolExtensionCheck) {
   // If the signatures don't conflict to begin with, we're done.
   if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
@@ -1726,10 +1727,15 @@ bool swift::conflicting(ASTContext &ctx,
     // Prior to Swift 5, we permitted redeclarations of variables as different
     // declarations if the variable was declared in an extension of a generic
     // type. Make sure we maintain this behaviour in versions < 5.
-    if (!ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(5))
+    if (!ctx.isSwiftVersionAtLeast(5)) {
       if ((sig1.IsVariable && sig1.InExtensionOfGenericType) ||
-          (sig2.IsVariable && sig2.InExtensionOfGenericType))
+          (sig2.IsVariable && sig2.InExtensionOfGenericType)) {
+        if (wouldConflictInSwift5)
+          *wouldConflictInSwift5 = true;
+
         return false;
+      }
+    }
 
     return true;
   }
