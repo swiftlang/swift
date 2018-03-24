@@ -806,30 +806,29 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 }
 
 SILGlobalVariable *SILGlobalOpt::getVariableOfGlobalInit(SILFunction *AddrF) {
-  if (AddrF->isGlobalInit()) {
-    // If the addressor contains a single "once" call, it calls globalinit_func,
-    // and the globalinit_func is called by "once" from a single location,
-    // continue; otherwise bail.
-    BuiltinInst *CallToOnce;
-    auto *InitF = findInitializer(Module, AddrF, CallToOnce);
+  if (!AddrF->isGlobalInit())
+    return nullptr;
 
-    if (!InitF || !InitF->getName().startswith("globalinit_")
-        || InitializerCount[InitF] > 1)
-      return nullptr;
+  // If the addressor contains a single "once" call, it calls globalinit_func,
+  // and the globalinit_func is called by "once" from a single location,
+  // continue; otherwise bail.
+  BuiltinInst *CallToOnce;
+  auto *InitF = findInitializer(Module, AddrF, CallToOnce);
 
-    // If the globalinit_func is trivial, continue; otherwise bail.
-    SingleValueInstruction *dummyInitVal;
-    auto *SILG = getVariableOfStaticInitializer(InitF, dummyInitVal);
-    if (!SILG || !SILG->isDefinition())
-      return nullptr;
+  if (!InitF || !InitF->getName().startswith("globalinit_")
+      || InitializerCount[InitF] > 1)
+    return nullptr;
 
-    return SILG;
-  }
-  return nullptr;
+  // If the globalinit_func is trivial, continue; otherwise bail.
+  SingleValueInstruction *dummyInitVal;
+  auto *SILG = getVariableOfStaticInitializer(InitF, dummyInitVal);
+  if (!SILG || !SILG->isDefinition())
+    return nullptr;
+
+  return SILG;
 }
 
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {
-
   // Don't assume anything about globals which are imported from other modules.
   if (isAvailableExternally(SILG->getLinkage()))
     return true;
