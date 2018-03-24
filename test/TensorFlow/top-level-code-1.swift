@@ -33,6 +33,9 @@ x -= one
 let y = Tensor<Float>(2.0)
 let y2 = y*y*y*y
 
+// b/76155918
+let a: Tensor<Float> = [1, 2, 3]
+let b: Tensor<Float> = [1, 2]
 
 print(x)
 print(y2)

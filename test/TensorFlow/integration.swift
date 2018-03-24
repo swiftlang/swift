@@ -402,7 +402,6 @@ public func testResourceAndVariants() {
   //     .Attr("output_shapes: list(shape) >= 1")
   //     .SetShapeFn(shape_inference::ScalarShape);
   let iterator: ResourceHandle =
-    // FIXME: String attributes not getting inlined.
     #tfop("Iterator", shared_name: "foo", container: "bar",
           output_types: [Float.self], output_shapes: [TensorShape(1)])
 
