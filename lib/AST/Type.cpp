@@ -3671,22 +3671,26 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType) {
+    if (oldParentType && !oldParentType->hasTypeParameter() &&
+        !oldParentType->hasArchetype()) {
       newParentType = oldParentType.transformRec(fn);
-      if (!newParentType) return Type();
+      if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
-    auto genericSig = alias->getDecl()->getGenericSignature();
-    if (genericSig) {
+    if (auto genericSig = subMap.getGenericSignature()) {
       for (Type gp : genericSig->getGenericParams()) {
         Type oldReplacementType = gp.subst(subMap);
         if (!oldReplacementType)
           return newUnderlyingType;
 
+        if (oldReplacementType->hasTypeParameter() ||
+            oldReplacementType->hasArchetype())
+          return newUnderlyingType;
+
         Type newReplacementType = oldReplacementType.transformRec(fn);
         if (!newReplacementType)
-          return Type();
+          return newUnderlyingType;
 
         // If anything changed with the replacement type, we lose the sugar.
         // FIXME: This is really unfortunate.
