@@ -206,7 +206,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILGLobalVariable
+// ilist_traits for SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
