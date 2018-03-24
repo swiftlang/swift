@@ -609,13 +609,13 @@ namespace {
     SmallVectorImpl<SILGlobalVariable*> &globals;
     SmallVectorImpl<AllocStackInst*> &stackAllocs;
     SmallPtrSet<SILInstruction*, 32> visited;
-
-    SmallVector<GlobalAddrInst*, 8> globalAddrs;
+    TensorFunctionClassifier &tfc;
   public:
 
     PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
-                           SmallVectorImpl<AllocStackInst*> &stackAllocs)
-      : globals(globals), stackAllocs(stackAllocs) {}
+                           SmallVectorImpl<AllocStackInst*> &stackAllocs,
+                           TensorFunctionClassifier &tfc)
+      : globals(globals), stackAllocs(stackAllocs), tfc(tfc) {}
 
     void run(ArrayRef<SILInstruction*> tensorOps);
   private:
@@ -631,49 +631,48 @@ namespace {
 void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
 
+  // Find all the promotable memory reachable from tensor ops.  This ensures
+  // we can directly connect their use-def edges together.
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands())
       findPromotableMemoryFromValue(operand.get());
   }
 
-  // If we found any global variables, scan the function once to collect all of
-  // global_addr instructions.  If we found no globals, we're done.
-  if (globalAddrs.empty())
+  // If we're in the main function processing top level code, scan the function
+  // to collect any global_addr instructions.  We want to promote tensor-related
+  // globals and the values that feed into them.
+  auto &fn = *tensorOps.front()->getFunction();
+  if (fn.getName() != SWIFT_ENTRY_POINT_FUNCTION)
     return;
 
   // Find all global addrs in the function, whether or not they involve tensor
   // operations: they could involve tensor values but not be directly used in
-  // the ops.
+  // the ops.  If we find a global tensor, make sure to add it to our set.  It
+  // may be a use of a tensor op, but not being used by one.
   DenseMap<SILGlobalVariable*, SmallVector<SILValue, 4>> allGlobalAddrs;
-  for (auto &bb : *tensorOps.front()->getFunction())
+  for (auto &bb : fn) {
     for (auto &inst : bb)
       if (auto ga = dyn_cast<GlobalAddrInst>(&inst))
-        allGlobalAddrs[ga->getReferencedGlobal()].push_back(ga);
-
-  SmallPtrSet<SILGlobalVariable*, 4> checkedGlobals;
+        if (tfc.containsTensorFlowValue(ga->getType()))
+          allGlobalAddrs[ga->getReferencedGlobal()].push_back(ga);
+  }
 
   // If we've found references to global variables, we need to make sure to
   // analyze the computation that feeds into the globals as well.  This is an
   // iterative process since new references can be discovered as new globals are
   // found.
-  for (unsigned nextAddrToCheck = 0; nextAddrToCheck != globalAddrs.size();
-       ++nextAddrToCheck) {
-    auto addr = globalAddrs[nextAddrToCheck];
-    auto global = addr->getReferencedGlobal();
-
-    // If we've already checked this global we're done.
-    if (!checkedGlobals.insert(global).second)
-      continue;
+  for (auto &entry : allGlobalAddrs) {
+    auto global = entry.first;
 
     bool canPromoteGlobal = true;
 
-    // Process *all* of the global_addrs that are referencing this global, not
-    // just the ones that fed into tensor ops.  Iterate through a copy of the
-    // array so we can discover new things to inspect.
-    auto addrs = allGlobalAddrs[global];
+    // Process the global_addrs that are referencing this global, using the
+    // array as a worklist.
+    SmallVector<SILValue, 4> addrWorklist(std::move(entry.second));
 
-    for (unsigned i = 0; i != addrs.size(); ++i) {
-      auto addr = addrs[i];
+    while (!addrWorklist.empty()) {
+      auto addr = addrWorklist.pop_back_val();
+
       // Walk the use chains of the addr, looking for stores to it.  Any store
       // to it produces a value that feeds it, which we can contain global
       // variable references and stack allocation references.
@@ -706,7 +705,7 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
         // If this is a begin_access instruction, then it is a projection/copy
         // of the address.  Analyze it too.
         if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
-          addrs.push_back(begin);
+          addrWorklist.push_back(begin);
           continue;
         }
 
@@ -773,17 +772,15 @@ findPromotableMemoryFromLoadedAddress(SILValue pointer) {
     pointer = cast<SingleValueInstruction>(pointer)->getOperand(0);
   }
 
-  // If the base of the pointer is a global variable, save it for possible
-  // consideration.
-  if (auto *ga = dyn_cast<GlobalAddrInst>(pointer)) {
-    globalAddrs.push_back(ga);
+  // If we've already processed this instruction, then we're done.
+  auto *pointerInst = pointer->getDefiningInstruction();
+  if (!pointerInst || !visited.insert(pointerInst).second)
     return;
-  }
 
   // If the base of the pointer is something other than a stack allocation or if
   // we already processed this, then we're done.
-  auto *alloc = dyn_cast<AllocStackInst>(pointer);
-  if (!alloc || !visited.insert(alloc).second)
+  auto *alloc = dyn_cast<AllocStackInst>(pointerInst);
+  if (!alloc)
     return;
 
   // Ok, this is a stack allocation we want to promote, remember it.
@@ -1669,7 +1666,7 @@ void TFDeabstraction::doIt() {
   // and global variables that must be promoted to SSA.
   SmallVector<SILGlobalVariable*, 8> globals;
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  PromotableMemoryFinder(globals, stackAllocs).run(tensorOps);
+  PromotableMemoryFinder(globals, stackAllocs, tfc).run(tensorOps);
 
   // If any global variable references were found in the operation chain, try
   // to predictably promote their references to unblock analysis.  This is only
