@@ -127,6 +127,9 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
+  // SWIFT_ENABLE_TENSORFLOW
+  // On the next merge, this will become @_frozen.  This change can be dropped.
+  @_fixed_layout
   public enum Index {
     case pastEnd
     case inRange(Bound)
