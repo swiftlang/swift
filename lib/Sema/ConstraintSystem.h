@@ -2696,7 +2696,7 @@ private:
     ConstraintKind BindingSource;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;
+    ProtocolDecl *DefaultedProtocol;
 
     /// If this is a binding that comes from a \c Defaultable constraint,
     /// the locator of that constraint.
@@ -2704,7 +2704,7 @@ private:
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      ConstraintKind bindingSource,
-                     Optional<ProtocolDecl *> defaultedProtocol = None,
+                     ProtocolDecl *defaultedProtocol = nullptr,
                      ConstraintLocator *defaultableBinding = nullptr)
         : BindingType(type), Kind(kind), BindingSource(bindingSource),
           DefaultedProtocol(defaultedProtocol),
@@ -2839,7 +2839,7 @@ private:
                    }
                    if (binding.DefaultedProtocol)
                      out << "(default from "
-                         << (*binding.DefaultedProtocol)->getName() << ") ";
+                         << binding.DefaultedProtocol->getName() << ") ";
                    out << type.getString();
                  },
                  [&]() { out << "; "; });

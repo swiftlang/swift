@@ -708,8 +708,8 @@ bool ConstraintSystem::tryTypeVariableBindings(
       // If we have a protocol with a default type, look for alternative
       // types to the default.
       if (tryCount == 0 && binding.DefaultedProtocol) {
-        KnownProtocolKind knownKind 
-          = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
+        KnownProtocolKind knownKind =
+            *(binding.DefaultedProtocol->getKnownProtocolKind());
         for (auto altType : getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
             newBindings.push_back({altType, AllowedBindingKind::Subtypes,
