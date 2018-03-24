@@ -27,6 +27,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/ASTMangler.h"
+
 using namespace swift;
 
 namespace {
@@ -48,7 +49,7 @@ namespace {
 ///   constant propagation in case of statically initialized "lets".
 class SILGlobalOpt {
   SILModule *Module;
-  DominanceAnalysis* DA;
+  DominanceAnalysis *DA;
   bool HasChanged = false;
 
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
@@ -962,7 +963,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // inside each function that loads from the global. This
   // invocation should happen at the common dominator of all
   // loads inside this function.
-  for (auto *Load: GlobalLoadMap[SILG]) {
+  for (auto *Load : GlobalLoadMap[SILG]) {
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
@@ -1025,17 +1026,21 @@ bool SILGlobalOpt::run() {
   return HasChanged;
 }
 
+//===----------------------------------------------------------------------===//
+//                           Top Level Entry Point
+//===----------------------------------------------------------------------===//
+
 namespace {
-class SILGlobalOptPass : public SILModuleTransform
-{
+
+class SILGlobalOptPass : public SILModuleTransform {
   void run() override {
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
     if (SILGlobalOpt(getModule(), DA).run()) {
       invalidateAll();
     }
   }
-
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createGlobalOpt() {
