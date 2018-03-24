@@ -2816,25 +2816,6 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   return (kind != CheckedCastKind::Unresolved);
 }
 
-bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
-                                     DeclContext *dc) {
-  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
-    return false;
-
-  if (auto superclass = archetype->getSuperclass()) {
-    if (!superclass->isExactSuperclassOf(type))
-      return false;
-  }
-
-  for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
-      return false;
-  }
-
-  return true;
-}
-
 Expr *TypeChecker::coerceToRValue(Expr *expr,
                                llvm::function_ref<Type(Expr *)> getType,
                                llvm::function_ref<void(Expr *, Type)> setType) {
