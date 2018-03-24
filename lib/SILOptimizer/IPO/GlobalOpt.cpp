@@ -912,16 +912,14 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG->getDecl())
     return;
 
-  SILValue V = GAI;
-  for (auto Use : getNonDebugUses(V)) {
-
-    if (auto *SI = dyn_cast<StoreInst>(Use->getUser())) {
+  for (auto *Op : getNonDebugUses(GAI)) {
+    if (auto *SI = dyn_cast<StoreInst>(Op->getUser())) {
       if (SI->getDest() == GAI)
         collectGlobalStore(SI, SILG);
       continue;
     }
 
-    if (auto *Load = getValidLoad(Use->getUser(), GAI)) {
+    if (auto *Load = getValidLoad(Op->getUser(), GAI)) {
       collectGlobalLoad(Load, SILG);
       continue;
     }
