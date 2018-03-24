@@ -32,6 +32,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;

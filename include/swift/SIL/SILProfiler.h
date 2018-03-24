@@ -21,7 +21,6 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILAllocated.h"
 #include "llvm/ADT/DenseMap.h"
 
