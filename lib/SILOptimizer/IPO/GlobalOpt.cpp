@@ -689,10 +689,6 @@ static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *InitFunc,
   return GVar;
 }
 
-namespace {
-
-} // end anonymous namespace
-
 /// Replace loads from a global variable by the known value.
 void SILGlobalOpt::
 replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
