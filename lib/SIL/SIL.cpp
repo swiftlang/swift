@@ -44,11 +44,6 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (isa<ClangModuleUnit>(fileContext))
     return FormalLinkage::PublicNonUnique;
 
-  if (!D->hasAccess()) {
-    assert(D->getDeclContext()->isLocalContext());
-    return FormalLinkage::Private;
-  }
-
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Public:
   case AccessLevel::Open:
