@@ -13,15 +13,16 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
-#include "swift/Strings.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/Strings.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -361,6 +362,8 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
+  PrettyStackTraceSILFunction stackTrace("Serializing", &F);
+
   ValueIDs.clear();
   InstID = 0;
 
@@ -675,6 +678,8 @@ SILSerializer::writeKeyPathPatternComponent(
 }
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
+  PrettyStackTraceSILNode stackTrace("Serializing", &SI);
+
   switch (SI.getKind()) {
   case SILInstructionKind::ObjectInst:
     llvm_unreachable("static initializers of sil_global are not serialized");

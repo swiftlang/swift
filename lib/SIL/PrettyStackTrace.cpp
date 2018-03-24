@@ -73,3 +73,9 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
   if (SILPrintOnError)
     TheFn->print(out);
 }
+
+void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " SIL node ";
+  if (Node)
+    out << *Node;
+}
