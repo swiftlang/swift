@@ -11,6 +11,9 @@
 // RUN:   -decl-from-mangled=%t.input > %t.output 2>&1
 // RUN: diff %t.check %t.output
 
+// FIXME: rdar://38822524
+// REQUIRES: OS=macosx
+
 // REQUIRES: executable_test
 struct S {
   init() {
