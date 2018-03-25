@@ -41,15 +41,16 @@ class QuickCheckResult(perf_test_driver.Result):
 
 class QuickCheckBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
-    def __init__(self, binary, xfail_list, num_iters):
+    def __init__(self, binary, xfail_list, num_iters, opt_levels):
         perf_test_driver.BenchmarkDriver.__init__(
             self, binary, xfail_list,
-            enable_parallel=True)
+            enable_parallel=True,
+            opt_levels=opt_levels)
         self.num_iters = num_iters
 
     def print_data_header(self, max_test_len):
-        fmt = '{:<%d}{:<10}{:}' % (max_test_len + 5)
-        print(fmt.format('Name', 'Result', 'RC Delta'))
+        fmt = '{:<%d}{:<10}' % (max_test_len + 5)
+        print(fmt.format('Name', 'Result'))
 
     # Propagate any data from this class that is needed for individual
     # tests. The reason this is needed is to avoid issues with attempting to
@@ -99,15 +100,21 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-filter', type=str, default=None,
+        '--filter', type=str, default=None,
         help='Filter out any test that does not match the given regex')
-    parser.add_argument('-num-iters', type=int, default=2)
+    parser.add_argument('--num-iters', type=int, default=2)
+    default_opt_levels = perf_test_driver.BenchmarkDriver_OptLevels
+    parser.add_argument('--opt-level', choices=default_opt_levels)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    l = QuickCheckBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST, args.num_iters)
+    opt_levels = perf_test_driver.BenchmarkDriver_OptLevels
+    if args.opt_level is not None:
+        opt_levels = [args.opt_level]
+    l = QuickCheckBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST, args.num_iters,
+                                  opt_levels)
     if l.run(args.filter):
         sys.exit(0)
     else:
