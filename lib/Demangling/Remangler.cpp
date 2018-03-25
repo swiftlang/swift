@@ -598,25 +598,25 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   Buffer << 'B';
   StringRef text = node->getText();
 
-  if (text == "Builtin.BridgeObject") {
+  if (text == BUILTIN_TYPE_NAME_BRIDGEOBJECT) {
     Buffer << 'b';
-  } else if (text == "Builtin.UnsafeValueBuffer") {
+  } else if (text == BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER) {
     Buffer << 'B';
-  } else if (text == "Builtin.UnknownObject") {
+  } else if (text == BUILTIN_TYPE_NAME_UNKNOWNOBJECT) {
     Buffer << 'O';
-  } else if (text == "Builtin.NativeObject") {
+  } else if (text == BUILTIN_TYPE_NAME_NATIVEOBJECT) {
     Buffer << 'o';
-  } else if (text == "Builtin.RawPointer") {
+  } else if (text == BUILTIN_TYPE_NAME_RAWPOINTER) {
     Buffer << 'p';
-  } else if (text == "Builtin.SILToken") {
+  } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
-  } else if (text == "Builtin.Word") {
+  } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
-  } else if (stripPrefix(text, "Builtin.Int")) {
+  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_INT)) {
     Buffer << 'i' << text << '_';
-  } else if (stripPrefix(text, "Builtin.Float")) {
+  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_FLOAT)) {
     Buffer << 'f' << text << '_';
-  } else if (stripPrefix(text, "Builtin.Vec")) {
+  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_VEC)) {
     auto split = text.split('x');
     if (split.second == "RawPointer") {
       Buffer << 'p';
