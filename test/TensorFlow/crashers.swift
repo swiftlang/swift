@@ -232,3 +232,23 @@ public func argumentCrash() {
   }
 }
 
+// b/76310230 tf-partition crashes on uninlinable multiresult function
+@inline(never)
+func twoHandles() -> (TensorHandle<Int32>, ResourceHandle) {
+  fatalError()
+}
+
+public func testMultiResultUninlinable() {
+  let (x1, _) = twoHandles()  // expected-warning {{value implicitly copied to the accelerator}}
+  let _ : Tensor<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
+}
+
+// Test support for copying multiple result outputs.
+public func testMultiOutputsFnResults() -> (Tensor<Float>,  Tensor<Float>) {
+  // expected-error @+1 {{Op type not registered 'MultResult'}}
+  let (x1, y1): (TensorHandle<Float>, TensorHandle<Float>) = #tfop("MultResult")
+  let x = Tensor<Float>(handle: x1)
+  let y = Tensor<Float>(handle: y1)
+  return (x.toHost(),y.toHost())
+}
+
