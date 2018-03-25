@@ -265,6 +265,12 @@ extension _SwiftStringStorage {
     opaqueOther other: _StringGuts, range: Range<Int>
   ) {
     _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String[range].withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
     defer { _fixLifetime(other) }
     _appendInPlace(other._asOpaque()[range])
   }
@@ -289,6 +295,12 @@ extension _SwiftStringStorage {
   @_versioned // @opaque
   internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
     _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String.withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
     defer { _fixLifetime(other) }
     _appendInPlace(other._asOpaque())
   }

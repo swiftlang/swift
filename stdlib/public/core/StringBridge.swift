@@ -183,8 +183,10 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   } else if let wrapped = cocoaString as? _NSContiguousString {
     return wrapped._guts
   } else if _isObjCTaggedPointer(cocoaString) {
-    // TODO(SSO): small check
-    return _StringGuts(_taggedCocoaObject: cocoaString)
+    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
+      fatalError("Internal invariant violated: large tagged NSStrings")
+    }
+    return _StringGuts(small)
   }
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
@@ -193,16 +195,32 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
   if _isObjCTaggedPointer(immutableCopy) {
-    // TODO(SSO): small check
-    return _StringGuts(_taggedCocoaObject: immutableCopy)
+    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
+      fatalError("Internal invariant violated: large tagged NSStrings")
+    }
+    return _StringGuts(small)
   }
 
   let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
 
-  // TODO(SSO): small check
-
   let length = _StringGuts.getCocoaLength(
     _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
+
+  // TODO(SSO): And also for UTF-16 strings and non-contiguous strings
+  if let ptr = start, !isUTF16 && length <= _SmallUTF8String.capacity {
+    if let small = _SmallUTF8String(
+      UnsafeBufferPointer(
+        start: ptr.assumingMemoryBound(to: UInt8.self), count: length)
+    ) {
+      return _StringGuts(small)
+    } else {
+#if arch(i386) || arch(arm)
+#else
+      _sanityCheckFailure("Couldn't fit 15-char ASCII small string?")
+#endif
+    }
+  }
+
   return _StringGuts(
     _largeNonTaggedCocoaObject: immutableCopy,
     count: length,
@@ -393,6 +411,9 @@ extension String {
   /// library.
   @_inlineable // FIXME(sil-serialize-all)
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
+    if _guts._isSmall {
+      return _bridgeToCocoa(_guts._smallUTF8String)
+    }
     if let cocoa = _guts._underlyingCocoaString {
       return cocoa
     }
