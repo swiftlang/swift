@@ -227,3 +227,4 @@ public func testMultiOutputs() {
   print(x.array.scalars[0])
   print(y.array.scalars[0])
 }
+
