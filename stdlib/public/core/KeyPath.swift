@@ -625,23 +625,89 @@ internal enum KeyPathComponent: Hashable {
   }
 }
 
+
+@usableFromInline
+@inline(never)
+@_semantics("optimize.sil.preserve_exclusivity")
+func beginAccessHelper<T>(_ address: Builtin.RawPointer, _ accessRecordPtr: Builtin.RawPointer, _ type: T.Type) {
+  print("Begin: \(address) - \(accessRecordPtr)")
+  Builtin.beginUnpairedModifyAccess(address, accessRecordPtr, type)
+}
+
+@usableFromInline
+@inline(never)
+@_semantics("optimize.sil.preserve_exclusivity")
+func endAccessHelper(_ accessRecordPtr: Builtin.RawPointer) {
+  print("End: \(accessRecordPtr)")
+  Builtin.endUnpairedAccess(accessRecordPtr)
+}
+
 // A class that maintains ownership of another object while a mutable projection
-// into it is underway.
+// into it is underway. The lifetime of the instance of this class is also used
+// to begin and end exclusive 'modify' access to the projected address.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-internal final class ClassHolder {
+internal final class ClassHolder<ProjectionType> {
+
+  /// The type of the scratch record passed to the runtime to record
+  /// accesses to guarantee exlcusive access.
+  internal typealias AccessRecord = Builtin.UnsafeValueBuffer
+
   @usableFromInline // FIXME(sil-serialize-all)
-  internal let previous: AnyObject?
+  internal var previous: AnyObject?
   @usableFromInline // FIXME(sil-serialize-all)
-  internal let instance: AnyObject
+  internal var instance: AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
-  internal init(previous: AnyObject?, instance: AnyObject) {
-    self.previous = previous
-    self.instance = instance
+  internal init() {
+    _sanityCheckFailure("use _create(...)")
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  deinit {}
+  internal final class func _create(
+      previous: AnyObject?,
+      instance: AnyObject,
+      accessingAddress address: UnsafeRawPointer,
+      type: ProjectionType.Type
+  ) -> ClassHolder {
+
+    // Tail allocate the UnsafeValueBuffer used as the AccessRecord.
+    // This avoids a second heap allocation since there is no source-level way to
+    // initialize a Builtin.UnsafeValueBuffer type and thus we cannot have a
+    // stored property of that type.
+    let holder: ClassHolder = Builtin.allocWithTailElems_1(self,
+                                                          1._builtinWordValue,
+                                                          AccessRecord.self)
+
+    // Initialize the ClassHolder's instance variables. This is done via
+    // withUnsafeMutablePointer(to:) because the instance was just allocated with
+    // allocWithTailElems_1 and so we need to make sure to use an initialization
+    // rather than an assignment.
+    withUnsafeMutablePointer(to: &holder.previous) {
+      $0.initialize(to: previous)
+    }
+
+    withUnsafeMutablePointer(to: &holder.instance) {
+      $0.initialize(to: instance)
+    }
+
+    let accessRecordPtr = Builtin.projectTailElems(holder, AccessRecord.self)
+
+    // Begin a 'modify' access to the address. This access is ended in
+    // ClassHolder's deinitializer.
+    beginAccessHelper(address._rawValue, accessRecordPtr, type)
+
+    return holder
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
+  deinit {
+    let accessRecordPtr = Builtin.projectTailElems(self, AccessRecord.self)
+
+    // Ends the access begun in _create().
+    endAccessHelper(accessRecordPtr)
+  }
 }
 
 // A class that triggers writeback to a pointer when destroyed.
@@ -1185,7 +1251,15 @@ internal struct RawKeyPathComponent {
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
       defer { _fixLifetime(baseObj) }
-      return .continue(basePtr.advanced(by: offset)
+
+      let offsetAddress = basePtr.advanced(by: offset)
+
+      // Perform an instaneous record access on the address in order to
+      // ensure that the read will not conflict with an already in-progress
+      // 'modify' access.
+      Builtin.performInstantaneousReadAccess(offsetAddress._rawValue,
+                                             NewValue.self)
+      return .continue(offsetAddress
         .assumingMemoryBound(to: NewValue.self)
         .pointee)
 
@@ -1244,12 +1318,16 @@ internal struct RawKeyPathComponent {
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
       let object = base.assumingMemoryBound(to: AnyObject.self).pointee
-      // The base ought to be kept alive for the duration of the derived access
-      keepAlive = keepAlive == nil
-        ? object
-        : ClassHolder(previous: keepAlive, instance: object)
-      return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
+      let offsetAddress = UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
             .advanced(by: offset)
+
+      // Keep the  base alive for the duration of the derived access and also
+      // enforce exclusive access to the address.
+      keepAlive = ClassHolder._create(previous: keepAlive, instance: object,
+                                      accessingAddress: offsetAddress,
+                                      type: NewValue.self)
+
+      return offsetAddress
     
     case .mutatingGetSet(id: _, get: let rawGet, set: let rawSet,
                          argument: let argument):

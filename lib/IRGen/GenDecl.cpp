@@ -2317,10 +2317,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                llvm::Attribute::NoInline);
     break;
   case AlwaysInline:
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::AlwaysInline);
-    break;
+    // We do not transfer AlwaysInline since we get weird test failures.
   case InlineDefault:
     break;
   }
