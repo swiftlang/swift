@@ -98,8 +98,8 @@ public:
 private:
   int_type Data;
 
-  constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
 public:
+  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this

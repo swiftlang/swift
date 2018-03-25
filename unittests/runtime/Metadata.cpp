@@ -707,7 +707,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
 }
 
 namespace swift {
-  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+  void installCommonValueWitnesses(const TypeLayout &layout,
+                                   ValueWitnessTable *vwtable);
 } // namespace swift
 
 
@@ -726,7 +727,7 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
     .withInlineStorage(false);
   testTable.stride = sizeof(ValueBuffer) + alignof(ValueBuffer);
 
-  installCommonValueWitnesses(&testTable);
+  installCommonValueWitnesses(*testTable.getTypeLayout(), &testTable);
 
   // Replace allocateBuffer and destroyBuffer with logging versions.
   struct {
@@ -1014,7 +1015,7 @@ static void initialize_pod_witness_table(ValueWitnessTable &testTable) {
     .withBitwiseTakable(true)
     .withInlineStorage(true);
   testTable.stride = sizeof(ValueBuffer);
-  installCommonValueWitnesses(&testTable);
+  installCommonValueWitnesses(*testTable.getTypeLayout(), &testTable);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod) {
@@ -1093,7 +1094,7 @@ static void initialize_indirect_witness_table(ValueWitnessTable &testTable) {
     .withBitwiseTakable(true)
     .withInlineStorage(false);
   testTable.stride = sizeof(ValueBuffer) + 1;
-  installCommonValueWitnesses(&testTable);
+  installCommonValueWitnesses(*testTable.getTypeLayout(), &testTable);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_indirect) {
