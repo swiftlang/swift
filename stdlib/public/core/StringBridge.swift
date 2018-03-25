@@ -43,7 +43,8 @@ public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
+  return UnsafeMutablePointer(
+    mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
 /// Loading Foundation initializes these function variables
@@ -114,7 +115,38 @@ internal func _cocoaStringSubscript(
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
-  return 0x0600
+  @inline(__always) get { return 0x0600 }
+}
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+  @inline(__always) get { return 0x8000100 }
+}
+
+@_versioned // @opaque
+internal func _bridgeASCIICocoaString(
+  _ cocoa: _CocoaString,
+  intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
+    to: UInt8.self)
+  let length = _stdlib_binary_CFStringGetLength(cocoa)
+  var count = 0
+  let numCharWritten = _swift_stdlib_CFStringGetBytes(
+    cocoa, _swift_shims_CFRange(location: 0, length: length),
+    kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
+  return length == numCharWritten ? count : nil
+}
+
+public // @testable
+func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
+  return small.withUTF8CodeUnits { bufPtr in
+      return _swift_stdlib_CFStringCreateWithBytes(
+          nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          bufPtr.count,
+          small.isASCII ? kCFStringEncodingASCII : kCFStringEncodingUTF8, 0)
+      as AnyObject
+  }
 }
 
 internal func _getCocoaStringPointer(
