@@ -61,6 +61,13 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     count: Int = 0
   ) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count >= 0 && count <= capacity)
+
+#if arch(i386) || arch(arm)
+#else
+    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
+      "Should prefer a small representation")
+#endif // 64-bit
+
     let storage = Builtin.allocWithTailElems_1(
       _SwiftStringStorage<CodeUnit>.self,
       capacity._builtinWordValue, CodeUnit.self)

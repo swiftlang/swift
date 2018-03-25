@@ -688,6 +688,9 @@ extension _StringGuts {
     if self.isASCII {
       defer { _fixLifetime(self) }
       let ascii = self._unmanagedASCIIView[range]
+      if let small = _SmallUTF8String(ascii.buffer) {
+        return _StringGuts(small)
+      }
       if _object.isUnmanaged {
         return _StringGuts(_large: ascii)
       }
@@ -1348,6 +1351,15 @@ extension _StringGuts {
       return (nil, true)
     }
     if isASCII {
+      if let small = _SmallUTF8String(
+        _fromCodeUnits: input,
+        utf16Length: utf16Count,
+        isASCII: true,
+        Encoding.self
+      ) {
+        return (_StringGuts(small), false)
+      }
+
       let storage = _SwiftStringStorage<UTF8.CodeUnit>.create(
         capacity: Swift.max(minimumCapacity, utf16Count),
         count: utf16Count)

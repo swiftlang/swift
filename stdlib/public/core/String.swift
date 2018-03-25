@@ -106,6 +106,23 @@ extension _StringGuts {
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
     _sanityCheck(_isOpaque)
+
+    if self._isSmall {
+      let small = self._smallUTF8String[bounds]
+      if small.isASCII {
+        return try small.withUnmanagedASCII {
+          (ascii: _UnmanagedString<Unicode.UTF8.CodeUnit>) throws -> Result in
+          return try Swift._withCStringAndLength(
+            encodedAs: targetEncoding,
+            from: ascii.buffer,
+            encodedAs: Unicode.UTF8.self,
+            execute: body)
+          }
+      } else {
+        fatalError("TODO: UTF-8 support in small strings")
+      }
+    }
+
     defer { _fixLifetime(self) }
     let opaque = _asOpaque()[bounds]
     return try Swift._withCStringAndLength(
@@ -143,6 +160,15 @@ extension String {
 
     let capacity = Swift.max(utf16Count, minimumCapacity)
     if isASCII {
+      if let small = _SmallUTF8String(
+        _fromCodeUnits: input,
+        utf16Length: utf16Count,
+        isASCII: true,
+        Encoding.self
+      ) {
+        return String(_StringGuts(small))
+      }
+
       let storage = _SwiftStringStorage<UInt8>.create(
         capacity: capacity,
         count: utf16Count)
@@ -609,6 +635,9 @@ extension String {
   static func _fromUTF8CodeUnitSequence<C : RandomAccessCollection>(
     _ input: C, repair: Bool
   ) -> String? where C.Element == UInt8 {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
     return String._fromCodeUnits(
       input, encoding: UTF8.self, repairIllFormedSequences: repair)
   }
@@ -618,6 +647,9 @@ extension String {
   static func _fromASCII<C : RandomAccessCollection>(
     _ input: C
   ) -> String where C.Element == UInt8 {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
     let storage = _SwiftStringStorage<UInt8>.create(
       capacity: input.count, count: input.count)
     var (itr, end) = input._copyContents(initializing: storage.usedBuffer)
@@ -644,6 +676,22 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   }
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ scalar: Unicode.Scalar) {
+    // Until we have UTF-8 support in small string, need to be large
+    //
+    // TODO: All scalars are small
+    if scalar.value <= 0x7f {
+      if let small = _SmallUTF8String(
+        Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
+      ) {
+        self = String(_StringGuts(small))
+        return
+      } else {
+#if arch(i386) || arch(arm)
+#else
+      _sanityCheckFailure("Couldn't fit ASCII scalar into small string?")
+#endif
+      }
+    }
     self = String._fromCodeUnits(
       CollectionOfOne(scalar.value),
       encoding: UTF32.self,
@@ -684,7 +732,6 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
       return
     }
 
-    // TODO(SSO): small check
     self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
   }
 }
@@ -706,6 +753,10 @@ extension String : _ExpressibleByBuiltinStringLiteral {
       return
     }
 
+    if let small = _SmallUTF8String(bufPtr) {
+      self = String(_StringGuts(small))
+      return
+    }
     if _fastPath(Bool(isASCII)) {
       self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
       return
