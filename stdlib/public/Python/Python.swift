@@ -27,7 +27,7 @@ import PythonWrapper
 #endif
 
 //===----------------------------------------------------------------------===//
-// MARK: PyRef Implementation
+// MARK: PyReference Implementation
 //===----------------------------------------------------------------------===//
 
 /// This is a typealias used when we're passing or returning a PyObject
@@ -40,7 +40,7 @@ public typealias OwnedPyObject = UnsafeMutablePointer<PyObject>
 /// - TODO: It sure would be nice to be able to express this as a Swift struct
 ///   with C++ style user-defined copy ctors, move operators, etc.
 @_versioned @_fixed_layout
-final class PyRef {
+final class PyReference {
   private var state: OwnedPyObject
 
   public init(owned: OwnedPyObject) {
@@ -77,19 +77,19 @@ final class PyRef {
 @_fixed_layout
 public struct PyValue {
   /// This is the actual handle to a Python value that we represent.
-  fileprivate var state: PyRef
+  fileprivate var state: PyReference
 
   @_versioned
-  init(_ value: PyRef) {
+  init(_ value: PyReference) {
     state = value
   }
 
   public init(owned: OwnedPyObject) {
-    state = PyRef(owned: owned)
+    state = PyReference(owned: owned)
   }
 
   public init(borrowed: UnsafeMutablePointer<PyObject>) {
-    state = PyRef(borrowed: borrowed)
+    state = PyReference(borrowed: borrowed)
   }
 
   fileprivate var borrowedPyObject: UnsafeMutablePointer<PyObject> {
@@ -151,8 +151,8 @@ fileprivate extension PythonConvertible {
   }
 }
 
-// PyRef and PyValue are trivially PythonConvertible
-extension PyRef : PythonConvertible {
+// PyReference and PyValue are trivially PythonConvertible
+extension PyReference : PythonConvertible {
   public convenience init(_ value: PyValue) {
     self.init(owned: value.ownedPyObject)
   }
@@ -600,6 +600,7 @@ public extension PyValue {
 public let Python = PythonInterface()
 
 @_fixed_layout
+@dynamicMemberLookup
 public struct PythonInterface {
   /// A hash table of the builtins provided by the Python language.
   public let builtins: PyValue
@@ -609,7 +610,7 @@ public struct PythonInterface {
     builtins = PyValue(borrowed: PyEval_GetBuiltins())
   }
 
-  public func `import`(_ name: String) throws -> PyValue {
+  public func attemptImport(_ name: String) throws -> PyValue {
     guard let module = PyImport_ImportModule(name) else {
       try throwPythonErrorIfPresent()
       throw PythonError.invalidModule(name)
@@ -617,26 +618,21 @@ public struct PythonInterface {
     return PyValue(owned: module)
   }
 
-  public func setPath(_ path: String) {
-    path.withCString {
-      PySys_SetPath(UnsafeMutablePointer(mutating: $0))
+  public func `import`(_ name: String) -> PyValue {
+    return try! attemptImport(name)
+  }
+
+  public func updatePath(to path: String) {
+    var cStr = path.utf8CString
+    cStr.withUnsafeMutableBufferPointer { buf in
+      PySys_SetPath(buf.baseAddress)
     }
   }
 
-  // TODO: Make the PythonInterface type itself `DynamicCallable`, so that
-  // things like Python.open" naturally resolve to Python.get(member: "open")
-  // and all the builtin functions are therefore available naturally and don't
-  // have to be enumerated here.
-  public var isinstance: PyValue { return builtins["isinstance"] }
-  public var len: PyValue { return builtins["len"] }
-  public var open: PyValue { return builtins["open"] }
-  public var print: PyValue { return builtins["print"] }
-  public var range: PyValue { return builtins["range"] }
-  public var repr: PyValue { return builtins["repr"] }
-  public var str: PyValue { return builtins["str"] }
-  public var type: PyValue { return builtins["type"] }
+  public subscript(dynamicMember name: String) -> PyValue {
+    return builtins[name]
+  }
 }
-
 
 //===----------------------------------------------------------------------===//
 // MARK: Python List, Dictionary, Slice and Tuple Helpers
@@ -953,35 +949,35 @@ extension Dictionary : PythonConvertible
 //===----------------------------------------------------------------------===//
 
 public extension PyValue {
-  static func +(lhs: PyValue, rhs: PyValue) -> PyValue {
-    return lhs.callMember("__add__", with: rhs)
+  static func + (lhs: PyValue, rhs: PyValue) -> PyValue {
+    return lhs.__add__.call(with: rhs)
   }
 
-  static func -(lhs: PyValue, rhs: PyValue) -> PyValue {
-    return lhs.callMember("__sub__", with: rhs)
+  static func - (lhs: PyValue, rhs: PyValue) -> PyValue {
+    return lhs.__sub__.call(with: rhs)
   }
 
-  static func *(lhs: PyValue, rhs: PyValue) -> PyValue {
-    return lhs.callMember("__mul__", with: rhs)
+  static func * (lhs: PyValue, rhs: PyValue) -> PyValue {
+    return lhs.__mul__.call(with: rhs)
   }
 
-  static func /(lhs: PyValue, rhs: PyValue) -> PyValue {
-    return lhs.callMember("__truediv__", with: rhs)
+  static func / (lhs: PyValue, rhs: PyValue) -> PyValue {
+    return lhs.__truediv__.call(with: rhs)
   }
 
-  static func +=(lhs: inout PyValue, rhs: PyValue) {
+  static func += (lhs: inout PyValue, rhs: PyValue) {
     lhs = lhs + rhs
   }
 
-  static func -=(lhs: inout PyValue, rhs: PyValue) {
+  static func -= (lhs: inout PyValue, rhs: PyValue) {
     lhs = lhs - rhs
   }
 
-  static func *=(lhs: inout PyValue, rhs: PyValue) {
+  static func *= (lhs: inout PyValue, rhs: PyValue) {
     lhs = lhs * rhs
   }
 
-  static func /=(lhs: inout PyValue, rhs: PyValue) {
+  static func /= (lhs: inout PyValue, rhs: PyValue) {
     lhs = lhs / rhs
   }
 }
@@ -1049,7 +1045,7 @@ extension PyValue : Hashable, Comparable, Equatable {
   }
 
   public var hashValue: Int {
-    guard let hash = Int(self.callMember("__hash__")) else {
+    guard let hash = Int(self.__hash__.call()) else {
       fatalError("cannot use __hash__ on \(self)")
     }
     return hash
