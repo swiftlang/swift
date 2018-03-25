@@ -251,8 +251,7 @@ endif()
 
 set(swiftCoreExtraFileDepends)
 if(SWIFT_ENABLE_TENSORFLOW)
-  list(APPEND swiftCoreExtraFileDepends
-      "copy_ctensorflow_modulemap" "${SWIFTLIB_DIR}/CTensorFlow")
+  list(APPEND swiftCoreExtraFileDepends "${SWIFTLIB_DIR}/CTensorFlow")
 endif()
 
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
