@@ -1323,6 +1323,8 @@ extension _StringGuts : Sequence {
 }
 
 extension _StringGuts {
+  // TODO: Drop or unify with String._fromCodeUnits
+  //
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal
@@ -1358,6 +1360,20 @@ extension _StringGuts {
       fromCodeUnits: input,
       encoding: Encoding.self)
     return (_StringGuts(_large: storage), hadError)
+  }
+}
+
+extension _StringGuts {
+  // For testing purposes only. Might be both inefficient and too low-level.
+  // There should be an eventual API on String to accomplish something similar.
+  public // @_testable
+  static
+  func _createStringFromUTF16<C: RandomAccessCollection>(_ cus: C) -> String
+  where C.Element == UInt16 {
+    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: cus.count, count: cus.count)
+    _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
+    return String(_StringGuts(_large: storage))
   }
 }
 
