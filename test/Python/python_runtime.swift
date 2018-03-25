@@ -9,7 +9,7 @@ import StdlibUnittest
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 
 PythonRuntimeTestSuite.test("check-version") {
-  let sysModule = try! Python.import("sys")
+  let sysModule = Python.import("sys")
   let version = String(sysModule.version)!
   expectEqual("2.7.", version.prefix(4))
 }
