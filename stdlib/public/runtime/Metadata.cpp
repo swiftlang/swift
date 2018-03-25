@@ -3233,13 +3233,16 @@ static Result performOnMetadataCache(const Metadata *metadata,
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
     description = classMetadata->getDescription();
-  } else {
-    auto valueMetadata = cast<ValueMetadata>(metadata);
+  } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
+  } else {
+    return std::move(callbacks).forOtherMetadata(metadata);
   }
 
-  assert(description->isGeneric() &&
-         "only generic metadata can delay evaluation for now");
+  if (!description->isGeneric()) {
+    return std::move(callbacks).forOtherMetadata(metadata);
+  }
+
   auto &generics = description->getFullGenericContextHeader();
 
   auto genericArgs =
@@ -3264,6 +3267,10 @@ bool swift::addToMetadataQueue(
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
       return cache.enqueue(key, std::move(QueueEntry));
+    }
+
+    bool forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
     }
   } callbacks = { std::move(queueEntry) };
 
@@ -3295,10 +3302,36 @@ void swift::resumeMetadataCompletion(
                                  // non-key arguments.
                                  key.KeyData.begin());
     }
+
+    void forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
+    }
   } callbacks = { std::move(queueEntry) };
 
   auto metadata = queueEntry->Value;
   performOnMetadataCache<void>(metadata, std::move(callbacks));
+}
+
+MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
+                                                 const Metadata *type) {
+  struct CheckStateCallbacks {
+    MetadataRequest Request;
+
+    /// Generic types just need to be awaited.
+    MetadataResponse forGenericMetadata(const Metadata *type,
+                                      const TypeContextDescriptor *description,
+                                      GenericMetadataCache &cache,
+                                      MetadataCacheKey key) && {
+      return cache.await(key, Request);
+    }
+
+    /// All other type metadata are always complete.
+    MetadataResponse forOtherMetadata(const Metadata *type) && {
+      return MetadataResponse{type, MetadataState::Complete};
+    }
+  } callbacks = { request };
+
+  return performOnMetadataCache<MetadataResponse>(type, std::move(callbacks));
 }
 
 /***************************************************************************/

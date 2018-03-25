@@ -176,6 +176,15 @@ public:
 
     return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
   }
+
+  /// Given that an entry already exists, await it.
+  template <class KeyType, class... ArgTys>
+  Status await(KeyType key, ArgTys &&...args) {
+    auto entry = Map.find(key);
+    assert(entry && "entry doesn't already exist!");
+
+    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+  }
 };
 
 /// A base class for metadata cache entries which supports an unfailing

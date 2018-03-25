@@ -3981,6 +3981,11 @@ swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const GenericValueMetadataPattern *pattern,
                                    size_t extraDataSize);
 
+/// \brief Check that the given metadata has the right state.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_checkMetadataState(MetadataRequest request,
+                                          const Metadata *type);
+
 /// Instantiate a resilient or generic protocol witness table.
 ///
 /// \param genericTable - The witness table template for the
