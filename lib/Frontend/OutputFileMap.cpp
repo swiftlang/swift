@@ -65,7 +65,7 @@ OutputFileMap::getOrCreateOutputMapForSingleOutput() {
 }
 
 void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
-  typedef std::pair<file_types::ID, std::string> TypePathPair;
+  using TypePathPair = std::pair<file_types::ID, std::string>;
 
   auto printOutputPair = [&os](StringRef InputPath,
                                const TypePathPair &OutputPair) -> void {
@@ -74,7 +74,7 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   };
 
   if (Sort) {
-    typedef std::pair<StringRef, TypeToPathMap> PathMapPair;
+    using PathMapPair = std::pair<StringRef, TypeToPathMap>;
     std::vector<PathMapPair> Maps;
     for (auto &InputPair : InputToOutputsMap) {
       Maps.emplace_back(InputPair.first(), InputPair.second);
