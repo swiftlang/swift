@@ -738,6 +738,31 @@ static ValueDecl *getGetTailAddrOperation(ASTContext &Context, Identifier Id,
   return builder.build(Id);
 }
 
+static ValueDecl *getBeginUnpairedAccessOperation(ASTContext &Context,
+                                                  Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeMetatype(makeGenericParam(0)));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *
+getPerformInstantaneousReadAccessOperation(ASTContext &Context,
+                                           Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeMetatype(makeGenericParam(0)));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getEndUnpairedAccessOperation(ASTContext &Context,
+                                                Identifier Id) {
+  return getBuiltinFunction(Id, { Context.TheRawPointerType },
+                                Context.TheEmptyTupleType);
+}
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1643,6 +1668,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GetTailAddr:
     if (Types.size() != 1) return nullptr;
     return getGetTailAddrOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::PerformInstantaneousReadAccess:
+    if (!Types.empty()) return nullptr;
+      return getPerformInstantaneousReadAccessOperation(Context, Id);
+
+  case BuiltinValueKind::BeginUnpairedModifyAccess:
+    if (!Types.empty()) return nullptr;
+    return getBeginUnpairedAccessOperation(Context, Id);
+
+  case BuiltinValueKind::EndUnpairedAccess:
+    if (!Types.empty()) return nullptr;
+    return getEndUnpairedAccessOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload)  case BuiltinValueKind::id:
