@@ -48,19 +48,12 @@ extension String {
   ///     string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
+    precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
       self = count == 0 ? "" : repeatedValue
       return
     }
-
-    precondition(count > 0, "Negative count not allowed")
-    self = _visitGuts(repeatedValue._guts, range: nil, args: count,
-      ascii: { ascii, count in
-        return String(_StringGuts(_large: ascii._repeated(count))) },
-      utf16: { utf16, count in
-        return String(_StringGuts(_large: utf16._repeated(count))) },
-      opaque: { opaque, count in
-        return String(_StringGuts(_large: opaque._repeated(count))) })
+    self = String(repeatedValue._guts._repeated(count))
   }
 
   /// A Boolean value indicating whether a string has no characters.
@@ -267,3 +260,22 @@ extension String {
     self = value._description(radix: radix, uppercase: uppercase)
   }
 }
+
+extension _StringGuts {
+  @_inlineable
+  @_versioned
+  func _repeated(_ n: Int) -> _StringGuts {
+    _sanityCheck(n > 1)
+    if self._isSmall {
+      // TODO: visitor pattern for something like this...
+      if let small = self._smallUTF8String._repeated(n) {
+        return _StringGuts(small)
+      }
+    }
+    return _visitGuts(self, range: nil, args: n,
+      ascii: { ascii, n in return _StringGuts(_large: ascii._repeated(n)) },
+      utf16: { utf16, n in return _StringGuts(_large: utf16._repeated(n)) },
+      opaque: { opaque, n in return _StringGuts(_large: opaque._repeated(n)) })
+  }
+}
+

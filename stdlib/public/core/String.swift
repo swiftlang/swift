@@ -811,6 +811,17 @@ extension String {
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
+    // TODO: ASCII fast path, and probably adjust this interface too.
+    if _guts._isSmall {
+      _guts._smallUTF8String.withUnmanagedUTF16 { utf16 in
+        var i = utf16.makeIterator()
+        Unicode.UTF16.ForwardParser._parse(&i) {
+          Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
+        }
+      }
+      return
+    }
+
     _sanityCheck(_guts._isOpaque)
     defer { _fixLifetime(self) }
     let opaque = _guts._asOpaque()
@@ -936,48 +947,26 @@ extension Sequence where Element: StringProtocol {
       }
       return r > 0 ? r - separatorSize : 0
     }
-    if width == 1 {
-      return _joined(
-        capacity: reservation ?? 0,
-        of: UInt8.self,
-        separator: separatorSize == 0 ? nil : separator)
-    }
-    else {
-      return _joined(
-        capacity: reservation ?? 0,
-        of: UTF16.CodeUnit.self,
-        separator: separatorSize == 0 ? nil : separator)
-    }
-  }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _joined<CodeUnit>(
-    capacity: Int,
-    of codeUnit: CodeUnit.Type,
-    separator: String?
-  ) -> String
-  where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    let result = _SwiftStringStorage<CodeUnit>.create(capacity: capacity)
-
-    // TODO(TODO: JIRA): check for small
-
-    guard let separator = separator else {
+    let capacity = reservation ?? separatorSize
+    var result = ""
+    result.reserveCapacity(capacity)
+    if separator.isEmpty {
       for x in self {
-        result._appendInPlace(x)
+        result._guts.append(x)
       }
-      return String(_largeStorage: result)
+      return result
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result._appendInPlace(first)
+      result._guts.append(first)
       while let next = iter.next() {
-        result._appendInPlace(separator)
-        result._appendInPlace(next)
+        result.append(separator)
+        result._guts.append(next)
       }
     }
-    return String(_largeStorage: result)
+    return result
   }
 }
 

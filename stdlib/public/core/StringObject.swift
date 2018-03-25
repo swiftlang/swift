@@ -327,6 +327,7 @@ extension _StringObject {
 // Empty strings
 //
 
+#if arch(i386) || arch(arm)
 @_versioned // FIXME(sil-serialize-all)
 internal var _emptyStringStorage: UInt32 = 0
 
@@ -336,6 +337,7 @@ internal var _emptyStringAddressBits: UInt {
   let p = UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
   return UInt(bitPattern: p)
 }
+#endif // arch(i386) || arch(arm)
 
 extension _StringObject {
 #if arch(i386) || arch(arm)
@@ -365,8 +367,7 @@ extension _StringObject {
   internal
   static var _emptyStringBitPattern: UInt {
     @inline(__always)
-    get { return UInt(Builtin.stringObjectOr_Int64(
-      _isValueBit._value, _emptyStringAddressBits._value)) }
+    get {  return _smallUTF8TopNibble }
   }
 
   @_versioned
@@ -385,6 +386,103 @@ extension _StringObject {
     self.init(taggedRawBits: _StringObject._emptyStringBitPattern)
   }
 #endif
+}
+
+//
+// Small strings
+//
+extension _StringObject {
+  // TODO: Decide what to do for the last bit in the top nibble, when we scrap
+  // the opaque bit (which should really be the isSmallUTF8String bit)
+  //
+  // TODO: Pretty ASCII art, better description
+  //
+  // An encoded small UTF-8 string's first byte has a leading nibble of 1110
+  // and a trailing nibble containing the count.
+
+#if arch(i386) || arch(arm)
+#else
+  @_versioned @_inlineable internal
+  static var _topNibbleMask: UInt {
+    @inline(__always)
+    get { return 0xF000_0000_0000_0000 }
+  }
+  @_versioned @_inlineable internal
+  static var _smallUTF8TopNibble: UInt {
+    @inline(__always)
+    get { return 0xE000_0000_0000_0000 }
+  }
+  @_versioned @_inlineable internal
+  static var _smallUTF8CountMask: UInt {
+    @inline(__always)
+    get { return 0x0F00_0000_0000_0000 }
+  }
+#endif
+
+  @_versioned
+  @_inlineable
+  internal
+  var _isSmallUTF8: Bool {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      return false
+#else
+      return rawBits & _StringObject._topNibbleMask
+        == _StringObject._smallUTF8TopNibble
+#endif
+    }
+  }
+
+  // TODO: describe better
+  //
+  // The top nibble is the mask, second nibble the count. Turn off the mask and
+  // keep the count. The StringObject represents the second word of a
+  // SmallUTF8String.
+  //
+  @_versioned
+  @_inlineable
+  internal
+  var asSmallUTF8SecondWord: UInt {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      unsupportedOn32bit()
+#else
+      _sanityCheck(_isSmallUTF8)
+      return rawBits & ~_StringObject._topNibbleMask
+#endif
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
+  var smallUTF8Count: Int {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      unsupportedOn32bit()
+#else
+      _sanityCheck(_isSmallUTF8)
+      let count = (rawBits & _StringObject._smallUTF8CountMask) &>> 56
+      _sanityCheck(count <= _SmallUTF8String.capacity)
+      return Int(bitPattern: count)
+#endif
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
+  init(_smallUTF8SecondWord bits: UInt) {
+#if arch(i386) || arch(arm)
+      unsupportedOn32bit()
+#else
+    _sanityCheck(bits & _StringObject._topNibbleMask == 0)
+    self.init(taggedRawBits: bits | _StringObject._smallUTF8TopNibble)
+#endif
+  }
 }
 
 //
@@ -581,6 +679,25 @@ extension _StringObject {
     }
   }
 
+  @_versioned
+  @_inlineable
+  internal
+  var isSmallOrCocoa: Bool {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      switch _variant {
+      case .smallSingleByte, .smallDoubleByte:
+        return true
+      default:
+        return isCocoa
+      }
+#else
+      return rawBits & _StringObject._subVariantBit != 0
+#endif
+    }
+  }
+
   //
   // Frequently queried properties
   //
@@ -731,7 +848,9 @@ extension _StringObject {
       _sanityCheckFailure("Cocoa objects aren't supported on this platform")
 #endif
     } else if isSmall {
+      // TODO: Drop the whole opaque bit thing...
       _sanityCheck(isOpaque)
+
     } else {
       fatalError("Unimplemented string form")
     }
@@ -879,19 +998,6 @@ extension _StringObject {
       isSingleByte: false)
   }
 #endif
-
-  @_versioned
-  @_inlineable
-  @inline(__always)
-  internal
-  init(smallStringPayload: UInt, isSingleByte: Bool) {
-    self.init(
-      _payloadBits: smallStringPayload,
-      isValue: true,
-      isSmallOrObjC: true,
-      isOpaque: true,
-      isTwoByte: !isSingleByte)
-  }
 
   @_versioned
   @_inlineable
