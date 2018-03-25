@@ -56,7 +56,7 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
   auto type = ext->getExtendedType();
   if (!type) return nullptr;
 
-  do {
+  while (true) {
     // expected case: we reference a nominal type (potentially through sugar)
     if (auto nominal = type->getAnyNominal())
       return nominal;
@@ -73,7 +73,7 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
     }
 
     return nullptr;
-  } while (true);
+  }
 }
 
 /// If this DeclContext is a NominalType declaration or an
