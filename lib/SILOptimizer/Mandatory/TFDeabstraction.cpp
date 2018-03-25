@@ -768,7 +768,10 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
         // Take an extremely conservative approach to handling accesses of the
         // global, whitelisting specific sorts of uses.  If we find anything
         // we can't handle, we abort promotion of this global.
-        if (isa<EndAccessInst>(user)) // Just a marker.
+
+        if (isa<EndAccessInst>(user) ||    // Just a marker.
+            isa<LoadInst>(user) ||         // Reads are always ok.
+            isa<DebugValueAddrInst>(user)) // Debug info is ok.
           continue;
 
         // Anything that dives into an element of the global can continue to
@@ -776,7 +779,7 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
         if (isa<StructElementAddrInst>(user) || isa<TupleElementAddrInst>(user))
           continue;
 
-        // If this is a store to the global, analyze the input value.
+        // If this is a store *to* the global, analyze the input value.
         if (auto *si = dyn_cast<StoreInst>(user)) {
           if (use->getOperandNumber() == 1) {
             findPromotableMemoryFromValue(si->getOperand(0));
@@ -784,16 +787,27 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
           }
         }
 
-        // Loads are fine.
-        if (isa<LoadInst>(user))
-          continue;
-
         // If this is a begin_access instruction, then it is a projection/copy
         // of the address.  Analyze it too.
         if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
           addrWorklist.push_back(begin);
           continue;
         }
+
+        // If this is an apply_inst passing the global's address as an indirect
+        // operand, then we are ok.
+        if (auto *apply = dyn_cast<ApplyInst>(user)) {
+          auto conventions = apply->getSubstCalleeConv();
+
+          unsigned opIdx = use->getOperandNumber();
+          if (auto argIndex = apply->getArgumentIndexForOperandIndex(opIdx)) {
+            auto paramConvention =
+              conventions.getParameters()[argIndex.getValue()].getConvention();
+            if (isIndirectFormalParameter(paramConvention))
+              continue;
+          }
+        }
+
 
         // Some other unexpected user of the address is left around.  We should
         // handle this some day, but for now just leave the global access
