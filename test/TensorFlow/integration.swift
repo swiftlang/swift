@@ -447,3 +447,18 @@ public func testNotInlined() {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNotInlined
 // CHECK: [[FN:%.*]] = function_ref @{{.*}}shouldntInline
 // CHECK: = apply [[FN]](
+
+
+
+// b/76362738 - eliminate workaround needed in @noinline mutating method
+public struct NonInlineMethodExample {
+  var a = Tensor<Float>(1.0)
+  var b = Tensor<Float>(2.0)
+
+  @inline(never)
+  public mutating func mutatingMethod() {  // expected-warning 2 {{value implicitly copied}}
+    a += b   // expected-note 2 {{value used here}}
+    b += a
+  }
+}
+

@@ -119,8 +119,6 @@ namespace {
     void inlineCalls();
     void simplifyTensorOperands();
 
-    void promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
-                               SmallVectorImpl<AllocStackInst*> &stackAllocs);
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateTensorValues();
@@ -692,31 +690,40 @@ namespace {
   /// to be able to look through the various cases that will be eliminated
   /// later.
   class PromotableMemoryFinder {
-    SmallVectorImpl<SILGlobalVariable*> &globals;
+    SILFunction &fn;
     SmallVectorImpl<AllocStackInst*> &stackAllocs;
     SmallPtrSet<SILInstruction*, 32> visited;
     TensorFunctionClassifier &tfc;
   public:
 
-    PromotableMemoryFinder(SmallVectorImpl<SILGlobalVariable*> &globals,
-                           SmallVectorImpl<AllocStackInst*> &stackAllocs,
-                           TensorFunctionClassifier &tfc)
-      : globals(globals), stackAllocs(stackAllocs), tfc(tfc) {}
+    PromotableMemoryFinder(SmallVectorImpl<AllocStackInst*> &stackAllocs,
+                           TensorFunctionClassifier &tfc, SILFunction &fn)
+      : fn(fn), stackAllocs(stackAllocs), tfc(tfc) {}
 
-    void run(ArrayRef<SILInstruction*> tensorOps);
+    bool run(ArrayRef<SILInstruction*> tensorOps);
   private:
     void findPromotableMemoryFromValue(SILValue value);
     void findPromotableMemoryFromLoadedAddress(SILValue pointer);
+
+    void findMainFunctionGlobalAddressRootCandidates(
+                     SmallVectorImpl<std::pair<SILValue, bool>> &addressRoots);
+    bool canAddressRootBeReliablyPromoted(SILValue root);
+
+    void promoteAddressRootsToStack(
+                        ArrayRef<std::pair<SILValue, bool>> addressRoots);
+
   };
 } // end anonymous namespace
 
 
 
 /// Analyze the dataflow values feeding into the specified tensor operations in
-/// order to find promotable stack and global references.
-void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
+/// order to find promotable stack values and address root references.
+///
+/// This returns true if any address roots were promoted to stack values.
+///
+bool PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::run");
-  auto &fn = *tensorOps.front()->getFunction();
 
   // Find all the promotable memory reachable from tensor ops.  This ensures
   // we can directly connect their use-def edges together.
@@ -725,114 +732,56 @@ void PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
       findPromotableMemoryFromValue(operand.get());
   }
 
+  // Next we collect address roots, which are pointers that are not stack
+  // allocations that we need to promote.  We start by collecting candidate
+  // pointers, then validating them.  We keep track of the root pointer as well
+  // as whether the value starts out uninitialized (which is the case for many
+  // global roots).
+  SmallVector<std::pair<SILValue, bool>, 8> addressRoots;
+
+  // Check the arguments to the SIL function for any indirect structs/tuples
+  // that contain tensors.  Such functions are generally inlined into the caller
+  // but can appear this way when the user explicitly specifies @noinline.  In
+  // this case we want to promote the pointer as a root because this allows
+  // turning the entire body into SSA.
+  for (auto arg : fn.getArguments()) {
+    auto convention = cast<SILFunctionArgument>(arg)->getArgumentConvention();
+    // If this is an indirect argument working on tensors, it is a candidate.
+    if (convention.isIndirectConvention() &&
+        tfc.containsTensorFlowValue(arg->getType()))
+      addressRoots.push_back({ arg, /*startsUninitialized*/false });
+  }
+
+
   // If we're in the main function processing top level code, scan the function
-  // to collect any global_addr instructions.  We want to promote tensor-related
-  // globals and the values that feed into them.
-  if (fn.getName() != SWIFT_ENTRY_POINT_FUNCTION)
-    return;
+  // to collect any global_addr instructions which provide address roots.  We
+  // want to promote tensor-related globals and the values that feed into them.
+  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+    findMainFunctionGlobalAddressRootCandidates(addressRoots);
 
-  // Find all global addrs in the function, whether or not they involve tensor
-  // operations: they could involve tensor values but not be directly used in
-  // the ops.  If we find a global tensor, make sure to add it to our set.  It
-  // may be a use of a tensor op, but not being used by one.
-  DenseMap<SILGlobalVariable*, SmallVector<SILValue, 4>> allGlobalAddrs;
-  for (auto &bb : fn) {
-    for (auto &inst : bb)
-      if (auto ga = dyn_cast<GlobalAddrInst>(&inst))
-        if (tfc.containsTensorFlowValue(ga->getType()))
-          allGlobalAddrs[ga->getReferencedGlobal()].push_back(ga);
+  if (addressRoots.empty())
+    return false;
+
+  // If we've found any address roots, check to see if the computation that
+  // feeds into them can be reliably promoted.
+  for (unsigned i = 0; i != addressRoots.size(); ++i) {
+    if (canAddressRootBeReliablyPromoted(addressRoots[i].first))
+      continue;
+
+    // If we can't promote this root, remove it from our set.
+    std::swap(addressRoots[i], addressRoots.back());
+    addressRoots.pop_back();
+    --i;
   }
 
-  // If we've found references to global variables, we need to make sure to
-  // analyze the computation that feeds into the globals as well.  This is an
-  // iterative process since new references can be discovered as new globals are
-  // found.
-  for (auto &entry : allGlobalAddrs) {
-    auto global = entry.first;
+  if (addressRoots.empty())
+    return false;
 
-    bool canPromoteGlobal = true;
-
-    // Process the global_addrs that are referencing this global, using the
-    // array as a worklist.
-    SmallVector<SILValue, 4> addrWorklist(std::move(entry.second));
-
-    while (!addrWorklist.empty()) {
-      auto addr = addrWorklist.pop_back_val();
-
-      // Walk the use chains of the addr, looking for stores to it.  Any store
-      // to it produces a value that feeds it, which we can contain global
-      // variable references and stack allocation references.
-      for (auto *use : addr->getUses()) {
-        auto user = use->getUser();
-
-        // Take an extremely conservative approach to handling accesses of the
-        // global, whitelisting specific sorts of uses.  If we find anything
-        // we can't handle, we abort promotion of this global.
-
-        if (isa<EndAccessInst>(user) ||    // Just a marker.
-            isa<LoadInst>(user) ||         // Reads are always ok.
-            isa<DebugValueAddrInst>(user)) // Debug info is ok.
-          continue;
-
-        // Anything that dives into an element of the global can continue to
-        // dive into the promoted value.
-        if (isa<StructElementAddrInst>(user) || isa<TupleElementAddrInst>(user))
-          continue;
-
-        // If this is a store *to* the global, analyze the input value.
-        if (auto *si = dyn_cast<StoreInst>(user)) {
-          if (use->getOperandNumber() == 1) {
-            findPromotableMemoryFromValue(si->getOperand(0));
-            continue;
-          }
-        }
-
-        // If this is a begin_access instruction, then it is a projection/copy
-        // of the address.  Analyze it too.
-        if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
-          addrWorklist.push_back(begin);
-          continue;
-        }
-
-        // If this is an apply_inst passing the global's address as an indirect
-        // operand, then we are ok.
-        if (auto *apply = dyn_cast<ApplyInst>(user)) {
-          auto conventions = apply->getSubstCalleeConv();
-
-          unsigned opIdx = use->getOperandNumber();
-          if (auto argIndex = apply->getArgumentIndexForOperandIndex(opIdx)) {
-            auto paramConvention =
-              conventions.getParameters()[argIndex.getValue()].getConvention();
-            if (isIndirectFormalParameter(paramConvention))
-              continue;
-          }
-        }
-
-
-        // Some other unexpected user of the address is left around.  We should
-        // handle this some day, but for now just leave the global access
-        // unchanged, to avoid miscompiling code.
-        canPromoteGlobal = false;
-
-        // Make this a hard error in the testsuite.
-        if (getTFDumpIntermediateStream() == &llvm::outs()) {
-          llvm::errs() << "unexpected global_addr user in top level code"
-                       << " promotion: " << *user << "\n\n";
-          llvm::errs() << *user->getFunction();
-          llvm::errs() << "unexpected global_addr user in top level code"
-                       << " promotion: " << *user << "\n\n";
-          abort();
-        }
-        break;
-      }
-    }
-
-    // Tell the caller that this global is promotable.
-    if (canPromoteGlobal)
-      globals.push_back(global);
-  }
+  // If any address roots were found, predictably promote them to the stack to
+  // unblock analysis.
+  promoteAddressRootsToStack(addressRoots);
+  return true;
 }
-
 
 
 /// Scan upward through the def-use chains of the specified operand value,
@@ -938,104 +887,250 @@ findPromotableMemoryFromLoadedAddress(SILValue pointer) {
   }
 }
 
+/// Find all global addrs in the function, whether or not they involve tensor
+/// operations: they could involve tensor values but not be directly used in
+/// the ops.  If we find a global tensor, make sure to add it to our set.  It
+/// may be a use of a tensor op, but not being used by one.
+///
+/// The representation of global addresses is also a bit wonky:  There can be
+/// multiple global_addr instructions for each global.  Later code wants to
+/// have a single pointer to reason about, so we canonicalize to one of them.
+///
+void PromotableMemoryFinder::
+findMainFunctionGlobalAddressRootCandidates(
+                    SmallVectorImpl<std::pair<SILValue, bool>> &addressRoots) {
+  // First collect all the alloc_globals that may be present in the function,
+  // to ensure we have them all when we start scanning for global_addr's.
+  DenseMap<SILGlobalVariable*, AllocGlobalInst*> allocGlobals;
+  for (auto &bb : fn) {
+    for (auto &inst : bb) {
+      // If we see an alloc global, remember where it is.
+      if (auto agi = dyn_cast<AllocGlobalInst>(&inst)) {
+        auto gv = agi->getReferencedGlobal();
+        if (tfc.containsTensorFlowValue(gv->getLoweredType())) {
+          assert(allocGlobals[agi->getReferencedGlobal()] == 0 &&
+                 "more than one alloc_global instruction in the function?");
+
+          allocGlobals[gv] = agi;
+        }
+      }
+    }
+  }
+
+  // FIXME: We are missing an important validity check here that checks to
+  // verify that there are no references to the global *other* than from the
+  // main function.  This is generally true because we inline tensor ops
+  // aggressively, but can be incorrect in some cases: e.g. a tensor-using
+  // function is marked @noinline, or such a function just contains a copy.
+  DenseMap<SILGlobalVariable*, GlobalAddrInst*> globalAddrRoots;
+  for (auto &bb : fn) {
+    for (auto bbi = bb.begin(), e = bb.end(); bbi != e; ) {
+      auto &inst = *(bbi++);
+
+      // Process GlobalAddrInst's.
+      auto ga = dyn_cast<GlobalAddrInst>(&inst);
+      if (!ga || !tfc.containsTensorFlowValue(ga->getType()))
+        continue;
+
+      // Check to see if this is the first global_addr for this global
+      // variable.  If not, we reuse the existing one, which we know dominates
+      // our current code.
+      auto &entry = globalAddrRoots[ga->getReferencedGlobal()];
+      if (entry) {
+        ga->replaceAllUsesWith(entry);
+        ga->eraseFromParent();
+        continue;
+      }
+
+      // Otherwise, this is the first one, and it will be our canonical
+      // pointer.  If we have a global_alloc, then it starts out uninitialized
+      // but if we don't (as in the case of the REPL) it is known to be
+      // previously initialized.
+      auto allocGlobal = allocGlobals[ga->getReferencedGlobal()];
+      entry = ga;
+      addressRoots.push_back({ ga, /*isUninit*/allocGlobal != nullptr });
+
+      // If this global_addr is in the entry block, then it will dominate any
+      // other ones: we know it is the first in the entry block (because we
+      // scan top to bottom) and we know the entry block dominates everything
+      // else.
+      if (ga->getParent() == fn.getEntryBlock())
+        continue;
+
+      // Otherwise, we aren't sure it will dominate all uses.  If we saw an
+      // alloc_global instruction, move it right after that.  We know it will
+      // dominate all uses.
+      if (allocGlobal) {
+        ga->moveAfter(allocGlobal);
+        continue;
+      }
+
+      // Otherwise, move this to the entry block.
+      ga->moveBefore(fn.getEntryBlock()->getTerminator());
+    }
+  }
+}
+
+/// Once we've found address roots that we're interested in, walk their uses to
+/// see if they are doing things we have confidence in promoting.  Notably, we
+/// cannot promote something that escapes the pointer.
+///
+bool PromotableMemoryFinder::canAddressRootBeReliablyPromoted(SILValue root) {
+  // Check all uses of the root, including direct aliases formed by things
+  // like begin_access.
+  SmallVector<SILValue, 4> addrWorklist;
+  addrWorklist.push_back(root);
+
+  while (!addrWorklist.empty()) {
+    auto addr = addrWorklist.pop_back_val();
+
+    // Walk the use chains of the addr, looking for stores to it.  Any store
+    // to it produces a value that feeds it, which can add new stack allocations
+    // to our set.
+    for (auto *use : addr->getUses()) {
+      auto user = use->getUser();
+
+      // Take an extremely conservative approach to handling accesses of the
+      // global, whitelisting specific sorts of uses.  If we find anything
+      // we can't handle, we abort promotion of this root.
+      if (isa<EndAccessInst>(user) ||    // Just a marker.
+          isa<LoadInst>(user) ||         // Reads are always ok.
+          isa<DebugValueAddrInst>(user)) // Debug info is ok.
+        continue;
+
+      // Anything that dives into an element of the global can continue to
+      // dive into the promoted value.
+      if (isa<StructElementAddrInst>(user) || isa<TupleElementAddrInst>(user))
+        continue;
+
+      // If this is a store *to* the global, analyze the input value.
+      if (auto *si = dyn_cast<StoreInst>(user)) {
+        if (use->getOperandNumber() == 1) {
+          findPromotableMemoryFromValue(si->getOperand(0));
+          continue;
+        }
+      }
+
+      // If this is a begin_access instruction, then it is a projection/copy
+      // of the address.  Analyze it too.
+      if (auto *begin = dyn_cast<BeginAccessInst>(user)) {
+        addrWorklist.push_back(begin);
+        continue;
+      }
+
+      // If this is an apply_inst passing the global's address as an indirect
+      // operand, then we are ok.  These generally get inlined, but can occur
+      // when the user specifies @noinline on a method, for example.
+      //
+      if (auto *apply = dyn_cast<ApplyInst>(user)) {
+        auto conventions = apply->getSubstCalleeConv();
+
+        unsigned opIdx = use->getOperandNumber();
+        if (auto argIndex = apply->getArgumentIndexForOperandIndex(opIdx)) {
+          auto paramConvention =
+            conventions.getParameters()[argIndex.getValue()].getConvention();
+          if (isIndirectFormalParameter(paramConvention))
+            continue;
+        }
+      }
+
+
+      // Some other unexpected user of the address is left around.  We should
+      // handle this some day, but for now just leave the global access
+      // unchanged, to avoid miscompiling code.
+      if (getTFDumpIntermediateStream() == &llvm::outs()) {
+        // Make this a hard error in the testsuite.
+        llvm::errs() << "unexpected global_addr user in top level code"
+                     << " promotion: " << *user << "\n\n";
+        llvm::errs() << *user->getFunction();
+        llvm::errs() << "unexpected global_addr user in top level code"
+                     << " promotion: " << *user << "\n\n";
+        abort();
+      }
+
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 /// Our dataflow analysis of tensor operations has decided that some number of
-/// global variables need to be promoted to SSA in order to perform
-/// deabstraction.  We know that all calls within this function have been
-/// forcibly inlined, so we can switch them to stack allocations and then allow
-/// SSA promotion to take care of converting them to registers.
-void TFDeabstraction::
-promoteGlobalsToStack(ArrayRef<SILGlobalVariable*> globals,
-                      SmallVectorImpl<AllocStackInst*> &stackAllocs) {
-  llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::promoteGlobals");
+/// address roots need to be promoted to SSA in order to perform deabstraction,
+/// and has verified that this is safe.  Perform this transformation now.
+void PromotableMemoryFinder::
+promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
+  llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::"
+                                 "promoteAddressRootsToStack");
 
-  DenseMap<SILGlobalVariable*, AllocStackInst*> stackAllocForGlobal;
+  DenseMap<SILValue, AllocStackInst*> stackAllocForRoot;
 
-  // Promote each global by making a stack allocation that corresponds to them,
-  // inserting loads and stores to the real global, and replacing the uses of
-  // the global_addr instructions with the stack allocation.
-  for (auto *global : globals) {
+  // Promote each root by making a stack allocation that corresponds to them,
+  // inserting loads and stores to the real root, and replacing the uses of
+  // the root instructions with the stack allocation.
+  for (auto rootInfo : addressRoots) {
+    auto root = rootInfo.first;
+
     // Create a stack allocation in the entry block for the function.
     SILBuilder B(&fn.getEntryBlock()->front());
     auto stackAlloc = B.createAllocStack(fn.getLocation(),
-                                         global->getLoweredType());
-    stackAllocForGlobal[global] = stackAlloc;
+                                         root->getType().getObjectType());
+    stackAllocForRoot[root] = stackAlloc;
 
     // Make sure to convert the generated alloc_stack to SSA.
     stackAllocs.push_back(stackAlloc);
+
+    // Replace all uses of the root with the stack value.
+    root->replaceAllUsesWith(stackAlloc);
   }
 
-  // Scan the function to find any alloc_global instructions, and replace any
-  // global_addr instructions with our stack allocation.
-  DenseMap<SILGlobalVariable*, AllocGlobalInst*> allocGlobals;
+  // Find all exit blocks from the function.
   SmallVector<SILBasicBlock*, 4> exitBlocks;
-
   for (auto &bb : fn) {
-    // Find all exit blocks from the function.
     if (isa<ReturnInst>(bb.getTerminator()) ||
         isa<ThrowInst>(bb.getTerminator()) ||
         isa<UnwindInst>(bb.getTerminator()))
       exitBlocks.push_back(&bb);
-
-    for (auto i = bb.begin(), e = bb.end(); i != e;) {
-      auto inst = &*i++;
-
-      if (auto *alloc = dyn_cast<AllocGlobalInst>(inst)) {
-        assert(allocGlobals[alloc->getReferencedGlobal()] == 0 &&
-               "more than one alloc_global instruction in the function?");
-        allocGlobals[alloc->getReferencedGlobal()] = alloc;
-      }
-
-      // If this is a global_addr for a global we're referencing, replace it
-      // with a use of the stack allocation.
-      if (auto *addr = dyn_cast<GlobalAddrInst>(inst)) {
-        auto stack = stackAllocForGlobal[addr->getReferencedGlobal()];
-        if (!stack) continue;
-
-        addr->replaceAllUsesWith(stack);
-        addr->eraseFromParent();
-      }
-    }
   }
 
 
   // Insert a stack deallocation plus cleanup in all of the exit blocks.
-  for (auto *global : globals) {
-    auto stackAlloc = stackAllocForGlobal[global];
+  for (auto rootInfo : addressRoots) {
+    auto root = rootInfo.first;
+    auto stackAlloc = stackAllocForRoot[root];
     assert(stackAlloc && "where'd our alloc_stack go?");
 
-    // If there was an alloc_global for the global, then this is the code that
-    // initializes the global, otherwise it is just something that uses it
-    // (REPL case).  In the later case, we start the stack allocation off with
-    // a load.
-    if (!allocGlobals.count(global)) {
-      // Insert after the stack alloc.
-      SILBuilder B(++SILBasicBlock::iterator(stackAlloc));
+    // In some cases like global variables in top level code, the root will
+    // start out uninitialized.  In other cases, it is already initialized - as
+    // in indirect arguments to functions or REPL code that reuses a global.
+    // If it is initialize, emit code to do so.
+    if (!rootInfo.second) {
+      auto insertionPoint = rootInfo.first->getDefiningInstruction();
+
+      // Insert the initialization after the root or stack alloc.
+      if (!insertionPoint) insertionPoint = stackAlloc;
+      SILBuilder B(++SILBasicBlock::iterator(insertionPoint));
       auto loc = fn.getLocation();
 
-      auto *addr = B.createGlobalAddr(loc, global);
       auto &TL = B.getTypeLowering(stackAlloc->getType());
-      TL.emitCopyInto(B, loc, addr, stackAlloc, IsTake_t::IsNotTake,
+      TL.emitCopyInto(B, loc, root, stackAlloc, IsTake_t::IsNotTake,
                       IsInitialization_t::IsInitialization);
     }
-
 
     // Process each exit block, inserting epilog code.
     for (auto *exit : exitBlocks) {
       SILBuilder B(exit->getTerminator());
       auto loc = fn.getLocation();
 
-      // Load from the stack allocation and store to the global, leaving it
+      // Load from the stack allocation and store to the root, leaving it
       // initialized with our final state.
-      auto addr = B.createGlobalAddr(loc, global);
 
-      // If this function defines the global, then this is an initialization
+      // If the root started out uninitialized, then this is an initialization
       // of it, otherwise this is a reassignment of it.
-      bool isInit = allocGlobals.count(global);
-
       auto &TL = B.getTypeLowering(stackAlloc->getType());
-      TL.emitCopyInto(B, loc, addr, stackAlloc, IsTake_t::IsTake,
-                      IsInitialization_t(isInit));
+      TL.emitCopyInto(B, loc, root, stackAlloc, IsTake_t::IsTake,
+                      IsInitialization_t(rootInfo.second));
 
       B.createDeallocStack(loc, stackAlloc);
     }
@@ -1803,18 +1898,11 @@ void TFDeabstraction::doIt() {
   logCurrentState("After simplifyTensorOperands", /*detailed*/true);
 
   // Scan over all of the operands of the tensor ops, finding stack allocations
-  // and global variables that must be promoted to SSA.
-  SmallVector<SILGlobalVariable*, 8> globals;
+  // that we want to promote to SSA.
   SmallVector<AllocStackInst*, 16> stackAllocs;
-  PromotableMemoryFinder(globals, stackAllocs, tfc).run(tensorOps);
-
-  // If any global variable references were found in the operation chain, try
-  // to predictably promote their references to unblock analysis.  This is only
-  // valid in cases that we have forcibly flattened the function (e.g.
-  // Playgrounds, REPL, and other top-level-code situations).
-  if (forciblyFlattened && !globals.empty()) {
-    promoteGlobalsToStack(globals, stackAllocs);
-    logCurrentState("After promoteGlobalsToStack", /*detailed*/true);
+  if (PromotableMemoryFinder(stackAllocs, tfc, fn).run(tensorOps)) {
+    logCurrentState("After promoteAddressRootsToStack",
+                    /*detailed*/true);
   }
 
   // Promote stack allocations to SSA, this allows us to do dataflow analysis,
