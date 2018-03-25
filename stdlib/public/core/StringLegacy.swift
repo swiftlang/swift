@@ -70,16 +70,6 @@ extension String {
   }
 }
 
-extension String {
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _c: Unicode.Scalar) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(_c.value, count: 1))
-  }
-}
-
-
 // TODO: since this is generally useful, make public via evolution proposal.
 extension BidirectionalCollection {
   @_inlineable
