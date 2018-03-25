@@ -20,11 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Python
-#else
-import PythonWrapper
-#endif
+import CPython
 
 //===----------------------------------------------------------------------===//
 // MARK: PyReference Implementation
@@ -116,6 +112,13 @@ extension PyValue : CustomStringConvertible {
 extension PyValue : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
+  }
+}
+
+// Mirror representation, used by debugger/REPL.
+extension PyValue : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 

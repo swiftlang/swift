@@ -1,0 +1,167 @@
+//===--- module.modulemap -------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// SWIFT_ENABLE_TENSORFLOW
+//
+//===----------------------------------------------------------------------===//
+
+module SwiftCPython [system] [extern_c] {
+  umbrella header "python/Python.h"
+
+  export *
+  module * { export * }
+
+  explicit module bitset {
+    header "python/bitset.h"
+    export *
+  }
+
+  explicit module bytes_methods {
+    header "python/bytes_methods.h"
+    export *
+  }
+
+  explicit module cStringIO {
+    header "python/cStringIO.h"
+    export *
+  }
+
+  explicit module datetime {
+    header "python/datetime.h"
+    export *
+  }
+
+  explicit module errcode {
+    header "python/errcode.h"
+    export *
+  }
+
+  explicit module frameobject {
+    header "python/frameobject.h"
+    export *
+  }
+
+  explicit module graminit {
+    header "python/graminit.h"
+    export *
+  }
+
+  explicit module grammar {
+    // rdar://problem/19484773
+    requires !cplusplus
+    header "python/grammar.h"
+    export *
+  }
+
+  explicit module longintrepr {
+    header "python/longintrepr.h"
+    export *
+  }
+
+  explicit module marshal {
+    header "python/marshal.h"
+    export *
+  }
+
+  explicit module metagrammar {
+    header "python/metagrammar.h"
+    export *
+  }
+
+  explicit module node {
+    header "python/node.h"
+    export *
+  }
+
+  explicit module opcode {
+    header "python/opcode.h"
+    export *
+  }
+
+  explicit module osdefs {
+    header "python/osdefs.h"
+    export *
+  }
+
+  explicit module parsetok {
+    // rdar://problem/19484773
+    requires !cplusplus
+    header "python/parsetok.h"
+    export *
+  }
+
+  explicit module pgen {
+    // rdar://problem/19484773
+    requires !cplusplus
+    header "python/pgen.h"
+    export *
+  }
+
+  explicit module pgenheaders {
+    header "python/pgenheaders.h"
+    export *
+  }
+
+  explicit module py_curses {
+    header "python/py_curses.h"
+    export *
+  }
+
+  explicit module pygetopt {
+    header "python/pygetopt.h"
+    export *
+  }
+
+  explicit module pymactoolbox {
+    header "python/pymactoolbox.h"
+    export *
+  }
+
+  explicit module pythread {
+    header "python/pythread.h"
+    export *
+  }
+
+  explicit module structmember {
+    header "python/structmember.h"
+    export *
+  }
+
+  explicit module structseq {
+    header "python/structseq.h"
+    export *
+  }
+
+  explicit module timefuncs {
+    header "python/timefuncs.h"
+    export *
+  }
+
+  explicit module token {
+    header "python/token.h"
+    export *
+  }
+
+  explicit module ucnhash {
+    header "python/ucnhash.h"
+    export *
+  }
+
+  // FIXME: true/false issues might be a compiler bug
+  exclude header "python/asdl.h"
+  exclude header "python/ast.h"
+  exclude header "python/Python-ast.h"
+  exclude header "python/symtable.h"
+
+  // Note: missing #include here
+  exclude header "python/pyexpat.h"
+}
