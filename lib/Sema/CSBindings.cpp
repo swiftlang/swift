@@ -239,8 +239,15 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     SmallPtrSet<TypeVariableType *, 4> typeVars;
     findInferableTypeVars(first, typeVars);
     findInferableTypeVars(second, typeVars);
-    if (typeVars.size() > 1 && typeVars.count(typeVar))
+    if (typeVars.size() > 1 && typeVars.count(typeVar)) {
       result.InvolvesTypeVariables = true;
+      // Delay binding type variable that has constraints
+      // that have it nested inside some other type e.g.  for `T2`
+      // `T0 arg conv [T2]` and `T conv $T0.ArrayLiteralElement`,
+      // because until related constraints are simplified
+      // there is no way to get full set of bindings for it.
+      result.FullyBound = true;
+    }
     return None;
   }
 
