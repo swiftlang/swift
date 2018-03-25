@@ -1421,6 +1421,8 @@ inline bool isAtLeast(MetadataState lhs, MetadataState rhs) {
 class MetadataRequest : public FlagSet<size_t> {
   using IntType = size_t;
   using super = FlagSet<IntType>;
+
+public:
   enum : IntType {
     State_bit = 0,
     State_width = 8,
@@ -1434,7 +1436,6 @@ class MetadataRequest : public FlagSet<size_t> {
     NonBlocking_bit = 8,
   };
 
-public:
   MetadataRequest(MetadataState state, bool isNonBlocking = false) {
     setState(state);
     setIsNonBlocking(isNonBlocking);
@@ -1454,6 +1455,11 @@ public:
                                 isNonBlocking,
                                 setIsNonBlocking)
   bool isBlocking() const { return !isNonBlocking(); }
+
+  /// Is this request satisfied by a metadata that's in the given state?
+  bool isSatisfiedBy(MetadataState state) const {
+    return isAtLeast(state, getState());
+  }
 };
 
 } // end namespace swift
