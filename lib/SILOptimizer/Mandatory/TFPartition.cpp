@@ -93,6 +93,8 @@ enum class PartitioningClass {
 };
 
 static PartitioningClass classifyInst(SILInstruction *inst) {
+  if (!inst) return PartitioningClass::Unknown;
+
   if (auto *BI = dyn_cast<BuiltinInst>(inst)) {
     switch (BI->getBuiltinInfo().ID) {
     default: return PartitioningClass::Unknown;
@@ -975,19 +977,27 @@ enum class ScalarPromoteClass {
 
 /// Determine whether we can promote the specified scalar instruction to a
 /// tensor operation in the graph.
-static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
-  // We can handle (tuple_extract x, 0) if x is an overflow-checking integer
-  // operation.
+static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
+                                                  TFFunctionPartition &tffp) {
   if (auto *TE = dyn_cast<TupleExtractInst>(inst)) {
-    auto *op = dyn_cast<SILInstruction>((SILNode*)TE->getOperand());
-    if (!op || TE->getFieldNo() != 0 ||
-        classifyInst(op) != PartitioningClass::OverflowCheckingInst)
+    auto *opInst = TE->getOperand()->getDefiningInstruction();
+    if (!opInst) return ScalarPromoteClass::NeverPromote;
+
+    // We can handle (tuple_extract x, c) when the operand is a tensor op, since
+    // it is just extracting a result from the tensor op.
+    if (tffp.tensorOpsSet.count(opInst))
+      return ScalarPromoteClass::ShouldPromote;
+
+    // We can handle (tuple_extract x, 0) if x is an overflow-checking integer
+    // operation.
+    if (TE->getFieldNo() != 0 ||
+        classifyInst(opInst) != PartitioningClass::OverflowCheckingInst)
       return ScalarPromoteClass::NeverPromote;
 
     // We can only handle this tuple_extract if the underlying instruction can
     // be handled.  This can depend on dtype support, whether the overflow
     // flag is used, etc.
-    return shouldPromoteToTensorOp(op);
+    return shouldPromoteToTensorOp(opInst, tffp);
   }
 
   // We can handle (struct_extract x, 0) if x is __tf_get_scalar_or_die.
@@ -1023,23 +1033,12 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
   // If this is a conversion from an instruction that should be promoted (like
   // a literal), then try hard to promote the conversion.
   if (scalarClass == PromotedScalarKind::Conversion)
-    if (auto *op = dyn_cast<SILInstruction>((SILNode*)inst->getOperand(0)))
-      if (shouldPromoteToTensorOp(op) == ScalarPromoteClass::ShouldPromote)
+    if (auto *op = inst->getOperand(0)->getDefiningInstruction())
+      if (shouldPromoteToTensorOp(op, tffp) ==ScalarPromoteClass::ShouldPromote)
         return ScalarPromoteClass::ShouldPromote;
 
   // Otherwise, we can promote this if desired.
   return ScalarPromoteClass::CanPromote;
-}
-
-/// Returns true if the extract instruction returns a TensorFlow value such as
-/// TensorHandle. e.g.
-/// %16 = tuple_extract %15 : $(TensorHandle<Float>, TensorHandle<Int32>), 1
-static bool isTupleExtractOfTensorFlowValue(SILInstruction &inst) {
-  if (auto *ti = dyn_cast<TupleExtractInst>(&inst)) {
-    assert(ti->getNumResults() == 1);
-    return isTensorFlowValue(ti->getType());
-  }
-  return false;
 }
 
 void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
@@ -1049,24 +1048,27 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     return;
 
   // If we're moving a computation to the accelerator, we can remove any
-  // debug_value and retain/release instructions using this one.
+  // debug_value and retain/release instructions using this one.  Similarly, if
+  // we see a tuple_extract from a moved value, then we move the tuple_extract
+  // as well, to make sure that any copy-to-host or results are scalar values,
+  // not the multiple results of tensor ops.
   if (mark == Marking::Move) {
     for (auto result : inst.getResults())
-      for (auto *operand : result->getUses()) {
-        auto user = operand->getUser();
+      for (auto *use : result->getUses()) {
+        auto user = use->getUser();
         if (isUserIgnoredByPartitioning(user))
           markInstruction(*user, Marking::Delete);
+        else if (isa<TupleExtractInst>(user)) {
+          // It is possible the tuple extract already got marked as a copy.  If
+          // so, remove its entry so we can upgrade it to a move.
+          markedInstructions.erase(user);
+          markInstruction(*user, Marking::Move);
+        }
       }
   }
 
   // If we are simply deleting this instruction, then we're done.
   if (mark == Marking::Delete)
-    return;
-
-  // We'd like an inst like the one below to be marked for Marking::Move, but
-  // this inst itself is not a tensorOp, so we skip the rest of this function.
-  // %16 = tuple_extract %15 : $(TensorHandle<Float>, TensorHandle<Int32>), 1
-  if (isTupleExtractOfTensorFlowValue(inst))
     return;
 
   // Make sure the instruction's block is marked as being copied over to the
@@ -1082,6 +1084,8 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   // If we are moving the instruction over, then we know it is a tensor op, and
   // it get special attention.  Otherwise, we just recursively mark the
   // operands in question.
+  // TODO: This special case will go away when Tensor ops are not representing
+  // attributes as operands.
   if (mark != Marking::Move) {
     auto operandRange = inst.getAllOperands();
 
@@ -1109,6 +1113,11 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
       markValue(op.get(), &inst);
     return;
   }
+
+  // If this is a tuple_extract of a tensor op, then we already marked its
+  // operand.
+  if (isa<TupleExtractInst>(inst))
+    return;
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
@@ -1359,7 +1368,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // start point, and whether it is something we can promote into the graph.
   bool isBeforeStartPoint =
     !DI.properlyDominates(tensorStartPoint, inst);
-  ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst);
+  ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst, *this);
 
   // If this is a scalar operation that we really want to promote to a tensor
   // operation, then try to do so.
@@ -1668,12 +1677,6 @@ bool TFFunctionPartition::markFunction() {
       if (auto apply = dyn_cast<ApplyInst>(inst))
         inst = SILTensorOpInfo::decodeApply(apply);
 
-      if (isTupleExtractOfTensorFlowValue(*inst)) {
-        // If it's a TupleExtract, do not add it as a tensor op, but mark the
-        // instruction for Move.
-        markInstruction(*inst, Marking::Move);
-        continue;
-      }
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
@@ -2150,13 +2153,16 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
 void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
   // This case corresponds to PromotedScalarKind::OverflowingBinary above. We
-  // clone over tuple_extract(x, 0) into x's value.  The only time tuple_extract
-  // instructions get marked is when this is safe.
-  if (!isTupleExtractOfTensorFlowValue(*inst)) {
+  // clone over tuple_extract(x, 0) into x's value.
+  if (classifyInst(inst->getOperand()->getDefiningInstruction()) ==
+         PartitioningClass::OverflowCheckingInst) {
     assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
     ValueMap[inst] = remapValue(inst->getOperand());
     return;
   }
+
+  // Otherwise we have a normal tuple_exract from a tuple of TensorFlow values,
+  // which is the result of a TensorFlow op.
   SILCloner::visitTupleExtractInst(inst);
 }
 
