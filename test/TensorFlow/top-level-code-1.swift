@@ -13,6 +13,9 @@ import TensorFlow
 // they are represented as global variables, and require special promotion
 // logic.
 
+// CHECK-LABEL: TFDeabstraction Result: main
+// CHECK:  sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+
 // This test also verifies that the assignment inside of
 // 'localFunctionTouchingGlobalVar' is properly deabstracted.
 //
@@ -33,15 +36,6 @@ x -= one
 let y = Tensor<Float>(2.0)
 let y2 = y*y*y*y
 
-// b/76155918
-let a: Tensor<Float> = [1, 2, 3]
-let b: Tensor<Float> = [1, 2]
-
-print(x)
-print(y2)
-
-// CHECK-LABEL: TFDeabstraction Result: main
-// CHECK:  sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // CHECK:   [[ONE:%.*]] = builtin "__tfop_tfc.scalarToTensor
 // CHECK:   [[ADD1:%.*]] = builtin "__tfop_Add,$in,$in"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
 // CHECK:   [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
@@ -54,5 +48,14 @@ print(y2)
 // CHECK:   [[MUL2:%.*]] = builtin "__tfop_Mul,$in,$in"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
 // CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
 // CHECK:   [[MUL3:%.*]] = builtin "__tfop_Mul,$in,$in"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+
+// b/76155918
+let a: Tensor<Float> = [1, 2, 3]
+let b: Tensor<Float> = [1, 2]
+
+print(x)
+print(y2)
+
+
 // CHECK-LABEL: } // end sil function 'main'
 
