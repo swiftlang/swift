@@ -55,6 +55,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  # SWIFT_ENABLE_TENSORFLOW
   if(SWIFT_ENABLE_TENSORFLOW)
     add_subdirectory(CTensorFlow)
     add_subdirectory(TensorFlow)
@@ -68,6 +69,9 @@ endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(Platform)
+  # SWIFT_ENABLE_TENSORFLOW
+  add_subdirectory(CPython)
+  add_subdirectory(Python)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
