@@ -1309,13 +1309,16 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
       assert(isMember && "Access on self, but var isn't a member");
 
     // Within a variable's own didSet/willSet specifier, access its storage
-    // directly if it's either:
-    // 1) A 'plain variable' (i.e a variable that's not a member).
-    // 2) An access to the member on the implicit 'self' declaration. If it's a
-    //    member access on some other base, we want to call the setter as we
-    //    might be accessing the member on a *different* instance.
+    // directly if either:
+    // 1) It's a 'plain variable' (i.e a variable that's not a member).
+    // 2) It's an access to the member on the implicit 'self' declaration.
+    //    If it's a member access on some other base, we want to call the setter
+    //    as we might be accessing the member on a *different* instance.
+    // 3) We're not in Swift 5 mode (or higher), as in earlier versions of Swift
+    //    we always performed direct accesses.
     // This prevents assignments from becoming infinite loops in most cases.
-    if (!isMember || isAccessOnSelf)
+    if (!isMember || isAccessOnSelf ||
+        !UseDC->getASTContext().isSwiftVersionAtLeast(5))
       if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
         if (var->hasStorage() && var->hasAccessorFunctions() &&
             UseFD->getStorage() == var)
