@@ -237,11 +237,12 @@ public:
   ///
   /// \param TC The current tool chain.
   /// \param Args The input arguments.
-  /// \param Inputs The inputs to the driver.
-  /// \param[out] OI The OutputInfo in which to store the resulting output
-  /// information.
+  /// \param SingleCompileMode Was single compile (whole-module-optimization)
+  /// requested? \param Inputs The inputs to the driver. \param[out] OI The
+  /// OutputInfo in which to store the resulting output information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
+                       const bool SingleCompileMode,
                        const InputFileList &Inputs, OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,

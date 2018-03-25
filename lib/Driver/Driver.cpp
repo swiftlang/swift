@@ -534,8 +534,24 @@ Driver::buildCompilation(const ToolChain &TC,
   DriverForceOneBatchRepartition =
       ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
+  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
+                                    options::OPT_disable_batch_mode, false);
+
+  bool SingleCompileMode =
+      ArgList->hasArg(options::OPT_whole_module_optimization);
+  if (BatchMode && SingleCompileMode &&
+      !ArgList->hasArg(options::OPT_index_file)) {
+    const bool IsLastWMO =
+        ArgList->getLastArg(options::OPT_enable_batch_mode,
+                            options::OPT_disable_batch_mode,
+                            options::OPT_whole_module_optimization) ==
+        ArgList->getLastArg(options::OPT_whole_module_optimization);
+    BatchMode = BatchMode && !IsLastWMO;
+    SingleCompileMode = SingleCompileMode && IsLastWMO;
+  }
+
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
-  if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
+  if (SingleCompileMode) {
     if (Incremental && ShowIncrementalBuildDecisions) {
       llvm::outs() << "Incremental compilation has been disabled, because it "
                    << "is not compatible with whole module optimization.";
@@ -550,10 +566,6 @@ Driver::buildCompilation(const ToolChain &TC,
     }
     Incremental = false;
   }
-
-  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
-                                    options::OPT_disable_batch_mode,
-                                    false);
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
@@ -588,7 +600,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, SingleCompileMode, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -1093,6 +1105,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
+                             const bool SingleCompileMode,
                              const InputFileList &Inputs,
                              OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
@@ -1104,11 +1117,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::REPL;
     OI.CompilerOutputType = file_types::TY_Nothing;
 
-  } else { // DriverKind::Batch
-    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization,
-                    options::OPT_index_file))
-      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+  } else { // DriverKind::Batch or WMO
+    OI.CompilerMode = SingleCompileMode || Args.hasArg(options::OPT_index_file)
+                          ? OutputInfo::Mode::SingleCompile
+                          : OutputInfo::Mode::StandardCompile;
     OI.CompilerOutputType = file_types::TY_Object;
   }
 
