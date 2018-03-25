@@ -923,18 +923,18 @@ NodePointer Demangler::demangleBuiltinType() {
   switch (nextChar()) {
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                               "Builtin.BridgeObject");
+                               BUILTIN_TYPE_NAME_BRIDGEOBJECT);
       break;
     case 'B':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                              "Builtin.UnsafeValueBuffer");
+                              BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
       break;
     case 'f': {
       int size = demangleIndex() - 1;
       if (size <= 0)
         return nullptr;
       CharVector name;
-      name.append("Builtin.Float", *this);
+      name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
       name.append(size, *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
@@ -944,7 +944,7 @@ NodePointer Demangler::demangleBuiltinType() {
       if (size <= 0)
         return nullptr;
       CharVector name;
-      name.append("Builtin.Int", *this);
+      name.append(BUILTIN_TYPE_NAME_INT, *this);
       name.append(size, *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
@@ -955,34 +955,34 @@ NodePointer Demangler::demangleBuiltinType() {
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
-          !EltType->getText().startswith("Builtin."))
+          !EltType->getText().startswith(BUILTIN_TYPE_NAME_PREFIX))
         return nullptr;
       CharVector name;
-      name.append("Builtin.Vec", *this);
+      name.append(BUILTIN_TYPE_NAME_VEC, *this);
       name.append(elts, *this);
       name.push_back('x', *this);
-      name.append(EltType->getText().substr(sizeof("Builtin.") - 1), *this);
+      name.append(EltType->getText().substr(strlen(BUILTIN_TYPE_NAME_PREFIX)), *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
     case 'O':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                               "Builtin.UnknownObject");
+                               BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
       break;
     case 'o':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                               "Builtin.NativeObject");
+                               BUILTIN_TYPE_NAME_NATIVEOBJECT);
       break;
     case 'p':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                               "Builtin.RawPointer");
+                               BUILTIN_TYPE_NAME_RAWPOINTER);
       break;
     case 't':
-      Ty = createNode(Node::Kind::BuiltinTypeName, "Builtin.SILToken");
+      Ty = createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN);
       break;
     case 'w':
       Ty = createNode(Node::Kind::BuiltinTypeName,
-                               "Builtin.Word");
+                               BUILTIN_TYPE_NAME_WORD);
       break;
     default:
       return nullptr;

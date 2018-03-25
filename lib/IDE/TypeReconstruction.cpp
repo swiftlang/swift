@@ -131,7 +131,7 @@ public:
                        bool allow_clang_importer = true) {
     assert(!module_name.empty());
     static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
-    static ConstString g_BuiltinModule("Builtin");
+    static ConstString g_BuiltinModule(BUILTIN_NAME);
     static ConstString g_CModule(MANGLING_MODULE_CLANG_IMPORTER);
     if (allow_clang_importer) {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
@@ -799,13 +799,13 @@ static void VisitNodeBuiltinTypeName(
 
   StringRef builtin_name_ref(builtin_name);
 
-  if (builtin_name_ref.startswith("Builtin.")) {
+  if (builtin_name_ref.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
     StringRef stripped_name_ref =
-        builtin_name_ref.drop_front(strlen("Builtin."));
+        builtin_name_ref.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
     SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module =
-        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString("Builtin"));
+        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString(BUILTIN_NAME));
 
     if (!FindNamedDecls(ast, ast->getIdentifier(stripped_name_ref), result)) {
       result.Clear();
@@ -814,7 +814,7 @@ static void VisitNodeBuiltinTypeName(
     }
   } else {
     result._error = stringWithFormat(
-        "BuiltinTypeName %s doesn't start with Builtin.", builtin_name.c_str());
+        "BuiltinTypeName %s doesn't start with %s", builtin_name.c_str(), BUILTIN_TYPE_NAME_PREFIX);
   }
 }
 
