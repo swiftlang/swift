@@ -13,12 +13,13 @@
 if(SWIFT_ENABLE_TENSORFLOW)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
+  set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
+  set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
+
   include_directories(BEFORE
     "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
   )
 
-  set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-  set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
@@ -42,7 +43,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
       TensorProtocol.swift
       TensorShape.swift
       Utilities.swift
-      INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
+      INCORPORATE_OBJECT_LIBRARIES swiftTensorFlowInit
       TARGET_SDKS OSX
       PRIVATE_LINK_LIBRARIES "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so" "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}/libtensorflow_framework.so"
       SWIFT_MODULE_DEPENDS SwiftOnoneSupport
