@@ -57,6 +57,12 @@ UBool u_isdefined(UChar32);
 void u_charAge(UChar32, UVersionInfo);
 int32_t u_getIntPropertyValue(UChar32, UProperty);
 int32_t u_charName(UChar32, UCharNameChoice, char *, int32_t, UErrorCode *);
+int32_t u_strToLower(UChar *, int32_t, const UChar *, int32_t, const char *,
+                     UErrorCode *);
+int32_t u_strToTitle(UChar *, int32_t, const UChar *, int32_t,
+                     UBreakIterator *, const char *, UErrorCode *);
+int32_t u_strToUpper(UChar *, int32_t, const UChar *, int32_t, const char *,
+                     UErrorCode *);
 }
 
 #else
@@ -70,6 +76,7 @@ int32_t u_charName(UChar32, UCharNameChoice, char *, int32_t, UErrorCode *);
 #include <unicode/uiter.h>
 #include <unicode/ubrk.h>
 #include <unicode/uchar.h>
+#include <unicode/ustring.h>
 #include <unicode/uvernum.h>
 #include <unicode/uversion.h>
 
@@ -350,6 +357,35 @@ __swift_int32_t swift::__swift_stdlib_u_charName(
   return u_charName(code, static_cast<UCharNameChoice>(nameChoice),
                     buffer, bufferLength,
                     ptr_cast<UErrorCode>(pErrorCode));
+}
+
+__swift_int32_t swift::__swift_stdlib_u_strToLower(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    const char *locale, __swift_stdlib_UErrorCode *pErrorCode) {
+  return u_strToLower(ptr_cast<UChar>(dest), destCapacity,
+                      ptr_cast<UChar>(src), srcLength,
+                      locale, ptr_cast<UErrorCode>(pErrorCode));
+}
+
+__swift_int32_t swift::__swift_stdlib_u_strToTitle(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    __swift_stdlib_UBreakIterator *titleIter, const char *locale,
+    __swift_stdlib_UErrorCode *pErrorCode) {
+  return u_strToTitle(ptr_cast<UChar>(dest), destCapacity,
+                      ptr_cast<UChar>(src), srcLength,
+                      ptr_cast<UBreakIterator>(titleIter), locale,
+                      ptr_cast<UErrorCode>(pErrorCode));
+}
+
+__swift_int32_t swift::__swift_stdlib_u_strToUpper(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    const char *locale, __swift_stdlib_UErrorCode *pErrorCode) {
+  return u_strToUpper(ptr_cast<UChar>(dest), destCapacity,
+                      ptr_cast<UChar>(src), srcLength,
+                      locale, ptr_cast<UErrorCode>(pErrorCode));
 }
 
 

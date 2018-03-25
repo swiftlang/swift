@@ -522,6 +522,25 @@ __swift_int32_t __swift_stdlib_u_charName(
     char *buffer, __swift_int32_t bufferLength,
     __swift_stdlib_UErrorCode *pErrorCode);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t __swift_stdlib_u_strToLower(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    const char *locale, __swift_stdlib_UErrorCode *pErrorCode);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t __swift_stdlib_u_strToTitle(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    __swift_stdlib_UBreakIterator *_Nullable titleIter, const char *locale,
+    __swift_stdlib_UErrorCode *pErrorCode);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t __swift_stdlib_u_strToUpper(
+    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
+    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
+    const char *locale, __swift_stdlib_UErrorCode *pErrorCode);
+
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

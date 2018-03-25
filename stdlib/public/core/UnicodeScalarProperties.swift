@@ -20,19 +20,28 @@ extension Unicode.Scalar {
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
   public struct Properties {
-    internal init(_value: UInt32) {
+    internal init(_scalar: Unicode.Scalar) {
       // We convert the value to the underlying UChar32 type here and store it
       // in that form to make calling the ICU APIs cleaner below.
-      self._value = __swift_stdlib_UChar32(bitPattern: _value)
+      self._value = __swift_stdlib_UChar32(bitPattern: _scalar._value)
+
+      // Likewise, we cache the UTF-16 encoding of the scalar for a few of the
+      // properties that require treating it like a string (e.g., case
+      // mappings).
+      let utf16 = _scalar.utf16
+      self._utf16Length = utf16.count
+      self._utf16 = (utf16[0], _utf16Length > 1 ? utf16[1] : 0)
     }
 
     internal var _value: __swift_stdlib_UChar32
+    internal var _utf16: (UTF16.CodeUnit, UTF16.CodeUnit)
+    internal var _utf16Length: Int
   }
 
   /// A value that provides access to properties of the Unicode scalar that are
   /// defined by the Unicode standard.
   public var properties: Properties {
-    return Properties(_value: _value)
+    return Properties(_scalar: self)
   }
 }
 
@@ -1043,5 +1052,110 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
     return _scalarName(__swift_stdlib_U_CHAR_NAME_ALIAS)
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The lowercase mapping of the scalar.
+  ///
+  /// This property is a `String` because some mappings may transform a single
+  /// scalar into multiple scalars. For example, the character "İ" (U+0130
+  /// LATIN CAPITAL LETTER I WITH DOT ABOVE) becomes two scalars (U+0069 LATIN
+  /// SMALL LETTER I, U+0307 COMBINING DOT ABOVE) when converted to lowercase.
+  ///
+  /// This property corresponds to the `Lowercase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var lowercaseMapping: String {
+    let initialCapacity = 1
+
+    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: initialCapacity,
+      count: 0)
+
+    _ = _expandingStorageIfNeeded(&storage) { storage in
+      var utf16 = _utf16
+      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = __swift_stdlib_u_strToLower(
+          storage.start, Int32(storage.capacity),
+          utf16Pointer, Int32(_utf16Length), "", &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError(
+            "u_strToLower: Unexpected error lowercasing Unicode scalar.")
+        }
+        return correctSize
+      }
+    }
+    return String(_storage: storage)
+  }
+
+  /// The titlecase mapping of the scalar.
+  ///
+  /// This property is a `String` because some mappings may transform a single
+  /// scalar into multiple scalars. For example, the ligature "ﬁ" (U+FB01 LATIN
+  /// SMALL LIGATURE FI) becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069
+  /// LATIN SMALL LETTER I) when converted to titlecase.
+  ///
+  /// This property corresponds to the `Titlecase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var titlecaseMapping: String {
+    let initialCapacity = 1
+
+    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: initialCapacity,
+      count: 0)
+
+    _ = _expandingStorageIfNeeded(&storage) { storage in
+      var utf16 = _utf16
+      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = __swift_stdlib_u_strToTitle(
+          storage.start, Int32(storage.capacity),
+          utf16Pointer, Int32(_utf16Length), nil, "", &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError(
+            "u_strToTitle: Unexpected error titlecasing Unicode scalar.")
+        }
+        return correctSize
+      }
+    }
+    return String(_storage: storage)
+  }
+
+  /// The uppercase mapping of the scalar.
+  ///
+  /// This property is a `String` because some mappings may transform a single
+  /// scalar into multiple scalars. For example, the German letter "ß" (U+00DF
+  /// LATIN SMALL LETTER SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S,
+  /// U+0053 LATIN CAPITAL LETTER S) when converted to uppercase.
+  ///
+  /// This property corresponds to the `Uppercase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var uppercaseMapping: String {
+    let initialCapacity = 1
+
+    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: initialCapacity,
+      count: 0)
+
+    _ = _expandingStorageIfNeeded(&storage) { storage in
+      var utf16 = _utf16
+      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = __swift_stdlib_u_strToUpper(
+          storage.start, Int32(storage.capacity),
+          utf16Pointer, Int32(_utf16Length), "", &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError(
+            "u_strToUpper: Unexpected error uppercasing Unicode scalar.")
+        }
+        return correctSize
+      }
+    }
+    return String(_storage: storage)
   }
 }
