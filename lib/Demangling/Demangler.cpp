@@ -140,7 +140,10 @@ swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
 int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   if (mangledName.empty()) return 0;
 
-  llvm::StringRef prefixes[] = {/*Swift 4*/ "_T0", /*Swift > 4*/ "$S", "_$S"};
+  llvm::StringRef prefixes[] = {
+    /*Swift 4*/   "_T0",
+    /*Swift 4.x*/ "$S", "_$S",
+    /*Swift 5+*/  "$s", "_$s"};
 
   // Look for any of the known prefixes
   for (auto prefix : prefixes) {
