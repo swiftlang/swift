@@ -2908,6 +2908,8 @@ BoundNameAliasType::BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
     Bits.BoundNameAliasType.NumSubstitutions = flatSubs.size();
     std::copy(flatSubs.begin(), flatSubs.end(),
               getTrailingObjects<Substitution>());
+
+    *getTrailingObjects<GenericSignature *>() = genericSig;
   } else {
     Bits.BoundNameAliasType.NumSubstitutions = 0;
   }
@@ -2955,8 +2957,10 @@ BoundNameAliasType *BoundNameAliasType::get(
   // Build a new type.
   unsigned numSubstitutions =
     genericSig ? genericSig->getSubstitutionListSize() : 0;
+  assert(static_cast<bool>(genericSig) == numSubstitutions > 0);
   auto size =
-    totalSizeToAlloc<Type, Substitution>(parent ? 1 : 0, numSubstitutions);
+    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
+                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
   auto mem = ctx.Allocate(size, alignof(BoundNameAliasType), arena);
   auto result = new (mem) BoundNameAliasType(typealias, parent, substitutions,
                                              underlying, storedProperties);
