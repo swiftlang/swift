@@ -1074,6 +1074,10 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 
