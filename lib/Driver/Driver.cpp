@@ -502,6 +502,43 @@ static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
   }
 }
 
+static void computeCompilationModes(const InputArgList *ArgList,
+                                    DiagnosticEngine &Diags, bool &BatchMode,
+                                    bool &SingleCompileMode) {
+  BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
+                               options::OPT_disable_batch_mode, false);
+
+  SingleCompileMode = ArgList->hasArg(options::OPT_whole_module_optimization);
+
+  // -index-file compilations are weird. They are processed as SingleCompiles
+  // (WMO), but must indicate that there is one primary file, designated by
+  // -index-file-path.
+  if (ArgList->hasArg(options::OPT_index_file)) {
+    BatchMode = false;
+    SingleCompileMode = true;
+    return;
+  }
+
+  if (!(BatchMode && SingleCompileMode))
+    return;
+
+  const Arg *WMOArg =
+      ArgList->getLastArg(options::OPT_whole_module_optimization);
+
+  const Arg *BatchArg = ArgList->getLastArg(options::OPT_enable_batch_mode);
+
+  const bool IsLastWMO =
+      WMOArg == ArgList->getLastArg(options::OPT_enable_batch_mode,
+                                    options::OPT_whole_module_optimization);
+  BatchMode = BatchMode && !IsLastWMO;
+  SingleCompileMode = SingleCompileMode && IsLastWMO;
+
+  const Arg *earlierArg = IsLastWMO ? BatchArg : WMOArg;
+  const Arg *laterArg = IsLastWMO ? WMOArg : BatchArg;
+  Diags.diagnose(SourceLoc(), diag::note_ignoring_earlier_mode_argument,
+                 earlierArg->getSpelling(), laterArg->getSpelling());
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -534,21 +571,8 @@ Driver::buildCompilation(const ToolChain &TC,
   DriverForceOneBatchRepartition =
       ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
-  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
-                                    options::OPT_disable_batch_mode, false);
-
-  bool SingleCompileMode =
-      ArgList->hasArg(options::OPT_whole_module_optimization);
-  if (BatchMode && SingleCompileMode &&
-      !ArgList->hasArg(options::OPT_index_file)) {
-    const bool IsLastWMO =
-        ArgList->getLastArg(options::OPT_enable_batch_mode,
-                            options::OPT_disable_batch_mode,
-                            options::OPT_whole_module_optimization) ==
-        ArgList->getLastArg(options::OPT_whole_module_optimization);
-    BatchMode = BatchMode && !IsLastWMO;
-    SingleCompileMode = SingleCompileMode && IsLastWMO;
-  }
+  bool BatchMode, SingleCompileMode;
+  computeCompilationModes(ArgList.get(), Diags, BatchMode, SingleCompileMode);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (SingleCompileMode) {
@@ -600,7 +624,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, SingleCompileMode, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, BatchMode, SingleCompileMode, Inputs,
+                  OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -1105,7 +1130,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
-                             const bool SingleCompileMode,
+                             const bool BatchMode, const bool SingleCompileMode,
                              const InputFileList &Inputs,
                              OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
@@ -1118,14 +1143,15 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.CompilerOutputType = file_types::TY_Nothing;
 
   } else { // DriverKind::Batch or WMO
-    OI.CompilerMode = SingleCompileMode || Args.hasArg(options::OPT_index_file)
-                          ? OutputInfo::Mode::SingleCompile
-                          : OutputInfo::Mode::StandardCompile;
+    OI.CompilerMode = SingleCompileMode ? OutputInfo::Mode::SingleCompile
+                                        : OutputInfo::Mode::StandardCompile;
     OI.CompilerOutputType = file_types::TY_Object;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
+    if (BatchMode) {
+      Diags.diagnose(SourceLoc(), diag::note_cannot_multithread_batch_mode);
+    } else if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
@@ -2316,6 +2342,15 @@ void Driver::computeMainOutput(
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
+
+    // In batch mode, the driver will try to reserve multiple differing main
+    // outputs to a bridging header. Another assertion will trip, but the cause
+    // will be harder to track down. Since the driver now ignores -num-threads
+    // in batch mode, the user should never be able to falsify this assertion.
+    assert(!C.getBatchModeEnabled() && "Batch mode produces only one main "
+                                       "output per input action, cannot have "
+                                       "batch mode & num-threads");
+
     auto OutputFunc = [&](StringRef Base, StringRef Primary) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
