@@ -1159,3 +1159,142 @@ extension Unicode.Scalar.Properties {
     return String(_storage: storage)
   }
 }
+
+extension Unicode {
+
+  /// The classification of a scalar used in the Canonical Ordering Algorithm
+  /// defined by the Unicode Standard.
+  ///
+  /// Canonical combining classes are used by the ordering algorithm to
+  /// determine if two sequences of combining marks should be considered
+  /// canonically equivalent (that is, identical in interpretation). Two
+  /// sequences are canonically equivalent if they are equal when sorting the
+  /// scalars in ascending order by their combining class.
+  ///
+  /// For example, consider the sequence `"\u{0041}\u{0301}\u{0316}"` (LATIN
+  /// CAPITAL LETTER A, COMBINING ACUTE ACCENT, COMBINING GRAVE ACCENT BELOW).
+  /// The combining classes of these scalars have the numeric values 0, 230, and
+  /// 220, respectively. Sorting these scalars by their combining classes yields
+  /// `"\u{0041}\u{0316}\u{0301}"`, so two strings that differ only by the
+  /// ordering of those scalars would compare as equal:
+  ///
+  /// ```
+  /// print("\u{0041}\u{0316}\u{0301}" == "\u{0041}\u{0301}\u{0316}")
+  /// // Prints "true"
+  /// ```
+  ///
+  /// Named and Unnamed Combining Classes
+  /// ===================================
+  ///
+  /// Canonical combining classes are defined in the Unicode Standard as
+  /// integers in the range `0...254`. For convenience, the standard assigns
+  /// symbolic names to a subset of these combining classes.
+  ///
+  /// The `CanonicalCombiningClass` type conforms to `RawRepresentable` with a
+  /// raw value of type `UInt8`. Instances of the type can be created from the
+  /// actual numeric value using the `init(rawValue:)` initializer, and
+  /// combining classes with symbolic names can also be referenced using the
+  /// static members that share those names.
+  ///
+  /// ```
+  /// print(Unicode.CanonicalCombiningClass(rawValue: 1) == .overlay)
+  /// // Prints "true"
+  /// ```
+  public struct CanonicalCombiningClass:
+    Comparable, Hashable, RawRepresentable
+  {
+    /// Base glyphs that occupy their own space and do not combine with others.
+    public static let notReordered = CanonicalCombiningClass(rawValue: 0)
+
+    /// Marks that overlay a base letter or symbol.
+    public static let overlay = CanonicalCombiningClass(rawValue: 1)
+
+    /// Diacritic nukta marks in Brahmi-derived scripts.
+    public static let nukta = CanonicalCombiningClass(rawValue: 7)
+
+    /// Combining marks that are attached to hiragana and katakana to indicate
+    /// voicing changes.
+    public static let kanaVoicing = CanonicalCombiningClass(rawValue: 8)
+
+    /// Diacritic virama marks in Brahmi-derived scripts.
+    public static let virama = CanonicalCombiningClass(rawValue: 9)
+
+    /// Marks attached at the bottom left.
+    public static let attachedBelowLeft = CanonicalCombiningClass(rawValue: 200)
+
+    /// Marks attached directly below.
+    public static let attachedBelow = CanonicalCombiningClass(rawValue: 202)
+
+    /// Marks attached directly above.
+    public static let attachedAbove = CanonicalCombiningClass(rawValue: 214)
+
+    /// Marks attached at the top right.
+    public static let attachedAboveRight =
+      CanonicalCombiningClass(rawValue: 216)
+
+    /// Distinct marks at the bottom left.
+    public static let belowLeft = CanonicalCombiningClass(rawValue: 218)
+
+    /// Distinct marks directly below.
+    public static let below = CanonicalCombiningClass(rawValue: 220)
+
+    /// Distinct marks at the bottom right.
+    public static let belowRight = CanonicalCombiningClass(rawValue: 222)
+
+    /// Distinct marks to the left.
+    public static let left = CanonicalCombiningClass(rawValue: 224)
+
+    /// Distinct marks to the right.
+    public static let right = CanonicalCombiningClass(rawValue: 226)
+
+    /// Distinct marks at the top left.
+    public static let aboveLeft = CanonicalCombiningClass(rawValue: 228)
+
+    /// Distinct marks directly above.
+    public static let above = CanonicalCombiningClass(rawValue: 230)
+
+    /// Distinct marks at the top right.
+    public static let aboveRight = CanonicalCombiningClass(rawValue: 232)
+
+    /// Distinct marks subtending two bases.
+    public static let doubleBelow = CanonicalCombiningClass(rawValue: 233)
+
+    /// Distinct marks extending above two bases.
+    public static let doubleAbove = CanonicalCombiningClass(rawValue: 234)
+
+    /// Greek iota subscript only (U+0345 COMBINING GREEK YPOGEGRAMMENI).
+    public static let iotaSubscript = CanonicalCombiningClass(rawValue: 240)
+
+    /// The raw integer value of the canonical combining class.
+    public let rawValue: UInt8
+
+    /// Creates a new canonical combining class with the given raw integer
+    /// value.
+    ///
+    /// - Parameter rawValue: The raw integer value of the canonical combining
+    ///   class.
+    public init(rawValue: UInt8) {
+      self.rawValue = rawValue
+    }
+
+    public static func < (
+      lhs: CanonicalCombiningClass,
+      rhs: CanonicalCombiningClass
+    ) -> Bool {
+      return lhs.rawValue < rhs.rawValue
+    }
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The canonical combining class of the scalar.
+  ///
+  /// This property corresponds to the `Canonical_Combining_Class` property in
+  /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
+    let rawValue = UInt8(__swift_stdlib_u_getIntPropertyValue(
+      _value, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
+    return Unicode.CanonicalCombiningClass(rawValue: rawValue)
+  }
+}
