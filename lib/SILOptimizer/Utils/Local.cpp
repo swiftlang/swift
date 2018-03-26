@@ -1379,20 +1379,18 @@ swift::analyzeStaticInitializer(SILValue V,
     // If it is not a struct which is a simple type, bail.
     if (!isSimpleType(SI->getType(), SI->getModule()))
       return false;
-    return llvm::none_of(SI->getAllOperands(),
-           [&](Operand &Op) -> bool {
-             return !analyzeStaticInitializer(Op.get(), Insts);
-           });
+    return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *TI = dyn_cast<TupleInst>(V)) {
     // If it is not a tuple which is a simple type, bail.
     if (!isSimpleType(TI->getType(), TI->getModule()))
       return false;
-    return llvm::none_of(TI->getAllOperands(),
-                         [&](Operand &Op) -> bool {
-                           return !analyzeStaticInitializer(Op.get(), Insts);
-                         });
+    return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *bi = dyn_cast<BuiltinInst>(V)) {
