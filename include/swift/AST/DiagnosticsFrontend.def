@@ -83,6 +83,8 @@ ERROR(error_unknown_arg,none,
   "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
+NOTE(note_multiple_js,none,
+  "multiple -j arguments, using the smallest ('%0')", (unsigned))
 ERROR(error_unsupported_option_argument,none,
   "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,
