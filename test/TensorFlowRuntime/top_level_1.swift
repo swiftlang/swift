@@ -6,14 +6,15 @@
 // specifics, so we can keep it simple and just test CPU.
 
 import TensorFlow
+import TestUtils
 import StdlibUnittest
 
-_RuntimeConfig.usesTFEagerAPI = false
-_RuntimeConfig.executionMode = .cpu
-_RuntimeConfig.printsDebugLog = false
+var TopLevelTests = TestSuite("TopLevel")
 
-var x = Tensor<Int8>([1,2,3])*2
+TopLevelTests.testCPU("TopLevel") {
+  var x = Tensor<Int8>([1,2,3])*2
+  x = x + x
+  expectEqual(x.array, ShapedArray(shape: [3], scalars: [4, 8, 12]))
+}
 
-x = x + x
-
-expectEqual(x.array, ShapedArray(shape: [3], scalars: [2,4,6]))
+runAllTests()
