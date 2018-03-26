@@ -407,18 +407,13 @@ internal func _float${bits}ToStringImpl(
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> String {
-
-  if value.isInfinite {
-      return value.sign == .minus ? "-inf" : "inf"
-  } else {
-    _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
-    var buffer = _Buffer32()
-    return buffer.withBytes { (bufferPtr) in
-      let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-      return String._fromWellFormedCodeUnitSequence(
-                 UTF8.self,
-                 input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
-    }
+  _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
+  var buffer = _Buffer32()
+  return buffer.withBytes { (bufferPtr) in
+    let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
+    return String._fromWellFormedCodeUnitSequence(
+               UTF8.self,
+               input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
   }
 }
 
