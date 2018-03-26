@@ -2160,17 +2160,12 @@ static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
                             VisitNodeResult &result) {
   assert(result._error.empty());
 
-  Demangle::Node::iterator child_end = cur_node->end();
-  for (Demangle::Node::iterator child_pos = cur_node->begin();
-       child_pos != child_end; ++child_pos) {
-    auto child = *child_pos;
-    const Demangle::Node::Kind childKind = child->getKind();
-
-    switch (childKind) {
+  for (const auto &child : *cur_node) {
+    switch (child->getKind()) {
     case Demangle::Node::Kind::Identifier:
       break;
     default:
-      VisitNode(ast, *child_pos, result);
+      VisitNode(ast, child, result);
       break;
     }
   }
