@@ -2156,6 +2156,26 @@ static void VisitAllChildNodes(
   }
 }
 
+static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
+                            VisitNodeResult &result) {
+  assert(result._error.empty());
+
+  Demangle::Node::iterator child_end = cur_node->end();
+  for (Demangle::Node::iterator child_pos = cur_node->begin();
+       child_pos != child_end; ++child_pos) {
+    auto child = *child_pos;
+    const Demangle::Node::Kind childKind = child->getKind();
+
+    switch (childKind) {
+    case Demangle::Node::Kind::Identifier:
+      break;
+    default:
+      VisitNode(ast, *child_pos, result);
+      break;
+    }
+  }
+}
+
 static void VisitNode(
     ASTContext *ast,
     Demangle::NodePointer node, VisitNodeResult &result) {
@@ -2203,6 +2223,9 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Global:
+    VisitNodeGlobal(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::Static:
   case Demangle::Node::Kind::Type:
   case Demangle::Node::Kind::TypeMangling:
