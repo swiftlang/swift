@@ -108,7 +108,7 @@
 
 #include "swift/Runtime/SwiftDtoa.h"
 
-#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__SIZEOF_INT128__)
   // We get a significant speed boost if we can use the __uint128_t
   // type that's present in GCC and Clang on 64-bit architectures.  In
   // particular, we can do 128-bit arithmetic directly and can
