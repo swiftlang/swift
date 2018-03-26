@@ -13,6 +13,9 @@ import StdlibUnittest
 
 var InfeedTests = TestSuite("Infeed")
 
+// FIXME: Revisit how to enable infeed outside the context of dataset /
+// iterators.
+#if false
 @inline(never)
 func testScalarInput() {
   func add(_ x: Float, _ y: Float) -> Float {
@@ -25,6 +28,7 @@ func testScalarInput() {
   expectNearlyEqual(3.7, add(1.3, 2.4), byError: 0.1)
 }
 InfeedTests.testTPU("ScalarInput", testScalarInput)
+#endif
 
 InfeedTests.testTPU("JustDataset") {
   TensorFlow.enableTPU(infeed: true)
@@ -61,15 +65,15 @@ InfeedTests.testTPU("DatasetWithMnist") {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "mnist",
     filePath: "/cns/ok-d/home/sasabour/mnist",
-    batchSize: 128,
-    output_shapes: [TensorShape(128,784), TensorShape(128)])
+    batchSize: 2048,
+    output_shapes: [TensorShape(2048,784), TensorShape(2048)])
   let images : Tensor<Float> = #tfop("Identity", images1)
   let labels : Tensor<Int32> = #tfop("Identity", labels1)
   // Add some more graph nodes consuming the output of the iterator.
   let imagesMod = images + 1
   let labelsMod = labels + 2
-  expectEqual([128,784], imagesMod.array.shape)
-  expectEqual([128], labelsMod.array.shape)
+  expectEqual([2048,784], imagesMod.array.shape)
+  expectEqual([2048], labelsMod.array.shape)
 }
 
 #if false
