@@ -250,10 +250,8 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   // Check whether this is a member access on 'self'.
   bool isAccessOnSelf = false;
   if (auto *baseDRE = dyn_cast<DeclRefExpr>(base->getValueProvidingExpr()))
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
-      if (auto *selfDecl = AFD->getImplicitSelfDecl())
-        if (baseDRE->getDecl() == selfDecl)
-          isAccessOnSelf = true;
+    if (auto *baseVar = dyn_cast<VarDecl>(baseDRE->getDecl()))
+      isAccessOnSelf = baseVar->isSelfParameter();
 
   // If the value is always directly accessed from this context, do it.
   return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
