@@ -2319,12 +2319,36 @@ Restart:
     return lexNumber();
 
   case '"':
-  case '\'':
     return lexStringLiteral(false);
-      
+  case '\'':
+    return lexChar();
+
   case '`':
     return lexEscapedIdentifier();
   }
+}
+
+void Lexer::lexChar() {
+  const char *TokStart = CurPtr-1;
+  if (*CurPtr == '\\') {
+    switch (*++CurPtr) {
+      case 'r': break;
+      case 'n': break;
+      case '\'': ++CurPtr; break;
+      case '\\': break;
+      default:
+        diagnose(CurPtr, diag::lex_character_invalid_escape);
+    }
+  }
+  else {
+    uint32_t c = swift::validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
+    if (*CurPtr != '\'' || c == ~0U) {
+      diagnose(TokStart, diag::lex_character_not_codepoint);
+    }
+  }
+
+  while (*CurPtr && *CurPtr++ != '\'');
+  formToken(tok::integer_literal, TokStart);
 }
 
 Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {

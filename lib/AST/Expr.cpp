@@ -25,6 +25,7 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
@@ -993,6 +994,25 @@ LiteralExpr *LiteralExpr::shallowClone(
 
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
+  if (Text[0] == '\'') {
+    const char *CurPtr = Text.begin() + 1;
+    int32_t c = 0;
+    if (*CurPtr == '\\') {
+      switch (*++CurPtr) {
+        case 'r': c = '\r'; break;
+        case 'n': c = '\n'; break;
+        case '\'': c = '\''; break;
+        case '\\': c = '\\'; break;
+        default:
+          break;
+      }
+    }
+    else {
+      c = swift::validateUTF8CharacterAndAdvance(CurPtr, Text.end());
+    }
+    return llvm::APInt(BitWidth, c);
+  }
+
   llvm::APInt Value(BitWidth, 0);
   // swift encodes octal differently from C
   bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);

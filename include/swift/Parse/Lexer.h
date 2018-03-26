@@ -534,6 +534,7 @@ private:
                         bool RawString = false);
   void lexStringLiteral(bool RawString);
   void lexEscapedIdentifier();
+  void lexChar();
 
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
