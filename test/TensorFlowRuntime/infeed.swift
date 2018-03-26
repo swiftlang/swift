@@ -29,22 +29,56 @@ InfeedTests.testTPU("ScalarInput", testScalarInput)
 InfeedTests.testTPU("JustDataset") {
   TensorFlow.enableTPU(infeed: true)
 
-  let result: Tensor<Int32> = #tfop(
+  let result: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    filepath: "dummy_path")
+    readsImagenetData: 0,
+    filePath: "dummy_path",
+    batchSize: 1,
+    outputShapes: [TensorShape()])
   // 1 is the magic output currently hard-coded.
-  expectEqual(result.array.scalars[0], 1)
+  expectEqual(result.array.scalars[0], 42.0)
 }
 
 InfeedTests.testTPU("DatasetWithOtherNodes") {
   TensorFlow.enableTPU(infeed: true)
 
-  // 1 is the magic output of the iterator currently hard-coded.
-  let x: Tensor<Int32> = #tfop("tfc.makeIteratorGetNextWithDatasets",
-    filepath: "dummy_path")
+  // 42.0 is the magic output of the iterator currently hard-coded.
+  let x: Tensor<Float> = #tfop(
+    "tfc.makeIteratorGetNextWithDatasets",
+    readsImagenetData: 0,
+    filePath: "dummy_path",
+    batchSize: 1,
+    outputShapes: [TensorShape()])
   let result = x + 1
-  expectEqual(result.array.scalars[0], 2)
+  expectEqual(result.array.scalars[0], 43.0)
 }
+
+#if false
+// This test runs on cloud TPU, but not on Forge yet due to the dynamic path
+// challenge described below.
+InfeedTests.testTPU("DatasetWithImagenet") {
+  // FIXME: We need to set a dynamic file path (based on the scheduled Forge
+  // machine) for reading the TFRecord data at runtime, but the TF graph
+  // (storing a string attribute of that file path) is generated at compile
+  // time.
+  //
+  // One option is to rewrite the graph at runtime to set that string attribute,
+  // before calling TF_SessionRun().
+  let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
+    "tfc.makeIteratorGetNextWithDatasets",
+    readsImagenetData: 1,
+    filePath: "gs://cloudtpu-imagenet-data/train/train-*",
+    batchSize: 64,
+    output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
+  let images : Tensor<Float> = #tfop("Identity", images1)
+  let labels : Tensor<Int32> = #tfop("Identity", labels1)
+  // Add some more graph nodes consuming the output of the iterator.
+  let imagesMod = images + 1
+  let labelsMod = labels + 2
+  expectEqual([64, 224, 224, 3], imagesMod.array.shape)
+  expectEqual([64], labelsMod.array.shape)
+}
+#endif
 
 #if false
 // TODO(hongm): Extend shape info support to make this test work.
