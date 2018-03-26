@@ -1622,7 +1622,8 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
                                                  2 * IGF.IGM.getPointerSize());
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
   
-  IGF.bindArchetype(openedArchetype, metadata, witness);
+  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                    witness);
   return box.getAddress();
 }
 
@@ -1924,7 +1925,8 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
   auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
-  IGF.bindArchetype(openedArchetype, metadata, wtables);
+  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                    wtables);
 
   return value;
 }
@@ -1973,7 +1975,8 @@ irgen::emitExistentialMetatypeProjection(IRGenFunction &IGF,
   }
 
   auto openedArchetype = cast<ArchetypeType>(targetType.getInstanceType());
-  IGF.bindArchetype(openedArchetype, metatype, wtables);
+  IGF.bindArchetype(openedArchetype, metatype, MetadataState::Complete,
+                    wtables);
 
   return value;
 }
@@ -2271,7 +2274,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         wtables.push_back(IGF.Builder.CreateLoad(wtableAddr));
       }
 
-      IGF.bindArchetype(openedArchetype, metadata, wtables);
+      IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                        wtables);
     }
 
     return valueAddr;
@@ -2289,7 +2293,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
     for (unsigned i = 0, n = layout.getNumTables(); i != n; ++i) {
       wtables.push_back(layout.loadWitnessTable(IGF, base, i));
     }
-    IGF.bindArchetype(openedArchetype, metadata, wtables);
+    IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                      wtables);
   }
 
   Address buffer = layout.projectExistentialBuffer(IGF, base);

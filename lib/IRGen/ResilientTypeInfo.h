@@ -155,15 +155,6 @@ public:
     emitStoreExtraInhabitantCall(IGF, T, index, dest);
   }
 
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          bool isVWTMutable,
-                          SILType T) const override {
-    // Resilient value types and archetypes always refer to an existing type.
-    // A witness table should never be independently initialized for one.
-    llvm_unreachable("initializing value witness table for opaque type?!");
-  }
-
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,

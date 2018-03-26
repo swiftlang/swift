@@ -462,7 +462,8 @@ void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
          "Self argument is not a type?!");
 
   auto formalType = getFormalTypeInContext(abstractType);
-  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
+  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg,
+                                        MetadataState::Complete);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.

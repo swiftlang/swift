@@ -518,13 +518,6 @@ namespace {
       return StructNonFixedOffsets(T).getFieldAccessStrategy(IGM,
                                               field.getNonFixedElementIndex());
     }
-
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      emitInitializeFieldOffsetVector(IGF, T, metadata, isVWTMutable);
-    }
   };
 
   class StructTypeBuilder :

@@ -933,7 +933,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
-      layout->getBindings().restore(subIGF, bindingsAddr);
+      layout->getBindings().restore(subIGF, bindingsAddr,
+                                    MetadataState::Complete);
     }
 
   // There's still a placeholder to claim if the target type is thick

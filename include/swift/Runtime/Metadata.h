@@ -211,8 +211,9 @@ struct MetadataResponse {
   ///
   /// For metadata initialization functions, this is the state that the
   /// given metadata needs to be in before initialization can continue.
-  MetadataRequest::BasicKind State;
+  MetadataState State;
 };
+using MetadataDependency = MetadataResponse;
 
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
@@ -398,6 +399,14 @@ struct ValueWitnessTable {
   const TypeLayout *getTypeLayout() const {
     return reinterpret_cast<const TypeLayout *>(&size);
   }
+
+  /// Check whether this metadata is complete.
+  bool checkIsComplete() const;
+
+  /// "Publish" the layout of this type to other threads.  All other stores
+  /// to the value witness table (including its extended header) should have
+  /// happened before this is called.
+  void publishLayout(const TypeLayout &layout);
 };
   
 /// A value-witness table with extra inhabitants entry points.
@@ -474,6 +483,15 @@ private:
 
   void _static_assert_layout();
 public:
+  TypeLayout() = default;
+  constexpr TypeLayout(value_witness_types::size size,
+                       value_witness_types::flags flags,
+                       value_witness_types::stride stride,
+                       value_witness_types::extraInhabitantFlags eiFlags =
+                         value_witness_types::extraInhabitantFlags())
+    : size(size), flags(flags), stride(stride),
+      extraInhabitantFlags(eiFlags) {}
+
   value_witness_types::extraInhabitantFlags getExtraInhabitantFlags() const {
     assert(flags.hasExtraInhabitants());
     return extraInhabitantFlags;
@@ -499,6 +517,25 @@ inline void TypeLayout::_static_assert_layout() {
   CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantFlags);
 
   #undef CHECK_TYPE_LAYOUT_OFFSET
+}
+
+inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
+  size = layout.size;
+  stride = layout.stride;
+
+  // Currently there is nothing in the runtime or ABI which tries to
+  // asynchronously check completion, so we can just do a normal store here.
+  //
+  // If we decide to start allowing that (to speed up checkMetadataState,
+  // maybe), we'll have to:
+  //   - turn this into an store-release,
+  //   - turn the load in checkIsComplete() into a load-acquire, and
+  //   - do something about getMutableVWTableForInit.
+  flags = layout.flags;
+}
+
+inline bool ValueWitnessTable::checkIsComplete() const {
+  return !flags.isIncomplete();
 }
 
 inline const ExtraInhabitantsValueWitnessTable *
@@ -3060,9 +3097,9 @@ struct MetadataCompletionContext {
 ///   some other type
 using MetadataCompleter =
   SWIFT_CC(swift)
-  MetadataResponse(const Metadata *type,
-                   MetadataCompletionContext *context,
-                   const TargetGenericMetadataPattern<InProcess> *pattern);
+  MetadataDependency(const Metadata *type,
+                     MetadataCompletionContext *context,
+                     const TargetGenericMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
@@ -3277,7 +3314,7 @@ struct TargetTypeGenericContextDescriptorHeader {
 };
 using TypeGenericContextDescriptorHeader =
   TargetTypeGenericContextDescriptorHeader<InProcess>;
-  
+
 /// Wrapper class for the pointer to a metadata access function that provides
 /// operator() overloads to call it with the right calling convention.
 class MetadataAccessFunction {
@@ -3943,6 +3980,11 @@ swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
                                    const GenericValueMetadataPattern *pattern,
                                    size_t extraDataSize);
+
+/// \brief Check that the given metadata has the right state.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_checkMetadataState(MetadataRequest request,
+                                          const Metadata *type);
 
 /// Instantiate a resilient or generic protocol witness table.
 ///

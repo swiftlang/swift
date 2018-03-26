@@ -31,11 +31,32 @@ namespace swift {
   class ProtocolDecl;
   class CanType;
   class Decl;
+  enum class MetadataState : size_t;
 
 namespace irgen {
+  class DynamicMetadataRequest;
   class IRGenFunction;
   class LocalTypeDataKey;
+  class LocalTypeDataValue;
+  class MetadataResponse;
 
+class LocalTypeDataValue {
+public:
+  enum { StateSize = 2 };
+
+private:
+  llvm::PointerIntPair<llvm::Value*, StateSize, MetadataState> Value;
+
+public:
+  LocalTypeDataValue() {}
+  LocalTypeDataValue(llvm::Value *value, MetadataState state)
+    : Value(value, state) {}
+
+  explicit operator bool() const { return Value.getOpaqueValue() != nullptr; }
+
+  llvm::Value *getValue() const { return Value.getPointer(); }
+  MetadataState getState() const { return Value.getInt(); }
+};
 
 /// A path from one source metadata --- either Swift type metadata or a Swift
 /// protocol conformance --- to another.
@@ -187,17 +208,19 @@ public:
   }
 
   /// Given a pointer to type metadata, follow a path from it.
-  llvm::Value *followFromTypeMetadata(IRGenFunction &IGF,
-                                      CanType sourceType,
-                                      llvm::Value *source,
-                                      Map<llvm::Value*> *cache) const;
+  MetadataResponse followFromTypeMetadata(IRGenFunction &IGF,
+                                          CanType sourceType,
+                                          MetadataResponse source,
+                                          DynamicMetadataRequest request,
+                                          Map<MetadataResponse> *cache) const;
 
   /// Given a pointer to a protocol witness table, follow a path from it.
-  llvm::Value *followFromWitnessTable(IRGenFunction &IGF,
-                                      CanType conformingType,
-                                      ProtocolConformanceRef conformance,
-                                      llvm::Value *source,
-                                      Map<llvm::Value*> *cache) const;
+  MetadataResponse followFromWitnessTable(IRGenFunction &IGF,
+                                          CanType conformingType,
+                                          ProtocolConformanceRef conformance,
+                                          MetadataResponse source,
+                                          DynamicMetadataRequest request,
+                                          Map<MetadataResponse> *cache) const;
 
   template <typename Allocator>
   const reflection::MetadataSource *
@@ -227,18 +250,20 @@ public:
   }
 
 private:
-  static llvm::Value *follow(IRGenFunction &IGF,
-                             LocalTypeDataKey key,
-                             llvm::Value *source,
-                             MetadataPath::iterator begin,
-                             MetadataPath::iterator end,
-                             Map<llvm::Value*> *cache);
+  static MetadataResponse follow(IRGenFunction &IGF,
+                                 LocalTypeDataKey key,
+                                 MetadataResponse source,
+                                 MetadataPath::iterator begin,
+                                 MetadataPath::iterator end,
+                                 DynamicMetadataRequest request,
+                                 Map<MetadataResponse> *cache);
 
   /// Follow a single component of a metadata path.
-  static llvm::Value *followComponent(IRGenFunction &IGF,
-                                      LocalTypeDataKey &key,
-                                      llvm::Value *source,
-                                      Component component);
+  static MetadataResponse followComponent(IRGenFunction &IGF,
+                                          LocalTypeDataKey &key,
+                                          MetadataResponse source,
+                                          Component component,
+                                          DynamicMetadataRequest request);
 };
 
 } // end namespace irgen

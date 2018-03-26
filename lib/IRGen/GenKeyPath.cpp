@@ -81,6 +81,7 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
   }
   bindFromGenericRequirementsBuffer(IGF, requirements,
     Address(args, IGF.IGM.getPointerAlignment()),
+    MetadataState::Complete,
     [&](CanType t) {
       return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
     });
@@ -274,6 +275,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     if (genericEnv) {
       bindFromGenericRequirementsBuffer(IGF, requirements,
         Address(args, IGF.IGM.getPointerAlignment()),
+        MetadataState::Complete,
         [&](CanType t) {
           return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
         });
@@ -547,6 +549,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       // Bind the generic environment from the argument buffer.
       bindFromGenericRequirementsBuffer(IGF, requirements,
         Address(src, IGF.IGM.getPointerAlignment()),
+        MetadataState::Complete,
         [&](CanType t) {
           return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
         });
@@ -673,6 +676,7 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
       
       bindFromGenericRequirementsBuffer(IGF, requirements,
             Address(bindingsBufPtr, IGM.getPointerAlignment()),
+            MetadataState::Complete,
             [&](CanType t) {
               return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
             });

@@ -224,7 +224,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
     auto bindingsAddr = layout.getElement(0).project(IGF, structAddr, None);
-    layout.getBindings().restore(IGF, bindingsAddr);
+    layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
   // Figure out the non-fixed offsets.

@@ -38,6 +38,7 @@ namespace irgen {
   class EnumPayload;
   class EnumPayloadSchema;
   class IRGenFunction;
+  class MetadataDependencyCollector;
   class TypeConverter;
   using clang::CodeGen::swiftcall::SwiftAggLowering;
 
@@ -369,7 +370,8 @@ public:
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   bool isVWTMutable,
-                                  SILType T) const = 0;
+                                  SILType T,
+                              MetadataDependencyCollector *collector) const = 0;
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
