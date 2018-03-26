@@ -50,7 +50,7 @@
 using namespace swift;
 using namespace ide;
 
-typedef std::vector<std::pair<StringRef, StringRef>> CommandWordsPairs;
+using CommandWordsPairs = std::vector<std::pair<StringRef, StringRef>>;
 
 enum CodeCompletionCommandKind {
   none,
@@ -309,7 +309,7 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   return false;
 }
 
-typedef std::function<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
+using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
 static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
   return true;
 }
