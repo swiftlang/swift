@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 public func testDatasetWithFakeData() {
   TensorFlow.enableTPU(infeed: true)
   let x: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    readsImagenetData: 0,
+    dataSource: "fake",
     filePath: "dummy_path",
     batchSize: 1,
     outputShapes: [TensorShape()])
@@ -20,11 +20,11 @@ public func testDatasetWithFakeData() {
 // CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>)
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
-public func testDatasetWithImagenet() {
+public func testDatasetWithMNIST() {
   TensorFlow.enableTPU(infeed: true)
   let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    readsImagenetData: 1,
+    dataSource: "mnist",
     filePath: "some_path",
     batchSize: 64,
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
@@ -37,7 +37,7 @@ public func testDatasetWithImagenet() {
   print(labelsMod.array.scalars[0])
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithImagenet{{.*}}
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
 // CHECK: bb0:
 // CHECK:  builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>)
 // CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 0
