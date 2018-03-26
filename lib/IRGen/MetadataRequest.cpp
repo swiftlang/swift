@@ -45,33 +45,82 @@ llvm::Value *DynamicMetadataRequest::get(IRGenFunction &IGF) const {
   }
 }
 
+llvm::Value *DynamicMetadataRequest::getRequiredState(IRGenFunction &IGF) const{
+  if (isStatic()) {
+    return IGF.IGM.getSize(Size(size_t(StaticRequest.getState())));
+  }
+
+  auto request = DynamicRequest;
+
+  static_assert(MetadataRequest::State_bit == 0,
+                "code below is not doing any shifts");
+
+  uint32_t mask =
+    ((uint32_t(1) << MetadataRequest::State_width) - 1);
+  auto requiredState =
+    IGF.Builder.CreateAnd(request,
+                          llvm::ConstantInt::get(IGF.IGM.SizeTy, mask));
+  return requiredState;
+}
+
 MetadataResponse MetadataResponse::getUndef(IRGenFunction &IGF) {
   return forComplete(llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy));
 }
 
 MetadataResponse
 MetadataResponse::handle(IRGenFunction &IGF, DynamicMetadataRequest request,
-                         llvm::Value *response) {
+                         llvm::Value *pair) {
+  assert(pair->getType() == IGF.IGM.TypeMetadataResponseTy);
+
+  // If the request is statically known to produce a complete result,
+  // we never even need to extract the status value.
   if (request.isStaticallyBlockingComplete()) {
-    assert(response->getType() == IGF.IGM.TypeMetadataResponseTy);
-    auto value = IGF.Builder.CreateExtractValue(response, 0);
+    auto value = IGF.Builder.CreateExtractValue(pair, 0);
     return MetadataResponse::forComplete(value);
-  } else {
-    assert(response->getType() == IGF.IGM.TypeMetadataResponseTy);
-    auto split = IGF.Builder.CreateSplit<2>(response);
-    return MetadataResponse(split[0], split[1]);
   }
+
+  // Otherwise, split the response.
+  auto split = IGF.Builder.CreateSplit<2>(pair);
+
+  // If the request has a collector installed, check the dependency now.
+  if (auto collector = request.getDependencyCollector()) {
+    collector->checkDependency(IGF, request, split[0], split[1]);
+  }
+
+  // Compute the static lower bound on the metadata's dynamic state.
+  // This will include any refinements from having branched for the
+  // dependency collector.
+  auto staticBound = request.getStaticLowerBoundOnResponseState();
+
+  auto response = MetadataResponse(split[0], split[1], staticBound);
+  return response;
 }
 
 llvm::Value *MetadataResponse::combine(IRGenFunction &IGF) const {
   assert(isValid());
+  assert(hasDynamicState() && "cannot combine response without dynamic state");
   return IGF.Builder.CreateCombine(IGF.IGM.TypeMetadataResponseTy,
-                                   {Metadata, getDynamicState(IGF)});
+                                   {Metadata, getDynamicState()});
 }
 
-llvm::Value *MetadataResponse::getDynamicState(IRGenFunction &IGF) const {
+void MetadataResponse::ensureDynamicState(IRGenFunction &IGF) & {
   assert(isValid());
-  return State ? State : getCompletedState(IGF.IGM);
+
+  // If we already have a dynamic state, bail out.
+  if (hasDynamicState()) return;
+
+  // If we're statically known complete, we can just fill in
+  // MetadataState::Complete.
+  if (isStaticallyKnownComplete()) {
+    State.setPointer(getCompletedState(IGF.IGM));
+    return;
+  }
+
+  // Otherwise, we need to check the state dynamically.  Do a non-blocking
+  // request for complete metadata.
+  auto request = MetadataRequest(MetadataState::Complete,
+                                 /*non-blocking*/ true);
+  *this = emitGetTypeMetadataDynamicState(IGF, request, Metadata);
 }
 
 llvm::Constant *MetadataResponse::getCompletedState(IRGenModule &IGM) {
@@ -80,22 +129,90 @@ llvm::Constant *MetadataResponse::getCompletedState(IRGenModule &IGM) {
 
 llvm::Value *MetadataDependency::combine(IRGenFunction &IGF) const {
   if (isTrivial()) {
-    return getTrivialDependency(IGF.IGM);
+    return getTrivialCombinedDependency(IGF.IGM);
   }
 
   return IGF.Builder.CreateCombine(IGF.IGM.TypeMetadataDependencyTy,
-                                   {getRequiredMetadata(),
-                                    getRequiredState(IGF)});
+                                   {RequiredMetadata, RequiredState});
 }
 
-llvm::Constant *MetadataDependency::getRequiredState(IRGenFunction &IGF) const {
-  assert(isNonTrivial());
-  return IGF.IGM.getSize(Size(size_t(RequiredState)));
-}
-
-llvm::Constant *MetadataDependency::getTrivialDependency(IRGenModule &IGM) {
+llvm::Constant *
+MetadataDependency::getTrivialCombinedDependency(IRGenModule &IGM) {
   return llvm::ConstantAggregateZero::get(IGM.TypeMetadataDependencyTy);
 }
+
+void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
+                                              DynamicMetadataRequest request,
+                                                  llvm::Value *metadata,
+                                                  llvm::Value *metadataState) {
+  // Having either both or neither of the PHIs is normal.
+  // Having just RequiredState means that we already finalized this collector
+  // and shouldn't be using it anymore.
+  assert((!RequiredMetadata || RequiredState) &&
+         "checking dependencies on a finished collector");
+
+  // If the request is statically always satisfied, the operation cannot
+  // have failed.
+  if (request.isStaticallyAlwaysSatisfied())
+    return;
+
+  // Otherwise, we need to pull out the response state and compare it against
+  // the request state.
+
+  // Lazily create the continuation block and phis.
+  if (!RequiredMetadata) {
+    auto contBB = IGF.createBasicBlock("metadata-dependencies.cont");
+    RequiredMetadata =
+      llvm::PHINode::Create(IGF.IGM.TypeMetadataPtrTy, 4, "", contBB);
+    RequiredState = llvm::PHINode::Create(IGF.IGM.SizeTy, 4, "", contBB);
+  }
+
+  llvm::Value *requiredState = request.getRequiredState(IGF);
+
+  // More advanced metadata states are lower numbers.
+  static_assert(MetadataStateIsReverseOrdered,
+                "relying on the ordering of MetadataState here");
+  auto satisfied = IGF.Builder.CreateICmpULE(metadataState, requiredState);
+
+  auto satisfiedBB = IGF.createBasicBlock("dependency-satisfied");
+  auto curBB = IGF.Builder.GetInsertBlock();
+  RequiredMetadata->addIncoming(metadata, curBB);
+  RequiredState->addIncoming(requiredState, curBB);
+  IGF.Builder.CreateCondBr(satisfied, satisfiedBB,
+                           RequiredMetadata->getParent());
+
+  IGF.Builder.emitBlock(satisfiedBB);
+}
+
+MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
+  assert((!RequiredMetadata || RequiredState) &&
+         "finishing an already-finished collector");
+
+  // If we never branched with a dependency, the result is trivial.
+  if (RequiredMetadata == nullptr)
+    return MetadataDependency();
+
+  llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
+  assert(curBB);
+  auto contBB = RequiredMetadata->getParent();
+  IGF.Builder.CreateBr(contBB);
+  RequiredMetadata->addIncoming(
+    llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy),
+                                curBB);
+  RequiredState->addIncoming(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), curBB);
+
+  IGF.Builder.emitBlock(contBB);
+
+  auto result = MetadataDependency(RequiredMetadata, RequiredState);
+
+  // Clear RequiredMetadata to tell the destructor that we finished.
+  // We leave RequiredState in place so that we can detect attempts to
+  // add 
+  RequiredMetadata = nullptr;
+
+  return result;
+}
+
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str) {
   return getAddrOfStringForTypeRef(SymbolicMangling{str,{}});
@@ -255,7 +372,7 @@ namespace {
         if (conf) {
           Values.push_back(emitWitnessTableRef(IGF, type, *conf));
         } else {
-          Values.push_back(IGF.emitTypeMetadataRef(type));
+          Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
         }
       });
 
@@ -429,7 +546,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
     IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, genericArgs.Values,
                                                   request);
 
-  IGF.setScopedLocalTypeMetadata(theType, request, response);
+  IGF.setScopedLocalTypeMetadata(theType, response);
   return response;
 }
 
@@ -767,7 +884,7 @@ namespace {
         return IGF.emitTypeMetadataRef(eltType, eltRequest).getMetadata();
       });
 
-      return setLocal(type, request, response);
+      return setLocal(type, response);
     }
 
     MetadataResponse visitGenericFunctionType(CanGenericFunctionType type,
@@ -892,8 +1009,7 @@ namespace {
           auto *metadataFn = constructSimpleCall(arguments);
           auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
           call->setDoesNotThrow();
-          return setLocal(CanType(type), request,
-                          MetadataResponse::forComplete(call));
+          return setLocal(CanType(type), MetadataResponse::forComplete(call));
         }
 
         // If function type has parameter flags, let's emit
@@ -952,7 +1068,7 @@ namespace {
           IGF.Builder.CreateLifetimeEnd(parameters,
                                         IGF.IGM.getPointerSize() * numParams);
 
-        return setLocal(type, request, MetadataResponse::forComplete(call));
+        return setLocal(type, MetadataResponse::forComplete(call));
       }
     }
 
@@ -977,7 +1093,7 @@ namespace {
       auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
 
-      return setLocal(type, request, MetadataResponse::forComplete(call));
+      return setLocal(type, MetadataResponse::forComplete(call));
     }
 
     MetadataResponse visitModuleType(CanModuleType type,
@@ -1046,7 +1162,7 @@ namespace {
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
       if (layout.superclass) {
-        superclassConstraint = IGF.emitTypeMetadataRef(
+        superclassConstraint = IGF.emitAbstractTypeMetadataRef(
           CanType(layout.superclass));
       }
 
@@ -1058,7 +1174,7 @@ namespace {
       call->setDoesNotThrow();
       IGF.Builder.CreateLifetimeEnd(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
-      return setLocal(type, request, MetadataResponse::forComplete(call));
+      return setLocal(type, MetadataResponse::forComplete(call));
     }
 
     MetadataResponse visitProtocolType(CanProtocolType type,
@@ -1132,9 +1248,8 @@ namespace {
     }
 
     /// Set the metatype in local data.
-    MetadataResponse setLocal(CanType type, DynamicMetadataRequest request,
-                              MetadataResponse response) {
-      IGF.setScopedLocalTypeMetadata(type, request, response);
+    MetadataResponse setLocal(CanType type, MetadataResponse response) {
+      IGF.setScopedLocalTypeMetadata(type, response);
       return response;
     }
   };
@@ -1185,6 +1300,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
     auto response = getValue(IGF, parameters);
     llvm::Value *ret;
     if (returnsResponse) {
+      response.ensureDynamicState(IGF);
       ret = response.combine(IGF);
     } else {
       assert(response.isStaticallyKnownComplete());
@@ -1238,18 +1354,24 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
   MetadataResponse response = getValue(IGF, parameters);
+
+  // Ensure that we have a dynamically-correct state value.
+  llvm::Constant *completedState = nullptr;
+  if (returnsResponse) {
+    completedState = MetadataResponse::getCompletedState(IGM);
+    response.ensureDynamicState(IGF);
+  }
+
   auto directResult = response.getMetadata();
 
-  llvm::Constant *completedState =
-    (returnsResponse ? MetadataResponse::getCompletedState(IGM) : nullptr);
-
-  // Skip caching if we're working with responses and the fetched result
-  // is statically known to be complete.
+  // Emit a branch around the caching code if we're working with responses
+  // and the fetched result is not complete.  We can avoid doing this if
+  // the response is statically known to be complete.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
   if (returnsResponse && !response.isStaticallyKnownComplete()) {
     completionCheckBB = IGF.Builder.GetInsertBlock();
-    directState = response.getDynamicState(IGF);
+    directState = response.getDynamicState();
 
     auto isCompleteBB = IGF.createBasicBlock("is_complete");
     auto isComplete =
@@ -1301,7 +1423,8 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // Build the return value.
   llvm::Value *ret;
   if (returnsResponse) {
-    ret = MetadataResponse(phi, stateToReturn).combine(IGF);
+    ret = MetadataResponse(phi, stateToReturn, MetadataState::Abstract)
+            .combine(IGF);
   } else {
     ret = phi;
   }
@@ -1714,7 +1837,7 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   auto response = MetadataResponse::handle(IGF, request, call);
   
   // Save the metadata for future lookups.
-  IGF.setScopedLocalTypeMetadata(type, request, response);
+  IGF.setScopedLocalTypeMetadata(type, response);
   
   return response;
 }
@@ -1819,7 +1942,7 @@ namespace {
           IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, args,
                                                         request);
 
-        return setLocal(type, request, response);
+        return setLocal(type, response);
       }
 
       // Otherwise, generic arguments are not lowered.
@@ -1838,7 +1961,7 @@ namespace {
         return visit(eltType, eltRequest);
       });
 
-      return setLocal(type, request, response);
+      return setLocal(type, response);
     }
 
     llvm::Value *visitAnyFunctionType(CanAnyFunctionType type,
@@ -1911,12 +2034,10 @@ namespace {
     }
 
     /// Set the metatype in local data.
-    llvm::Value *setLocal(CanType type, DynamicMetadataRequest request,
-                          MetadataResponse response) {
+    llvm::Value *setLocal(CanType type, MetadataResponse response) {
       IGF.setScopedLocalTypeMetadataForLayout(
                                       SILType::getPrimitiveObjectType(type),
-                                      request, response);
-      assert(request.canResponseStatusBeIgnored());
+                                      response);
       return response.getMetadata();
     }
 
@@ -1951,7 +2072,8 @@ namespace {
   ///   valid recursive types bottom out in fixed-sized types like classes
   ///   or pointers.)
   class EmitTypeLayoutRef
-    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *> {
+    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *,
+                            DynamicMetadataRequest> {
   private:
     IRGenFunction &IGF;
   public:
@@ -1972,8 +2094,10 @@ namespace {
     }
 
     /// Emit the type layout by projecting it from dynamic type metadata.
-    llvm::Value *emitFromTypeMetadata(CanType t) {
-      auto *vwtable = IGF.emitValueWitnessTableRef(IGF.IGM.getLoweredType(t));
+    llvm::Value *emitFromTypeMetadata(CanType t,
+                                      DynamicMetadataRequest request) {
+      auto *vwtable =
+        IGF.emitValueWitnessTableRef(IGF.IGM.getLoweredType(t), request);
       return emitFromValueWitnessTablePointer(vwtable);
     }
 
@@ -2013,7 +2137,7 @@ namespace {
     }
 
     /// Fallback default implementation.
-    llvm::Value *visitType(CanType t) {
+    llvm::Value *visitType(CanType t, DynamicMetadataRequest request) {
       auto silTy = IGF.IGM.getLoweredType(t);
       auto &ti = IGF.getTypeInfo(silTy);
 
@@ -2027,20 +2151,22 @@ namespace {
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
                                              silTy, ResilienceExpansion::Maximal))
-        return visit(singletonFieldTy.getSwiftRValueType());
+        return visit(singletonFieldTy.getSwiftRValueType(), request);
 
       // If the type is fixed-layout, emit a copy of its layout.
       if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
         return IGF.IGM.emitFixedTypeLayout(t, *fixed);
 
-      return emitFromTypeMetadata(t);
+      return emitFromTypeMetadata(t, request);
     }
       
-    llvm::Value *visitAnyFunctionType(CanAnyFunctionType type) {
+    llvm::Value *visitAnyFunctionType(CanAnyFunctionType type,
+                                      DynamicMetadataRequest request) {
       llvm_unreachable("not a SIL type");
     }
       
-    llvm::Value *visitSILFunctionType(CanSILFunctionType type) {
+    llvm::Value *visitSILFunctionType(CanSILFunctionType type,
+                                      DynamicMetadataRequest request) {
       // All function types have the same layout regardless of arguments or
       // abstraction level. Use the value witness table for
       // @convention(blah) () -> () from the runtime.
@@ -2069,7 +2195,8 @@ namespace {
       llvm_unreachable("Not a valid SILFunctionType.");
     }
 
-    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
+    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type,
+                                      DynamicMetadataRequest request) {
       
       assert(type->hasRepresentation()
              && "not a lowered metatype");
@@ -2081,7 +2208,7 @@ namespace {
       }
       case MetatypeRepresentation::Thick:
         if (isa<ExistentialMetatypeType>(type)) {
-          return emitFromTypeMetadata(type);
+          return emitFromTypeMetadata(type, request);
         }
         // Otherwise, this is a metatype that looks like a pointer.
         LLVM_FALLTHROUGH;
@@ -2094,7 +2221,8 @@ namespace {
       llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
-    llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
+    llvm::Value *visitAnyClassType(ClassDecl *classDecl,
+                                   DynamicMetadataRequest request) {
       // All class types have the same layout.
       auto type = classDecl->getDeclaredType()->getCanonicalType();
       switch (getReferenceCountingForType(IGF.IGM, type)) {
@@ -2114,15 +2242,18 @@ namespace {
       llvm_unreachable("Not a valid ReferenceCounting.");
     }
 
-    llvm::Value *visitClassType(CanClassType type) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass());
+    llvm::Value *visitClassType(CanClassType type,
+                                DynamicMetadataRequest request) {
+      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
     }
 
-    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass());
+    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
+                                            DynamicMetadataRequest request) {
+      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
     }
 
-    llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
+    llvm::Value *visitReferenceStorageType(CanReferenceStorageType type,
+                                           DynamicMetadataRequest request) {
       // Other reference storage types all have the same layout for their
       // storage qualification and the reference counting of their underlying
       // object.
@@ -2148,7 +2279,7 @@ namespace {
         for (auto *protoTy : layout.getProtocols()) {
           auto *protoDecl = protoTy->getDecl();
           if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
-            return visitType(type);
+            return visitType(type, request);
         }
       }
 
@@ -2196,8 +2327,13 @@ namespace {
 
 } // end anonymous namespace
 
-llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
-  return EmitTypeLayoutRef(*this).visit(type.getSwiftRValueType());
+llvm::Value *irgen::emitTypeLayoutRef(IRGenFunction &IGF, SILType type,
+                                      MetadataDependencyCollector *collector) {
+  auto request =
+    DynamicMetadataRequest::getNonBlocking(MetadataState::LayoutComplete,
+                                           collector);
+  assert(request.canResponseStatusBeIgnored());
+  return EmitTypeLayoutRef(IGF).visit(type.getSwiftRValueType(), request);
 }
 
 /// Given a class metatype, produce the necessary heap metadata
@@ -2228,14 +2364,17 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
 /// object.
 llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                              MetadataValueType desiredType,
+                                             DynamicMetadataRequest request,
                                              bool allowUninitialized) {
+  assert(request.canResponseStatusBeIgnored() &&
+         "emitClassHeapMetadataRef only supports satisfied requests");
   assert(type->mayHaveSuperclass());
 
   // Archetypes may or may not be ObjC classes and need unwrapping to get at
   // the class object.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // Look up the Swift metadata from context.
-    llvm::Value *archetypeMeta = IGF.emitTypeMetadataRef(type);
+    auto archetypeMeta = IGF.emitTypeMetadataRef(type, request).getMetadata();
     // Get the class pointer.
     auto classPtr = emitClassHeapMetadataRefForMetatype(IGF, archetypeMeta,
                                                         archetype);
@@ -2254,7 +2393,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
     }
   }
 
-  llvm::Value *result = IGF.emitTypeMetadataRef(type);
+  llvm::Value *result = IGF.emitTypeMetadataRef(type, request).getMetadata();
   if (desiredType == MetadataValueType::ObjCClass)
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.ObjCClassPtrTy);
   return result;
@@ -2274,7 +2413,69 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
 
   case MetatypeRepresentation::ObjC:
     explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType(),
-                                           MetadataValueType::ObjCClass));
+                                           MetadataValueType::ObjCClass,
+                                           MetadataState::Complete));
     break;
   }
+}
+
+static bool canCheckStateWithBranch(DynamicMetadataRequest request,
+                                    MetadataResponse response) {
+  assert(request.getDependencyCollector() == nullptr ||
+         (request.isStatic() && request.getStaticRequest().isNonBlocking()));
+
+  return (response.hasDynamicState() &&
+          request.getDependencyCollector() != nullptr);
+}
+
+MetadataResponse
+irgen::emitCheckTypeMetadataState(IRGenFunction &IGF,
+                                  DynamicMetadataRequest request,
+                                  MetadataResponse response) {
+  // Note that the structure of this function is mirrored in
+  // getCheckTypeMetadataStateCost.
+
+  // If the request is already satisfied by the response, we don't need
+  // to check anything.
+  if (request.isSatisfiedBy(response))
+    return response;
+
+  auto metadata = response.getMetadata();
+
+  // Try to check the already-fetched dynamic state against the required state.
+  if (canCheckStateWithBranch(request, response)) {
+    auto dynamicState = response.getDynamicState();
+    request.getDependencyCollector()
+          ->checkDependency(IGF, request, metadata, dynamicState);
+
+    return MetadataResponse(metadata, dynamicState,
+                            request.getStaticRequest().getState());
+  }
+
+  // Otherwise, we have to ask the runtime.
+  return emitGetTypeMetadataDynamicState(IGF, request, metadata);
+}
+
+OperationCost
+irgen::getCheckTypeMetadataStateCost(DynamicMetadataRequest request,
+                                     MetadataResponse response) {
+  if (request.isSatisfiedBy(response))
+    return OperationCost::Free;
+
+  if (canCheckStateWithBranch(request, response))
+    return OperationCost::Arithmetic;
+
+  return OperationCost::Call;
+}
+
+/// Call swift_checkMetadataState.
+MetadataResponse
+irgen::emitGetTypeMetadataDynamicState(IRGenFunction &IGF,
+                                       DynamicMetadataRequest request,
+                                       llvm::Value *metadata) {
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getCheckMetadataStateFn(),
+                                     { request.get(IGF), metadata });
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  return MetadataResponse::handle(IGF, request, call);
 }

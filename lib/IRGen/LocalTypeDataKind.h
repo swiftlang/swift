@@ -117,6 +117,11 @@ public:
 
   LocalTypeDataKind getCachingKind() const;
 
+  bool isAnyTypeMetadata() const {
+    return Value == FormalTypeMetadata ||
+           Value == RepresentationTypeMetadata;
+  }
+
   bool isSingletonKind() const {
     return (Value < FirstPayloadValue);
   }
@@ -169,6 +174,9 @@ class LocalTypeDataKey {
 public:
   CanType Type;
   LocalTypeDataKind Kind;
+
+  LocalTypeDataKey(CanType type, LocalTypeDataKind kind)
+    : Type(type), Kind(kind) {}
 
   LocalTypeDataKey getCachingKey() const;
 

@@ -73,7 +73,7 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
 
   setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
 
-  IGF.setScopedLocalTypeMetadata(archetype, request, response);
+  IGF.setScopedLocalTypeMetadata(archetype, response);
 
   return response;
 }
@@ -279,12 +279,15 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   }
   assert(lastProtocol == protocol);
 
-  auto rootWTable = IGF.getLocalTypeData(rootArchetype,
+  auto rootWTable = IGF.tryGetLocalTypeData(rootArchetype,
               LocalTypeDataKind::forAbstractProtocolWitnessTable(rootProtocol));
+  assert(rootWTable && "root witness table not bound in local context!");
 
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
                                        ProtocolConformanceRef(rootProtocol),
-                                       rootWTable, nullptr);
+                                       MetadataResponse::forComplete(rootWTable),
+                                       /*request*/ MetadataState::Complete,
+                                       nullptr).getMetadata();
 
   return wtable;
 }
@@ -300,7 +303,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata =
-    emitArchetypeTypeMetadataRef(IGF, origin, MetadataState::Complete)
+    emitArchetypeTypeMetadataRef(IGF, origin, MetadataState::Abstract)
       .getMetadata();
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
@@ -378,11 +381,11 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
 
 static void setMetadataRef(IRGenFunction &IGF,
                            ArchetypeType *archetype,
-                           llvm::Value *metadata) {
+                           llvm::Value *metadata,
+                           MetadataState metadataState) {
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-  IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeDataKind::forFormalTypeMetadata(),
-                               metadata);
+  IGF.setUnscopedLocalTypeMetadata(CanType(archetype),
+                         MetadataResponse::forBounded(metadata, metadataState));
 }
 
 static void setWitnessTable(IRGenFunction &IGF,
@@ -401,10 +404,11 @@ static void setWitnessTable(IRGenFunction &IGF,
 /// witness value within this scope.
 void IRGenFunction::bindArchetype(ArchetypeType *archetype,
                                   llvm::Value *metadata,
+                                  MetadataState metadataState,
                                   ArrayRef<llvm::Value*> wtables) {
   // Set the metadata pointer.
   setTypeMetadataName(IGM, metadata, CanType(archetype));
-  setMetadataRef(*this, archetype, metadata);
+  setMetadataRef(*this, archetype, metadata, metadataState);
 
   // Set the protocol witness tables.
 

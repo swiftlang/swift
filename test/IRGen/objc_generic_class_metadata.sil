@@ -84,7 +84,7 @@ entry(%0: $Subclass, %1: $NSDictionary):
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSaySo12GenericClassC_SitGMa"
 // CHECK-SAME:    ([[INT]])
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"([[INT]] 0)
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"([[INT]] 2)
 // CHECK:         [[TUPLE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:         call swiftcc %swift.metadata_response @"$SSaMa"([[INT]] 0, %swift.type* [[TUPLE]])
 

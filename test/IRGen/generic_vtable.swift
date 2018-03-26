@@ -120,7 +120,7 @@ public class Concrete : Derived<Int> {
 // CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
 
-// CHECK: ret %swift.metadata_response zeroinitializer
+// CHECK: ret %swift.metadata_response
 
 
 //// Metadata initialization function for 'Concrete' copies superclass vtable
