@@ -479,4 +479,5 @@ extension ClosedRange {
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 @available(*, deprecated, renamed: "ClosedRange")
-public typealias CountableClosedRange<T: Comparable> = ClosedRange<T>
+public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
+  where Bound.Stride : SignedInteger
