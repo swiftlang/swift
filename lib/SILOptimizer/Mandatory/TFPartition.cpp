@@ -722,6 +722,15 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return;
 
+  // If this is an implicit tensor program argument in a Playground, don't emit
+  // a warning.
+  // TODO: We need to determine what we're going to do with tensor program
+  // arguments in general.  We should have a single consistent approach and not
+  // special case playgrounds here.  This only affects @noinline functions
+  // though so it isn't particularly important to figure out right now.
+  if (isTensorProgramArgument && fn.getASTContext().LangOpts.Playground)
+    return;
+
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.

@@ -171,7 +171,7 @@ public extension Tensor {
   // attribute.
   @_inlineable @inline(__always)
   func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
-    // expected-error @+1 {{Op type not registered 'ExampleOp'}}
+    // expected-error @+1 {{op named 'ExampleOp' is not registered in TensorFlow}}
     return #tfop("ExampleOp", handle, axis: axis, axisType: T.self)
   }
 }
@@ -245,7 +245,7 @@ public func testMultiResultUninlinable() {
 
 // Test support for copying multiple result outputs.
 public func testMultiOutputsFnResults() -> (Tensor<Float>,  Tensor<Float>) {
-  // expected-error @+1 {{Op type not registered 'MultResult'}}
+  // expected-error @+1 {{op named 'MultResult' is not registered in TensorFlow}}
   let (x1, y1): (TensorHandle<Float>, TensorHandle<Float>) = #tfop("MultResult")
   let x = Tensor<Float>(handle: x1)
   let y = Tensor<Float>(handle: y1)

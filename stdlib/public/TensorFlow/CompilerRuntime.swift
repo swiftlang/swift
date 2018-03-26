@@ -36,6 +36,21 @@ import Glibc
 #endif
 import CTensorFlow
 
+// This is a sketch of an eventual user-facing configuration framework for
+// our TensorFlow runtime config.  This will need more iteration, including
+// consideration of how to integrate it with the existing runtime config.
+public enum TensorFlow {
+  // FIXME: We need transparent here because deabstraction isn't inlining this
+  // function.  We need to inline if a callee contains tensor ops, not only if
+  // it takes and returns a TensorFlow value.
+  @_transparent
+  public static func enableTPU(infeed: Bool = false) {
+    _RuntimeConfig.executionMode = .tpu
+    () = #tfop("tfc.configureTPU", enableInfeed: infeed)
+  }
+}
+
+
 @_fixed_layout
 public enum _ExecutionMode : Equatable {
   /// Classical TF interpreter backend, on CPU.
