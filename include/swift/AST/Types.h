@@ -373,7 +373,7 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(BoundNameAliasType, SugarType, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
     : NumPadBits,
 
     /// Whether we have a parent type.
@@ -1550,9 +1550,9 @@ public:
 
 /// A reference to a type alias that is somehow generic, along with the
 /// set of substitutions to apply to make the type concrete.
-class BoundNameAliasType final
+class NameAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<BoundNameAliasType, Type, GenericSignature *,
+    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
                           Substitution>
 {
   TypeAliasDecl *typealias;
@@ -1560,16 +1560,16 @@ class BoundNameAliasType final
   friend class ASTContext;
   friend TrailingObjects;
 
-  BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
+  NameAliasType(TypeAliasDecl *typealias, Type parent,
                      const SubstitutionMap &substitutions, Type underlying,
                      RecursiveTypeProperties properties);
 
   unsigned getNumSubstitutions() const {
-    return Bits.BoundNameAliasType.NumSubstitutions;
+    return Bits.NameAliasType.NumSubstitutions;
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.BoundNameAliasType.HasParent ? 1 : 0;
+    return Bits.NameAliasType.HasParent ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
@@ -1594,7 +1594,7 @@ class BoundNameAliasType final
   }
 
 public:
-  static BoundNameAliasType *get(TypeAliasDecl *typealias, Type parent,
+  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
                                  const SubstitutionMap &substitutions,
                                  Type underlying);
 
@@ -1607,7 +1607,7 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.BoundNameAliasType.HasParent ? *getTrailingObjects<Type>()
+    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
                                              : Type();
   }
 
@@ -1632,7 +1632,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BoundNameAlias;
+    return T->getKind() == TypeKind::NameAlias;
   }
 };
 

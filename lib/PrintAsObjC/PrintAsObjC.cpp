@@ -987,9 +987,9 @@ private:
       ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
 
     const TypeAliasDecl *TAD = nullptr;
-    while (auto boundAliasTy = dyn_cast<BoundNameAliasType>(ty.getPointer())) {
-      TAD = boundAliasTy->getDecl();
-      ty = boundAliasTy->getSinglyDesugaredType();
+    while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
+      TAD = aliasTy->getDecl();
+      ty = aliasTy->getSinglyDesugaredType();
     }
 
     return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
@@ -1506,7 +1506,7 @@ private:
     return true;
   }
 
-  void visitBoundNameAliasType(BoundNameAliasType *aliasTy,
+  void visitNameAliasType(NameAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
@@ -1953,8 +1953,8 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     llvm_unreachable("unhandled type");
   }
 
-  void visitBoundNameAliasType(BoundNameAliasType *boundAliasTy) {
-    Callback(*this, boundAliasTy->getDecl());
+  void visitNameAliasType(NameAliasType *aliasTy) {
+    Callback(*this, aliasTy->getDecl());
   }
 
   void visitParenType(ParenType *parenTy) {

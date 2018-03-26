@@ -733,16 +733,16 @@ void ASTMangler::appendType(Type type) {
       appendType(cast<BuiltinVectorType>(tybase)->getElementType());
       return appendOperator("Bv",
                             cast<BuiltinVectorType>(tybase)->getNumElements());
-    case TypeKind::BoundNameAlias: {
+    case TypeKind::NameAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto boundAliasTy = cast<BoundNameAliasType>(tybase);
+      auto aliasTy = cast<NameAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
       // FIXME: We also cannot yet mangle references to typealiases that
       // involve generics.
-      TypeAliasDecl *decl = boundAliasTy->getDecl();
+      TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        return appendType(boundAliasTy->getSinglyDesugaredType());
+        return appendType(aliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,

@@ -2540,7 +2540,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     // If we can set a sugared type, do so.
     if (!getGenericSignature()) {
       auto sugaredType =
-        BoundNameAliasType::get(this, Type(), SubstitutionMap(), underlying);
+        NameAliasType::get(this, Type(), SubstitutionMap(), underlying);
       setInterfaceType(MetatypeType::get(sugaredType, ctx));
     } else {
       setInterfaceType(MetatypeType::get(underlying, ctx));

@@ -4180,11 +4180,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::BOUND_NAME_ALIAS_TYPE: {
+  case decls_block::NAME_ALIAS_TYPE: {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
-    decls_block::BoundNameAliasTypeLayout::readRecord(scratch, typealiasID,
+    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
                                                       parentTypeID,
                                                       underlyingTypeID);
     auto aliasOrError = getDeclChecked(typealiasID);
@@ -4232,7 +4232,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
     }
 
-    typeOrOffset = BoundNameAliasType::get(alias, parentType, subMap,
+    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
                                            underlyingType);
     break;
   }

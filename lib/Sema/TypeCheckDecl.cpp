@@ -1323,7 +1323,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
   Action walkToTypePre(Type T) override {
     ValueDecl *VD;
-    if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
+    if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer())) {
       if (CanonicalizeParentTypes &&
           BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
         VD = nullptr;
@@ -1339,7 +1339,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       return Action::Stop;
 
     if (!CanonicalizeParentTypes) {
-      return isa<BoundNameAliasType>(T.getPointer()) ? Action::SkipChildren
+      return isa<NameAliasType>(T.getPointer()) ? Action::SkipChildren
                                                      : Action::Continue;
     }
     
@@ -1350,13 +1350,13 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       nominalParentTy = genericTy->getParent();
       for (auto genericArg : genericTy->getGenericArgs())
         genericArg.walk(*this);
-    } else if (auto boundNameAliasTy =
-                 dyn_cast<BoundNameAliasType>(T.getPointer())) {
+    } else if (auto NameAliasTy =
+                 dyn_cast<NameAliasType>(T.getPointer())) {
       // The parent type would have been lost previously, so look right through
       // this type.
-      if (boundNameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
+      if (NameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
             ->hasTypeParameter())
-        Type(boundNameAliasTy->getSinglyDesugaredType()).walk(*this);
+        Type(NameAliasTy->getSinglyDesugaredType()).walk(*this);
     } else {
       return Action::Continue;
     }
@@ -8326,7 +8326,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
       mustInferRequirements = true;
     }
 
-    resultType = BoundNameAliasType::get(typealias, parentType, subMap,
+    resultType = NameAliasType::get(typealias, parentType, subMap,
                                          resultType);
   }
 

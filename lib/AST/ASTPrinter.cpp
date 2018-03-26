@@ -3263,7 +3263,7 @@ public:
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;
   }
 
-  void visitBoundNameAliasType(BoundNameAliasType *T) {
+  void visitNameAliasType(NameAliasType *T) {
     if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
       return;

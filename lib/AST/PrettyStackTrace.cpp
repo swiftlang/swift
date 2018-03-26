@@ -164,7 +164,7 @@ namespace {
     Decl *visitNominalType(NominalType *type) {
       return type->getDecl();
     }
-    Decl *visitBoundNameAliasType(BoundNameAliasType *type) {
+    Decl *visitNameAliasType(NameAliasType *type) {
       return type->getDecl();
     }
   };

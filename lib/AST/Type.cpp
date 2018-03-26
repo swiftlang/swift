@@ -1261,7 +1261,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Paren:
     llvm_unreachable("parenthesis are sugar, but not syntax sugar");
-  case TypeKind::BoundNameAlias:
+  case TypeKind::NameAlias:
     llvm_unreachable("bound name alias types always have an underlying type");
   case TypeKind::ArraySlice:
     implDecl = Context->getArrayDecl();
@@ -1289,14 +1289,14 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-SubstitutionMap BoundNameAliasType::getSubstitutionMap() const {
+SubstitutionMap NameAliasType::getSubstitutionMap() const {
   if (auto genericSig = getGenericSignature())
     return genericSig->getSubstitutionMap(getSubstitutionList());
 
   return SubstitutionMap();
 }
 
-SmallVector<Type, 2> BoundNameAliasType::getInnermostGenericArgs() const {
+SmallVector<Type, 2> NameAliasType::getInnermostGenericArgs() const {
   SmallVector<Type, 2> result;
 
   // If the typealias is not generic, there are no generic arguments
@@ -2832,10 +2832,10 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
     if (options & SubstFlags::DesugarMemberTypes) {
-      if (auto *boundAliasType =
-                   dyn_cast<BoundNameAliasType>(witness.getPointer())) {
-        if (!boundAliasType->is<ErrorType>())
-          witness = boundAliasType->getSinglyDesugaredType();
+      if (auto *aliasType =
+                   dyn_cast<NameAliasType>(witness.getPointer())) {
+        if (!aliasType->is<ErrorType>())
+          witness = aliasType->getSinglyDesugaredType();
       }
     }
 
@@ -3638,8 +3638,8 @@ case TypeKind::Id:
     return DynamicSelfType::get(selfTy, selfTy->getASTContext());
   }
 
-  case TypeKind::BoundNameAlias: {
-    auto alias = cast<BoundNameAliasType>(base);
+  case TypeKind::NameAlias: {
+    auto alias = cast<NameAliasType>(base);
     Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
     Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
     if (!newUnderlyingType) return Type();
@@ -3677,7 +3677,7 @@ case TypeKind::Id:
     if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
-    return BoundNameAliasType::get(alias->getDecl(), newParentType, subMap,
+    return NameAliasType::get(alias->getDecl(), newParentType, subMap,
                                    newUnderlyingType);
   }
 
@@ -3932,9 +3932,9 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (auto *BNAT = dyn_cast<BoundNameAliasType>(Ty.getPointer())) {
-    auto *AliasDecl = BNAT->getDecl();
-    if (auto parent = BNAT->getParent()) {
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    auto *AliasDecl = NAT->getDecl();
+    if (auto parent = NAT->getParent()) {
       if (parent.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic))
         return true;
     }
@@ -3942,7 +3942,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     if (AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
-    return Type(BNAT->getSinglyDesugaredType()).isPrivateStdlibType(
+    return Type(NAT->getSinglyDesugaredType()).isPrivateStdlibType(
                                             treatNonBuiltinProtocolsAsPublic);
   }
 

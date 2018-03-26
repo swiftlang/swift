@@ -195,8 +195,8 @@ namespace {
       // Handle missing or invalid stdlib declarations
       if (!T || T->hasError())
         return Type();
-      if (auto *BNAT = dyn_cast<BoundNameAliasType>(T.getPointer()))
-        return BNAT->getSinglyDesugaredType();
+      if (auto *NAT = dyn_cast<NameAliasType>(T.getPointer()))
+        return NAT->getSinglyDesugaredType();
       return T;
     }
     
@@ -2478,7 +2478,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
         parentType = nominal->getDeclaredInterfaceType();
     }
 
-    return BoundNameAliasType::get(typealias, parentType, SubstitutionMap(),
+    return NameAliasType::get(typealias, parentType, SubstitutionMap(),
                                    typealias->getUnderlyingTypeLoc().getType());
   }
 

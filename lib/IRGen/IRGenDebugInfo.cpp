@@ -1276,8 +1276,8 @@ private:
 
     // Sugared types.
 
-    case TypeKind::BoundNameAlias: {
-      auto *NameAliasTy = cast<BoundNameAliasType>(BaseTy);
+    case TypeKind::NameAlias: {
+      auto *NameAliasTy = cast<NameAliasType>(BaseTy);
       auto *Decl = NameAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto AliasedTy = NameAliasTy->getSinglyDesugaredType();

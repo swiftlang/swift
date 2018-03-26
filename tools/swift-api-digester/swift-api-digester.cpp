@@ -1158,8 +1158,8 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }
-  if (auto *BNAT = dyn_cast<BoundNameAliasType>(Ty.getPointer())) {
-    return BNAT->getDecl()->getNameStr();
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    return NAT->getDecl()->getNameStr();
   }
   if (Ty->getAnyNominal()) {
     if (IsImplicitlyUnwrappedOptional) {
@@ -1362,9 +1362,9 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, InitInfo)
     .createSDKNode(SDKNodeKind::TypeNominal);
 
-  if (auto BNAT = dyn_cast<BoundNameAliasType>(T.getPointer())) {
+  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeNameAlias);
-    Root->addChild(constructTypeNode(Ctx, BNAT->getCanonicalType()));
+    Root->addChild(constructTypeNode(Ctx, NAT->getCanonicalType()));
     return Root;
   }
 

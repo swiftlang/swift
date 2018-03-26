@@ -2740,7 +2740,7 @@ public:
         }
         addTypeAnnotation(
                       Builder,
-                      BoundNameAliasType::get(const_cast<TypeAliasDecl *>(TAD),
+                      NameAliasType::get(const_cast<TypeAliasDecl *>(TAD),
                                          parentType, SubstitutionMap(),
                                          underlyingType));
 
@@ -2939,7 +2939,7 @@ public:
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
             if (!CD->getInterfaceType()->is<ErrorType>() &&
-                (isa<BoundNameAliasType>(AT.getPointer()) &&
+                (isa<NameAliasType>(AT.getPointer()) &&
                  AT->getDesugaredType() ==
                    CD->getResultInterfaceType().getPointer()))
               Result = AT;
