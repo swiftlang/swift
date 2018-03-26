@@ -1074,6 +1074,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
         markInvalid();
       }
+
+      // Make sure we don't do this checking again for the same decl. We also
+      // set this at the beginning of the function, but we might have swapped
+      // the decls for diagnostics; so ensure we also set this for the actual
+      // decl we diagnosed on.
+      current->setCheckedRedeclaration(true);
       break;
     }
   }
