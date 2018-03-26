@@ -31,7 +31,7 @@ InfeedTests.testTPU("JustDataset") {
 
   let result: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    readsImagenetData: 0,
+    dataSource: "fake",
     filePath: "dummy_path",
     batchSize: 1,
     outputShapes: [TensorShape()])
@@ -45,7 +45,7 @@ InfeedTests.testTPU("DatasetWithOtherNodes") {
   // 42.0 is the magic output of the iterator currently hard-coded.
   let x: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    readsImagenetData: 0,
+    dataSource: "fake",
     filePath: "dummy_path",
     batchSize: 1,
     outputShapes: [TensorShape()])
@@ -53,10 +53,30 @@ InfeedTests.testTPU("DatasetWithOtherNodes") {
   expectEqual(result.array.scalars[0], 43.0)
 }
 
+InfeedTests.testTPU("DatasetWithMnist") {
+  TensorFlow.enableTPU(infeed: true)
+  // FIXME: Replace the CNS directory with a dynamically generated file path
+  // from this test's data dependency, so that the test will be hermetic.
+  let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
+    "tfc.makeIteratorGetNextWithDatasets",
+    dataSource: "mnist",
+    filePath: "/cns/ok-d/home/sasabour/mnist",
+    batchSize: 128,
+    output_shapes: [TensorShape(128,784), TensorShape(128)])
+  let images : Tensor<Float> = #tfop("Identity", images1)
+  let labels : Tensor<Int32> = #tfop("Identity", labels1)
+  // Add some more graph nodes consuming the output of the iterator.
+  let imagesMod = images + 1
+  let labelsMod = labels + 2
+  expectEqual([128,784], imagesMod.array.shape)
+  expectEqual([128], labelsMod.array.shape)
+}
+
 #if false
 // This test runs on cloud TPU, but not on Forge yet due to the dynamic path
 // challenge described below.
 InfeedTests.testTPU("DatasetWithImagenet") {
+  TensorFlow.enableTPU(infeed: true)
   // FIXME: We need to set a dynamic file path (based on the scheduled Forge
   // machine) for reading the TFRecord data at runtime, but the TF graph
   // (storing a string attribute of that file path) is generated at compile
@@ -66,7 +86,7 @@ InfeedTests.testTPU("DatasetWithImagenet") {
   // before calling TF_SessionRun().
   let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    readsImagenetData: 1,
+    dataSource: "imagenet",
     filePath: "gs://cloudtpu-imagenet-data/train/train-*",
     batchSize: 64,
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])

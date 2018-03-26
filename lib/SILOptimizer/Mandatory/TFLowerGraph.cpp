@@ -260,11 +260,19 @@ private:  // Helpers to create TensorFlow graph nodes.
     /// tfc.makeIteratorGetNextWithDatasets.
     BuiltinInst *datasetInst = nullptr;
 
-    /// Whether to read Imagenet data or synthetic test data.
-    bool readsImagenetData = false;
+    /// Specifies which (hard-coded) iterator stack to create.
+    enum DataSource {
+      // Use a fake iterator stack that's non-file-based, for unit testing only.
+      FAKE = 0,
+      // Read an MNIST file dataset.
+      MNIST = 1,
+      // Reads an Imagenet file dataset.
+      IMAGENET = 2
+    };
+    DataSource dataSource;
 
-    /// The file path for Imagenet data. Only defined when `readsImagenetData`
-    /// is true.
+    /// The file path for Imagenet or MNIST data. Olny defined when dataSource
+    /// is not FAKE.
     StringRef filePath;
 
     /// The batch size for each IteratorGetNext call.
@@ -278,12 +286,12 @@ private:  // Helpers to create TensorFlow graph nodes.
     std::vector<TF_DataType> infeedInputDtypes;
 
    public:
-    DatasetCreationContext(BuiltinInst *datasetInst, bool readsImagenetData,
+    DatasetCreationContext(BuiltinInst *datasetInst, DataSource dataSource,
                            StringRef filePath, int batchSize,
                            ArrayRef<int64_t> dims, ArrayRef<int> numDims,
                            ArrayRef<TF_DataType> dTypes)
         : datasetInst(datasetInst),
-          readsImagenetData(readsImagenetData),
+          dataSource(dataSource),
           filePath(filePath),
           batchSize(batchSize),
           dims(dims),
@@ -312,11 +320,13 @@ private:  // Helpers to create TensorFlow graph nodes.
 
     TF_Operation *makeIteratorGetNextWithDatasets(TF_Graph *resultGraph,
                                                   TF_Status *status) {
-      return readsImagenetData
-                 ? TF_MakeImagenetIteratorGetNextWithDatasets(
-                       resultGraph, filePath.str().c_str(), batchSize,
-                       status)
-                 : TF_MakeFakeIteratorGetNextWithDatasets(resultGraph, status);
+      if (dataSource == FAKE) {
+        // For unit testing.
+        return TF_MakeFakeIteratorGetNextWithDatasets(resultGraph, status);
+      }
+      return TF_MakeFileBasedIteratorGetNextWithDatasets(
+          resultGraph, filePath.str().c_str(), batchSize, dataSource == MNIST,
+          status);
     }
   };
 
@@ -753,20 +763,28 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   }
 
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
-  // Type check and process the first attribute: filePath
-  bool readsImagenetData;
+  // Type check and process the first attribute: dataSource.
+  DatasetCreationContext::DataSource dataSource;
   {
     auto operand = inst->getOperand(0);
     auto opInfo = tfopInfo.operandClasses[0];
     assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
-    // BoolLiteralInst is would be more ideal, but it does not exist.
-    auto *ili = cast<IntegerLiteralInst>(operand);
-    readsImagenetData = ili->getValue().getLimitedValue() != 0;
+    auto *sli = cast<StringLiteralInst>(operand);
+    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
+    if (sli->getValue().str() == "fake") {
+      dataSource = DatasetCreationContext::FAKE;
+    } else if (sli->getValue().str() == "mnist") {
+      dataSource = DatasetCreationContext::MNIST;
+    } else {
+      dataSource = DatasetCreationContext::IMAGENET;
+    }
   }
 
-  // Type check and process the second attribute: filePath
+  // Type check and process the second attribute: filePath.
+  // When dataSource is FAKE, this attribute needs to be present, but is not
+  // used.
   StringRef filePath;
-  if (readsImagenetData) {
+  if (dataSource != DatasetCreationContext::FAKE) {
     auto operand = inst->getOperand(1);
     auto opInfo = tfopInfo.operandClasses[1];
     auto *sli = cast<StringLiteralInst>(operand);
@@ -792,15 +810,9 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   unsigned e = inst->getNumOperands();
   decodeShapeArray(inst, tfopInfo, i, e, dims, numDims, dimPtrs);
 
-  // Even in the case of `readsImagenetData`, the two output tensors, images and
-  // labels, are encoded into a single tuple.
-  if (inst->getNumResults() != 1) {
-    internalError(
-        getUserSourceLocation(inst->getDebugLocation()),
-        "tfc.makeIteratorGetNextWithDatasets must produce a single output.",
-        diag::tfop_invalid_tfop);
-    return;
-  }
+  // Even when this built-in returns multiple tensors, they are always presented
+  // by a single tuple.
+  assert(inst->getNumResults() == 1);
 
   std::vector<TF_DataType> outputTypes;
   auto outputType = inst->getType().getSwiftRValueType();
@@ -835,9 +847,8 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   // associated infeed enqueue till the creation of top level function
   // nodes. Here we fill in the dataset creation context, and then create an
   // infeed dequeue node to feed the user(s) of `inst`.
-  datasetCreationContext.reset(
-      new DatasetCreationContext(inst, readsImagenetData, filePath, batchSize,
-                                 dims, numDims, outputTypes));
+  datasetCreationContext.reset(new DatasetCreationContext(
+      inst, dataSource, filePath, batchSize, dims, numDims, outputTypes));
 
   {
     auto &graphFn = getCurrentGraphFunction();
