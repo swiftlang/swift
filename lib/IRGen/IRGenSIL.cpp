@@ -3339,10 +3339,7 @@ void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto *outlinedF = IGM.getOrCreateRetainFunction(
-      addrTI, objectT.getSwiftRValueType()->mapTypeOutOfContext()
-                  ->getCanonicalType(),
-      llvmType);
+  auto *outlinedF = IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
@@ -3418,9 +3415,7 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto *outlinedF = IGM.getOrCreateReleaseFunction(
-      addrTI, objectT.getSwiftRValueType()->mapTypeOutOfContext()
-                  ->getCanonicalType(),
-      llvmType);
+      addrTI, objectT, llvmType);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);

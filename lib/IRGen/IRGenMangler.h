@@ -259,86 +259,68 @@ public:
     return finalize();
   }
 
-  std::string mangleOutlinedRetainFunction(Type t) {
+  std::string mangleOutlinedRetainFunction(CanType t,
+                                           CanGenericSignature sig) {
     beginMangling();
     appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("WOr");
     return finalize();
   }
-  std::string mangleOutlinedReleaseFunction(Type t) {
+  std::string mangleOutlinedReleaseFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
     appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
     appendOperator("WOs");
     return finalize();
   }
 
-  std::string mangleOutlinedInitializeWithTakeFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("WOb", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("WOb", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOb");
     return finalize();
   }
-  std::string mangleOutlinedInitializeWithCopyFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("WOc", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("WOc", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOc");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithTakeFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithTakeFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("WOd", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("WOd", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOd");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithCopyFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithCopyFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("WOf", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("WOf", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOf");
     return finalize();
   }
-  std::string mangleOutlinedDestroyFunction(const CanType t, IRGenModule *mod) {
+  std::string mangleOutlinedDestroyFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("WOh", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("WOh", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOh");
     return finalize();
   }
 
