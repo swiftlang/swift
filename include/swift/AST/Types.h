@@ -1512,8 +1512,8 @@ protected:
   SugarType(TypeKind K, const ASTContext *ctx,
             RecursiveTypeProperties properties)
       : TypeBase(K, nullptr, properties), Context(ctx) {
-    if (K != TypeKind::NameAlias)
-      assert(ctx != nullptr && "Context for SugarType should not be null");
+    assert(ctx != nullptr &&
+           "Context for SugarType should not be null");
     Bits.SugarType.HasCachedType = false;
   }
 
@@ -1545,28 +1545,6 @@ public:
       return T->getKind() >= TypeKind::First_SugarType;
     return T->getKind() >= TypeKind::First_SugarType &&
            T->getKind() <= TypeKind::Last_SugarType;
-  }
-};
-
-/// NameAliasType - An alias type is a name for another type, just like a
-/// typedef in C.
-class NameAliasType : public SugarType {
-  friend class TypeAliasDecl;
-  // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
-    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
-                RecursiveTypeProperties()),
-      TheDecl(d) {}
-  TypeAliasDecl *const TheDecl;
-
-public:
-  TypeAliasDecl *getDecl() const { return TheDecl; }
-
-  using TypeBase::setRecursiveProperties;
-   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::NameAlias;
   }
 };
 

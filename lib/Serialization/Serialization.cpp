@@ -3605,18 +3605,6 @@ void Serializer::writeType(Type ty) {
                                     TypeID());
     break;
   }
-  case TypeKind::NameAlias: {
-    auto nameAlias = cast<NameAliasType>(ty.getPointer());
-    const TypeAliasDecl *typeAlias = nameAlias->getDecl();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    addTypeRef(ty->getCanonicalType()));
-    break;
-  }
   case TypeKind::BoundNameAlias: {
     auto boundAlias = cast<BoundNameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = boundAlias->getDecl();

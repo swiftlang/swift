@@ -3833,11 +3833,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 
   do {
     // Look through typealiases.
-    if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
-      type = aliasTy->getSinglyDesugaredType();
-      continue;
-    }
-
     if (auto boundAliasTy = dyn_cast<BoundNameAliasType>(type.getPointer())) {
       type = boundAliasTy->getSinglyDesugaredType();
       continue;

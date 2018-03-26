@@ -1323,9 +1323,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
   Action walkToTypePre(Type T) override {
     ValueDecl *VD;
-    if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
-      VD = TAD->getDecl();
-    else if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
+    if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
       if (CanonicalizeParentTypes &&
           BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
         VD = nullptr;

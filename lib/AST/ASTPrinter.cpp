@@ -3263,26 +3263,6 @@ public:
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;
   }
 
-  void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
-      visit(T->getSinglyDesugaredType());
-      return;
-    }
-
-    auto ParentDC = T->getDecl()->getDeclContext();
-    auto ParentNominal = ParentDC ?
-      ParentDC->getAsNominalTypeOrNominalTypeExtensionContext() : nullptr;
-
-    if (ParentNominal) {
-      visit(ParentNominal->getDeclaredType());
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
-  }
-
   void visitBoundNameAliasType(BoundNameAliasType *T) {
     if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
