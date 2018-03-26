@@ -246,7 +246,7 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("Wy");
+    appendOperator("WOy");
     return finalize();
   }
   std::string mangleOutlinedConsumeFunction(CanType ty,
@@ -255,20 +255,20 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("We");
+    appendOperator("WOe");
     return finalize();
   }
 
   std::string mangleOutlinedRetainFunction(Type t) {
     beginMangling();
     appendType(t);
-    appendOperator("Wr");
+    appendOperator("WOr");
     return finalize();
   }
   std::string mangleOutlinedReleaseFunction(Type t) {
     beginMangling();
     appendType(t);
-    appendOperator("Ws");
+    appendOperator("WOs");
     return finalize();
   }
 
@@ -277,12 +277,12 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wb", Index(1));
+      appendOperator("WOb", Index(1));
     } else {
       appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
-      appendOperator("Wb", Index(mod->getCanTypeID(t)));
+      appendOperator("WOb", Index(mod->getCanTypeID(t)));
     }
     return finalize();
   }
@@ -291,12 +291,12 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wc", Index(1));
+      appendOperator("WOc", Index(1));
     } else {
       appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
-      appendOperator("Wc", Index(mod->getCanTypeID(t)));
+      appendOperator("WOc", Index(mod->getCanTypeID(t)));
     }
     return finalize();
   }
@@ -305,12 +305,12 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wd", Index(1));
+      appendOperator("WOd", Index(1));
     } else {
       appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
-      appendOperator("Wd", Index(mod->getCanTypeID(t)));
+      appendOperator("WOd", Index(mod->getCanTypeID(t)));
     }
     return finalize();
   }
@@ -319,12 +319,12 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wf", Index(1));
+      appendOperator("WOf", Index(1));
     } else {
       appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
-      appendOperator("Wf", Index(mod->getCanTypeID(t)));
+      appendOperator("WOf", Index(mod->getCanTypeID(t)));
     }
     return finalize();
   }
@@ -332,12 +332,12 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wh", Index(1));
+      appendOperator("WOh", Index(1));
     } else {
       appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
-      appendOperator("Wh", Index(mod->getCanTypeID(t)));
+      appendOperator("WOh", Index(mod->getCanTypeID(t)));
     }
     return finalize();
   }

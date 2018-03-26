@@ -61,7 +61,7 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call %swift.unowned* @swift_unknownUnownedInit(%swift.unowned* returned [[T0]], [[UNKNOWN]]* [[PV:%0]])
   store_unowned %p to [initialization] %x : $*@sil_unowned P
 
-  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWc0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWOc0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
   copy_addr %x to [initialization] %y : $*@sil_unowned P
 
   // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
@@ -73,7 +73,7 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[TV]])
   strong_release %t0 : $P
 
-  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWf0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWOf0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
   copy_addr %x to %y : $*@sil_unowned P
 
   // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
@@ -82,10 +82,10 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call %swift.unowned* @swift_unknownUnownedAssign(%swift.unowned* returned [[T0]], [[UNKNOWN]]* [[QV:%2]])
   store_unowned %q to %y : $*@sil_unowned P
 
-  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWd0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWOd0_"({ %swift.unowned, i8** }* [[X]], { %swift.unowned, i8** }* [[Y]])
   copy_addr [take] %x to %y : $*@sil_unowned P
 
-  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWb0_"({ %swift.unowned, i8** }* [[Y]], { %swift.unowned, i8** }* [[X]])
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWOb0_"({ %swift.unowned, i8** }* [[Y]], { %swift.unowned, i8** }* [[X]])
   copy_addr [take] %y to [initialization] %x : $*@sil_unowned P
 
   // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
@@ -103,7 +103,7 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[TV]])
   strong_release %t1 : $P
 
-  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWh0_"({ %swift.unowned, i8** }*
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @"$S12unowned_objc1P_pXoWOh0_"({ %swift.unowned, i8** }*
   destroy_addr %x : $*@sil_unowned P
 
   // CHECK-NEXT: bitcast
