@@ -29,13 +29,13 @@ namespace irgen {
 class FunctionPointer;
 class IRGenModule;
 
-typedef llvm::IRBuilder<> IRBuilderBase;
+using IRBuilderBase = llvm::IRBuilder<>;
 
 class IRBuilder : public IRBuilderBase {
 public:
   // Without this, it keeps resolving to llvm::IRBuilderBase because
   // of the injected class name.
-  typedef irgen::IRBuilderBase IRBuilderBase;
+  using IRBuilderBase = irgen::IRBuilderBase;
 
 private:
   /// The block containing the insertion point when the insertion
@@ -115,7 +115,7 @@ public:
   class StableIP {
     /// Either an instruction that we're inserting after or the basic
     /// block that we're inserting at the beginning of.
-    typedef llvm::PointerUnion<llvm::Instruction*, llvm::BasicBlock*> UnionTy;
+    using UnionTy = llvm::PointerUnion<llvm::Instruction *, llvm::BasicBlock *>;
     UnionTy After;
   public:
     StableIP() = default;
@@ -400,7 +400,8 @@ public:
 
 namespace llvm {
   template <> struct PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
-    typedef swift::irgen::IRBuilder::StableIP type;
+    using type = swift::irgen::IRBuilder::StableIP;
+
   public:
     static void *getAsVoidPointer(type IP) {
       return IP.getOpaqueValue();

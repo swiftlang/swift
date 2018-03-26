@@ -60,7 +60,7 @@ namespace irgen {
   class WeakTypeInfo;
   
 /// Either a type or a forward-declaration.
-typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
+using TypeCacheEntry = llvm::PointerUnion<const TypeInfo *, llvm::Type *>;
 
 /// The helper class for generating types.
 class TypeConverter {

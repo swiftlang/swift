@@ -100,7 +100,7 @@ class RecordTypeInfoImpl : public Base,
   friend class llvm::TrailingObjects<Impl, FieldImpl_>;
 
 public:
-  typedef FieldImpl_ FieldImpl;
+  using FieldImpl = FieldImpl_;
 
 private:
   const unsigned NumFields;
@@ -298,7 +298,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ false, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   /// The index+1 of the unique non-empty field, or zero if there is none.
   unsigned UniqueNonEmptyFieldIndexPlusOne;
@@ -378,7 +378,8 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
+
 protected:
   template <class... As> 
   RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
@@ -389,7 +390,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   unsigned ExplosionSize : 16;
 
