@@ -1827,7 +1827,12 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   if (configuration.isTPUEnabled)
     markNodeAsTPUReplicated(funcDesc);
 
-  bool addTPUInfeedNodes = configuration.isTPUInfeedEnabled && !inputs.empty();
+  // FIXME: Revisit how to enable infeed outside the context of dataset /
+  // iterators.
+  // bool addTPUInfeedNodes = configuration.isTPUInfeedEnabled &&
+  // !inputs.empty();
+  bool addTPUInfeedNodes = false;
+
   // These vectors are only used when addTPUInfeedNodes is true.
   std::vector<TF_Output> infeedInputs;
   infeedInputs.reserve(inputs.size());
@@ -1983,7 +1988,6 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   }
 
   if (datasetCreationContext) {
-    assert(inputs.empty());
     if (createDatasetIteratorNodesWithInfeedEnqueue()) return true;
   }
 
