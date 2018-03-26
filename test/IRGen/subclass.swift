@@ -16,7 +16,7 @@
 // CHECK:   void ([[A]]*)* @"$S8subclass1ACfD",
 // CHECK:   i8** @"$SBoWV",
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$S8subclass1ACMm" to i64),
-// CHECK:   [[OBJC_CLASS]]* @"OBJC_CLASS_$__TtCs12_SwiftObject",
+// CHECK:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),

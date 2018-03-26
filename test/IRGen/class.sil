@@ -37,7 +37,7 @@ sil_vtable C {}
 // \ CHECK:   void ([[C_CLASS]]*)* @"$S5class1CCfD",
 // \ CHECK:   i8** @"$SBoWV",
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @"$S5class1CCMm" to i64),
-// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$__TtCs12_SwiftObject",
+// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* null,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
