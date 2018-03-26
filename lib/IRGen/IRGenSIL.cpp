@@ -1885,7 +1885,8 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
 
   CanType ClassType = loweredTy.getSwiftRValueType();
   llvm::Value *Metadata =
-    emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata);
+    emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,
+                             MetadataState::Complete);
   llvm::Value *CastAddr = Builder.CreateBitCast(Ref, IGM.RefCountedPtrTy);
   llvm::Value *InitRef = emitInitStaticObjectCall(Metadata, CastAddr, "staticref");
   InitRef = Builder.CreateBitCast(InitRef, Ref->getType());

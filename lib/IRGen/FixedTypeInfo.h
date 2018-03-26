@@ -223,12 +223,6 @@ public:
   static void applyFixedSpareBitsMask(SpareBitVector &mask,
                                       const SpareBitVector &spareBits);
   
-  /// Fixed-size types never need dynamic value witness table instantiation.
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          bool isVWTMutable,
-                          SILType T) const override {}
-
   void collectArchetypeMetadata(
       IRGenFunction &IGF,
       llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,

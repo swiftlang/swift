@@ -66,8 +66,11 @@ struct Fulfilled<T : P & Q> : Assocked {
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
 // CHECK-NEXT:    [[T2:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK-NEXT:    [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[T2]], 0
-// CHECK-NEXT:    [[T4:%.*]] = insertvalue %swift.metadata_response [[T3]], i64 0, 1
+// CHECK-NEXT:    [[T3:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 %0, %swift.type* [[T2]])
+// CHECK-NEXT:    [[CHECKED:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
+// CHECK-NEXT:    [[STATE:%.*]] = extractvalue %swift.metadata_response [[T3]], 1
+// CHECK-NEXT:    [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[CHECKED]], 0
+// CHECK-NEXT:    [[T4:%.*]] = insertvalue %swift.metadata_response [[T3]], i64 [[STATE]], 1
 // CHECK-NEXT:    ret %swift.metadata_response [[T4]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : P.
@@ -122,9 +125,11 @@ struct Computed<T, U> : Assocked {
 // CHECK-NEXT:     [[T1:%.*]] = icmp eq %swift.type* [[CACHE_RESULT]], null
 // CHECK-NEXT:     br i1 [[T1]], label %fetch, label %cont
 // CHECK:        cont:
-// CHECK-NEXT:     [[T0:%.*]] = phi %swift.type* [ [[CACHE_RESULT]], %entry ], [ [[FETCH_RESULT:%.*]], %fetch ]
+// CHECK-NEXT:     [[T0:%.*]] = phi %swift.type* [ [[CACHE_RESULT]], %entry ], [ [[FETCH_RESULT:%.*]], %fetch ],
+// CHECK-SAME:        [ [[FETCH_RESULT]], %is_complete ]
+// CHECK-NEXT:     [[T1:%.*]] = phi i64 [ 0, %entry ], [ [[FETCH_STATE:%.*]], %fetch ], [ 0, %is_complete ]
 // CHECK-NEXT:     [[T2:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[T0]], 0
-// CHECK-NEXT:     [[T3:%.*]] = insertvalue %swift.metadata_response [[T2]], i64 0, 1
+// CHECK-NEXT:     [[T3:%.*]] = insertvalue %swift.metadata_response [[T2]], i64 [[T1]], 1
 // CHECK-NEXT:     ret %swift.metadata_response [[T3]]
 // CHECK:        fetch:
 // CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
@@ -133,8 +138,12 @@ struct Computed<T, U> : Assocked {
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
 // CHECK-NEXT:    [[U:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S23associated_type_witness4PairVMa"(i64 0, %swift.type* [[T]], %swift.type* [[U]])
+// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S23associated_type_witness4PairVMa"(i64 %0, %swift.type* [[T]], %swift.type* [[U]])
 // CHECK-NEXT:    [[FETCH_RESULT]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[FETCH_STATE]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT:    [[COMPLETE:%.*]] = icmp eq i64 [[FETCH_STATE]], 0
+// CHECK-NEXT:    br i1 [[COMPLETE]], label %is_complete, label %cont
+// CHECK:       is_complete:
 // CHECK-NEXT:    store atomic %swift.type* [[FETCH_RESULT]], %swift.type** [[CACHE]] release, align 8
 // CHECK-NEXT:    br label %cont
 

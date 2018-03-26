@@ -757,13 +757,15 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   if (objc) {
     llvm::Value *metadata =
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
+                               MetadataState::Complete,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
     return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   llvm::Value *metadata =
-    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata);
+    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
+                             MetadataState::Complete);
 
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   llvm::Value *size, *alignMask;
@@ -2440,7 +2442,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // dynamically.
 
       metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
-                                          MetadataValueType::TypeMetadata);
+                                          MetadataValueType::TypeMetadata,
+                                          MetadataState::Complete);
       auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
       metadata = IGF.Builder.CreateLoad(superField);
     } else {
@@ -2448,7 +2451,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // metadata.
       auto superTy = instanceTy.getSuperclass();
       metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
-                                          MetadataValueType::TypeMetadata);
+                                          MetadataValueType::TypeMetadata,
+                                          MetadataState::Complete);
     }
   } else {
     if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||

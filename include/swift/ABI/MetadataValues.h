@@ -98,8 +98,8 @@ public:
 private:
   int_type Data;
 
-  constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
 public:
+  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this
@@ -1383,36 +1383,49 @@ public:
                                  value_setMetadataKind)
 };
 
+/// The public state of a metadata.
+enum class MetadataState : size_t {
+  /// A request for fully-completed metadata.  The metadata must be
+  /// prepared for all supported type operations.  This is a superset
+  /// of the requirements of LayoutComplete.
+  ///
+  /// For example, a class must be ready for subclassing and instantiation:
+  /// it must have a completed instance layout and (under ObjCInterop)
+  /// must have been realized by the Objective-C runtime.
+  Complete,
+
+  /// A request for metadata that can be used for type layout; that is,
+  /// the type's value witness table must be completely initialized.
+  LayoutComplete,
+
+  /// A request for a metadata pointer that fully identifies the type.
+  /// Basic type structure, such as the type context descriptor and the
+  /// list of generic arguments, should have been installed, but there is
+  /// no requirement for a valid value witness table.
+  Abstract,
+};
+
+/// Something that can be static_asserted in all the places where we depend
+/// on metadata state ordering.
+constexpr const bool MetadataStateIsReverseOrdered = true;
+
+/// Return true if the first metadata state is at least as advanced as the
+/// second.
+inline bool isAtLeast(MetadataState lhs, MetadataState rhs) {
+  static_assert(MetadataStateIsReverseOrdered,
+                "relying on the ordering of MetadataState here");
+  return size_t(lhs) <= size_t(rhs);
+}
+
 /// Kinds of requests for metadata.
-template <class IntType>
-class TargetMetadataRequest : public FlagSet<IntType> {
+class MetadataRequest : public FlagSet<size_t> {
+  using IntType = size_t;
   using super = FlagSet<IntType>;
+
 public:
-  enum BasicKind : IntType {
-    /// A request for fully-completed metadata.  The metadata must be
-    /// prepared for all supported type operations.  This is a superset
-    /// of the requirements of LayoutComplete.
-    ///
-    /// For example, a class must be ready for subclassing and instantiation:
-    /// it must have a completed instance layout and (under ObjCInterop)
-    /// must have been realized by the Objective-C runtime.
-    Complete,
-
-    /// A request for metadata that can be used for type layout; that is,
-    /// the type's value witness table must be completely initialized.
-    LayoutComplete,
-
-    /// A request for a metadata pointer that fully identifies the type.
-    /// Basic type structure, such as the type context descriptor and the
-    /// list of generic arguments, should have been installed, but there is
-    /// no requirement for a valid value witness table.
-    Abstract,
-  };
-
-private:
   enum : IntType {
-    BasicKind_bit = 0,
-    BasicKind_width = 8,
+    State_bit = 0,
+    State_width = 8,
 
     /// A blocking request will not return until the runtime is able to produce
     /// metadata with the given kind.  A non-blocking request will return
@@ -1423,28 +1436,31 @@ private:
     NonBlocking_bit = 8,
   };
 
-public:
-  TargetMetadataRequest(BasicKind kind, bool isNonBlocking = false) {
-    setBasicKind(kind);
+  MetadataRequest(MetadataState state, bool isNonBlocking = false) {
+    setState(state);
     setIsNonBlocking(isNonBlocking);
   }
-  explicit TargetMetadataRequest(IntType bits) : super(bits) {}
-  constexpr TargetMetadataRequest() {}
+  explicit MetadataRequest(IntType bits) : super(bits) {}
+  constexpr MetadataRequest() {}
 
-  FLAGSET_DEFINE_EQUALITY(TargetMetadataRequest)
+  FLAGSET_DEFINE_EQUALITY(MetadataRequest)
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(BasicKind_bit,
-                                 BasicKind_width,
-                                 BasicKind,
-                                 getBasicKind,
-                                 setBasicKind)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(State_bit,
+                                 State_width,
+                                 MetadataState,
+                                 getState,
+                                 setState)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
                                 isNonBlocking,
                                 setIsNonBlocking)
+  bool isBlocking() const { return !isNonBlocking(); }
+
+  /// Is this request satisfied by a metadata that's in the given state?
+  bool isSatisfiedBy(MetadataState state) const {
+    return isAtLeast(state, getState());
+  }
 };
-using MetadataRequest =
-  TargetMetadataRequest<size_t>;
 
 } // end namespace swift
 

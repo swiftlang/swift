@@ -826,6 +826,13 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
+// MetadataResponse swift_checkMetadataState(MetadataRequest request,
+//                                           cosnt Metadata *type);
+FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,

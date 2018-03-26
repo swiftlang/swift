@@ -682,9 +682,24 @@ public:
   ///
   /// A type is SIL-illegal if it is:
   ///   - an l-value type,
-  ///   - an AST function type (i.e. subclasses of AnyFunctionType), or
+  ///   - a metatype without a representation,
+  ///   - an AST function type (i.e. subclasses of AnyFunctionType),
+  ///   - an optional whose object type is SIL-illegal, or
   ///   - a tuple type with a SIL-illegal element type.
   bool isLegalSILType();
+
+  /// \brief Determine whether this type is a legal formal type.
+  ///
+  /// A type is illegal as a formal type if it is:
+  ///   - an l-value type,
+  ///   - a reference storage type,
+  ///   - a metatype with a representation,
+  ///   - a lowered function type (i.e. SILFunctionType),
+  ///   - an optional whose object type is not a formal type, or
+  ///   - a tuple type with an element that is not a formal type.
+  ///
+  /// These are the types of the Swift type system.
+  bool isLegalFormalType();
 
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();

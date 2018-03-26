@@ -122,6 +122,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "MetadataRequest.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -593,7 +594,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -602,7 +604,7 @@ namespace {
 
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
                                             IGM.getSILModule());
-      auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
+      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumMetadataSingleCaseFn(),
@@ -858,7 +860,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // No-payload enums are always fixed-size so never need dynamic value
       // witness table initialization.
     }
@@ -2829,7 +2832,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -2837,7 +2841,7 @@ namespace {
       // of empty cases.
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
                                             IGM.getSILModule());
-      auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
+      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
@@ -4697,7 +4701,8 @@ namespace {
       }
     }
 
-    llvm::Value *emitPayloadLayoutArray(IRGenFunction &IGF, SILType T) const {
+    llvm::Value *emitPayloadLayoutArray(IRGenFunction &IGF, SILType T,
+                                 MetadataDependencyCollector *collector) const {
       auto numPayloads = ElementsWithPayload.size();
       auto metadataBufferTy = llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                                    numPayloads);
@@ -4713,7 +4718,7 @@ namespace {
         
         auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
         
-        auto metadata = IGF.emitTypeLayoutRef(payloadTy);
+        auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
         
         IGF.Builder.CreateStore(metadata, eltAddr);
       }
@@ -4725,12 +4730,13 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic metadata initialization.
       if (TIK >= Fixed) return;
       
       // Ask the runtime to set up the metadata record for a dynamic enum.
-      auto payloadLayoutArray = emitPayloadLayoutArray(IGF, T);
+      auto payloadLayoutArray = emitPayloadLayoutArray(IGF, T, collector);
       auto numPayloadsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                                    ElementsWithPayload.size());
 
@@ -5136,7 +5142,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       llvm_unreachable("resilient enums cannot be defined");
     }
 
@@ -5378,12 +5385,6 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       return Strategy.assignWithTake(IGF, dest, src, T, isOutlined);
-    }
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      return Strategy.initializeMetadata(IGF, metadata, isVWTMutable, T);
     }
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return Strategy.mayHaveExtraInhabitants(IGM);

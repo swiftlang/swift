@@ -6,6 +6,7 @@ int $SBi64_WV;
 int $SBi8_WV;
 void swift_getEnumCaseSinglePayload(void) {}
 void swift_getGenericMetadata(void) {}
+void swift_checkMetadataState(void) {}
 void swift_slowAlloc(void) {}
 void swift_slowDealloc(void) {}
 void swift_storeEnumTagSinglePayload(void) {}
