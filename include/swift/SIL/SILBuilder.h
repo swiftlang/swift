@@ -980,6 +980,8 @@ public:
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           operand->getType().isLoadable(getModule()));
     return insert(new (getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
@@ -994,6 +996,8 @@ public:
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           operand->getType().isLoadable(getModule()));
     return insert(new (getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
   }
@@ -1010,6 +1014,8 @@ public:
                                                        SILValue operand,
                                                        Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           operand->getType().isLoadable(getModule()));
     return insert(new (getModule()) UnmanagedRetainValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -1018,6 +1024,8 @@ public:
                                                          SILValue operand,
                                                          Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           operand->getType().isLoadable(getModule()));
     return insert(new (getModule()) UnmanagedReleaseValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -1034,6 +1042,8 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           operand->getType().isLoadable(getModule()));
     return insert(new (getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
@@ -1069,6 +1079,8 @@ public:
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           Ty.isLoadable(getModule()));
     return insert(
         StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                            getModule()));
@@ -1076,6 +1088,8 @@ public:
 
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           Ty.isLoadable(getModule()));
     return insert(
         TupleInst::create(getSILDebugLocation(Loc), Ty, Elements,
                           getModule()));
@@ -1085,18 +1099,24 @@ public:
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           Ty.isLoadable(getModule()));
     return insert(new (getModule()) EnumInst(getSILDebugLocation(Loc),
                                                Operand, Element, Ty));
   }
 
   /// Inject a loadable value into the corresponding optional type.
   EnumInst *createOptionalSome(SILLocation Loc, SILValue operand, SILType ty) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           ty.isLoadable(getModule()));
     auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
     return createEnum(Loc, operand, someDecl, ty);
   }
 
   /// Create the nil value of a loadable optional type.
   EnumInst *createOptionalNone(SILLocation Loc, SILType ty) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           ty.isLoadable(getModule()));
     auto noneDecl = getModule().getASTContext().getOptionalNoneDecl();
     return createEnum(Loc, nullptr, noneDecl, ty);
   }
@@ -1113,6 +1133,8 @@ public:
                                                  SILValue Operand,
                                                  EnumElementDecl *Element,
                                                  SILType Ty) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           Ty.isLoadable(getModule()));
     return insert(new (getModule()) UncheckedEnumDataInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1152,6 +1174,8 @@ public:
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                    Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
                    ProfileCounter DefaultCount = ProfileCounter()) {
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses() ||
+           Ty.isLoadable(getModule()));
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getFunction(), CaseCounts, DefaultCount));
