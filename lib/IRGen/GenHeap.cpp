@@ -1969,6 +1969,10 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
+  if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
+
+  // This needs to be kept up-to-date with hasKnownSwiftMetadata.
+
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
     if (getRootClass(theClass)->hasKnownSwiftImplementation())
@@ -1976,6 +1980,21 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
   }
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // If we have a concrete superclass constraint, just recurse.
+    if (auto superclass = archetype->getSuperclass()) {
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
+    }
+
+    // Otherwise, we must just have a class constraint.  Use the
+    // conservative answer.
+    return IsaEncoding::ObjC;
+  }
+
+  // We should never be working with an unopened existential type here.
+  assert(!type->isAnyExistentialType());
+
   // Non-class heap objects should be pure Swift, so we can access their isas
   // directly.
   return IsaEncoding::Pointer;

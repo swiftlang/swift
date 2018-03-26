@@ -2314,6 +2314,8 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
+  // This needs to be kept up-to-date with getIsaEncodingForType.
+
   if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
