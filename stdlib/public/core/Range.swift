@@ -878,5 +878,5 @@ extension Range {
 }
 
 @available(*, deprecated, renamed: "Range")
-public typealias CountableRange<Bound: Comparable> = Range<Bound>
-
+public typealias CountableRange<Bound: Strideable> = Range<Bound>
+  where Bound.Stride : SignedInteger
