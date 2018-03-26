@@ -3899,24 +3899,34 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // The protocol concrete type has an underlying type written in terms
   // of the protocol's 'Self' type.
-  auto type = concreteDecl->getDeclaredInterfaceType();
+  auto typealias = dyn_cast<TypeAliasDecl>(concreteDecl);
+  auto type = typealias ? typealias->getUnderlyingTypeLoc().getType()
+                        : concreteDecl->getDeclaredInterfaceType();
 
+  Type parentType;
+  SubstitutionMap subMap;
   if (proto) {
     // Substitute in the type of the current PotentialArchetype in
     // place of 'Self' here.
-    Type parentType = basePA->getDependentType(builder.getGenericParams());
+    parentType = basePA->getDependentType(builder.getGenericParams());
 
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+    subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
 
     type = type.subst(subMap, SubstFlags::UseErrorType);
   } else {
     // Substitute in the superclass type.
-    auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
-    auto superclassDecl = superclass->getClassOrBoundGenericClass();
-    type = superclass->getTypeOfMember(
-        superclassDecl->getParentModule(), concreteDecl,
-        concreteDecl->getDeclaredInterfaceType());
+    parentType = basePA->getEquivalenceClassIfPresent()->superclass;
+    auto superclassDecl = parentType->getClassOrBoundGenericClass();
+
+    subMap = parentType->getMemberSubstitutionMap(
+                           superclassDecl->getParentModule(), concreteDecl);
+    type = type.subst(subMap, SubstFlags::UseErrorType);
+  }
+
+  // If we had a typealias, form a sugared type.
+  if (typealias) {
+    type = NameAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;
@@ -5431,13 +5441,13 @@ public:
 
   Action walkToTypePost(Type ty) override {
     // Infer from generic typealiases.
-    if (auto boundNameAlias = dyn_cast<BoundNameAliasType>(ty.getPointer())) {
-      auto decl = boundNameAlias->getDecl();
+    if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
+      auto decl = NameAlias->getDecl();
       auto genericSig = decl->getGenericSignature();
       if (!genericSig)
         return Action::Continue;
 
-      auto subMap = boundNameAlias->getSubstitutionMap();
+      auto subMap = NameAlias->getSubstitutionMap();
       for (const auto &rawReq : genericSig->getRequirements()) {
         if (auto req = rawReq.subst(subMap))
           Builder.addRequirement(*req, source, nullptr);

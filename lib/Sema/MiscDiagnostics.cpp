@@ -3838,11 +3838,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       continue;
     }
 
-    if (auto boundAliasTy = dyn_cast<BoundNameAliasType>(type.getPointer())) {
-      type = boundAliasTy->getSinglyDesugaredType();
-      continue;
-    }
-
     // Strip off lvalue/inout types.
     Type newType = type->getWithoutSpecifierType();
     if (newType.getPointer() != type.getPointer()) {

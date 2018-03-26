@@ -1323,10 +1323,9 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
   Action walkToTypePre(Type T) override {
     ValueDecl *VD;
-    if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
-      VD = TAD->getDecl();
-    else if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
-      if (CanonicalizeParentTypes)
+    if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer())) {
+      if (CanonicalizeParentTypes &&
+          BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
         VD = nullptr;
       else
         VD = BNAD->getDecl();
@@ -1339,9 +1338,11 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
     if (!visitDecl(VD))
       return Action::Stop;
 
-    if (!CanonicalizeParentTypes)
-      return Action::Continue;
-
+    if (!CanonicalizeParentTypes) {
+      return isa<NameAliasType>(T.getPointer()) ? Action::SkipChildren
+                                                     : Action::Continue;
+    }
+    
     Type nominalParentTy;
     if (auto nominalTy = dyn_cast<NominalType>(T.getPointer())) {
       nominalParentTy = nominalTy->getParent();
@@ -1349,11 +1350,13 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       nominalParentTy = genericTy->getParent();
       for (auto genericArg : genericTy->getGenericArgs())
         genericArg.walk(*this);
-    } else if (auto boundNameAliasTy =
-                 dyn_cast<BoundNameAliasType>(T.getPointer())) {
+    } else if (auto NameAliasTy =
+                 dyn_cast<NameAliasType>(T.getPointer())) {
       // The parent type would have been lost previously, so look right through
       // this type.
-      Type(boundNameAliasTy->getSinglyDesugaredType()).walk(*this);
+      if (NameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
+            ->hasTypeParameter())
+        Type(NameAliasTy->getSinglyDesugaredType()).walk(*this);
     } else {
       return Action::Continue;
     }
@@ -8307,9 +8310,9 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
   // If we have a typealias, try to form type sugar.
   if (typealias && isPassThroughTypealias(typealias)) {
     auto typealiasSig = typealias->getGenericSignature();
+    SubstitutionMap subMap;
     if (typealiasSig) {
-      auto subMap =
-        typealiasSig->getSubstitutionMap(
+      subMap = typealiasSig->getSubstitutionMap(
                               [](SubstitutableType *type) -> Type {
                                 return Type(type);
                               },
@@ -8320,13 +8323,11 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
                                 return ProtocolConformanceRef(proto);
                               });
 
-      resultType = BoundNameAliasType::get(typealias, parentType,
-                                           subMap, resultType);
-
       mustInferRequirements = true;
-    } else {
-      resultType = typealias->getDeclaredInterfaceType();
     }
+
+    resultType = NameAliasType::get(typealias, parentType, subMap,
+                                         resultType);
   }
 
   return resultType;

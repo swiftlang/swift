@@ -4145,11 +4145,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
-  case decls_block::NAME_ALIAS_TYPE: {
+  case decls_block::BUILTIN_ALIAS_TYPE: {
     DeclID underlyingID;
     TypeID canonicalTypeID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
-                                                 canonicalTypeID);
+    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                    canonicalTypeID);
     auto aliasOrError = getDeclChecked(underlyingID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4180,20 +4180,38 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::BOUND_NAME_ALIAS_TYPE: {
+  case decls_block::NAME_ALIAS_TYPE: {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
-    decls_block::BoundNameAliasTypeLayout::readRecord(scratch, typealiasID,
+    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
                                                       parentTypeID,
                                                       underlyingTypeID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
-    auto alias = cast<TypeAliasDecl>(aliasOrError.get());
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+
+    Type underlyingType;
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType.get()->getCanonicalType();
+          break;
+        }
+      }
+
+      underlyingType = expectedType.get();
+    } else {
+      underlyingType = getType(underlyingTypeID);
+    }
 
     Type parentType = getType(parentTypeID);
-    Type underlyingType = getType(underlyingTypeID);
 
     // Read the substitutions.
     SubstitutionMap subMap;
@@ -4207,7 +4225,14 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       subMap = genericSig->getSubstitutionMap(substitutions);
     }
 
-    typeOrOffset = BoundNameAliasType::get(alias, parentType, subMap,
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      break;
+    }
+
+    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
                                            underlyingType);
     break;
   }

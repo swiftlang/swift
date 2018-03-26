@@ -2534,14 +2534,17 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // underlying type. See the comment in the ProtocolDecl case of
   // validateDecl().
   if (!hasInterfaceType()) {
-    // Create a NameAliasType which will resolve to the underlying type.
-    ASTContext &Ctx = getASTContext();
-    auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-    aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
-        ->getRecursiveProperties());
-
     // Set the interface type of this declaration.
-    setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+    ASTContext &ctx = getASTContext();
+
+    // If we can set a sugared type, do so.
+    if (!getGenericSignature()) {
+      auto sugaredType =
+        NameAliasType::get(this, Type(), SubstitutionMap(), underlying);
+      setInterfaceType(MetatypeType::get(sugaredType, ctx));
+    } else {
+      setInterfaceType(MetatypeType::get(underlying, ctx));
+    }
   }
 }
 
