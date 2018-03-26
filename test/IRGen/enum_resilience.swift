@@ -324,5 +324,5 @@ private enum ProtGenEnumWithSize<T: Prot> {
     case c2(s2: Size)
 }
 
-// CHECK-LABEL: define{{( protected)?}} internal %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilienceytWh2_"(%T15enum_resilience19ProtGenEnumWithSize
+// CHECK-LABEL: define{{( protected)?}} internal %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilienceytWOh2_"(%T15enum_resilience19ProtGenEnumWithSize
 // CHECK:   ret %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* %0

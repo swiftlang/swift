@@ -214,7 +214,7 @@ sil public_external @indirect_consumed_captured_class_pair_param : $@convention(
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
 // CHECK:         [[X_TMP:%.*]] = alloca
-// CHECK:         call %T13partial_apply14SwiftClassPairV* @"$S13partial_apply14SwiftClassPairVWc0_"
+// CHECK:         call %T13partial_apply14SwiftClassPairV* @"$S13partial_apply14SwiftClassPairVWOc0_"
 // CHECK:         release{{.*}}%1)
 // CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_consumed_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* noalias nocapture dereferenceable({{.*}}) [[X_TMP]])
 // CHECK:         ret i64 [[RESULT]]
