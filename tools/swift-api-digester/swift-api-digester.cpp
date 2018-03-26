@@ -277,6 +277,11 @@ enum class KnownTypeKind: uint8_t {
   Unknown,
 };
 
+enum class KnownProtocolKind: uint8_t {
+#define KNOWN_PROTOCOL(NAME) NAME,
+#include "swift/IDE/DigesterEnums.def"
+};
+
 enum class SDKDeclAttrKind: uint8_t {
 #define DECL_ATTR(Name) DAK_##Name,
 #include "swift/IDE/DigesterEnums.def"
@@ -830,6 +835,18 @@ public:
       return (*Super)->lookupChildByPrintedName(Name);
     }
     return None;
+  }
+
+  bool isConformingTo(KnownProtocolKind Kind) const {
+    StringRef Usr;
+    switch (Kind) {
+#define KNOWN_PROTOCOL(NAME)                                                  \
+      case KnownProtocolKind::NAME:                                           \
+        return std::find(ConformingProtocols.begin(),                         \
+                         ConformingProtocols.end(),                           \
+                         #NAME) != ConformingProtocols.end();
+#include "swift/IDE/DigesterEnums.def"
+    }
   }
 };
 
@@ -2598,6 +2615,38 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
     return false;
   }
 
+  bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
+    if (!IsVisitingLeft)
+      return false;
+    if (L->getTypeKind() != KnownTypeKind::Dictionary ||
+        R->getTypeKind() != KnownTypeKind::Dictionary)
+      return false;
+    auto *Left = dyn_cast<SDKNodeTypeNominal>(L);
+    auto *Right = dyn_cast<SDKNodeTypeNominal>(R);
+    assert(Left && Right);
+    assert(Left->getChildrenCount() == 2);
+    assert(Right->getChildrenCount() == 2);
+    auto* LKey = dyn_cast<SDKNodeTypeNominal>(*Left->getChildBegin());
+    auto* RKey = dyn_cast<SDKNodeTypeNominal>(*Right->getChildBegin());
+    if (!LKey || !RKey)
+      return false;
+    if (LKey->getTypeKind() != KnownTypeKind::String)
+      return false;
+    auto Results = RKey->getRootNode()->getDescendantsByUsr(RKey->getUsr());
+    if (Results.empty())
+      return false;
+    if (auto DT = dyn_cast<SDKNodeTypeDecl>(Results.front())) {
+      if (DT->isConformingTo(KnownProtocolKind::RawRepresentable)) {
+        L->annotate(NodeAnnotation::DictionaryKeyUpdate);
+        L->annotate(NodeAnnotation::TypeRewrittenRight);
+        L->addAnnotateComment(NodeAnnotation::TypeRewrittenRight,
+                              DT->getFullyQualifiedName());
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool isUnhandledCase(SDKNodeType *Node) {
     auto Counter = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
     return Node->getTypeKind() == KnownTypeKind::Void ||
@@ -2628,6 +2677,7 @@ public:
                   detectOptionalUpdate(Node, Counter)||
                   detectWrapImplicitOptional(Node, Counter)||
                   detectUnmanagedUpdate(Node, Counter)||
+                  detectDictionaryKeyChange(Node, Counter) ||
                   detectTypeRewritten(Node, Counter);
     (void) Result;
     return;
@@ -2739,6 +2789,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
     switch (Anno) {
+      case NodeAnnotation::DictionaryKeyUpdate:
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -2795,7 +2846,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
                         NodeAnnotation::GetterToProperty,
                         NodeAnnotation::ModernizeEnum,
                         NodeAnnotation::Rename,
-                        NodeAnnotation::NowThrowing
+                        NodeAnnotation::NowThrowing,
+                        NodeAnnotation::DictionaryKeyUpdate,
                       });
   }
 
