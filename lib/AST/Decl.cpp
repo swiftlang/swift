@@ -1296,20 +1296,34 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
-ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
+ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
+                                         bool isAccessOnSelf) const {
   // If we're inside a @_transparent function, use the most conservative
   // access pattern, since we may be inlined from a different resilience
   // domain.
   ResilienceExpansion expansion = UseDC->getResilienceExpansion();
 
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
-    // Observing member are accessed directly from within their didSet/willSet
-    // specifiers.  This prevents assignments from becoming infinite loops.
-    if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
-      if (var->hasStorage() && var->hasAccessorFunctions() &&
-          UseFD->getStorage() == var)
-        return AccessSemantics::DirectToStorage;
-    
+    auto isMember = var->getDeclContext()->isTypeContext();
+    if (isAccessOnSelf)
+      assert(isMember && "Access on self, but var isn't a member");
+
+    // Within a variable's own didSet/willSet specifier, access its storage
+    // directly if either:
+    // 1) It's a 'plain variable' (i.e a variable that's not a member).
+    // 2) It's an access to the member on the implicit 'self' declaration.
+    //    If it's a member access on some other base, we want to call the setter
+    //    as we might be accessing the member on a *different* instance.
+    // 3) We're not in Swift 5 mode (or higher), as in earlier versions of Swift
+    //    we always performed direct accesses.
+    // This prevents assignments from becoming infinite loops in most cases.
+    if (!isMember || isAccessOnSelf ||
+        !UseDC->getASTContext().isSwiftVersionAtLeast(5))
+      if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
+        if (var->hasStorage() && var->hasAccessorFunctions() &&
+            UseFD->getStorage() == var)
+          return AccessSemantics::DirectToStorage;
+
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
     // thing as the getter/setter (i.e., it can't be overridden), then just do a
