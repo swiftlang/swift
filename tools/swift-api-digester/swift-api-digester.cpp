@@ -383,11 +383,11 @@ public:
   void removeChild(ChildIt CI) { Children.erase(CI); }
   ChildIt getChildBegin() { return Children.begin(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
+  void annotate(NodeAnnotation Anno, StringRef Comment);
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
   NodePtr childAt(unsigned I) const;
   void removeChild(NodePtr C);
-  void addAnnotateComment(NodeAnnotation Anno, StringRef Comment);
   StringRef getAnnotateComment(NodeAnnotation Anno) const;
   bool isAnnotatedAs(NodeAnnotation Anno) const;
   void addChild(SDKNode *Child);
@@ -603,8 +603,9 @@ void SDKNode::removeChild(NodePtr C) {
   Children.erase(std::find(Children.begin(), Children.end(), C));
 }
 
-void SDKNode::addAnnotateComment(NodeAnnotation Anno, StringRef Comment) {
-  assert(isAnnotatedAs(Anno) && "Cannot find annotation");
+void SDKNode::annotate(NodeAnnotation Anno, StringRef Comment) {
+  assert(!isAnnotatedAs(Anno) && "already annotated");
+  annotate(Anno);
   AnnotateComments[Anno] = Comment;
 }
 
@@ -1974,8 +1975,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
         } else {
           return false;
         }
-        R->annotate(NodeAnnotation::PropertyName);
-        R->addAnnotateComment(NodeAnnotation::PropertyName, A->getPrintedName());
+        R->annotate(NodeAnnotation::PropertyName, A->getPrintedName());
         foundMatch(R, A);
         return true;
       }
@@ -2012,11 +2012,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (auto VC = dyn_cast<SDKNodeVar>(Child)) {
       auto LastPartOfA = getLastPartOfUsr(VC);
         if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
-          R->annotate(NodeAnnotation::ModernizeEnum);
           std::string FullName = (llvm::Twine(A->getName()) + "." +
             Child->getName()).str();
-          R->addAnnotateComment(NodeAnnotation::ModernizeEnum,
-                                R->getSDKContext().buffer(FullName));
+          R->annotate(NodeAnnotation::ModernizeEnum,
+                      R->getSDKContext().buffer(FullName));
           foundMatch(R, A);
           return true;
         }
@@ -2321,10 +2320,8 @@ static void detectRename(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (isa<SDKNodeDecl>(L) && L->getPrintedName() != R->getPrintedName()) {
     L->annotate(NodeAnnotation::Rename);
-    L->annotate(NodeAnnotation::RenameOldName);
-    L->addAnnotateComment(NodeAnnotation::RenameOldName, L->getPrintedName());
-    L->annotate(NodeAnnotation::RenameNewName);
-    L->addAnnotateComment(NodeAnnotation::RenameNewName, R->getPrintedName());
+    L->annotate(NodeAnnotation::RenameOldName, L->getPrintedName());
+    L->annotate(NodeAnnotation::RenameNewName, R->getPrintedName());
   }
 }
 
@@ -2494,12 +2491,10 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
              diffNode->getKind() == SDKNodeKind::Function &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);
-      diffNode->annotate(NodeAnnotation::RenameOldName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameOldName,
-                                   diffNode->getPrintedName());
-      diffNode->annotate(NodeAnnotation::RenameNewName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameNewName,
-                                   node->getParent()->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameOldName,
+                         diffNode->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameNewName,
+                         node->getParent()->getPrintedName());
     }
   }
 
@@ -2604,12 +2599,9 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
         (Node->getName() != Counter->getName()||
         Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
-      Node->annotate(NodeAnnotation::TypeRewrittenLeft);
-      Node->annotate(NodeAnnotation::TypeRewrittenRight);
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenLeft,
-                               Node->getPrintedName());
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenRight,
-                               Counter->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenRight, 
+                     Counter->getPrintedName());
       return true;
     }
     return false;
@@ -2638,9 +2630,8 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
     if (auto DT = dyn_cast<SDKNodeTypeDecl>(Results.front())) {
       if (DT->isConformingTo(KnownProtocolKind::RawRepresentable)) {
         L->annotate(NodeAnnotation::DictionaryKeyUpdate);
-        L->annotate(NodeAnnotation::TypeRewrittenRight);
-        L->addAnnotateComment(NodeAnnotation::TypeRewrittenRight,
-                              DT->getFullyQualifiedName());
+        L->annotate(NodeAnnotation::TypeRewrittenRight,
+                    DT->getFullyQualifiedName());
         return true;
       }
     }
