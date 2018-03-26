@@ -802,10 +802,10 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false);
 
-  llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, Type t,
+  llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                                             llvm::Type *llvmType);
 
-  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
                                              llvm::Type *llvmType);
 
   typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
@@ -842,8 +842,6 @@ public:
       IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
       const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
           nullptr);
-
-  unsigned getCanTypeID(const CanType type);
 
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
@@ -945,10 +943,6 @@ private:
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
-
-  /// Mapping from archetype-containing CanType to UniqueID (for outline)
-  llvm::DenseMap<const swift::TypeBase *, unsigned> typeToUniqueID;
-  unsigned currUniqueID = 2;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
   void emitLazyObjCProtocolDefinitions();

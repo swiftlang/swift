@@ -19,7 +19,7 @@ public struct StructWithBaseStruct<T: BaseProt> {
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"$S11outcopyaddr010StructWithbc4BaseB0V4elemAA0bcdB0VyxGvg"(%T11outcopyaddr014StructWithBaseB0V.0* noalias nocapture sret, %swift.type* %"StructWithStructWithBaseStruct<T>", %T11outcopyaddr010StructWithbc4BaseB0V* noalias nocapture swiftself)
-// CHECK: call %T11outcopyaddr014StructWithBaseB0V.0* @"$S11outcopyaddrytWOc3_"
+// CHECK: call %T11outcopyaddr014StructWithBaseB0V.0* @"$S11outcopyaddr014StructWithBaseB0VyxGAA9ChildProtRzlWOc"
 public struct StructWithStructWithBaseStruct<T: ChildProt> {
     public typealias Element = T
     let elem: StructWithBaseStruct<Element>

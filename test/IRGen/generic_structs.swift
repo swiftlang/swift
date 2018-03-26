@@ -58,4 +58,4 @@ public struct GenericStruct<T : Proto> {
 // CHECK-64:  [[OFFSET:%.*]] = load i64, i64* [[FIELDOFFSET]]
 // CHECK-64:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, i64 [[OFFSET]]
 // CHECK-64:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
-// CHECK-64:  call %TSq* @"$S15generic_structsytWOb3_"(%TSq* {{.*}}, %TSq* [[OPTPTR]]
+// CHECK-64:  call %TSq* @"$SxSg15generic_structs5ProtoRzlWOb"(%TSq* {{.*}}, %TSq* [[OPTPTR]]

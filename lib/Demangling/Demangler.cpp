@@ -2119,43 +2119,59 @@ NodePointer Demangler::demangleWitness() {
       }
       case 'e': {
         if (auto sig = popNode(Node::Kind::DependentGenericSignature))
-          return createWithChildren(Node::Kind::OutlinedCopy,
+          return createWithChildren(Node::Kind::OutlinedConsume,
                                     popNode(Node::Kind::Type), sig);
         return createWithChild(Node::Kind::OutlinedConsume,
                                popNode(Node::Kind::Type));
       }
       case 'r': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedRetain,
+                                    popNode(Node::Kind::Type), sig);
         return createWithChild(Node::Kind::OutlinedRetain,
                                popNode(Node::Kind::Type));
       }
       case 's': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedRelease,
+                                    popNode(Node::Kind::Type), sig);
         return createWithChild(Node::Kind::OutlinedRelease,
                                popNode(Node::Kind::Type));
       }
       case 'b': {
-        NodePointer IndexChild = demangleIndexAsNode();
-        return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
-                                  popNode(Node::Kind::Type), IndexChild);
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedInitializeWithTake,
+                               popNode(Node::Kind::Type));
       }
       case 'c': {
-        NodePointer IndexChild = demangleIndexAsNode();
-        return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
-                                  popNode(Node::Kind::Type), IndexChild);
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedInitializeWithCopy,
+                               popNode(Node::Kind::Type));
       }
       case 'd': {
-        NodePointer IndexChild = demangleIndexAsNode();
-        return createWithChildren(Node::Kind::OutlinedAssignWithTake,
-                                  popNode(Node::Kind::Type), IndexChild);
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedAssignWithTake,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedAssignWithTake,
+                               popNode(Node::Kind::Type));
       }
       case 'f': {
-        NodePointer IndexChild = demangleIndexAsNode();
-        return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
-                                  popNode(Node::Kind::Type), IndexChild);
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedAssignWithCopy,
+                               popNode(Node::Kind::Type));
       }
       case 'h': {
-        NodePointer IndexChild = demangleIndexAsNode();
-        return createWithChildren(Node::Kind::OutlinedDestroy,
-                                  popNode(Node::Kind::Type), IndexChild);
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedDestroy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedDestroy,
+                               popNode(Node::Kind::Type));
       }
       default:
         return nullptr;

@@ -1852,43 +1852,38 @@ void Remangler::mangleOutlinedConsume(Node *node) {
 }
 
 void Remangler::mangleOutlinedRetain(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << "WOr";
 }
 
 void Remangler::mangleOutlinedRelease(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << "WOs";
 }
 
 void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
-  mangleChildNode(node, 0);
+  mangleChildNodes(node);
   Buffer << "WOb";
-  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
-  mangleChildNode(node, 0);
+  mangleChildNodes(node);
   Buffer << "WOc";
-  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithTake(Node *node) {
-  mangleChildNode(node, 0);
+  mangleChildNodes(node);
   Buffer << "WOd";
-  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
-  mangleChildNode(node, 0);
+  mangleChildNodes(node);
   Buffer << "WOf";
-  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedDestroy(Node *node) {
-  mangleChildNode(node, 0);
+  mangleChildNodes(node);
   Buffer << "WOh";
-  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedVariable(Node *node) {
