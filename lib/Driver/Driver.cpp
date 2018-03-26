@@ -502,6 +502,32 @@ static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
   }
 }
 
+/// Since we need to be able to set -j smaller than Xcode sets it for testing,
+/// and since Xcode puts the OTHER_SWIFT_FLAGS *before* the -j it supplies,
+/// use the minimum value for -j.
+/// \return 0 for error
+static unsigned
+calculateNumberOfNumberOfParallelCommands(const ArgList *ArgList,
+                                          DiagnosticEngine &Diags) {
+  unsigned NumberOfParallelCommands = 1;
+  unsigned numberOfJs = 0;
+  for (const Arg *A : ArgList->filtered(options::OPT_j)) {
+    ++numberOfJs;
+    unsigned N = 1;
+    if (StringRef(A->getValue()).getAsInteger(10, N)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(*ArgList), A->getValue());
+      return 0;
+    }
+    if (N < NumberOfParallelCommands)
+      NumberOfParallelCommands = N;
+  }
+  if (numberOfJs > 1)
+    Diags.diagnose(SourceLoc(), diag::note_multiple_js,
+                   NumberOfParallelCommands);
+  return NumberOfParallelCommands;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -674,14 +700,10 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
-  unsigned NumberOfParallelCommands = 1;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
-    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-      return nullptr;
-    }
-  }
+  unsigned NumberOfParallelCommands =
+      calculateNumberOfNumberOfParallelCommands(ArgList.get(), Diags);
+  if (NumberOfParallelCommands == 0)
+    return nullptr;
 
   OutputLevel Level = OutputLevel::Normal;
   if (const Arg *A =
