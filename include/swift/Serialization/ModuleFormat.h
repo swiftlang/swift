@@ -641,8 +641,8 @@ namespace decls_block {
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   };
 
-  using NameAliasTypeLayout = BCRecordLayout<
-    NAME_ALIAS_TYPE,
+  using BuiltinAliasTypeLayout = BCRecordLayout<
+    BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
     TypeIDField  // canonical type (a fallback)
   >;

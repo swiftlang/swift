@@ -3597,12 +3597,12 @@ void Serializer::writeType(Type ty) {
     TypeAliasDecl *typeAlias =
       findTypeAliasForBuiltin(M->getASTContext(), ty);
 
-    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    TypeID());
+    unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
+    BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(typeAlias,
+                                                  /*forceSerialization*/false,
+                                                  /*allowTypeAliasXRef*/true),
+                                       TypeID());
     break;
   }
   case TypeKind::BoundNameAlias: {
@@ -3977,7 +3977,7 @@ void Serializer::writeType(Type ty) {
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
   using namespace decls_block;
-  registerDeclTypeAbbr<NameAliasTypeLayout>();
+  registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<BoundNameAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();

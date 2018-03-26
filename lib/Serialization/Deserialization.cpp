@@ -4145,11 +4145,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
-  case decls_block::NAME_ALIAS_TYPE: {
+  case decls_block::BUILTIN_ALIAS_TYPE: {
     DeclID underlyingID;
     TypeID canonicalTypeID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
-                                                 canonicalTypeID);
+    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                    canonicalTypeID);
     auto aliasOrError = getDeclChecked(underlyingID);
     if (!aliasOrError)
       return aliasOrError.takeError();
