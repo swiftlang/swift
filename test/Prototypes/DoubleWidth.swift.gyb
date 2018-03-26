@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
+// REQUIRES: CPU=x86_64
 
 import StdlibUnittest
 
