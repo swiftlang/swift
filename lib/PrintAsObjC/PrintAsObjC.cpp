@@ -1476,38 +1476,44 @@ private:
       clangTy->isObjCObjectPointerType();
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy,
+  bool printImportedAlias(const TypeAliasDecl *alias,
                           Optional<OptionalTypeKind> optionalKind) {
+    if (!alias->hasClangNode()) {
+      if (!alias->isObjC()) return false;
+
+      os << alias->getName();
+      return true;
+    }
+
+    if (auto *clangTypeDecl =
+          dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      maybePrintTagKeyword(alias);
+      os << getNameForObjC(alias);
+
+      if (isClangPointerType(clangTypeDecl))
+        printNullability(optionalKind);
+    } else if (auto *clangObjCClass
+               = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      os << clangObjCClass->getName() << " *";
+      printNullability(optionalKind);
+    } else {
+      auto *clangCompatAlias =
+      cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
+      os << clangCompatAlias->getName() << " *";
+      printNullability(optionalKind);
+    }
+
+    return true;
+  }
+
+  void visitNameAliasType(NameAliasType *aliasTy,
+                               Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (alias->hasClangNode()) {
-      if (auto *clangTypeDecl =
-            dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-        maybePrintTagKeyword(alias);
-        os << getNameForObjC(alias);
-
-        if (isClangPointerType(clangTypeDecl))
-          printNullability(optionalKind);
-      } else if (auto *clangObjCClass
-                   = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-        os << clangObjCClass->getName() << " *";
-        printNullability(optionalKind);
-      } else {
-        auto *clangCompatAlias =
-          cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-        os << clangCompatAlias->getName() << " *";
-        printNullability(optionalKind);
-      }
-
+    if (printImportedAlias(alias, optionalKind))
       return;
-    }
-
-    if (alias->isObjC()) {
-      os << alias->getName();
-      return;
-    }
 
     visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }

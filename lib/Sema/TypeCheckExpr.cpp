@@ -658,10 +658,8 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     // Strip off one level of sugar; we don't actually want to print
     // the name of the typealias itself anywhere.
     if (type && *type) {
-      if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getSinglyDesugaredType();
-      else if (auto boundTypeAlias =
-                 dyn_cast<BoundNameAliasType>(type->getPointer()))
+      if (auto boundTypeAlias =
+                 dyn_cast<NameAliasType>(type->getPointer()))
         *type = boundTypeAlias->getSinglyDesugaredType();
     }
   }

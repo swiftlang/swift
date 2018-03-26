@@ -611,14 +611,13 @@ Type TypeChecker::applyUnboundGenericArguments(
                                 SubstFlags::UseErrorType);
 
   // Form a sugared typealias reference.
-  if (typealias) {
+  Type parentType = unboundType->getParent();
+  if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
                                                  LookUpConformance(*this, dc));
-    if (!subMap.empty()) {
-      resultType = BoundNameAliasType::get(typealias, unboundType->getParent(),
-                                           subMap, resultType);
-    }
+    resultType = NameAliasType::get(typealias, parentType,
+                                         subMap, resultType);
   }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
@@ -3162,8 +3161,10 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
-  if (baseTy->is<ModuleType>())
+  if (baseTy->is<ModuleType>()) {
     baseTy = Type();
+    sugaredBaseTy = Type();
+  }
 
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
@@ -3197,18 +3198,30 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  auto memberType = member->getDeclaredInterfaceType();
-  if (!baseTy || !memberType->hasTypeParameter())
-    return memberType;
+  Type resultType;
+  auto memberType = aliasDecl ? aliasDecl->getUnderlyingTypeLoc().getType()
+                              : member->getDeclaredInterfaceType();
+  SubstitutionMap subs;
+  if (baseTy) {
+    // Cope with the presence of unbound generic types, which are ill-formed
+    // at this point but break the invariants of getContextSubstitutionMap().
+    if (baseTy->hasUnboundGenericType()) {
+      if (memberType->hasTypeParameter())
+        return ErrorType::get(memberType);
 
-  auto subs = baseTy->getContextSubstitutionMap(
-      module, member->getDeclContext());
-  Type resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+      return memberType;
+    }
+
+    subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
+    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+  } else {
+    resultType = memberType;
+  }
 
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
-  if (aliasDecl && aliasDecl->getGenericSignature()) {
-    resultType = BoundNameAliasType::get(aliasDecl, sugaredBaseTy, subs,
+  if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
+    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs,
                                          resultType);
   }
 

@@ -373,7 +373,7 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(BoundNameAliasType, SugarType, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
     : NumPadBits,
 
     /// Whether we have a parent type.
@@ -1512,8 +1512,8 @@ protected:
   SugarType(TypeKind K, const ASTContext *ctx,
             RecursiveTypeProperties properties)
       : TypeBase(K, nullptr, properties), Context(ctx) {
-    if (K != TypeKind::NameAlias)
-      assert(ctx != nullptr && "Context for SugarType should not be null");
+    assert(ctx != nullptr &&
+           "Context for SugarType should not be null");
     Bits.SugarType.HasCachedType = false;
   }
 
@@ -1548,49 +1548,32 @@ public:
   }
 };
 
-/// NameAliasType - An alias type is a name for another type, just like a
-/// typedef in C.
-class NameAliasType : public SugarType {
-  friend class TypeAliasDecl;
-  // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
-    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
-                RecursiveTypeProperties()),
-      TheDecl(d) {}
-  TypeAliasDecl *const TheDecl;
-
-public:
-  TypeAliasDecl *getDecl() const { return TheDecl; }
-
-  using TypeBase::setRecursiveProperties;
-   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::NameAlias;
-  }
-};
-
 /// A reference to a type alias that is somehow generic, along with the
 /// set of substitutions to apply to make the type concrete.
-class BoundNameAliasType final
+class NameAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<BoundNameAliasType, Type, Substitution>
+    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
+                          Substitution>
 {
   TypeAliasDecl *typealias;
 
   friend class ASTContext;
   friend TrailingObjects;
 
-  BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
+  NameAliasType(TypeAliasDecl *typealias, Type parent,
                      const SubstitutionMap &substitutions, Type underlying,
                      RecursiveTypeProperties properties);
 
   unsigned getNumSubstitutions() const {
-    return Bits.BoundNameAliasType.NumSubstitutions;
+    return Bits.NameAliasType.NumSubstitutions;
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.BoundNameAliasType.HasParent ? 1 : 0;
+    return Bits.NameAliasType.HasParent ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
+    return getNumSubstitutions() > 0 ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<Substitution>) const {
@@ -1603,8 +1586,15 @@ class BoundNameAliasType final
     return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
   }
 
+  /// Retrieve the generic signature used for substitutions.
+  GenericSignature *getGenericSignature() const {
+    return getNumSubstitutions() > 0
+             ? *getTrailingObjects<GenericSignature *>()
+             : nullptr;
+  }
+
 public:
-  static BoundNameAliasType *get(TypeAliasDecl *typealias, Type parent,
+  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
                                  const SubstitutionMap &substitutions,
                                  Type underlying);
 
@@ -1617,7 +1607,7 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.BoundNameAliasType.HasParent ? *getTrailingObjects<Type>()
+    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
                                              : Type();
   }
 
@@ -1637,11 +1627,12 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, const SubstitutionMap &substitutions);
+                      Type parent, const SubstitutionMap &substitutions,
+                      Type underlying);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BoundNameAlias;
+    return T->getKind() == TypeKind::NameAlias;
   }
 };
 

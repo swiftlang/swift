@@ -65,7 +65,6 @@ namespace swift {
   class GenericTypeParamType;
   class LazyResolver;
   class ModuleDecl;
-  class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
