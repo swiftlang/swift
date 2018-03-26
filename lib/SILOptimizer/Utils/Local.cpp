@@ -1330,11 +1330,11 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
 /// True if a type can be expanded
 /// without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (EnableExpandAll) {
-    return true;
-  }
   if (Ty.isAddressOnly(Module)) {
     return false;
+  }
+  if (EnableExpandAll) {
+    return true;
   }
   unsigned numFields = Module.Types.countNumberOfFields(Ty);
   if (numFields > 6) {
