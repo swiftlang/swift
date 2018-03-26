@@ -1365,7 +1365,7 @@ static uint64_t multiply64x32RoundingDown(uint64_t lhs, uint32_t rhs) {
     __uint128_t full = (__uint128_t)lhs * rhs;
     return (uint64_t)(full >> 32);
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = ((lhs & mask32) * rhs) >> 32;
     return t + (lhs >> 32) * rhs;
 #endif
@@ -1374,11 +1374,11 @@ static uint64_t multiply64x32RoundingDown(uint64_t lhs, uint32_t rhs) {
 // Multiply a 64-bit fraction by a 32-bit fraction, rounding up.
 static uint64_t multiply64x32RoundingUp(uint64_t lhs, uint32_t rhs) {
 #if HAVE_UINT128_T
-    static const __uint128_t roundingFactor = ((__uint128_t)1 << 32) - 1;
+    static const __uint128_t roundingFactor = UINT32_MAX;
     __uint128_t full = (__uint128_t)lhs * rhs;
     return (uint64_t)((full + roundingFactor) >> 32);
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (((lhs & mask32) * rhs) + mask32) >> 32;
     return t + (lhs >> 32) * rhs;
 #endif
@@ -1390,7 +1390,7 @@ static uint64_t multiply64x64RoundingDown(uint64_t lhs, uint64_t rhs) {
     __uint128_t full = (__uint128_t)lhs * rhs;
     return (uint64_t)(full >> 64);
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (lhs & mask32) * (rhs & mask32);
     t >>= 32;
     uint64_t a = (lhs >> 32) * (rhs & mask32);
@@ -1409,7 +1409,7 @@ static uint64_t multiply64x64RoundingUp(uint64_t lhs, uint64_t rhs) {
     __uint128_t full = (__uint128_t)lhs * rhs;
     return (uint64_t)((full + roundingFactor) >> 64);
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (lhs & mask32) * (rhs & mask32);
     t = (t + mask32) >> 32;
     uint64_t a = (lhs >> 32) * (rhs & mask32);
@@ -1440,7 +1440,7 @@ static swift_uint128_t multiply128x64RoundingDown(swift_uint128_t lhs, uint64_t 
     return h + (l >> 64);
 #else
     swift_uint128_t result;
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t rhs0 = rhs & mask32;
     uint64_t rhs1 = rhs >> 32;
     uint64_t t = (lhs.low) * rhs0;
@@ -1481,7 +1481,7 @@ static swift_uint128_t multiply128x64RoundingUp(swift_uint128_t lhs, uint64_t rh
     return h + (l >> 64) + round;
 #else
     swift_uint128_t result;
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t rhs0 = rhs & mask32;
     uint64_t rhs1 = rhs >> 32;
     uint64_t t = (lhs.low) * rhs0 + mask32;
@@ -1611,7 +1611,7 @@ static void multiply192x64RoundingDown(swift_uint192_t *lhs, uint64_t rhs) {
     lhs->mid = b;
     lhs->low = c;
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t rhs0 = rhs & mask32;
     uint64_t rhs1 = rhs >> 32;
     uint64_t t = lhs->low * rhs0;
@@ -1666,7 +1666,7 @@ static void multiply192x64RoundingUp(swift_uint192_t *lhs, uint64_t rhs) {
     lhs->mid = b;
     lhs->low = c;
 #else
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     static const uint64_t bias = mask32;
     uint64_t rhs0 = rhs & mask32;
     uint64_t rhs1 = rhs >> 32;
@@ -1768,7 +1768,7 @@ static void multiply192x128RoundingDown(swift_uint192_t *lhs, swift_uint128_t rh
 #else
     uint64_t a, b, c, d; // temporaries
     // Six 32-bit values multiplied by 4 32-bit values.  Oh my.
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = lhs->low * rhs.low;
     t >>= 32;
     a = (uint64_t)lhs->low * rhs.b;
@@ -1860,7 +1860,7 @@ static void multiply192x128RoundingUp(swift_uint192_t *lhs, swift_uint128_t rhs)
 #else
     uint64_t a, b, c, d; // temporaries
     // Six 32-bit values multiplied by 4 32-bit values.  Oh my.
-    static const uint64_t mask32 = ((uint64_t)1 << 32) - 1;
+    static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (uint64_t)lhs->low * rhs.low + mask32;
     t >>= 32;
     a = (uint64_t)lhs->low * rhs.b;
