@@ -258,42 +258,65 @@ private:  // Helpers to create TensorFlow graph nodes.
   struct DatasetCreationContext {
     /// The instruction corresponding to the builtin
     /// tfc.makeIteratorGetNextWithDatasets.
-    BuiltinInst *dataset_inst = nullptr;
+    BuiltinInst *datasetInst = nullptr;
+
+    /// Whether to read Imagenet data or synthetic test data.
+    bool readsImagenetData = false;
+
+    /// The file path for Imagenet data. Only defined when `readsImagenetData`
+    /// is true.
+    StringRef filePath;
+
+    /// The batch size for each IteratorGetNext call.
+    int batchSize;
 
     /// Metadata for the infeed enqueue node creation.
+    /// FIXME: Assess whether to use SmallVector.
+    std::vector<int64_t> dims;
+    std::vector<int> numDims;
+    std::vector<int64_t*> dimPtrs;
     std::vector<TF_DataType> infeedInputDtypes;
-    std::vector<TF_Buffer *> infeedInputShapes;
-    std::vector<const void *> shapeProtos;
-    std::vector<size_t> shapeProtoLens;
 
    public:
-    DatasetCreationContext(BuiltinInst *dataset_inst)
-        : dataset_inst(dataset_inst) {
-      assert(dataset_inst);
-    }
-
-    ~DatasetCreationContext() {
-      for (auto *shape : infeedInputShapes) {
-        TF_DeleteBuffer(shape);
+    DatasetCreationContext(BuiltinInst *datasetInst, bool readsImagenetData,
+                           StringRef filePath, int batchSize,
+                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
+                           ArrayRef<TF_DataType> dTypes)
+        : datasetInst(datasetInst),
+          readsImagenetData(readsImagenetData),
+          filePath(filePath),
+          batchSize(batchSize),
+          dims(dims),
+          numDims(numDims),
+          infeedInputDtypes(dTypes) {
+      assert(numDims.size() == dTypes.size());
+      auto dimPtr = this->dims.data();
+      for (int shape = 0; shape != numDims.size(); ++shape) {
+        dimPtrs.push_back(dimPtr);
+        dimPtr += numDims[shape];
       }
     }
 
-    /// `shape` is owned by the callee.
-    void AddInputTypeAndShape(TF_DataType dtype, TF_Buffer* shape) {
-        infeedInputDtypes.push_back(dtype);
-        infeedInputShapes.push_back(shape);
-        shapeProtos.push_back(shape->data);
-        shapeProtoLens.push_back(shape->length);
+    /// Returns the number of tensors produced by the dataset / iterator stack.
+    int getNumTensors() const {
+      return infeedInputDtypes.size();
     }
 
     /// `desc` can be the partially constructed infeed enqueue or dequeue node.
-    void SetInfeedTypeAndShapeList(TF_OperationDescription *desc,
-                                   TF_Status *status) {
+    void setInfeedTypeAndShapeList(TF_OperationDescription *desc) {
       TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
                          infeedInputDtypes.size());
-      TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
-                                     shapeProtoLens.data(), shapeProtos.size(),
-                                     status);
+      TF_SetAttrShapeList(desc, "shapes", dimPtrs.data(), numDims.data(),
+                          dimPtrs.size());
+    }
+
+    TF_Operation *makeIteratorGetNextWithDatasets(TF_Graph *resultGraph,
+                                                  TF_Status *status) {
+      return readsImagenetData
+                 ? TF_MakeImagenetIteratorGetNextWithDatasets(
+                       resultGraph, filePath.str().c_str(), batchSize,
+                       status)
+                 : TF_MakeFakeIteratorGetNextWithDatasets(resultGraph, status);
     }
   };
 
@@ -303,7 +326,7 @@ private:  // Helpers to create TensorFlow graph nodes.
   /// 2. All input tensors of the TF graph must be supplied via this mechanism
   /// (in other words, the generated TF graph should require 0 input from other
   /// Placeholders, etc).
-  std::unique_ptr<DatasetCreationContext> dataset_creation_context;
+  std::unique_ptr<DatasetCreationContext> datasetCreationContext;
 
   /// Builds TF graph nodes for the top level TF function call, where `funcName`
   /// is the function name. `inputs` specifies the inputs to the function, and
@@ -623,57 +646,99 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
 }
 
 bool TFGraphLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
-  assert(dataset_creation_context);
-  auto *dataset_inst = dataset_creation_context->dataset_inst;
-
-  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(dataset_inst).getValue();
-  assert(dataset_inst->getNumOperands() == 1 &&
-         "__tfop_tfc.makeIteratorGetNextWithDatasets should have a single "
-         "attribute operand on filenames.");
-  auto operand = dataset_inst->getOperand(0);
-  auto opInfo = tfopInfo.operandClasses[0];
-
-  assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
-  auto *sli = dyn_cast<StringLiteralInst>(operand);
-  assert(sli && sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
-         "The attribute must be string");
-  auto value = sli->getValue();
-
-  // FIXME: We could change the C API below to delete `datasetFn` before it
-  // returns, as it turns out the caller need not use it. Will do so once the
-  // code structure stabilizes more.
-  TF_Function *datasetFn = nullptr;
-  TF_Operation *get_next_op = TF_MakeIteratorGetNextWithDatasets(
-    resultGraph, value.str().c_str(), &datasetFn, status);
+  assert(datasetCreationContext);
+  TF_Operation *getnextOp =
+      datasetCreationContext->makeIteratorGetNextWithDatasets(resultGraph,
+                                                              status);
 
   // If the node builder failed, then the tfop definition is wrong, report
   // an error in a way that can hopefully be fixed - pointing to the op
   // definition in the Swift code, and emitting the TensorFlow error
   // information.
-  if (checkStatus(getUserSourceLocation(dataset_inst->getDebugLocation()),
+  if (checkStatus(getUserSourceLocation(
+                      datasetCreationContext->datasetInst->getDebugLocation()),
                   diag::tfop_incorrect_definition))
     return true;
-
-  TF_DeleteFunction(datasetFn);
 
   // Add infeed enqueue to consume the output of the iterator.
   {
     auto *desc = TF_NewOperation(resultGraph, "InfeedEnqueueTuple",
                                  "InfeedEnqueueTuple");
-    // FIXME: Support multiple inputs.
+    int numInputs = datasetCreationContext->getNumTensors();
     std::vector<TF_Output> infeedInputs;
-    infeedInputs.reserve(1);
-    infeedInputs.push_back({get_next_op, 0});
+    infeedInputs.reserve(numInputs);
+    for (int i = 0; i < numInputs; ++i) {
+      infeedInputs.push_back({getnextOp, i});
+    }
     TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
     TF_SetDevice(desc, "/device:CPU:0");
     TF_SetAttrInt(desc, "device_ordinal", 0);
-    dataset_creation_context->SetInfeedTypeAndShapeList(desc, status);
-    if (checkStatus(SILFn.getLocation())) return true;
+    datasetCreationContext->setInfeedTypeAndShapeList(desc);
     /*TF_Operation* enqueue =*/ TF_FinishOperation(desc, status);
     if (checkStatus(SILFn.getLocation())) return true;
   }
 
   return false;
+}
+
+/// If `type` is Tensor<T> or TensorHandle<T>, return the TF_DataType
+/// corresponding to element type T. Otherwise, return 0.
+static unsigned getTFDataTypeFromTensorGenericType(Type type) {
+  auto *genTy = type->getAs<BoundGenericType>();
+  if (!genTy || genTy->getGenericArgs().size() != 1) {
+    return 0;
+  }
+  return convertSwiftTypeToTF(genTy->getGenericArgs()[0]);
+}
+
+/// Decode shape elements from the tfop builtin instruction, starting at
+/// operand `operandIdx`, into `shape`.
+static void decodeShapeElements(SILValue attrValue, SILInstruction *inst,
+                                const SILTensorOpInfo &tfopInfo,
+                                unsigned &operandIdx, unsigned operandEndIdx,
+                                SmallVectorImpl<int64_t> &shape) {
+  assert(isa<MetatypeInst>(attrValue) && "$shape should start with a metatype");
+  while (operandIdx + 1 < operandEndIdx &&
+         tfopInfo.operandClasses[operandIdx + 1].second ==
+             SILTensorOpInfo::OperandClass::ArrayElement) {
+    auto eltValue = inst->getOperand(++operandIdx);
+    auto intValue = cast<IntegerLiteralInst>(eltValue);
+    shape.push_back(intValue->getValue().getLimitedValue());
+  }
+}
+
+/// Decode the shape array attribute from the tfop builtin instruction, starting
+/// at operand `operandIdx`, into `dims`, `numDims` and `dimPtrs`.
+static void decodeShapeArray(SILInstruction *inst,
+                             const SILTensorOpInfo &tfopInfo,
+                             unsigned &operandIdx, unsigned operandEndIdx,
+                             SmallVectorImpl<int64_t> &dims,
+                             SmallVectorImpl<int> &numDims,
+                             SmallVectorImpl<int64_t *> &dimPtrs) {
+  auto numShapes = cast<IntegerLiteralInst>(inst->getOperand(operandIdx))
+                       ->getValue()
+                       .getLimitedValue();
+  for (int shape = 0; shape != numShapes; ++shape) {
+    auto prevNumDims = dims.size();
+    ++operandIdx;  // We consumed an operand.
+    auto nextOperand = inst->getOperand(operandIdx);
+    assert(tfopInfo.operandClasses[operandIdx].second ==
+               SILTensorOpInfo::OperandClass::Shape &&
+           "expected a shape value");
+
+    decodeShapeElements(nextOperand, inst, tfopInfo, operandIdx, operandEndIdx,
+                        dims);
+    numDims.push_back(int(dims.size() - prevNumDims));
+  }
+
+  // Now that we've build the array of dimensions, convert it to the array
+  // of pointers that TensorFlow needs.  This is safe now that the vector
+  // has finished its resizing.
+  auto dimPtr = dims.data();
+  for (int shape = 0; shape != numShapes; ++shape) {
+    dimPtrs.push_back(dimPtr);
+    dimPtr += numDims[shape];
+  }
 }
 
 void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
@@ -687,56 +752,105 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
     return;
   }
 
-  // Defer the creation of the dataset / iterator related nodes, along with
-  // the associated infeed enqueue till the creation of top level function
-  // nodes. Here we create an infeed dequeue node to feed the user(s) of
-  // `inst`.
-  dataset_creation_context.reset(new DatasetCreationContext(inst));
-
-  // FIXME: support multiple output tensors produced by an iterator stack.
-  if (inst->getNumResults() != 1) {
-    internalError(getUserSourceLocation(inst->getDebugLocation()),
-                  "Dataset / iterator stack must produce a single tensor.",
-                  diag::tfop_invalid_tfop);
-    return;
+  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
+  // Type check and process the first attribute: filePath
+  bool readsImagenetData;
+  {
+    auto operand = inst->getOperand(0);
+    auto opInfo = tfopInfo.operandClasses[0];
+    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
+    // BoolLiteralInst is would be more ideal, but it does not exist.
+    auto *ili = cast<IntegerLiteralInst>(operand);
+    readsImagenetData = ili->getValue().getLimitedValue() != 0;
   }
-  auto outputValue = inst->getResults()[0];
-  // This type looks like Tensor<T> or TensorHandle<T>, and we want to get the
-  // element type T.
-  auto outputType = outputValue->getType().getSwiftRValueType();
-  auto *genTy = outputType->getAs<BoundGenericType>();
-  if (!genTy || genTy->getGenericArgs().size() != 1) {
+
+  // Type check and process the second attribute: filePath
+  StringRef filePath;
+  if (readsImagenetData) {
+    auto operand = inst->getOperand(1);
+    auto opInfo = tfopInfo.operandClasses[1];
+    auto *sli = cast<StringLiteralInst>(operand);
+    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
+    filePath = sli->getValue();
+  }
+
+  // Type check and process the third attribute: batchSize
+  int batchSize;
+  {
+    auto operand = inst->getOperand(2);
+    auto opInfo = tfopInfo.operandClasses[2];
+    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
+    auto *ili = cast<IntegerLiteralInst>(operand);
+    batchSize = ili->getValue().getLimitedValue();
+  }
+
+  // Type check and process the fourth attribute: outputShapes
+  SmallVector<int64_t, 8> dims;
+  SmallVector<int, 3> numDims;
+  SmallVector<int64_t*, 8> dimPtrs;
+  unsigned i = 3;
+  unsigned e = inst->getNumOperands();
+  decodeShapeArray(inst, tfopInfo, i, e, dims, numDims, dimPtrs);
+
+  // Even in the case of `readsImagenetData`, the two output tensors, images and
+  // labels, are encoded into a single tuple.
+  if (inst->getNumResults() != 1) {
     internalError(
         getUserSourceLocation(inst->getDebugLocation()),
-        "The returned datatype of builtin tfc.makeIteratorGetNextWithDatasets "
-        "should be Tensor<T> or TensorHandle<T>.",
+        "tfc.makeIteratorGetNextWithDatasets must produce a single output.",
         diag::tfop_invalid_tfop);
     return;
   }
-  TF_DataType dtype = static_cast<TF_DataType>(
-      convertSwiftTypeToTF(genTy->getGenericArgs()[0]));
 
-  TF_Buffer *shapeProto = TF_NewBuffer();
-  // FIXME: The shape may need to be passed in from user. For nowe we hard-code
-  // a scalar shape.
-  TF_GetAttrScalarTensorShapeProto(shapeProto, status);
-  if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+  std::vector<TF_DataType> outputTypes;
+  auto outputType = inst->getType().getSwiftRValueType();
+  if (auto tfType = getTFDataTypeFromTensorGenericType(outputType)) {
+    outputTypes.push_back(static_cast<TF_DataType>(tfType));
+  } else {
+    // This must be a tuple type
+    auto *tt = outputType->getAs<TupleType>();
+    if (!tt) {
+      internalError(getUserSourceLocation(inst->getDebugLocation()),
+                    "The returned datatype of builtin "
+                    "tfc.makeIteratorGetNextWithDatasets "
+                    "should be a single element or a tuple of elements or type "
+                    "Tensor<T> or TensorHandle<T>.",
+                    diag::tfop_invalid_tfop);
+      return;
+    }
+    for (unsigned i = 0, n = tt->getNumElements(); i != n; ++i) {
+      auto tfType = getTFDataTypeFromTensorGenericType(tt->getElementType(i));
+      assert(tfType && "Each output tuple element must be a TF type.");
+      outputTypes.push_back(static_cast<TF_DataType>(tfType));
+    }
+  }
+  if (outputTypes.size() != numDims.size()) {
+    internalError(getUserSourceLocation(inst->getDebugLocation()),
+                  "Must specify the same number of shapes and output tensors.",
+                  diag::tfop_invalid_tfop);
+    return;
+  }
 
-  dataset_creation_context->AddInputTypeAndShape(dtype, shapeProto);
+  // Defer the creation of the dataset / iterator related nodes, along with the
+  // associated infeed enqueue till the creation of top level function
+  // nodes. Here we fill in the dataset creation context, and then create an
+  // infeed dequeue node to feed the user(s) of `inst`.
+  datasetCreationContext.reset(
+      new DatasetCreationContext(inst, readsImagenetData, filePath, batchSize,
+                                 dims, numDims, outputTypes));
 
   {
     auto &graphFn = getCurrentGraphFunction();
     auto *desc = TF_NewOperation(graphFn.getGraph(), "InfeedDequeueTuple",
                                  "InfeedDequeueTuple");
     markNodeAsTPUReplicated(desc);
-    dataset_creation_context->SetInfeedTypeAndShapeList(desc, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+    datasetCreationContext->setInfeedTypeAndShapeList(desc);
     auto *dequeue = TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
 
-    // FIXME: Support multiple inputs. When the iterator stack produces K
-    // output tensors, we'll be adding K map entries here.
-    addValueMapping({inst, 0}, {dequeue, 0});
+    for (int i = 0, n = outputTypes.size(); i != n; ++i) {
+      addValueMapping({inst, i}, {dequeue, i});
+    }
   }
 }
 
@@ -779,20 +893,6 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         elements.push_back(cast<SingleValueInstruction>(inst->getOperand(++i)));
       }
     };
-
-    auto decodeShapeElements = [&](SILValue attrValue,
-                                   SmallVectorImpl<int64_t> &shape) {
-      assert(isa<MetatypeInst>(attrValue) &&
-             "$shape should start with a metatype");
-      while (i+1 < e &&
-             tfopInfo.operandClasses[i+1].second ==
-                     SILTensorOpInfo::OperandClass::ArrayElement) {
-        auto eltValue = inst->getOperand(++i);
-        auto intValue = cast<IntegerLiteralInst>(eltValue);
-        shape.push_back(intValue->getValue().getLimitedValue());
-      }
-    };
-
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
@@ -894,8 +994,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         auto shapeAttr = tfopInfo.operandClasses[++i]; (void)shapeAttr;
         assert(shapeAttr.second == SILTensorOpInfo::OperandClass::Shape);
         auto shapeAttrValue = tfopInfo.getAttrOperand(i);
-        decodeShapeElements(shapeAttrValue, shape);
-
+        decodeShapeElements(shapeAttrValue, inst, tfopInfo, i, e, shape);
         auto eltSILType =
           SILType::getPrimitiveObjectType(eltType->getCanonicalType());
         dtype = getTensorFlowDataType(eltSILType, inst->getLoc());
@@ -910,41 +1009,17 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
     case SILTensorOpInfo::OperandClass::Shape: {
       SmallVector<int64_t, 4> shape;
-      decodeShapeElements(operand, shape);
+      decodeShapeElements(operand, inst, tfopInfo, i, e, shape);
       TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
       break;
     }
     case SILTensorOpInfo::OperandClass::ShapeArray: {
-      auto numShapes = (int)cast<IntegerLiteralInst>(operand)
-                                ->getValue().getLimitedValue();
-
       SmallVector<int64_t, 8> dims;
       SmallVector<int, 3> numDims;
-
-      for (int shape = 0; shape != numShapes; ++shape) {
-        auto prevNumDims = dims.size();
-        ++i;  // We consumed an operand.
-        auto nextOperand = inst->getOperand(i);
-        assert(tfopInfo.operandClasses[i].second ==
-                                        SILTensorOpInfo::OperandClass::Shape &&
-               "expected a shape value");
-
-        decodeShapeElements(nextOperand, dims);
-        numDims.push_back(int(dims.size()-prevNumDims));
-      }
-
-      // Now that we've build the array of dimensions, convert it to the array
-      // of pointers that TensorFlow needs.  This is safe now that the vector
-      // has finished its resizing.
       SmallVector<int64_t*, 8> dimPtrs;
-      auto dimPtr = dims.data();
-      for (int shape = 0; shape != numShapes; ++shape) {
-        dimPtrs.push_back(dimPtr);
-        dimPtr += numDims[shape];
-      }
-
+      decodeShapeArray(inst, tfopInfo, i, e, dims, numDims, dimPtrs);
       TF_SetAttrShapeList(op, name.c_str(), dimPtrs.data(), numDims.data(),
-                          numShapes);
+                          numDims.size());
       break;
     }
     case SILTensorOpInfo::OperandClass::Array: {
@@ -1896,7 +1971,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     if (checkStatus(SILFn.getLocation())) return true;
   }
 
-  if (dataset_creation_context) {
+  if (datasetCreationContext) {
     assert(inputs.empty());
     if (createDatasetIteratorNodesWithInfeedEnqueue()) return true;
   }
