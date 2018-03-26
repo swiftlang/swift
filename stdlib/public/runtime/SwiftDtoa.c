@@ -201,10 +201,11 @@ static void intervalContainingPowerOf10_Float(int p, uint64_t *lower, uint64_t *
 #define initialize128WithHigh64(dest, value) ((dest) = (__uint128_t)(value) << 64)
 #define extractHigh64From128(arg) ((uint64_t)((arg) >> 64))
 static int extractIntegerPart128(__uint128_t *fixed128, int fractionBits) {
-    int digits = (int)(*fixed128 >> fractionBits);
+    return (int)(*fixed128 >> fractionBits);
+}
+static void clearIntegerPart128(__uint128_t *fixed128, int fractionBits) {
     const swift_uint128_t fixedPointMask = (((__uint128_t)1 << fractionBits) - 1);
     *fixed128 &= fixedPointMask;
-    return digits;
 }
 #else
 #define increment128(dest)             \
@@ -230,9 +231,11 @@ static void multiply128xi32(swift_uint128_t *lhs, uint32_t rhs);
 #define extractHigh64From128(arg) (((uint64_t)(arg).high << 32)|((arg).c))
 static int extractIntegerPart128(swift_uint128_t *fixed128, int fractionBits) {
     const int highFractionBits = fractionBits % 32;
-    int digits = (int)(fixed128->high >> highFractionBits);
+    return (int)(fixed128->high >> highFractionBits);
+}
+static void clearIntegerPart128(swift_uint128_t *fixed128, int fractionBits) {
+    const int highFractionBits = fractionBits % 32;
     fixed128->high &= ((uint32_t)1 << highFractionBits) - 1;
-    return digits;
 }
 #endif
 static const uint64_t powersOf10_Double[];
@@ -541,6 +544,7 @@ int swift_decompose_double(double d,
 
     // Adjustment above already set up the first digit:
     int nextDigit = extractIntegerPart128(&t, fractionBits);
+    clearIntegerPart128(&t, fractionBits);
 
     // Further optimization: Generating four digits at a time reduces
     // the total arithmetic required per digit.  Note: The following
@@ -552,6 +556,7 @@ int swift_decompose_double(double d,
     swift_uint128_t t0 = t;
     multiply128xi32(&t0, 10000);
     int fourDigits = extractIntegerPart128(&t0, fractionBits); // 4 digits
+    clearIntegerPart128(&t0, fractionBits);
     while (isLessThan128x128(d0, t0)) {
         *digit_p++ = nextDigit;
         int d = fourDigits / 100; // top 2 digits
@@ -565,6 +570,7 @@ int swift_decompose_double(double d,
         multiply128xi32(&d0, 10000);
         multiply128xi32(&t0, 10000);
         fourDigits = extractIntegerPart128(&t0, fractionBits);
+        clearIntegerPart128(&t0, fractionBits);
     }
 
     // Finish by generating one digit at a time.
@@ -573,6 +579,7 @@ int swift_decompose_double(double d,
         multiply128xi32(&delta, 10);
         multiply128xi32(&t, 10);
         nextDigit = extractIntegerPart128(&t, fractionBits);
+        clearIntegerPart128(&t, fractionBits);
     }
 
     // Adjust the final digit to be closer to the original value.
