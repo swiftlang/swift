@@ -16,6 +16,7 @@ var InfeedTests = TestSuite("Infeed")
 @inline(never)
 func testScalarInput() {
   func add(_ x: Float, _ y: Float) -> Float {
+    TensorFlow.enableTPU(infeed: false)
     let x = Tensor<Float>(x)
     let y = Tensor<Float>(y)
     return (x+y).array.scalars[0]
@@ -26,6 +27,8 @@ func testScalarInput() {
 InfeedTests.testTPU("ScalarInput", testScalarInput)
 
 InfeedTests.testTPU("JustDataset") {
+  TensorFlow.enableTPU(infeed: true)
+
   let result: Tensor<Int32> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
     filepath: "dummy_path")
@@ -34,6 +37,8 @@ InfeedTests.testTPU("JustDataset") {
 }
 
 InfeedTests.testTPU("DatasetWithOtherNodes") {
+  TensorFlow.enableTPU(infeed: true)
+
   // 1 is the magic output of the iterator currently hard-coded.
   let x: Tensor<Int32> = #tfop("tfc.makeIteratorGetNextWithDatasets",
     filepath: "dummy_path")
@@ -45,7 +50,7 @@ InfeedTests.testTPU("DatasetWithOtherNodes") {
 // TODO(hongm): Extend shape info support to make this test work.
 // TODO(hongm): Unify with TensorTests.ElementIndexing
 InfeedTests.testTPU("ElementIndexing") {
-  _RuntimeConfig.executionMode = .tpu
+  TensorFlow.enableTPU(infeed: false)
 
   // NOTE: This tests the `subscript(index:)` method, which is distinct from
   // the `subscript(indices:)` method.
