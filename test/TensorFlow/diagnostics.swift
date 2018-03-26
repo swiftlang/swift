@@ -68,3 +68,16 @@ public func invalidAttrTensor(a: Tensor<Float>) {
    () = #tfop("foo", someAttr: a)
 }
 
+// b/76387659 - Verify that there is a way to configure the TPU.
+public func testDevice() {
+  TensorFlow.enableTPU()
+  let a = Tensor<Float>(1.0)
+  _ = a+a
+}
+
+
+// Verify we reject multiple attempts to configure hardware.
+public func testDeviceInvalid() {
+  TensorFlow.enableTPU() // expected-note {{previous configuration is specified here}}
+  TensorFlow.enableTPU() // expected-error {{device configuration specified multiple times}}
+}
