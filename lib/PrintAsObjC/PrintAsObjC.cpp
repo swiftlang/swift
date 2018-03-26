@@ -987,10 +987,21 @@ private:
       ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
 
     const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
-      TAD = aliasTy->getDecl();
-      ty = aliasTy->getSinglyDesugaredType();
-    }
+    do {
+      if (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
+        TAD = aliasTy->getDecl();
+        ty = aliasTy->getSinglyDesugaredType();
+        continue;
+      }
+
+      if (auto boundAliasTy = dyn_cast<BoundNameAliasType>(ty.getPointer())) {
+        TAD = boundAliasTy->getDecl();
+        ty = boundAliasTy->getSinglyDesugaredType();
+        continue;
+      }
+
+      break;
+    } while (true);
 
     return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
   }
@@ -1476,38 +1487,56 @@ private:
       clangTy->isObjCObjectPointerType();
   }
 
+  bool printImportedAlias(const TypeAliasDecl *alias,
+                          Optional<OptionalTypeKind> optionalKind) {
+    if (!alias->hasClangNode()) {
+      if (!alias->isObjC()) return false;
+
+      os << alias->getName();
+      return true;
+    }
+
+    if (auto *clangTypeDecl =
+          dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      maybePrintTagKeyword(alias);
+      os << getNameForObjC(alias);
+
+      if (isClangPointerType(clangTypeDecl))
+        printNullability(optionalKind);
+    } else if (auto *clangObjCClass
+               = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      os << clangObjCClass->getName() << " *";
+      printNullability(optionalKind);
+    } else {
+      auto *clangCompatAlias =
+      cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
+      os << clangCompatAlias->getName() << " *";
+      printNullability(optionalKind);
+    }
+
+    return true;
+  }
+
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (alias->hasClangNode()) {
-      if (auto *clangTypeDecl =
-            dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-        maybePrintTagKeyword(alias);
-        os << getNameForObjC(alias);
-
-        if (isClangPointerType(clangTypeDecl))
-          printNullability(optionalKind);
-      } else if (auto *clangObjCClass
-                   = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-        os << clangObjCClass->getName() << " *";
-        printNullability(optionalKind);
-      } else {
-        auto *clangCompatAlias =
-          cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-        os << clangCompatAlias->getName() << " *";
-        printNullability(optionalKind);
-      }
-
+    if (printImportedAlias(alias, optionalKind))
       return;
-    }
 
-    if (alias->isObjC()) {
-      os << alias->getName();
+    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
+  }
+
+  void visitBoundNameAliasType(BoundNameAliasType *aliasTy,
+                               Optional<OptionalTypeKind> optionalKind) {
+    const TypeAliasDecl *alias = aliasTy->getDecl();
+    if (printIfKnownSimpleType(alias, optionalKind))
       return;
-    }
+
+    if (printImportedAlias(alias, optionalKind))
+      return;
 
     visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
@@ -1949,6 +1978,10 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitNameAliasType(NameAliasType *aliasTy) {
     Callback(*this, aliasTy->getDecl());
+  }
+
+  void visitBoundNameAliasType(BoundNameAliasType *boundAliasTy) {
+    Callback(*this, boundAliasTy->getDecl());
   }
 
   void visitParenType(ParenType *parenTy) {

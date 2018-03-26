@@ -1299,7 +1299,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 }
 
 SubstitutionMap BoundNameAliasType::getSubstitutionMap() const {
-  if (auto genericSig = typealias->getGenericSignature())
+  if (auto genericSig = getGenericSignature())
     return genericSig->getSubstitutionMap(getSubstitutionList());
 
   return SubstitutionMap();
@@ -2837,10 +2837,16 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes)
-      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer()))
+    if (options & SubstFlags::DesugarMemberTypes) {
+      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer())) {
         if (!aliasType->is<ErrorType>())
           witness = aliasType->getSinglyDesugaredType();
+      } else if (auto *boundAliasType =
+                   dyn_cast<BoundNameAliasType>(witness.getPointer())) {
+        if (!boundAliasType->is<ErrorType>())
+          witness = boundAliasType->getSinglyDesugaredType();
+      }
+    }
 
     if (witness->is<ErrorType>())
       return failed();
@@ -3665,22 +3671,26 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType) {
+    if (oldParentType && !oldParentType->hasTypeParameter() &&
+        !oldParentType->hasArchetype()) {
       newParentType = oldParentType.transformRec(fn);
-      if (!newParentType) return Type();
+      if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
-    auto genericSig = alias->getDecl()->getGenericSignature();
-    if (genericSig) {
+    if (auto genericSig = subMap.getGenericSignature()) {
       for (Type gp : genericSig->getGenericParams()) {
         Type oldReplacementType = gp.subst(subMap);
         if (!oldReplacementType)
           return newUnderlyingType;
 
+        if (oldReplacementType->hasTypeParameter() ||
+            oldReplacementType->hasArchetype())
+          return newUnderlyingType;
+
         Type newReplacementType = oldReplacementType.transformRec(fn);
         if (!newReplacementType)
-          return Type();
+          return newUnderlyingType;
 
         // If anything changed with the replacement type, we lose the sugar.
         // FIXME: This is really unfortunate.

@@ -582,7 +582,8 @@ public:
         abort();
       }
 
-      bool foundError = type.findIf([&](Type type) -> bool {
+      bool foundError = type->hasArchetype() &&
+      type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
@@ -2116,6 +2117,7 @@ public:
       // Make sure that there are no archetypes in the interface type.
       if (VD->getDeclContext()->isTypeContext() &&
           !hasEnclosingFunctionContext(VD->getDeclContext()) &&
+          VD->getInterfaceType()->hasArchetype() &&
           VD->getInterfaceType().findIf([](Type type) {
             return type->is<ArchetypeType>();
           })) {

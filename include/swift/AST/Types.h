@@ -1574,7 +1574,8 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class BoundNameAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<BoundNameAliasType, Type, Substitution>
+    llvm::TrailingObjects<BoundNameAliasType, Type, GenericSignature *,
+                          Substitution>
 {
   TypeAliasDecl *typealias;
 
@@ -1593,6 +1594,10 @@ class BoundNameAliasType final
     return Bits.BoundNameAliasType.HasParent ? 1 : 0;
   }
 
+  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
+    return getNumSubstitutions() > 0 ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<Substitution>) const {
     return getNumSubstitutions();
   }
@@ -1601,6 +1606,13 @@ class BoundNameAliasType final
   /// produce the underlying type.
   SubstitutionList getSubstitutionList() const {
     return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+  }
+
+  /// Retrieve the generic signature used for substitutions.
+  GenericSignature *getGenericSignature() const {
+    return getNumSubstitutions() > 0
+             ? *getTrailingObjects<GenericSignature *>()
+             : nullptr;
   }
 
 public:
@@ -1637,7 +1649,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, const SubstitutionMap &substitutions);
+                      Type parent, const SubstitutionMap &substitutions,
+                      Type underlying);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

@@ -2500,6 +2500,14 @@ namespace {
             if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
+            // Don't create an extra typealias in the imported module because
+            // doing so will cause confusion (or even lookup ambiguity) between
+            // the name in the imported module and the same name in the
+            // standard library.
+            if (auto *BNAT =
+                  dyn_cast<BoundNameAliasType>(SwiftType.getPointer()))
+              return BNAT->getDecl();
+
             auto *NTD = SwiftType->getAnyNominal();
             assert(NTD);
             return NTD;

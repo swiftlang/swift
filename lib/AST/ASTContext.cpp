@@ -2902,12 +2902,14 @@ BoundNameAliasType::BoundNameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 
   // Record the substitutions.
-  if (auto genericSig = typealias->getGenericSignature()) {
+  if (auto genericSig = substitutions.getGenericSignature()) {
     SmallVector<Substitution, 4> flatSubs;
     genericSig->getSubstitutions(substitutions, flatSubs);
     Bits.BoundNameAliasType.NumSubstitutions = flatSubs.size();
     std::copy(flatSubs.begin(), flatSubs.end(),
               getTrailingObjects<Substitution>());
+
+    *getTrailingObjects<GenericSignature *>() = genericSig;
   } else {
     Bits.BoundNameAliasType.NumSubstitutions = 0;
   }
@@ -2919,14 +2921,21 @@ BoundNameAliasType *BoundNameAliasType::get(
                                         const SubstitutionMap &substitutions,
                                         Type underlying) {
   // Compute the recursive properties.
+  //
   auto properties = underlying->getRecursiveProperties();
-  if (parent)
+  auto storedProperties = properties;
+  if (parent) {
     properties |= parent->getRecursiveProperties();
-  auto genericSig = typealias->getGenericSignature();
+    if (parent->hasTypeVariable())
+      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+  }
+  auto genericSig = substitutions.getGenericSignature();
   if (genericSig) {
     for (Type gp : genericSig->getGenericParams()) {
-      properties |= gp.subst(substitutions, SubstFlags::UseErrorType)
-                      ->getRecursiveProperties();
+      auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
+      properties |= substGP->getRecursiveProperties();
+      if (substGP->hasTypeVariable())
+        storedProperties |= RecursiveTypeProperties::HasTypeVariable;
     }
   }
 
@@ -2936,7 +2945,8 @@ BoundNameAliasType *BoundNameAliasType::get(
 
   // Profile the type.
   llvm::FoldingSetNodeID id;
-  BoundNameAliasType::Profile(id, typealias, parent, substitutions);
+  BoundNameAliasType::Profile(id, typealias, parent, substitutions,
+                              underlying);
 
   // Did we already record this type?
   void *insertPos;
@@ -2947,26 +2957,31 @@ BoundNameAliasType *BoundNameAliasType::get(
   // Build a new type.
   unsigned numSubstitutions =
     genericSig ? genericSig->getSubstitutionListSize() : 0;
+  assert(static_cast<bool>(genericSig) == numSubstitutions > 0);
   auto size =
-    totalSizeToAlloc<Type, Substitution>(parent ? 1 : 0, numSubstitutions);
+    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
+                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
   auto mem = ctx.Allocate(size, alignof(BoundNameAliasType), arena);
   auto result = new (mem) BoundNameAliasType(typealias, parent, substitutions,
-                                             underlying, properties);
+                                             underlying, storedProperties);
   types.InsertNode(result, insertPos);
   return result;
 }
 
 void BoundNameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
-  Profile(id, getDecl(), getParent(), getSubstitutionMap());
+  Profile(id, getDecl(), getParent(), getSubstitutionMap(),
+          Type(getSinglyDesugaredType()));
 }
 
 void BoundNameAliasType::Profile(
                            llvm::FoldingSetNodeID &id,
                            TypeAliasDecl *typealias,
-                           Type parent, const SubstitutionMap &substitutions) {
+                           Type parent, const SubstitutionMap &substitutions,
+                           Type underlying) {
   id.AddPointer(typealias);
   id.AddPointer(parent.getPointer());
   substitutions.profile(id);
+  id.AddPointer(underlying.getPointer());
 }
 
 // Simple accessors.
