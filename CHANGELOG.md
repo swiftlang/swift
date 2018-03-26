@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift 5.0](#swift-50) |
 | [Swift 4.2](#swift-42) |
 | [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
@@ -19,6 +20,43 @@ CHANGELOG
 | [Swift 1.0](#swift-10) |
 
 </details>
+
+Swift 5.0
+---------
+
+- [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+
+  For example:
+  ```swift
+  class Node {
+    var children = [Node]()
+
+    var depth: Int {
+      didSet {
+        if depth < 0 {
+          // Will not recursively call didSet, as setting depth on self (same
+          // with `self.depth = 0`).
+          depth = 0
+        }
+
+        // Will call didSet for each of the children, as we're not setting the
+        // property on self (prior to Swift 5, this did not trigger property
+        // observers to be called again).
+        for child in children {
+          child.depth = depth + 1
+        }
+      }
+    }
+
+    init(depth: Int) {
+      self.depth = depth
+    }
+  }
+  ```
+
+**Add new entries to the top of this section, not here!**
 
 Swift 4.2
 ---------
@@ -55,7 +93,7 @@ Swift 4.2
 	conditionally conforms to `P`, will succeed when the conditional
 	requirements are met.
 
-**Add new entries to the top of this file, not here!**
+**Add new entries to the top of this section, not here!**
 
 Swift 4.1
 ---------
@@ -276,7 +314,7 @@ Swift 4.0
   CFHash and CFEqual as the implementation. This change applies even to "Swift
   3 mode", so if you were previously adding this conformance yourself, use
   `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
-  ([SR-2388](https://bugs.swift.org/browse/SR-2388))
+  ([SR-2388][])
 
 * [SE-0156][]
 
@@ -425,7 +463,7 @@ Swift 4.0
   slice[i..<j] = buffer[k..<l]
   ```
 
-* [SR-1529](https://bugs.swift.org/browse/SR-1529):
+* [SR-1529][]:
 
   Covariant method overrides are now fully supported, fixing many crashes
   and compile-time assertions when defining or calling such methods.
@@ -508,7 +546,7 @@ Swift 3.1
   side effects, leading to bugs when Swift code attempted to override
   `initialize`.
 
-* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+* [SR-2394][]
 
   C functions that "return twice" are no longer imported into Swift. Instead,
   they are explicitly made unavailable, so attempting to reference them will
@@ -585,7 +623,7 @@ Swift 3.1
   is not guaranteed to work in future versions of Swift, and will
   now raise a warning.
 
-* [SR-1446](https://bugs.swift.org/browse/SR-1446)
+* [SR-1446][]
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
 
@@ -605,7 +643,7 @@ Swift 3.1
   extension OuterGeneric.InnerGeneric {}
   ```
 
-* [SR-1009](https://bugs.swift.org/browse/SR-1009):
+* [SR-1009][]:
 
   Constrained extensions allow same-type constraints between generic parameters and concrete types. This enables you to create extensions, for example, on `Array` with `Int` elements:
 
@@ -827,7 +865,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     var x2 = p as! [Int]
     ```
 
-* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+* [SR-2131][]:
 
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a prefix and suffix of all strings.
 
@@ -6915,3 +6953,11 @@ Swift 1.0
 [SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+
+[SR-419]: <https://bugs.swift.org/browse/SR-419>
+[SR-1009]: <https://bugs.swift.org/browse/SR-1009>
+[SR-1446]: <https://bugs.swift.org/browse/SR-1446>
+[SR-1529]: <https://bugs.swift.org/browse/SR-1529>
+[SR-2131]: <https://bugs.swift.org/browse/SR-2131>
+[SR-2388]: <https://bugs.swift.org/browse/SR-2388>
+[SR-2394]: <https://bugs.swift.org/browse/SR-2394>
