@@ -445,6 +445,20 @@ public:
     bool shouldVerify(Pattern *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
 
+    bool shouldVerify(TypeAliasDecl *typealias) {
+      // Don't verify type aliases formed by the debugger; they violate some
+      // AST invariants involving archetypes.
+      if (typealias->isDebuggerAlias()) return false;
+
+      // FIXME: Temporary hack to bridge the gap until LLDB starts setting
+      // the "debugger alias" flag.
+      if (typealias->getName().str().startswith("$") &&
+          typealias->getName().str().contains("lldb"))
+        return false;
+
+      return true;
+    }
+
     // Default cases for whether we should verify a checked subtree.
     bool shouldVerifyChecked(Expr *E) {
       if (!E->getType()) {
@@ -582,8 +596,7 @@ public:
         abort();
       }
 
-      bool foundError = false &&
-      type->getCanonicalType().findIf([&](Type type) -> bool {
+      bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
