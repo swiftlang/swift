@@ -43,23 +43,25 @@ static llvm::cl::opt<bool>
 TFTargetTPU("tf-target-tpu", llvm::cl::init(false),
             llvm::cl::desc("If true, target TPU in the generated TF graph"));
 
-// FIXME: Remove this flag by always enabling it -tf-target-tpu is enabled.
-static llvm::cl::opt<bool> TFUseTPUInfeed(
-    "tf-tpu-use-infeed", llvm::cl::init(false),
-    llvm::cl::desc(
-        "If true and tf-target-tpu is enabled, use infeed "
-        "enqueue/dequeue nodes in the the generated TF TPU graph, where the "
-        "infeed enqueue node is always named 'InfeedEnqueueTuple'"));
-
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
 static InFlightDiagnostic
-diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
-  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+diagnose(SILFunction &fn, SILLocation loc, Diag<T...> diag, U &&...args) {
+  auto &diags = fn.getASTContext().Diags;
+  return diags.diagnose(loc.getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
-static const char *const DEVICE_TPU_REPLICATED_CORE = "TPU_REPLICATED_CORE";
-static const char *const DEVICE_TPU_SYSTEM = "TPU_SYSTEM";
+
+/// This struct holds information about the global configuration of the graph
+/// we are generating.  This can be different between distinct graphs in the
+/// same program though.
+struct GraphGlobalConfiguration {
+  bool isTPUEnabled = false;
+  bool isTPUInfeedEnabled = false;
+};
+
+static const char DEVICE_TPU_REPLICATED_CORE[] = "TPU_REPLICATED_CORE";
+static const char DEVICE_TPU_SYSTEM[] = "TPU_SYSTEM";
 
 /// When generating a TF TPU graph, call this function to place an eligible TF
 /// graph node onto TPU device. Some nodes such as Placeholder and
@@ -104,6 +106,8 @@ namespace {
   /// including its inputs, outputs, live-in values used by the loop and the
   /// ops created that make it up.
   struct GraphFunctionBody {
+    GraphGlobalConfiguration configuration;
+
     /// This is the temporary Graph we use to build up the body of this
     /// function.  When we're done building the graph, we transform it into a
     /// graph function, then copy it out into a resultGraph, deleting both the
@@ -139,8 +143,8 @@ namespace {
     std::vector<const TF_Operation*> operations;
 
   public:
-    GraphFunctionBody()
-      : graph(TF_NewGraph(), &TF_DeleteGraph) {}
+    GraphFunctionBody(GraphGlobalConfiguration configuration)
+      : configuration(configuration), graph(TF_NewGraph(), &TF_DeleteGraph) {}
 
     TF_Graph *getGraph() const { return graph.get(); }
 
@@ -155,7 +159,7 @@ namespace {
         TF_AddControlInput(desc, controlDependenceValue);
 
       // If this node should be put onto TPU, mark it with an attribute.
-      if (TFTargetTPU && isEligibleForTPU) {
+      if (configuration.isTPUEnabled && isEligibleForTPU) {
         markNodeAsTPUReplicated(desc);
       }
 
@@ -174,7 +178,8 @@ namespace {
 
 namespace {
 struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
-  SILFunction *SILFn;
+  SILFunction &SILFn;
+  GraphGlobalConfiguration configuration;
   TF_Graph *resultGraph = TF_NewGraph();
   TF_Status *status = TF_NewStatus();
 
@@ -194,7 +199,8 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   /// gracefully.
   bool errorOccurred = false;
 public:
-  TFGraphLowering(SILFunction *F) : SILFn(F) {}
+  TFGraphLowering(SILFunction &fn, GraphGlobalConfiguration configuration)
+    : SILFn(fn), configuration(configuration) {}
 
   /// Return the current graph function that is being set up.
   GraphFunctionBody &getCurrentGraphFunction() {
@@ -221,7 +227,7 @@ public:
 
   void internalError(SILLocation loc, std::string message,
                      Diag<StringRef> id = diag::tf_lowering_error) {
-    diagnose(SILFn->getASTContext(), loc.getSourceLoc(), id, message);
+    diagnose(SILFn, loc, id, message);
     errorOccurred = true;
   }
 
@@ -474,7 +480,7 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
   // Skip over internal implementation details of the Tensor library.
   loc = skipInternalLocations(loc);
 
-  auto &SM = SILFn->getASTContext().SourceMgr;
+  auto &SM = SILFn.getASTContext().SourceMgr;
 
   // Form a name for this op based on the user's source location and "stack
   // trace" of where it got inlined in user code.  We use the form
@@ -607,6 +613,9 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
   if (inst->getName().str().startswith(
           "__tfop_tfc.makeIteratorGetNextWithDatasets"))
     return visitTFDataset(inst);
+  // This is a marker that doesn't actually directly generate graph logic.
+  if (inst->getName().str().startswith("__tfop_tfc.configureTPU"))
+    return;
   if (inst->getName().str().startswith("__tfop_"))
     return visitTFOpInst(inst);
 
@@ -659,9 +668,9 @@ bool TFGraphLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
     TF_SetDevice(desc, "/device:CPU:0");
     TF_SetAttrInt(desc, "device_ordinal", 0);
     dataset_creation_context->SetInfeedTypeAndShapeList(desc, status);
-    if (checkStatus(SILFn->getLocation())) return true;
-    TF_Operation* enqueue = TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn->getLocation())) return true;
+    if (checkStatus(SILFn.getLocation())) return true;
+    /*TF_Operation* enqueue =*/ TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn.getLocation())) return true;
   }
 
   return false;
@@ -669,7 +678,7 @@ bool TFGraphLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
 
 void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   // FIXME: Also support dataset/iterator outside of TPU context.
-  if(!TFTargetTPU || !TFUseTPUInfeed) {
+  if(!configuration.isTPUEnabled || !configuration.isTPUInfeedEnabled) {
     internalError(
         getUserSourceLocation(inst->getDebugLocation()),
         "Builtin tfc.makeIteratorGetNextWithDatasets can only be used when "
@@ -1016,12 +1025,21 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   auto *result =
       graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
 
-  // If the node builder failed, then the tfop definition is wrong, report an
-  // error in a way that can hopefully be fixed - pointing to the op definition
-  // in the Swift code, and emitting the TensorFlow error information.
-  if (checkStatus(getUserSourceLocation(inst->getDebugLocation()),
-                  diag::tfop_incorrect_definition))
+  // If the node builder failed, then something is wrong.  Handle a few special
+  // cases to improve the diagnostics.
+  if (TF_GetCode(status) != TF_OK) {
+    auto loc = getUserSourceLocation(inst->getDebugLocation());
+
+    StringRef message = TF_Message(status);
+    if (message.startswith("Op type not registered")) {
+      internalError(loc, tfopInfo.opName.str(), diag::tf_lowering_unknown_op);
+      return;
+    }
+
+    // Otherwise, emit a generic error message.
+    internalError(loc, message);
     return;
+  }
 
   // Check to make sure that the operation produces the number of results we
   // expect, and wire them into the valueMapping result table.
@@ -1035,7 +1053,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   }
 
   if (numOpResults != numActualResults) {
-    diagnose(SILFn->getASTContext(), inst->getLoc().getSourceLoc(),
+    diagnose(SILFn, inst->getLoc(),
              diag::tfop_incorrect_definition,
              "TensorFlow op '" + tfopInfo.opName.str() + "' produces " +
              llvm::utostr(numOpResults) + " result, but Swift function "
@@ -1489,7 +1507,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
     // Remember the result type for later when we're building the op node.
     outputTypes.push_back(getTensorFlowDataType(arg->getType(),
-                                                SILFn->getLocation()));
+                                                SILFn.getLocation()));
 
     // If the false code function has the results in the wrong order, reorder
     // them.  This isn't an efficient algorithm, but should suffice for now.
@@ -1640,7 +1658,7 @@ lowerToFunction(const std::function<void()> &body) {
   ValueMappingScopedHashTable::ScopeTy scope(valueMapping);
 
   /// Start a new graph function.
-  functionStack.push_back(GraphFunctionBody());
+  functionStack.push_back(GraphFunctionBody(configuration));
 
   // Lower the code in the body however the caller wants to do it.
   body();
@@ -1657,7 +1675,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
     TF_SetAttrInt(desc, "num_replicas", 1);
     markNodeAsTPUReplicated(desc);
     *metadataNode = TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn->getLocation()))
+    if (checkStatus(SILFn.getLocation()))
       return true;
   }
 
@@ -1666,7 +1684,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
                                  "ConfigureDistributedTPU");
     TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
     TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn->getLocation()))
+    if (checkStatus(SILFn.getLocation()))
       return true;
   }
 
@@ -1675,7 +1693,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
                                  "ShutdownDistributedTPU");
     TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
     TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn->getLocation()))
+    if (checkStatus(SILFn.getLocation()))
       return true;
   }
 
@@ -1685,7 +1703,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
 bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     StringRef funcName, ArrayRef<TF_Output> inputs, unsigned numOutputs) {
   TF_Operation *metadataNode = nullptr;
-  if (TFTargetTPU) {
+  if (configuration.isTPUEnabled) {
     if (addTopLevelTPUConfigLogic(&metadataNode)) {
       // An error has occurred. Abort graph generation.
       return true;
@@ -1720,11 +1738,10 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   TF_OperationDescription *funcDesc =
       TF_NewOperation(resultGraph, /*op_type*/ funcNameStr.c_str(),
                       /*op_name*/ funcNodeName.c_str());
-  if (TFTargetTPU) {
+  if (configuration.isTPUEnabled)
     markNodeAsTPUReplicated(funcDesc);
-  }
 
-  bool addTPUInfeedNodes = TFTargetTPU && TFUseTPUInfeed && !inputs.empty();
+  bool addTPUInfeedNodes = configuration.isTPUInfeedEnabled && !inputs.empty();
   // These vectors are only used when addTPUInfeedNodes is true.
   std::vector<TF_Output> infeedInputs;
   infeedInputs.reserve(inputs.size());
@@ -1746,16 +1763,16 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
     TF_SetAttrType(inputDesc, "dtype", TF_OperationOutputType(inputs[i]));
     TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
-    if (checkStatus(SILFn->getLocation())) return true;
+    if (checkStatus(SILFn.getLocation())) return true;
     TF_Output inputNode{placeholder, 0};
-    if (!TFTargetTPU) {
+    if (!configuration.isTPUEnabled) {
       // Feed I directly into F.
       TF_AddInput(funcDesc, inputNode);
     } else if (!addTPUInfeedNodes) {
       // Add some intermediate nodes between I and F.
       TF_Operation *replicatedInput;
       {
-        const std::string nodeName = "TPUReplicate/input" + std::to_string(i);
+        std::string nodeName = "TPUReplicate/input" + std::to_string(i);
         auto *desc = TF_NewOperation(resultGraph, "TPUReplicatedInput",
                                      nodeName.c_str());
         SmallVector<TF_Output, 1> input;
@@ -1763,30 +1780,30 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
         // This node requires an input list.
         TF_AddInputList(desc, input.data(), input.size());
         replicatedInput = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn->getLocation())) return true;
+        if (checkStatus(SILFn.getLocation())) return true;
       }
       {
-        const std::string nodeName =
-            "TPUReplicate/replicated_input_" + std::to_string(i);
+        std::string nodeName =
+          "TPUReplicate/replicated_input_" + std::to_string(i);
         auto *desc = TF_NewOperation(resultGraph, "Identity", nodeName.c_str());
         TF_AddControlInput(desc, metadataNode);
         TF_AddInput(desc, {replicatedInput, 0});
         markNodeAsTPUReplicated(desc);
         TF_Operation *idInput = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn->getLocation())) return true;
+        if (checkStatus(SILFn.getLocation())) return true;
         TF_AddInput(funcDesc, {idInput, 0});
       }
     } else {
       // Collect the input tensors' metadata, to be used for infeed node
       // construction later.
       assert(!inputs.empty());
-      const TF_Output inputPlaceholder = {placeholder, 0};
+      TF_Output inputPlaceholder = {placeholder, 0};
       infeedInputs.push_back(inputPlaceholder);
       infeedInputDtypes.push_back(TF_OperationOutputType(inputPlaceholder));
       TF_Buffer *shapeProto = TF_NewBuffer();
       TF_OperationGetAttrTensorShapeProto(placeholder, "shape", shapeProto,
                                           status);
-      if (checkStatus(SILFn->getLocation())) return true;
+      if (checkStatus(SILFn.getLocation())) return true;
       infeedInputShapes.push_back(shapeProto);
     }
   }
@@ -1813,9 +1830,9 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
       TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
                                      shapeProtoLens.data(),
                                      shapeProtos.size(), status);
-      if (checkStatus(SILFn->getLocation())) return true;
+      if (checkStatus(SILFn.getLocation())) return true;
       TF_FinishOperation(desc, status);
-      if (checkStatus(SILFn->getLocation())) return true;
+      if (checkStatus(SILFn.getLocation())) return true;
     }
     // The enqueue node runs on TPU.
     {
@@ -1828,16 +1845,16 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
       TF_SetAttrTensorShapeProtoList(desc, "shapes", shapeProtos.data(),
                                      shapeProtoLens.data(),
                                      shapeProtos.size(), status);
-      if (checkStatus(SILFn->getLocation())) return true;
+      if (checkStatus(SILFn.getLocation())) return true;
       auto *dequeue = TF_FinishOperation(desc, status);
-      if (checkStatus(SILFn->getLocation())) return true;
+      if (checkStatus(SILFn.getLocation())) return true;
       for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
         TF_AddInput(funcDesc, {dequeue, static_cast<int>(i)});
       }
     }
   }
   TF_Operation *funcNode = TF_FinishOperation(funcDesc, status);
-  if (checkStatus(SILFn->getLocation())) return true;
+  if (checkStatus(SILFn.getLocation())) return true;
 
   // Now handle outputs.
   for (unsigned i = 0; i != numOutputs; ++i) {
@@ -1846,7 +1863,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     TF_OperationDescription *outputDesc =
         TF_NewOperation(resultGraph, "Identity", outputNodeName.c_str());
     TF_Output funcOutputNode{funcNode, static_cast<int>(i)};
-    if (!TFTargetTPU) {
+    if (!configuration.isTPUEnabled) {
       // Feed F directly into O.
       TF_AddInput(outputDesc, funcOutputNode);
     } else {
@@ -1862,7 +1879,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_SetDevice(desc, deviceName.c_str());
         markNodeAsTPUReplicated(desc);
         outputIdNode = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn->getLocation())) return true;
+        if (checkStatus(SILFn.getLocation())) return true;
       }
       {
         const std::string nodeName = "TPUReplicate/output" + std::to_string(i);
@@ -1871,12 +1888,12 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_AddInput(desc, {outputIdNode, 0});
         TF_SetAttrInt(desc, "num_replicas", 1);
         TF_Operation *replicatedOutputNode = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn->getLocation())) return true;
+        if (checkStatus(SILFn.getLocation())) return true;
         TF_AddInput(outputDesc, {replicatedOutputNode, 0});
       }
     }
-    TF_Operation *outputNode = TF_FinishOperation(outputDesc, status);
-    if (checkStatus(SILFn->getLocation())) return true;
+    /*TF_Operation *outputNode =*/ TF_FinishOperation(outputDesc, status);
+    if (checkStatus(SILFn.getLocation())) return true;
   }
 
   if (dataset_creation_context) {
@@ -1921,7 +1938,7 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
                                      /*outputnames*/ nullptr,
                                      /*functionoptions*/ nullptr, "", status);
   // Diagnose any error that occurred if it happened building the graph.
-  if (checkStatus(SILFn->getLocation()))
+  if (checkStatus(SILFn.getLocation()))
     return true;
   SWIFT_DEFER { TF_DeleteFunction(resultFn); };
 
@@ -1930,7 +1947,7 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
   // we don't want the nodes for the original function body to end up in the
   // result graph.
   TF_GraphCopyFunction(resultGraph, resultFn, /*gradient*/nullptr, status);
-  if (checkStatus(SILFn->getLocation()))
+  if (checkStatus(SILFn.getLocation()))
     return true;
 
   if (isTopLevelFunction) {
@@ -1952,14 +1969,14 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
 
   // Serialize the graph into the buffer.
   TF_GraphToGraphDef(resultGraph, buffer, status);
-  if (checkStatus(SILFn->getLocation())) return {};
+  if (checkStatus(SILFn.getLocation())) return {};
 
   // If the user wants a copy of the graph in /tmp, emit it now.
   if (TFDumpGraph) {
     int resultFD = -1;
     SmallString<64> resultPath;
     auto error = llvm::sys::fs::createTemporaryFile(
-        "tf-dump-graph-" + SILFn->getName().str(), "pb", resultFD, resultPath);
+        "tf-dump-graph-" + SILFn.getName().str(), "pb", resultFD, resultPath);
     if (error) {
       llvm::errs() << "error opening '" << resultPath.str()
                    << "' for -tf-dump-graph emission!\n";
@@ -1973,7 +1990,7 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
 
     // Also write in a textual format.
     error = llvm::sys::fs::createTemporaryFile(
-        "tf-dump-graph-" + SILFn->getName().str(), "pbtxt", resultFD,
+        "tf-dump-graph-" + SILFn.getName().str(), "pbtxt", resultFD,
         resultPath);
     if (error) {
       llvm::errs() << "error opening '" << resultPath.str()
@@ -1997,6 +2014,55 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
 
   auto bufPtr = (const char*)buffer->data;
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
+}
+
+/// Scan the specified function, looking for logic that configures the current
+/// graph.
+GraphGlobalConfiguration findConfigurationInfo(SILFunction &fn) {
+  GraphGlobalConfiguration result;
+
+  SILInstruction *alreadyFound = nullptr;
+  for (auto &bb : fn)
+    for (auto &inst : bb) {
+      // Scan for the device configuration ops if present.
+      auto tfopInfo = SILTensorOpInfo::decode(&inst);
+      if (!tfopInfo ||
+          tfopInfo->opName != "tfc.configureTPU")
+        continue;
+
+      // If we found one, make sure we don't have more than one.
+      if (alreadyFound) {
+        diagnose(fn, inst.getLoc(), diag::tf_lowering_multiple_device);
+        diagnose(fn, alreadyFound->getLoc(),
+                 diag::tf_lowering_multiple_device_prev);
+        continue;
+      }
+
+      // Otherwise, remember this one and decode it.
+      alreadyFound = &inst;
+
+      // Eventually we'll support multiple different configuration ops, so
+      // we recheck the opcode here.
+      if (tfopInfo->opName == "tfc.configureTPU") {
+        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
+        result.isTPUEnabled = true;
+        auto infeedEnabled =
+          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        result.isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+
+      } else {
+        llvm_unreachable("unknown device configuration op");
+      }
+    }
+
+
+  // If the program didn't specify, fall back to the command line option.
+  // FIXME: We should remove this command line flag and convert the testsuite
+  // over to using the new mechanism directly.
+  if (!alreadyFound)
+    result.isTPUEnabled = TFTargetTPU;
+
+  return result;
 }
 
 #endif // SWIFT_ENABLE_TENSORFLOW
@@ -2027,11 +2093,13 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   // console, which are just noise.  This is apparently controlled through
   // an environment variable, so we set it to silence these informational logs.
   //
-  // TODO: is there a better way to silence this?  We could forcably change
+  // TODO: is there a better way to silence this?  We could forcibly change
   // the file descriptor mapping...
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
-  TFGraphLowering graphGen(fn);
+  GraphGlobalConfiguration configuration = findConfigurationInfo(*fn);
+
+  TFGraphLowering graphGen(*fn, configuration);
   auto graphFnBody = graphGen.lowerToFunction([&]() {
     // This is the top level of the function, add its formal arguments.
     graphGen.lowerArgumentsToParams(fn->getArguments(), {}, fn->getLocation());
@@ -2044,7 +2112,7 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   });
 
   // Create the graph function for the top level code.
-  auto fnName = graphGen.SILFn->getName();
+  auto fnName = graphGen.SILFn.getName();
   if (fnName.startswith("$"))
     fnName = fnName.substr(1);
 

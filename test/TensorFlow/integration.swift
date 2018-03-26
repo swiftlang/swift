@@ -386,7 +386,7 @@ public func testResourceAndVariants() {
   //     .Attr("Toutput_types: list(type) >= 1")
   //     .Attr("output_shapes: list(shape) >= 1")
   let dataset: VariantHandle =
-    // expected-error @+1 {{Op type not registered 'TensorDataSet'}}
+    // expected-error @+1 {{op named 'TensorDataSet' is not registered in TensorFlow}}
     #tfop("TensorDataSet", values, Toutput_types: [Float.self],
           output_shapes: [TensorShape(1)])
 

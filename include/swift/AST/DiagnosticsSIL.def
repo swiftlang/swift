@@ -230,6 +230,12 @@ ERROR(tfop_incorrect_definition, none,
       (StringRef))
 ERROR(tf_lowering_error, none,
       "internal error generating TensorFlow graph:\n%0", (StringRef))
+ERROR(tf_lowering_unknown_op, none,
+      "op named '%0' is not registered in TensorFlow", (StringRef))
+ERROR(tf_lowering_multiple_device, none,
+      "device configuration specified multiple times", ())
+NOTE(tf_lowering_multiple_device_prev, none,
+      "previous configuration is specified here", ())
 
 WARNING(tf_value_implicitly_copied_to_accel, none,
         "%0 implicitly copied to the accelerator, use .toDevice() to make "
