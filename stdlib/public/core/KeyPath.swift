@@ -159,6 +159,27 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
     return try f(KeyPathBuffer(base: base))
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _storedInlineOffset: Int? {
+    return withBuffer {
+      var buffer = $0
+      var offset = 0
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
+
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap:
+          return .none
+        }
+
+        if optNextType == nil { return .some(offset) }
+      }
+    }
+  }
 }
 
 /// A partially type-erased key path, from a concrete root type to any

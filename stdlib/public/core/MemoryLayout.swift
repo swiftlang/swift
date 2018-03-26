@@ -162,4 +162,41 @@ extension MemoryLayout {
   public static func alignment(ofValue value: T) -> Int {
     return MemoryLayout.alignment
   }
+
+  /// Returns the offset of an inline stored property of `T` within the
+  /// in-memory representation of `T`.
+  ///
+  /// If the given `key` refers to inline storage within the
+  /// in-memory representation of `T`, and the storage is directly
+  /// addressable (meaning that accessing it does not need to trigger any
+  /// `didSet` or `willSet` accessors, perform any representation changes
+  /// such as bridging or closure reabstraction, or mask the value out of
+  /// overlapping storage as for packed bitfields), then the return value
+  /// is a distance in bytes that can be added to a pointer of type `T` to
+  /// get a pointer to the storage accessed by `key`. If the return value is
+  /// non-nil, then these formulations are equivalent:
+  ///
+  ///   var root: T, value: U
+  ///   var key: WritableKeyPath<T, U>
+  ///   // Mutation through the key path...
+  ///   root[keyPath: \.key] = value
+  ///   // ...is exactly equivalent to mutation through the offset pointer...
+  ///   withUnsafePointer(to: &root) {
+  ///     (UnsafeMutableRawPointer($0) + MemoryLayout<T>.offset(of: \.key))
+  ///       // ...which can be assumed to be bound to the target type
+  ///       .assumingMemoryBound(to: U.self).pointee = value
+  ///   }
+  ///
+  /// - Parameter key: A key path referring to storage that can be accessed
+  ///   through a value of type `T`.
+  /// - Returns: The offset in bytes from a pointer to a value of type `T`
+  ///   to a pointer to the storage referenced by `key`, or `nil` if no
+  ///   such offset is available for the storage referenced by `key`, such as
+  ///   because `key` is computed, has observers, requires reabstraction, or
+  ///   overlaps storage with other properties.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func offset(of key: PartialKeyPath<T>) -> Int? {
+    return key._storedInlineOffset
+  }
 }

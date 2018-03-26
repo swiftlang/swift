@@ -666,6 +666,32 @@ keyPath.test("subscripts") {
   expectEqual(base[keyPath: ints_be], (17 + 38).bigEndian)
 }
 
+struct NonOffsetableProperties {
+  // observers
+  var x: Int { didSet {} }
+  // reabstracted
+  var y: () -> ()
+  // computed
+  var z: Int { return 0 }
+}
+
+keyPath.test("offsets") {
+  let SLayout = MemoryLayout<S<Int>>.self
+  expectNotNil(SLayout.offset(of: \S<Int>.x))
+  expectNotNil(SLayout.offset(of: \S<Int>.y))
+  expectNotNil(SLayout.offset(of: \S<Int>.z))
+  expectNotNil(SLayout.offset(of: \S<Int>.p))
+  expectNotNil(SLayout.offset(of: \S<Int>.p.x))
+  expectNotNil(SLayout.offset(of: \S<Int>.p.y))
+  expectNotNil(SLayout.offset(of: \S<Int>.c))
+  expectNil(SLayout.offset(of: \S<Int>.c.x))
+
+  let NOPLayout = MemoryLayout<NonOffsetableProperties>.self
+  expectNil(NOPLayout.offset(of: \NonOffsetableProperties.x))
+  expectNil(NOPLayout.offset(of: \NonOffsetableProperties.y))
+  expectNil(NOPLayout.offset(of: \NonOffsetableProperties.z))
+}
+
 // SR-6096
 
 protocol Protocol6096 {}
