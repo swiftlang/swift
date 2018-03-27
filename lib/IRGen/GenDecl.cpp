@@ -4319,9 +4319,6 @@ void IRGenModule::generateCallToOutlinedCopyAddr(
   llvm::Type *llvmType = dest->getType();
   auto *outlinedF =
       (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
-  llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
-  assert(fn && "Expected llvm::Function");
-  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
   llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
 }
@@ -4366,12 +4363,6 @@ void IRGenModule::generateCallToOutlinedDestroy(
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);
-
-  if (T.hasArchetype()) {
-    llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
-    assert(fn && "Expected llvm::Function");
-    fn->setLinkage(llvm::GlobalValue::InternalLinkage);
-  }
 
   llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);

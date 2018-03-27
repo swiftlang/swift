@@ -443,7 +443,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 // CHECK:   [[LOCAL_METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
@@ -480,7 +480,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
-// CHECK-LABEL: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[ARG_TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:   [[LOCAL_TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
