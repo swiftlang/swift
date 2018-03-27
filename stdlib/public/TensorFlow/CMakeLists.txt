@@ -32,6 +32,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
     CompilerRuntime.swift
     CompositeMath.swift
     DataTypes.swift
+    Dataset.swift
     Gradients.swift
     HighLevel.swift
     OpaqueHandles.swift
