@@ -21,7 +21,9 @@ if(SWIFT_ENABLE_TENSORFLOW)
   set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
-  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
+  # FIXME(b/76437561): __tfop_tfc.configureTPU broke the ownership verifier.
+  # Uncomment this when the bug is fixed.
+  # list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
   list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
   list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
   list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}")
