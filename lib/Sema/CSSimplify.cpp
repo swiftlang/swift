@@ -2158,8 +2158,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                           locator.withPathElement(ConstraintLocator::Load));
     }
 
-    // Pointer arguments can be converted from pointer-compatible types.
-    if (kind >= ConstraintKind::ArgumentConversion) {
+    // Pointer arguments to non-operator functions can be converted
+    // from pointer-compatible types. Prior to Swift version 5, we
+    // even allow inout- and array-to-pointer conversions for operator
+    // arguments.
+    if ((!flags.contains(TMF_ApplyingOperatorParameter) &&
+         (kind == ConstraintKind::ArgumentConversion ||
+          kind == ConstraintKind::ArgumentTupleConversion)) ||
+        !getASTContext().isSwiftVersionAtLeast(5) &&
+            kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
       bool type2IsOptional = false;
       if (Type unwrapped = type2->getOptionalObjectType()) {
