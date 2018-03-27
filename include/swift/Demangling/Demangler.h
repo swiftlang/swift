@@ -24,7 +24,7 @@
 //#define NODE_FACTORY_DEBUGGING
 
 #ifdef NODE_FACTORY_DEBUGGING
-#include <iostream>
+#include "llvm/Support/raw_ostream.h"
 #endif
 
 
@@ -74,14 +74,14 @@ public:
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "## New NodeFactory " << this << "\n";
+    llvm::errs() << "## New NodeFactory " << this << "\n";
 #endif
   }
   
   virtual ~NodeFactory() {
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "Delete NodeFactory " << this << "\n";
+    llvm::errs() << "Delete NodeFactory " << this << "\n";
 #endif
   }
   
@@ -92,7 +92,7 @@ public:
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  alloc " << ObjectSize << ", CurPtr = "
+    llvm::errs() << "  alloc " << ObjectSize << ", CurPtr = "
               << (void *)CurPtr << "\n";
 #endif
 
@@ -113,7 +113,7 @@ public:
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** new slab " << newSlab << ", allocsize = "
+      llvm::errs() << "    ** new slab " << newSlab << ", allocsize = "
                 << AllocSize << ", CurPtr = " << (void *)CurPtr
                 << ", End = " << (void *)End << "\n";
 #endif
@@ -138,7 +138,7 @@ public:
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  realloc " << Objects << ", num = " << NumObjects
+    llvm::errs() << "  realloc " << Objects << ", num = " << NumObjects
               << " (size = " << OldAllocSize << "), Growth = " << Growth
               << " (size = " << AdditionalAlloc << ")\n";
 #endif
@@ -149,7 +149,7 @@ public:
       CurPtr += AdditionalAlloc;
       Capacity += MinGrowth;
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** can grow: CurPtr = " << (void *)CurPtr << "\n";
+      llvm::errs() << "    ** can grow: CurPtr = " << (void *)CurPtr << "\n";
 #endif
       return;
     }

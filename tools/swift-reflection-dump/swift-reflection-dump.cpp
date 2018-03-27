@@ -28,6 +28,7 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -36,7 +37,6 @@
 #endif
 
 #include <algorithm>
-#include <iostream>
 #include <csignal>
 
 using llvm::dyn_cast;
@@ -228,7 +228,7 @@ public:
 static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
                                     StringRef arch,
                                     ActionType action,
-                                    std::ostream &OS) {
+                                    llvm::raw_ostream &OS) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> binaryOwners;

@@ -307,7 +307,7 @@ void NodeFactory::freeSlabs(Slab *slab) {
   while (slab) {
     Slab *prev = slab->Previous;
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  free slab = " << slab << "\n";
+    llvm::errs() << "  free slab = " << slab << "\n";
 #endif
     free(slab);
     slab = prev;
