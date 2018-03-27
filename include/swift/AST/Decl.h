@@ -430,7 +430,7 @@ protected:
     /// Whether the typealias forwards perfectly to its underlying type.
     IsCompatibilityAlias : 1,
     /// Whether this was a global typealias synthesized by the debugger.
-    IsDebuggerAlias : 1;
+    IsDebuggerAlias : 1
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
