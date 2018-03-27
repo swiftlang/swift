@@ -115,6 +115,7 @@
 #include "llvm/Support/Compiler.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
+#include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -1441,25 +1442,6 @@ namespace {
       auto type = element.getScalarType();
       PayloadTypesAndTagType.push_back(type);
     }
-  }
-  
-  static std::pair<CanType, CanGenericSignature>
-  getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
-    auto loweredType = type.getSwiftRValueType();
-    if (loweredType->hasArchetype()) {
-      GenericEnvironment *env = nullptr;
-      loweredType.findIf([&env](Type t) -> bool {
-        if (auto arch = t->getAs<ArchetypeType>()) {
-          env = arch->getGenericEnvironment();
-          return true;
-        }
-        return false;
-      });
-      assert(env && "has archetype but no archetype?!");
-      return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
-              env->getGenericSignature()->getCanonicalSignature()};
-    }
-    return {loweredType, nullptr};
   }
 
   static llvm::Function *createOutlineLLVMFunction(

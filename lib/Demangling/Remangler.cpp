@@ -1843,52 +1843,47 @@ void Remangler::mangleVariadicMarker(Node *node) {
 
 void Remangler::mangleOutlinedCopy(Node *node) {
   mangleChildNodes(node);
-  Buffer << "Wy";
+  Buffer << "WOy";
 }
 
 void Remangler::mangleOutlinedConsume(Node *node) {
   mangleChildNodes(node);
-  Buffer << "We";
+  Buffer << "WOe";
 }
 
 void Remangler::mangleOutlinedRetain(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Wr";
+  mangleChildNodes(node);
+  Buffer << "WOr";
 }
 
 void Remangler::mangleOutlinedRelease(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Ws";
+  mangleChildNodes(node);
+  Buffer << "WOs";
 }
 
 void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
-  mangleChildNode(node, 0);
-  Buffer << "Wb";
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
+  Buffer << "WOb";
 }
 
 void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
-  mangleChildNode(node, 0);
-  Buffer << "Wc";
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
+  Buffer << "WOc";
 }
 
 void Remangler::mangleOutlinedAssignWithTake(Node *node) {
-  mangleChildNode(node, 0);
-  Buffer << "Wd";
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
+  Buffer << "WOd";
 }
 
 void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
-  mangleChildNode(node, 0);
-  Buffer << "Wf";
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
+  Buffer << "WOf";
 }
 
 void Remangler::mangleOutlinedDestroy(Node *node) {
-  mangleChildNode(node, 0);
-  Buffer << "Wh";
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
+  Buffer << "WOh";
 }
 
 void Remangler::mangleOutlinedVariable(Node *node) {

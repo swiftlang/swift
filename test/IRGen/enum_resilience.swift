@@ -311,7 +311,7 @@ public func constructFullyFixed() -> FullyFixedLayout {
   return .noPayload
 }
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
+// CHECK-LABEL: define private void @initialize_metadata_EnumWithResilientPayload(i8*)
 // CHECK: call void @swift_initEnumMetadataMultiPayload(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 2, i8*** {{.*}})
 
 
@@ -324,5 +324,5 @@ private enum ProtGenEnumWithSize<T: Prot> {
     case c2(s2: Size)
 }
 
-// CHECK-LABEL: define{{( protected)?}} internal %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilienceytWh2_"(%T15enum_resilience19ProtGenEnumWithSize
+// CHECK-LABEL: define linkonce_odr hidden %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(%T15enum_resilience19ProtGenEnumWithSize
 // CHECK:   ret %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* %0

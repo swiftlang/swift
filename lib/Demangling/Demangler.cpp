@@ -2108,54 +2108,75 @@ NodePointer Demangler::demangleWitness() {
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, AssocTypePath, ProtoTy);
     }
-    case 'y': {
-      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
-        return createWithChildren(Node::Kind::OutlinedCopy,
-                                  popNode(Node::Kind::Type), sig);
-      return createWithChild(Node::Kind::OutlinedCopy,
-                             popNode(Node::Kind::Type));
+    case 'O': {
+      switch (nextChar()) {
+      case 'y': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedCopy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedCopy,
+                               popNode(Node::Kind::Type));
+      }
+      case 'e': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedConsume,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedConsume,
+                               popNode(Node::Kind::Type));
+      }
+      case 'r': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedRetain,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedRetain,
+                               popNode(Node::Kind::Type));
+      }
+      case 's': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedRelease,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedRelease,
+                               popNode(Node::Kind::Type));
+      }
+      case 'b': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedInitializeWithTake,
+                               popNode(Node::Kind::Type));
+      }
+      case 'c': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedInitializeWithCopy,
+                               popNode(Node::Kind::Type));
+      }
+      case 'd': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedAssignWithTake,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedAssignWithTake,
+                               popNode(Node::Kind::Type));
+      }
+      case 'f': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedAssignWithCopy,
+                               popNode(Node::Kind::Type));
+      }
+      case 'h': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedDestroy,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedDestroy,
+                               popNode(Node::Kind::Type));
+      }
+      default:
+        return nullptr;
+      }
     }
-    case 'e': {
-      if (auto sig = popNode(Node::Kind::DependentGenericSignature))
-        return createWithChildren(Node::Kind::OutlinedCopy,
-                                  popNode(Node::Kind::Type), sig);
-      return createWithChild(Node::Kind::OutlinedConsume,
-                             popNode(Node::Kind::Type));
-    }
-    case 'r': {
-      return createWithChild(Node::Kind::OutlinedRetain,
-                             popNode(Node::Kind::Type));
-    }
-    case 's': {
-      return createWithChild(Node::Kind::OutlinedRelease,
-                             popNode(Node::Kind::Type));
-    }
-    case 'b': {
-      NodePointer IndexChild = demangleIndexAsNode();
-      return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
-                                popNode(Node::Kind::Type), IndexChild);
-    }
-    case 'c': {
-      NodePointer IndexChild = demangleIndexAsNode();
-      return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
-                                popNode(Node::Kind::Type), IndexChild);
-    }
-    case 'd': {
-      NodePointer IndexChild = demangleIndexAsNode();
-      return createWithChildren(Node::Kind::OutlinedAssignWithTake,
-                                popNode(Node::Kind::Type), IndexChild);
-    }
-    case 'f': {
-      NodePointer IndexChild = demangleIndexAsNode();
-      return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
-                                popNode(Node::Kind::Type), IndexChild);
-    }
-    case 'h': {
-      NodePointer IndexChild = demangleIndexAsNode();
-      return createWithChildren(Node::Kind::OutlinedDestroy,
-                                popNode(Node::Kind::Type), IndexChild);
-    }
-
     default:
       return nullptr;
   }

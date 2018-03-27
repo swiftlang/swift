@@ -52,4 +52,4 @@ enum AllMixedRefcountedTwoSimple {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
-// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWy"
+// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"

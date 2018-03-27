@@ -246,7 +246,7 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("Wy");
+    appendOperator("WOy");
     return finalize();
   }
   std::string mangleOutlinedConsumeFunction(CanType ty,
@@ -255,90 +255,72 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("We");
+    appendOperator("WOe");
     return finalize();
   }
 
-  std::string mangleOutlinedRetainFunction(Type t) {
+  std::string mangleOutlinedRetainFunction(CanType t,
+                                           CanGenericSignature sig) {
     beginMangling();
     appendType(t);
-    appendOperator("Wr");
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOr");
     return finalize();
   }
-  std::string mangleOutlinedReleaseFunction(Type t) {
+  std::string mangleOutlinedReleaseFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
     appendType(t);
-    appendOperator("Ws");
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOs");
     return finalize();
   }
 
-  std::string mangleOutlinedInitializeWithTakeFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wb", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wb", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOb");
     return finalize();
   }
-  std::string mangleOutlinedInitializeWithCopyFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wc", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wc", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOc");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithTakeFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithTakeFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wd", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wd", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOd");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithCopyFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithCopyFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wf", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wf", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOf");
     return finalize();
   }
-  std::string mangleOutlinedDestroyFunction(const CanType t, IRGenModule *mod) {
+  std::string mangleOutlinedDestroyFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wh", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wh", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOh");
     return finalize();
   }
 
