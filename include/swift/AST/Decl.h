@@ -426,9 +426,11 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
-    IsCompatibilityAlias : 1
+    IsCompatibilityAlias : 1,
+    /// Whether this was a global typealias synthesized by the debugger.
+    IsDebuggerAlias : 1;
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
@@ -2517,6 +2519,12 @@ public:
 
   void markAsCompatibilityAlias(bool newValue = true) {
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
+  }
+
+  /// Is this a special debugger variable?
+  bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
+  void markAsDebuggerAlias(bool isDebuggerAlias) {
+    Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
   }
 
   static bool classof(const Decl *D) {
