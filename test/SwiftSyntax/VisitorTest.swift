@@ -63,7 +63,7 @@ VisitorTests.test("SyntaxRewriter.visitAny") {
       if let tok = node as? TokenSyntax {
         return transform(tok)
       }
-      return node
+      return nil
     }
   }
   expectDoesNotThrow({
