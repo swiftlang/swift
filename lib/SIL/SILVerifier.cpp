@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PostOrder.h"
@@ -4541,16 +4542,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isa<AllocStackInst>(SI))
+      if (isMaintenanceInst(&SI))
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      // `alloc_stack` can create false positive, so we skip it
-      // for now.
-      if (isa<AllocStackInst>(SI))
+      if (isMaintenanceInst(&SI))
         continue;
 
       // If we haven't seen this debug scope yet, update the
