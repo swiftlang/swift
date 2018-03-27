@@ -94,7 +94,6 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
       // We can't remove metadata for externally visible types.
       return false;
     case FormalLinkage::HiddenUnique:
-    case FormalLinkage::HiddenNonUnique:
       // In non-whole-module mode, also internal types are visible externally.
       if (!SIL.isWholeModule())
         return false;
@@ -1418,7 +1417,6 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
     return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
 
   case FormalLinkage::HiddenUnique:
-  case FormalLinkage::HiddenNonUnique:
     return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
 
   case FormalLinkage::Private:
@@ -1541,7 +1539,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Resilient classes don't expose field offset symbols.
     if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
-             linkage != FormalLinkage::HiddenNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
       if (linkage == FormalLinkage::PublicUnique)
