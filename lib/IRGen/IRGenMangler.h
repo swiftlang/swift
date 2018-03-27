@@ -121,6 +121,13 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolRequirementArray(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("WR");
+    return finalize();
+  }
+
   std::string mangleProtocolConformanceDescriptor(
                                  const ProtocolConformance *Conformance) {
     beginMangling();
