@@ -1177,7 +1177,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_versioned
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
-    _ storage: _ContiguousArrayStorage<Element>, count: Int
+    _ storage: __owned _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
 
     let innerBuffer = _ContiguousArrayBuffer<Element>(
