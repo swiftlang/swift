@@ -32,6 +32,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -635,7 +636,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
       return MetadataAccessStrategy::PrivateAccessor;
 
     case FormalLinkage::PublicNonUnique:
-    case FormalLinkage::HiddenNonUnique:
       return MetadataAccessStrategy::NonUniqueAccessor;
     }
     llvm_unreachable("bad formal linkage");
