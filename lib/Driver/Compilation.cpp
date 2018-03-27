@@ -1192,6 +1192,12 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+
+    if (OutputCompilationRecordForModuleOnlyBuild) {
+      // TODO: Optimize with clonefile(2) ?
+      llvm::sys::fs::copy_file(CompilationRecordPath,
+                               CompilationRecordPath + "~moduleonly");
+    }
   }
 
   abnormalExit = State.hadAnyAbnormalExit();

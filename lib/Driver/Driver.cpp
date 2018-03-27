@@ -649,12 +649,9 @@ Driver::buildCompilation(const ToolChain &TC,
       Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
 
     } else {
-      StringRef buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-        auto iter = masterOutputMap->find(file_types::TY_SwiftDeps);
-        if (iter != masterOutputMap->end())
-          buildRecordPath = iter->second;
-      }
+      std::string buildRecordPath;
+      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+        buildRecordPath = masterOutputMap->lookup(file_types::TY_SwiftDeps);
 
       if (buildRecordPath.empty()) {
         Diags.diagnose(SourceLoc(),
@@ -663,6 +660,11 @@ Driver::buildCompilation(const ToolChain &TC,
         rebuildEverything = true;
 
       } else {
+        // In 'emit-module' only mode, use '~moduleonly' suffixed build record
+        // file.
+        if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile)
+          buildRecordPath = buildRecordPath.append("~moduleonly");
+
         if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
                                  buildRecordPath,
                                  ShowIncrementalBuildDecisions)) {
@@ -750,8 +752,21 @@ Driver::buildCompilation(const ToolChain &TC,
 
   if (OFM) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      C->setCompilationRecordPath(
-          masterOutputMap->lookup(file_types::TY_SwiftDeps));
+      auto buildRecordFilename = masterOutputMap->lookup(file_types::TY_SwiftDeps);
+
+      // In 'emit-module' only mode, suffix build-record filename with
+      // '~moduleonly'. So that module-only mode doesn't mess up build-record
+      // file for full compilation.
+      if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
+        C->setCompilationRecordPath(buildRecordFilename + "~moduleonly");
+      } else {
+        C->setCompilationRecordPath(buildRecordFilename);
+
+        // If we emit module along with full compilation, emit build record
+        // file for '-emit-module' only mode as well.
+        if (OI.ShouldTreatModuleAsTopLevelOutput)
+          C->setOutputCompilationRecordForModuleOnlyBuild();
+      }
 
       auto buildEntry = outOfDateMap.find(nullptr);
       if (buildEntry != outOfDateMap.end())

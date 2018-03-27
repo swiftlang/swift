@@ -160,6 +160,15 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// When true, emit duplicated compilation record file whose filename is
+  /// suffixed with '~moduleonly'.
+  ///
+  /// This compilation record is used by '-emit-module'-only incremental builds
+  /// so that module-only builds do not affect compilation record file for
+  /// normal builds, while module-only incremental builds are able to use
+  /// artifacts of normal builds if they are already up to date.
+  bool OutputCompilationRecordForModuleOnlyBuild = false;
+
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
@@ -299,6 +308,10 @@ public:
   void setCompilationRecordPath(StringRef path) {
     assert(CompilationRecordPath.empty() && "already set");
     CompilationRecordPath = path;
+  }
+
+  void setOutputCompilationRecordForModuleOnlyBuild(bool value = true) {
+    OutputCompilationRecordForModuleOnlyBuild = value;
   }
 
   void setLastBuildTime(llvm::sys::TimePoint<> time) {
