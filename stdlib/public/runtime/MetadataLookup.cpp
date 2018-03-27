@@ -1049,6 +1049,12 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
 }
 
 void swift::swift_getFieldAt(
+  const Metadata *base, unsigned index, 
+  void (*callback)(const char *name, const Metadata *type)) {
+    swift::_swift_getFieldAt(base, index, [&] (llvm::StringRef name, FieldType fieldInfo) { callback(name.data(), fieldInfo.getType()); });
+}
+
+void swift::_swift_getFieldAt(
     const Metadata *base, unsigned index,
     std::function<void(llvm::StringRef name, FieldType fieldInfo)>
         callback) {

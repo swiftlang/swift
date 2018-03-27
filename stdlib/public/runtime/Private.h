@@ -329,6 +329,11 @@ public:
                            const Metadata *type,
                            const ProtocolDescriptor *protocol,
                            const WitnessTable **conformance);
+
+  void _swift_getFieldAt(
+      const Metadata *type, unsigned index,
+      std::function<void(llvm::StringRef name, FieldType type)> callback);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

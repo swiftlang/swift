@@ -4286,10 +4286,11 @@ SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
+SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_getFieldAt(
-    const Metadata *type, unsigned index,
-    std::function<void(llvm::StringRef name, FieldType type)> callback);
+  const Metadata *base, unsigned index, 
+  void (*callback)(const char *name, const Metadata *type));
 
 } // end namespace swift
 
