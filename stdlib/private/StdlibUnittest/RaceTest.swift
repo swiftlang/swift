@@ -38,7 +38,7 @@
 
 import SwiftPrivate
 import SwiftPrivateLibcExtras
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 #if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
@@ -394,7 +394,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var racingThreadCount: Int
   var stopNow = _stdlib_AtomicInt(0)
 
-  var trialBarrier: _stdlib_Barrier
+  var trialBarrier: _stdlib_thread_barrier
   var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
 
   var raceData: [RT.RaceData] = []
@@ -404,7 +404,10 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
 
   init(racingThreadCount: Int) {
     self.racingThreadCount = racingThreadCount
-    self.trialBarrier = _stdlib_Barrier(threadCount: racingThreadCount + 1)
+    guard let barrier = _stdlib_thread_barrier(threadCount: racingThreadCount + 1) else {
+      fatalError("")
+    }
+    self.trialBarrier = barrier
 
     self.workerStates.reserveCapacity(racingThreadCount)
     for _ in 0..<racingThreadCount {
@@ -600,43 +603,40 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
     _ = timeoutReached.fetchAndAdd(1)
   }
 
-  var testTids = [pthread_t]()
-  var alarmTid: pthread_t
+  var testTids = [_stdlib_thread_t]()
+  var alarmTid: _stdlib_thread_t
 
   // Create the master thread.
   do {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, masterThreadBody, ())
+    let (ret, tid) = _stdlib_thread_create_block(masterThreadBody, ())
     expectEqual(0, ret)
     testTids.append(tid!)
   }
 
   // Create racing threads.
   for i in 0..<racingThreadCount {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, racingThreadBody, i)
+    let (ret, tid) = _stdlib_thread_create_block(racingThreadBody, i)
     expectEqual(0, ret)
     testTids.append(tid!)
   }
 
   // Create the alarm thread that enforces the timeout.
   do {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, alarmThreadBody, ())
+    let (ret, tid) = _stdlib_thread_create_block(alarmThreadBody, ())
     expectEqual(0, ret)
     alarmTid = tid!
   }
 
   // Join all testing threads.
   for tid in testTids {
-    let (ret, _) = _stdlib_pthread_join(tid, Void.self)
+    let (ret, _) = _stdlib_thread_join(tid, Void.self)
     expectEqual(0, ret)
   }
 
   // Tell the alarm thread to stop if it hasn't already, then join it.
   do {
     alarmTimer.wake()
-    let (ret, _) = _stdlib_pthread_join(alarmTid, Void.self)
+    let (ret, _) = _stdlib_thread_join(alarmTid, Void.self)
     expectEqual(0, ret)
   }
 

@@ -15,13 +15,15 @@ from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
 import SwiftPrivate
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 #if _runtime(_ObjC)

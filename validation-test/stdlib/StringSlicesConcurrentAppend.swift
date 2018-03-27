@@ -3,11 +3,13 @@
 // REQUIRES: stress_test
 
 import StdlibUnittest
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(Cygwin) || os(Android)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 
@@ -35,13 +37,13 @@ enum ThreadID {
   case Secondary
 }
 
-var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t>?
+var barrierVar: UnsafeMutablePointer<_stdlib_thread_barrier>?
 var sharedString: String = ""
 var secondaryString: String = ""
 
 func barrier() {
-  var ret = _stdlib_pthread_barrier_wait(barrierVar!)
-  expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
+  var ret = _stdlib_thread_barrier_wait(barrierVar!)
+  expectTrue(ret == 0 || ret == _stdlib_THREAD_BARRIER_SERIAL_THREAD)
 }
 
 func sliceConcurrentAppendThread(_ tid: ThreadID) {
@@ -89,25 +91,25 @@ func sliceConcurrentAppendThread(_ tid: ThreadID) {
 
 StringTestSuite.test("SliceConcurrentAppend") {
   barrierVar = UnsafeMutablePointer.allocate(capacity: 1)
-  barrierVar!.initialize(to: _stdlib_pthread_barrier_t())
-  var ret = _stdlib_pthread_barrier_init(barrierVar!, nil, 2)
+  barrierVar!.initialize(to: _stdlib_thread_barrier())
+  var ret = _stdlib_thread_barrier_init(barrierVar!, nil, 2)
   expectEqual(0, ret)
 
-  let (createRet1, tid1) = _stdlib_pthread_create_block(
+  let (createRet1, tid1) = _stdlib_thread_create_block(
     nil, sliceConcurrentAppendThread, .Primary)
-  let (createRet2, tid2) = _stdlib_pthread_create_block(
+  let (createRet2, tid2) = _stdlib_thread_create_block(
     nil, sliceConcurrentAppendThread, .Secondary)
 
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)
 
-  let (joinRet1, _) = _stdlib_pthread_join(tid1!, Void.self)
-  let (joinRet2, _) = _stdlib_pthread_join(tid2!, Void.self)
+  let (joinRet1, _) = _stdlib_thread_join(tid1!, Void.self)
+  let (joinRet2, _) = _stdlib_thread_join(tid2!, Void.self)
 
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)
 
-  ret = _stdlib_pthread_barrier_destroy(barrierVar!)
+  ret = _stdlib_thread_barrier_destroy(barrierVar!)
   expectEqual(0, ret)
 
   barrierVar!.deinitialize(count: 1)
