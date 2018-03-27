@@ -254,7 +254,7 @@ public:
   /// True if either:
   /// 1) The type, or the referenced type of an address type, is loadable.
   /// 2) The SIL Module conventions uses lowered addresses
-  bool isLoadableOrLowered(SILModule &M) const;
+  bool isLoadableOrOpaque(SILModule &M) const;
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;

@@ -354,7 +354,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
-bool SILType::isLoadableOrLowered(SILModule &M) const {
+bool SILType::isLoadableOrOpaque(SILModule &M) const {
   return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
