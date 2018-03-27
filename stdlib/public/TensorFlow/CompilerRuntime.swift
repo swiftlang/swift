@@ -40,7 +40,7 @@ import CTensorFlow
 // function.  We need to inline if a callee contains tensor ops, not only if
 // it takes and returns a TensorFlow value.
 @_transparent
-public func enableTPU(infeed: Bool = false) {
+public func enableTPU(infeed: Bool = true) {
   _RuntimeConfig.executionMode = .tpu
   #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
 }
