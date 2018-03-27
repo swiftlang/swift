@@ -808,7 +808,7 @@ public:
   llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
                                              llvm::Type *llvmType);
 
-  typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
+  using OutlinedCopyAddrFunction = llvm::Constant *(IRGenModule::*)(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
       const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec);
 

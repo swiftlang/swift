@@ -69,7 +69,8 @@ public:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class StructMetadataScanner : public StructMetadataVisitor<Impl> {
-  typedef StructMetadataVisitor<Impl> super;
+  using super = StructMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 

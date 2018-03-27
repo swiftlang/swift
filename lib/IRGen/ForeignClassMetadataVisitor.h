@@ -58,7 +58,8 @@ public:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class ForeignClassMetadataScanner : public ForeignClassMetadataVisitor<Impl> {
-  typedef ForeignClassMetadataVisitor<Impl> super;
+  using super = ForeignClassMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 

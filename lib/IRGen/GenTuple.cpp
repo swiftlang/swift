@@ -92,7 +92,7 @@ namespace {
   template <class Impl, class Base>
   class TupleTypeInfoBase
       : public RecordTypeInfo<Impl, Base, TupleFieldInfo> {
-    typedef RecordTypeInfo<Impl, Base, TupleFieldInfo> super;
+    using super = RecordTypeInfo<Impl, Base, TupleFieldInfo>;
 
   protected:
     template <class... As>

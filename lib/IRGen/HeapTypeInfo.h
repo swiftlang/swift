@@ -53,7 +53,8 @@ enum class IsaEncoding : uint8_t {
 ///   ReferenceCounting getReferenceCounting() const;
 template <class Impl>
 class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
-  typedef SingleScalarTypeInfo<Impl, ReferenceTypeInfo> super;
+  using super = SingleScalarTypeInfo<Impl, ReferenceTypeInfo>;
+
 protected:
   using super::asDerived;
 public:
