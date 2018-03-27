@@ -107,7 +107,7 @@ namespace {
   template <class Impl, class Base, class FieldInfoType = StructFieldInfo>
   class StructTypeInfoBase :
      public RecordTypeInfo<Impl, Base, FieldInfoType> {
-    typedef RecordTypeInfo<Impl, Base, FieldInfoType> super;
+    using super = RecordTypeInfo<Impl, Base, FieldInfoType>;
 
   protected:
     template <class... As>

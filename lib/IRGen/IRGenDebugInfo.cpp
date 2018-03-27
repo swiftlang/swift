@@ -59,8 +59,8 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
-    TrackingDIRefMap;
+using TrackingDIRefMap =
+    llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
@@ -71,7 +71,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   IRGenModule &IGM;
 
   /// Used for caching SILDebugScopes without inline information.
-  typedef std::pair<const void *, const void *> LocalScopeHash;
+  using LocalScopeHash = std::pair<const void *, const void *>;
   struct LocalScope : public LocalScopeHash {
     LocalScope(const SILDebugScope *DS)
         : LocalScopeHash({DS->Loc.getOpaquePointerValue(),

@@ -118,7 +118,8 @@ namespace {
   /// An implementation of DynamicPackingPHIMapping for Addresses.
   template <> class DynamicPackingPHIMapping<Address>
       : private DynamicPackingPHIMapping<llvm::Value*> {
-    typedef DynamicPackingPHIMapping<llvm::Value*> super;
+    using super = DynamicPackingPHIMapping<llvm::Value *>;
+
   public:
     void collect(IRGenFunction &IGF, Address value) {
       super::collect(IGF, value.getAddress());

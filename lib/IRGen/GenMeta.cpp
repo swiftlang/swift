@@ -1078,7 +1078,7 @@ namespace {
   /// generic metadata layout class.
   template <class Impl, class Base>
   class GenericMetadataBuilderBase : public Base {
-    typedef Base super;
+    using super = Base;
 
     struct FillOp {
       CanType Type;
@@ -2159,7 +2159,7 @@ namespace {
                       ClassMetadataBuilderBase<GenericClassMetadataBuilder,
                                                ResilientClassMemberBuilder>>
   {
-    typedef GenericMetadataBuilderBase super;
+    using super = GenericMetadataBuilderBase;
 
     Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
       ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
@@ -2684,8 +2684,8 @@ namespace {
     public GenericValueMetadataBuilderBase<GenericStructMetadataBuilder,
                       StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
 
-    typedef GenericValueMetadataBuilderBase super;
-                        
+    using super = GenericValueMetadataBuilderBase;
+
   public:
     GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
                                  ConstantStructBuilder &B)
@@ -3048,8 +3048,8 @@ namespace {
   /// the first-used instance as the canonical instance for a process.
   template<typename Impl, typename Base>
   class ForeignMetadataBuilderBase : public Base {
-    typedef Base super;
-    
+    using super = Base;
+
   protected:
     using super::IGM;
     using super::asImpl;
