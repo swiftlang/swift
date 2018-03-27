@@ -557,3 +557,7 @@ do {
     let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
   }
 }
+
+func rdar35890334(_ arr: inout [Int]) {
+  _ = arr.popFirst() // expected-error {{'[Int]' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent to use 'popFirst'}}
+}
