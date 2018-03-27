@@ -205,8 +205,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // mandatory requirement count
-    Int16Ty,                // total requirement count
+    Int32Ty,                // total requirement count
     Int32Ty,                // requirements array
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names

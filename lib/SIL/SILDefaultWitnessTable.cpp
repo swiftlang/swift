@@ -101,31 +101,6 @@ Identifier SILDefaultWitnessTable::getIdentifier() const {
   return Mod.getASTContext().getIdentifier(name);
 }
 
-unsigned SILDefaultWitnessTable::getMinimumWitnessTableSize() const {
-  unsigned defaultEntries = 0;
-  unsigned minimumEntries = 0;
-
-  // Count the number of entries up to and including the last null entry.
-  // This is the number of witnesses that all conforming types must
-  // provide.
-  //
-  // Any witnesses after the last null entry all have defaults, and can
-  // be omitted from conformances; these are the resilient defaults.
-  //
-  // FIXME: Really this should look at availability instead.
-  for (auto entry : Entries) {
-    if (entry.isValid()) {
-      defaultEntries++;
-    } else {
-      minimumEntries++;
-      minimumEntries += defaultEntries;
-      defaultEntries = 0;
-    }
-  }
-
-  return minimumEntries;
-}
-
 SILDefaultWitnessTable::~SILDefaultWitnessTable() {
   // Drop the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {

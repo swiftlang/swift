@@ -755,7 +755,6 @@ struct TestProtocol {
     : descriptor("TestProtocol",
                  nullptr,
                  ProtocolDescriptorFlags().withResilient(true)) {
-    descriptor.NumMandatoryRequirements = 3;
     descriptor.NumRequirements = 5;
     initializeRelativePointer(
       (int32_t *) &descriptor.Requirements,

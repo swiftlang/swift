@@ -3196,11 +3196,6 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
 
   auto protocol = genericTable->Protocol.get();
 
-  // The number of mandatory requirements, i.e. requirements lacking
-  // default implementations.
-  assert(numPatternWitnesses >= protocol->NumMandatoryRequirements +
-                                    WitnessTableFirstRequirementOffset);
-
   // The total number of requirements.
   size_t numRequirements =
     protocol->NumRequirements + WitnessTableFirstRequirementOffset;

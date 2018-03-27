@@ -37,7 +37,6 @@ class SILModule;
 class ProtocolConformance;
 class NormalProtocolConformance;
 enum IsSerialized_t : unsigned char;
-enum class ResilienceStrategy : unsigned;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.

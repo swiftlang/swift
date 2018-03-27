@@ -1991,14 +1991,11 @@ struct TargetProtocolDescriptor {
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
 
-  /// The number of non-defaultable requirements in the protocol.
-  uint16_t NumMandatoryRequirements;
-
   /// The number of requirements described by the Requirements array.
   /// If any requirements beyond MinimumWitnessTableSizeInWords are present
   /// in the witness table template, they will be not be overwritten with
   /// defaults.
-  uint16_t NumRequirements;
+  uint32_t NumRequirements;
 
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
@@ -2026,7 +2023,6 @@ struct TargetProtocolDescriptor {
       _ObjC_InstanceProperties(nullptr),
       DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
       Flags(Flags),
-      NumMandatoryRequirements(0),
       NumRequirements(0),
       Requirements(nullptr),
       Superclass(nullptr),
