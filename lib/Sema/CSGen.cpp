@@ -2003,41 +2003,40 @@ namespace {
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
 
-        auto ROK = ReferenceOwnership::Strong; // The default.
-        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-          ROK = OA->get();
-
         // If we have a type from an initializer expression, and that
         // expression does not produce an InOut type, use it.  This
         // will avoid exponential typecheck behavior in the case of
         // tuples, nested arrays, and dictionary literals.
         //
         // Otherwise, create a new type variable.
-        switch (ROK) {
-        case ReferenceOwnership::Strong:
-        case ReferenceOwnership::Unowned:
-        case ReferenceOwnership::Unmanaged:
-          if (!var->hasNonPatternBindingInit()) {
-            if (auto boundExpr = locator.trySimplifyToExpr()) {
-              if (!boundExpr->isSemanticallyInOutExpr())
-                return CS.getType(boundExpr)->getRValueType();
-            }
+        auto ty = Type();
+        if (!var->hasNonPatternBindingInit()) {
+          if (auto boundExpr = locator.trySimplifyToExpr()) {
+            if (!boundExpr->isSemanticallyInOutExpr())
+              ty = CS.getType(boundExpr)->getRValueType();
           }
-          break;
-        case ReferenceOwnership::Weak:
-          break;
         }
 
-        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToInOut);
+        auto ROK = ReferenceOwnership::Strong; // The default.
+        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+          ROK = OA->get();
 
         switch (ROK) {
         case ReferenceOwnership::Strong:
         case ReferenceOwnership::Unowned:
         case ReferenceOwnership::Unmanaged:
-          return ty;
+          if (ty)
+            return ty;
+          return CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                       TVO_CanBindToInOut);
         case ReferenceOwnership::Weak:
           // For weak variables, use Optional<T>.
+          if (ty && ty->getOptionalObjectType())
+            return ty; // Already Optional<T>.
+          // Create a fresh type variable to handle overloaded expressions.
+          if (!ty || ty->is<TypeVariableType>())
+            ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                       TVO_CanBindToInOut);
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         }
 
