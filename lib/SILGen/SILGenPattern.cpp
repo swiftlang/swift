@@ -1690,10 +1690,9 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
 
 namespace {
   struct CaseInfo {
-    EnumElementDecl *FormalElement;
+    SmallVector<SpecializedRow, 2> SpecializedRows;
     Pattern *FirstMatcher;
     bool Irrefutable = false;
-    SmallVector<SpecializedRow, 2> SpecializedRows;
   };
 
   class CaseBlocks {
@@ -1773,7 +1772,6 @@ CaseBlocks::CaseBlocks(
       curBB = SGF.createBasicBlock(curBB);
       CaseBBs.push_back({formalElt, curBB});
       CaseInfos.push_back(CaseInfo());
-      CaseInfos.back().FormalElement = formalElt;
       CaseInfos.back().FirstMatcher = row.Pattern;
       CaseCounts.push_back(row.Count);
     }
@@ -1852,7 +1850,6 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
                          const CaseInfo &caseInfo) {
     SILLocation loc = caseInfo.FirstMatcher;
     auto &specializedRows = caseInfo.SpecializedRows;
-    EnumElementDecl *formalElt = caseInfo.FormalElement;
 
     SGF.B.setInsertionPoint(caseBB);
 
@@ -1927,8 +1924,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
-                                formalElt->getArgumentInterfaceType())
+              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
+                                elt->getArgumentInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2014,7 +2011,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
                          const CaseInfo &caseInfo) {
     SILLocation loc = caseInfo.FirstMatcher;
     auto &specializedRows = caseInfo.SpecializedRows;
-    EnumElementDecl *formalElt = caseInfo.FormalElement;
 
     SGF.B.setInsertionPoint(caseBB);
 
@@ -2137,8 +2133,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // Reabstract to the substituted type, if needed.
 
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
-                                    formalElt->getArgumentInterfaceType())
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
+                                    elt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
