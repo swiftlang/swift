@@ -14,14 +14,14 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
+
+class ProtocolConformance;
+class NormalProtocolConformance;
+
 namespace irgen {
 
 /// A mangling string that includes embedded symbolic references.
@@ -122,7 +122,7 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                 const NormalProtocolConformance *Conformance) {
+                                 const ProtocolConformance *Conformance) {
     beginMangling();
     appendProtocolConformance(Conformance);
     appendOperator("Mc");
