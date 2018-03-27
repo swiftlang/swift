@@ -45,6 +45,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
@@ -95,17 +96,10 @@ public:
     return new OpaqueArchetypeTypeInfo(type);
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
-    if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
-      return;
-    }
-    auto *metadata = IGF.emitTypeMetadataRef(canType);
-    assert(metadata && "Expected Type Metadata Ref");
-    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We'll need formal type metadata for this archetype.
+    collector.collectFormalTypeMetadata(T.getSwiftRValueType());
   }
 };
 
@@ -134,19 +128,6 @@ public:
                                          ReferenceCounting refCount) {
     return new ClassArchetypeTypeInfo(storageType, size, spareBits, align,
                                       refCount);
-  }
-
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
-    if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
-      return;
-    }
-    auto *metadata = IGF.emitTypeMetadataRef(canType);
-    assert(metadata && "Expected Type Metadata Ref");
-    typeToMetadataVec.insert(std::make_pair(canType, metadata));
   }
 
   ReferenceCounting getReferenceCounting() const {

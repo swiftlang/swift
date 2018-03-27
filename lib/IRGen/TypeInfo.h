@@ -35,6 +35,7 @@ namespace llvm {
 }
 
 namespace swift {
+  enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILType;
 
@@ -48,6 +49,7 @@ namespace irgen {
   class ExplosionSchema;
   class NativeConventionSchema;
   enum OnHeap_t : unsigned char;
+  class OutliningMetadataCollector;
   class OwnedAddress;
   class RValue;
   class RValueSchema;
@@ -63,7 +65,7 @@ enum class FixedPacking {
   /// It needs to be checked dynamically.
   Dynamic
 };
-  
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -474,12 +476,10 @@ public:
                                    Address src, llvm::Value *count,
                                    SILType T) const;
 
-  /// Outlining helper function: recursively traverse the SILType:
-  /// When encountering an Archetype - add it to a type-metadata vec.
-  virtual void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const;
+  /// Collect all the metadata necessary in order to perform value
+  /// operations on this type.
+  virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                           SILType T) const;
 
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
@@ -492,6 +492,12 @@ public:
   virtual void verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const;
+
+  void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, IsInitialization_t isInit,
+                        IsTake_t isTake) const;
+
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
 };
 
 } // end namespace irgen

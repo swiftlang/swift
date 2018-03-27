@@ -54,9 +54,6 @@ namespace irgen {
                                        Optional<SILLocation> DebugLoc = None,
                                        StringRef DebugName = StringRef());
 
-  std::pair<CanType, CanGenericSignature>
-  getTypeAndGenericSignatureForManglingOutlineFunction(SILType type);
-
 }
 }
 

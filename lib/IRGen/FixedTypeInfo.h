@@ -222,12 +222,11 @@ public:
   /// larger than this type, the trailing bits are untouched.
   static void applyFixedSpareBitsMask(SpareBitVector &mask,
                                       const SpareBitVector &spareBits);
-  
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    return;
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We assume that fixed type infos generally do not require type
+    // metadata in order to perform value operations.
   }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
