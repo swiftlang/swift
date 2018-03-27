@@ -47,6 +47,7 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
 #include "WeakTypeInfo.h"
@@ -333,9 +334,9 @@ public:
                                                srcBuffer);
     } else {
       // Create an outlined function to avoid explosion
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsNotTake);
     }
   }
 
@@ -354,9 +355,9 @@ public:
                                                srcBuffer);
     } else {
       // Create an outlined function to avoid explosion
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsTake);
     }
   }
 
@@ -415,9 +416,9 @@ public:
       asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsNotInitialization, IsNotTake);
     }
   }
 
@@ -429,9 +430,9 @@ public:
       asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsNotTake);
     }
   }
 
@@ -443,9 +444,9 @@ public:
       asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsNotInitialization, IsTake);
     }
   }
 
@@ -457,9 +458,9 @@ public:
       asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsTake);
     }
   }
 
@@ -469,7 +470,8 @@ public:
       Address valueAddr = projectValue(IGF, existential);
       asDerived().emitValueDestroy(IGF, valueAddr);
     } else {
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, existential, T);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedDestroy(existential, T, *this);
     }
   }
 
