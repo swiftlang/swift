@@ -118,11 +118,11 @@ func testAKA(structValue: ImportantCStruct, aliasValue: ImportantCAlias) {
 
   let optStructValue: Optional = structValue
   let _: Int = optStructValue
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCStruct>' to specified type 'Int'
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'ImportantCStruct?' to specified type 'Int'
 
   let optAliasValue: Optional = aliasValue
   let _: Int = optAliasValue
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCAlias>' (aka 'Optional<Int32>') to specified type 'Int'
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'ImportantCAlias?' (aka 'Optional<Int32>') to specified type 'Int'
 }
 
 func testRenamedEnumConstants() {
