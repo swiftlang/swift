@@ -1129,7 +1129,7 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
       // If the root started out uninitialized, then this is an initialization
       // of it, otherwise this is a reassignment of it.
       auto &TL = B.getTypeLowering(stackAlloc->getType());
-      TL.emitCopyInto(B, loc, root, stackAlloc, IsTake_t::IsTake,
+      TL.emitCopyInto(B, loc, stackAlloc, root, IsTake_t::IsTake,
                       IsInitialization_t(rootInfo.second));
 
       B.createDeallocStack(loc, stackAlloc);
