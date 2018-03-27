@@ -588,7 +588,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -1093,7 +1093,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
-                             const InputFileList &Inputs,
+                             const bool BatchMode, const InputFileList &Inputs,
                              OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
@@ -1113,7 +1113,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
+    if (BatchMode) {
+      Diags.diagnose(SourceLoc(), diag::warning_cannot_multithread_batch_mode);
+    } else if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
@@ -2304,6 +2306,15 @@ void Driver::computeMainOutput(
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
+
+    // In batch mode, the driver will try to reserve multiple differing main
+    // outputs to a bridging header. Another assertion will trip, but the cause
+    // will be harder to track down. Since the driver now ignores -num-threads
+    // in batch mode, the user should never be able to falsify this assertion.
+    assert(!C.getBatchModeEnabled() && "Batch mode produces only one main "
+                                       "output per input action, cannot have "
+                                       "batch mode & num-threads");
+
     auto OutputFunc = [&](StringRef Base, StringRef Primary) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
