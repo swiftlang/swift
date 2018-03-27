@@ -1664,7 +1664,7 @@
   {
     key.kind: source.lang.swift.ref.associatedtype,
     key.name: "Element",
-    key.usr: "s:4main5Prot2P7Element",
+    key.usr: "s:4main5Prot2P7ElementQa",
     key.offset: 1935,
     key.length: 7
   },
@@ -2381,7 +2381,7 @@
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
-        key.usr: "s:4main5Prot2P7Element",
+        key.usr: "s:4main5Prot2P7ElementQa",
         key.offset: 1752,
         key.length: 15,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>Element</decl.name></decl.associatedtype>"
