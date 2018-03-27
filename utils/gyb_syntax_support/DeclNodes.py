@@ -96,11 +96,13 @@ DECL_NODES = [
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
-         traits=['WithStatements'],
          children=[
              Child('PoundIf', kind='PoundIfToken'),
              Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('Elements', kind='Syntax',
+                   node_choices=[
+                      Child('Statements', kind='CodeBlockItemList'),
+                      Child('SwitchCases', kind='SwitchCaseList')]),
              Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
                    is_optional=True),
              Child('ElseClause', kind='ElseDirectiveClause',
