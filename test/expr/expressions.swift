@@ -688,11 +688,9 @@ func test() {
   var x = Foo()
   let y = Foo()
 
-  // FIXME: Bad diagnostics
-
   // rdar://15708430
-  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
-  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
+  (&x).method()  // expected-error {{use of extraneous '&'}}
+  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
 }
 
 
