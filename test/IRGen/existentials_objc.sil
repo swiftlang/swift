@@ -42,7 +42,7 @@ bb0(%0 : $*Any, %1 : $*Any):
 // CHECK: call %Any* @"$SypWOb"(%Any* %1, %Any* %0)
 // CHECK-NEXT:    ret void
 
-// CHECK-DAG:   define internal %Any* @"$SypWOb"([[ANY:%Any]]*, %Any*)
+// CHECK-DAG:   define linkonce_odr hidden %Any* @"$SypWOb"([[ANY:%Any]]*, %Any*)
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%0]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%1]], i32 0, i32 1
