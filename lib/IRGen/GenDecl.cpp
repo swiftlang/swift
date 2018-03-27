@@ -4231,13 +4231,35 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   return fn;
 }
 
+std::pair<CanType, CanGenericSignature>
+irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
+  auto loweredType = type.getSwiftRValueType();
+  if (loweredType->hasArchetype()) {
+    GenericEnvironment *env = nullptr;
+    loweredType.findIf([&env](Type t) -> bool {
+        if (auto arch = t->getAs<ArchetypeType>()) {
+          env = arch->getGenericEnvironment();
+          return true;
+        }
+        return false;
+      });
+    assert(env && "has archetype but no archetype?!");
+    return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
+        env->getGenericSignature()->getCanonicalSignature()};
+  }
+  return {loweredType, nullptr};
+}
+
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
-                                                       Type t,
+                                                       SILType t,
                                                        llvm::Type *llvmType) {
   auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
   assert(loadableTI && "Should only be called on Loadable types");
   IRGenMangler mangler;
-  std::string funcName = mangler.mangleOutlinedRetainFunction(t);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(t);
+  auto funcName = mangler.mangleOutlinedRetainFunction(manglingBits.first,
+                                                       manglingBits.second);
   llvm::Type *argTys[] = {llvmType};
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
@@ -4255,12 +4277,16 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
 }
 
 llvm::Constant *
-IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI,
+                                        SILType t,
                                         llvm::Type *llvmType) {
   auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
   assert(loadableTI && "Should only be called on Loadable types");
   IRGenMangler mangler;
-  std::string funcName = mangler.mangleOutlinedReleaseFunction(t);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(t);
+  auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,
+                                                        manglingBits.second);
   llvm::Type *argTys[] = {llvmType};
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
@@ -4293,9 +4319,6 @@ void IRGenModule::generateCallToOutlinedCopyAddr(
   llvm::Type *llvmType = dest->getType();
   auto *outlinedF =
       (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
-  llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
-  assert(fn && "Expected llvm::Function");
-  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
   llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
 }
@@ -4304,8 +4327,10 @@ void IRGenModule::generateCallToOutlinedDestroy(
     IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
     const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = T.getSwiftRValueType();
-  std::string funcName = mangler.mangleOutlinedDestroyFunction(canType, this);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(T);
+  auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
+                                                        manglingBits.second);
 
   llvm::SmallVector<llvm::Type *, 4> argsTysVec;
   llvm::SmallVector<llvm::Value *, 4> argsVec;
@@ -4338,12 +4363,6 @@ void IRGenModule::generateCallToOutlinedDestroy(
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);
-
-  if (T.hasArchetype()) {
-    llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
-    assert(fn && "Expected llvm::Function");
-    fn->setLinkage(llvm::GlobalValue::InternalLinkage);
-  }
 
   llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
@@ -4388,9 +4407,10 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
     const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getSwiftRValueType();
-  std::string funcName =
-      mangler.mangleOutlinedInitializeWithTakeFunction(canType, this);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
+  auto funcName = mangler.mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
+                                                                   manglingBits.second);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
     objectTI.initializeWithTake(IGF, dest, src, T, true);
@@ -4403,9 +4423,11 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
     const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName =
-      mangler.mangleOutlinedInitializeWithCopyFunction(canType, this);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
+  auto funcName =
+    mangler.mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
+                                                     manglingBits.second);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
     objectTI.initializeWithCopy(IGF, dest, src, T, true);
@@ -4418,9 +4440,11 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
     const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName =
-      mangler.mangleOutlinedAssignWithTakeFunction(canType, this);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
+  auto funcName =
+    mangler.mangleOutlinedAssignWithTakeFunction(manglingBits.first,
+                                                 manglingBits.second);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
     objectTI.assignWithTake(IGF, dest, src, T, true);
@@ -4433,29 +4457,15 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
     const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName =
-      mangler.mangleOutlinedAssignWithCopyFunction(canType, this);
+  auto manglingBits =
+    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
+  auto funcName =
+    mangler.mangleOutlinedAssignWithCopyFunction(manglingBits.first,
+                                                 manglingBits.second);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
     objectTI.assignWithCopy(IGF, dest, src, T, true);
   };
   return getOrCreateOutlinedCopyAddrHelperFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
-}
-
-// IRGen is only multi-threaded during LLVM part
-// We don't need to be thread safe even
-// We are working on the primary module *before* LLVM
-unsigned IRGenModule::getCanTypeID(const CanType type) {
-  if (this != IRGen.getPrimaryIGM()) {
-    return IRGen.getPrimaryIGM()->getCanTypeID(type);
-  }
-  auto it = typeToUniqueID.find(type.getPointer());
-  if (it != typeToUniqueID.end()) {
-    return it->second;
-  }
-  ++currUniqueID;
-  typeToUniqueID[type.getPointer()] = currUniqueID;
-  return currUniqueID;
 }
