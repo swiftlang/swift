@@ -450,12 +450,6 @@ public:
       // AST invariants involving archetypes.
       if (typealias->isDebuggerAlias()) return false;
 
-      // FIXME: Temporary hack to bridge the gap until LLDB starts setting
-      // the "debugger alias" flag.
-      if (typealias->getName().str().startswith("$") &&
-          typealias->getName().str().contains("lldb"))
-        return false;
-
       return true;
     }
 
