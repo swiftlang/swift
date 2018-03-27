@@ -14,9 +14,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
+#include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/AbstractionPattern.h"
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -351,6 +352,10 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
 
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
+}
+
+bool SILType::isLoadableOrLowered(SILModule &M) const {
+  return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
 /// True if the type, or the referenced type of an address type, is
