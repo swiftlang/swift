@@ -52,9 +52,9 @@ public struct _FDInputStream {
         bufferFree += 1
       }
     }
+    let fd = self.fd
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
-      let fd = self.fd
       let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
       return _stdlib_read(fd, addr, size)
