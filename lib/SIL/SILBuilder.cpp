@@ -117,7 +117,7 @@ SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
 SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
-  assert(Ty.isLoadableOrLowered(getModule()));
+  assert(Ty.isLoadableOrOpaque(getModule()));
   if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
@@ -525,7 +525,7 @@ void SILBuilder::emitShallowDestructureAddressOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var) {
-  assert(src->getType().isLoadableOrLowered(getModule()));
+  assert(src->getType().isLoadableOrOpaque(getModule()));
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(

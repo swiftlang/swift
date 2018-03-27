@@ -575,7 +575,7 @@ public:
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            getFunction().hasQualifiedOwnership() &&
                "Qualified inst in unqualified function");
-    assert(LV->getType().isLoadableOrLowered(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
@@ -594,13 +594,13 @@ public:
   /// non-address values.
   SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
                                   LoadOwnershipQualifier Qualifier) {
-    assert(LV->getType().isLoadableOrLowered(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     const auto &lowering = getTypeLowering(LV->getType());
     return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
-    assert(LV->getType().isLoadableOrLowered(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -977,7 +977,7 @@ public:
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());
-    assert(operand->getType().isLoadableOrLowered(getModule()));
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
@@ -992,7 +992,7 @@ public:
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());
-    assert(operand->getType().isLoadableOrLowered(getModule()));
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
   }
@@ -1009,7 +1009,7 @@ public:
                                                        SILValue operand,
                                                        Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
-    assert(operand->getType().isLoadableOrLowered(getModule()));
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UnmanagedRetainValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -1018,7 +1018,7 @@ public:
                                                          SILValue operand,
                                                          Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
-    assert(operand->getType().isLoadableOrLowered(getModule()));
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UnmanagedReleaseValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -1035,7 +1035,7 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
-    assert(operand->getType().isLoadableOrLowered(getModule()));
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
@@ -1071,7 +1071,7 @@ public:
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
-    assert(Ty.isLoadableOrLowered(getModule()));
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(
         StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                            getModule()));
@@ -1079,7 +1079,7 @@ public:
 
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements) {
-    assert(Ty.isLoadableOrLowered(getModule()));
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(
         TupleInst::create(getSILDebugLocation(Loc), Ty, Elements,
                           getModule()));
@@ -1089,21 +1089,21 @@ public:
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
-    assert(Ty.isLoadableOrLowered(getModule()));
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) EnumInst(getSILDebugLocation(Loc),
                                                Operand, Element, Ty));
   }
 
   /// Inject a loadable value into the corresponding optional type.
   EnumInst *createOptionalSome(SILLocation Loc, SILValue operand, SILType ty) {
-    assert(ty.isLoadableOrLowered(getModule()));
+    assert(ty.isLoadableOrOpaque(getModule()));
     auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
     return createEnum(Loc, operand, someDecl, ty);
   }
 
   /// Create the nil value of a loadable optional type.
   EnumInst *createOptionalNone(SILLocation Loc, SILType ty) {
-    assert(ty.isLoadableOrLowered(getModule()));
+    assert(ty.isLoadableOrOpaque(getModule()));
     auto noneDecl = getModule().getASTContext().getOptionalNoneDecl();
     return createEnum(Loc, nullptr, noneDecl, ty);
   }
@@ -1120,7 +1120,7 @@ public:
                                                  SILValue Operand,
                                                  EnumElementDecl *Element,
                                                  SILType Ty) {
-    assert(Ty.isLoadableOrLowered(getModule()));
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UncheckedEnumDataInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1160,7 +1160,7 @@ public:
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                    Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
                    ProfileCounter DefaultCount = ProfileCounter()) {
-    assert(Ty.isLoadableOrLowered(getModule()));
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getFunction(), CaseCounts, DefaultCount));
