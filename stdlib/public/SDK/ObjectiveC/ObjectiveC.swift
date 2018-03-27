@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _runtime(_ObjC)
+
 @_exported
 import ObjectiveC
 import _SwiftObjectiveCOverlayShims
@@ -224,4 +226,6 @@ extension NSObject : CVarArg {
     return _encodeBitsAsWords(self)
   }
 }
+
+#endif
 
