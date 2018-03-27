@@ -1489,10 +1489,8 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
 }
 
-void TypeInfo::collectArchetypeMetadata(
-    IRGenFunction &IGF,
-    llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-    SILType T) const {
+void TypeInfo::collectMetadataForOutlining(OutliningMetadataCollector &c,
+                                           SILType T) const {
   auto canType = T.getSwiftRValueType();
   assert(!canType->is<ArchetypeType>() && "Did not expect an ArchetypeType");
 }
