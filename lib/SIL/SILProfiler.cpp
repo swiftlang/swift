@@ -886,7 +886,6 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
     return llvm::GlobalValue::ExternalLinkage;
 
   case FormalLinkage::HiddenUnique:
-  case FormalLinkage::HiddenNonUnique:
   case FormalLinkage::Private:
     return llvm::GlobalValue::PrivateLinkage;
   }

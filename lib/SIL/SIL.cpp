@@ -77,9 +77,6 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
   case FormalLinkage::HiddenUnique:
     return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
-  case FormalLinkage::HiddenNonUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
-
   case FormalLinkage::Private:
     return SILLinkage::Private;
   }

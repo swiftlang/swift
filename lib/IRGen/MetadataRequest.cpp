@@ -635,7 +635,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
       return MetadataAccessStrategy::PrivateAccessor;
 
     case FormalLinkage::PublicNonUnique:
-    case FormalLinkage::HiddenNonUnique:
       return MetadataAccessStrategy::NonUniqueAccessor;
     }
     llvm_unreachable("bad formal linkage");
