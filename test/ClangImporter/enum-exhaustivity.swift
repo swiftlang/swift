@@ -55,3 +55,10 @@ func testAttributes(
   case .A, .B: break
   }
 }
+
+func testUnavailableCases(_ value: UnavailableCases) {
+  switch value { // okay
+  case .A: break
+  case .B: break
+  }
+}

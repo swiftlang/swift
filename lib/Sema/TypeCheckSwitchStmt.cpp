@@ -1048,6 +1048,13 @@ namespace {
             if (!eed->hasInterfaceType()) {
               return Space();
             }
+
+            // Don't force people to match unavailable cases; they can't even
+            // write them.
+            if (AvailableAttr::isUnavailable(eed)) {
+              return Space();
+            }
+
             auto eedTy = tp->getCanonicalType()
                            ->getTypeOfMember(E->getModuleContext(), eed,
                                              eed->getArgumentInterfaceType());

@@ -1124,3 +1124,52 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break
   }
 }
+
+enum UnavailableCase {
+  case a
+  case b
+  @available(*, unavailable)
+  case oopsThisWasABadIdea
+}
+
+enum UnavailableCaseOSSpecific {
+  case a
+  case b
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  @available(macOS, unavailable)
+  @available(iOS, unavailable)
+  @available(tvOS, unavailable)
+  @available(watchOS, unavailable)
+  case unavailableOnAllTheseApplePlatforms
+#else
+  @available(*, unavailable)
+  case dummyCaseForOtherPlatforms
+#endif
+}
+
+enum UnavailableCaseOSIntroduced {
+  case a
+  case b
+
+  @available(macOS 50, iOS 50, tvOS 50, watchOS 50, *)
+  case notYetIntroduced
+}
+
+func testUnavailableCases(_ x: UnavailableCase, _ y: UnavailableCaseOSSpecific, _ z: UnavailableCaseOSIntroduced) {
+  switch x {
+  case .a: break
+  case .b: break
+  } // no-error
+
+  switch y {
+  case .a: break
+  case .b: break
+  } // no-error
+
+  switch z {
+  case .a: break
+  case .b: break
+  case .notYetIntroduced: break
+  } // no-error
+}
