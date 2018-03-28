@@ -56,7 +56,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 
-const uint16_t VERSION_MINOR = 405; // Last change: EnumElementDecl has a ParameterList
+const uint16_t VERSION_MINOR = 406; // Last change: EnumElementDecl resilience expansion
 
 using DeclIDField = BCFixed<31>;
 
@@ -1091,6 +1091,7 @@ namespace decls_block {
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
     IdentifierIDField, // raw value
+    BCFixed<1>,   // default argument resilience expansion
     BCVBR<5>, // number of parameter name components
     BCArray<IdentifierIDField> // name components,
 
