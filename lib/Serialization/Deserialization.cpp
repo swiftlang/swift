@@ -3675,28 +3675,51 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
-    bool hasArgumentType;
-    bool isImplicit; bool isNegative;
+    bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
+    IdentifierID blobData;
+    unsigned numArgNames;
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID,
+    decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                interfaceTypeID,
-                                               hasArgumentType,
-                                               isImplicit, rawValueKindID,
-                                               isNegative);
+                                               isImplicit, hasPayload,
+                                               rawValueKindID, isNegative,
+                                               blobData,
+                                               numArgNames,
+                                               argNameAndDependencyIDs);
+
+    // Resolve the name ids.
+    Identifier baseName = getIdentifier(argNameAndDependencyIDs.front());
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName compoundName(ctx, baseName, argNames);
+    DeclName name = argNames.empty() ? baseName : compoundName;
+    
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+          name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
+    // Read payload parameter list, if it exists.
+    ParameterList *paramList = nullptr;
+    if (hasPayload) {
+      paramList = readParameterList();
+    }
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
-                                            getIdentifier(nameID),
-                                            TypeLoc(),
-                                            hasArgumentType,
+                                            name,
+                                            paramList,
                                             SourceLoc(),
                                             nullptr,
                                             DC);
@@ -3707,8 +3730,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getContext().AllocateCopy(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+      auto literalText = getIdentifier(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)

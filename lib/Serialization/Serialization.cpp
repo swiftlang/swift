@@ -3299,29 +3299,41 @@ void Serializer::writeDecl(const Decl *D) {
     auto elem = cast<EnumElementDecl>(D);
     auto contextID = addDeclContextRef(elem->getDeclContext());
 
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(addDeclBaseNameRef(elem->getBaseName()));
+    for (auto argName : elem->getFullName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
+
+    Type ty = elem->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
+
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
     auto RawValueKind = EnumElementRawValueKind::None;
     bool Negative = false;
-    StringRef RawValueText;
+    Identifier RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       RawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
-      RawValueText = ILE->getDigitsText();
+      RawValueText = M->getASTContext().getIdentifier(ILE->getDigitsText());
       Negative = ILE->isNegative();
     }
 
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclBaseNameRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getInterfaceType()),
-                                  elem->hasAssociatedValues(),
                                   elem->isImplicit(),
+                                  elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
                                   Negative,
-                                  RawValueText);
+                                  addDeclBaseNameRef(RawValueText),
+                                  elem->getFullName().getArgumentNames().size()+1,
+                                  nameComponentsAndDependencies);
+    if (auto *PL = elem->getParameterList())
+      writeParameterList(PL);
     break;
   }
 

@@ -2217,6 +2217,13 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     auto ArgName = param->getArgumentName();
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
+    case PrintOptions::ArgAndParamPrintingMode::EnumElement:
+      if (ArgName.empty() && BodyName.empty() && !param->getDefaultValue()) {
+        // Don't print anything, in the style of a tuple element.
+        return;
+      }
+      // Else, print the argument only.
+      LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
@@ -2560,9 +2567,16 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
       Printer.printName(elt->getName());
     });
 
-  if (auto argTy = elt->getArgumentInterfaceType()) {
-    if (!Options.SkipPrivateStdlibDecls || !argTy.isPrivateStdlibType())
-      argTy.print(Printer, Options);
+  if (auto *PL = elt->getParameterList()) {
+    llvm::SaveAndRestore<PrintOptions::ArgAndParamPrintingMode>
+      mode(Options.ArgAndParamPrinting,
+           PrintOptions::ArgAndParamPrintingMode::EnumElement);
+    printParameterList(PL,
+                       elt->hasInterfaceType()
+                         ? elt->getArgumentInterfaceType()
+                         : nullptr,
+                       /*isCurried=*/false,
+                       /*isAPINameByDefault*/[]()->bool{return true;});
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -4224,42 +4238,31 @@ void swift::printEnumElementsAsCases(
               return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
             });
 
-  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
+  auto printPayloads = [](ParameterList *PL, llvm::raw_ostream &OS) {
     // If the enum element has no payloads, return.
-    auto TL = EE->getArgumentTypeLoc();
-    if (TL.isNull())
+    if (!PL)
       return;
-    TypeRepr *TR = EE->getArgumentTypeLoc().getTypeRepr();
-    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-      SmallVector<Identifier, 4> Names;
-      if (TTR->hasElementNames()) {
-        // Get the name from the tuple repr, if exist.
-        TTR->getElementNames(Names);
+    OS << "(";
+    // Print each element in the pattern match.
+    for (auto i = PL->begin(); i != PL->end(); ++i) {
+      auto *param = *i;
+      if (param->hasName()) {
+        OS << tok::kw_let << " " << param->getName().str();
       } else {
-        // Create same amount of empty names to the elements.
-        Names.assign(TTR->getNumElements(), Identifier());
+        OS << "_";
       }
-      OS << "(";
-      // Print each element in the pattern match.
-      for (unsigned I = 0, N = Names.size(); I < N; I++) {
-        auto Id = Names[I];
-        if (Id.empty())
-          OS << "_";
-        else
-          OS << tok::kw_let << " " << Id.str();
-        if (I + 1 != N) {
-          OS << ", ";
-        }
+      if (i + 1 != PL->end()) {
+        OS << ", ";
       }
-      OS << ")";
     }
+    OS << ")";
   };
 
   // Print each enum element name.
   std::for_each(SortedElements.begin(), SortedElements.end(),
                 [&](EnumElementDecl *EE) {
                   OS << tok::kw_case << " ." << EE->getNameStr();
-                  printPayloads(EE, OS);
+                  printPayloads(EE->getParameterList(), OS);
                   OS << ": " << getCodePlaceholder() << "\n";
                 });
 }
