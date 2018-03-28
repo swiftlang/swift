@@ -36,12 +36,17 @@ import Glibc
 #endif
 import CTensorFlow
 
+// If `serverAddress` is nil, use local session (good for forge testing).
+//
 // FIXME: We need transparent here because deabstraction isn't inlining this
 // function.  We need to inline if a callee contains tensor ops, not only if
 // it takes and returns a TensorFlow value.
 @_transparent
-public func enableTPU(infeed: Bool = true) {
+public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
   _RuntimeConfig.executionMode = .tpu
+  if let serverAddress = serverAddress {
+    _RuntimeConfig.session = .remote(grpcAddress: serverAddress)
+  }
   #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
 }
 
