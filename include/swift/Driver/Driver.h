@@ -242,7 +242,8 @@ public:
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const InputFileList &Inputs, OutputInfo &OI) const;
+                       const bool BatchMode, const InputFileList &Inputs,
+                       OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
