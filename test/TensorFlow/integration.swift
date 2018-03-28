@@ -462,3 +462,31 @@ public struct NonInlineMethodExample {
   }
 }
 
+
+// b/77158282
+// This was a miscompilation caused by us deleting all retain/release instructions
+// involving a value that got moved to the accelerator.  In fact, we need
+// to retain these if there is a host use, because they may be retaining the value!
+@inline(never)
+func noInlineUser(_ x: Tensor<Float>) {
+  print(x)
+}
+
+public func testNoInlineUser() {
+    let x = Tensor<Float>(1)
+    noInlineUser(x)
+    noInlineUser(x)
+}
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNoInlineUser
+// CHECK: [[X:%.*]] = alloc_ref $TensorHandle<Float>
+// CHECK: [[XS:%.*]] = struct $Tensor<Float> ([[X]] : $TensorHandle<Float>)
+// CHECK:  strong_retain %26 : $TensorHandle<Float>
+// CHECK-NEXT:  strong_release %26 : $TensorHandle<Float>
+// CHECK:  strong_retain %26 : $TensorHandle<Float>
+// CHECK:  [[FN:%.*]] = function_ref @${{.*}}noInlineUser
+// CHECK-NEXT: apply [[FN]]([[XS]])
+// CHECK-NEXT: apply [[FN]]([[XS]])
+// CHECK:  strong_release %26 : $TensorHandle<Float>
+// CHECK:  strong_release %26 : $TensorHandle<Float>
+// CHECK-LABEL: } // end sil function{{.*}}testNoInlineUser

@@ -515,10 +515,12 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
 
     // Add the blocks that any users live in.
     for (auto result : i->getResults()) {
-      for (auto user : result->getUses()) {
-        if (user->getUser()->getParent() != instBB &&
-            !isUserIgnoredByPartitioning(user->getUser()))
-          worklist.push_back(user->getUser()->getParent());
+      for (auto use : result->getUses()) {
+        auto user = use->getUser();
+        if (user->getParent() != instBB &&
+            // Ignore values that don't need to keep the tensor value alive.
+            !isUserIgnoredByPartitioning(user))
+          worklist.push_back(user->getParent());
       }
     }
   }
@@ -681,8 +683,8 @@ public:
 
   void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
                                  bool isTensorProgramArgument);
-  bool diagnoseCopyToHost(SILValue value, SILInstruction *user,
-                          SILLocation loc);
+  void diagnoseUsesFromHost(SILValue value, SILLocation loc);
+  void diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc);
 
 private:
   // Marking.
@@ -826,21 +828,37 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
 /// accelerator is our designated "receive" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
-bool TFFunctionPartition::
-diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
-  // If it isn't the result of a "send" operation, then produce a warning about
-  // an implicit copy to the accelerator.
-  if (classifyInst(user) == PartitioningClass::ExplicitReceive) {
-    explicitCopyMarkers.insert(user);
-    return false;
+void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
+  bool diagnosed = false;
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+
+    // If it is used by a "receive" operation, remember the receive and don't
+    // emit a warning.
+    if (classifyInst(user) == PartitioningClass::ExplicitReceive) {
+      explicitCopyMarkers.insert(user);
+      continue;
+    }
+
+    // If this is a retain/release or debug instruction, don't emit the warning
+    // here.  It won't be very useful.
+    if (isUserIgnoredByPartitioning(user))
+      continue;
+
+    // If we are running this in the context of an expression run in the REPL or
+    // playgrounds, or script mode, then we should never emit a warning: we know
+    // we're going to be implicitly copying things in as warnings all the time.
+    if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+      continue;
+
+    // Only emit one warning per use.
+    if (!diagnosed)
+      diagnoseCopyToHost(value, user, loc);
   }
+}
 
-  // If we are running this in the context of an expression run in the REPL or
-  // playgrounds, or script mode, then we should never emit a warning: we know
-  // we're going to be implicitly copying things in as warnings all the time.
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
-    return false;
-
+void TFFunctionPartition::
+diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.
@@ -864,7 +882,7 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
                       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
     diagnose(ctx, fn.getLocation().getSourceLoc(), diag::tf_op_misuse,
              "located in " + name + " aka '" + fn.getName().str() + "'");
-    return true;
+    return;
   }
 
   // If the use is at a different position, emit a note showing where it is.
@@ -874,8 +892,6 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
     .highlight(userLoc.getSourceRange());
   }
-
-  return true;
 }
 
 
@@ -1056,18 +1072,19 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   if (!markedInstructions.insert({&inst, mark}).second)
     return;
 
-  // If we're moving a computation to the accelerator, we can remove any
-  // debug_value and retain/release instructions using this one.  Similarly, if
-  // we see a tuple_extract from a moved value, then we move the tuple_extract
-  // as well, to make sure that any copy-to-host or results are scalar values,
-  // not the multiple results of tensor ops.
+  // If we're moving a computation to the accelerator and we see a tuple_extract
+  // from a moved value, then we move the tuple_extract as well, to make sure
+  // that any copy-to-host or results are scalar values, not the multiple
+  // results of tensor ops.
   if (mark == Marking::Move) {
     for (auto result : inst.getResults())
       for (auto *use : result->getUses()) {
         auto user = use->getUser();
-        if (isUserIgnoredByPartitioning(user))
-          markInstruction(*user, Marking::Delete);
-        else if (isa<TupleExtractInst>(user)) {
+
+        // FIXME: We should probably consider these as tensorops to make sure
+        // they get moved to the accelerator and we don't end up with any
+        // multi-result tensor operations being copied over.
+        if (isa<TupleExtractInst>(user)) {
           // It is possible the tuple extract already got marked as a copy.  If
           // so, remove its entry so we can upgrade it to a move.
           markedInstructions.erase(user);
@@ -1489,8 +1506,6 @@ void TFFunctionPartition::promoteCopyToMove() {
   }
 
   // Iteratively process instructions until we converge.
-  SmallVector<SILInstruction*, 4> additionalInstsToDelete;
-
   while (!worklist.empty()) {
     auto *inst = worklist.pop_back_val();
     auto mii = markedInstructions.find(inst);
@@ -1500,7 +1515,6 @@ void TFFunctionPartition::promoteCopyToMove() {
         isa<TermInst>(inst))
       continue;
 
-    additionalInstsToDelete.clear();
     bool canMove = true;
     for (auto result : inst->getResults())
       for (auto *use : result->getUses()) {
@@ -1513,11 +1527,9 @@ void TFFunctionPartition::promoteCopyToMove() {
           continue;
 
         // If this is a debug_value or retain/release instruction that becomes
-        // obsolete if we move the value, then keep track of it, but keep going.
-        if (isUserIgnoredByPartitioning(user)) {
-          additionalInstsToDelete.push_back(user);
+        // obsolete if we move the value, then keep going.
+        if (isUserIgnoredByPartitioning(user))
           continue;
-        }
 
         // Otherwise, there are host instructions that need this value.  Leave
         // the computation on the host.
@@ -1532,11 +1544,6 @@ void TFFunctionPartition::promoteCopyToMove() {
 
     // Okay, we can move this instruction.
     markedInstructions[inst] = Marking::Move;
-
-    // Make sure to delete any debug_value or refcounting instructions this
-    // uses.
-    for (auto inst : additionalInstsToDelete)
-      markedInstructions[inst] = Marking::Delete;
 
     // Moving this over means that any operands of the instruction may have
     // become movable.  Add them (back?) to the worklist for further
@@ -1855,6 +1862,7 @@ public:
 
   void insertSend(SILInstruction &inst);
   void insertReceive(SILValue value, SILLocation loc);
+  void handleHostReferencesOfMovedValue(SILValue value, SILLocation loc);
 
   // Handle references to blocks from cloned code.
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
@@ -2231,6 +2239,9 @@ void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   assert(isa<SILInstruction>((SILNode*)value) || isa<SILArgument>(value) &&
          "Don't know how to receive this value");
 
+  // Diagnose implicit data transfers if they are implicit.
+  FP.diagnoseUsesFromHost(value, loc);
+
   SILBuilder BH(FP.fn);          // Builder for the host.
   auto BA = getBuilder();        // Builder for accelerator.
 
@@ -2249,11 +2260,6 @@ void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
     BA.setInsertionPoint(&otherBB->front());
   }
 
-  // Diagnose implicit data transfers.
-  for (auto *use : value->getUses()) {
-    FP.diagnoseCopyToHost(value, use->getUser(), loc);
-  }
-
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
   createSend(BA, loc, remapValue(value), nextSendID);
@@ -2264,6 +2270,31 @@ void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   nextSendID++;
 }
 
+void PartitionCloner::
+handleHostReferencesOfMovedValue(SILValue value, SILLocation loc) {
+  // If the argument has any non-debug-non-retain/release instructions using
+  // it, then we need to insert a copy.
+  SmallVector<SILInstruction*, 4> instToRemove;
+  bool needsCopy = false;
+  for (auto use : value->getUses()) {
+    auto user = use->getUser();
+    if (isUserIgnoredByPartitioning(user)) {
+      instToRemove.push_back(user);
+      continue;
+    }
+    needsCopy = true;
+    break;
+  }
+
+  if (needsCopy) {
+    // If we need the value on the host, then keep the retain/release ops.
+    insertReceive(value, loc);
+  } else {
+    // Otherwise, drop them.
+    for (auto *inst : instToRemove)
+      inst->eraseFromParent();
+  }
+}
 
 /// Move and clone code over from the input block into this block, inserting
 /// transfers between the host and destination code as necessary.
@@ -2510,42 +2541,17 @@ void PartitionCloner::finalizeOriginal() {
       continue;
 
     auto arg = argInfo.first;
-    auto loc = argInfo.second.second;
-
-    // If the argument has any non-debug-non-retain/release instructions using
-    // it, then we need to insert a copy.
-    SmallVector<SILInstruction*, 2> instToRemove;
-    bool needsCopy = false;
-    for (auto operand : arg->getUses()) {
-      auto user = operand->getUser();
-      if (isUserIgnoredByPartitioning(user)) {
-        instToRemove.push_back(user);
-        continue;
-      }
-      needsCopy = true;
-      break;
-    }
-
-    if (needsCopy) {
-      // If we need the value on the host, then keep the retain/release ops.
-      insertReceive(arg, loc);
-    } else {
-      // Otherwise, drop them.
-      for (auto *inst : instToRemove)
-        inst->eraseFromParent();
-    }
+    handleHostReferencesOfMovedValue(arg, argInfo.second.second);
 
     // Remove it from the block that it lives in.
     arg->getParent()->eraseArgument(arg->getIndex());
   }
 
-  // Next, add sends back of values that are used by the host code, and remove
-  // the original instructions.
+  // Next, add sends back of any values that are used by the host code, and
+  // remove the original instruction.
   for (auto inst : instructionsToRemove) {
     for (auto result : inst->getResults())
-      if (!result->use_empty()) {
-        insertReceive(result, getUserSourceLocation(inst));
-      }
+      handleHostReferencesOfMovedValue(result, getUserSourceLocation(inst));
 
     inst->eraseFromParent();
   }
@@ -2927,6 +2933,15 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     B.createStore(result.getLoc(), newValue, fieldAddress,
                   storeOwnership);
 
+    // FIXME: We are emitting an extra retain because we aren't tracking the
+    // use counts outside of the region properly.  This needs to be fixed
+    // correctly.
+    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
+    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
+    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
+    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
+    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
+
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
     for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
@@ -2997,60 +3012,69 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   // from the accelerator to the host.
   SmallVector<SILValue, 4> resultValues;
 
-  // TODO: Should also handle Tensor BB Arguments to avoid sends.
-  for (auto markInfo : markedInstructions) {
-    // We only care about values that are being moved to the accelerator.  If
-    // they are being copied over, we can just use the original value computed
-    // on the host.
-    if (markInfo.second != Marking::Move)
-      continue;
+  // Walk the function in a determinstic order to populate resultValues.
+  for (auto *block : llvm::depth_first(&fn)) {
+    for (auto &inst : *block) {
+      auto it = markedInstructions.find(&inst);
 
-    auto inst = markInfo.first;
+      // We only care about values that are being moved to the accelerator.  If
+      // they are being copied over, we can just use the original value computed
+      // on the host.
+      if (it == markedInstructions.end() || it->second != Marking::Move)
+        continue;
 
-    // Scan all the users of return values of the instructions moved over.  If
-    // any of the results cannot be handled with a result, then we just send the
-    // whole value.
-    bool hasAnyNonResultUse = false, hasAnyUse = false;
-    for (auto result : inst->getResults())
-      for (auto *operand : result->getUses()) {
-        auto user = operand->getUser();
+      // Scan all the users of return values of the instructions moved over.  If
+      // any of the results cannot be handled with a result, then we just send
+      // the whole value.
+      bool hasAnyNonResultUse = false, hasAnyUse = false;
+      for (auto result : inst.getResults())
+        for (auto *operand : result->getUses()) {
+          auto user = operand->getUser();
 
-        // If the user is to be deleted or moved, then we can safely ignore it.
-        auto it = markedInstructions.find(user);
-        if (it != markedInstructions.end() &&
-            (it->second == Marking::Delete || it->second == Marking::Move))
-          continue;
-
-        // If the user is an unconditional branch instruction, and the value is
-        // feeding a basic block argument that is being moved or deleted, then
-        // we can ignore it.
-        if (auto *branch = dyn_cast<BranchInst>(user)) {
-          auto opNumber = operand->getOperandNumber();
-          auto arg = branch->getDestBB()->getArgument(opNumber);
-          auto argInfo = markedBBArguments.find(arg);
-          if (argInfo != markedBBArguments.end() &&
-              (argInfo->second.first == Marking::Move ||
-               argInfo->second.first == Marking::Delete))
+          // If the user is to be deleted or moved, then we can safely ignore
+          // it.
+          auto it = markedInstructions.find(user);
+          if (it != markedInstructions.end() &&
+              (it->second == Marking::Delete || it->second == Marking::Move))
             continue;
+
+          // Ignore retain/release and debugging instructions.  They can all
+          // be removed if the other users are.
+          if (isUserIgnoredByPartitioning(user))
+            continue;
+
+          // If the user is an unconditional branch instruction, and the value
+          // is feeding a basic block argument that is being moved or deleted,
+          // then we can ignore it.
+          if (auto *branch = dyn_cast<BranchInst>(user)) {
+            auto opNumber = operand->getOperandNumber();
+            auto arg = branch->getDestBB()->getArgument(opNumber);
+            auto argInfo = markedBBArguments.find(arg);
+            if (argInfo != markedBBArguments.end() &&
+                (argInfo->second.first == Marking::Move ||
+                 argInfo->second.first == Marking::Delete))
+              continue;
+          }
+
+          // Remember if the instruction has any use.  If not, then it never
+          // needs to be sent or returned.
+          hasAnyUse = true;
+
+          // If the end point dominates the out-of-model use, then we can
+          // represent it with the return value of the tensor program.
+          // Otherwise, it will turn into a send of data back to the host.
+          if (!sinkValueAfterEndPoint(user, tensorEndPoint, DI)) {
+            hasAnyNonResultUse = true;
+            break;
+          }
         }
 
-        // Remember if the instruction has any use.  If not, then it never needs
-        // to be sent or returned.
-        hasAnyUse = true;
-
-        // If the end point dominates the out-of-model use, then we can
-        // represent it with the return value of the tensor program.  Otherwise
-        // it will turn into a send of data back to the host.
-        if (!sinkValueAfterEndPoint(user, tensorEndPoint, DI)) {
-          hasAnyNonResultUse = true;
-          break;
-        }
-      }
-
-    // If all of the results can be handled with return values, then handle them
-    // that way by appending them to our result list.
-    if (hasAnyUse && !hasAnyNonResultUse)
-      resultValues.append(inst->getResults().begin(), inst->getResults().end());
+      // If all of the results can be handled with return values, then handle
+      // them that way by appending them to our result list.
+      if (hasAnyUse && !hasAnyNonResultUse)
+        resultValues.append(inst.getResults().begin(),
+                            inst.getResults().end());
+    }
   }
 
   // Insert the start/finish and any terminate runtime calls.

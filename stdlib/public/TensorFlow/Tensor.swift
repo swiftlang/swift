@@ -62,7 +62,6 @@ func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
 
 @_versioned @inline(never)
 @_silgen_name("__tf_receive")
-@effects(readnone)
 func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
