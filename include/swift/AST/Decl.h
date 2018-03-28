@@ -193,22 +193,56 @@ struct OverloadSignature {
   DeclName Name;
 
   /// The kind of unary operator.
-  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+  UnaryOperatorKind UnaryOperator;
 
   /// Whether this is an instance member.
-  bool IsInstanceMember = false;
+  unsigned IsInstanceMember : 1;
 
-  /// Whether this is a property.
-  bool IsProperty = false;
+  /// Whether this is a variable.
+  unsigned IsVariable : 1;
+
+  /// Whether this is a function.
+  unsigned IsFunction : 1;
 
   /// Whether this signature is part of a protocol extension.
-  bool InProtocolExtension = false;
+  unsigned InProtocolExtension : 1;
+
+  /// Whether this signature is of a member defined in an extension of a generic
+  /// type.
+  unsigned InExtensionOfGenericType : 1;
+
+  OverloadSignature()
+      : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
+        IsVariable(false), IsFunction(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
+///
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
+/// Determine whether two overload signatures and overload types conflict.
+///
+/// \param ctx The AST context.
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig1Type The overload type of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param sig2Type The overload type of the second declaration.
+/// \param wouldConflictInSwift5 If non-null, the referenced boolean will be set
+///        to \c true iff the function returns \c false for this version of
+///        Swift, but the given overloads will conflict in Swift 5 mode.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
+bool conflicting(ASTContext &ctx,
+                 const OverloadSignature& sig1, CanType sig1Type,
+                 const OverloadSignature& sig2, CanType sig2Type,
+                 bool *wouldConflictInSwift5 = nullptr,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
