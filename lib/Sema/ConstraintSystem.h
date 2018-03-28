@@ -161,8 +161,8 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to an lvalue type or not.
   TVO_CanBindToLValue = 0x01,
 
-  /// Whether the type variable can be bound to an inout type or not.
-  TVO_CannotBindToInOut = 0x02,
+  /// Whether the type variable is a generic type parameter or not.
+  TVO_IsGenericTypeParam = 0x02,
 
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
@@ -225,7 +225,7 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToInOut() const {
-    return !(getRawOptions() & TVO_CannotBindToInOut);
+    return !(getRawOptions() & TVO_IsGenericTypeParam);
   }
 
   /// Whether this type variable prefers a subtype binding over a supertype
@@ -348,7 +348,7 @@ public:
       if (record)
         recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
-      getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CannotBindToInOut;
+      getTypeVariable()->Bits.TypeVariableType.Options |=TVO_IsGenericTypeParam;
     }
   }
 
@@ -392,7 +392,7 @@ public:
       rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
         &= ~TVO_CanBindToLValue;
       rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
-        |= TVO_CannotBindToInOut;
+        |= TVO_IsGenericTypeParam;
     }
   }
 
