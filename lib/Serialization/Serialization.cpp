@@ -3315,6 +3315,9 @@ void Serializer::writeDecl(const Decl *D) {
       Negative = ILE->isNegative();
     }
 
+    uint8_t rawResilienceExpansion =
+        getRawStableResilienceExpansion(
+            elem->getDefaultArgumentResilienceExpansion());
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
@@ -3324,6 +3327,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   (unsigned)RawValueKind,
                                   Negative,
                                   addDeclBaseNameRef(RawValueText),
+                                  rawResilienceExpansion,
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
