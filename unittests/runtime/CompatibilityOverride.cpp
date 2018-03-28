@@ -83,7 +83,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCast) {
   auto Result = swift_dynamicCast(nullptr, nullptr, nullptr, nullptr,
                                   DynamicCastFlags::Default);
-  ASSERT_TRUE(Result);
+  ASSERT_FALSE(Result);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastClass) {
