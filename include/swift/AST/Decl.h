@@ -1425,6 +1425,10 @@ public:
 
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
+
+  /// Retrieve the position of any where clause for this context's
+  /// generic parameters.
+  SourceRange getGenericTrailingWhereClauseSourceRange() const;
 };
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
