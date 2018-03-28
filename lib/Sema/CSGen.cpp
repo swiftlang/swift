@@ -1991,12 +1991,9 @@ namespace {
         // tuples, nested arrays, and dictionary literals.
         //
         // Otherwise, create a new type variable.
-        auto boundExpr = locator.trySimplifyToExpr();
-
-        if (boundExpr) {
-          auto boundExprTy = CS.getType(boundExpr);
-          if (!boundExprTy->is<InOutType>())
-            return boundExprTy->getRValueType();
+        if (auto boundExpr = locator.trySimplifyToExpr()) {
+          if (!boundExpr->isSemanticallyInOutExpr())
+            return CS.getType(boundExpr)->getRValueType();
         }
 
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
@@ -2022,9 +2019,8 @@ namespace {
         case ReferenceOwnership::Unmanaged:
           if (!var->hasNonPatternBindingInit()) {
             if (auto boundExpr = locator.trySimplifyToExpr()) {
-              auto boundExprTy = CS.getType(boundExpr);
-              if (!boundExprTy->is<InOutType>())
-                return boundExprTy->getRValueType();
+              if (!boundExpr->isSemanticallyInOutExpr())
+                return CS.getType(boundExpr)->getRValueType();
             }
           }
           break;
