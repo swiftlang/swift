@@ -1053,7 +1053,8 @@ void IRGenerator::emitGlobalTopLevel() {
   unsigned nextOrderNumber = 0;
   for (auto &silFn : PrimaryIGM->getSILModule().getFunctions()) {
     // Don't bother adding external declarations to the function order.
-    if (!silFn.isDefinition()) continue;
+    if (!silFn.isDefinition())
+      continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
   }
 
@@ -1199,6 +1200,23 @@ void IRGenerator::emitLazyDefinitions() {
              && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
     }
+  }
+}
+
+void IRGenerator::addLazyFunction(SILFunction *f) {
+  // If the function is a shared declaration, it may have a body to
+  // deserialize.
+  if (!f->isDefinition() && hasSharedVisibility(f->getLinkage())) {
+    SIL.linkFunction(f, SILOptions::LinkingMode::LinkThisFunctionOnly);
+    if (!f->isDefinition())
+      return;
+    FunctionOrder.insert({f, FunctionOrder.size()});
+  }
+
+  // Add it to the queue if it hasn't already been put there.
+  if (LazilyEmittedFunctions.insert(f).second) {
+    LazyFunctionDefinitions.push_back(f);
+    DefaultIGMForFunction[f] = CurrentIGM;
   }
 }
 
@@ -2212,8 +2230,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
   }
 
-  bool isDefinition = f->isDefinition();
-  bool hasOrderNumber = isDefinition;
+  bool isDefinition = f->isDefinition() || hasSharedVisibility(f->getLinkage());
+  bool hasOrderNumber = f->isDefinition();
   unsigned orderNumber = ~0U;
   llvm::Function *insertBefore = nullptr;
 
@@ -2244,8 +2262,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     }
 
   // Otherwise, if we have a lazy definition for it, be sure to queue that up.
-  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally() &&
-             !hasCodeCoverageInstrumentation(*f, getSILModule())) {
+  } else if (isDefinition
+             && !forDefinition && !f->isPossiblyUsedExternally()
+             && !hasCodeCoverageInstrumentation(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
 
@@ -4050,7 +4069,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
 llvm::Function *
 IRGenModule::getAddrOfWitnessTableAccessFunction(
                                       const NormalProtocolConformance *conf,
-                                              ForDefinition_t forDefinition) {
+                                      ForDefinition_t forDefinition) {
   IRGen.addLazyWitnessTable(conf);
 
   LinkEntity entity = LinkEntity::forProtocolWitnessTableAccessFunction(conf);
