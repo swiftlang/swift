@@ -1298,3 +1298,112 @@ extension Unicode.Scalar.Properties {
     return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
 }
+
+extension Unicode {
+
+  /// The numeric type of a scalar.
+  ///
+  /// Scalars with a non-nil numeric type include numbers, fractions, numeric
+  /// superscripts and subscripts, and circled or otherwise decorated number
+  /// glyphs.
+  ///
+  /// Some letterlike scalars used in numeric systems, such as Greek or Latin
+  /// letters, do not have a non-nil numeric type, in order to prevent programs
+  /// from incorrectly interpreting them as numbers in non-numeric contexts.
+  public enum NumericType {
+
+    /// Digits that are commonly understood to form base-10 numbers.
+    ///
+    /// Specifically, scalars have this numeric type if they occupy a contiguous
+    /// range of code points representing numeric values `0...9`.
+    case decimal
+
+    /// Decimal digits that otherwise do not meet the requirements of numeric
+    /// type `decimal`.
+    ///
+    /// Scalars with this numeric type are often those that represent a decimal
+    /// digit but would not typically be used to write a base-10 number, such as
+    /// "④" (U+2463 CIRCLED DIGIT FOUR).
+    ///
+    /// In practice, the distinction between `digit` and `numeric` has not
+    /// proven to be valuable. As of Unicode 6.3, any new scalars that represent
+    /// numbers but do not meet the requirements of `decimal` will have numeric
+    /// type `numeric`, and programs can treat `digit` and `numeric`
+    /// equivalently.
+    case digit
+
+    /// Numbers that are not decimal digits.
+    ///
+    /// This numeric type includes fractions such as "⅕" (U+2155 VULGAR FRACITON
+    /// ONE FIFTH), numerical CJK ideographs like "兆" (U+5146 CJK UNIFIED
+    /// IDEOGRAPH-5146), and other scalars that are not decimal digits used
+    /// positionally in the writing of base-10 numbers.
+    case numeric
+
+    internal init?(rawValue: __swift_stdlib_UNumericType) {
+      switch rawValue {
+      case __swift_stdlib_U_NT_NONE: return nil
+      case __swift_stdlib_U_NT_DECIMAL: self = .decimal
+      case __swift_stdlib_U_NT_DIGIT: self = .digit
+      case __swift_stdlib_U_NT_NUMERIC: self = .numeric
+      default: fatalError("Unknown numeric type \(rawValue)")
+      }
+    }
+  }
+}
+
+/// Numeric properties of scalars.
+extension Unicode.Scalar.Properties {
+
+  /// The numeric type of the scalar.
+  ///
+  /// The value of this property is nil for scalars that do not represent a
+  /// number.
+  ///
+  /// ```
+  /// print("X", ("X" as Unicode.Scalar).properties.numericType)
+  /// // Prints "X nil"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericType)
+  /// // Prints "4 Optional(Swift.Unicode.NumericType.decimal)"
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType)
+  /// // Prints "④ Optional(Swift.Unicode.NumericType.digit)"
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType)
+  /// // Prints "⅕ Optional(Swift.Unicode.NumericType.numeric)"
+  /// ```
+  ///
+  /// This property corresponds to the `Numeric_Type` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var numericType: Unicode.NumericType? {
+    let rawValue = __swift_stdlib_UNumericType(
+      UInt32(__swift_stdlib_u_getIntPropertyValue(
+        _value, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
+    return Unicode.NumericType(rawValue: rawValue)
+  }
+
+  /// The numeric value of the scalar.
+  ///
+  /// The value of this property is `Double.nan` for scalars that do not
+  /// represent a number.
+  ///
+  /// The numeric value of a scalar is represented as a `Double` because some
+  /// scalars represent fractions.
+  ///
+  /// ```
+  /// print("X", ("X" as Unicode.Scalar).properties.numericValue)
+  /// // Prints "X nan"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericValue)
+  /// // Prints "4 4.0"
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericValue)
+  /// // Prints "④ 4.0"
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericValue)
+  /// // Prints "⅕ 0.2"
+  /// ```
+  ///
+  /// This property corresponds to the `Numeric_Value` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  public var numericValue: Double {
+    let icuNoNumericValue: Double = -123456789
+    let result = __swift_stdlib_u_getNumericValue(_value)
+    return result != icuNoNumericValue ? result : .nan
+  }
+}

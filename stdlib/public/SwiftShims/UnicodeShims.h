@@ -436,6 +436,16 @@ typedef enum __swift_stdlib_UCharNameChoice {
 #endif
 } __swift_stdlib_UCharNameChoice;
 
+typedef enum __swift_stdlib_UNumericType {
+  __swift_stdlib_U_NT_NONE,
+  __swift_stdlib_U_NT_DECIMAL,
+  __swift_stdlib_U_NT_DIGIT,
+  __swift_stdlib_U_NT_NUMERIC,
+#ifndef U_HIDE_DEPRECATED_API
+  __swift_stdlib_U_NT_COUNT
+#endif
+} __swift_stdlib_UNumericType;
+
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_int8_t __swift_stdlib_UBool;
@@ -540,6 +550,9 @@ __swift_int32_t __swift_stdlib_u_strToUpper(
     __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
     const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
     const char *locale, __swift_stdlib_UErrorCode *pErrorCode);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+double __swift_stdlib_u_getNumericValue(__swift_stdlib_UChar32 c);
 
 
 #ifdef __cplusplus

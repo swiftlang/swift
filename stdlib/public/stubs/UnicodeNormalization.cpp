@@ -63,6 +63,7 @@ int32_t u_strToTitle(UChar *, int32_t, const UChar *, int32_t,
                      UBreakIterator *, const char *, UErrorCode *);
 int32_t u_strToUpper(UChar *, int32_t, const UChar *, int32_t, const char *,
                      UErrorCode *);
+double u_getNumericValue(UChar32);
 }
 
 #else
@@ -386,6 +387,10 @@ __swift_int32_t swift::__swift_stdlib_u_strToUpper(
   return u_strToUpper(ptr_cast<UChar>(dest), destCapacity,
                       ptr_cast<UChar>(src), srcLength,
                       locale, ptr_cast<UErrorCode>(pErrorCode));
+}
+
+double swift::__swift_stdlib_u_getNumericValue(__swift_stdlib_UChar32 c) {
+  return u_getNumericValue(c);
 }
 
 
