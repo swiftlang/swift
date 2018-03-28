@@ -4542,14 +4542,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isMaintenanceInst(&SI))
+      if (SI.isMetaInstruction())
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      if (isMaintenanceInst(&SI))
+      if (SI.isMetaInstruction())
         continue;
 
       // If we haven't seen this debug scope yet, update the

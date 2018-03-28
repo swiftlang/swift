@@ -946,7 +946,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
     LoadInst *optimizableLoad) {
   SILValue value = optimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1069,7 +1069,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
   }
   SILValue value = unoptimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1411,7 +1411,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1438,7 +1438,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 AllocStackInst *
 LoadableStorageAllocation::allocateForApply(SILInstruction *apply,
                                             SILType type) {
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(apply->getLoc(), type);
 
   pass.largeLoadableArgs.push_back(allocInstr);
@@ -1524,7 +1524,7 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
 static void allocateAndSetForInstrOperand(StructLoweringState &pass,
                                           SingleValueInstruction *instrOperand){
   assert(instrOperand->getType().isObject());
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr = allocBuilder.createAllocStack(
       instrOperand->getLoc(), instrOperand->getType());
 
@@ -1558,7 +1558,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
   auto *arg = dyn_cast<SILArgument>(value);
   assert(arg && "non-instr operand must be an argument");
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(applyInst->getLoc(), value->getType());
 
@@ -1677,7 +1677,8 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   auto value = orig->getOperand();
   auto type = value->getType();
   if (type.isObject()) {
-    SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+    SILBuilderWithScope allocBuilder(&*pass.F->begin());
+
     // support for non-address operands / enums
     auto *allocInstr = allocBuilder.createAllocStack(orig->getLoc(), type);
     SILBuilderWithScope storeBuilder(orig);
@@ -1696,7 +1697,7 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
     }
     value = allocInstr;
   }
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(value.getLoc(), type);
 
   SILBuilderWithScope copyBuilder(orig);
