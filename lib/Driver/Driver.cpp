@@ -1098,19 +1098,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
-  if (driverKind == DriverKind::Interactive) {
-    OI.CompilerMode = OutputInfo::Mode::Immediate;
-    if (Inputs.empty())
-      OI.CompilerMode = OutputInfo::Mode::REPL;
-    OI.CompilerOutputType = file_types::TY_Nothing;
+  OI.CompilerOutputType = driverKind == DriverKind::Interactive
+                              ? file_types::TY_Nothing
+                              : file_types::TY_Object;
 
-  } else { // DriverKind::Batch
-    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization,
-                    options::OPT_index_file))
-      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
-    OI.CompilerOutputType = file_types::TY_Object;
-  }
+  OI.CompilerMode = computeCompilerMode(Args, Inputs);
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
@@ -1377,6 +1369,31 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   }
 
+}
+
+OutputInfo::Mode
+Driver::computeCompilerMode(const DerivedArgList &Args,
+                            const InputFileList &Inputs) const {
+
+  if (driverKind == Driver::DriverKind::Interactive)
+    return Inputs.empty() ? OutputInfo::Mode::REPL
+                          : OutputInfo::Mode::Immediate;
+
+  const Arg *ArgRequiringWMO = Args.getLastArg(
+      options::OPT_whole_module_optimization, options::OPT_index_file);
+
+  if (!ArgRequiringWMO)
+    return OutputInfo::Mode::StandardCompile;
+
+  // Test for -enable-batch-mode, rather than the BatchMode flag that is
+  // passed into the caller because the diagnostic is intended to warn against
+  // overriding *explicit* batch mode. No warning should be given if in batch
+  // mode by default.
+  if (Args.hasArg(options::OPT_enable_batch_mode))
+    Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
+                   ArgRequiringWMO->getOption().getPrefixedName());
+
+  return OutputInfo::Mode::SingleCompile;
 }
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
