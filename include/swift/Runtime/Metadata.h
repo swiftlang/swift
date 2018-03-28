@@ -4290,7 +4290,7 @@ SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_getFieldAt(
   const Metadata *base, unsigned index, 
-  void (*callback)(const char *name, const Metadata *type));
+  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);
 
 } // end namespace swift
 
