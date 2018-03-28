@@ -1,26 +1,24 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
+var __lolcode_IT: Any = 0
+
+public func _set_lolcode_IT(_ value: Any) {
+  __lolcode_IT = value
+}
+
+public func _get_lolcode_IT() -> Any {
+  return __lolcode_IT
+}
 
 public enum _LOLCodeType: String {
   case yarn, numbar, numbr, noob, bukkit, troof
 
-  var defaultValue: Any {
+  var defaultValue: _LOLCodeValue {
     switch self {
-    case .bukkit: return [Any]()
-    case .noob: return ()
-    case .numbar: return 0.0
-    case .numbr: return 0
-    case .troof: return false
-    case .yarn: return ""
+    case .bukkit: return .bukkit([])
+    case .noob: return .noob
+    case .numbar: return .numbar(0.0)
+    case .numbr: return .numbr(0)
+    case .troof: return .troof(false)
+    case .yarn: return .yarn("")
     }
   }
 }
@@ -30,8 +28,39 @@ public enum _LOLCodeValue: Equatable {
   case numbar(Double)
   case numbr(Int)
   case noob
-  indirect case bukkit([_LOLCodeValue])
+  case bukkit([_LOLCodeValue])
   case troof(Bool)
+
+  public static func == (lhs: _LOLCodeValue, rhs: _LOLCodeValue) -> Bool {
+    switch (lhs, rhs) {
+    case let (.yarn(l), .yarn(r)): return l == r
+    case let (.numbar(l), .numbar(r)): return l == r
+    case let (.numbr(l), .numbr(r)): return l == r
+    case let (.numbar(l), .numbr(r)): return l == Double(r)
+    case let (.numbr(l), .numbar(r)): return Double(l) == r
+    case (.noob, .noob): return true
+    case let (.bukkit(l), .bukkit(r)): return l == r
+    case let (.troof(l), .troof(r)): return l == r
+    default: return false
+    }
+  }
+
+  var _type: _LOLCodeType {
+    switch self {
+    case .yarn(_):
+      return .yarn
+    case .numbar(_):
+      return .numbar
+    case .numbr(_):
+      return .numbr
+    case .noob:
+      return .noob
+    case .bukkit(_):
+      return .bukkit
+    case .troof(_):
+      return .troof
+    }
+  }
 
   var value: Any {
     switch self {
@@ -45,6 +74,10 @@ public enum _LOLCodeValue: Equatable {
   }
 
   func cast(to type: _LOLCodeType) -> _LOLCodeValue {
+    guard self._type != type else {
+      return self
+    }
+
     switch (self, type) {
     case (_, .troof): return .troof(asTroof)
     case (_, .yarn): return .yarn("\(self.value)")
@@ -55,7 +88,7 @@ public enum _LOLCodeValue: Equatable {
       guard let d = Double(s) else { break }
       return .numbar(d)
     case let (.yarn(s), .numbr):
-      guard let i = Int(s) else { break }
+      guard let i = Int(s, radix: 10) else { break }
       return .numbr(i)
     case let (.troof(b), .numbr): return .numbr(b ? 1 : 0)
     case let (.troof(b), .numbar): return .numbar(b ? 1 : 0)
@@ -123,7 +156,7 @@ public func _lolcode_promoteNumericPair(
   _ lhs: _LOLCodeValue,
   _ rhs: _LOLCodeValue,
   _ operation: String
-) -> (_LOLCodeValue, _LOLCodeValue) {
+  ) -> (_LOLCodeValue, _LOLCodeValue) {
   switch (lhs, rhs) {
   case (.numbar, .numbar), (.numbr, .numbr):
     return (lhs, rhs)
@@ -147,14 +180,14 @@ public func _lolcode_promoteNumericPair(
 
   // promote (str, int or fp) and (int or fp, str) to (int or fp, int or fp)
   case (.yarn(let s), _):
-    if let int = Int(s) {
+    if let int = Int(s, radix: 10) {
       return _lolcode_promoteNumericPair(.numbr(int), rhs, operation)
     }
     if let double = Double(s) {
       return _lolcode_promoteNumericPair(.numbar(double), rhs, operation)
     }
   case (_, .yarn(let s)):
-    if let int = Int(s) {
+    if let int = Int(s, radix: 10) {
       return _lolcode_promoteNumericPair(lhs, .numbr(int), operation)
     }
     if let double = Double(s) {
@@ -214,20 +247,20 @@ public func _lolcode_quoshunt(_ lhs: Any, _ rhs: Any) -> Any {
 
 public func _lolcode_mod(_ lhs: Any, _ rhs: Any) -> Any {
   return _lolcode_binary_op(lhs, rhs, "get remainder of",
-    numbarOp: {
-      $0.truncatingRemainder(dividingBy: $1)
-    },
-    numbrOp: %)
+                            numbarOp: {
+                              $0.truncatingRemainder(dividingBy: $1)
+  },
+                            numbrOp: %)
 }
 
 public func _lolcode_biggr(_ lhs: Any, _ rhs: Any) -> Any {
   return _lolcode_binary_op(lhs, rhs, "get bigger of",
-    numbarOp: max, numbrOp: max)
+                            numbarOp: max, numbrOp: max)
 }
 
 public func _lolcode_smallr(_ lhs: Any, _ rhs: Any) -> Any {
   return _lolcode_binary_op(lhs, rhs, "get smaller of",
-    numbarOp: min, numbrOp: min)
+                            numbarOp: min, numbrOp: min)
 }
 
 /// MARK: Boolean operators
@@ -279,7 +312,7 @@ public func _lolcode_smoosh(_ values: Any...) -> Any {
   return values.map { "\($0)" }.joined() as String
 }
 
-public func _lolcode_visible(values: Any..., newline: Bool) {
+public func _lolcode_visible(_ values: Any..., newline: Bool) {
   for value in values {
     print(_LOLCodeValue(value).value, terminator: "")
   }
@@ -292,3 +325,4 @@ public func _lolcode_gimmeh() -> Any {
   guard let value = readLine() else { return "" }
   return value
 }
+

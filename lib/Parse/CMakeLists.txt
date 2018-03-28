@@ -3,6 +3,7 @@ add_swift_library(swiftParse STATIC
   Lexer.cpp
   ParseDecl.cpp
   ParseExpr.cpp
+  ParseLOLCodeExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
   ParsePattern.cpp

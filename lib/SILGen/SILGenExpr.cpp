@@ -519,6 +519,10 @@ namespace {
                                             SGFContext C);
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
+
+    RValue visitLOLCodeExpr(LOLCodeExpr *E, SGFContext C) {
+      return SGF.emitRValue(E->getSubExpr(), C);
+    }
   };
 } // end anonymous namespace
 

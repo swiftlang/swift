@@ -1188,6 +1188,24 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
+  ParserResult<Expr> parseLOLCodeCastStmt();
+  ParserResult<Expr> parseLOLCodePrintStmt();
+  ParserResult<Decl> parseLOLCodeDeclarationStmtNode(VarDecl *&Decl);
+  ParserResult<Stmt> parseLOLCodeIfStmt();
+  ParserResult<Stmt> parseLOLCodeReturnStmt();
+  ParserStatus parseLOLCodeScript(SmallVectorImpl<ASTNode> &Entries,
+                                  bool *addedReturn = nullptr);
+  ParserStatus parseLOLCodeStmt(ASTNode &Result, VarDecl *&Decl,
+                                bool *addedReturn = nullptr);
+  ParserResult<Expr> parseLOLCodeAssignmentStmtNode(Expr *IdentExpr,
+                                                    bool destIsIT);
+  
+  ParserResult<Expr> parseLOLCodeExprShed();
+  ParserResult<Expr> parseLOLCodeShedExpr();
+  ParserResult<Expr> parseLOLCodeExpr();
+  ParserResult<Expr> parseLOLCodeBuiltinOpExpr();
+
+  ParserStatus parseLOLCodeParameters(SmallVectorImpl<Expr *> &Exprs);
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    SmallVectorImpl<Expr*> &Exprs,
                                    Token EntireTok);

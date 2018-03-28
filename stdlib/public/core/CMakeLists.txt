@@ -79,7 +79,6 @@ set(SWIFTLIB_ESSENTIAL
   LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
-  LOLCode.swift
   ManagedBuffer.swift
   Map.swift
   MemoryLayout.swift
@@ -175,6 +174,7 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
+  LOLCode.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
