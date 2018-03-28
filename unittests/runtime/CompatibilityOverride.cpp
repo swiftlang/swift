@@ -22,119 +22,31 @@ using namespace swift;
 bool EnableOverride;
 bool Ran;
 
-static const Metadata *
-GetTypeByMangledNameOverrideFunc(const char *typeNameStart,
-                                 size_t typeNameLength,
-                                 size_t numberOfLevels,
-                                 size_t *parametersPerLevel,
-                                 const Metadata * const *flatSubstitutions,
-                                 GetTypeByMangledNameOriginal originalImpl) {
-  if (!EnableOverride)
-    return originalImpl(typeNameStart,
-                        typeNameLength,
-                        numberOfLevels,
-                        parametersPerLevel,
-                        flatSubstitutions);
-  Ran = true;
-  return nullptr;
-}
 
-static bool DynamicCastOverrideFunc(OpaqueValue *dest, OpaqueValue *src,
-                                    const Metadata *srcType,
-                                    const Metadata *targetType,
-                                    DynamicCastFlags flags,
-                                    DynamicCastOriginal originalImpl) {
-  if (!EnableOverride)
-    return originalImpl(dest, src, srcType, targetType, flags);
-  Ran = true;
-  return true;
-}
-
-#define CAST_FUNC(name, rettype, objtype, metatypetype) \
-  static const rettype *name ## OverrideFunc(           \
-    const objtype *object,                              \
-    const metatypetype *targetType,                     \
-    name ## Original originalImpl) {                    \
-    if (!EnableOverride)                                \
-      return originalImpl(object, targetType);          \
-    Ran = true;                                         \
-    return nullptr;                                     \
+#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+  static ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,      \
+                          Original_ ## name originalImpl) {         \
+    if (!EnableOverride)                                            \
+      return originalImpl namedArgs;                                \
+    Ran = true;                                                     \
+    return nullptr;                                                 \
   }
+#include "../../stdlib/public/runtime/CompatibilityOverride.def"
 
-#define CAST(name) CAST_FUNC(name, void, void, ClassMetadata)
-#define FOREIGN_CAST(name) CAST_FUNC(name, void, void, ForeignClassMetadata)
-#define CLASSMETATYPE_CAST(name) \
-  CAST_FUNC(name, ClassMetadata, ClassMetadata, ClassMetadata)
-  #define UNKNOWN_CAST(name) CAST_FUNC(name, void, void, Metadata)
-#define METATYPE_CAST(name) CAST_FUNC(name, Metadata, Metadata, Metadata)
-
-CAST(DynamicCastClass)
-CAST(DynamicCastClassUnconditional)
-CAST(DynamicCastObjCClass)
-CAST(DynamicCastObjCClassUnconditional)
-FOREIGN_CAST(DynamicCastForeignClass)
-FOREIGN_CAST(DynamicCastForeignClassUnconditional)
-UNKNOWN_CAST(DynamicCastUnknownClass)
-UNKNOWN_CAST(DynamicCastUnknownClassUnconditional)
-METATYPE_CAST(DynamicCastMetatype)
-METATYPE_CAST(DynamicCastMetatypeUnconditional)
-CLASSMETATYPE_CAST(DynamicCastObjCClassMetatype)
-CLASSMETATYPE_CAST(DynamicCastObjCClassMetatypeUnconditional)
-CLASSMETATYPE_CAST(DynamicCastForeignClassMetatype)
-CLASSMETATYPE_CAST(DynamicCastForeignClassMetatypeUnconditional)
-
-static const WitnessTable *
-ConformsToProtocolOverrideFunc(const Metadata * const type,
-                               const ProtocolDescriptor *protocol,
-                               ConformsToProtocolOriginal originalImpl) {
-  if (!EnableOverride)
-    return originalImpl(type, protocol);
-  Ran = true;
-  return nullptr;
-}
 
 struct OverrideSection {
   uintptr_t version;
   
-#define FIELD(typename) typename typename ## Fptr
-  FIELD(GetTypeByMangledNameOverride);
-  FIELD(DynamicCastOverride);
-  FIELD(DynamicCastClassOverride);
-  FIELD(DynamicCastClassUnconditionalOverride);
-  FIELD(DynamicCastObjCClassOverride);
-  FIELD(DynamicCastObjCClassUnconditionalOverride);
-  FIELD(DynamicCastForeignClassOverride);
-  FIELD(DynamicCastForeignClassUnconditionalOverride);
-  FIELD(DynamicCastUnknownClassOverride);
-  FIELD(DynamicCastUnknownClassUnconditionalOverride);
-  FIELD(DynamicCastMetatypeOverride);
-  FIELD(DynamicCastMetatypeUnconditionalOverride);
-  FIELD(DynamicCastObjCClassMetatypeOverride);
-  FIELD(DynamicCastObjCClassMetatypeUnconditionalOverride);
-  FIELD(DynamicCastForeignClassMetatypeOverride);
-  FIELD(DynamicCastForeignClassMetatypeUnconditionalOverride);
-  FIELD(ConformsToProtocolOverride);
+#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+  Override_ ## name name;
+#include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
 OverrideSection Overrides __attribute__((section("__DATA,__swift_lite"))) = {
   0,
-  GetTypeByMangledNameOverrideFunc,
-  DynamicCastOverrideFunc,
-  DynamicCastClassOverrideFunc,
-  DynamicCastClassUnconditionalOverrideFunc,
-  DynamicCastObjCClassOverrideFunc,
-  DynamicCastObjCClassUnconditionalOverrideFunc,
-  DynamicCastForeignClassOverrideFunc,
-  DynamicCastForeignClassUnconditionalOverrideFunc,
-  DynamicCastUnknownClassOverrideFunc,
-  DynamicCastUnknownClassUnconditionalOverrideFunc,
-  DynamicCastMetatypeOverrideFunc,
-  DynamicCastMetatypeUnconditionalOverrideFunc,
-  DynamicCastObjCClassMetatypeOverrideFunc,
-  DynamicCastObjCClassMetatypeUnconditionalOverrideFunc,
-  DynamicCastForeignClassMetatypeOverrideFunc,
-  DynamicCastForeignClassMetatypeUnconditionalOverrideFunc,
-  ConformsToProtocolOverrideFunc
+#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+  name ## Override,
+#include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

@@ -1048,20 +1048,6 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
     });
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
-                           size_t numberOfLevels,
-                           size_t *parametersPerLevel,
-                           const Metadata * const *flatSubstitutions) {
-  static CompatibilityOverride<GetTypeByMangledNameOverride> Override;
-  return Override.call(getGetTypeByMangledNameOverride, swift_getTypeByMangledNameImpl,
-                       typeNameStart, typeNameLength,
-                       numberOfLevels,
-                       parametersPerLevel,
-                       flatSubstitutions);
-}
-
 void swift::swift_getFieldAt(
     const Metadata *base, unsigned index,
     std::function<void(llvm::StringRef name, FieldType fieldInfo)>
@@ -1162,3 +1148,6 @@ void swift::swift_getFieldAt(
     }
   }
 }
+
+#define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

@@ -1052,15 +1052,6 @@ swift_dynamicCastObjCClassImpl(const void *object,
   return nullptr;
 }
 
-const void *
-swift::swift_dynamicCastObjCClass(const void *object,
-                                  const ClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastObjCClassOverride> Override;
-  return Override.call(getDynamicCastObjCClassOverride,
-                       swift_dynamicCastObjCClassImpl,
-                       object, targetType);
-}
-
 static const void *
 swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
                                             const ClassMetadata *targetType) {
@@ -1077,29 +1068,11 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
                            targetType);
 }
 
-const void *
-swift::swift_dynamicCastObjCClassUnconditional(const void *object,
-                                             const ClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastObjCClassUnconditionalOverride> Override;
-  return Override.call(getDynamicCastObjCClassUnconditionalOverride,
-                       swift_dynamicCastObjCClassUnconditionalImpl,
-                       object, targetType);
-}
-
 static const void *
 swift_dynamicCastForeignClassImpl(const void *object,
                                   const ForeignClassMetadata *targetType) {
   // FIXME: Actually compare CFTypeIDs, once they are available in the metadata.
   return object;
-}
-
-const void *
-swift::swift_dynamicCastForeignClass(const void *object,
-                                     const ForeignClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastForeignClassOverride> Override;
-  return Override.call(getDynamicCastForeignClassOverride,
-                       swift_dynamicCastForeignClassImpl,
-                       object, targetType);
 }
 
 static const void *
@@ -1108,16 +1081,6 @@ swift_dynamicCastForeignClassUnconditionalImpl(
          const ForeignClassMetadata *targetType) {
   // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
   return object;
-}
-
-const void *
-swift::swift_dynamicCastForeignClassUnconditional(
-         const void *object,
-         const ForeignClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastForeignClassUnconditionalOverride> Override;
-  return Override.call(getDynamicCastForeignClassUnconditionalOverride,
-                       swift_dynamicCastForeignClassUnconditionalImpl,
-                       object, targetType);
 }
 
 bool swift::objectConformsToObjCProtocol(const void *theObject,
@@ -1280,15 +1243,6 @@ swift_dynamicCastObjCClassMetatypeImpl(const ClassMetadata *source,
   return nil;
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastObjCClassMetatype(const ClassMetadata *source,
-                                          const ClassMetadata *dest) {
-  static CompatibilityOverride<DynamicCastObjCClassMetatypeOverride> Override;
-  return Override.call(getDynamicCastObjCClassMetatypeOverride,
-                       swift_dynamicCastObjCClassMetatypeImpl,
-                       source, dest);
-}
-
 static const ClassMetadata *
 swift_dynamicCastObjCClassMetatypeUnconditionalImpl(const ClassMetadata *source,
                                                     const ClassMetadata *dest) {
@@ -1298,16 +1252,6 @@ swift_dynamicCastObjCClassMetatypeUnconditionalImpl(const ClassMetadata *source,
   swift_dynamicCastFailure(source, dest);
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastObjCClassMetatypeUnconditional(
-                                                   const ClassMetadata *source,
-                                                   const ClassMetadata *dest) {
-  static CompatibilityOverride<DynamicCastObjCClassMetatypeUnconditionalOverride>
-                                                                             Override;
-  return Override.call(getDynamicCastObjCClassMetatypeUnconditionalOverride,
-                       swift_dynamicCastObjCClassMetatypeUnconditionalImpl,
-                       source, dest);
-}
 #endif
 
 static const ClassMetadata *
@@ -1318,15 +1262,6 @@ swift_dynamicCastForeignClassMetatypeImpl(const ClassMetadata *sourceType,
   return sourceType;
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
-                                             const ClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastForeignClassMetatypeOverride> Override;
-  return Override.call(getDynamicCastForeignClassMetatypeOverride,
-                       swift_dynamicCastForeignClassMetatypeImpl,
-                       sourceType, targetType);
-}
-
 static const ClassMetadata *
 swift_dynamicCastForeignClassMetatypeUnconditionalImpl(
   const ClassMetadata *sourceType,
@@ -1335,18 +1270,6 @@ swift_dynamicCastForeignClassMetatypeUnconditionalImpl(
   // FIXME: Actually compare CFTypeIDs, once they arae available in
   // the metadata.
   return sourceType;
-}
-
-const ClassMetadata *
-swift::swift_dynamicCastForeignClassMetatypeUnconditional(
-  const ClassMetadata *sourceType,
-  const ClassMetadata *targetType)
-{
-  static CompatibilityOverride<DynamicCastForeignClassMetatypeUnconditionalOverride>
-                                                                             Override;
-  return Override.call(getDynamicCastForeignClassMetatypeUnconditionalOverride,
-                       swift_dynamicCastForeignClassMetatypeUnconditionalImpl,
-                       sourceType, targetType);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1635,3 +1558,11 @@ const ClassMetadata *swift::getRootSuperclass() {
   return nullptr;
 #endif
 }
+
+#if SWIFT_OBJC_INTEROP
+#define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
+#endif
+
+#define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

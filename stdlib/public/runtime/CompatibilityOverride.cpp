@@ -38,24 +38,9 @@ using namespace swift;
 struct OverrideSection {
   uintptr_t version;
   
-#define FIELD(typename) typename typename ## Fptr
-  FIELD(GetTypeByMangledNameOverride);
-  FIELD(DynamicCastOverride);
-  FIELD(DynamicCastClassOverride);
-  FIELD(DynamicCastClassUnconditionalOverride);
-  FIELD(DynamicCastObjCClassOverride);
-  FIELD(DynamicCastObjCClassUnconditionalOverride);
-  FIELD(DynamicCastForeignClassOverride);
-  FIELD(DynamicCastForeignClassUnconditionalOverride);
-  FIELD(DynamicCastUnknownClassOverride);
-  FIELD(DynamicCastUnknownClassUnconditionalOverride);
-  FIELD(DynamicCastMetatypeOverride);
-  FIELD(DynamicCastMetatypeUnconditionalOverride);
-  FIELD(DynamicCastObjCClassMetatypeOverride);
-  FIELD(DynamicCastObjCClassMetatypeUnconditionalOverride);
-  FIELD(DynamicCastForeignClassMetatypeOverride);
-  FIELD(DynamicCastForeignClassMetatypeUnconditionalOverride);
-  FIELD(ConformsToProtocolOverride);
+#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+  Override_ ## name name;
+#include "CompatibilityOverride.def"
 };
 
 static_assert(std::is_pod<OverrideSection>::value,
@@ -76,28 +61,11 @@ static OverrideSection *getOverrideSectionPtr() {
   return OverrideSectionPtr;
 }
 
-#define GETTER(typename)                     \
-  typename swift::get ## typename() {        \
-    auto *Section = getOverrideSectionPtr(); \
-    if (Section == nullptr)                  \
-      return nullptr;                        \
-    return Section->typename ## Fptr;        \
+#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+  Override_ ## name swift::getOverride_ ## name() {                 \
+    auto *Section = getOverrideSectionPtr();                        \
+    if (Section == nullptr)                                         \
+      return nullptr;                                               \
+    return Section->name;                                           \
   }
-
-GETTER(GetTypeByMangledNameOverride)
-GETTER(DynamicCastOverride)
-GETTER(DynamicCastClassOverride);
-GETTER(DynamicCastClassUnconditionalOverride);
-GETTER(DynamicCastObjCClassOverride);
-GETTER(DynamicCastObjCClassUnconditionalOverride);
-GETTER(DynamicCastForeignClassOverride);
-GETTER(DynamicCastForeignClassUnconditionalOverride);
-GETTER(DynamicCastUnknownClassOverride);
-GETTER(DynamicCastUnknownClassUnconditionalOverride);
-GETTER(DynamicCastMetatypeOverride);
-GETTER(DynamicCastMetatypeUnconditionalOverride);
-GETTER(DynamicCastObjCClassMetatypeOverride);
-GETTER(DynamicCastObjCClassMetatypeUnconditionalOverride);
-GETTER(DynamicCastForeignClassMetatypeOverride);
-GETTER(DynamicCastForeignClassMetatypeUnconditionalOverride);
-GETTER(ConformsToProtocolOverride)
+#include "CompatibilityOverride.def"

@@ -691,14 +691,6 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   }
 }
 
-const WitnessTable *
-swift::swift_conformsToProtocol(const Metadata * const type,
-                                const ProtocolDescriptor *protocol) {
-  static CompatibilityOverride<ConformsToProtocolOverride> Override;
-  return Override.call(getConformsToProtocolOverride, swift_conformsToProtocolImpl,
-                       type, protocol);
-}
-
 const TypeContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
@@ -833,3 +825,6 @@ bool swift::_checkGenericRequirements(
   // Success!
   return false;
 }
+
+#define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

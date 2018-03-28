@@ -288,13 +288,6 @@ static const void *swift_dynamicCastClassImpl(const void *object,
   return nullptr;
 }
 
-const void *swift::swift_dynamicCastClass(const void *object,
-                                          const ClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastClassOverride> Override;
-  return Override.call(getDynamicCastClassOverride, swift_dynamicCastClassImpl,
-                       object, targetType);
-}
-
 /// Dynamically cast a class object to a Swift class type.
 static const void *
 swift_dynamicCastClassUnconditionalImpl(const void *object,
@@ -303,15 +296,6 @@ swift_dynamicCastClassUnconditionalImpl(const void *object,
   if (value) return value;
 
   swift_dynamicCastFailure(_swift_getClass(object), targetType);
-}
-
-const void *
-swift::swift_dynamicCastClassUnconditional(const void *object,
-                                           const ClassMetadata *targetType) {
-  static CompatibilityOverride<DynamicCastClassUnconditionalOverride> Override;
-  return Override.call(getDynamicCastClassUnconditionalOverride,
-                       swift_dynamicCastClassUnconditionalImpl,
-                       object, targetType);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1059,15 +1043,6 @@ swift_dynamicCastUnknownClassImpl(const void *object,
   _failCorruptType(targetType);
 }
 
-const void *
-swift::swift_dynamicCastUnknownClass(const void *object,
-                                     const Metadata *targetType) {
-  static CompatibilityOverride<DynamicCastUnknownClassOverride> Override;
-  return Override.call(getDynamicCastUnknownClassOverride,
-                       swift_dynamicCastUnknownClassImpl,
-                       object, targetType);
-}
-
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
 static const void *
@@ -1122,15 +1097,6 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
   }
   _failCorruptType(targetType);
-}
-
-const void *
-swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
-                                                  const Metadata *targetType) {
-  static CompatibilityOverride<DynamicCastUnknownClassUnconditionalOverride> Override;
-  return Override.call(getDynamicCastUnknownClassUnconditionalOverride,
-                       swift_dynamicCastUnknownClassUnconditionalImpl,
-                       object, targetType);
 }
 
 /******************************************************************************/
@@ -1249,15 +1215,6 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
-const Metadata *
-swift::swift_dynamicCastMetatype(const Metadata *sourceType,
-                                 const Metadata *targetType) {
-  static CompatibilityOverride<DynamicCastMetatypeOverride> Override;
-  return Override.call(getDynamicCastMetatypeOverride,
-                       swift_dynamicCastMetatypeImpl,
-                       sourceType, targetType);
-}
-
 static const Metadata *
 swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
                                            const Metadata *targetType) {
@@ -1368,15 +1325,6 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
   }
 
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
-}
-
-const Metadata *
-swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
-                                              const Metadata *targetType) {
-  static CompatibilityOverride<DynamicCastMetatypeUnconditionalOverride> Override;
-  return Override.call(getDynamicCastMetatypeUnconditionalOverride,
-                       swift_dynamicCastMetatypeUnconditionalImpl,
-                       sourceType, targetType);
 }
 
 /******************************************************************************/
@@ -2701,15 +2649,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   _failCorruptType(srcType);
 }
 
-bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
-                              const Metadata *srcType,
-                              const Metadata *targetType,
-                              DynamicCastFlags flags) {
-  static CompatibilityOverride<DynamicCastOverride> Override;
-  return Override.call(getDynamicCastOverride, swift_dynamicCastImpl,
-                       dest, src, srcType, targetType, flags);
-}
-
 static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
   auto kind = T->getKind();
   // Classes.
@@ -3307,3 +3246,7 @@ SWIFT_RUNTIME_STDLIB_API
 bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
+
+#define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
+
