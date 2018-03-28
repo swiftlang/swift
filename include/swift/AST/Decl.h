@@ -65,7 +65,6 @@ namespace swift {
   class GenericTypeParamType;
   class LazyResolver;
   class ModuleDecl;
-  class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -180,18 +179,6 @@ enum class AssociatedValueCheck {
   HasAssociatedValues,
 };
 
-/// Describes if an enum element constructor directly or indirectly references
-/// its enclosing type.
-enum class ElementRecursiveness {
-  /// The element does not reference its enclosing type.
-  NotRecursive,
-  /// The element is currently being validated, and may references its enclosing
-  /// type.
-  PotentiallyRecursive,
-  /// The element does not reference its enclosing type.
-  Recursive
-};
-
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
@@ -206,25 +193,65 @@ struct OverloadSignature {
   DeclName Name;
 
   /// The kind of unary operator.
-  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+  UnaryOperatorKind UnaryOperator;
 
   /// Whether this is an instance member.
-  bool IsInstanceMember = false;
+  unsigned IsInstanceMember : 1;
 
-  /// Whether this is a property.
-  bool IsProperty = false;
+  /// Whether this is a variable.
+  unsigned IsVariable : 1;
+
+  /// Whether this is a function.
+  unsigned IsFunction : 1;
 
   /// Whether this signature is part of a protocol extension.
-  bool InProtocolExtension = false;
+  unsigned InProtocolExtension : 1;
+
+  /// Whether this signature is of a member defined in an extension of a generic
+  /// type.
+  unsigned InExtensionOfGenericType : 1;
+
+  OverloadSignature()
+      : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
+        IsVariable(false), IsFunction(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
+///
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
+/// Determine whether two overload signatures and overload types conflict.
+///
+/// \param ctx The AST context.
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig1Type The overload type of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param sig2Type The overload type of the second declaration.
+/// \param wouldConflictInSwift5 If non-null, the referenced boolean will be set
+///        to \c true iff the function returns \c false for this version of
+///        Swift, but the given overloads will conflict in Swift 5 mode.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
+bool conflicting(ASTContext &ctx,
+                 const OverloadSignature& sig1, CanType sig1Type,
+                 const OverloadSignature& sig2, CanType sig2Type,
+                 bool *wouldConflictInSwift5 = nullptr,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+  enum class ValidationState {
+    Unchecked,
+    Checking,
+    Checked,
+  };
+
 protected:
   union { uint64_t OpaqueBits;
 
@@ -247,12 +274,8 @@ protected:
     /// FIXME: This is ugly.
     EarlyAttrValidation : 1,
 
-    /// \brief Whether this declaration is currently being validated.
-    BeingValidated : 1,
-
-    /// \brief Whether we have started validating the declaration; this *isn't*
-    /// reset after finishing it.
-    ValidationStarted : 1,
+    /// \brief The validation state of this declaration.
+    ValidationState : 2,
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -339,13 +362,9 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 3,
-    /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1,
-
-    /// \brief Whether or not this element directly or indirectly references
-    /// the enum type.
-    Recursiveness : 2
+  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
+    /// \brief The ResilienceExpansion to use for default arguments.
+    DefaultArgumentResilienceExpansion : 1
   );
   
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
@@ -441,9 +460,11 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
-    IsCompatibilityAlias : 1
+    IsCompatibilityAlias : 1,
+    /// Whether this was a global typealias synthesized by the debugger.
+    IsDebuggerAlias : 1
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
@@ -625,8 +646,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EarlyAttrValidation = false;
-    Bits.Decl.BeingValidated = false;
-    Bits.Decl.ValidationStarted = false;
+    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -775,25 +795,32 @@ public:
   /// Whether the declaration has a valid interface type and
   /// generic signature.
   bool isBeingValidated() const {
-    return Bits.Decl.BeingValidated;
+    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
   }
 
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingValidated(bool ibv = true) {
-    assert(Bits.Decl.BeingValidated != ibv);
-    Bits.Decl.BeingValidated = ibv;
     if (ibv) {
-      Bits.Decl.ValidationStarted = true;
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
+    } else {
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
     }
   }
 
-  bool hasValidationStarted() const { return Bits.Decl.ValidationStarted; }
+  bool hasValidationStarted() const {
+    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+  }
 
   /// Manually indicate that validation has started for the declaration.
   ///
   /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
   /// and so rarely needs to be called directly.
-  void setValidationStarted() { Bits.Decl.ValidationStarted = true; }
+  void setValidationStarted() {
+    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+  }
 
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
@@ -2359,7 +2386,13 @@ public:
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
-  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
+  ///
+  /// \param DC The declaration context.
+  ///
+  /// \param isAccessOnSelf Whether this is a member access on the implicit
+  ///        'self' declaration of the declaration context.
+  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
+                                                bool isAccessOnSelf) const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;
@@ -2520,6 +2553,12 @@ public:
 
   void markAsCompatibilityAlias(bool newValue = true) {
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
+  }
+
+  /// Is this a special debugger variable?
+  bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
+  void markAsDebuggerAlias(bool isDebuggerAlias) {
+    Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
   }
 
   static bool classof(const Decl *D) {
@@ -3224,6 +3263,13 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+
+  /// True if the enum can be exhaustively switched within \p useDC.
+  ///
+  /// Note that this property is \e not necessarily true for all children of
+  /// \p useDC. In particular, an inlinable function does not get to switch
+  /// exhaustively over a non-exhaustive enum declared in the same module.
+  bool isExhaustive(const DeclContext *useDC) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -5174,16 +5220,6 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
-  /// Determine the default argument kind and type for the given argument index
-  /// in this declaration, which must be a function or constructor.
-  ///
-  /// \param Index The index of the argument for which we are querying the
-  /// default argument.
-  ///
-  /// \returns the default argument kind and, if there is a default argument,
-  /// the type of the corresponding parameter.
-  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
-
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
@@ -5741,7 +5777,7 @@ class EnumElementDecl : public ValueDecl {
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
-  TypeLoc ArgumentType;
+  ParameterList *Params;
   
   SourceLoc EqualsLoc;
   
@@ -5751,20 +5787,18 @@ class EnumElementDecl : public ValueDecl {
   Expr *TypeCheckedRawValueExpr = nullptr;
   
 public:
-  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                  TypeLoc ArgumentType,
-                  bool HasArgumentType,
+  EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                  ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    ArgumentType(ArgumentType),
+    Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    Bits.EnumElementDecl.Recursiveness =
-        static_cast<unsigned>(ElementRecursiveness::NotRecursive);
-    Bits.EnumElementDecl.HasArgumentType = HasArgumentType;
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -5781,8 +5815,7 @@ public:
 
   Type getArgumentInterfaceType() const;
 
-  TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-  const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
+  ParameterList *getParameterList() const { return Params; }
 
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
@@ -5793,6 +5826,21 @@ public:
   }
   void setTypeCheckedRawValueExpr(Expr *e) {
     TypeCheckedRawValueExpr = e;
+  }
+
+  /// The ResilienceExpansion for default arguments.
+  ///
+  /// In Swift 4 mode, default argument expressions are serialized, and must
+  /// obey the restrictions imposed upon inlineable function bodies.
+  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
+    return ResilienceExpansion(
+        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
+  }
+
+  /// Set the ResilienceExpansion for default arguments.
+  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        unsigned(expansion);
   }
   
   /// Return the containing EnumDecl.
@@ -5808,17 +5856,8 @@ public:
   }
   SourceRange getSourceRange() const;
   
-  ElementRecursiveness getRecursiveness() const {
-    return
-      static_cast<ElementRecursiveness>(Bits.EnumElementDecl.Recursiveness);
-  }
-  
-  void setRecursiveness(ElementRecursiveness recursiveness) {
-    Bits.EnumElementDecl.Recursiveness = static_cast<unsigned>(recursiveness);
-  }
-
   bool hasAssociatedValues() const {
-    return Bits.EnumElementDecl.HasArgumentType;
+    return getParameterList() != nullptr;
   }
 
   static bool classof(const Decl *D) {
@@ -6675,6 +6714,17 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
+
+/// Determine the default argument kind and type for the given argument index
+/// in this declaration, which must be a function or constructor.
+///
+/// \param Index The index of the argument for which we are querying the
+/// default argument.
+///
+/// \returns the default argument kind and, if there is a default argument,
+/// the type of the corresponding parameter.
+std::pair<DefaultArgumentKind, Type>
+getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
 } // end namespace swift
 

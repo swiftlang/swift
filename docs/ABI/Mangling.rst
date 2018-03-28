@@ -88,6 +88,7 @@ Globals
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
+  global ::= entity 'WC' // resilient enum tag index
 
   global ::= type 'Wy' // Outlined Copy Function Type
   global ::= type 'We' // Outlined Consume Function Type
@@ -208,6 +209,7 @@ Entities
   entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
+  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter

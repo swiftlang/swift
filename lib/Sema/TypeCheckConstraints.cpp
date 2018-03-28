@@ -824,7 +824,12 @@ namespace {
           TC.typeCheckDecl(capture.Var, true);
           TC.typeCheckDecl(capture.Var, false);
         }
-        return finish(true, expr);
+
+        // Since closure expression is contained by capture list
+        // let's handle it directly to avoid walking into capture
+        // list itself.
+        captureList->getClosureBody()->walk(*this);
+        return finish(false, expr);
       }
 
       // For closures, type-check the patterns and result type as written,
@@ -2131,7 +2136,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *foundSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      InitTypeAndInOut.setPointer(solution.simplifyType(InitTypeAndInOut.getPointer()));
+      auto ty = solution.simplifyType(InitTypeAndInOut.getPointer());
+      InitTypeAndInOut.setPointer(
+          ty->getRValueType()->reconstituteSugar(/*recursive =*/false));
       InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
 
       // Just keep going.
@@ -2814,25 +2821,6 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   auto kind = typeCheckCheckedCast(t1, t2, CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange());
   return (kind != CheckedCastKind::Unresolved);
-}
-
-bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
-                                     DeclContext *dc) {
-  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
-    return false;
-
-  if (auto superclass = archetype->getSuperclass()) {
-    if (!superclass->isExactSuperclassOf(type))
-      return false;
-  }
-
-  for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
-      return false;
-  }
-
-  return true;
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr,

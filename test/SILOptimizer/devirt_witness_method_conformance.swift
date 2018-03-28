@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name devirt_witness_method_conformance -O -emit-ir  -primary-file %s | %FileCheck %s
 // This is a swift file because the crash doesn't reproduce with SIL.

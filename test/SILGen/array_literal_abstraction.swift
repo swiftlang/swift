@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name array_literal_abstraction -emit-silgen %s | %FileCheck %s
 

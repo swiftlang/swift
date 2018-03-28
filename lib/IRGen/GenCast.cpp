@@ -115,6 +115,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
     targetMetadata
       = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
                                  MetadataValueType::ObjCClass,
+                                 MetadataState::Complete,
                                  /*allowUninitialized*/ allowConservative);
   }
 
@@ -248,7 +249,8 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
     // Get the ObjC metadata for the type we're checking.
     toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
-                                          MetadataValueType::ObjCClass);
+                                          MetadataValueType::ObjCClass,
+                                          MetadataState::Complete);
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();

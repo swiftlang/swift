@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name cast_folding_objc_no_foundation -O -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop

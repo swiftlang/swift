@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name witness_same_type -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name witness_same_type -enable-sil-ownership -emit-ir %s

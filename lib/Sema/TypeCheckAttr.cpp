@@ -79,6 +79,7 @@ public:
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(FixedLayout)
+  IGNORED_ATTR(Frozen)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -235,7 +236,7 @@ public:
   void visitIndirectAttr(IndirectAttr *attr) {
     if (auto caseDecl = dyn_cast<EnumElementDecl>(D)) {
       // An indirect case should have a payload.
-      if (caseDecl->getArgumentTypeLoc().isNull())
+      if (!caseDecl->hasAssociatedValues())
         TC.diagnose(attr->getLocation(),
                     diag::indirect_case_without_payload, caseDecl->getName());
       // If the enum is already indirect, its cases don't need to be.
@@ -886,6 +887,8 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+
+  void visitFrozenAttr(FrozenAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2100,6 +2103,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
                 diag::implements_attr_non_protocol_type)
       .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
+}
+
+void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
+  switch (D->getModuleContext()->getResilienceStrategy()) {
+  case ResilienceStrategy::Default:
+    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+    return;
+  case ResilienceStrategy::Resilient:
+    break;
+  }
+
+  if (cast<EnumDecl>(D)->getFormalAccess() >= AccessLevel::Public)
+    return;
+  if (D->getAttrs().hasAttribute<VersionedAttr>())
+    return;
+  diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

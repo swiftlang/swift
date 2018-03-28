@@ -750,7 +750,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let distance = levenshteinDistance(word1[...], word2[...])
 ///     // distance == 2
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.
@@ -878,5 +878,5 @@ extension Range {
 }
 
 @available(*, deprecated, renamed: "Range")
-public typealias CountableRange<Bound: Comparable> = Range<Bound>
-
+public typealias CountableRange<Bound: Strideable> = Range<Bound>
+  where Bound.Stride : SignedInteger

@@ -155,15 +155,6 @@ public:
     emitStoreExtraInhabitantCall(IGF, T, index, dest);
   }
 
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          bool isVWTMutable,
-                          SILType T) const override {
-    // Resilient value types and archetypes always refer to an existing type.
-    // A witness table should never be independently initialized for one.
-    llvm_unreachable("initializing value witness table for opaque type?!");
-  }
-
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
@@ -177,17 +168,9 @@ public:
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    if (!T.hasArchetype()) {
-      return;
-    }
-    auto canType = T.getSwiftRValueType();
-    auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    assert(metadata && "Expected Type Metadata Ref");
-    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 

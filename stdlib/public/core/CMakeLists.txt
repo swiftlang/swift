@@ -47,7 +47,7 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
-  DoubleWidth.swift.gyb
+  Dictionary.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -61,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   Hashable.swift
-  HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
   AnyHashable.swift
@@ -111,6 +110,7 @@ set(SWIFTLIB_ESSENTIAL
   Sequence.swift
   SequenceAlgorithms.swift
   SequenceWrapper.swift
+  Set.swift
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-key-path-resilience %s | %FileCheck %s
 
 // TODO: globals should get descriptors
 public var a: Int = 0

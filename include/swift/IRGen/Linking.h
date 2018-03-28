@@ -116,6 +116,9 @@ class LinkEntity {
     /// ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
+    /// A resilient enum tag index. The pointer is a EnumElementDecl*.
+    EnumCase,
+
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -166,10 +169,14 @@ class LinkEntity {
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
     ModuleDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// An array of protocol requirement descriptors for a protocol.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementArray,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -277,7 +284,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::ProtocolRequirementArray;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -434,6 +441,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forEnumCase(EnumElementDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::EnumCase, decl);
+    return entity;
+  }
+
   static LinkEntity forObjCClassRef(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ObjCClassRef, decl);
@@ -555,6 +568,12 @@ public:
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forProtocolRequirementArray(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementArray, decl);
     return entity;
   }
 
@@ -846,7 +865,7 @@ public:
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
 template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
-  typedef swift::irgen::LinkEntity LinkEntity;
+  using LinkEntity = swift::irgen::LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
     entity.Pointer = nullptr;

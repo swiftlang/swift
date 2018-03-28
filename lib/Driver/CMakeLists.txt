@@ -5,12 +5,10 @@ set(swiftDriver_sources
   Driver.cpp
   FrontendUtil.cpp
   Job.cpp
-  OutputFileMap.cpp
   ParseableOutput.cpp
   PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
-  Types.cpp
   )
 
 set(swiftDriver_targetDefines)

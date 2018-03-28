@@ -141,7 +141,7 @@ extension LazyPrefixWhileCollection: Sequence {
 extension LazyPrefixWhileCollection {
   /// A position in the base collection of a `LazyPrefixWhileCollection` or the
   /// end of that collection.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   @_versioned
   internal enum _IndexRepresentation {
     case index(Base.Index)

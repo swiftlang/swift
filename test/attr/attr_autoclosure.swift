@@ -124,9 +124,11 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)  // expected-error {{@autoclosure may only be used on parameters}}
+  case Success(@autoclosure () -> T)
   case Failure()
 }
+
+let _ : AutoclosureFailableOf<Int> = .Success(42)
 
 let _ : (@autoclosure () -> ()) -> ()
 let _ : (@autoclosure(escaping) () -> ()) -> ()

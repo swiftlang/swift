@@ -70,7 +70,8 @@ public:
 /// pointer-sized chunks) into the metadata for the next field.
 template <class Impl>
 class EnumMetadataScanner : public EnumMetadataVisitor<Impl> {
-  typedef EnumMetadataVisitor<Impl> super;
+  using super = EnumMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 

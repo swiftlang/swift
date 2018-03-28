@@ -118,7 +118,7 @@
 ///
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
-@_fixed_layout
+@_frozen
 public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.

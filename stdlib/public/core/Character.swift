@@ -68,7 +68,7 @@ public struct Character {
   // to discriminate between small and large representations.  Since a grapheme
   // cluster cannot have U+0000 anywhere but in its first scalar, we can store
   // zero in empty code units above the first one.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   @_versioned
   internal enum Representation {
     case smallUTF16(Builtin.Int63)

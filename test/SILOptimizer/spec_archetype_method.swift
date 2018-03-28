@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name spec_archetype_method -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -disable-arc-opts -emit-sil -primary-file %s | %FileCheck %s
 

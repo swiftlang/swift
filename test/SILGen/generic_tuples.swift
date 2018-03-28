@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name generic_tuples -emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 

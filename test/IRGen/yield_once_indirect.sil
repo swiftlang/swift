@@ -109,7 +109,7 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[VALUE:%.*]] = bitcast %T19yield_once_indirect8IndirectV* [[ORIG_VALUE]] to [[INDIRECT_SUB:%T19yield_once_indirect8IndirectVyAA12SomeSubclassCG]]*
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
 
-  // CHECK-NEXT:    call [[INDIRECT_SUB]]* @"$S19yield_once_indirect8IndirectVyAA12SomeSubclassCGWh0_"([[INDIRECT_SUB]]* [[VALUE]])
+  // CHECK-NEXT:    call [[INDIRECT_SUB]]* @"$S19yield_once_indirect8IndirectVyAA12SomeSubclassCGWOh"([[INDIRECT_SUB]]* [[VALUE]])
   destroy_addr %value : $*Indirect<SomeSubclass>
 
   //   Branch.

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name capture_typed_boxes -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

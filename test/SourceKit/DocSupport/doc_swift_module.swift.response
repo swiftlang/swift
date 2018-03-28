@@ -1988,7 +1988,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "T",
-        key.usr: "s:4cake2P3P1T",
+        key.usr: "s:4cake2P3P1TQa",
         key.offset: 962,
         key.length: 16,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>"
@@ -2014,7 +2014,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
-        key.usr: "s:4cake2P5P7Element",
+        key.usr: "s:4cake2P5P7ElementQa",
         key.offset: 1018,
         key.length: 22,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>Element</decl.name></decl.associatedtype>"
@@ -2067,7 +2067,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
-        key.usr: "s:4cake4ProtP7Element",
+        key.usr: "s:4cake4ProtP7ElementQa",
         key.offset: 1142,
         key.length: 22,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>Element</decl.name></decl.associatedtype>"
@@ -2337,7 +2337,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.ref.associatedtype,
             key.name: "Element",
-            key.usr: "s:4cake2P5P7Element"
+            key.usr: "s:4cake2P5P7ElementQa"
           }
         ]
       }

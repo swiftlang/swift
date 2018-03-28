@@ -21,9 +21,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
-#include "swift/Driver/OutputFileMap.h"
-#include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
+#include "swift/Frontend/FileTypes.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -50,7 +50,6 @@ namespace driver {
   class Compilation;
   class Job;
   class JobAction;
-  class OutputFileMap;
   class ToolChain;
 
 /// \brief A class encapsulating information about the outputs the driver
@@ -79,7 +78,7 @@ public:
   Mode CompilerMode = Mode::StandardCompile;
 
   /// The output type which should be used for compile actions.
-  types::ID CompilerOutputType = types::ID::TY_INVALID;
+  file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
 
   /// Describes if and how the output of compile actions should be
   /// linked together.
@@ -116,6 +115,14 @@ public:
   std::string SDKPath;
 
   OptionSet<SanitizerKind> SelectedSanitizers;
+
+  /// Might this sort of compile have explicit primary inputs?
+  /// When running a single compile for the whole module (in other words
+  /// "whole-module-optimization" mode) there must be no -primary-input's and
+  /// nothing in a (preferably non-existent) -primary-filelist. Left to its own
+  /// devices, the driver would forget to omit the primary input files, so
+  /// return a flag here.
+  bool mightHaveExplicitPrimaryInputs(const CommandOutput &Output) const;
 };
 
 class Driver {
@@ -158,6 +165,9 @@ private:
 
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   unsigned DriverBatchSeed = 0;
+
+  /// Forces a repartition for testing.
+  bool DriverForceOneBatchRepartition = false;
 
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
@@ -232,7 +242,8 @@ public:
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const InputFileList &Inputs, OutputInfo &OI) const;
+                       const bool BatchMode, const InputFileList &Inputs,
+                       OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
@@ -251,7 +262,7 @@ public:
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  std::unique_ptr<OutputFileMap>
+  Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 

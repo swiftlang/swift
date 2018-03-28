@@ -25,6 +25,36 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief Determine whether one type would be a valid substitution for an
+/// archetype.
+///
+/// \param type The potential type.
+///
+/// \param archetype The archetype for which type may (or may not) be
+/// substituted.
+///
+/// \param dc The context of the check.
+///
+/// \returns true if \c t1 is a valid substitution for \c t2.
+static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
+                               DeclContext *dc) {
+  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
+    return false;
+
+  if (auto superclass = archetype->getSuperclass()) {
+    if (!superclass->isExactSuperclassOf(type))
+      return false;
+  }
+
+  for (auto proto : archetype->getConformsTo()) {
+    if (!dc->getParentModule()->lookupConformance(
+          type, proto))
+      return false;
+  }
+
+  return true;
+}
+
 UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
 : declOrExpr(decl), level(level), substituted(false) {
   
@@ -90,9 +120,11 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
       
       // The associated data of the case.
       if (level == 1) {
-        auto argTy = enumElt->getArgumentInterfaceType();
-        if (!argTy) return { };
-        gatherArgumentLabels(argTy, scratch);
+        auto *paramList = enumElt->getParameterList();
+        if (!paramList) return { };
+        for (auto param : *paramList) {
+          scratch.push_back(param->getArgumentName());
+        }
         return scratch;
       }
     }
@@ -426,14 +458,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
             if (!archetype->isPrimary())
               return { CC_ArgumentMismatch, {}};
             
-            if (!CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+            if (!isSubstitutableFor(substitution, archetype, CS.DC)) {
               // If we have multiple non-substitutable types, this is just a mismatched mess.
               if (!nonSubstitutableArchetype.isNull())
                 return { CC_ArgumentMismatch, {}};
               
               if (auto argOptType = argType->getOptionalObjectType())
                 mismatchesAreNearMisses &=
-                CS.TC.isSubstitutableFor(argOptType, archetype, CS.DC);
+                  isSubstitutableFor(argOptType, archetype, CS.DC);
               else
                 mismatchesAreNearMisses = false;
               
@@ -455,7 +487,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
               if (isNonSubstitutableArchetype && nonSubstitutableArgs == 1 &&
-                  CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+                  isSubstitutableFor(substitution, archetype, CS.DC)) {
                 mismatchesAreNearMisses = argumentMismatchIsNearMiss(existingSubstitution, substitution);
                 allGenericSubstitutions[archetype] = substitution;
               } else {
@@ -959,7 +991,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (CS.TC.isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
+      if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
         CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
                        argType);
         foundFailure = true;

@@ -327,27 +327,33 @@ static void formatSelectionArgument(StringRef ModifierArguments,
 }
 
 static bool isInterestingTypealias(Type type) {
-  auto aliasTy = dyn_cast<NameAliasType>(type.getPointer());
-  if (!aliasTy)
-    return false;
-  if (aliasTy->getDecl() == type->getASTContext().getVoidDecl())
-    return false;
-  if (type->is<BuiltinType>())
+  // Dig out the typealias declaration, if there is one.
+  TypeAliasDecl *aliasDecl = nullptr;
+  if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer()))
+    aliasDecl = aliasTy->getDecl();
+  else
     return false;
 
-  auto aliasDecl = aliasTy->getDecl();
+  if (aliasDecl == type->getASTContext().getVoidDecl())
+    return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.
   if (aliasDecl->getName() ==
-      aliasDecl->getASTContext().getIdentifier("AnyObject") &&
-      aliasDecl->getParentModule()->isStdlibModule()) {
+        aliasDecl->getASTContext().getIdentifier("AnyObject") &&
+      (aliasDecl->getParentModule()->isStdlibModule() ||
+       aliasDecl->getParentModule()->isBuiltinModule())) {
     return false;
   }
 
-  auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
-
-  if (aliasDecl->isCompatibilityAlias())
+  // Compatibility aliases are only interesting insofar as their underlying
+  // types are interesting.
+  if (aliasDecl->isCompatibilityAlias()) {
+    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
     return isInterestingTypealias(underlyingTy);
+  }
+
+  // Builtin types are never interesting typealiases.
+  if (type->is<BuiltinType>()) return false;
 
   return true;
 }

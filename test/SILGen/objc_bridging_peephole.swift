@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_peephole -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop

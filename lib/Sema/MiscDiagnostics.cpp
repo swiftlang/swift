@@ -210,7 +210,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, nullptr, OperandKind::None);
+        checkNoEscapeParameterUse(DRE, Parent.getAsExpr(), OperandKind::None);
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
@@ -703,7 +703,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
-      // a special case, in the binding of a withoutActuallyEscaping block.
+      // a special case, e.g. in the binding of a withoutActuallyEscaping block
+      // or the argument of a type(of: ...).
       if (parent) {
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
@@ -713,6 +714,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                    && useKind == OperandKind::Argument) {
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
+          return;
+        } else if (isa<DynamicTypeExpr>(parent)) {
           return;
         }
       }
@@ -3973,23 +3976,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);

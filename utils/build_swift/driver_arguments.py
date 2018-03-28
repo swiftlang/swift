@@ -703,6 +703,9 @@ def create_argument_parser():
     option('--long-test', toggle_true,
            help='run the long test suite')
 
+    option('--stress-test', toggle_true,
+           help='run the stress test suite')
+
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')
 

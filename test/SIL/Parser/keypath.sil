@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 

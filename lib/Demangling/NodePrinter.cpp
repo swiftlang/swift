@@ -333,6 +333,7 @@ private:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
+    case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
@@ -398,6 +399,7 @@ private:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolRequirementArray:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -1397,6 +1399,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(entity, /*asContext*/ false);
     return nullptr;
   }
+  case Node::Kind::EnumCase: {
+    Printer << "enum case for ";
+    auto entity = Node->getChild(0);
+    print(entity, /*asContext*/ false);
+    return nullptr;
+  }
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
@@ -1444,6 +1452,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ProtocolRequirementArray:
+    Printer << "protocol requirement array for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::FullTypeMetadata:

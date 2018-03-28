@@ -5387,11 +5387,18 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   generics = P.maybeParseGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
   
-  if (patternEnv->getGenericSignature()->getCanonicalSignature()
-        != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
-      ->getCanonicalSignature()) {
-    P.diagnose(loc, diag::sil_property_generic_signature_mismatch);
-    return true;
+  if (patternEnv) {
+    if (patternEnv->getGenericSignature()->getCanonicalSignature()
+           != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
+                ->getCanonicalSignature()) {
+      P.diagnose(loc, diag::sil_property_generic_signature_mismatch);
+      return true;
+    }
+  } else {
+    if (VD->getInnermostDeclContext()->getGenericSignatureOfContext()) {
+      P.diagnose(loc, diag::sil_property_generic_signature_mismatch);
+      return true;
+    }
   }
 
   Identifier ComponentKind;

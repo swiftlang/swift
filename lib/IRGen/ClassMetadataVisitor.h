@@ -35,7 +35,7 @@ class IRGenModule;
 template <class Impl> class ClassMetadataVisitor
     : public NominalMetadataVisitor<Impl>,
       public SILVTableVisitor<Impl> {
-  typedef NominalMetadataVisitor<Impl> super;
+  using super = NominalMetadataVisitor<Impl>;
 
 protected:
   using super::IGM;
@@ -157,7 +157,8 @@ private:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class ClassMetadataScanner : public ClassMetadataVisitor<Impl> {
-  typedef ClassMetadataVisitor<Impl> super;
+  using super = ClassMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 

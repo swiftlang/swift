@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name devirt_nested_class -emit-sil -O %s | %FileCheck %s
 

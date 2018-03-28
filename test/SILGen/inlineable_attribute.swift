@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name inlineable_attribute -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 

@@ -247,8 +247,14 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
     }
   }
 
+  // Check whether this is a member access on 'self'.
+  bool isAccessOnSelf = false;
+  if (auto *baseDRE = dyn_cast<DeclRefExpr>(base->getValueProvidingExpr()))
+    if (auto *baseVar = dyn_cast<VarDecl>(baseDRE->getDecl()))
+      isAccessOnSelf = baseVar->isSelfParameter();
+
   // If the value is always directly accessed from this context, do it.
-  return member->getAccessSemanticsFromContext(DC);
+  return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
 void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
@@ -4655,6 +4661,8 @@ namespace {
       
         auto hashable =
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+        auto equatable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
@@ -4669,6 +4677,17 @@ namespace {
             continue;
           }
           hashables.push_back(*conformance);
+          
+          // FIXME: Hashable implies Equatable, but we need to make sure the
+          // Equatable conformance is forced into existence during type checking
+          // so that it's available for SILGen.
+          auto eqConformance =
+            cs.TC.conformsToProtocol(indexType.getType(), equatable,
+                                     cs.DC,
+                                     (ConformanceCheckFlags::Used|
+                                      ConformanceCheckFlags::InExpression));
+          assert(eqConformance.hasValue());
+          (void)eqConformance;
         }
 
         if (allIndexesHashable) {
@@ -4964,8 +4983,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     SourceLoc loc, ConcreteDeclRef &owner,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
-  auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
-  auto defArg = ownerFn->getDefaultArg(index);
+
+  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
   Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
@@ -5025,7 +5044,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
+  auto defArgType = owner.getDecl()->getDeclContext()
+                       ->mapTypeIntoContext(defArg.second);
   auto resultTy = tc.typeCheckExpression(
       init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
   assert(resultTy && "Conversion cannot fail");
@@ -7817,7 +7837,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
   if (!resolved || !resolved->getAnchor() ||
-      !resolved->getPath().empty())
+      (!resolved->getPath().empty() &&
+       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
+       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -7973,6 +7995,30 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       }
     }
     return false;
+  }
+
+  case FixKind::ExplicitlyEscaping: {
+    auto path = locator->getPath();
+    auto *anchor = locator->getAnchor();
+
+    if (path.empty())
+      return false;
+
+    auto &last = path.back();
+    if (last.getKind() == ConstraintLocator::Archetype) {
+      auto *archetype = last.getArchetype();
+      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                  archetype);
+      return true;
+    }
+    break;
+  }
+
+  case FixKind::ExplicitlyEscapingToAny: {
+    auto *anchor = locator->getAnchor();
+    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                getASTContext().TheAnyType);
+    return true;
   }
   }
 

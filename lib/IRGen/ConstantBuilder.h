@@ -94,6 +94,15 @@ public:
                             unsigned(reference.isIndirect()));
   }
 
+  /// Add an indirect relative reference to the given address.
+  /// The target must be a "GOT-equivalent", i.e. a pointer to an
+  /// external object.
+  void addIndirectRelativeAddress(ConstantReference reference) {
+    assert(reference.isIndirect());
+    addRelativeOffset(IGM().RelativeAddressTy,
+                      reference.getValue());
+  }
+
   Size getNextOffsetFromGlobal() const {
     return Size(super::getNextOffsetFromGlobal().getQuantity());
   }

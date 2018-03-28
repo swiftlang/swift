@@ -99,7 +99,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath, Argv.data(),
                                    (const char **)envp,
-                                   /*redirects*/nullptr, /*memoryLimit*/0,
+                                   /*redirects*/None, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {
       return true;

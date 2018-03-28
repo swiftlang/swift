@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name multi_file -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 

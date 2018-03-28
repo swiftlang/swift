@@ -293,7 +293,7 @@ inline bool operator<=(OperationCost l, OperationCost r) {
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:
-  typedef uint32_t int_type;
+  using int_type = uint32_t;
 
   constexpr Alignment() : Value(0) {}
   constexpr explicit Alignment(int_type Value) : Value(Value) {}
@@ -334,7 +334,7 @@ private:
 /// A size value, in eight-bit units.
 class Size {
 public:
-  typedef uint64_t int_type;
+  using int_type = uint64_t;
 
   constexpr Size() : Value(0) {}
   explicit constexpr Size(int_type Value) : Value(Value) {}

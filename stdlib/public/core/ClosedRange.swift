@@ -127,7 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_fixed_layout // FIXME(resilience)
+  @_frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
@@ -479,4 +479,5 @@ extension ClosedRange {
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 @available(*, deprecated, renamed: "ClosedRange")
-public typealias CountableClosedRange<T: Comparable> = ClosedRange<T>
+public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
+  where Bound.Stride : SignedInteger

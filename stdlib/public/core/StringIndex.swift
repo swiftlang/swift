@@ -19,7 +19,7 @@ extension String {
     internal var _cache: _Cache
 
     internal typealias _UTF8Buffer = _ValidUTF8Buffer<UInt64>
-    @_fixed_layout // FIXME(sil-serialize-all)
+    @_frozen // FIXME(sil-serialize-all)
     @_versioned
     internal enum _Cache {
     case utf16

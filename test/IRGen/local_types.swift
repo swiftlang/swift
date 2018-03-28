@@ -50,7 +50,7 @@ public func topLevelIfConfig() {
 }
 #else
 public func topLevelIfConfig() {
-  // CHECK-DAG: @"$S11local_types16topLevelIfConfigyyF17LocalClassEnabledL_CMm" = hidden global %objc_class
+  // CHECK-DAG: @"$S11local_types16topLevelIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
   class LocalClassEnabled {}
 }
 #endif
@@ -62,7 +62,7 @@ public struct NominalIfConfig {
   }
   #else
   public func method() {
-    // CHECK-DAG: @"$S11local_types15NominalIfConfigV6methodyyF17LocalClassEnabledL_CMm" = hidden global %objc_class
+    // CHECK-DAG: @"$S11local_types15NominalIfConfigV6methodyyF17LocalClassEnabledL_CMm" = internal global %objc_class
     class LocalClassEnabled {}
   }
   #endif
@@ -75,10 +75,10 @@ public func innerIfConfig() {
     class LocalClassDisabled {}
   }
   #else
-  // CHECK-DAG: @"$S11local_types13innerIfConfigyyF17LocalClassEnabledL_CMm" = hidden global %objc_class
+  // CHECK-DAG: @"$S11local_types13innerIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
   class LocalClassEnabled {}
   func inner() {
-    // CHECK-DAG: @"$S11local_types13innerIfConfigyyF0C0L0_yyF17LocalClassEnabledL_CMm" = hidden global %objc_class
+    // CHECK-DAG: @"$S11local_types13innerIfConfigyyF0C0L0_yyF17LocalClassEnabledL_CMm" = internal global %objc_class
     class LocalClassEnabled {}
   }
   #endif

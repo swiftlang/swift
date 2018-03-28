@@ -1776,6 +1776,10 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
     return true;
   }
 
+  // Skip unavailable overloads unless solver is in the "diagnostic" mode.
+  if (!cs.shouldAttemptFixes() && choice.isUnavailable())
+    return true;
+
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.
 
@@ -1784,7 +1788,7 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   //        already have a solution involving non-generic operators,
   //        but continue looking for a better non-generic operator
   //        solution.
-  if (bestNonGenericScore && choice.isGenericOperatorOrUnavailable()) {
+  if (bestNonGenericScore && choice.isGenericOperator()) {
     auto &score = bestNonGenericScore->Data;
     // Let's skip generic overload choices only in case if
     // non-generic score indicates that there were no forced
@@ -1943,7 +1947,7 @@ bool ConstraintSystem::solveSimplified(
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->first.getConstraint();
+      Constraint *lastChoice = lastSolvedChoice->first;
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
       bool hasFixes = score.Data[SK_Fix] > 0;
@@ -1952,8 +1956,7 @@ bool ConstraintSystem::solveSimplified(
       // that there are no unavailable overload choices present in the
       // solution, and the solution does not involve fixes.
       if (!hasUnavailableOverloads && !hasFixes &&
-          shortCircuitDisjunctionAt(&currentChoice, lastChoice,
-                                    getASTContext()))
+          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
         break;
     }
 
@@ -1981,7 +1984,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!currentChoice.isGenericOperatorOrUnavailable() &&
+      if (!currentChoice.isGenericOperator() &&
           currentChoice.isSymmetricOperator()) {
         if (!bestNonGenericScore || score < bestNonGenericScore)
           bestNonGenericScore = score;
@@ -2046,21 +2049,17 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
   return bestScore;
 }
 
-bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {
-  auto *decl = getOperatorDecl(Choice);
+bool DisjunctionChoice::isGenericOperator() const {
+  auto *decl = getOperatorDecl();
   if (!decl)
     return false;
-
-  auto &ctx = decl->getASTContext();
-  if (decl->getAttrs().isUnavailable(ctx))
-    return true;
 
   auto interfaceType = decl->getInterfaceType();
   return interfaceType->is<GenericFunctionType>();
 }
 
 bool DisjunctionChoice::isSymmetricOperator() const {
-  auto *decl = getOperatorDecl(Choice);
+  auto *decl = getOperatorDecl();
   if (!decl)
     return false;
 

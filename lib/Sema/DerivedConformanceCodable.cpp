@@ -356,8 +356,7 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
     // TODO: Ensure the class doesn't already have or inherit a variable named
     // "`super`"; otherwise we will generate an invalid enum. In that case,
     // diagnose and bail.
-    auto *super = new (C) EnumElementDecl(SourceLoc(), C.Id_super, TypeLoc(),
-                                          /*HasArgumentType=*/false,
+    auto *super = new (C) EnumElementDecl(SourceLoc(), C.Id_super, nullptr,
                                           SourceLoc(), nullptr, enumDecl);
     super->setImplicit();
     enumDecl->addMember(super);
@@ -376,9 +375,8 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
       case Conforms:
       {
         auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
-                                            TypeLoc(),
-                                            /*HasArgumentType=*/false,
-                                            SourceLoc(), nullptr, enumDecl);
+                                            nullptr, SourceLoc(), nullptr,
+                                            enumDecl);
         elt->setImplicit();
         enumDecl->addMember(elt);
         break;
@@ -768,6 +766,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   }
 
   encodeDecl->setInterfaceType(interfaceType);
+  encodeDecl->setValidationStarted();
   encodeDecl->setAccess(target->getFormalAccess());
 
   // If the type was not imported, the derived conformance is either from the
@@ -1109,6 +1108,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   }
 
   initDecl->setInterfaceType(interfaceType);
+  initDecl->setValidationStarted();
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->setAccess(target->getFormalAccess());
 

@@ -756,6 +756,10 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   Out << "Mc";
   mangleProtocolConformance(node->begin()[0]);
@@ -809,6 +813,11 @@ void Remangler::mangleThrowsAnnotation(Node *node) {
 void Remangler::mangleFieldOffset(Node *node) {
   Out << "Wv";
   mangleChildNodes(node); // directness, entity
+}
+
+void Remangler::mangleEnumCase(Node *node) {
+  Out << "WC";
+  mangleSingleChildNode(node); // enum case
 }
 
 void Remangler::mangleProtocolWitnessTable(Node *node) {

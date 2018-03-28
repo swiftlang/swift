@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s

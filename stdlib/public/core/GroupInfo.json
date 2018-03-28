@@ -105,8 +105,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift",
-        "HashedCollectionsAnyHashableExtensions.swift"
+        "Dictionary.swift",
+        "HashedCollectionsAnyHashableExtensions.swift",
+        "Set.swift",
       ]
     }
   ],
@@ -133,7 +134,6 @@
     "BuiltinMath.swift",
     {
     "Integers": [
-      "DoubleWidth.swift",
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [

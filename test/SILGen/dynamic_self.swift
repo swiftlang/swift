@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name dynamic_self -emit-silgen -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // RUN: %target-swift-frontend -module-name dynamic_self -emit-sil -O %s -disable-objc-attr-requires-foundation-module

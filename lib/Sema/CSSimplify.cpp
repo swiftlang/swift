@@ -638,6 +638,9 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       } else if (isa<SubscriptDecl>(decl)) {
         // Subscript level 1 == the indices.
         level = 1;
+      } else if (isa<EnumElementDecl>(decl)) {
+        // Enum element level 1 == the payload.
+        level = 1;
       }
     }
 
@@ -672,9 +675,16 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
 
     // Disallow assignment of noescape function to parameter of type
     // Any. Allowing this would allow these functions to escape.
-    if (auto *fnTy = argType->getAs<AnyFunctionType>())
-      if (fnTy->isNoEscape())
+    if (auto *fnTy = argType->getAs<AnyFunctionType>()) {
+      if (fnTy->isNoEscape()) {
+        // Allow assigned of 'no-escape' function with recorded fix.
+        if (cs.shouldAttemptFixes() &&
+            !cs.recordFix(FixKind::ExplicitlyEscaping, locator))
+          return cs.getTypeMatchSuccess();
+
         return cs.getTypeMatchFailure(locator);
+      }
+    }
 
     return cs.getTypeMatchSuccess();
   }
@@ -1317,6 +1327,10 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     if (!fnTy || !fnTy->isNoEscape())
       return getTypeMatchSuccess();
 
+    if (shouldAttemptFixes() &&
+        !recordFix(FixKind::ExplicitlyEscapingToAny, locator))
+      return getTypeMatchSuccess();
+
     return getTypeMatchFailure(locator);
   }
 
@@ -1490,10 +1504,18 @@ ConstraintSystem::matchTypesBindTypeVar(
   // Disallow bindings of noescape functions to type variables that
   // represent an opened archetype. If we allowed this it would allow
   // the noescape function to potentially escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>())
-    if (fnTy->isNoEscape())
-      if (typeVar->getImpl().getArchetype())
+  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    if (fnTy->isNoEscape() && typeVar->getImpl().getArchetype()) {
+      if (shouldAttemptFixes()) {
+        if (recordFix(FixKind::ExplicitlyEscaping, locator))
+          return getTypeMatchFailure(locator);
+
+        // Allow no-escape function to be bound with recorded fix.
+      } else {
         return getTypeMatchFailure(locator);
+      }
+    }
+  }
 
   // Check whether the type variable must be bound to a materializable
   // type.
@@ -2011,9 +2033,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Penalize conversions to Any, and disallow conversions of
       // noescape functions to Any.
       if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (auto *fnTy = type1->getAs<AnyFunctionType>())
-          if (fnTy->isNoEscape())
-            return getTypeMatchFailure(locator);
+        if (auto *fnTy = type1->getAs<AnyFunctionType>()) {
+          if (fnTy->isNoEscape()) {
+            if (shouldAttemptFixes()) {
+              if (recordFix(FixKind::ExplicitlyEscapingToAny, locator))
+                return getTypeMatchFailure(locator);
+
+              // Allow 'no-escape' functions to be converted to 'Any'
+              // with a recorded fix that helps us to properly diagnose
+              // such situations.
+            } else {
+              return getTypeMatchFailure(locator);
+            }
+          }
+        }
 
         increaseScore(ScoreKind::SK_EmptyExistentialConversion);
       }
@@ -2598,7 +2631,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::SelfObjectOfProtocol:
     if (auto conformance =
           TC.containsProtocol(type, protocol, DC,
-                              ConformanceCheckFlags::InExpression)) {
+                              (ConformanceCheckFlags::InExpression|
+                               ConformanceCheckFlags::SkipConditionalRequirements))) {
       return recordConformance(*conformance);
     }
     break;
@@ -4757,7 +4791,17 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   if (worseThanBestSolution())
     return true;
 
-  Fixes.push_back({fix, getConstraintLocator(locator)});
+  auto *loc = getConstraintLocator(locator);
+  auto existingFix =
+      llvm::find_if(Fixes, [&](std::pair<Fix, ConstraintLocator *> &e) {
+        // If we already have a fix like this recorded, let's not do it again,
+        // this situation might happen when the same fix kind is applicable to
+        // different overload choices.
+        return e.first == fix && e.second == loc;
+      });
+
+  if (existingFix == Fixes.end())
+    Fixes.push_back({fix, loc});
 
   return false;
 }
@@ -4802,6 +4846,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     return result;
   }
 
+  case FixKind::ExplicitlyEscaping:
+  case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
   }
