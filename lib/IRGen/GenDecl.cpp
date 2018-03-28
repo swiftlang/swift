@@ -59,6 +59,7 @@
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -2730,31 +2731,29 @@ namespace {
     void addWitnessTable() {
       using ConformanceKind = ConformanceFlags::ConformanceKind;
 
-     // Figure out what kind of witness table we have.
-      auto proto = Conformance->getProtocol();
+      // Figure out what kind of witness table we have.
       llvm::Constant *witnessTableVar;
-      if (!IGM.isResilient(proto, ResilienceExpansion::Maximal) &&
-          Conformance->getConditionalRequirements().empty()) {
-        Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
 
-        // If the conformance is in this object's table, then the witness table
-        // should also be in this object file, so we can always directly
-        // reference it.
-        witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
-      } else {
-        if (Conformance->getConditionalRequirements().empty()) {
+      if (Conformance->getConditionalRequirements().empty()) {
+        if (!isDependentConformance(IGM, Conformance,
+                                    ResilienceExpansion::Maximal)) {
+          Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+          witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+        } else {
           Flags = Flags.withConformanceKind(
                                         ConformanceKind::WitnessTableAccessor);
-        } else {
-          Flags =
-            Flags.withConformanceKind(
-                ConformanceKind::ConditionalWitnessTableAccessor)
-              .withNumConditionalRequirements(
-                              Conformance->getConditionalRequirements().size());
+          witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+              Conformance, ForDefinition);
         }
+      } else {
+        Flags =
+          Flags.withConformanceKind(
+              ConformanceKind::ConditionalWitnessTableAccessor)
+            .withNumConditionalRequirements(
+              Conformance->getConditionalRequirements().size());
 
         witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
-            Conformance, ForDefinition);
+          Conformance, ForDefinition);
       }
 
       // Relative reference to the witness table.

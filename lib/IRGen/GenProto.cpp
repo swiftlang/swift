@@ -937,7 +937,7 @@ static bool isResilientConformance(const NormalProtocolConformance *conformance)
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(IRGenModule &IGM,
+bool irgen::isDependentConformance(IRGenModule &IGM,
                              const NormalProtocolConformance *conformance,
                                    ResilienceExpansion expansion) {
   // If the conformance is resilient, this is always true.
@@ -946,6 +946,9 @@ static bool isDependentConformance(IRGenModule &IGM,
 
   // Check whether any of the inherited conformances are dependent.
   for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+    if (inherited->isObjC())
+      continue;
+
     if (isDependentConformance(IGM,
                                conformance->getInheritedConformance(inherited)
                                  ->getRootNormalConformance(),
