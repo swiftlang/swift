@@ -26,10 +26,23 @@
 
 using namespace swift;
 
-void LookupResult::filter(const std::function<bool(LookupResultEntry)> &pred) {
+void LookupResult::filter(
+    const std::function<bool(LookupResultEntry, bool)> &pred) {
+  size_t index = 0;
+  size_t originalFirstOuter = IndexOfFirstOuterResult;
   Results.erase(std::remove_if(Results.begin(), Results.end(),
                                [&](LookupResultEntry result) -> bool {
-                                 return !pred(result);
+                                 auto isInner = index < originalFirstOuter;
+                                 index++;
+                                 if (pred(result, !isInner))
+                                   return false;
+
+                                 // Need to remove this, which means, if it is
+                                 // an inner result, the outer results need to
+                                 // shift down.
+                                 if (isInner)
+                                   IndexOfFirstOuterResult--;
+                                 return true;
                                }),
                 Results.end());
 }
@@ -46,6 +59,8 @@ namespace {
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
+    /// The vector of found declarations.
+    SmallVector<ValueDecl *, 4> FoundOuterDecls;
 
     /// The set of known declarations.
     llvm::SmallDenseMap<std::pair<ValueDecl *, DeclContext *>, bool, 4> Known;
@@ -76,25 +91,35 @@ namespace {
 
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
+      removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
       removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC);
+      removeShadowedDecls(FoundOuterDecls, DC->getParentModule(), &TC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
-      unsigned foundIdx = 0, foundSize = FoundDecls.size();
-      Result.filter([&](LookupResultEntry result) -> bool {
-          // If the current result matches the remaining found declaration,
-          // keep it and move to the next found declaration.
-          if (foundIdx < foundSize &&
-              result.getValueDecl() == FoundDecls[foundIdx]) {
-            ++foundIdx;
-            return true;
-          }
+      unsigned foundIdx = 0, foundSize = FoundDecls.size(),
+               foundOuterSize = FoundOuterDecls.size();
+      Result.filter([&](LookupResultEntry result, bool isOuter) -> bool {
+        unsigned idx = foundIdx;
+        unsigned limit = foundSize;
+        ArrayRef<ValueDecl *> decls = FoundDecls;
+        if (isOuter) {
+          idx = foundIdx - foundSize;
+          limit = foundOuterSize;
+          decls = FoundOuterDecls;
+        }
+        // If the current result matches the remaining found declaration,
+        // keep it and move to the next found declaration.
+        if (idx < limit && result.getValueDecl() == decls[idx]) {
+          ++foundIdx;
+          return true;
+        }
 
-          // Otherwise, this result should be filtered out.
-          return false;
-        });
+        // Otherwise, this result should be filtered out.
+        return false;
+      });
     }
 
     /// Add a new result.
@@ -106,7 +131,11 @@ namespace {
     ///
     /// \param foundInType The type through which we found the
     /// declaration.
-    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType) {
+    ///
+    /// \param isOuter Whether this is an outer result (i.e. a result that isn't
+    /// from the innermost scope with results)
+    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType,
+             bool isOuter) {
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
@@ -116,8 +145,11 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          Result.add(LookupResultEntry(baseDC, result));
-          FoundDecls.push_back(result);
+          Result.add(LookupResultEntry(baseDC, result), isOuter);
+          if (isOuter)
+            FoundOuterDecls.push_back(result);
+          else
+            FoundDecls.push_back(result);
         }
       };
 
@@ -221,6 +253,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IncludeOuterResults))
+    newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
 
   return newOptions;
 }
@@ -234,7 +268,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
                               /*memberLookup*/false);
-  for (const auto &found : lookup.Results) {
+  for (auto idx : indices(lookup.Results)) {
+    const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -248,7 +283,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType);
+    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
+                /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
   }
   return result;
 }
@@ -267,7 +303,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
 
     if (!lookup.Results.empty() ||
         !options.contains(NameLookupFlags::ProtocolMembers)) {
-      return LookupResult(lookup.Results);
+      return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
     }
   }
 
@@ -281,7 +317,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         name, dc, this, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
-    return LookupResult(lookup.Results);
+    return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
   }
 }
 
@@ -312,7 +348,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
   for (auto found : lookupResults)
-    builder.add(found, nullptr, type);
+    builder.add(found, nullptr, type, /*isOuter=*/false);
 
   return result;
 }
@@ -623,7 +659,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 void
 TypoCorrectionResults::addAllCandidatesToLookup(LookupResult &lookup) const {
   for (auto candidate : Candidates)
-    lookup.add(LookupResultEntry(candidate));
+    lookup.add(LookupResultEntry(candidate), /*isOuter=*/false);
 }
 
 static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {

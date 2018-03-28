@@ -295,12 +295,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // If there's anything to remove, filter it out now.
   if (anyRemovals) {
-    result->filter([&](LookupResultEntry entry) -> bool {
+    result->filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto *decl = entry.getValueDecl();
 
       // Remove invalid declarations so the constraint solver doesn't need to
       // cope with them.
-      if (decl->isInvalid()) return false;
+      if (decl->isInvalid())
+        return false;
 
       return known[getDynamicResultSignature(decl)] == decl;
     });

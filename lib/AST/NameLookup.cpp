@@ -454,7 +454,9 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
-                                     Options options) {
+                                     Options options)
+  : IndexOfFirstOuterResult(0)
+{
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -476,6 +478,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     isCascadingUse = false;
 
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
+
+  auto shouldReturnBasedOnResults = [&](bool noMoreOuterResults = false) {
+    if (Results.empty())
+      return false;
+
+    if (IndexOfFirstOuterResult == 0)
+      IndexOfFirstOuterResult = Results.size();
+
+    return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
+  };
 
   if (Loc.isValid() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
@@ -512,7 +524,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       }
 
       // If we found anything, we're done.
-      if (!Results.empty())
+      if (shouldReturnBasedOnResults())
         return;
 
       // When we are in the body of a method, get the 'self' declaration.
@@ -588,9 +600,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         else
           options |= NL_KnownNonCascadingDependency;
 
-
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
+
+        auto startIndex = Results.size();
         for (auto result : lookup) {
           auto *baseDC = dc;
           if (!isa<TypeDecl>(result) && selfDC) baseDC = selfDC;
@@ -607,15 +620,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 .isUnavailableInSwiftVersion(effectiveVersion);
           };
 
-          // If all of the results we found are unavailable, keep looking.
-          if (std::all_of(Results.begin(), Results.end(),
-                          unavailableLookupResult)) {
-            UnavailableInnerResults.append(Results.begin(), Results.end());
-            Results.clear();
+          // If all of the results we just found are unavailable, keep looking.
+          auto begin = Results.begin() + startIndex;
+          if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+            UnavailableInnerResults.append(begin, Results.end());
+            Results.erase(begin, Results.end());
           } else {
             if (DebugClient)
               filterForDiscriminator(Results, DebugClient);
-            return;
+
+            if (shouldReturnBasedOnResults())
+              return;
           }
         }
 
@@ -652,7 +667,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (auto *selfParam = PBI->getImplicitSelfDecl()) {
             Consumer.foundDecl(selfParam,
                                DeclVisibilityKind::FunctionParameter);
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
 
             DC = DC->getParent();
@@ -698,11 +713,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
             localVal.visit(AFD->getBody());
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
             for (auto *PL : AFD->getParameterLists())
               localVal.checkParameterList(PL);
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
           }
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
@@ -741,10 +756,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
               namelookup::FindLocalVal localVal(SM, Loc, Consumer);
               localVal.visit(CE->getBody());
-              if (!Results.empty())
+              if (shouldReturnBasedOnResults())
                 return;
               localVal.checkParameterList(CE->getParameters());
-              if (!Results.empty())
+              if (shouldReturnBasedOnResults())
                 return;
             }
           }
@@ -781,7 +796,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
 
-          if (!Results.empty())
+          if (shouldReturnBasedOnResults())
             return;
         }
 
@@ -795,6 +810,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
           bool FoundAny = false;
+          auto startIndex = Results.size();
           for (auto Result : Lookup) {
             // In Swift 3 mode, unqualified lookup skips static methods when
             // performing lookup from instance context.
@@ -839,15 +855,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             };
 
             // If all of the results we found are unavailable, keep looking.
-            if (std::all_of(Results.begin(), Results.end(),
-                            unavailableLookupResult)) {
-              UnavailableInnerResults.append(Results.begin(), Results.end());
-              Results.clear();
-              FoundAny = false;
+            auto begin = Results.begin() + startIndex;
+            if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+              UnavailableInnerResults.append(begin, Results.end());
+              Results.erase(begin, Results.end());
             } else {
               if (DebugClient)
                 filterForDiscriminator(Results, DebugClient);
-              return;
+
+              if (shouldReturnBasedOnResults())
+                return;
             }
           }
         }
@@ -866,7 +883,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(dcGenericParams);
 
-          if (!Results.empty())
+          if (shouldReturnBasedOnResults())
             return;
 
           if (!isa<ExtensionDecl>(DC))
@@ -889,7 +906,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // local types.
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
         localVal.checkSourceFile(*SF);
-        if (!Results.empty())
+        if (shouldReturnBasedOnResults())
           return;
       }
     }
@@ -927,16 +944,15 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                  isOriginallyTypeLookup, Results);
 
   // If we've found something, we're done.
-  if (!Results.empty())
+  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
     return;
 
   // If we still haven't found anything, but we do have some
   // declarations that are "unavailable in the current Swift", drop
   // those in.
-  if (!UnavailableInnerResults.empty()) {
-    Results = std::move(UnavailableInnerResults);
+  Results = std::move(UnavailableInnerResults);
+  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
     return;
-  }
 
   if (!Name.isSimpleName())
     return;
@@ -944,7 +960,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
     Results.push_back(LookupResultEntry(&M));
-    return;
+    if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+      return;
   }
 
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
@@ -959,6 +976,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       return true;
     });
   }
+  // Make sure we've recorded the inner-result-boundary.
+  (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {

@@ -988,11 +988,11 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   
   // If none of the ones we find are acceptable, then reject one.
   auto oneCandidate = candidates.front();
-  candidates.filter([&](LookupResultEntry entry)->bool {
+  candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
     return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
   });
-  
+
   if (candidates.empty()) {
     TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
                 diag::type_invalid_dml, type);

@@ -96,6 +96,9 @@ public:
     AllowProtocolMembers = 0x04,
     /// Don't check access when doing lookup into a type.
     IgnoreAccessControl = 0x08,
+    /// This lookup should include results from outside the innermost scope with
+    /// results.
+    IncludeOuterResults = 0x10,
   };
   using Options = OptionSet<Flags>;
 
