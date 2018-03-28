@@ -1446,6 +1446,25 @@ extension Dictionary: Equatable where Value: Equatable {
   }
 }
 
+extension Dictionary: Hashable where Value: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    var commutativeHash = 0
+    for (k, v) in self {
+      var elementHasher = _Hasher()
+      elementHasher.append(k)
+      elementHasher.append(v)
+      commutativeHash ^= elementHasher.finalize()
+    }
+    hasher.append(commutativeHash)
+  }
+}
+
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

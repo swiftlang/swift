@@ -232,15 +232,15 @@ extension FlattenCollection.Index : Comparable {
 
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     hasher.append(_outer)
-    if let inner = _inner {
-      hasher.append(inner)
-    }
+    hasher.append(_inner)
   }
 }
 

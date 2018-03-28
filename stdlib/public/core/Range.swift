@@ -398,6 +398,19 @@ extension Range: Equatable {
   }
 }
 
+extension Range: Hashable where Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(lowerBound)
+    hasher.append(upperBound)
+  }
+}
+
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range
