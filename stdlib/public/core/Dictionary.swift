@@ -2538,8 +2538,8 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @_versioned // FIXME(sil-serialize-all)
   internal func unsafeAddNew(key newKey: Key, value: Value) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
-    _sanityCheck(
-      !found, "unsafeAddNew was called, but the key is already present")
+    _precondition(
+      !found, "Duplicate key found in Dictionary. Keys may have been mutated after insertion")
     initializeKey(newKey, value: value, at: i.offset)
   }
 
