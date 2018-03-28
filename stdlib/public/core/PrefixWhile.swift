@@ -207,10 +207,12 @@ extension LazyPrefixWhileCollection.Index: Comparable {
 }
 
 extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     switch _value {
     case .index(let value):

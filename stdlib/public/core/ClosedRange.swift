@@ -166,14 +166,21 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable 
+extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
     switch self {
     case .inRange(let value):
-      return value.hashValue
+      hasher.append(0 as Int8)
+      hasher.append(value)
     case .pastEnd:
-      return .max
+      hasher.append(1 as Int8)
     }
   }
 }
@@ -378,6 +385,19 @@ extension ClosedRange: Equatable {
     lhs: ClosedRange<Bound>, rhs: ClosedRange<Bound>
   ) -> Bool {
     return lhs.lowerBound == rhs.lowerBound && lhs.upperBound == rhs.upperBound
+  }
+}
+
+extension ClosedRange: Hashable where Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(lowerBound)
+    hasher.append(upperBound)
   }
 }
 
