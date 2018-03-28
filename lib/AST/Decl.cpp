@@ -1699,11 +1699,49 @@ bool swift::conflicting(const OverloadSignature& sig1,
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
-    return !((sig1.IsProperty && !sig2.Name.getArgumentNames().empty()) ||
-             (sig2.IsProperty && !sig1.Name.getArgumentNames().empty()));
+    return !((sig1.IsVariable && !sig2.Name.getArgumentNames().empty()) ||
+             (sig2.IsVariable && !sig1.Name.getArgumentNames().empty()));
   }
   
   return sig1.Name == sig2.Name;
+}
+
+bool swift::conflicting(ASTContext &ctx,
+                        const OverloadSignature& sig1, CanType sig1Type,
+                        const OverloadSignature& sig2, CanType sig2Type,
+                        bool *wouldConflictInSwift5,
+                        bool skipProtocolExtensionCheck) {
+  // If the signatures don't conflict to begin with, we're done.
+  if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
+    return false;
+
+  // Functions always conflict with non-functions with the same signature.
+  // In practice, this only applies for zero argument functions.
+  if (sig1.IsFunction != sig2.IsFunction)
+    return true;
+
+  // Variables always conflict with non-variables with the same signature.
+  // (e.g variables with zero argument functions, variables with type
+  //  declarations)
+  if (sig1.IsVariable != sig2.IsVariable) {
+    // Prior to Swift 5, we permitted redeclarations of variables as different
+    // declarations if the variable was declared in an extension of a generic
+    // type. Make sure we maintain this behaviour in versions < 5.
+    if (!ctx.isSwiftVersionAtLeast(5)) {
+      if ((sig1.IsVariable && sig1.InExtensionOfGenericType) ||
+          (sig2.IsVariable && sig2.InExtensionOfGenericType)) {
+        if (wouldConflictInSwift5)
+          *wouldConflictInSwift5 = true;
+
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Otherwise, the declarations conflict if the overload types are the same.
+  return sig1Type == sig2Type;
 }
 
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
@@ -1815,9 +1853,10 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 
   signature.Name = getFullName();
   signature.InProtocolExtension
-    = getDeclContext()->getAsProtocolExtensionContext();
+    = static_cast<bool>(getDeclContext()->getAsProtocolExtensionContext());
   signature.IsInstanceMember = isInstanceMember();
-  signature.IsProperty = isa<VarDecl>(this);
+  signature.IsVariable = isa<VarDecl>(this);
+  signature.IsFunction = isa<AbstractFunctionDecl>(this);
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
@@ -1826,11 +1865,15 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     }
   }
 
+  if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
+    if (extension->getGenericSignature())
+      signature.InExtensionOfGenericType = true;
+
   return signature;
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     return mapSignatureFunctionType(
                            getASTContext(), getInterfaceType(),
                            /*topLevelFunction=*/true,
@@ -1839,41 +1882,29 @@ CanType ValueDecl::getOverloadSignatureType() const {
                            afd->getNumParameterLists())->getCanonicalType();
   }
 
-  if (isa<SubscriptDecl>(this)) {
-    CanType interfaceType = getInterfaceType()->getCanonicalType();
-
-    // If the subscript declaration occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
-    if (!ext) return interfaceType;
-
-    auto genericSig = ext->getGenericSignature();
-    if (!genericSig) return interfaceType;
-
-    if (auto funcTy = interfaceType->getAs<AnyFunctionType>()) {
-      return GenericFunctionType::get(genericSig,
-                                      funcTy->getParams(),
-                                      funcTy->getResult(),
-                                      funcTy->getExtInfo())
-              ->getCanonicalType();
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(this)) {
+    // First, get the default overload signature type for the decl. For vars,
+    // this is the empty tuple type, as variables cannot be overloaded directly
+    // by type. For subscripts, it's their interface type.
+    CanType defaultSignatureType;
+    if (isa<VarDecl>(this)) {
+      defaultSignatureType = TupleType::getEmpty(getASTContext());
+    } else {
+      defaultSignatureType = getInterfaceType()->getCanonicalType();
     }
-    return interfaceType;
-  } else if (isa<VarDecl>(this)) {
-    // If the variable declaration occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
-    if (!ext) return CanType();
 
-    auto genericSig = ext->getGenericSignature();
-    if (!genericSig) return CanType();
-
-    ASTContext &ctx = getASTContext();
-    return GenericFunctionType::get(genericSig,
-                                    TupleType::getEmpty(ctx),
-                                    TupleType::getEmpty(ctx),
-                                    AnyFunctionType::ExtInfo())
-             ->getCanonicalType();
+    // We want to curry the default signature type with the 'self' type of the
+    // given context (if any) in order to ensure the overload signature type
+    // is unique across different contexts, such as between a protocol extension
+    // and struct decl.
+    return defaultSignatureType->addCurriedSelfType(getDeclContext())
+                               ->getCanonicalType();
   }
+
+  // Note: If you add more cases to this function, you should update the
+  // implementation of the swift::conflicting overload that deals with
+  // overload types, in order to account for cases where the overload types
+  // don't match, but the decls differ and therefore always conflict.
 
   return CanType();
 }
