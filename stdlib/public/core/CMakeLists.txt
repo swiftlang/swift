@@ -79,6 +79,7 @@ set(SWIFTLIB_ESSENTIAL
   LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
+  LOLCode.swift
   ManagedBuffer.swift
   Map.swift
   MemoryLayout.swift
