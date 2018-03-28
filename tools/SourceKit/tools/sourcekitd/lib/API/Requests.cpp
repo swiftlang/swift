@@ -163,7 +163,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion);
+                          StringRef swiftVersion);
 
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
@@ -498,10 +498,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
     Optional<int64_t> UsingSwiftArgs = Req.getOptionalInt64(KeyUsingSwiftArgs);
-    Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
-    Optional<unsigned> swiftVer;
-    if (swiftVerVal.hasValue())
-      swiftVer = *swiftVerVal;
+    std::string swiftVer;
+    Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
+    if (swiftVerValStr.hasValue()) {
+      swiftVer = swiftVerValStr.getValue();
+    } else {
+      Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
+      if (swiftVerVal.hasValue())
+        swiftVer = std::to_string(*swiftVerVal);
+    }
     return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
                                          UsingSwiftArgs.getValueOr(false),
                                          SynthesizedExtension, swiftVer));
@@ -2151,7 +2156,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion) {
+                          StringRef swiftVersion) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,

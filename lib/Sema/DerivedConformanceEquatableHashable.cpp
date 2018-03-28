@@ -42,27 +42,16 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getArgumentTypeLoc().getType())
+    if (!elt->hasInterfaceType())
       tc.validateDecl(elt);
 
-    auto argumentType = elt->getArgumentTypeLoc().getType();
-    if (!argumentType)
+    auto PL = elt->getParameterList();
+    if (!PL)
       continue;
 
-    if (auto tupleType = argumentType->getAs<TupleType>()) {
-      // One associated value with a label or multiple associated values
-      // (labeled or unlabeled) are tuple types.
-      for (auto tupleElementType : tupleType->getElementTypes()) {
-        if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
-                                   ConformanceCheckFlags::Used)) {
-          return false;
-        }
-      }
-    } else {
-      // One associated value with no label is represented as a paren type.
-      auto actualType = argumentType->getWithoutParens();
-      if (!tc.conformsToProtocol(actualType, protocol, declContext,
-                                 ConformanceCheckFlags::Used)) {
+    for (auto param : *PL) {
+      if (!tc.conformsToProtocol(param->getType(), protocol, declContext,
+                                        ConformanceCheckFlags::Used)) {
         return false;
       }
     }
@@ -154,12 +143,11 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   auto parentDC = enumElementDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto argumentTypeLoc = enumElementDecl->getArgumentTypeLoc();
-  if (argumentTypeLoc.isNull())
-    // No arguments, so no subpattern to match.
+  // No arguments, so no subpattern to match.
+  if (!enumElementDecl->hasAssociatedValues())
     return nullptr;
 
-  auto argumentType = argumentTypeLoc.getType();
+  auto argumentType = enumElementDecl->getArgumentInterfaceType();
   if (auto tupleType = argumentType->getAs<TupleType>()) {
     // Either multiple (labeled or unlabeled) arguments, or one labeled
     // argument. Return a tuple pattern that matches the enum element in arity,
@@ -671,6 +659,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   }
   eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  eqDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -1062,6 +1051,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                                       AnyFunctionType::ExtInfo());
 
   getterDecl->setInterfaceType(interfaceType);
+  getterDecl->setValidationStarted();
   getterDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
@@ -1073,6 +1063,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setValidationStarted();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
   hashValueDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);

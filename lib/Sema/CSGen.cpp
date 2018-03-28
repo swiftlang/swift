@@ -1984,42 +1984,68 @@ namespace {
         // Var doesn't affect the type.
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
                                  locator);
-      case PatternKind::Any:
-        // For a pattern of unknown type, create a new type variable.
+      case PatternKind::Any: {
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
+        //
+        // Otherwise, create a new type variable.
+        auto boundExpr = locator.trySimplifyToExpr();
+
+        if (boundExpr) {
+          auto boundExprTy = CS.getType(boundExpr);
+          if (!boundExprTy->is<InOutType>())
+            return boundExprTy->getRValueType();
+        }
+
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
                                      TVO_CanBindToInOut);
+      }
 
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
-        
-        auto boundExpr = locator.trySimplifyToExpr();
-        auto haveBoundCollectionLiteral = boundExpr &&
-                                            !var->hasNonPatternBindingInit() &&
-                                            (isa<ArrayExpr>(boundExpr) ||
-                                             isa<DictionaryExpr>(boundExpr));
 
-        // For a named pattern without a type, create a new type variable
-        // and use it as the type of the variable.
-        //
-        // FIXME: For now, substitute in the bound type for literal collection
-        // exprs that would otherwise result in a simple conversion constraint
-        // being placed between two type variables. (The bound type and the
-        // collection type, which will always be the same in this case.)
-        // This will avoid exponential typecheck behavior in the case of nested
-        // array and dictionary literals.
-        Type ty = haveBoundCollectionLiteral ?
-                    CS.getType(boundExpr) :
-                    CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                          TVO_CanBindToInOut);
-
-        // For weak variables, use Optional<T>.
+        auto ROK = ReferenceOwnership::Strong; // The default.
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-          if (OA->get() == ReferenceOwnership::Weak) {
-            ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
-            if (!ty) return Type();
-          }
+          ROK = OA->get();
 
-        return ty;
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
+        //
+        // Otherwise, create a new type variable.
+        switch (ROK) {
+        case ReferenceOwnership::Strong:
+        case ReferenceOwnership::Unowned:
+        case ReferenceOwnership::Unmanaged:
+          if (!var->hasNonPatternBindingInit()) {
+            if (auto boundExpr = locator.trySimplifyToExpr()) {
+              auto boundExprTy = CS.getType(boundExpr);
+              if (!boundExprTy->is<InOutType>())
+                return boundExprTy->getRValueType();
+            }
+          }
+          break;
+        case ReferenceOwnership::Weak:
+          break;
+        }
+
+        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                        TVO_CanBindToInOut);
+
+        switch (ROK) {
+        case ReferenceOwnership::Strong:
+        case ReferenceOwnership::Unowned:
+        case ReferenceOwnership::Unmanaged:
+          return ty;
+        case ReferenceOwnership::Weak:
+          // For weak variables, use Optional<T>.
+          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+        }
+
+        llvm_unreachable("Unhandled ReferenceOwnership kind");
       }
 
       case PatternKind::Typed: {
@@ -2954,7 +2980,12 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
-    enum class TypeOperation { None, Join, JoinInout, JoinMeta };
+    enum class TypeOperation { None,
+                               Join,
+                               JoinInout,
+                               JoinMeta,
+                               JoinNonexistent
+    };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
                                           ASTContext &Context) {
@@ -2970,6 +3001,7 @@ namespace {
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
+          .Case("type_join_nonexistent", TypeOperation::JoinNonexistent)
           .Default(TypeOperation::None);
     }
 
@@ -3033,6 +3065,25 @@ namespace {
           return ErrorType::get(ctx);
 
         return *join;
+      }
+
+      case TypeOperation::JoinNonexistent: {
+        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+        if (!lhsMeta || !rhsMeta)
+          llvm_unreachable("Unexpected argument types for Builtin.type_join_nonexistent!");
+
+        auto &ctx = lhsMeta->getASTContext();
+
+        auto join =
+            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
+
+        // Verify that we could not compute a join.
+        if (join)
+          llvm_unreachable("Unexpected result from join - it should not have been computable!");
+
+        // The return value is unimportant.
+        return MetatypeType::get(ctx.TheAnyType)->getCanonicalType();
       }
       }
     }
@@ -3451,6 +3502,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
 
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  Parent = Parent->walk(SanitizeExpr(*TC));
   ConstraintSystem CS(*TC, &DC, Options);
   CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);

@@ -1413,3 +1413,36 @@ extension _StringGuts {
     return UnsafeMutablePointer(mutating: _unmanagedUTF16View.start)
   }
 }
+
+extension _StringGuts {
+  @available(*, deprecated)
+  public // SPI(Foundation)
+  var _isContiguousASCII: Bool {
+    return _object.isContiguousASCII
+  }
+
+  @available(*, deprecated)
+  public // SPI(Foundation)
+  var _isContiguousUTF16: Bool {
+    return _object.isContiguousUTF16
+  }
+
+  @available(*, deprecated)
+  public // SPI(Foundation)
+  func _withUnsafeUTF8CodeUnitsIfAvailable<Result>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
+  ) rethrows -> Result? {
+    guard _object.isContiguousASCII else { return nil }
+    return try f(_unmanagedASCIIView.buffer)
+  }
+
+  @available(*, deprecated)
+  public // SPI(Foundation)
+  func _withUnsafeUTF16CodeUnitsIfAvailable<Result>(
+    _ f: (UnsafeBufferPointer<UInt16>) throws -> Result
+  ) rethrows -> Result? {
+    guard _object.isContiguousUTF16 else { return nil }
+    return try f(_unmanagedUTF16View.buffer)
+  }
+}
+

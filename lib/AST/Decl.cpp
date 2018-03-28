@@ -1296,20 +1296,34 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
-ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
+ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
+                                         bool isAccessOnSelf) const {
   // If we're inside a @_transparent function, use the most conservative
   // access pattern, since we may be inlined from a different resilience
   // domain.
   ResilienceExpansion expansion = UseDC->getResilienceExpansion();
 
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
-    // Observing member are accessed directly from within their didSet/willSet
-    // specifiers.  This prevents assignments from becoming infinite loops.
-    if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
-      if (var->hasStorage() && var->hasAccessorFunctions() &&
-          UseFD->getStorage() == var)
-        return AccessSemantics::DirectToStorage;
-    
+    auto isMember = var->getDeclContext()->isTypeContext();
+    if (isAccessOnSelf)
+      assert(isMember && "Access on self, but var isn't a member");
+
+    // Within a variable's own didSet/willSet specifier, access its storage
+    // directly if either:
+    // 1) It's a 'plain variable' (i.e a variable that's not a member).
+    // 2) It's an access to the member on the implicit 'self' declaration.
+    //    If it's a member access on some other base, we want to call the setter
+    //    as we might be accessing the member on a *different* instance.
+    // 3) We're not in Swift 5 mode (or higher), as in earlier versions of Swift
+    //    we always performed direct accesses.
+    // This prevents assignments from becoming infinite loops in most cases.
+    if (!isMember || isAccessOnSelf ||
+        !UseDC->getASTContext().isSwiftVersionAtLeast(5))
+      if (auto *UseFD = dyn_cast<AccessorDecl>(UseDC))
+        if (var->hasStorage() && var->hasAccessorFunctions() &&
+            UseFD->getStorage() == var)
+          return AccessSemantics::DirectToStorage;
+
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
     // thing as the getter/setter (i.e., it can't be overridden), then just do a
@@ -1844,7 +1858,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
 
-  if (auto *func = dyn_cast<FuncDecl>(this)) {
+  // Unary operators also include prefix/postfix.
+  if (auto func = dyn_cast<FuncDecl>(this)) {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
@@ -2541,6 +2556,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
     TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {
   Bits.TypeAliasDecl.IsCompatibilityAlias = false;
+  Bits.TypeAliasDecl.IsDebuggerAlias = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -2562,14 +2578,17 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // underlying type. See the comment in the ProtocolDecl case of
   // validateDecl().
   if (!hasInterfaceType()) {
-    // Create a NameAliasType which will resolve to the underlying type.
-    ASTContext &Ctx = getASTContext();
-    auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-    aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
-        ->getRecursiveProperties());
-
     // Set the interface type of this declaration.
-    setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+    ASTContext &ctx = getASTContext();
+
+    // If we can set a sugared type, do so.
+    if (!getGenericSignature()) {
+      auto sugaredType =
+        NameAliasType::get(this, Type(), SubstitutionMap(), underlying);
+      setInterfaceType(MetatypeType::get(sugaredType, ctx));
+    } else {
+      setInterfaceType(MetatypeType::get(underlying, ctx));
+    }
   }
 }
 
@@ -4518,12 +4537,14 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
-void DefaultArgumentInitializer::changeFunction(AbstractFunctionDecl *parent) {
-  assert(parent->isLocalContext());
-  setParent(parent);
+void DefaultArgumentInitializer::changeFunction(
+    DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+  if (parent->isLocalContext()) {
+    setParent(parent);
+  }
 
   unsigned offset = getIndex();
-  for (auto list : parent->getParameterLists()) {
+  for (auto list : paramLists) {
     if (offset < list->size()) {
       auto param = list->get(offset);
       if (param->getDefaultValue())
@@ -4690,11 +4711,17 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
 }
 
 std::pair<DefaultArgumentKind, Type>
-AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
-  auto paramLists = getParameterLists();
+swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
+  ArrayRef<const ParameterList *> paramLists;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
+    paramLists = AFD->getParameterLists();
 
-  if (getImplicitSelfDecl()) // Skip the 'self' parameter; it is not counted.
-    paramLists = paramLists.slice(1);
+    // Skip the 'self' parameter; it is not counted.
+    if (AFD->getImplicitSelfDecl())
+      paramLists = paramLists.slice(1);
+  } else {
+    paramLists = cast<EnumElementDecl>(source)->getParameterList();
+  }
 
   for (auto paramList : paramLists) {
     if (Index < paramList->size()) {
@@ -5286,8 +5313,8 @@ SourceRange FuncDecl::getSourceRange() const {
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
-  if (ArgumentType.hasLocation())
-    return {getStartLoc(), ArgumentType.getSourceRange().End};
+  if (auto *PL = getParameterList())
+    return {getStartLoc(), PL->getSourceRange().End};
   return {getStartLoc(), getNameLoc()};
 }
 
@@ -5306,8 +5333,9 @@ bool EnumElementDecl::computeType() {
   Type selfTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-  if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
+  if (auto *PL = getParameterList()) {
+    auto paramTy = PL->getType(getASTContext());
+    resultTy = FunctionType::get(paramTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())
@@ -5323,7 +5351,7 @@ bool EnumElementDecl::computeType() {
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
-  if (!Bits.EnumElementDecl.HasArgumentType)
+  if (!hasAssociatedValues())
     return nullptr;
 
   auto interfaceType = getInterfaceType();

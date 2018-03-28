@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s

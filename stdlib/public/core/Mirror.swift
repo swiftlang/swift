@@ -501,6 +501,7 @@ extension Mirror {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
+@_frozen // rdar://problem/38719739 - needed by LLDB
 @available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public enum PlaygroundQuickLook {
   /// Plain text.

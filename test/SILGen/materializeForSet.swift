@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s

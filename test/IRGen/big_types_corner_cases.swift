@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: optimized_stdlib
@@ -46,8 +45,8 @@ let bigStructGlobalArray : [BigStruct] = [
 ]
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @"$S22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_Sg* nocapture dereferenceable({{.*}})
-// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWe
-// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWy
+// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOe
+// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOy
 // CHECK: ret void
 
 public func f1_returns_BigType(_ x: BigStruct) -> BigStruct {

@@ -39,7 +39,7 @@ struct TokenInfo {
   operator bool() { return StartOfLineTarget && StartOfLineBeforeTarget; }
 };
 
-typedef llvm::SmallString<64> StringBuilder;
+using StringBuilder = llvm::SmallString<64>;
 
 static SourceLoc getVarDeclInitEnd(VarDecl *VD) {
   return VD->getBracesRange().isValid()
@@ -485,7 +485,7 @@ public:
 };
 
 class FormatWalker : public SourceEntityWalker {
-  typedef ArrayRef<Token>::iterator TokenIt;
+  using TokenIt = ArrayRef<Token>::iterator;
   class SiblingCollector {
     SourceLoc FoundSibling;
     SourceManager &SM;

@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name force_cast_chained_optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

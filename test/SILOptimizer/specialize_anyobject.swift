@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name specialize_anyobject -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 

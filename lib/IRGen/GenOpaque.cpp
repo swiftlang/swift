@@ -354,20 +354,18 @@ emitLoadOfValueWitnessFunctionFromMetadata(IRGenFunction &IGF,
   return emitLoadOfValueWitnessFunction(IGF, vwtable, index);
 }
 
-llvm::Value * IRGenFunction::emitValueWitnessValue(SILType type,
-                                                   ValueWitness index) {
+llvm::Value *IRGenFunction::emitValueWitnessValue(SILType type,
+                                                  ValueWitness index) {
   assert(!isValueWitnessFunction(index));
 
-  if (auto witness = tryGetLocalTypeDataForLayout(type,
-                                LocalTypeDataKind::forValueWitness(index))) {
+  auto key = LocalTypeDataKind::forValueWitness(index);
+  if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     return witness;
   }
   
   auto vwtable = emitValueWitnessTableRef(type);
   auto witness = emitLoadOfValueWitnessValue(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type,
-                                  LocalTypeDataKind::forValueWitness(index),
-                                  witness);
+  setScopedLocalTypeDataForLayout(type, key, witness);
   return witness;
 }
 
@@ -377,8 +375,8 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
                                            ValueWitness index) {
   assert(isValueWitnessFunction(index));
 
-  if (auto witness = tryGetLocalTypeDataForLayout(type,
-                                LocalTypeDataKind::forValueWitness(index))) {
+  auto key = LocalTypeDataKind::forValueWitness(index);
+  if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     metadataSlot = emitTypeMetadataRefForLayout(type);
     auto signature = IGM.getValueWitnessSignature(index);
     return FunctionPointer(witness, signature);
@@ -386,9 +384,7 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
   
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type,
-                                  LocalTypeDataKind::forValueWitness(index),
-                                  witness.getPointer());
+  setScopedLocalTypeDataForLayout(type, key, witness.getPointer());
   return witness;
 }
 

@@ -62,6 +62,48 @@ static void printValidationInfo(llvm::StringRef data) {
   }
 }
 
+static void resolveDeclFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Decl *ResolvedDecl =
+        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
+    if (!ResolvedDecl) {
+      llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
+    } else {
+      ResolvedDecl->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+static void resolveTypeFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Type ResolvedType =
+        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+    if (!ResolvedType) {
+      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+    } else {
+      ResolvedType->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+static void
+collectMangledNames(const std::string &FilePath,
+                    llvm::SmallVectorImpl<std::string> &MangledNames) {
+  std::string Name;
+  std::ifstream InputStream(FilePath);
+  while (std::getline(InputStream, Name)) {
+    if (Name.empty())
+      continue;
+    MangledNames.push_back(Name);
+  }
+}
+
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -90,8 +132,15 @@ int main(int argc, char **argv) {
   llvm::cl::list<std::string> FrameworkPaths(
     "F", llvm::cl::desc("add a directory to the framework search path"));
 
+  llvm::cl::opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
+
   llvm::cl::opt<std::string> DumpTypeFromMangled(
-      "type-from-mangled", llvm::cl::desc("dump type from mangled name"));
+      "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
+
+  // FIXME: we should infer this from the module.
+  llvm::cl::opt<std::string> TargetTriple(
+      "target-triple", llvm::cl::desc("specify target triple"));
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
@@ -103,6 +152,7 @@ int main(int argc, char **argv) {
   DumpTypeFromMangled.removeArgument();
   SDK.removeArgument();
   InputNames.removeArgument();
+  TargetTriple.removeArgument();
 
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
   if (SDK.getNumOccurrences() == 0) {
@@ -121,7 +171,13 @@ int main(int argc, char **argv) {
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setSDKPath(SDK);
-  Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
+  // FIXME: we should infer this from the module.
+  if (!TargetTriple.empty())
+    Invocation.setTargetTriple(TargetTriple);
+  else
+    Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setImportSearchPaths(ImportPaths);
@@ -238,28 +294,14 @@ int main(int argc, char **argv) {
       }
     }
     if (!DumpTypeFromMangled.empty()) {
-      std::string Error;
-      std::string Name;
-      swift::ASTContext &Ctx = CI.getASTContext();
       llvm::SmallVector<std::string, 8> MangledNames;
-
-      std::ifstream InputStream(DumpTypeFromMangled);
-      while (std::getline(InputStream, Name)) {
-        if (Name.empty())
-          continue;
-        MangledNames.push_back(Name);
-      }
-
-      for (auto &Mangled : MangledNames) {
-        swift::Type ResolvedType = swift::ide::getTypeFromMangledSymbolname(
-            Ctx, Mangled, Error);
-        if (!ResolvedType) {
-          llvm::errs() << "Can't resolve type of " << Mangled << "\n";
-        } else {
-          ResolvedType->print(llvm::errs());
-          llvm::errs() << "\n";
-        }
-      }
+      collectMangledNames(DumpTypeFromMangled, MangledNames);
+      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+    }
+    if (!DumpDeclFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpDeclFromMangled, MangledNames);
+      resolveDeclFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;

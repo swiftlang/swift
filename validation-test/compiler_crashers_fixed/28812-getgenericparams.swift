@@ -5,6 +5,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-@objc protocol P{{}func a}class a:P{{}func a{}func a
+
+// RUN: not %target-swift-frontend %s -emit-ir
+class a<a{{}
+let d=a
+& a
+P{{{}}}typealias a:A protocol A

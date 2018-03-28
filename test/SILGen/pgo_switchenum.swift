@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main

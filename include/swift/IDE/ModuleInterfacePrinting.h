@@ -40,7 +40,7 @@ enum class ModuleTraversal : unsigned {
 };
 
 /// Options used to describe the traversal of a module for printing.
-typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
+using ModuleTraversalOptions = OptionSet<ModuleTraversal>;
 
 ArrayRef<StringRef> collectModuleGroups(ModuleDecl *M,
                                         std::vector<StringRef> &Scratch);
@@ -82,4 +82,3 @@ void printSwiftSourceInterface(SourceFile &File, ASTPrinter &Printer,
 } // namespace swift
 
 #endif // SWIFT_IDE_MODULE_INTERFACE_PRINTING_H
-

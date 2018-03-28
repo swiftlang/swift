@@ -1,4 +1,3 @@
-// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name dependent_member_lowering -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 

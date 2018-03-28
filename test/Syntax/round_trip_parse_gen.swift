@@ -362,6 +362,19 @@ func statementTests() {
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
+
+  switch Foo {
+    case n1:
+      break
+    case n2, n3l:
+      break
+#if FOO
+    case let (x, y)  where !x, n3l where false:
+      break
+#endif
+    default:
+      break
+  }
 }
 
 // MARK: - ExtensionDecl

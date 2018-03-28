@@ -14,6 +14,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Intrinsics.h"
@@ -886,7 +887,6 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
     return llvm::GlobalValue::ExternalLinkage;
 
   case FormalLinkage::HiddenUnique:
-  case FormalLinkage::HiddenNonUnique:
   case FormalLinkage::Private:
     return llvm::GlobalValue::PrivateLinkage;
   }

@@ -59,65 +59,161 @@ void IRGenFunction::destroyLocalTypeData() {
 OperationCost LocalTypeDataCache::CacheEntry::cost() const {
   switch (getKind()) {
   case Kind::Concrete:
-    return static_cast<const ConcreteCacheEntry*>(this)->cost();
+    return cast<ConcreteCacheEntry>(this)->cost();
   case Kind::Abstract:
-    return static_cast<const AbstractCacheEntry*>(this)->cost();
+    return cast<AbstractCacheEntry>(this)->cost();
   }
   llvm_unreachable("bad cache entry kind");
+}
+
+OperationCost
+LocalTypeDataCache::CacheEntry::costForRequest(LocalTypeDataKey key,
+                                        DynamicMetadataRequest request) const {
+  switch (getKind()) {
+  case Kind::Concrete:
+    return cast<ConcreteCacheEntry>(this)->costForRequest(key, request);
+  case Kind::Abstract:
+    return cast<AbstractCacheEntry>(this)->costForRequest(key, request);
+  }
+  llvm_unreachable("bad cache entry kind");
+}
+
+OperationCost
+LocalTypeDataCache::ConcreteCacheEntry::costForRequest(LocalTypeDataKey key,
+                                        DynamicMetadataRequest request) const {
+  auto totalCost = cost();
+  if (!immediatelySatisfies(key, request)) {
+    // Use a lower cost for requests where emitCheckTypeMetadataState can just
+    // branch on the existing response's returned dynamic state.
+    totalCost += getCheckTypeMetadataStateCost(request, Value);
+  }
+  return totalCost;
+}
+
+OperationCost
+LocalTypeDataCache::AbstractCacheEntry::costForRequest(LocalTypeDataKey key,
+                                        DynamicMetadataRequest request) const {
+  auto totalCost = cost();
+  if (!immediatelySatisfies(key, request)) {
+    totalCost += OperationCost::Call;
+  }
+  return totalCost;
 }
 
 void LocalTypeDataCache::CacheEntry::erase() const {
   switch (getKind()) {
   case Kind::Concrete:
-    delete static_cast<const ConcreteCacheEntry*>(this);
+    delete cast<ConcreteCacheEntry>(this);
     return;
   case Kind::Abstract:
-    delete static_cast<const AbstractCacheEntry*>(this);
+    delete cast<AbstractCacheEntry>(this);
     return;
   }
   llvm_unreachable("bad cache entry kind");
 }
 
+static bool immediatelySatisfies(LocalTypeDataKey key,
+                                 MetadataState storedState,
+                                 DynamicMetadataRequest request) {
+  assert((storedState == MetadataState::Complete ||
+          key.Kind.isAnyTypeMetadata()) &&
+         "non-metadata entry stored with incomplete state");
+
+  return request.isSatisfiedBy(storedState);
+}
+
+bool LocalTypeDataCache::CacheEntry::immediatelySatisfies(
+                                         LocalTypeDataKey key,
+                                         DynamicMetadataRequest request) const {
+  switch (getKind()) {
+  case Kind::Concrete:
+    return cast<ConcreteCacheEntry>(this)->immediatelySatisfies(key, request);
+  case Kind::Abstract:
+    return cast<AbstractCacheEntry>(this)->immediatelySatisfies(key, request);
+  }
+  llvm_unreachable("bad cache entry kind");
+}
+
+bool LocalTypeDataCache::ConcreteCacheEntry::immediatelySatisfies(
+                                         LocalTypeDataKey key,
+                                         DynamicMetadataRequest request) const {
+  return ::immediatelySatisfies(key, Value.getStaticLowerBoundOnState(),
+                                request);
+}
+
+bool LocalTypeDataCache::AbstractCacheEntry::immediatelySatisfies(
+                                         LocalTypeDataKey key,
+                                         DynamicMetadataRequest request) const {
+  return ::immediatelySatisfies(key, getState(), request);
+}
+
+MetadataResponse
+IRGenFunction::tryGetLocalTypeMetadataForLayout(SILType layoutType,
+                                                DynamicMetadataRequest request){
+  auto type = layoutType.getSwiftRValueType();
+
+  // Check under the formal type first.
+  if (type->isLegalFormalType()) {
+    if (auto response = tryGetLocalTypeMetadata(type, request))
+      return response;
+  }
+
+  auto key = LocalTypeDataKey(type,
+                            LocalTypeDataKind::forRepresentationTypeMetadata());
+  return tryGetLocalTypeMetadata(key, request);
+}
+
 MetadataResponse
 IRGenFunction::tryGetLocalTypeMetadata(CanType type,
                                        DynamicMetadataRequest request) {
-  // For now, forTypeMetadata always means *complete* type metadata.
-  auto localDataKind = LocalTypeDataKind::forTypeMetadata();
-  if (auto metadata = tryGetLocalTypeData(type, localDataKind))
-    return MetadataResponse(metadata);
-
-  return MetadataResponse();
+  auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
+  return tryGetLocalTypeMetadata(key, request);
 }
 
-void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
-                                               MetadataResponse response) {
-  // For now, forTypeMetadata always means *complete* type metadata.
-  if (response.isStaticallyKnownComplete()) {
-    auto localDataKind = LocalTypeDataKind::forTypeMetadata();
-    setScopedLocalTypeData(type, localDataKind, response.getMetadata());
-  }
+MetadataResponse
+IRGenFunction::tryGetLocalTypeMetadata(LocalTypeDataKey key,
+                                       DynamicMetadataRequest request) {
+  assert(key.Kind.isAnyTypeMetadata());
+  if (!LocalTypeData) return MetadataResponse();
+  return LocalTypeData->tryGet(*this, key, /*allow abstract*/ true, request);
 }
 
-llvm::Value *IRGenFunction::getLocalTypeData(CanType type,
-                                             LocalTypeDataKind kind) {
-  assert(LocalTypeData);
-  return LocalTypeData->get(*this, LocalTypeDataCache::getKey(type, kind));
+/// Get local type data if it's possible to do so without emitting code.
+/// Specifically, it doesn't call MetadataPath::follow, and therefore
+/// it's safe to call from MetadataPath::follow.
+///
+/// It's okay to call this with any kind of key.
+MetadataResponse
+IRGenFunction::tryGetConcreteLocalTypeData(LocalTypeDataKey key,
+                                           DynamicMetadataRequest request) {
+  if (!LocalTypeData) return MetadataResponse();
+  return LocalTypeData->tryGet(*this, key, /*allow abstract*/ false, request);
 }
 
-llvm::Value *IRGenFunction::tryGetConcreteLocalTypeData(LocalTypeDataKey key) {
-  if (!LocalTypeData) return nullptr;
-  return LocalTypeData->tryGet(*this, key, /*allow abstract*/ false);
+llvm::Value *IRGenFunction::tryGetLocalTypeDataForLayout(SILType type,
+                                                       LocalTypeDataKind kind) {
+  return tryGetLocalTypeData(LocalTypeDataKey(type.getSwiftRValueType(), kind));
+}
+
+llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
+                                                LocalTypeDataKind kind) {
+  return tryGetLocalTypeData(LocalTypeDataKey(type, kind));
 }
 
 llvm::Value *IRGenFunction::tryGetLocalTypeData(LocalTypeDataKey key) {
+  assert(!key.Kind.isAnyTypeMetadata());
   if (!LocalTypeData) return nullptr;
-  return LocalTypeData->tryGet(*this, key);
+  if (auto response = LocalTypeData->tryGet(*this, key, /*allow abstract*/ true,
+                                            MetadataState::Complete))
+    return response.getMetadata();
+  return nullptr;
 }
 
-llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
-                                        bool allowAbstract) {
+MetadataResponse
+LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
+                           bool allowAbstract, DynamicMetadataRequest request) {
   auto it = Map.find(key);
-  if (it == Map.end()) return nullptr;
+  if (it == Map.end()) return MetadataResponse();
   auto &chain = it->second;
 
   CacheEntry *best = nullptr;
@@ -129,7 +225,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
     next = cur->getNext();
 
     // Ignore abstract entries if so requested.
-    if (!allowAbstract && cur->getKind() != CacheEntry::Kind::Concrete)
+    if (!allowAbstract && !isa<ConcreteCacheEntry>(cur))
       continue;
 
     // Ignore unacceptable entries.
@@ -141,11 +237,11 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
       // Compute the cost of the best entry if we haven't done so already.
       // If that's zero, go ahead and short-circuit out.
       if (!bestCost) {
-        bestCost = best->cost();
+        bestCost = best->costForRequest(key, request);
         if (*bestCost == OperationCost::Free) break;
       }
 
-      auto curCost = cur->cost();
+      auto curCost = cur->costForRequest(key, request);
       if (curCost >= *bestCost) continue;
 
       // Replace the best cost and fall through.
@@ -155,64 +251,84 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   }
 
   // If we didn't find anything, we're done.
-  if (!best) return nullptr;
+  if (!best) return MetadataResponse();
 
   // Okay, we've found the best entry available.
   switch (best->getKind()) {
 
   // For concrete caches, this is easy.
-  case CacheEntry::Kind::Concrete:
-    return static_cast<ConcreteCacheEntry*>(best)->Value;
+  case CacheEntry::Kind::Concrete: {
+    auto entry = cast<ConcreteCacheEntry>(best);
+
+    if (entry->immediatelySatisfies(key, request))
+      return entry->Value;
+
+    assert(key.Kind.isAnyTypeMetadata());
+
+    // Emit a dynamic check that the type metadata matches the request.
+    // TODO: we could potentially end up calling this redundantly with a
+    //   dynamic request.  Fortunately, those are used only in very narrow
+    //   circumstances.
+    auto response = emitCheckTypeMetadataState(IGF, request, entry->Value);
+
+    // Add a concrete entry for the checked result.
+    IGF.setScopedLocalTypeData(key, response);
+
+    return response;
+  }
 
   // For abstract caches, we need to follow a path.
   case CacheEntry::Kind::Abstract: {
-    auto entry = static_cast<AbstractCacheEntry*>(best);
+    auto entry = cast<AbstractCacheEntry>(best);
 
     // Follow the path.
     auto &source = AbstractSources[entry->SourceIndex];
-    auto result = entry->follow(IGF, source);
+    auto response = entry->follow(IGF, source, request);
 
     // Following the path automatically caches at every point along it,
     // including the end.
     assert(chain.Root->DefinitionPoint == IGF.getActiveDominancePoint());
-    assert(chain.Root->getKind() == CacheEntry::Kind::Concrete);
+    assert(isa<ConcreteCacheEntry>(chain.Root));
 
-    return result;
+    return response;
   }
 
   }
   llvm_unreachable("bad cache entry kind");
 }
 
-llvm::Value *
+MetadataResponse
 LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
-                                               AbstractSource &source) const {
+                                               AbstractSource &source,
+                                        DynamicMetadataRequest request) const {
   switch (source.getKind()) {
   case AbstractSource::Kind::TypeMetadata:
     return Path.followFromTypeMetadata(IGF, source.getType(),
-                                       source.getValue(), nullptr);
+                                       source.getValue(), request, nullptr);
 
   case AbstractSource::Kind::ProtocolWitnessTable:
     return Path.followFromWitnessTable(IGF, source.getType(),
                                        source.getProtocolConformance(),
-                                       source.getValue(), nullptr);
+                                       source.getValue(), request, nullptr);
   }
   llvm_unreachable("bad source kind");
 }
 
 static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
                                                LocalTypeDataKey key,
-                                               llvm::Value *data) {
+                                               MetadataResponse value) {
   // Only if debug info is enabled.
   if (!IGF.IGM.DebugInfo) return;
 
-  // Only for type metadata.
-  if (key.Kind != LocalTypeDataKind::forTypeMetadata()) return;
+  // Only for formal type metadata.
+  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata()) return;
 
   // Only for archetypes, and not for opened archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type) return;
   if (type->getOpenedExistentialType()) return;
+
+  llvm::Value *data = value.getMetadata();
 
   // At -O0, create an alloca to keep the type alive.
   auto name = type->getFullName();
@@ -227,9 +343,39 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
 }
 
-void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
+void
+IRGenFunction::setScopedLocalTypeMetadataForLayout(SILType type,
+                                                   MetadataResponse response) {
+  auto key = LocalTypeDataKey(type.getSwiftRValueType(),
+                         LocalTypeDataKind::forRepresentationTypeMetadata());
+  setScopedLocalTypeData(key, response);
+}
+
+void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
+                                               MetadataResponse response) {
+  auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
+  setScopedLocalTypeData(key, response);
+}
+
+void IRGenFunction::setScopedLocalTypeData(CanType type,
+                                           LocalTypeDataKind kind,
                                            llvm::Value *data) {
-  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
+  assert(!kind.isAnyTypeMetadata());
+  setScopedLocalTypeData(LocalTypeDataKey(type, kind),
+                         MetadataResponse::forComplete(data));
+}
+
+void IRGenFunction::setScopedLocalTypeDataForLayout(SILType type,
+                                                    LocalTypeDataKind kind,
+                                                    llvm::Value *data) {
+  assert(!kind.isAnyTypeMetadata());
+  setScopedLocalTypeData(LocalTypeDataKey(type.getSwiftRValueType(), kind),
+                         MetadataResponse::forComplete(data));
+}
+
+void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
+                                           MetadataResponse value) {
+  maybeEmitDebugInfoForLocalTypeData(*this, key, value);
 
   // Register with the active ConditionalDominanceScope if necessary.
   bool isConditional = isConditionalDominancePoint();
@@ -238,29 +384,47 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
   }
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
-                                         isConditional, key, data);
+                                         isConditional, key, value);
+}
+
+void IRGenFunction::setUnscopedLocalTypeMetadata(CanType type,
+                                                 MetadataResponse response) {
+  LocalTypeDataKey key(type, LocalTypeDataKind::forFormalTypeMetadata());
+  setUnscopedLocalTypeData(key, response);
+}
+
+void IRGenFunction::setUnscopedLocalTypeData(CanType type,
+                                             LocalTypeDataKind kind,
+                                             llvm::Value *data) {
+  assert(!kind.isAnyTypeMetadata());
+  setUnscopedLocalTypeData(LocalTypeDataKey(type, kind),
+                           MetadataResponse::forComplete(data));
 }
 
 void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
-                                             llvm::Value *data) {
-  maybeEmitDebugInfoForLocalTypeData(*this, key, data);
+                                             MetadataResponse value) {
+  maybeEmitDebugInfoForLocalTypeData(*this, key, value);
 
   // This is supportable, but it would require ensuring that we add the
   // entry after any conditional entries; otherwise the stack discipline
   // will get messed up.
   assert(!isConditionalDominancePoint() &&
          "adding unscoped local type data while in conditional scope");
+
   getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
-                                         /*conditional*/ false, key, data);
+                                         /*conditional*/ false, key, value);
 }
 
 void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
                                                       IsExact_t isExact,
-                                                      llvm::Value *metadata) {
+                                                      llvm::Value *metadata,
+                                                      MetadataState state) {
+  auto response = MetadataResponse::forBounded(metadata, state);
+
   // Remember that we have this type metadata concretely.
   if (isExact) {
     if (!metadata->hasName()) setTypeMetadataName(IGM, metadata, type);
-    setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(), metadata);
+    setScopedLocalTypeMetadata(type, response);
   }
 
   // Don't bother adding abstract fulfillments at a conditional dominance
@@ -269,7 +433,7 @@ void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
     return;
 
   getOrCreateLocalTypeData()
-    .addAbstractForTypeMetadata(*this, type, isExact, metadata);
+    .addAbstractForTypeMetadata(*this, type, isExact, response);
 }
 
 void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
@@ -303,7 +467,7 @@ void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
 void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
                                                     CanType type,
                                                     IsExact_t isExact,
-                                                    llvm::Value *metadata) {
+                                                    MetadataResponse metadata) {
   struct Callback : FulfillmentMap::InterestingKeysCallback {
     bool isInterestingType(CanType type) const override {
       return true;
@@ -330,6 +494,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // anything, stop.
   FulfillmentMap fulfillments;
   if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                       metadata.getStaticLowerBoundOnState(),
                                        /*source*/ 0, MetadataPath(),
                                        callbacks)) {
     return;
@@ -380,7 +545,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
         continue;
       }
 
-      localDataKind = LocalTypeDataKind::forTypeMetadata();
+      localDataKind = LocalTypeDataKind::forFormalTypeMetadata();
     }
 
     // Find the chain for the key.
@@ -435,7 +600,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     auto newEntry = new AbstractCacheEntry(IGF.getActiveDominancePoint(),
                                            isConditional,
                                            getSourceIndex(),
-                                           std::move(fulfillment.second.Path));
+                                           std::move(fulfillment.second.Path),
+                                           fulfillment.second.getState());
 
     // Add it to the front of the chain.
     chain.push_front(newEntry);
@@ -465,15 +631,16 @@ LLVM_DUMP_METHOD void LocalTypeDataCache::dump() const {
 
       switch (cur->getKind()) {
       case CacheEntry::Kind::Concrete: {
-        auto entry = static_cast<const ConcreteCacheEntry*>(cur);
-        out << "concrete: " << entry->Value << "\n  ";
-        if (!isa<llvm::Instruction>(entry->Value)) out << "  ";
-        entry->Value->dump();
+        auto entry = cast<ConcreteCacheEntry>(cur);
+        auto value = entry->Value.getMetadata();
+        out << "concrete: " << value << "\n  ";
+        if (!isa<llvm::Instruction>(value)) out << "  ";
+        value->dump();
         break;
       }
 
       case CacheEntry::Kind::Abstract: {
-        auto entry = static_cast<const AbstractCacheEntry*>(cur);
+        auto entry = cast<AbstractCacheEntry>(cur);
         out << "abstract: source=" << entry->SourceIndex << "\n";
         break;
       }
@@ -512,8 +679,10 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "AbstractConformance("
         << getAbstractProtocolConformance()->getName()
         << ")";
-  } else if (Value == TypeMetadata) {
-    out << "TypeMetadata";
+  } else if (Value == FormalTypeMetadata) {
+    out << "FormalTypeMetadata";
+  } else if (Value == RepresentationTypeMetadata) {
+    out << "RepresentationTypeMetadata";
   } else if (Value == ValueWitnessTable) {
     out << "ValueWitnessTable";
   } else {

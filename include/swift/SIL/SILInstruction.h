@@ -2478,7 +2478,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-      llvm_unreachable("not a computed property");
+      return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
     case Kind::External:

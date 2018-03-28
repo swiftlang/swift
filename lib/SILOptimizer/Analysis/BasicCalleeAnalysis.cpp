@@ -161,8 +161,11 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
         canCallUnknown = true;
         break;
       case AccessLevel::Internal:
-        canCallUnknown = !M.isWholeModule();
-        break;
+        if (!M.isWholeModule()) {
+          canCallUnknown = true;
+          break;
+        }
+        LLVM_FALLTHROUGH;
       case AccessLevel::FilePrivate:
       case AccessLevel::Private: {
         auto Witness = Conf->getWitness(Requirement.getDecl(), nullptr);

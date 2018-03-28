@@ -21,24 +21,23 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-ToolChain::JobContext::JobContext(Compilation &C,
-                                  ArrayRef<const Job *> Inputs,
+ToolChain::JobContext::JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+    : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output), OI(OI),
+      Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
@@ -75,8 +74,9 @@ ToolChain::constructJob(const JobAction &JA,
 
   auto invocationInfo = [&]() -> InvocationInfo {
     switch (JA.getKind()) {
-  #define CASE(K) case Action::K: \
-      return constructInvocation(cast<K##Action>(JA), context);
+#define CASE(K)                                                                \
+  case Action::Kind::K:                                                        \
+    return constructInvocation(cast<K##Action>(JA), context);
     CASE(CompileJob)
     CASE(InterpretJob)
     CASE(BackendJob)
@@ -89,7 +89,7 @@ ToolChain::constructJob(const JobAction &JA,
     CASE(AutolinkExtractJob)
     CASE(REPLJob)
 #undef CASE
-    case Action::Input:
+    case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
     }
 
@@ -147,8 +147,8 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
   return {};
 }
 
-types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
-  return types::lookupTypeForExtension(Ext);
+file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
+  return file_types::lookupTypeForExtension(Ext);
 }
 
 /// Return a _single_ TY_Swift InputAction, if one exists;
@@ -159,7 +159,7 @@ findSingleSwiftInput(const CompileJobAction *CJA) {
   const InputAction *IA = nullptr;
   for (auto const *I : Inputs) {
     if (auto const *S = dyn_cast<InputAction>(I)) {
-      if (S->getType() == types::TY_Swift) {
+      if (S->getType() == file_types::TY_Swift) {
         if (IA == nullptr) {
           IA = S;
         } else {
@@ -233,7 +233,7 @@ ToolChain::jobsAreBatchCombinable(const Compilation &C,
 /// \c CommandOutputs of all the jobs passed.
 static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
-                       types::ID outputType) {
+                       file_types::ID outputType) {
   auto output =
       llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {

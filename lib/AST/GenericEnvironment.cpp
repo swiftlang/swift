@@ -230,3 +230,25 @@ GenericEnvironment::getForwardingSubstitutions() const {
   genericSig->getSubstitutions(subMap, result);
   return genericSig->getASTContext().AllocateCopy(result);
 }
+
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
+                                           Type conformingType,
+                                           ProtocolConformanceRef conformance) {
+  if (!genericEnv)
+    return {conformingType, conformance};
+  
+  return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
+}
+
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(
+                                     Type conformingInterfaceType,
+                                     ProtocolConformanceRef conformance) const {
+  auto contextConformance = conformance.subst(conformingInterfaceType,
+    QueryInterfaceTypeSubstitutions(this),
+    LookUpConformanceInSignature(*getGenericSignature()));
+  
+  auto contextType = mapTypeIntoContext(conformingInterfaceType);
+  return {contextType, contextConformance};
+}

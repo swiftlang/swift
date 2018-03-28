@@ -598,10 +598,27 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
   }
 
+  // For a typealias, use the underlying type. We'll wrap up the result
+  // later.
+  auto typealias = dyn_cast<TypeAliasDecl>(decl);
+  if (typealias) {
+    resultType = typealias->getUnderlyingTypeLoc().getType();
+  }
+
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
+
+  // Form a sugared typealias reference.
+  Type parentType = unboundType->getParent();
+  if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
+    auto genericSig = typealias->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
+                                                 LookUpConformance(*this, dc));
+    resultType = NameAliasType::get(typealias, parentType,
+                                         subMap, resultType);
+  }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(
@@ -1024,13 +1041,12 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     SmallVector<ValueDecl *, 4> decls;
     if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
                             comp->getIdentifier(),
-                            NL_QualifiedDefault|NL_ProtocolMembers,
+                            NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
                             &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
-        auto typeDecl = dyn_cast<TypeDecl>(decl);
-        if (!typeDecl) continue;
+        auto typeDecl = cast<TypeDecl>(decl);
 
         if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
 
@@ -1425,11 +1441,10 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
                                         Type ty,
                                         TypeResolutionOptions options) {
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
-
-  bool defaultNoEscape = isFunctionParam;
+  bool defaultNoEscape =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
+    (options.contains(TypeResolutionFlags::FunctionInput) ||
+     options.contains(TypeResolutionFlags::ImmediateFunctionInput));
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();
@@ -1764,10 +1779,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   };
 
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+  bool isParam = options.contains(TypeResolutionFlags::FunctionInput) ||
+                 options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+
   bool isVariadicFunctionParam =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
     options.contains(TypeResolutionFlags::VariadicFunctionInput);
 
   // The type we're working with, in case we want to build it differently
@@ -1973,7 +1989,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // @autoclosure is only valid on parameters.
-    if (!isFunctionParam && attrs.has(TAK_autoclosure)) {
+    if (!isParam && attrs.has(TAK_autoclosure)) {
       TC.diagnose(attrs.getLoc(TAK_autoclosure),
                   isVariadicFunctionParam
                       ? diag::attr_not_on_variadic_parameters
@@ -2031,7 +2047,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           isVariadicFunctionParam && Context.isSwiftVersion3();
 
       // The attribute is meaningless except on parameter types.
-      if (!isFunctionParam && !skipDiagnostic) {
+      bool isEnum = options.contains(TypeResolutionFlags::EnumCase);
+      if ((isEnum || !isParam) && !skipDiagnostic) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
@@ -2642,10 +2659,13 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  // inout is only valid for (non-subscript) function parameters.
+  // inout is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
   if ((options & TypeResolutionFlags::SubscriptParameters) ||
+      (options & TypeResolutionFlags::EnumCase) ||
         (!(options & TypeResolutionFlags::FunctionInput) &&
          !(options & TypeResolutionFlags::ImmediateFunctionInput))) {
+
     decltype(diag::attr_only_on_parameters) diagID;
     if (options & TypeResolutionFlags::SubscriptParameters) {
       diagID = diag::attr_not_on_subscript_parameters;
@@ -2886,8 +2906,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // or SIL, either.
   if (!isImmediateFunctionInput) {
     if (elements.size() == 1 && elements[0].hasName()
-        && !(options & TypeResolutionFlags::SILType)
-        && !(options & TypeResolutionFlags::EnumCase)) {
+        && !(options & TypeResolutionFlags::SILType)) {
       if (!complained) {
         TC.diagnose(repr->getElementNameLoc(0),
                     diag::tuple_single_element)
@@ -3136,6 +3155,8 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy) {
+  Type sugaredBaseTy = baseTy;
+
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
@@ -3143,8 +3164,10 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
-  if (baseTy->is<ModuleType>())
+  if (baseTy->is<ModuleType>()) {
     baseTy = Type();
+    sugaredBaseTy = Type();
+  }
 
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
@@ -3161,7 +3184,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+  auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
+  if (aliasDecl) {
     // FIXME: If this is a protocol typealias and we haven't built the
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
@@ -3177,13 +3201,34 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  auto memberType = member->getDeclaredInterfaceType();
-  if (!baseTy || !memberType->hasTypeParameter())
-    return memberType;
+  Type resultType;
+  auto memberType = aliasDecl ? aliasDecl->getUnderlyingTypeLoc().getType()
+                              : member->getDeclaredInterfaceType();
+  SubstitutionMap subs;
+  if (baseTy) {
+    // Cope with the presence of unbound generic types, which are ill-formed
+    // at this point but break the invariants of getContextSubstitutionMap().
+    if (baseTy->hasUnboundGenericType()) {
+      if (memberType->hasTypeParameter())
+        return ErrorType::get(memberType);
 
-  auto subs = baseTy->getContextSubstitutionMap(
-      module, member->getDeclContext());
-  return memberType.subst(subs, SubstFlags::UseErrorType);
+      return memberType;
+    }
+
+    subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
+    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+  } else {
+    resultType = memberType;
+  }
+
+  // If we're referring to a typealias within a generic context, build
+  // a sugared alias type.
+  if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
+    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs,
+                                         resultType);
+  }
+
+  return resultType;
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

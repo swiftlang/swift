@@ -83,7 +83,7 @@
 /// point's `x` property with the hash value of its `y` property multiplied by
 /// a prime constant.
 ///
-/// - Note: The above example above is a reasonably good hash function for a
+/// - Note: The example above is a reasonably good hash function for a
 ///   simple type. If you're writing a hash function for a custom type, choose
 ///   a hashing algorithm that is appropriate for the kinds of data your type
 ///   comprises. Set and dictionary performance depends on hash values that
