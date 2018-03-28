@@ -10,9 +10,11 @@ code.
 
 ## Usage
 
-First, install the latest Swift Master toolchain from swift.org. This will
+First, install the latest Swift `master` toolchain from
+[swift.org](https://swift.org/download/#snapshots). This will
 ensure you have the latest version of SwiftSyntax, which is necessary as
-SwiftSyntax evolves.
+SwiftSyntax evolves. Next, select that toolchain in Xcode, using
+the File>Toolchains menu.
 
 Then, open a new Swift file or create a new Swift package and
 `import SwiftSyntax`. From there, you'll be able to use the SwiftSyntax API.
