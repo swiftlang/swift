@@ -4,6 +4,27 @@
 import resilient_struct
 import resilient_protocol
 
+public protocol Associate {
+  associatedtype X
+}
+
+// Dependent conformance
+// CHECK-LABEL: @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9AssociateMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVMn"
+// -- witness table accessor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
+// -- flags
+// CHECK-SAME:           i32 1
+// CHECK-SAME:         }
+public struct Dependent<T> {}
+
+extension Dependent : Associate {
+  public typealias X = (T, T)
+}
+
 public protocol Runcible {
   func runce()
 }
@@ -85,7 +106,6 @@ extension Size: Runcible {
 // CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
 // CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
 
-// TODO: conformances that need lazy initialization
 public protocol Spoon { }
 
 // Conditional conformances
