@@ -1995,9 +1995,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Add type variable for the code-completion expression.
   auto tvRHS =
-      CS.createTypeVariable(CS.getConstraintLocator(CCE),
-                            TVO_CanBindToLValue |
-                            TVO_CanBindToInOut);
+      CS.createTypeVariable(CS.getConstraintLocator(CCE), TVO_CanBindToLValue);
   CCE->setType(tvRHS);
 
   if (auto generated = CS.generateConstraints(expr)) {
@@ -2711,8 +2709,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
           return Type();
 
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator,
-                                                 TVO_CanBindToInOut);
+        auto replacement = cs.createTypeVariable(locator, /*options*/0);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2729,8 +2726,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator,
-                                               TVO_CanBindToInOut);
+      auto replacement = cs.createTypeVariable(locator, /*options*/0);
       types[origType] = replacement;
       return replacement;
     },

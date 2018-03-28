@@ -4802,7 +4802,6 @@ namespace {
 
       auto tv = cs.createTypeVariable(inputLocator,
                                       TVO_CanBindToLValue |
-                                      TVO_CanBindToInOut |
                                       TVO_PrefersSubtypeBinding);
 
       // In order to make this work, we pick the most general function type and
@@ -5254,10 +5253,9 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
         cs.addConstraint(ConstraintKind::Conversion, fnType->getResult(),
                          expectedResultType, locator);
       } else if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
-        auto tv =
-            cs.createTypeVariable(cs.getConstraintLocator(expr),
-                                  TVO_CanBindToLValue | TVO_CanBindToInOut |
-                                      TVO_PrefersSubtypeBinding);
+        auto tv = cs.createTypeVariable(cs.getConstraintLocator(expr),
+                                        TVO_CanBindToLValue |
+                                        TVO_PrefersSubtypeBinding);
 
         auto extInfo = FunctionType::ExtInfo().withThrows();
         auto fTy = FunctionType::get(ParenType::get(cs.getASTContext(), tv),
@@ -7073,7 +7071,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 
       bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
         auto *locator = cs.getConstraintLocator(expr);
-        auto valueType = cs.createTypeVariable(locator, TVO_CanBindToInOut);
+        auto valueType = cs.createTypeVariable(locator, /*options*/0);
 
         auto keyPathType =
             BoundGenericClassType::get(Decl, ParentType, {RootType, valueType});
