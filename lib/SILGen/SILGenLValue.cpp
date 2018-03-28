@@ -303,7 +303,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   RValue rvalue(SGF, loc, getSubstFormalType(), temporary);
 
   // Don't consume cleanups on the base if this isn't final.
-  if (!isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+  if (base && !isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
 
   // Clone the component if this isn't final.
   std::unique_ptr<LogicalPathComponent> clonedComponent =

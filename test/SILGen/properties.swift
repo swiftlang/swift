@@ -1230,3 +1230,11 @@ protocol NonmutatingProtocol {
 func overlappingLoadExpr(c: inout ReferenceType) {
   _ = c.p.x
 }
+
+var globalOptionalComputed: Int? {
+  didSet { print("hello") }
+}
+
+func updateGlobalOptionalComputed() {
+  globalOptionalComputed? = 123
+}
