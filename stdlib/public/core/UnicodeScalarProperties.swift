@@ -1407,3 +1407,43 @@ extension Unicode.Scalar.Properties {
     return result != icuNoNumericValue ? result : .nan
   }
 }
+
+/// Additional queries that do not correspond precisely to a named Unicode
+/// property.
+extension Unicode.Scalar.Properties {
+
+  /// A Boolean property indicating whether the supported version of Unicode has
+  /// assigned a code point to the value of this scalar.
+  ///
+  /// The value of this property may change depending on the platform, operating
+  /// system version, and versions of system libraries in use.
+  ///
+  /// ```
+  /// print(("A" as Unicode.Scalar).properties.isDefined)
+  /// // Prints "true"
+  /// print(("\u{ABCDE}" as Unicode.Scalar).properties.isDefined)
+  /// // Prints "false"
+  /// ```
+  public var isDefined: Bool {
+    return __swift_stdlib_u_isdefined(_value) != 0
+  }
+
+  /// A Boolean property indicating whether a normalization boundary always
+  /// occurs before this scalar.
+  ///
+  /// A normalization boundary is a position in a string where everything to the
+  /// left of the boundary can be normalized independently of everything to the
+  /// right of the boundary. The concatenation of each such normalization result
+  /// is thus the same as if the entire string had been normalized as a whole.
+  ///
+  /// ```
+  /// print(("A" as Unicode.Scalar).properties.hasNormalizationBoundaryBefore)
+  /// // Prints "true"
+  /// print(("\u{0301}" as Unicode.Scalar).properties.hasNormalizationBoundaryBefore)
+  /// // Prints "false"
+  /// ```
+  public var hasNormalizationBoundaryBefore: Bool {
+    return __swift_stdlib_unorm2_hasBoundaryBefore(
+      _Normalization._nfcNormalizer, _value) != 0
+  }
+}
