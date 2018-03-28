@@ -49,12 +49,6 @@ inline bool isDebugInst(SILInstruction *Inst) {
   return isa<DebugValueInst>(Inst) || isa<DebugValueAddrInst>(Inst);
 }
 
-/// Returns true if the instruction \p Inst is a maintenance instructions which
-/// is relevant for debug information and does not get lowered to an instruction.
-inline bool isMaintenanceInst(SILInstruction *Inst) {
-  return isDebugInst(Inst) || isa<AllocStackInst>(Inst);
-}
-
 /// Deletes all of the debug instructions that use \p Inst.
 inline void deleteAllDebugUses(ValueBase *Inst) {
   for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
