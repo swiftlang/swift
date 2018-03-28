@@ -824,7 +824,12 @@ namespace {
           TC.typeCheckDecl(capture.Var, true);
           TC.typeCheckDecl(capture.Var, false);
         }
-        return finish(true, expr);
+
+        // Since closure expression is contained by capture list
+        // let's handle it directly to avoid walking into capture
+        // list itself.
+        captureList->getClosureBody()->walk(*this);
+        return finish(false, expr);
       }
 
       // For closures, type-check the patterns and result type as written,
