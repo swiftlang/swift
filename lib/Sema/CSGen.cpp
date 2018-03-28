@@ -1299,9 +1299,7 @@ namespace {
       
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
-      auto tv = CS.createTypeVariable(locator,
-                                      TVO_CannotBindToInOut |
-                                      TVO_CanBindToLValue);
+      auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
@@ -2504,7 +2502,7 @@ namespace {
     Type
     createTypeVariableAndDisjunctionForIUOCoercion(Type toType,
                                                    ConstraintLocator *locator) {
-      auto typeVar = CS.createTypeVariable(locator, TVO_CannotBindToInOut);
+      auto typeVar = CS.createTypeVariable(locator);
       CS.buildDisjunctionForImplicitlyUnwrappedOptional(typeVar, toType,
                                                         locator);
       return typeVar;
@@ -2631,7 +2629,7 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CannotBindToInOut);
+      auto typeVar = CS.createTypeVariable(locator);
       return LValueType::get(typeVar);
     }
     
@@ -2646,8 +2644,7 @@ namespace {
       if (!destTy)
         return Type();
       if (destTy->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                     TVO_CannotBindToInOut);
+        return CS.createTypeVariable(CS.getConstraintLocator(expr));
       }
       
       // The source must be convertible to the destination.
@@ -2740,9 +2737,7 @@ namespace {
       // This should only appear in already-type-checked solutions, but we may
       // need to re-check for failure diagnosis.
       auto locator = CS.getConstraintLocator(expr);
-      auto projectedTy = CS.createTypeVariable(locator,
-                                               TVO_CannotBindToInOut |
-                                               TVO_CanBindToLValue);
+      auto projectedTy = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       CS.addKeyPathApplicationConstraint(expr->getKeyPath()->getType(),
                                          expr->getBase()->getType(),
                                          projectedTy,
@@ -2882,7 +2877,7 @@ namespace {
           
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
-          auto rvalueTy = CS.createTypeVariable(locator, TVO_CannotBindToInOut);
+          auto rvalueTy = CS.createTypeVariable(locator);
           CS.addConstraint(ConstraintKind::Equal, base, rvalueTy, locator);
           base = rvalueTy;
           LLVM_FALLTHROUGH;

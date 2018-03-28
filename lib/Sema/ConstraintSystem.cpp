@@ -1079,6 +1079,7 @@ void ConstraintSystem::openGeneric(
       locatorPtr = getConstraintLocator(
           locator.withPathElement(LocatorPathElt(archetype)));
 
+    // XXX -- Only a few tests crash if TVO_CannotBindToInOut is removed.
     auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_CannotBindToInOut |
                                       TVO_PrefersSubtypeBinding);
