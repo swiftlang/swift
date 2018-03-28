@@ -453,20 +453,26 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
 }
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                                     LazyResolver *TypeResolver,
-                                     bool IsKnownNonCascading,
-                                     SourceLoc Loc, bool IsTypeLookup,
-                                     bool AllowProtocolMembers,
-                                     bool IgnoreAccessControl) {
+                                     LazyResolver *TypeResolver, SourceLoc Loc,
+                                     Options options) {
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  NamedDeclConsumer Consumer(Name, Results, IsTypeLookup);
+  auto isOriginallyTypeLookup = options.contains(Flags::TypeLookup);
+  NamedDeclConsumer Consumer(Name, Results, isOriginallyTypeLookup);
+
+  NLOptions baseNLOptions = NL_UnqualifiedDefault;
+  if (options.contains(Flags::AllowProtocolMembers))
+    baseNLOptions |= NL_ProtocolMembers;
+  if (isOriginallyTypeLookup)
+    baseNLOptions |= NL_OnlyTypes;
+  if (options.contains(Flags::IgnoreAccessControl))
+    baseNLOptions |= NL_IgnoreAccessControl;
 
   Optional<bool> isCascadingUse;
-  if (IsKnownNonCascading)
+  if (options.contains(Flags::KnownPrivate))
     isCascadingUse = false;
 
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
@@ -575,19 +581,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (lookupType->hasError()) continue;
 
+        NLOptions options = baseNLOptions;
         // Perform lookup into the type.
-        NLOptions options = NL_UnqualifiedDefault;
         if (isCascadingUse.getValue())
           options |= NL_KnownCascadingDependency;
         else
           options |= NL_KnownNonCascadingDependency;
 
-        if (AllowProtocolMembers)
-          options |= NL_ProtocolMembers;
-        if (IsTypeLookup)
-          options |= NL_OnlyTypes;
-        if (IgnoreAccessControl)
-          options |= NL_IgnoreAccessControl;
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
@@ -786,18 +786,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         }
 
         if (BaseDC && !ExtendedType->hasError()) {
-          NLOptions options = NL_UnqualifiedDefault;
+          NLOptions options = baseNLOptions;
           if (isCascadingUse.getValue())
             options |= NL_KnownCascadingDependency;
           else
             options |= NL_KnownNonCascadingDependency;
-
-          if (AllowProtocolMembers)
-            options |= NL_ProtocolMembers;
-          if (IsTypeLookup)
-            options |= NL_OnlyTypes;
-          if (IgnoreAccessControl)
-            options |= NL_IgnoreAccessControl;
 
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -903,9 +896,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   }
 
   // TODO: Does the debugger client care about compound names?
-  if (Name.isSimpleName()
-      && DebugClient && DebugClient->lookupOverrides(Name.getBaseName(), DC,
-                                                   Loc, IsTypeLookup, Results))
+  if (Name.isSimpleName() && DebugClient &&
+      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
+                                   isOriginallyTypeLookup, Results))
     return;
 
   recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
@@ -917,8 +910,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
-  auto resolutionKind =
-    IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
+  auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
+                                               : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, TypeResolver, DC, extraImports);
 
@@ -930,8 +923,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Now add any names the DebugClient knows about to the lookup.
   if (Name.isSimpleName() && DebugClient)
-      DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc, IsTypeLookup,
-                                   Results);
+    DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc,
+                                 isOriginallyTypeLookup, Results);
 
   // If we've found something, we're done.
   if (!Results.empty())

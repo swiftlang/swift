@@ -212,16 +212,24 @@ namespace {
   };
 } // end anonymous namespace
 
+static UnqualifiedLookup::Options
+convertToUnqualifiedLookupOptions(NameLookupOptions options) {
+  UnqualifiedLookup::Options newOptions;
+  if (options.contains(NameLookupFlags::KnownPrivate))
+    newOptions |= UnqualifiedLookup::Flags::KnownPrivate;
+  if (options.contains(NameLookupFlags::ProtocolMembers))
+    newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
+  if (options.contains(NameLookupFlags::IgnoreAccessControl))
+    newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+
+  return newOptions;
+}
+
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(
-      name, dc, this,
-      options.contains(NameLookupFlags::KnownPrivate),
-      loc,
-      /*IsTypeLookup=*/false,
-      options.contains(NameLookupFlags::ProtocolMembers),
-      options.contains(NameLookupFlags::IgnoreAccessControl));
+  UnqualifiedLookup lookup(name, dc, this, loc,
+                           convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
@@ -249,15 +257,13 @@ LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  auto ulOptions = convertToUnqualifiedLookupOptions(options) |
+                   UnqualifiedLookup::Flags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-      name, dc, this,
-        options.contains(NameLookupFlags::KnownPrivate),
-        loc,
-        /*IsTypeLookup=*/true,
-        /*AllowProtocolMembers=*/false,
-        options.contains(NameLookupFlags::IgnoreAccessControl));
+        name, dc, this, loc,
+        ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
         !options.contains(NameLookupFlags::ProtocolMembers)) {
@@ -272,12 +278,8 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-      name, dc, this,
-        options.contains(NameLookupFlags::KnownPrivate),
-        loc,
-        /*IsTypeLookup=*/true,
-        /*AllowProtocolMembers=*/true,
-        options.contains(NameLookupFlags::IgnoreAccessControl));
+        name, dc, this, loc,
+        ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     return LookupResult(lookup.Results);
   }
