@@ -1690,8 +1690,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // left-hand side is bound to type variable which
         // is wrapped in `inout` type to preserve inout/lvalue pairing.
         if (auto *lvt = type2->getAs<LValueType>()) {
-          auto *tv = createTypeVariable(typeVar1->getImpl().getLocator(),
-                                        /*options=*/0);
+          auto *tv = createTypeVariable(typeVar1->getImpl().getLocator());
           assignFixedType(typeVar1, InOutType::get(tv));
 
           typeVar1 = tv;
@@ -2542,7 +2541,6 @@ ConstraintSystem::simplifyConstructionConstraint(
                                         ConstraintLocator::ApplyFunction);
   auto tv = createTypeVariable(applyLocator,
                                TVO_CanBindToLValue |
-                               TVO_CanBindToInOut |
                                TVO_PrefersSubtypeBinding);
 
   // The constructor will have function type T -> T2, for a fresh type
@@ -4701,9 +4699,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
 
     auto constraintLocator = getConstraintLocator(locator);
-    auto tv = createTypeVariable(constraintLocator,
-                                 TVO_PrefersSubtypeBinding |
-                                 TVO_CanBindToInOut);
+    auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
     
     addConstraint(ConstraintKind::ConformsTo, tv,
                   hashableProtocol->getDeclaredType(), constraintLocator);

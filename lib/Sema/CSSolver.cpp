@@ -1364,8 +1364,7 @@ ConstraintSystem::solve(Expr *&expr,
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(getConstraintLocator(expr),
-                                    TVO_CanBindToInOut);
+          return createTypeVariable(getConstraintLocator(expr));
         return type;
       });
     }
