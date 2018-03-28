@@ -329,8 +329,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
-    /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1
+    /// \brief The ResilienceExpansion to use for default arguments.
+    DefaultArgumentResilienceExpansion : 1
   );
   
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
@@ -5186,16 +5186,6 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
-  /// Determine the default argument kind and type for the given argument index
-  /// in this declaration, which must be a function or constructor.
-  ///
-  /// \param Index The index of the argument for which we are querying the
-  /// default argument.
-  ///
-  /// \returns the default argument kind and, if there is a default argument,
-  /// the type of the corresponding parameter.
-  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
-
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
@@ -5753,7 +5743,7 @@ class EnumElementDecl : public ValueDecl {
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
-  TypeLoc ArgumentType;
+  ParameterList *Params;
   
   SourceLoc EqualsLoc;
   
@@ -5763,18 +5753,18 @@ class EnumElementDecl : public ValueDecl {
   Expr *TypeCheckedRawValueExpr = nullptr;
   
 public:
-  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                  TypeLoc ArgumentType,
-                  bool HasArgumentType,
+  EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                  ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    ArgumentType(ArgumentType),
+    Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    Bits.EnumElementDecl.HasArgumentType = HasArgumentType;
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -5791,8 +5781,7 @@ public:
 
   Type getArgumentInterfaceType() const;
 
-  TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-  const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
+  ParameterList *getParameterList() const { return Params; }
 
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
@@ -5803,6 +5792,21 @@ public:
   }
   void setTypeCheckedRawValueExpr(Expr *e) {
     TypeCheckedRawValueExpr = e;
+  }
+
+  /// The ResilienceExpansion for default arguments.
+  ///
+  /// In Swift 4 mode, default argument expressions are serialized, and must
+  /// obey the restrictions imposed upon inlineable function bodies.
+  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
+    return ResilienceExpansion(
+        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
+  }
+
+  /// Set the ResilienceExpansion for default arguments.
+  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        unsigned(expansion);
   }
   
   /// Return the containing EnumDecl.
@@ -5819,7 +5823,7 @@ public:
   SourceRange getSourceRange() const;
   
   bool hasAssociatedValues() const {
-    return Bits.EnumElementDecl.HasArgumentType;
+    return getParameterList() != nullptr;
   }
 
   static bool classof(const Decl *D) {
@@ -6676,6 +6680,17 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
+
+/// Determine the default argument kind and type for the given argument index
+/// in this declaration, which must be a function or constructor.
+///
+/// \param Index The index of the argument for which we are querying the
+/// default argument.
+///
+/// \returns the default argument kind and, if there is a default argument,
+/// the type of the corresponding parameter.
+std::pair<DefaultArgumentKind, Type>
+getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
 } // end namespace swift
 
