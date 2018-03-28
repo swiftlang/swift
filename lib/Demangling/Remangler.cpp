@@ -1508,6 +1508,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  manglePureProtocol(getSingleChild(node));
+  Buffer << "WR";
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->getChild(0));
   Buffer << "Mc";

@@ -756,6 +756,10 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   Out << "Mc";
   mangleProtocolConformance(node->begin()[0]);

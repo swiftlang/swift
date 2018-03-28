@@ -47,6 +47,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "ConstantBuilder.h"
@@ -1557,6 +1558,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
+  case Kind::ProtocolRequirementArray:
+    return SILLinkage::Private;
+
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
   case Kind::ProtocolConformanceDescriptor:
@@ -1658,6 +1662,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementArray:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::EnumCase:
@@ -3487,6 +3492,14 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
   auto entity = LinkEntity::forProtocolDescriptor(D);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementArray(ProtocolDecl *D,
+                                                               ConstantInit definition) {
+  auto entity = LinkEntity::forProtocolRequirementArray(D);
+  return getAddrOfLLVMVariable(entity, Alignment(4), definition,
+                               definition.getType(),
+                               DebugTypeInfo());
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
