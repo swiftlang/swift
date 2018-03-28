@@ -268,8 +268,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                              Identifier(), elt, nullptr);
       pat->setImplicit();
 
-      auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
-                                     nullptr);
+      auto labelItem = CaseLabelItem(pat);
 
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),
                                                   SourceRange(),
@@ -334,8 +333,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                        nullptr);
     litPat->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(),
-                                   nullptr);
+    auto labelItem = CaseLabelItem(litPat);
 
     auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
@@ -353,8 +351,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 
   auto *anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabelItem = CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(),
-                                     nullptr);
+  auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),

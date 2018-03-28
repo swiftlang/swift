@@ -101,8 +101,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
 
-    auto labelItem =
-      CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
+    auto labelItem = CaseLabelItem(pat);
 
     auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
@@ -214,8 +213,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                       nullptr, nullptr);
     litPat->setImplicit();
 
-    auto labelItem =
-      CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
+    auto labelItem = CaseLabelItem(litPat);
 
     auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
@@ -239,8 +237,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   auto anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabelItem =
-    CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
+  auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),

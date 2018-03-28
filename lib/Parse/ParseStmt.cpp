@@ -2094,12 +2094,11 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       parseGuardedPattern(P, PatternResult, Status, BoundDecls,
                           GuardedPatternContext::Case, isFirst);
       LabelItems.push_back(
-          CaseLabelItem(/*IsDefault=*/false, PatternResult.ThePattern,
-                        PatternResult.WhereLoc, PatternResult.Guard));
+          CaseLabelItem(PatternResult.ThePattern, PatternResult.WhereLoc,
+                        PatternResult.Guard));
       isFirst = false;
-      if (P.consumeIf(tok::comma))
-        continue;
-      break;
+      if (!P.consumeIf(tok::comma))
+        break;
     }
   }
 
@@ -2144,7 +2143,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   // Create an implicit AnyPattern to represent the default match.
   auto Any = new (P.Context) AnyPattern(CaseLoc);
   LabelItems.push_back(
-      CaseLabelItem(/*IsDefault=*/true, Any, WhereLoc, Guard.getPtrOrNull()));
+      CaseLabelItem::getDefault(Any, WhereLoc, Guard.getPtrOrNull()));
 
   return Status;
 }
