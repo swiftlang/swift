@@ -168,17 +168,9 @@ public:
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    if (!T.hasArchetype()) {
-      return;
-    }
-    auto canType = T.getSwiftRValueType();
-    auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    assert(metadata && "Expected Type Metadata Ref");
-    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 

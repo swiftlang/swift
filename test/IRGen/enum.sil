@@ -226,7 +226,7 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-64: entry:
 // CHECK-32: entry:
 entry(%u : $Singleton):
-// CHECK-32:  call %T4enum9SingletonO* @"$S4enum9SingletonOWb0_"
+// CHECK-32:  call %T4enum9SingletonO* @"$S4enum9SingletonOWOb"
 // CHECK-64:   br label %[[PREDEST:[0-9]+]]
 // CHECK-32:   br label %[[PREDEST:[0-9]+]]
   switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest

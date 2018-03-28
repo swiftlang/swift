@@ -23,6 +23,7 @@
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "LoadableTypeInfo.h"
+#include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -149,12 +150,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
     }
   }
 
@@ -172,12 +168,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
   }
 
@@ -202,12 +193,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
     }
   }
 
@@ -233,12 +219,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
     }
   }
 
@@ -255,31 +236,19 @@ public:
                                     field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
-                                            &typeToMetadataVec);
+      this->callOutlinedDestroy(IGF, addr, T);
     }
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
-      auto fType = field.getType(IGF.IGM, T);
-      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                                   fType);
+      auto fType = field.getType(collector.IGF.IGM, T);
+      field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        T.hasArchetype()) {
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.insert(std::make_pair(canType, metadata));
-    }
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
