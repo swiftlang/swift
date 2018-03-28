@@ -1562,6 +1562,11 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
   Buffer << "WP";
 }
 
+void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wp";
+}
+
 void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Wa";

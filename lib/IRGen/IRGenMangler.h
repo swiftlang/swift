@@ -161,6 +161,10 @@ public:
     return mangleConformanceSymbol(Type(), C, "WP");
   }
 
+  std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {
+    return mangleConformanceSymbol(Type(), C, "Wp");
+  }
+
   std::string mangleGenericProtocolWitnessTableCache(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WG");

@@ -1201,7 +1201,10 @@ public:
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
-                                    ConstantInit definition = ConstantInit());
+                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfWitnessTablePattern(const NormalProtocolConformance *C,
+                                      ConstantInit definition = ConstantInit());
+
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);

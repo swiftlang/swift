@@ -1567,6 +1567,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolConformanceDescriptor:
     return getLinkageAsConformance();
 
+  case Kind::ProtocolWitnessTablePattern:
+    if (getLinkageAsConformance() == SILLinkage::Shared)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
+
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
     auto *nominal = getType().getAnyNominal();
@@ -1663,7 +1668,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
-  case Kind::ProtocolRequirementArray:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::EnumCase:
@@ -1673,6 +1677,8 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ProtocolConformanceDescriptor:
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::ProtocolRequirementArray:
   case Kind::ObjCClassRef:
   case Kind::ModuleDescriptor:
   case Kind::ExtensionDescriptor:
@@ -4125,16 +4131,27 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 
 /// Look up the address of a witness table.
 ///
-/// TODO: This needs to take a flag for the access mode of the witness table,
-/// which may be direct, lazy, or a runtime instantiation template.
-/// TODO: Use name from witness table here to lookup witness table instead of
-/// recomputing it.
+/// This can only be used with non-dependent conformances.
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
   auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
+                               WitnessTableTy, DebugTypeInfo());
+}
+
+/// Look up the address of a witness table pattern.
+///
+/// This can only be used with dependent conformances from inside the
+/// defining module.
+llvm::Constant*
+IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
+                                          ConstantInit definition) {
+  IRGen.addLazyWitnessTable(conf);
+
+  auto entity = LinkEntity::forProtocolWitnessTablePattern(conf);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                WitnessTableTy, DebugTypeInfo());
 }
