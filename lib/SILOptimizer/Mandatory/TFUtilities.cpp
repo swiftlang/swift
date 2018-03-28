@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -361,7 +362,7 @@ static bool decodeArrayElements(SILValue value,
     if (arrayInsts) arrayInsts->insert(store);
 
     // If we got a store to a valid index, it must be our element.
-    elements[index] = getValueInsideStructInst(store->getOperand(0));
+    elements[index] = store->getOperand(0);
 
     // Track how many elements we see so we can know if we got them all.
     --numElements;
@@ -454,7 +455,8 @@ static bool tryToRemoveArrayValue(SILValue value) {
 
   // Okay, we successfully nuked the array guts.  Check to see if any of the
   // element value can also be removed.  We'll often get a StructInst or other
-  // glue instructions hanging around, and we don't want to consider them uses.
+  // glue instructions hanging around, and we don't want to consider them uses
+  // of the elements on the host.
   SmallPtrSet<SILValue, 8> visitedInsts;
   while (!elements.empty()) {
     auto val = elements.pop_back_val();
@@ -463,22 +465,35 @@ static bool tryToRemoveArrayValue(SILValue value) {
     if (!visitedInsts.insert(val).second)
       continue;
 
-    auto inst = dyn_cast<SILInstruction>((SILNode*)val);
-    if (!inst || inst->hasUsesOfAnyResult()) continue;
-
     // Don't delete out of global initializers.
-    if (!inst->getFunction()) continue;
+    auto inst = dyn_cast<SILInstruction>((SILNode*)val);
+    if (!inst || !inst->getFunction()) continue;
 
-    if (isa<StructInst>(inst) || isa<LiteralInst>(inst) ||
-        isa<MetatypeInst>(inst)) {
-      for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-        visitedInsts.erase(inst->getOperand(i));
-        elements.push_back(inst->getOperand(i));
-      }
-      inst->eraseFromParent();
+    // FIXME: This should use recursivelyDeleteTriviallyDeadInstructions.
+    if (!isa<StructInst>(inst) && !isa<LiteralInst>(inst) &&
+        !isa<MetatypeInst>(inst))
+      continue;
+
+    // If this has any uses that are non-debug value, then we can't transform
+    // it.
+    bool hasUnknownUses = false;
+    for (auto result : inst->getResults())
+      for (auto *use : result->getUses())
+        if (!isa<DebugValueInst>(use->getUser()))
+          hasUnknownUses = true;
+    if (hasUnknownUses) continue;
+
+    // Remove any debug_values.
+    for (auto result : inst->getResults())
+      while (!result->use_empty())
+        result->use_begin()->getUser()->eraseFromParent();
+
+    for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+      visitedInsts.erase(inst->getOperand(i));
+      elements.push_back(inst->getOperand(i));
     }
+    inst->eraseFromParent();
   }
-
   return true;
 }
 
@@ -555,6 +570,9 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       return nullptr;
     }
   }
+
+  // Dig through struct wrappers.
+  v = getValueInsideStructInst(v);
 
   // Handle cases that create a literal array.
   if (auto *si = dyn_cast<StructInst>(v)) {
@@ -1006,9 +1024,11 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
     // our attribute requirements.
     if (!isInput(i)) {
       operand = getAttrOperand(operand);
-      if (!operand)
+      if (!operand) {
+        getAttrOperand(inst->getOperand(i));
         return "attribute '" + opClass.first.str() +
                "' requires a constant argument";
+      }
     }
 
     // Check additional requirements imposed by attribute modifiers.
@@ -1421,7 +1441,8 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto outerType = sei->getType().getSwiftRValueType();
     if (outerType->is<BuiltinType>() || isTensorHandle(outerType)) {
-      return getUserSourceLocation(sei->getOperand());
+      if (sei->getOperand())  // Could be called after dropAllReferences().
+        return getUserSourceLocation(sei->getOperand());
     }
   }
 
