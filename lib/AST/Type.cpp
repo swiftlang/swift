@@ -402,6 +402,27 @@ Type TypeBase::eraseDynamicSelfType() {
   });
 }
 
+Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
+  if (!dc->isTypeContext())
+    return this;
+
+  auto *type = this;
+
+  GenericSignature *sig = dc->getGenericSignatureOfContext();
+  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
+    sig = genericFn->getGenericSignature();
+    type = FunctionType::get(genericFn->getInput(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
+
+  auto selfTy = dc->getDeclaredInterfaceType();
+  if (sig)
+    return GenericFunctionType::get(sig, selfTy, type,
+                                    AnyFunctionType::ExtInfo());
+  return FunctionType::get(selfTy, type);
+}
+
 void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
@@ -456,6 +477,40 @@ static bool isLegalSILType(CanType type) {
 
 bool TypeBase::isLegalSILType() {
   return ::isLegalSILType(getCanonicalType());
+}
+
+static bool isLegalFormalType(CanType type) {
+  // L-values and inouts are not formal types.
+  if (!type->isMaterializable()) return false;
+
+  // Function types must not be lowered.
+  if (isa<SILFunctionType>(type)) return false;
+
+  // Reference storage types are not formal types.
+  if (isa<ReferenceStorageType>(type)) return false;
+
+  // Metatypes must not have a representation.
+  if (auto meta = dyn_cast<AnyMetatypeType>(type))
+    return !meta->hasRepresentation();
+
+  // Tuples are legal if all their elements are legal.
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    for (auto eltType : tupleType.getElementTypes()) {
+      if (!isLegalFormalType(eltType)) return false;
+    }
+    return true;
+  }
+
+  // Optionals are legal if their object type is legal.
+  if (auto objectType = type.getOptionalObjectType()) {
+    return isLegalFormalType(objectType);
+  }
+
+  return true;
+}
+
+bool TypeBase::isLegalFormalType() {
+  return ::isLegalFormalType(getCanonicalType());
 }
 
 bool TypeBase::isVoid() {
@@ -750,12 +805,15 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (paramOwner) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
       if (level < func->getNumParameterLists())
         paramList = func->getParameterList(level);
-    } else if (auto subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
+    } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
       if (level == 1)
         paramList = subscript->getIndices();
+    } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
+      if (level == 1)
+        paramList = enumElement->getParameterList();
     }
   }
   
@@ -1261,17 +1319,8 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Paren:
     llvm_unreachable("parenthesis are sugar, but not syntax sugar");
-  case TypeKind::BoundNameAlias:
+  case TypeKind::NameAlias:
     llvm_unreachable("bound name alias types always have an underlying type");
-  case TypeKind::NameAlias: {
-    auto Ty = cast<NameAliasType>(this);
-    auto UTy = Ty->getDecl()->getUnderlyingTypeLoc().getType().getPointer();
-    if (isa<NominalOrBoundGenericNominalType>(UTy)) {
-      Bits.SugarType.HasCachedType = true;
-      UnderlyingType = UTy;
-    }
-    return UTy;
-  }
   case TypeKind::ArraySlice:
     implDecl = Context->getArrayDecl();
     break;
@@ -1298,14 +1347,14 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-SubstitutionMap BoundNameAliasType::getSubstitutionMap() const {
-  if (auto genericSig = typealias->getGenericSignature())
+SubstitutionMap NameAliasType::getSubstitutionMap() const {
+  if (auto genericSig = getGenericSignature())
     return genericSig->getSubstitutionMap(getSubstitutionList());
 
   return SubstitutionMap();
 }
 
-SmallVector<Type, 2> BoundNameAliasType::getInnermostGenericArgs() const {
+SmallVector<Type, 2> NameAliasType::getInnermostGenericArgs() const {
   SmallVector<Type, 2> result;
 
   // If the typealias is not generic, there are no generic arguments
@@ -1313,6 +1362,9 @@ SmallVector<Type, 2> BoundNameAliasType::getInnermostGenericArgs() const {
 
   auto genericSig = typealias->getGenericSignature();
   if (!genericSig) return result;
+
+  // If the substitution list was empty, bail out.
+  if (getSubstitutionList().empty()) return result;
 
   // Retrieve the substitutions for the generic parameters (only).
   unsigned numAllGenericParams = genericSig->getGenericParams().size();
@@ -1466,26 +1518,14 @@ bool TypeBase::isBindableTo(Type b) {
       if (bound != Bindings.end()) {
         return bound->second->isEqual(subst);
       }
-      
-      auto canBindClassConstrainedArchetype = [](CanType t) -> bool {
-        // Classes and class-constrained archetypes.
-        if (t->mayHaveSuperclass())
-          return true;
-        
-        // Pure @objc existentials.
-        if (t->isObjCExistentialType())
-          return true;
-        
-        return false;
-      };
-      
+
       // Check that the archetype isn't constrained in a way that makes the
       // binding impossible.
       // For instance, if the archetype is class-constrained, and the binding
       // is not a class, it can never be bound.
-      if (orig->requiresClass() && !canBindClassConstrainedArchetype(subst))
+      if (orig->requiresClass() && !subst->satisfiesClassConstraint())
         return false;
-      
+
       // TODO: If the archetype has a superclass constraint, check that the
       // substitution is a subclass.
       
@@ -2849,10 +2889,13 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes)
-      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer()))
+    if (options & SubstFlags::DesugarMemberTypes) {
+      if (auto *aliasType =
+                   dyn_cast<NameAliasType>(witness.getPointer())) {
         if (!aliasType->is<ErrorType>())
           witness = aliasType->getSinglyDesugaredType();
+      }
+    }
 
     if (witness->is<ErrorType>())
       return failed();
@@ -3655,44 +3698,32 @@ case TypeKind::Id:
 
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
-    auto underlyingTy = Type(alias->getSinglyDesugaredType());
-    if (!underlyingTy)
-      return Type();
-
-    auto transformedTy = underlyingTy.transformRec(fn);
-    if (!transformedTy)
-      return Type();
-
-    if (transformedTy.getPointer() == underlyingTy.getPointer())
-      return *this;
-
-    return transformedTy;
-  }
-
-  case TypeKind::BoundNameAlias: {
-    auto alias = cast<BoundNameAliasType>(base);
     Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
     Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
     if (!newUnderlyingType) return Type();
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType) {
+    if (oldParentType && !oldParentType->hasTypeParameter() &&
+        !oldParentType->hasArchetype()) {
       newParentType = oldParentType.transformRec(fn);
-      if (!newParentType) return Type();
+      if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
-    auto genericSig = alias->getDecl()->getGenericSignature();
-    if (genericSig) {
+    if (auto genericSig = subMap.getGenericSignature()) {
       for (Type gp : genericSig->getGenericParams()) {
         Type oldReplacementType = gp.subst(subMap);
         if (!oldReplacementType)
           return newUnderlyingType;
 
+        if (oldReplacementType->hasTypeParameter() ||
+            oldReplacementType->hasArchetype())
+          return newUnderlyingType;
+
         Type newReplacementType = oldReplacementType.transformRec(fn);
         if (!newReplacementType)
-          return Type();
+          return newUnderlyingType;
 
         // If anything changed with the replacement type, we lose the sugar.
         // FIXME: This is really unfortunate.
@@ -3704,7 +3735,7 @@ case TypeKind::Id:
     if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
-    return BoundNameAliasType::get(alias->getDecl(), newParentType, subMap,
+    return NameAliasType::get(alias->getDecl(), newParentType, subMap,
                                    newUnderlyingType);
   }
 
@@ -3961,13 +3992,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   // A 'public' typealias can have an 'internal' type.
   if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
     auto *AliasDecl = NAT->getDecl();
-    return AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic);
-  }
-
-  // A 'public' typealias can have an 'internal' type.
-  if (auto *BNAT = dyn_cast<BoundNameAliasType>(Ty.getPointer())) {
-    auto *AliasDecl = BNAT->getDecl();
-    if (auto parent = BNAT->getParent()) {
+    if (auto parent = NAT->getParent()) {
       if (parent.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic))
         return true;
     }
@@ -3975,7 +4000,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     if (AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
-    return Type(BNAT->getSinglyDesugaredType()).isPrivateStdlibType(
+    return Type(NAT->getSinglyDesugaredType()).isPrivateStdlibType(
                                             treatNonBuiltinProtocolsAsPublic);
   }
 

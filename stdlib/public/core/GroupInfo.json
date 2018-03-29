@@ -10,6 +10,7 @@
     "CharacterUnicodeScalars.swift",
     "ICU.swift",
     "NormalizedCodeUnitIterator.swift",
+    "SmallString.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -134,7 +135,6 @@
     "BuiltinMath.swift",
     {
     "Integers": [
-      "DoubleWidth.swift",
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [

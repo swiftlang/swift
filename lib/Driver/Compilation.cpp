@@ -1154,6 +1154,9 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       else {
         // The normal case for non-single-compile jobs.
         for (const Action *A : job->getSource().getInputs()) {
+          // A could be a GeneratePCHJobAction
+          if (!isa<InputAction>(A))
+            continue;
           const auto *IA = cast<InputAction>(A);
           out << IA->getInputArg().getValue() << "\n";
         }

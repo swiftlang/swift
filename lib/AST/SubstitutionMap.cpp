@@ -535,6 +535,9 @@ void SubstitutionMap::dump() const {
 }
 
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
+  // Generic signature.
+  id.AddPointer(genericSig);
+
   if (empty() || !genericSig) return;
 
   // Replacement types.

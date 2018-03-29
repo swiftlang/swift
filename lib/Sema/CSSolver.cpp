@@ -708,8 +708,8 @@ bool ConstraintSystem::tryTypeVariableBindings(
       // If we have a protocol with a default type, look for alternative
       // types to the default.
       if (tryCount == 0 && binding.DefaultedProtocol) {
-        KnownProtocolKind knownKind 
-          = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
+        KnownProtocolKind knownKind =
+            *(binding.DefaultedProtocol->getKnownProtocolKind());
         for (auto altType : getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
             newBindings.push_back({altType, AllowedBindingKind::Subtypes,
@@ -1364,8 +1364,7 @@ ConstraintSystem::solve(Expr *&expr,
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(getConstraintLocator(expr),
-                                    TVO_CanBindToInOut);
+          return createTypeVariable(getConstraintLocator(expr), /*options*/0);
         return type;
       });
     }

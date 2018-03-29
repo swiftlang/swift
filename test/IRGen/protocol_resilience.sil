@@ -14,14 +14,40 @@ import resilient_protocol
 
 // Protocol is public -- needs resilient witness table
 
-// CHECK: [[RP_REQTS:@.*]] = internal unnamed_addr constant [8 x %swift.protocol_requirement]
-// CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 1) to [[INT]])){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 1) to [[INT]])){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 1) to [[INT]])){{ | to i32\) }}},
-// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 1) to [[INT]])){{ | to i32\) }}}]
+// CHECK: [[RP_REQTS:@"\$S19protocol_resilience17ResilientProtocolWR"]] = internal constant [8 x %swift.protocol_requirement]
+// CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 2, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32 0
+// CHECK-SAME:   },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultByyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 3, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32 0
+// CHECK-SAME:   },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultCyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:   },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultDyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:   },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 1,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultEyyFZTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:   },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 1,
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultFyyFZTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:   }
+// CHECK-SAME: ]
 
 // CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(protected )?}}constant %swift.protocol {
 // CHECK-SAME:   i32 1031,

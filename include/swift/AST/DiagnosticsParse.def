@@ -333,6 +333,8 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 // Func
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
+ERROR(enum_element_decl_without_paren,PointsToFirstBadToken,
+      "expected '(' in argument list of enum element declaration", ())
 ERROR(static_func_decl_global_scope,none,
       "%select{%error|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
@@ -835,6 +837,8 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
+ERROR(no_default_arg_enum_elt,none,
+      "default arguments are not allowed in enum cases", ())
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
@@ -877,7 +881,8 @@ WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
-      "%select{operator|closure}0 cannot have keyword arguments", (bool))
+      "%select{operator|closure|enum case}0 cannot have keyword arguments", 
+      (unsigned))
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())

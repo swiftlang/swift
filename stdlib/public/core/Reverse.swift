@@ -194,10 +194,12 @@ extension ReversedCollection.Index: Comparable {
 }
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     hasher.append(base)
   }

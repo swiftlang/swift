@@ -1,12 +1,25 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %s --check-prefix=ENUM_RES
+// RUN: %target-swift-frontend -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %s --check-prefix=ENUM_NOT_RES
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-resilience %s | %FileCheck %s -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-resilience -O %s
 
 import resilient_enum
 import resilient_struct
+
+// ENUM_RES: @"$S14resilient_enum6MediumO8PamphletyA2CcACmFWC" = {{.*}}constant i32 0
+// ENUM_RES: @"$S14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC" = {{.*}}constant i32 1
+// ENUM_RES: @"$S14resilient_enum6MediumO5PaperyA2CmFWC" = {{.*}}constant i32 2
+// ENUM_RES: @"$S14resilient_enum6MediumO6CanvasyA2CmFWC" = {{.*}}constant i32 3
+
+// ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO8PamphletyA2CcACmFWC" =
+// ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC" =
+// ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO5PaperyA2CmFWC" =
+// ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO6CanvasyA2CmFWC" =
 
 // CHECK: %T15enum_resilience5ClassC = type <{ %swift.refcounted }>
 // CHECK: %T15enum_resilience9ReferenceV = type <{ %T15enum_resilience5ClassC* }>
@@ -298,7 +311,7 @@ public func constructFullyFixed() -> FullyFixedLayout {
   return .noPayload
 }
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
+// CHECK-LABEL: define private void @initialize_metadata_EnumWithResilientPayload(i8*)
 // CHECK: call void @swift_initEnumMetadataMultiPayload(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 2, i8*** {{.*}})
 
 
@@ -311,5 +324,5 @@ private enum ProtGenEnumWithSize<T: Prot> {
     case c2(s2: Size)
 }
 
-// CHECK-LABEL: define{{( protected)?}} internal %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilienceytWh2_"(%T15enum_resilience19ProtGenEnumWithSize
+// CHECK-LABEL: define linkonce_odr hidden %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(%T15enum_resilience19ProtGenEnumWithSize
 // CHECK:   ret %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* %0

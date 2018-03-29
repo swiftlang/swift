@@ -5178,7 +5178,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD);
+    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
     for (auto PL : FD->getParameterLists())
       addParametersToScope(PL);
     setLocalDiscriminator(FD);
@@ -5428,17 +5428,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     }
 
     // See if there's a following argument type.
-    ParserResult<TypeRepr> ArgType;
+    ParserResult<ParameterList> ArgParams;
+    SmallVector<Identifier, 4> argumentNames;
     if (Tok.isFollowingLParen()) {
-      ArgType = parseTypeTupleBody();
-      if (ArgType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        return Status;
-      }
-      if (ArgType.isNull()) {
-        Status.setIsParseError();
-        return Status;
-      }
+      ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
+                                             &argumentNames);
+      if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
+        return ParserStatus(ArgParams);
     }
     
     // See if there's a raw value expression.
@@ -5490,14 +5486,20 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
     
+    
     // Create the element.
-    TypeRepr *ArgTR = ArgType.getPtrOrNull();
-    auto *result = new (Context) EnumElementDecl(NameLoc, Name,
-                                                 ArgTR,
-                                                 ArgTR != nullptr,
+    DeclName FullName;
+    if (ArgParams.isNull()) {
+      FullName = Name;
+    } else {
+      FullName = DeclName(Context, Name, argumentNames);
+    }
+    auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
+                                                 ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
     }
@@ -6041,7 +6043,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD);
+  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)

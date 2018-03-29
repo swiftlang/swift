@@ -28,7 +28,7 @@
 
 namespace swift {
 
-typedef llvm::DenseMap<file_types::ID, std::string> TypeToPathMap;
+using TypeToPathMap = llvm::DenseMap<file_types::ID, std::string>;
 
 class OutputFileMap {
 private:

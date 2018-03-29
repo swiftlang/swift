@@ -959,9 +959,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Get the overload signature type.
     CanType otherSigType = other->getOverloadSignatureType();
 
+    bool wouldBeSwift5Redeclaration = false;
+    auto isRedeclaration = conflicting(tc.Context, currentSig, currentSigType,
+                                       otherSig, otherSigType,
+                                       &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
-    if (currentSigType == otherSigType ||
-        currentSig.Name.isCompoundName() != otherSig.Name.isCompoundName()) {
+    if (isRedeclaration || wouldBeSwift5Redeclaration) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
       if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
@@ -1060,9 +1063,23 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
-      tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-      tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
-      markInvalid();
+      // If this isn't a redeclaration in the current version of Swift, but
+      // would be in Swift 5 mode, emit a warning instead of an error.
+      if (wouldBeSwift5Redeclaration) {
+        tc.diagnose(current, diag::invalid_redecl_swift5_warning,
+                    current->getFullName());
+        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+      } else {
+        tc.diagnose(current, diag::invalid_redecl, current->getFullName());
+        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        markInvalid();
+      }
+
+      // Make sure we don't do this checking again for the same decl. We also
+      // set this at the beginning of the function, but we might have swapped
+      // the decls for diagnostics; so ensure we also set this for the actual
+      // decl we diagnosed on.
+      current->setCheckedRedeclaration(true);
       break;
     }
   }
@@ -1323,10 +1340,9 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
   Action walkToTypePre(Type T) override {
     ValueDecl *VD;
-    if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
-      VD = TAD->getDecl();
-    else if (auto *BNAD = dyn_cast<BoundNameAliasType>(T.getPointer())) {
-      if (CanonicalizeParentTypes)
+    if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer())) {
+      if (CanonicalizeParentTypes &&
+          BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
         VD = nullptr;
       else
         VD = BNAD->getDecl();
@@ -1339,9 +1355,11 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
     if (!visitDecl(VD))
       return Action::Stop;
 
-    if (!CanonicalizeParentTypes)
-      return Action::Continue;
-
+    if (!CanonicalizeParentTypes) {
+      return isa<NameAliasType>(T.getPointer()) ? Action::SkipChildren
+                                                     : Action::Continue;
+    }
+    
     Type nominalParentTy;
     if (auto nominalTy = dyn_cast<NominalType>(T.getPointer())) {
       nominalParentTy = nominalTy->getParent();
@@ -1349,11 +1367,13 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       nominalParentTy = genericTy->getParent();
       for (auto genericArg : genericTy->getGenericArgs())
         genericArg.walk(*this);
-    } else if (auto boundNameAliasTy =
-                 dyn_cast<BoundNameAliasType>(T.getPointer())) {
+    } else if (auto NameAliasTy =
+                 dyn_cast<NameAliasType>(T.getPointer())) {
       // The parent type would have been lost previously, so look right through
       // this type.
-      Type(boundNameAliasTy->getSinglyDesugaredType()).walk(*this);
+      if (NameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
+            ->hasTypeParameter())
+        Type(NameAliasTy->getSinglyDesugaredType()).walk(*this);
     } else {
       return Action::Continue;
     }
@@ -1714,7 +1734,9 @@ static void checkTypeAccess(
   if (isa<ParamDecl>(context)) {
     context = dyn_cast<AbstractFunctionDecl>(DC);
     if (!context)
-      context = cast<SubscriptDecl>(DC);
+      context = dyn_cast<SubscriptDecl>(DC);
+    if (!context)
+      context = cast<EnumDecl>(DC);
     DC = context->getDeclContext();
   }
 
@@ -2339,20 +2361,22 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
   case DeclKind::EnumElement: {
     auto EED = cast<EnumElementDecl>(D);
 
-    if (!EED->getArgumentTypeLoc().getType())
+    if (!EED->hasAssociatedValues())
       return;
-    checkTypeAccess(TC, EED->getArgumentTypeLoc(), EED,
-                    [&](AccessScope typeAccessScope,
-                        const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-      auto diagID = diag::enum_case_access;
-      if (downgradeToWarning == DowngradeToWarning::Yes)
-        diagID = diag::enum_case_access_warn;
-      auto diag = TC.diagnose(EED, diagID,
-                              EED->getFormalAccess(), typeAccess);
-      highlightOffendingType(TC, diag, complainRepr);
-    });
+    for (auto &P : *EED->getParameterList()) {
+      checkTypeAccess(TC, P->getTypeLoc(), P,
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *complainRepr,
+                                 DowngradeToWarning downgradeToWarning) {
+        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+        auto diagID = diag::enum_case_access;
+        if (downgradeToWarning == DowngradeToWarning::Yes)
+          diagID = diag::enum_case_access_warn;
+        auto diag = TC.diagnose(EED, diagID,
+                                EED->getFormalAccess(), typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
 
     return;
   }
@@ -4260,47 +4284,51 @@ public:
       });
     }
 
-    if (!IsFirstPass)
-      checkAccessControl(TC, PBD);
-
     TC.checkDeclAttributes(PBD);
+
+    if (IsFirstPass)
+      checkAccessControl(TC, PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
       return;
     }
 
     TC.validateDecl(SD);
-
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessLevel(TAD);
 
-    if (IsFirstPass)
-      TC.validateDecl(TAD);
-
-    if (!IsFirstPass)
-      checkAccessControl(TC, TAD);
-
+    TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
+    checkAccessControl(TC, TAD);
   }
   
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    if (!assocType->hasValidationStarted())
-      TC.validateDecl(assocType);
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
+    if (!IsFirstPass) {
+      return;
+    }
 
-    auto *proto = assocType->getProtocol();
+    TC.validateDecl(AT);
+
+    auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
-      TC.diagnose(assocType->getLoc(),
+      TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
-                  assocType->getName(),
+                  AT->getName(),
                   proto->getName());
     }
+
+    checkAccessControl(TC, AT);
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -4366,28 +4394,6 @@ public:
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
-      {
-        // Check for duplicate enum members.
-        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
-        bool hasErrors = false;
-        for (auto *EED : ED->getAllElements()) {
-          auto Res = Elements.insert({ EED->getName(), EED });
-          if (!Res.second) {
-            EED->setInvalid();
-
-            auto PreviousEED = Res.first->second;
-            TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
-            TC.diagnose(PreviousEED->getLoc(),
-                        diag::previous_decldef, true, EED->getName());
-            hasErrors = true;
-          }
-        }
-
-        // If one of the cases is invalid, let's mark
-        // whole enum as invalid as well.
-        if (hasErrors)
-          ED->setInvalid();
-      }
     }
 
     if (!IsFirstPass) {
@@ -4401,7 +4407,7 @@ public:
 
       TC.checkConformancesInContext(ED, ED);
     }
-    
+
     for (Decl *member : ED->getMembers())
       visit(member);
     
@@ -4410,29 +4416,31 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+    if (!IsFirstPass) {
+      for (Decl *Member : SD->getMembers())
+        visit(Member);
+
+      return;
+    }
+
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessLevel(SD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(SD);
+    checkUnsupportedNestedType(SD);
 
-      TC.validateDecl(SD);
-      TC.DeclsToFinalize.remove(SD);
-      TC.addImplicitConstructors(SD);
-    }
+    TC.validateDecl(SD);
+    TC.DeclsToFinalize.remove(SD);
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, SD);
+    TC.addImplicitConstructors(SD);
 
-      if (!SD->isInvalid())
-        TC.checkConformancesInContext(SD, SD);
-    }
-
-    // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
     TC.checkDeclAttributes(SD);
+    checkAccessControl(TC, SD);
+
+    if (!SD->isInvalid())
+      TC.checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4674,25 +4682,14 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (!IsFirstPass) {
+      return;
+    }
+
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessLevel(PD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(PD);
-    }
-
-    if (!IsFirstPass) {
-      checkAccessControl(TC, PD);
-      for (auto member : PD->getMembers()) {
-        TC.checkUnsupportedProtocolType(member);
-        checkAccessControl(TC, member);
-      }
-      TC.checkInheritanceClause(PD);
-
-      GenericTypeToArchetypeResolver resolver(PD);
-      TC.validateWhereClauses(PD, &resolver);
-      return;
-    }
+    checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
     if (!PD->hasValidSignature())
@@ -4728,6 +4725,15 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(PD);
+
+    checkAccessControl(TC, PD);
+    for (auto member : PD->getMembers()) {
+      TC.checkUnsupportedProtocolType(member);
+    }
+    TC.checkInheritanceClause(PD);
+
+    GenericTypeToArchetypeResolver resolver(PD);
+    TC.validateWhereClauses(PD, &resolver);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -4795,14 +4801,12 @@ public:
         // Complain if we should have a body.
         TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
       }
-    }
 
-    if (!IsFirstPass) {
-      checkAccessControl(TC, FD);
       return;
     }
 
     TC.validateDecl(FD);
+    checkAccessControl(TC, FD);
   }
 
 
@@ -6206,90 +6210,92 @@ public:
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!IsFirstPass) {
-      checkAccessControl(TC, EED);
       return;
     }
 
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
+    checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    if (!IsFirstPass) {
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
+      return;
+    }
+
     TC.validateExtension(ED);
 
     TC.checkDeclAttributesEarly(ED);
 
-    if (IsFirstPass) {
-      if (auto extendedTy = ED->getExtendedType()) {
-        if (!extendedTy->is<NominalType>() &&
-            !extendedTy->is<BoundGenericType>() &&
-            !extendedTy->hasError()) {
-          // FIXME: Redundant diagnostic test here?
-          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                      extendedTy);
-          // FIXME: It would be nice to point out where we found the named type
-          // declaration, if any.
-          ED->setInvalid();
-        }
+    if (auto extendedTy = ED->getExtendedType()) {
+      if (!extendedTy->is<NominalType>() &&
+          !extendedTy->is<BoundGenericType>() &&
+          !extendedTy->hasError()) {
+        // FIXME: Redundant diagnostic test here?
+        TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
+                    extendedTy);
+        // FIXME: It would be nice to point out where we found the named type
+        // declaration, if any.
+        ED->setInvalid();
       }
-
-      TC.checkInheritanceClause(ED);
-      if (auto extendedTy = ED->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          TC.validateDecl(nominal);
-          if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-            TC.requestNominalLayout(classDecl);
-
-          // Check the raw values of an enum, since we might synthesize
-          // RawRepresentable while checking conformances on this extension.
-          if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-            if (enumDecl->hasRawType())
-              checkEnumRawValues(TC, enumDecl);
-          }
-        }
-      }
-
-      validateAttributes(TC, ED);
     }
 
-    // Check conformances before visiting members, since we might
-    // synthesize bodies for derived conformances
-    if (!IsFirstPass) {
-      TC.computeDefaultAccessLevel(ED);
-      if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
-        const auto access = AA->getAccess();
-        AccessScope desiredAccessScope = AccessScope::getPublic();
-        switch (access) {
-        case AccessLevel::Private:
-          assert((ED->isInvalid() ||
-                  ED->getDeclContext()->isModuleScopeContext()) &&
-                 "non-top-level extensions make 'private' != 'fileprivate'");
-          LLVM_FALLTHROUGH;
-        case AccessLevel::FilePrivate: {
-          const DeclContext *DC = ED->getModuleScopeContext();
-          bool isPrivate = access == AccessLevel::Private;
-          desiredAccessScope = AccessScope(DC, isPrivate);
-          break;
+    TC.checkInheritanceClause(ED);
+    if (auto extendedTy = ED->getExtendedType()) {
+      if (auto nominal = extendedTy->getAnyNominal()) {
+        TC.validateDecl(nominal);
+        if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+          TC.requestNominalLayout(classDecl);
+
+        // Check the raw values of an enum, since we might synthesize
+        // RawRepresentable while checking conformances on this extension.
+        if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+          if (enumDecl->hasRawType())
+            checkEnumRawValues(TC, enumDecl);
         }
-        case AccessLevel::Internal:
-          desiredAccessScope = AccessScope(ED->getModuleContext());
-          break;
-        case AccessLevel::Public:
-        case AccessLevel::Open:
-          break;
-        }
-        checkGenericParamAccess(TC, ED->getGenericParams(), ED,
-                                desiredAccessScope, access);
       }
-      TC.checkConformancesInContext(ED, ED);
     }
+
+    validateAttributes(TC, ED);
+
+    TC.computeDefaultAccessLevel(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
+    TC.checkConformancesInContext(ED, ED);
+
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
- }
+
+    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
+      const auto access = AA->getAccess();
+      AccessScope desiredAccessScope = AccessScope::getPublic();
+      switch (access) {
+      case AccessLevel::Private:
+        assert((ED->isInvalid() ||
+                ED->getDeclContext()->isModuleScopeContext()) &&
+               "non-top-level extensions make 'private' != 'fileprivate'");
+        LLVM_FALLTHROUGH;
+      case AccessLevel::FilePrivate: {
+        const DeclContext *DC = ED->getModuleScopeContext();
+        bool isPrivate = access == AccessLevel::Private;
+        desiredAccessScope = AccessScope(DC, isPrivate);
+        break;
+      }
+      case AccessLevel::Internal:
+        desiredAccessScope = AccessScope(ED->getModuleContext());
+        break;
+      case AccessLevel::Public:
+      case AccessLevel::Open:
+        break;
+      }
+      checkGenericParamAccess(TC, ED->getGenericParams(), ED,
+                              desiredAccessScope, access);
+    }
+  }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
@@ -6323,7 +6329,6 @@ public:
     }
 
     if (!IsFirstPass) {
-      checkAccessControl(TC, CD);
       return;
     }
 
@@ -6370,6 +6375,7 @@ public:
     }
 
     TC.checkDeclAttributes(CD);
+    checkAccessControl(TC, CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -7854,13 +7860,18 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     EED->setIsBeingValidated(true);
 
-    if (!EED->getArgumentTypeLoc().isNull()) {
-      if (validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
-                       TypeResolutionFlags::EnumCase)) {
-        EED->setIsBeingValidated(false);
+    if (auto *PL = EED->getParameterList()) {
+      GenericTypeToArchetypeResolver resolver(EED->getParentEnum());
+
+      bool isInvalid
+        = typeCheckParameterList(PL, EED->getParentEnum(),
+                                 TypeResolutionFlags::EnumCase, resolver);
+
+      if (isInvalid || EED->isInvalid()) {
         EED->setInterfaceType(ErrorType::get(Context));
         EED->setInvalid();
-        break;
+      } else {
+        checkDefaultArguments(PL, EED);
       }
     }
 
@@ -7885,7 +7896,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->computeType())
+    if (!EED->hasInterfaceType() && !EED->computeType())
       break;
 
     // Require the carried type to be materializable.
@@ -8215,46 +8226,137 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   assert(D->hasAccess());
 }
 
+bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
+  // Pass-through only makes sense when the typealias refers to a nominal
+  // type.
+  Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
+  auto nominal = underlyingType->getAnyNominal();
+  if (!nominal) return false;
+
+  // Check that the nominal type and the typealias are either both generic
+  // at this level or neither are.
+  if (nominal->isGeneric() != typealias->isGeneric())
+    return false;
+
+  // Make sure either both have generic signatures or neither do.
+  auto nominalSig = nominal->getGenericSignature();
+  auto typealiasSig = typealias->getGenericSignature();
+  if (static_cast<bool>(nominalSig) != static_cast<bool>(typealiasSig))
+    return false;
+
+  // If neither is generic, we're done: it's a pass-through alias.
+  if (!nominalSig) return true;
+
+  // Check that the type parameters are the same the whole way through.
+  auto nominalGenericParams = nominalSig->getGenericParams();
+  auto typealiasGenericParams = typealiasSig->getGenericParams();
+  if (nominalGenericParams.size() != typealiasGenericParams.size())
+    return false;
+  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+                  typealiasGenericParams.begin(),
+                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+                    return gp1->isEqual(gp2);
+                  }))
+    return false;
+
+  // If neither is generic at this level, we have a pass-through typealias.
+  if (!typealias->isGeneric()) return true;
+
+  auto boundGenericType = underlyingType->getAs<BoundGenericType>();
+  if (!boundGenericType) return false;
+
+  // If our arguments line up with our innermost generic parameters, it's
+  // a passthrough typealias.
+  auto innermostGenericParams = typealiasSig->getInnermostGenericParams();
+  auto boundArgs = boundGenericType->getGenericArgs();
+  if (boundArgs.size() != innermostGenericParams.size())
+    return false;
+
+  return std::equal(boundArgs.begin(), boundArgs.end(),
+                    innermostGenericParams.begin(),
+                    [](Type arg, GenericTypeParamType *gp) {
+                      return arg->isEqual(gp);
+                    });
+}
+
 /// Form the interface type of an extension from the raw type and the
 /// extension's list of generic parameters.
-static Type formExtensionInterfaceType(Type type,
-                                       GenericParamList *genericParams) {
+static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
+                                       Type type,
+                                       GenericParamList *genericParams,
+                                       bool &mustInferRequirements) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
-  NominalTypeDecl *nominal;
+  GenericTypeDecl *genericDecl;
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
-    nominal = cast<NominalTypeDecl>(unbound->getDecl());
+    genericDecl = unbound->getDecl();
   } else {
     if (type->is<ProtocolCompositionType>())
       type = type->getCanonicalType();
     auto nominalType = type->castTo<NominalType>();
     parentType = nominalType->getParent();
-    nominal = nominalType->getDecl();
+    genericDecl = nominalType->getDecl();
   }
 
   // Reconstruct the parent, if there is one.
   if (parentType) {
     // Build the nested extension type.
-    auto parentGenericParams = nominal->getGenericParams()
+    auto parentGenericParams = genericDecl->getGenericParams()
                                  ? genericParams->getOuterParameters()
                                  : genericParams;
-    parentType = formExtensionInterfaceType(parentType, parentGenericParams);
+    parentType =
+      formExtensionInterfaceType(tc, ext, parentType, parentGenericParams,
+                                 mustInferRequirements);
   }
 
-  // If we don't have generic parameters at this level, just build the result.
-  if (!nominal->getGenericParams() || isa<ProtocolDecl>(nominal)) {
-    return NominalType::get(nominal, parentType,
-                            nominal->getASTContext());
+  // Find the nominal type.
+  auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
+  auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
+  if (!nominal) {
+    Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
+    nominal = underlyingType->getNominalOrBoundGenericNominal();
   }
 
-  // Form the bound generic type with the type parameters provided.
+  // Form the result.
+  Type resultType;
   SmallVector<Type, 2> genericArgs;
-  for (auto gp : *genericParams) {
-    genericArgs.push_back(gp->getDeclaredInterfaceType());
+  if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
+    resultType = NominalType::get(nominal, parentType,
+                                  nominal->getASTContext());
+  } else {
+    // Form the bound generic type with the type parameters provided.
+    for (auto gp : *genericParams) {
+      genericArgs.push_back(gp->getDeclaredInterfaceType());
+    }
+
+    resultType = BoundGenericType::get(nominal, parentType, genericArgs);
   }
 
-  return BoundGenericType::get(nominal, parentType, genericArgs);
+  // If we have a typealias, try to form type sugar.
+  if (typealias && isPassThroughTypealias(typealias)) {
+    auto typealiasSig = typealias->getGenericSignature();
+    SubstitutionMap subMap;
+    if (typealiasSig) {
+      subMap = typealiasSig->getSubstitutionMap(
+                              [](SubstitutableType *type) -> Type {
+                                return Type(type);
+                              },
+                              [](CanType dependentType,
+                                 Type replacementType,
+                                 ProtocolType *protoType) {
+                                auto proto = protoType->getDecl();
+                                return ProtocolConformanceRef(proto);
+                              });
+
+      mustInferRequirements = true;
+    }
+
+    resultType = NameAliasType::get(typealias, parentType, subMap,
+                                         resultType);
+  }
+
+  return resultType;
 }
 
 /// Visit the given generic parameter lists from the outermost to the innermost,
@@ -8276,7 +8378,10 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   assert(!ext->getGenericEnvironment());
 
   // Form the interface type of the extension.
-  Type extInterfaceType = formExtensionInterfaceType(type, genericParams);
+  bool mustInferRequirements = false;
+  Type extInterfaceType =
+    formExtensionInterfaceType(tc, ext, type, genericParams,
+                               mustInferRequirements);
 
   // Prepare all of the generic parameter lists for generic signature
   // validation.
@@ -8298,7 +8403,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   auto *env = tc.checkGenericEnvironment(genericParams,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs);
+                                         ext, inferExtendedTypeReqs,
+                                         mustInferRequirements);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
@@ -8337,7 +8443,14 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     return;
 
   // Validate the nominal type declaration being extended.
-  auto nominal = extendedType->getAnyNominal();
+  NominalTypeDecl *nominal = extendedType->getAnyNominal();
+  if (!nominal) {
+    auto unbound = cast<UnboundGenericType>(extendedType.getPointer());
+    auto typealias = cast<TypeAliasDecl>(unbound->getDecl());
+    validateDecl(typealias);
+
+    nominal = typealias->getUnderlyingTypeLoc().getType()->getAnyNominal();
+  }
   validateDecl(nominal);
 
   if (nominal->getGenericParamsOfContext()) {

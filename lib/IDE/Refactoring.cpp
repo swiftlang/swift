@@ -195,7 +195,8 @@ private:
     size_t Colon = Content.find(':'); // FIXME: leading whitespace?
     if (Colon == StringRef::npos) {
       assert(Content.empty());
-      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined,
+                    NameIndex);
       return;
     }
 

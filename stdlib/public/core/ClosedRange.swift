@@ -166,14 +166,21 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable 
+extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
     switch self {
     case .inRange(let value):
-      return value.hashValue
+      hasher.append(0 as Int8)
+      hasher.append(value)
     case .pastEnd:
-      return .max
+      hasher.append(1 as Int8)
     }
   }
 }
@@ -381,6 +388,19 @@ extension ClosedRange: Equatable {
   }
 }
 
+extension ClosedRange: Hashable where Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(lowerBound)
+    hasher.append(upperBound)
+  }
+}
+
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
   @_inlineable // FIXME(sil-serialize-all)...
@@ -479,4 +499,5 @@ extension ClosedRange {
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 @available(*, deprecated, renamed: "ClosedRange")
-public typealias CountableClosedRange<T: Comparable> = ClosedRange<T>
+public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
+  where Bound.Stride : SignedInteger

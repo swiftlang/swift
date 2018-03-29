@@ -805,10 +805,10 @@ public:
           OtherSignatureType = CT->getCanonicalType();
       }
 
-      if (conflicting(FoundSignature, OtherSignature, true) &&
-          (FoundSignatureType == OtherSignatureType ||
-           FoundSignature.Name.isCompoundName() !=
-             OtherSignature.Name.isCompoundName())) {
+      if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
+                      OtherSignature, OtherSignatureType,
+                      /*wouldConflictInSwift5*/nullptr,
+                      /*skipProtocolExtensionCheck*/true)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);

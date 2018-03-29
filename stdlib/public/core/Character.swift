@@ -423,10 +423,15 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ c: Character) {
     if let utf16 = c._smallUTF16 {
-      self = String(decoding: utf16, as: Unicode.UTF16.self)
+      if let small = _SmallUTF8String(utf16) {
+        self = String(_StringGuts(small))
+      } else {
+        // FIXME: Remove when we support UTF-8 in small string
+        self = String(decoding: utf16, as: Unicode.UTF16.self)
+      }
     }
     else {
-      // TODO(SSO): small check
+      // TODO(SSO): small check. For now, since we only do ASCII, this won't hit
       self = String(_StringGuts(_large: c._largeUTF16!))
     }
   }

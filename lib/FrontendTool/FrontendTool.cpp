@@ -288,7 +288,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
-  json::Output jsonOut(*os);
+  json::Output jsonOut(*os, /*PrettyPrint=*/false);
   auto Root = SF->getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";

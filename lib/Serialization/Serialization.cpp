@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/Strings.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -3292,29 +3293,45 @@ void Serializer::writeDecl(const Decl *D) {
     auto elem = cast<EnumElementDecl>(D);
     auto contextID = addDeclContextRef(elem->getDeclContext());
 
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(addDeclBaseNameRef(elem->getBaseName()));
+    for (auto argName : elem->getFullName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
+
+    Type ty = elem->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
+
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
     auto RawValueKind = EnumElementRawValueKind::None;
     bool Negative = false;
-    StringRef RawValueText;
+    Identifier RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       RawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
-      RawValueText = ILE->getDigitsText();
+      RawValueText = M->getASTContext().getIdentifier(ILE->getDigitsText());
       Negative = ILE->isNegative();
     }
 
+    uint8_t rawResilienceExpansion =
+        getRawStableResilienceExpansion(
+            elem->getDefaultArgumentResilienceExpansion());
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclBaseNameRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getInterfaceType()),
-                                  elem->hasAssociatedValues(),
                                   elem->isImplicit(),
+                                  elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
                                   Negative,
-                                  RawValueText);
+                                  addDeclBaseNameRef(RawValueText),
+                                  rawResilienceExpansion,
+                                  elem->getFullName().getArgumentNames().size()+1,
+                                  nameComponentsAndDependencies);
+    if (auto *PL = elem->getParameterList())
+      writeParameterList(PL);
     break;
   }
 
@@ -3556,7 +3573,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   T->print(OS);
-  assert(FullName.startswith("Builtin."));
+  assert(FullName.startswith(BUILTIN_TYPE_NAME_PREFIX));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
@@ -3596,42 +3613,30 @@ void Serializer::writeType(Type ty) {
     TypeAliasDecl *typeAlias =
       findTypeAliasForBuiltin(M->getASTContext(), ty);
 
-    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    TypeID());
+    unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
+    BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(typeAlias,
+                                                  /*forceSerialization*/false,
+                                                  /*allowTypeAliasXRef*/true),
+                                       TypeID());
     break;
   }
   case TypeKind::NameAlias: {
-    auto nameAlias = cast<NameAliasType>(ty.getPointer());
-    const TypeAliasDecl *typeAlias = nameAlias->getDecl();
+    auto alias = cast<NameAliasType>(ty.getPointer());
+    const TypeAliasDecl *typeAlias = alias->getDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    addTypeRef(ty->getCanonicalType()));
-    break;
-  }
-  case TypeKind::BoundNameAlias: {
-    auto boundAlias = cast<BoundNameAliasType>(ty.getPointer());
-    const TypeAliasDecl *typeAlias = boundAlias->getDecl();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[BoundNameAliasTypeLayout::Code];
-    BoundNameAliasTypeLayout::emitRecord(
+    NameAliasTypeLayout::emitRecord(
                              Out, ScratchRecord, abbrCode,
                              addDeclRef(typeAlias,
                                         /*forceSerialization*/false,
                                         /*allowTypeAliasXRef*/true),
-                             addTypeRef(boundAlias->getParent()),
-                             addTypeRef(boundAlias->getSinglyDesugaredType()));
+                             addTypeRef(alias->getParent()),
+                             addTypeRef(alias->getSinglyDesugaredType()));
     // Write the set of substitutions.
     SmallVector<Substitution, 4> flatSubs;
     if (auto genericSig = typeAlias->getGenericSignature())
-      genericSig->getSubstitutions(boundAlias->getSubstitutionMap(), flatSubs);
+      genericSig->getSubstitutions(alias->getSubstitutionMap(), flatSubs);
     writeSubstitutions(flatSubs, DeclTypeAbbrCodes);
     break;
   }
@@ -3988,8 +3993,8 @@ void Serializer::writeType(Type ty) {
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
   using namespace decls_block;
+  registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<NameAliasTypeLayout>();
-  registerDeclTypeAbbr<BoundNameAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
   registerDeclTypeAbbr<NominalTypeLayout>();

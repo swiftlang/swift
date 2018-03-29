@@ -225,7 +225,8 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
 
     unsigned sourceIndex = 0; // unimportant, since impossible
     Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
-                                sourceIndex, std::move(path));
+                                sourceIndex, std::move(path),
+                                MetadataState::Complete);
   });
 }
 
@@ -307,7 +308,8 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
                                          unsigned sourceIndex,
                                          MetadataPath &&path) {
   FulfillmentMapCallback callbacks(*this);
-  return Fulfillments.searchTypeMetadata(IGM, type, isExact, sourceIndex,
+  return Fulfillments.searchTypeMetadata(IGM, type, isExact,
+                                         MetadataState::Complete, sourceIndex,
                                          std::move(path), callbacks);
 }
 
@@ -415,14 +417,16 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
 
 void PolymorphicConvention::addSelfMetadataFulfillment(CanType arg) {
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, nullptr}, source, MetadataPath());
+  Fulfillments.addFulfillment({arg, nullptr},
+                              source, MetadataPath(), MetadataState::Complete);
 }
 
 void PolymorphicConvention::addSelfWitnessTableFulfillment(
     CanType arg, ProtocolConformanceRef conformance) {
   auto proto = conformance.getRequirement();
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, proto}, source, MetadataPath());
+  Fulfillments.addFulfillment({arg, proto},
+                              source, MetadataPath(), MetadataState::Complete);
 
   if (conformance.isConcrete()) {
     FulfillmentMapCallback callbacks(*this);
@@ -521,7 +525,8 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       llvm::Value *metadata = in.claimNext();
       setTypeMetadataName(IGF.IGM, metadata, argTy);
 
-      IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata);
+      IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata,
+                                            MetadataState::Complete);
       return;
     }
 
@@ -540,7 +545,8 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       // type, and so the self metadata will be inexact. Currently, all
       // conformances are inheritable.
       IGF.bindLocalTypeDataFromTypeMetadata(
-          argTy, (!CD || CD->isFinal()) ? IsExact : IsInexact, metadata);
+          argTy, (!CD || CD->isFinal()) ? IsExact : IsInexact, metadata,
+                                            MetadataState::Complete);
       return;
     }
 
@@ -606,7 +612,8 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
     if (metatype->getRepresentation() == MetatypeRepresentation::Thick) {
       paramType = metatype.getInstanceType();
       llvm::Value *metadata = getParameter(paramIndex);
-      IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata);
+      IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                            MetadataState::Complete);
     }
     return;
   }
@@ -621,7 +628,8 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
     SILType instanceType = SILType::getPrimitiveObjectType(paramType);
     llvm::Value *metadata =
     emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
-    IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata);
+    IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                          MetadataState::Complete);
     return;
   }
 }
@@ -679,7 +687,8 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
   SILType instanceType = SILType::getPrimitiveObjectType(paramType);
   llvm::Value *metadata =
     emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
-  IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata);
+  IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                        MetadataState::Complete);
 }
 
 void irgen::bindPolymorphicParameter(IRGenFunction &IGF,
@@ -730,18 +739,6 @@ void irgen::setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *wtable,
 }
 
 namespace {
-  /// A concrete witness table, together with its known layout.
-  class WitnessTable {
-    llvm::Value *Table;
-    const ProtocolInfo &Info;
-  public:
-    WitnessTable(llvm::Value *wtable, const ProtocolInfo &info)
-      : Table(wtable), Info(info) {}
-
-    llvm::Value *getTable() const { return Table; }
-    const ProtocolInfo &getInfo() const { return Info; }
-  };
-
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
     SmallVector<WitnessTableEntry, 16> Entries;
@@ -1092,8 +1089,9 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF, Explosion &params) {
     llvm::Value *conformingMetadataCache = nullptr;
-    return MetadataResponse(emitWitnessTableAccessorCall(IGF, conformance,
-                                                     &conformingMetadataCache));
+    return MetadataResponse::forComplete(
+             emitWitnessTableAccessorCall(IGF, conformance,
+                                          &conformingMetadataCache));
   });
 
   return accessor;
@@ -1194,8 +1192,7 @@ public:
         : IGM(IGM), Table(table),
           ConcreteType(SILWT->getConformance()->getDeclContext()
                          ->mapTypeIntoContext(
-                           SILWT->getConformance()->getType()
-                             ->getCanonicalType())
+                           SILWT->getConformance()->getType())
                          ->getCanonicalType()),
           Conformance(*SILWT->getConformance()),
           ConformanceInContext(mapConformanceIntoContext(IGM,
@@ -1270,12 +1267,6 @@ public:
     void addMethod(SILDeclRef requirement) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
-
-      // Handle missing optional requirements.
-      if (entry.getKind() == SILWitnessTable::MissingOptional) {
-        Table.addNullPointer(IGM.Int8PtrTy);
-        return;
-      }
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
@@ -1439,6 +1430,7 @@ public:
           }
         } callback;
         Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
+                                         MetadataState::Abstract,
                                          /*sourceIndex*/ 0, MetadataPath(),
                                          callback);
       }
@@ -1499,21 +1491,27 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
   // is expensive.
   if (auto fulfillment =
         getFulfillmentMap().getTypeMetadata(associatedType)) {
-    llvm::Value *metadata =
-      fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, self,
-                                               /*cache*/ nullptr);
-    auto returnValue = MetadataResponse(metadata).combine(IGF);
+    // We don't know that 'self' is any better than an abstract metadata here.
+    auto source = MetadataResponse::forBounded(self, MetadataState::Abstract);
+
+    MetadataResponse response =
+      fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, source,
+                                               request, /*cache*/ nullptr);
+    response.ensureDynamicState(IGF);
+    auto returnValue = response.combine(IGF);
     IGF.Builder.CreateRet(returnValue);
     return accessor;
   }
 
   // Bind local type data from the metadata argument.
-  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
+  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
+                                        MetadataState::Abstract);
 
   // For now, assume that an associated type is cheap enough to access
   // that it doesn't need a new cache entry.
   if (auto archetype = dyn_cast<ArchetypeType>(associatedType)) {
     auto response = emitArchetypeTypeMetadataRef(IGF, archetype, request);
+    response.ensureDynamicState(IGF);
     auto returnValue = response.combine(IGF);
     IGF.Builder.CreateRet(returnValue);
     return accessor;
@@ -1645,17 +1643,24 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   if (auto fulfillment =
         getFulfillmentMap().getWitnessTable(associatedType,
                                             associatedProtocol)) {
+    // We don't know that 'self' is any better than an abstract metadata here.
+    auto source = MetadataResponse::forBounded(self, MetadataState::Abstract);
+
     llvm::Value *wtable =
-      fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, self,
-                                               /*cache*/ nullptr);
+      fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, source,
+                                               MetadataState::Complete,
+                                               /*cache*/ nullptr)
+                       .getMetadata();
     IGF.Builder.CreateRet(wtable);
     return accessor;
   }
 
   // Bind local type data from the metadata arguments.
   IGF.bindLocalTypeDataFromTypeMetadata(associatedType, IsExact,
-                                        associatedTypeMetadata);
-  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
+                                        associatedTypeMetadata,
+                                        MetadataState::Abstract);
+  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
+                                        MetadataState::Abstract);
 
   // For now, assume that finding an abstract conformance is always
   // fast enough that it's not worth caching.
@@ -1674,7 +1679,7 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   emitReturnOfCheckedLoadFromCache(IGF, destTable, self,
                                    [&]() -> MetadataResponse {
     // Pretend that we have a response here.
-    return MetadataResponse(
+    return MetadataResponse::forComplete(
              conformanceI->getTable(IGF, &associatedTypeMetadata));
   });
 
@@ -1727,7 +1732,8 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
     resultState->addIncoming(completedState, entryBB);
 
     llvm::Value *returnValue =
-      MetadataResponse(result, resultState).combine(IGF);
+      MetadataResponse(result, resultState, MetadataState::Abstract)
+        .combine(IGF);
     IGF.Builder.CreateRet(returnValue);
   } else {
     IGF.Builder.CreateRet(result);
@@ -1740,11 +1746,14 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   // The way we jam witness tables into this infrastructure involves
   // pretending that they're statically-complete metadata.
   assert(isReturningResponse || response.isStaticallyKnownComplete());
-  llvm::Value *fetchedResult = response.getMetadata();
-  llvm::Value *fetchedState = nullptr;
 
-  if (isReturningResponse)
-    fetchedState = response.getDynamicState(IGF);
+  llvm::Value *fetchedState = nullptr;
+  if (isReturningResponse) {
+    response.ensureDynamicState(IGF);
+    fetchedState = response.getDynamicState();
+  }
+
+  llvm::Value *fetchedResult = response.getMetadata();
 
   // Skip caching if we're working with responses and the fetched result
   // is not complete.
@@ -2137,36 +2146,39 @@ void EmitPolymorphicParameters::emit(Explosion &in,
   // Collect any concrete type metadata that's been passed separately.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
     auto value = in.claimNext();
-    bindGenericRequirement(IGF, requirement, value, getInContext);
+    bindGenericRequirement(IGF, requirement, value, MetadataState::Complete,
+                           getInContext);
   });
 
   // Bind all the fulfillments we can from the formal parameters.
   bindParameterSources(getParameter);
 }
 
-llvm::Value *
+MetadataResponse
 MetadataPath::followFromTypeMetadata(IRGenFunction &IGF,
                                      CanType sourceType,
-                                     llvm::Value *source,
-                                     Map<llvm::Value*> *cache) const {
+                                     MetadataResponse source,
+                                     DynamicMetadataRequest request,
+                                     Map<MetadataResponse> *cache) const {
   LocalTypeDataKey key = {
     sourceType,
-    LocalTypeDataKind::forTypeMetadata()
+    LocalTypeDataKind::forFormalTypeMetadata()
   };
-  return follow(IGF, key, source, Path.begin(), Path.end(), cache);
+  return follow(IGF, key, source, Path.begin(), Path.end(), request, cache);
 }
 
-llvm::Value *
+MetadataResponse
 MetadataPath::followFromWitnessTable(IRGenFunction &IGF,
                                      CanType conformingType,
                                      ProtocolConformanceRef conformance,
-                                     llvm::Value *source,
-                                     Map<llvm::Value*> *cache) const {
+                                     MetadataResponse source,
+                                     DynamicMetadataRequest request,
+                                     Map<MetadataResponse> *cache) const {
   LocalTypeDataKey key = {
     conformingType,
     LocalTypeDataKind::forProtocolWitnessTable(conformance)
   };
-  return follow(IGF, key, source, Path.begin(), Path.end(), cache);
+  return follow(IGF, key, source, Path.begin(), Path.end(), request, cache);
 }
 
 /// Follow this metadata path.
@@ -2178,11 +2190,12 @@ MetadataPath::followFromWitnessTable(IRGenFunction &IGF,
 ///   in the IRGenFunction will be used.  This caching system is somewhat
 ///   more efficient than what IGF provides, but it's less general, and it
 ///   should probably be removed.
-llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
-                                  LocalTypeDataKey sourceKey,
-                                  llvm::Value *source,
-                                  iterator begin, iterator end,
-                                  Map<llvm::Value*> *cache) {
+MetadataResponse MetadataPath::follow(IRGenFunction &IGF,
+                                      LocalTypeDataKey sourceKey,
+                                      MetadataResponse source,
+                                      iterator begin, iterator end,
+                                      DynamicMetadataRequest finalRequest,
+                                      Map<MetadataResponse> *cache) {
   assert(source && "no source metadata value!");
 
   // The invariant is that this iterator starts a path from source and
@@ -2207,7 +2220,8 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
       // Advance the source key past the cached prefix.
       while (i != result.second) {
         Component component = *i++;
-        (void) followComponent(IGF, sourceKey, /*source*/ nullptr, component);
+        (void) followComponent(IGF, sourceKey, MetadataResponse(), component,
+                               MetadataState::Abstract);
       }
     }
 
@@ -2218,17 +2232,21 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
     LocalTypeDataKey skipKey = sourceKey;
     while (skipI != end) {
       Component component = *skipI++;
-      (void) followComponent(IGF, skipKey, /*source*/ nullptr, component);
+      (void) followComponent(IGF, skipKey, MetadataResponse(), component,
+                             MetadataState::Abstract);
 
       // Check the cache for a concrete value.  We don't want an abstract
-      // entry because, if one exists, we'll just end up here again
+      // cache entry because, if one exists, we'll just end up here again
       // recursively.
-      if (auto skipSource =
-            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey())) {
-        // If we found one, advance the info for the source to the current
+      auto skipRequest =
+        (skipI == end ? finalRequest : MetadataState::Abstract);
+      if (auto skipResponse =
+            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey(),
+                                            skipRequest)) {
+        // Advance the baseline information for the source to the current
         // point in the path, then continue the search.
         sourceKey = skipKey;
-        source = skipSource;
+        source = skipResponse;
         i = skipI;
       }
     }
@@ -2237,13 +2255,17 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
   // Drill in on the actual source value.
   while (i != end) {
     auto component = *i++;
-    source = followComponent(IGF, sourceKey, source, component);
+
+    auto componentRequest =
+      (i == end ? finalRequest : MetadataState::Abstract);
+    source = followComponent(IGF, sourceKey, source,
+                             component, componentRequest);
 
     // If we have a cache, remember this in the cache at the next position.
     if (cache) {
       cache->insertNew(begin, i, source);
 
-    // Otherwise, insert it into the global cache.
+    // Otherwise, insert it into the global cache (at the updated source key).
     } else {
       IGF.setScopedLocalTypeData(sourceKey, source);
     }
@@ -2282,14 +2304,15 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
 /// sourceType and sourceDecl will be adjusted to refer to the new
 /// component.  Source can be null, in which case this will be the only
 /// thing done.
-llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
-                                           LocalTypeDataKey &sourceKey,
-                                           llvm::Value *source,
-                                           Component component) {
+MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
+                                               LocalTypeDataKey &sourceKey,
+                                               MetadataResponse source,
+                                               Component component,
+                                               DynamicMetadataRequest request) {
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
-    assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
+    assert(sourceKey.Kind == LocalTypeDataKind::forFormalTypeMetadata());
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
       type = archetypeTy->getSuperclass()->getCanonicalType();
@@ -2309,11 +2332,22 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     // If this is a type argument, we've fully updated sourceKey.
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
       assert(!requirement.Protocol && "index mismatch!");
-      if (source) {
-        source = emitArgumentMetadataRef(IGF, nominal,
-                                         requirements, reqtIndex, source);
-        setTypeMetadataName(IGF.IGM, source, sourceKey.Type);
-      }
+
+      if (!source) return MetadataResponse();
+
+      auto sourceMetadata = source.getMetadata();
+      auto *argMetadata = 
+        emitArgumentMetadataRef(IGF, nominal, requirements, reqtIndex,
+                                sourceMetadata);
+      setTypeMetadataName(IGF.IGM, argMetadata, sourceKey.Type);
+
+      // Assume that the argument metadata is complete if the metadata is.
+      auto argState = getPresumedMetadataStateForTypeArgument(
+                                           source.getStaticLowerBoundOnState());
+      auto response = MetadataResponse::forBounded(argMetadata, argState);
+
+      // Do a dynamic check if necessary to satisfy the request.
+      return emitCheckTypeMetadataState(IGF, request, response);
 
     // Otherwise, we need to switch sourceKey.Kind to the appropriate
     // conformance kind.
@@ -2324,15 +2358,17 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
       assert(conformance.getRequirement() == requirement.Protocol);
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
-      if (source) {
-        auto protocol = conformance.getRequirement();
-        source = emitArgumentWitnessTableRef(IGF, nominal,
-                                             requirements, reqtIndex, source);
-        setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type, protocol);
-      }
-    }
+      if (!source) return MetadataResponse();
 
-    return source;
+      auto sourceMetadata = source.getMetadata();
+      auto protocol = conformance.getRequirement();
+      auto wtable = emitArgumentWitnessTableRef(IGF, nominal,
+                                                requirements, reqtIndex,
+                                                sourceMetadata);
+      setProtocolWitnessTableName(IGF.IGM, wtable, sourceKey.Type, protocol);
+
+      return MetadataResponse::forComplete(wtable);
+    }
   }
 
   case Component::Kind::OutOfLineBaseProtocol: {
@@ -2355,15 +2391,19 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
       }
     }
 
-    if (source) {
-      WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
-      source = emitInvariantLoadOfOpaqueWitness(IGF, source,
-                                              index.forProtocolWitnessTable());
-      source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
-      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
-                                  inheritedProtocol);
-    }
-    return source;
+    if (!source) return MetadataResponse();
+
+    auto wtable = source.getMetadata();
+    WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
+    auto baseWTable =
+      emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                       index.forProtocolWitnessTable());
+    baseWTable =
+      IGF.Builder.CreateBitCast(baseWTable, IGF.IGM.WitnessTablePtrTy);
+    setProtocolWitnessTableName(IGF.IGM, baseWTable, sourceKey.Type,
+                                inheritedProtocol);
+
+    return MetadataResponse::forComplete(baseWTable);
   }
 
   case Component::Kind::AssociatedConformance: {
@@ -2399,17 +2439,21 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
             isa<ArchetypeType>(sourceKey.Type)) &&
            "couldn't find concrete conformance for concrete type");
 
-    if (source) {
-      WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
-      auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
-      auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
-      source = emitAssociatedTypeWitnessTableRef(IGF, sourceMetadata, source,
-                                                 index, associatedMetadata);
+    if (!source) return MetadataResponse();
 
-      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
-                                  associatedRequirement);
-    }
-    return source;
+    WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
+    auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
+    auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
+    auto sourceWTable = source.getMetadata();
+
+    auto associatedWTable = 
+      emitAssociatedTypeWitnessTableRef(IGF, sourceMetadata, sourceWTable,
+                                        index, associatedMetadata);
+
+    setProtocolWitnessTableName(IGF.IGM, associatedWTable, sourceKey.Type,
+                                associatedRequirement);
+
+    return MetadataResponse::forComplete(associatedWTable);
   }
 
   case Component::Kind::ConditionalConformance: {
@@ -2434,17 +2478,20 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     sourceKey.Kind =
         LocalTypeDataKind::forAbstractProtocolWitnessTable(conformingProto);
 
-    if (source) {
-      WitnessIndex index(privateWitnessTableIndexToTableOffset(reqtIndex),
-                         /*prefix*/ false);
+    if (!source) return MetadataResponse();
 
-      source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
-      source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
-      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
-                                  conformingProto);
-    }
+    WitnessIndex index(privateWitnessTableIndexToTableOffset(reqtIndex),
+                       /*prefix*/ false);
 
-    return source;
+    auto sourceWTable = source.getMetadata();
+    auto capturedWTable =
+      emitInvariantLoadOfOpaqueWitness(IGF, sourceWTable, index);
+    capturedWTable =
+      IGF.Builder.CreateBitCast(capturedWTable, IGF.IGM.WitnessTablePtrTy);
+    setProtocolWitnessTableName(IGF.IGM, capturedWTable, sourceKey.Type,
+                                conformingProto);
+
+    return MetadataResponse::forComplete(capturedWTable);
   }
 
   case Component::Kind::Impossible:
@@ -2524,7 +2571,8 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
 /// GenericArguments, bind the polymorphic parameters.
 void irgen::emitPolymorphicParametersFromArray(IRGenFunction &IGF,
                                                NominalTypeDecl *typeDecl,
-                                               Address array) {
+                                               Address array,
+                                               MetadataState state) {
   GenericTypeRequirements requirements(IGF.IGM, typeDecl);
 
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
@@ -2535,7 +2583,7 @@ void irgen::emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   };
 
   // Okay, bind everything else from the context.
-  requirements.bindFromBuffer(IGF, array, getInContext);
+  requirements.bindFromBuffer(IGF, array, state, getInContext);
 }
 
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
@@ -2543,8 +2591,10 @@ Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
   return IGM.getPointerSize() * Requirements.size();
 }
 
-void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer) const {
+void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
+                                MetadataState metadataState) const {
   bindFromGenericRequirementsBuffer(IGF, Requirements.getArrayRef(), buffer,
+                                    metadataState,
                                     [&](CanType type) { return type;});
 }
 
@@ -2985,13 +3035,16 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
 
 void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
                                              Address buffer,
+                                             MetadataState metadataState,
                                     GetTypeParameterInContextFn getInContext) {
-  bindFromGenericRequirementsBuffer(IGF, Requirements, buffer, getInContext);
+  bindFromGenericRequirementsBuffer(IGF, Requirements, buffer,
+                                    metadataState, getInContext);
 }
 
 void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
                                     ArrayRef<GenericRequirement> requirements,
                                     Address buffer,
+                                    MetadataState metadataState,
                                     GetTypeParameterInContextFn getInContext) {
   if (requirements.empty()) return;
 
@@ -3012,13 +3065,15 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);
-    bindGenericRequirement(IGF, requirements[index], value, getInContext);
+    bindGenericRequirement(IGF, requirements[index], value, metadataState,
+                           getInContext);
   }
 }
 
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
+                                   MetadataState metadataState,
                                    GetTypeParameterInContextFn getInContext) {
   // Get the corresponding context type.
   auto type = getInContext(requirement.TypeParameter);
@@ -3032,7 +3087,7 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   } else {
     assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
     setTypeMetadataName(IGF.IGM, value, type);
-    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value);
+    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
   }
 }
 
@@ -3172,7 +3227,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                        parentMetadata,
                                        wtable });
 
-  return MetadataResponse::split(IGF, request, call);
+  return MetadataResponse::handle(IGF, request, call);
 }
 
 Signature

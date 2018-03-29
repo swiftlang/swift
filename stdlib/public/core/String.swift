@@ -12,29 +12,6 @@
 
 import SwiftShims
 
-/// Call body with a pointer to zero-terminated sequence of
-/// `TargetEncoding.CodeUnit` representing the same string as `source`, when
-/// `source` is interpreted as being encoded with `SourceEncoding`.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func _withCString<
-  Source : Collection,
-  SourceEncoding : Unicode.Encoding,
-  TargetEncoding : Unicode.Encoding,
-  Result
->(
-  encodedAs targetEncoding: TargetEncoding.Type,
-  from source: Source,
-  encodedAs sourceEncoding: SourceEncoding.Type,
-  execute body : (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-) rethrows -> Result
-where Source.Iterator.Element == SourceEncoding.CodeUnit {
-  return try _withCStringAndLength(
-    encodedAs: targetEncoding,
-    from: source,
-    encodedAs: sourceEncoding) { p, _ in try body(p) }
-}
-
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.partial.never")
@@ -129,6 +106,23 @@ extension _StringGuts {
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
     _sanityCheck(_isOpaque)
+
+    if self._isSmall {
+      let small = self._smallUTF8String[bounds]
+      if small.isASCII {
+        return try small.withUnmanagedASCII {
+          (ascii: _UnmanagedString<Unicode.UTF8.CodeUnit>) throws -> Result in
+          return try Swift._withCStringAndLength(
+            encodedAs: targetEncoding,
+            from: ascii.buffer,
+            encodedAs: Unicode.UTF8.self,
+            execute: body)
+          }
+      } else {
+        fatalError("TODO: UTF-8 support in small strings")
+      }
+    }
+
     defer { _fixLifetime(self) }
     let opaque = _asOpaque()[bounds]
     return try Swift._withCStringAndLength(
@@ -150,7 +144,7 @@ extension String {
     encoding: Encoding.Type,
     repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
-  ) -> (String?, hadError: Bool)
+  ) -> String?
   where Input.Element == Encoding.CodeUnit {
 
     // TODO(SSO): small check
@@ -161,11 +155,20 @@ extension String {
         of: inputStream,
         decodedAs: encoding,
         repairingIllFormedSequences: repairIllFormedSequences) else {
-      return (nil, true)
+      return nil
     }
 
     let capacity = Swift.max(utf16Count, minimumCapacity)
     if isASCII {
+      if let small = _SmallUTF8String(
+        _fromCodeUnits: input,
+        utf16Length: utf16Count,
+        isASCII: true,
+        Encoding.self
+      ) {
+        return String(_StringGuts(small))
+      }
+
       let storage = _SwiftStringStorage<UInt8>.create(
         capacity: capacity,
         count: utf16Count)
@@ -181,8 +184,10 @@ extension String {
         into: sink)
       _sanityCheck(!hadError,
         "string cannot be ASCII if there were decoding errors")
-      return (String(_largeStorage: storage), hadError)
+      return String(_largeStorage: storage)
     } else {
+      // TODO(SSO): Small transcoded string
+
       let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
         capacity: capacity,
         count: utf16Count)
@@ -191,12 +196,12 @@ extension String {
         p.pointee = $0
         p += 1
       }
-      let hadError = transcode(
+      _ = transcode(
         input.makeIterator(),
         from: encoding, to: UTF16.self,
         stoppingOnError: !repairIllFormedSequences,
         into: sink)
-      return (String(_largeStorage: storage), hadError)
+      return String(_largeStorage: storage)
     }
   }
 
@@ -212,11 +217,8 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
-    let (result, _) = String._fromCodeUnits(
-      codeUnits,
-      encoding: sourceEncoding,
-      repairIllFormedSequences: true)
-    self = result!
+    self = String._fromCodeUnits(
+      codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)!
   }
 
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -628,45 +630,40 @@ extension String {
 }
 
 extension String {
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static func _fromWellFormedCodeUnitSequence<
-    Encoding : Unicode.Encoding, Input : Collection
-  >(
-    _ encoding: Encoding.Type, input: Input
-  ) -> String
-    where  Input.Element == Encoding.CodeUnit {
-    return String._fromCodeUnitSequence(encoding, input: input)!
+  @_inlineable
+  @_versioned
+  static func _fromUTF8CodeUnitSequence<C : RandomAccessCollection>(
+    _ input: C, repair: Bool
+  ) -> String? where C.Element == UInt8 {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
+    return String._fromCodeUnits(
+      input, encoding: UTF8.self, repairIllFormedSequences: repair)
+  }
+
+  @_inlineable
+  @_versioned
+  static func _fromASCII<C : RandomAccessCollection>(
+    _ input: C
+  ) -> String where C.Element == UInt8 {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
+    let storage = _SwiftStringStorage<UInt8>.create(
+      capacity: input.count, count: input.count)
+    var (itr, end) = input._copyContents(initializing: storage.usedBuffer)
+    _sanityCheck(itr.next() == nil)
+    _sanityCheck(end == storage.usedBuffer.endIndex)
+    return String(_StringGuts(_large: storage))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static func _fromCodeUnitSequence<
-    Encoding : Unicode.Encoding, Input : Collection
-  >(
-    _ encoding: Encoding.Type, input: Input
-  ) -> String?
-  where Input.Element == Encoding.CodeUnit {
-    let (result, _) = String._fromCodeUnits(
-      input,
-      encoding: encoding,
-      repairIllFormedSequences: false)
-    return result
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static func _fromCodeUnitSequenceWithRepair<
-    Encoding : Unicode.Encoding, Input : Collection
-  >(
-    _ encoding: Encoding.Type, input: Input
-  ) -> (String, hadError: Bool)
-  where Input.Element == Encoding.CodeUnit {
-    let (string, hadError) = String._fromCodeUnits(
-      input,
-      encoding: encoding,
-      repairIllFormedSequences: true)
-    return (string!, hadError)
+  public // FIXME: @_versioned, currently public because testing...
+  static func _fromWellFormedUTF8CodeUnitSequence<C : RandomAccessCollection>(
+    _ input: C, repair: Bool = false
+  ) -> String where C.Element == UTF8.CodeUnit {
+    return String._fromUTF8CodeUnitSequence(input, repair: repair)!
   }
 }
 
@@ -675,8 +672,31 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   @effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self, input: CollectionOfOne(UInt32(value)))
+    self.init(Unicode.Scalar(_value: UInt32(value)))
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(_ scalar: Unicode.Scalar) {
+    // Until we have UTF-8 support in small string, need to be large
+    //
+    // TODO: All scalars are small
+    if scalar.value <= 0x7f {
+      if let small = _SmallUTF8String(
+        Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
+      ) {
+        self = String(_StringGuts(small))
+        return
+      } else {
+#if arch(i386) || arch(arm)
+#else
+      _sanityCheckFailure("Couldn't fit ASCII scalar into small string?")
+#endif
+      }
+    }
+    self = String._fromCodeUnits(
+      CollectionOfOne(scalar.value),
+      encoding: UTF32.self,
+      repairIllFormedSequences: false
+    )._unsafelyUnwrappedUnchecked
   }
 }
 
@@ -687,12 +707,12 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF8.self,
-      input: UnsafeBufferPointer(
-        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-        count: Int(utf8CodeUnitCount)))
+    isASCII: Builtin.Int1
+  ) {
+    self.init(
+      _builtinStringLiteral: start,
+      utf8CodeUnitCount: utf8CodeUnitCount,
+      isASCII: isASCII)
   }
 }
 
@@ -704,12 +724,15 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
+    let bufPtr = UnsafeBufferPointer(
+      start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt16.self),
+      count: Int(utf16CodeUnitCount))
+    if let small = _SmallUTF8String(bufPtr) {
+      self = String(_StringGuts(small))
+      return
+    }
 
-    // TODO(SSO): small check
-
-    self = String(_StringGuts(_large: _UnmanagedString<UTF16.CodeUnit>(
-          start: UnsafePointer(start),
-          count: Int(utf16CodeUnitCount))))
+    self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
   }
 }
 
@@ -722,24 +745,23 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-
-    // TODO(SSO): small check
-
-    if Int(utf8CodeUnitCount) == 0 {
+    let bufPtr = UnsafeBufferPointer(
+      start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
+      count: Int(utf8CodeUnitCount))
+    if bufPtr.isEmpty {
       self.init()
       return
     }
-    if _fastPath(Bool(isASCII)) {
-      self = String(_StringGuts(_large: _UnmanagedString<UInt8>(
-            start: UnsafePointer(start),
-            count: Int(utf8CodeUnitCount))))
+
+    if let small = _SmallUTF8String(bufPtr) {
+      self = String(_StringGuts(small))
       return
     }
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF8.self,
-      input: UnsafeBufferPointer(
-        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-        count: Int(utf8CodeUnitCount)))
+    if _fastPath(Bool(isASCII)) {
+      self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
+      return
+    }
+    self = String._fromWellFormedUTF8CodeUnitSequence(bufPtr)
   }
 }
 
@@ -840,6 +862,17 @@ extension String {
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
+    // TODO: ASCII fast path, and probably adjust this interface too.
+    if _guts._isSmall {
+      _guts._smallUTF8String.withUnmanagedUTF16 { utf16 in
+        var i = utf16.makeIterator()
+        Unicode.UTF16.ForwardParser._parse(&i) {
+          Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
+        }
+      }
+      return
+    }
+
     _sanityCheck(_guts._isOpaque)
     defer { _fixLifetime(self) }
     let opaque = _guts._asOpaque()
@@ -924,9 +957,8 @@ extension String {
     utf8CodeUnitCount: Int
   ) {
     resultStorage.initialize(to:
-      String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
+      String._fromWellFormedUTF8CodeUnitSequence(
+        UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
   }
 }
 
@@ -966,48 +998,26 @@ extension Sequence where Element: StringProtocol {
       }
       return r > 0 ? r - separatorSize : 0
     }
-    if width == 1 {
-      return _joined(
-        capacity: reservation ?? 0,
-        of: UInt8.self,
-        separator: separatorSize == 0 ? nil : separator)
-    }
-    else {
-      return _joined(
-        capacity: reservation ?? 0,
-        of: UTF16.CodeUnit.self,
-        separator: separatorSize == 0 ? nil : separator)
-    }
-  }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _joined<CodeUnit>(
-    capacity: Int,
-    of codeUnit: CodeUnit.Type,
-    separator: String?
-  ) -> String
-  where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    let result = _SwiftStringStorage<CodeUnit>.create(capacity: capacity)
-
-    // TODO(TODO: JIRA): check for small
-
-    guard let separator = separator else {
+    let capacity = reservation ?? separatorSize
+    var result = ""
+    result.reserveCapacity(capacity)
+    if separator.isEmpty {
       for x in self {
-        result._appendInPlace(x)
+        result._guts.append(x)
       }
-      return String(_largeStorage: result)
+      return result
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result._appendInPlace(first)
+      result._guts.append(first)
       while let next = iter.next() {
-        result._appendInPlace(separator)
-        result._appendInPlace(next)
+        result.append(separator)
+        result._guts.append(next)
       }
     }
-    return String(_largeStorage: result)
+    return result
   }
 }
 

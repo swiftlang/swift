@@ -29,7 +29,7 @@
 using namespace swift;
 
 // FIXME: replace with std::string and StringRef as appropriate to each case.
-typedef const std::string ConstString;
+using ConstString = const std::string;
 
 static std::string stringWithFormat(const char *fmt_str, ...) {
   int final_n, n = ((int)strlen(fmt_str)) * 2;
@@ -76,7 +76,7 @@ GetClangTypeKindFromSwiftKind(DeclKind decl_kind) {
 
 class DeclsLookupSource {
 public:
-  typedef SmallVectorImpl<ValueDecl *> ValueDecls;
+  using ValueDecls = SmallVectorImpl<ValueDecl *>;
 
 private:
   class VisibleDeclsConsumer : public VisibleDeclConsumer {
@@ -124,14 +124,14 @@ public:
     Invalid
   };
 
-  typedef Optional<std::string> PrivateDeclIdentifier;
+  using PrivateDeclIdentifier = Optional<std::string>;
 
   static DeclsLookupSource
   GetDeclsLookupSource(ASTContext &ast, ConstString module_name,
                        bool allow_clang_importer = true) {
     assert(!module_name.empty());
     static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
-    static ConstString g_BuiltinModule("Builtin");
+    static ConstString g_BuiltinModule(BUILTIN_NAME);
     static ConstString g_CModule(MANGLING_MODULE_CLANG_IMPORTER);
     if (allow_clang_importer) {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
@@ -799,13 +799,13 @@ static void VisitNodeBuiltinTypeName(
 
   StringRef builtin_name_ref(builtin_name);
 
-  if (builtin_name_ref.startswith("Builtin.")) {
+  if (builtin_name_ref.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
     StringRef stripped_name_ref =
-        builtin_name_ref.drop_front(strlen("Builtin."));
+        builtin_name_ref.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
     SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module =
-        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString("Builtin"));
+        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString(BUILTIN_NAME));
 
     if (!FindNamedDecls(ast, ast->getIdentifier(stripped_name_ref), result)) {
       result.Clear();
@@ -814,7 +814,7 @@ static void VisitNodeBuiltinTypeName(
     }
   } else {
     result._error = stringWithFormat(
-        "BuiltinTypeName %s doesn't start with Builtin.", builtin_name.c_str());
+        "BuiltinTypeName %s doesn't start with %s", builtin_name.c_str(), BUILTIN_TYPE_NAME_PREFIX);
   }
 }
 
@@ -1217,7 +1217,7 @@ static void VisitLocalDeclVariableName(ASTContext *ast,
       name->getText());
 }
 
-// VisitNodeFunction gets used for Function, Variable and Allocator:
+// VisitNodeFunction gets used for Function and Variable.
 static void VisitNodeFunction(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1346,25 +1346,6 @@ static void VisitNodeFunction(
       break;
     }
   } while (0);
-
-  //                    if (node_kind == Demangle::Node::Kind::Allocator)
-  //                    {
-  //                        // For allocators we don't have an identifier for
-  //                        the name, we will
-  //                        // need to extract it from the class or struct in
-  //                        "identifier_result"
-  //                        //Find
-  //                        if (identifier_result.HasSingleType())
-  //                        {
-  //                            // This contains the class or struct
-  //                            StringRef init_name("init");
-  //
-  //                            if (FindFirstNamedDeclWithKind(ast, init_name,
-  //                            DeclKind::Constructor, identifier_result))
-  //                            {
-  //                            }
-  //                        }
-  //                    }
 
   if (identifier_result._types.size() == 1) {
     result._module = identifier_result._module;
@@ -2175,6 +2156,26 @@ static void VisitAllChildNodes(
   }
 }
 
+static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
+                            VisitNodeResult &result) {
+  assert(result._error.empty());
+
+  Demangle::Node::iterator child_end = cur_node->end();
+  for (Demangle::Node::iterator child_pos = cur_node->begin();
+       child_pos != child_end; ++child_pos) {
+    auto child = *child_pos;
+    const Demangle::Node::Kind childKind = child->getKind();
+
+    switch (childKind) {
+    case Demangle::Node::Kind::Identifier:
+      break;
+    default:
+      VisitNode(ast, *child_pos, result);
+      break;
+    }
+  }
+}
+
 static void VisitNode(
     ASTContext *ast,
     Demangle::NodePointer node, VisitNodeResult &result) {
@@ -2222,6 +2223,9 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Global:
+    VisitNodeGlobal(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::Static:
   case Demangle::Node::Kind::Type:
   case Demangle::Node::Kind::TypeMangling:
@@ -2229,6 +2233,7 @@ static void VisitNode(
     VisitAllChildNodes(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Constructor:
     VisitNodeConstructor(ast, node, result);
     break;
@@ -2254,7 +2259,6 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Function:
-  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Variable:
   case Demangle::Node::Kind::Subscript: // Out of order on purpose
     VisitNodeFunction(ast, node, result);

@@ -185,21 +185,21 @@ namespace {
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
 
-      MetadataRequest::BasicKind state;
+      MetadataState state;
       if (pattern->CompletionFunction.isNull()) {
-        state = MetadataRequest::Complete;
+        state = MetadataState::Complete;
       } else {
         state = inferStateForMetadata(metadata);
       }
       return { metadata, state };
     }
 
-    MetadataRequest::BasicKind inferStateForMetadata(Metadata *metadata) {
+    MetadataState inferStateForMetadata(Metadata *metadata) {
       if (metadata->getValueWitnesses()->isIncomplete())
-        return MetadataRequest::Abstract;
+        return MetadataState::Abstract;
 
       // TODO: internal vs. external layout-complete?
-      return MetadataRequest::LayoutComplete;
+      return MetadataState::LayoutComplete;
     }
 
     // Note that we have to pass 'arguments' separately here instead of
@@ -217,7 +217,7 @@ namespace {
       auto dependency = pattern->CompletionFunction(metadata, context, pattern);
 
       auto state = dependency.Value == nullptr
-                     ? MetadataRequest::Complete
+                     ? MetadataState::Complete
                      : inferStateForMetadata(metadata);
 
       return { state, dependency.State, dependency.Value };
@@ -1087,22 +1087,15 @@ static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
   0
 };
 
-namespace {
-struct BasicLayout {
-  size_t size;
-  ValueWitnessFlags flags;
-  size_t stride;
+static constexpr TypeLayout getInitialLayoutForValueType() {
+  return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
+}
 
-  static constexpr BasicLayout initialForValueType() {
-    return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
-  }
-
-  static constexpr BasicLayout initialForHeapObject() {
-    return {sizeof(HeapObject),
-            ValueWitnessFlags().withAlignment(alignof(HeapObject)),
-            sizeof(HeapObject)};
-  }
-};
+static constexpr TypeLayout getInitialLayoutForHeapObject() {
+  return {sizeof(HeapObject),
+          ValueWitnessFlags().withAlignment(alignof(HeapObject)),
+          sizeof(HeapObject)};
+}
 
 static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
   return (size + alignMask) & ~alignMask;
@@ -1114,10 +1107,10 @@ static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
 /// FUNCTOR should have signature:
 ///   void (size_t index, const Metadata *type, size_t offset)
 template<typename FUNCTOR, typename LAYOUT>
-void performBasicLayout(BasicLayout &layout,
-                        const LAYOUT * const *elements,
-                        size_t numElements,
-                        FUNCTOR &&f) {
+static void performBasicLayout(TypeLayout &layout,
+                               const LAYOUT * const *elements,
+                               size_t numElements,
+                               FUNCTOR &&f) {
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
@@ -1147,7 +1140,6 @@ void performBasicLayout(BasicLayout &layout,
                                     .withInlineStorage(isInline);
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
-} // end anonymous namespace
 
 const TupleTypeMetadata *
 swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
@@ -1201,7 +1193,7 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Data.Labels = key.Labels;
 
   // Perform basic layout on the tuple.
-  auto layout = BasicLayout::initialForValueType();
+  auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, key.Elements, key.NumElements,
     [&](size_t i, const Metadata *elt, size_t offset) {
       Data.getElement(i).Type = elt;
@@ -1477,15 +1469,16 @@ static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
   return (hasExtraInhabitants << 48) | (size << 16) | alignmentMask;
 }
 
-void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
-  auto flags = vwtable->flags;
+void swift::installCommonValueWitnesses(const TypeLayout &layout,
+                                        ValueWitnessTable *vwtable) {
+  auto flags = layout.flags;
   if (flags.isPOD()) {
     // Use POD value witnesses.
     // If the value has a common size and alignment, use specialized value
     // witnesses we already have lying around for the builtin types.
     const ValueWitnessTable *commonVWT;
     bool hasExtraInhabitants = flags.hasExtraInhabitants();
-    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask(),
+    switch (sizeWithAlignmentMask(layout.size, flags.getAlignmentMask(),
                                   hasExtraInhabitants)) {
     default:
       // For uncommon layouts, use value witnesses that work with an arbitrary
@@ -1585,6 +1578,11 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
                                     alignof(ValueWitnessTable));
     newTable = new (memory) ValueWitnessTable(*oldTable);
   }
+
+  // If we ever need to check layout-completeness asynchronously from
+  // initialization, we'll need this to be a store-release (and rely on
+  // consume ordering on the asynchronous check path); and we'll need to
+  // ensure that the current state says that the type is incomplete.
   self->setValueWitnesses(newTable);
 
   return newTable;
@@ -1597,7 +1595,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
                                      size_t numFields,
                                      const TypeLayout * const *fieldTypes,
                                      size_t *fieldOffsets) {
-  auto layout = BasicLayout::initialForValueType();
+  auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const TypeLayout *fieldType, size_t offset) {
       assignUnlessEqual(fieldOffsets[i], offset);
@@ -1608,15 +1606,11 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   auto vwtable =
     getMutableVWTableForInit(structType, layoutFlags, hasExtraInhabitants);
 
-  vwtable->size = layout.size;
-  vwtable->flags = layout.flags;
-  vwtable->stride = layout.stride;
-  
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
   if (hasExtraInhabitants) {
-    vwtable->flags = vwtable->flags.withExtraInhabitants(true);
-    auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
+    layout.flags = layout.flags.withExtraInhabitants(true);
+    auto xiVWT = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
     xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
 
     // The compiler should already have initialized these.
@@ -1625,7 +1619,9 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   }
 
   // Substitute in better value witnesses if we have them.
-  installCommonValueWitnesses(vwtable);
+  installCommonValueWitnesses(layout, vwtable);
+
+  vwtable->publishLayout(layout);
 }
 
 /***************************************************************************/
@@ -1845,10 +1841,11 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
-swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                                 size_t numFields,
-                                           const TypeLayout * const *fieldTypes,
-                                                 size_t *fieldOffsets) {
+swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets) {
   _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
@@ -1882,7 +1879,7 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // If we don't have a formal superclass, start with the basic heap header.
   } else {
-    auto heapLayout = BasicLayout::initialForHeapObject();
+    auto heapLayout = getInitialLayoutForHeapObject();
     size = heapLayout.size;
     alignMask = heapLayout.flags.getAlignmentMask();
   }
@@ -3236,13 +3233,16 @@ static Result performOnMetadataCache(const Metadata *metadata,
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
     description = classMetadata->getDescription();
-  } else {
-    auto valueMetadata = cast<ValueMetadata>(metadata);
+  } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
+  } else {
+    return std::move(callbacks).forOtherMetadata(metadata);
   }
 
-  assert(description->isGeneric() &&
-         "only generic metadata can delay evaluation for now");
+  if (!description->isGeneric()) {
+    return std::move(callbacks).forOtherMetadata(metadata);
+  }
+
   auto &generics = description->getFullGenericContextHeader();
 
   auto genericArgs =
@@ -3258,7 +3258,7 @@ static Result performOnMetadataCache(const Metadata *metadata,
 bool swift::addToMetadataQueue(
                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
                   const Metadata *dependency,
-                  MetadataRequest::BasicKind dependencyRequirement) {
+                  MetadataState dependencyRequirement) {
   struct EnqueueCallbacks {
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
@@ -3267,6 +3267,10 @@ bool swift::addToMetadataQueue(
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
       return cache.enqueue(key, std::move(QueueEntry));
+    }
+
+    bool forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
     }
   } callbacks = { std::move(queueEntry) };
 
@@ -3282,7 +3286,7 @@ void swift::resumeMetadataCompletion(
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
     static MetadataRequest getRequest() {
-      return MetadataRequest(MetadataRequest::Complete,
+      return MetadataRequest(MetadataState::Complete,
                              /*non-blocking*/ true);
     }
 
@@ -3298,10 +3302,36 @@ void swift::resumeMetadataCompletion(
                                  // non-key arguments.
                                  key.KeyData.begin());
     }
+
+    void forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
+    }
   } callbacks = { std::move(queueEntry) };
 
   auto metadata = queueEntry->Value;
   performOnMetadataCache<void>(metadata, std::move(callbacks));
+}
+
+MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
+                                                 const Metadata *type) {
+  struct CheckStateCallbacks {
+    MetadataRequest Request;
+
+    /// Generic types just need to be awaited.
+    MetadataResponse forGenericMetadata(const Metadata *type,
+                                      const TypeContextDescriptor *description,
+                                      GenericMetadataCache &cache,
+                                      MetadataCacheKey key) && {
+      return cache.await(key, Request);
+    }
+
+    /// All other type metadata are always complete.
+    MetadataResponse forOtherMetadata(const Metadata *type) && {
+      return MetadataResponse{type, MetadataState::Complete};
+    }
+  } callbacks = { request };
+
+  return performOnMetadataCache<MetadataResponse>(type, std::move(callbacks));
 }
 
 /***************************************************************************/

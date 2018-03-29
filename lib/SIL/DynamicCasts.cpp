@@ -80,8 +80,7 @@ static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
 static DynamicCastFeasibility
-classifyDynamicCastToProtocol(CanType source,
-                              CanType target,
+classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
                               bool isWholeModuleOpts) {
   assert(target.isExistentialType() &&
          "target should be an existential type");
@@ -89,31 +88,23 @@ classifyDynamicCastToProtocol(CanType source,
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
 
-  auto *TargetProtocol = target.getAnyNominal();
+  auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getAnyNominal());
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  auto *SourceNominalTy = source.getAnyNominal();
+  auto conformance = M->lookupConformance(source, TargetProtocol);
+  if (conformance) {
+    // A conditional conformance can have things that need to be evaluated
+    // dynamically.
+    if (conformance->getConditionalRequirements().empty())
+      return DynamicCastFeasibility::WillSucceed;
 
-  if (!SourceNominalTy) {
-    if (auto Archetype = dyn_cast<ArchetypeType>(source)) {
-      auto SourceProtocols = Archetype->getConformsTo();
-      // Check all protocols implemented by the archetype.
-      for (auto *Protocol : SourceProtocols) {
-        if (Protocol == TargetProtocol)
-          return DynamicCastFeasibility::WillSucceed;
-      }
-    }
     return DynamicCastFeasibility::MaySucceed;
   }
 
-  auto SourceProtocols = SourceNominalTy->getAllProtocols();
-
-  // Check all protocols implemented by the type.
-  for (auto *Protocol : SourceProtocols) {
-    if (Protocol == TargetProtocol)
-      return DynamicCastFeasibility::WillSucceed;
-  }
+  auto *SourceNominalTy = source.getAnyNominal();
+  if (!SourceNominalTy)
+    return DynamicCastFeasibility::MaySucceed;
 
   // If we are casting a protocol, then the cast will fail
   // as we have not found any conformances and protocols cannot
@@ -346,7 +337,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
     // Check conversions from non-protocol types into protocol types.
     if (!source.isExistentialType() &&
         target.isExistentialType())
-      return classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
+      return classifyDynamicCastToProtocol(M, source, target,
+                                           isWholeModuleOpts);
 
     // Check conversions from protocol types to non-protocol types.
     if (source.isExistentialType() &&
@@ -375,7 +367,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // Hashable is not actually a legal existential type right now, but
       // the check doesn't care about that.
       if (auto hashable = getHashableExistentialType(M)) {
-        return classifyDynamicCastToProtocol(source, hashable,
+        return classifyDynamicCastToProtocol(M, source, hashable,
                                              isWholeModuleOpts);
       }
     }
@@ -412,9 +404,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
     if (targetMetatype.isAnyExistentialType() &&
         (isa<ProtocolType>(target) || isa<ProtocolCompositionType>(target))) {
-      auto Feasibility = classifyDynamicCastToProtocol(source,
-                                                       target,
-                                                       isWholeModuleOpts);
+      auto Feasibility =
+          classifyDynamicCastToProtocol(M, source, target, isWholeModuleOpts);
       // Cast from existential metatype to existential metatype may still
       // succeed, even if we cannot prove anything statically.
       if (Feasibility != DynamicCastFeasibility::WillFail ||

@@ -181,12 +181,18 @@ extension String {
       @_versioned // FIXME(sil-serialize-all)
       internal var _guts: _StringGuts
 
+      // FIXME(TODO: JIRA): the below is absurdly wasteful.
+      // UnicodeScalarView.Iterator should be able to be passed in-registers.
+
       @_versioned // FIXME(sil-serialize-all)
       internal var _asciiIterator: _UnmanagedASCIIString.UnicodeScalarIterator?
       @_versioned // FIXME(sil-serialize-all)
       internal var _utf16Iterator: _UnmanagedUTF16String.UnicodeScalarIterator?
       @_versioned // FIXME(sil-serialize-all)
       internal var _opaqueIterator: _UnmanagedOpaqueString.UnicodeScalarIterator?
+
+      @_versioned
+      internal var _smallIterator: _SmallUTF8String.UnicodeScalarIterator?
 
       @_inlineable // FIXME(sil-serialize-all)
       @_versioned // FIXME(sil-serialize-all)
@@ -219,7 +225,13 @@ extension String {
         _sanityCheck(_guts._isOpaque)
         defer { _fixLifetime(self) }
         self._guts = _guts
-        self._opaqueIterator = _guts._asOpaque().makeUnicodeScalarIterator()
+        // TODO: Replace the whole iterator scheme with a sensible solution.
+        if self._guts._isSmall {
+          self._smallIterator =
+            _guts._smallUTF8String.makeUnicodeScalarIterator()
+        } else {
+          self._opaqueIterator = _guts._asOpaque().makeUnicodeScalarIterator()
+        }
       }
 
       /// Advances to the next element and returns it, or `nil` if no next
@@ -236,6 +248,9 @@ extension String {
         }
         if _asciiIterator != nil {
           return _asciiIterator!.next()
+        }
+        if _guts._isSmall {
+          return _smallIterator!.next()
         }
         return _utf16Iterator!.next()
       }

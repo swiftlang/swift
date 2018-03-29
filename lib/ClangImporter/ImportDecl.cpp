@@ -2497,7 +2497,8 @@ namespace {
             // doing so will cause confusion (or even lookup ambiguity) between
             // the name in the imported module and the same name in the
             // standard library.
-            if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
+            if (auto *NAT =
+                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -2832,7 +2833,7 @@ namespace {
                          AccessLevel::Public, loc, SourceLoc(),
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
-          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setUnderlyingType(Impl.getSugaredTypeReference(errorWrapper));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4967,7 +4968,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
 
@@ -5190,7 +5191,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     if (underlyingAlias->isGeneric())
       underlyingType = underlyingAlias->getUnboundGenericType();
     else
-      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
   } else {
     underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }
@@ -5480,7 +5481,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, AccessLevel::Public, SourceLoc(), name, TypeLoc(), false,
+      decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
   // Give the enum element the appropriate type.
