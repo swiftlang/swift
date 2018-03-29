@@ -237,6 +237,8 @@ public:
   ///
   /// \param TC The current tool chain.
   /// \param Args The input arguments.
+  /// \param BatchMode Whether the driver has been explicitly or implicitly
+  /// instructed to use batch mode.
   /// \param Inputs The inputs to the driver.
   /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
@@ -382,6 +384,13 @@ private:
   /// \param Args The arguments passed to the driver (excluding the path to the
   /// driver)
   void parseDriverKind(ArrayRef<const char *> Args);
+
+  /// Examine potentially conficting arguments and warn the user if
+  /// there is an actual conflict.
+  /// \param Args The input arguments.
+  /// \param Inputs The inputs to the driver.
+  OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
+                                       const InputFileList &Inputs) const;
 };
 
 } // end namespace driver
