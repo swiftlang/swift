@@ -169,8 +169,8 @@ private:
   /// An abstract entry in the cache, which requires some amount of
   /// non-trivial evaluation to derive the desired value.
   struct AbstractCacheEntry : CacheEntry {
-    unsigned SourceIndex : 32 - LocalTypeDataValue::StateSize;
-    unsigned State : LocalTypeDataValue::StateSize;
+    unsigned SourceIndex;
+    unsigned State;
     MetadataPath Path;
 
     AbstractCacheEntry(DominancePoint point, bool isConditional,

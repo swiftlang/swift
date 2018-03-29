@@ -37,26 +37,7 @@ namespace irgen {
   class DynamicMetadataRequest;
   class IRGenFunction;
   class LocalTypeDataKey;
-  class LocalTypeDataValue;
   class MetadataResponse;
-
-class LocalTypeDataValue {
-public:
-  enum { StateSize = 2 };
-
-private:
-  llvm::PointerIntPair<llvm::Value*, StateSize, MetadataState> Value;
-
-public:
-  LocalTypeDataValue() {}
-  LocalTypeDataValue(llvm::Value *value, MetadataState state)
-    : Value(value, state) {}
-
-  explicit operator bool() const { return Value.getOpaqueValue() != nullptr; }
-
-  llvm::Value *getValue() const { return Value.getPointer(); }
-  MetadataState getState() const { return Value.getInt(); }
-};
 
 /// A path from one source metadata --- either Swift type metadata or a Swift
 /// protocol conformance --- to another.

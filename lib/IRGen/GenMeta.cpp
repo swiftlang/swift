@@ -1910,9 +1910,8 @@ namespace {
     void emitStoreOfSuperclass(IRGenFunction &IGF, CanType superclassType,
                                llvm::Value *metadata,
                                MetadataDependencyCollector *collector) {
-      auto request =
-        DynamicMetadataRequest::getNonBlocking(MetadataState::Complete,
-                                               collector);
+      auto request = DynamicMetadataRequest::getNonBlocking(
+                               MetadataState::NonTransitiveComplete, collector);
 
       llvm::Value *superMetadata =
         emitClassHeapMetadataRef(IGF, superclassType,
