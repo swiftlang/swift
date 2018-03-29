@@ -707,13 +707,13 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                     std::make_pair("ModuleName", ModuleName)});
   }
@@ -783,13 +783,13 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     Consumer->handleRequestError(Error.c_str());
     return;
   }
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                      std::make_pair("SourceName", SourceName)});
   }
@@ -826,13 +826,13 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenHeaderInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenHeaderInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                     std::make_pair("HeaderName", HeaderName)});
   }

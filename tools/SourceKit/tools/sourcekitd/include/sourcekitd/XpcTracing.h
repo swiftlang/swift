@@ -34,7 +34,8 @@ void sendTraceMessage(sourcekitd_trace_message_t Msg);
 
 uint64_t getTracingSession();
 
-void initialize();
+void enableXPCTracing();
+void disableXPCTracing();
 
 } // namespace sourcekitd
 } // namespace trace
