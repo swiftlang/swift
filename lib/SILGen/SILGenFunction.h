@@ -1617,7 +1617,8 @@ public:
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
                                     CanType inputType,
                                     CanType outputType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool dontPostponeToNoEscapeCleanup = false);
 
   /// Most general form of the above.
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
@@ -1625,7 +1626,8 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool dontPostponeToNoEscapeCleanup = false);
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
