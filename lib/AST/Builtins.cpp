@@ -991,6 +991,15 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getAddressOfBorrowOperation(ASTContext &Context,
+                                              Identifier Id) {
+  // <T> (T) -> RawPointer
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
+}
+
 static ValueDecl *getTypeJoinOperation(ASTContext &Context, Identifier Id) {
   // <T,U,V> (T.Type, U.Type) -> V.Type
   BuiltinGenericSignatureBuilder builder(Context, 3);
@@ -1814,7 +1823,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
-      
+
+  case BuiltinValueKind::AddressOfBorrow:
+    if (!Types.empty()) return nullptr;
+    return getAddressOfBorrowOperation(Context, Id);
+
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
 
