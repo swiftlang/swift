@@ -739,6 +739,12 @@ void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
 
 }
 
+SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
+  if (!isGeneric())
+    return SourceRange();
+  return getGenericParams()->getTrailingWhereClauseSourceRange();
+}
+
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
@@ -2560,6 +2566,9 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
+  auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
+  if (TrailingWhereClauseSourceRange.isValid())
+    return { TypeAliasLoc, TrailingWhereClauseSourceRange.End };
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   return { TypeAliasLoc, getNameLoc() };
@@ -2695,10 +2704,13 @@ TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
 }
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
-  SourceLoc endLoc = getNameLoc();
-
-  if (!getInherited().empty()) {
+  SourceLoc endLoc;
+  if (auto TWC = getTrailingWhereClause())
+    endLoc = TWC->getSourceRange().End;
+  else if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
+  } else {
+    endLoc = getNameLoc();
   }
   return SourceRange(KeywordLoc, endLoc);
 }
@@ -5301,9 +5313,17 @@ SourceRange FuncDecl::getSourceRange() const {
   if (isa<AccessorDecl>(this))
     return StartLoc;
 
+  auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
+  if (TrailingWhereClauseSourceRange.isValid())
+    return { StartLoc, TrailingWhereClauseSourceRange.End };
+
   if (getBodyResultTypeLoc().hasLocation() &&
       getBodyResultTypeLoc().getSourceRange().End.isValid())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
+
+  if (hasThrows())
+    return { StartLoc, getThrowsLoc() };
+
   auto LastParamListEndLoc = getParameterLists().back()->getSourceRange().End;
   if (LastParamListEndLoc.isValid())
     return { StartLoc, LastParamListEndLoc };
@@ -5387,6 +5407,10 @@ SourceRange ConstructorDecl::getSourceRange() const {
   SourceLoc End;
   if (auto body = getBody())
     End = body->getEndLoc();
+  if (End.isInvalid())
+    End = getGenericTrailingWhereClauseSourceRange().End;
+  if (End.isInvalid())
+    End = getThrowsLoc();
   if (End.isInvalid())
     End = getSignatureSourceRange().End;
 
