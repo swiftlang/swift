@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__APPLE__) && defined(__MACH__)
+
 #include "../../stdlib/public/runtime/CompatibilityOverride.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Metadata.h"
@@ -161,3 +163,5 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
   auto Result = swift_conformsToProtocol(nullptr, nullptr);
   ASSERT_EQ(Result, nullptr);  
 }
+
+#endif
