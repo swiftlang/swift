@@ -96,7 +96,7 @@ import Swift
 // CHECK-SAME-native: %swift.type* null,
 // CHECK-SAME-native: %swift.opaque* null,
 // CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @"$S15generic_classes14RootNonGenericCMm" to i64),
-// CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$__TtCs12_SwiftObject",
+// CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-SAME-objc:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
 // CHECK-SAME-native: i64 1,
