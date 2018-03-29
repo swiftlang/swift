@@ -2952,6 +2952,114 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
   return Changed;
 }
 
+static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
+   auto numSuccs = SEI->getNumSuccessors();
+   if (numSuccs != 2)
+     return nullptr;
+   auto *SuccSome = SEI->getCase(0).second;
+   auto *SuccNone = SEI->getCase(1).second;
+   if (SuccSome->args_size() != 1)
+     std::swap(SuccSome, SuccNone);
+
+   if (SuccSome->args_size() != 1 || SuccNone->args_size() != 0)
+     return nullptr;
+
+   auto *Succ = SuccSome->getSingleSuccessorBlock();
+   if (!Succ)
+     return nullptr;
+
+   if (SuccNone == Succ)
+     return Succ;
+
+   SuccNone = SuccNone->getSingleSuccessorBlock();
+   if (SuccNone == Succ)
+     return Succ;
+
+   SuccNone = SuccNone->getSingleSuccessorBlock();
+   if (SuccNone == Succ)
+     return Succ;
+
+   return nullptr;
+}
+/// Ensure the lifetime of the closure accross an
+///
+///   optional<@escaping () -> ()> to
+///   optional<@noescape @convention(block) () -> ()>
+///
+///   conversion and its use.
+///
+///   The pattern this is looking for
+///                            switch_enum %closure
+///                           /           \
+///     convert_escape_to_noescape          nil
+///                             switch_enum
+///                           /           \
+///                convertToBlock          nil
+///                           \            /
+///                     (%convertOptionalBlock :)
+///   We will insert a copy_value of the original %closure before the two
+///   diamonds. And a destroy of %closure at the last destroy of
+///   %convertOptionalBlock.
+static bool fixupConvertEscapeToNoEscapeLifetime(SILFunction &Fn) {
+  bool Changed = false;
+  for (auto &BB : Fn) {
+    auto I = BB.begin();
+    while (I != BB.end()) {
+      SILInstruction *Inst = &*I;
+      ++I;
+      auto *convertEscapeToNoescape =
+          dyn_cast<ConvertEscapeToNoEscapeInst>(Inst);
+      if (!convertEscapeToNoescape)
+        continue;
+      auto *blockArg =
+          dyn_cast<SILArgument>(convertEscapeToNoescape->getOperand());
+      if (!blockArg)
+        continue;
+      auto *PredBB =
+          convertEscapeToNoescape->getParent()->getSinglePredecessorBlock();
+      if (!PredBB)
+        continue;
+      auto *ConvertSuccessorBlock = convertEscapeToNoescape->getParent()->getSingleSuccessorBlock();
+      if (!ConvertSuccessorBlock)
+        continue;
+      auto *SwitchEnum1 = dyn_cast<SwitchEnumInst>(PredBB->getTerminator());
+      if (!SwitchEnum1)
+        continue;
+      auto *DiamondSucc = getOptionalDiamondSuccessor(SwitchEnum1);
+      if (!DiamondSucc)
+        continue;
+      auto *SwitchEnum2 = dyn_cast<SwitchEnumInst>(DiamondSucc->getTerminator());
+      if (!SwitchEnum2)
+        continue;
+      auto *DiamondSucc2 = getOptionalDiamondSuccessor(SwitchEnum2);
+      if (!DiamondSucc2)
+        continue;
+      if (DiamondSucc2->getNumArguments() != 1)
+        continue;
+      SILInstruction *onlyDestroy = [&]() -> SILInstruction * {
+        SILInstruction *lastDestroy = nullptr;
+        for (auto *Use : DiamondSucc2->getArgument(0)->getUses()) {
+          SILInstruction *Usr = Use->getUser();
+          if (isa<ReleaseValueInst>(Usr) || isa<StrongReleaseInst>(Usr) ||
+              isa<DestroyValueInst>(Usr)) {
+            if (lastDestroy)
+              return nullptr;
+            lastDestroy = Usr;
+          }
+        }
+        return lastDestroy;
+      }();
+      if (!onlyDestroy)
+        continue;
+      SILBuilderWithScope B(SwitchEnum1);
+      auto copy =
+          B.createCopyValue(SwitchEnum1->getLoc(), SwitchEnum1->getOperand());
+      B.setInsertionPoint(onlyDestroy);
+      B.createDestroyValue(SwitchEnum1->getLoc(), copy);
+    }
+  }
+  return Changed;
+}
 
 namespace {
 /// Perform definitive initialization analysis and promote alloc_box uses into
@@ -2974,6 +3082,11 @@ class DefiniteInitialization : public SILFunctionTransform {
     // Lower raw-sil only instructions used by this pass, like "assign".
     if (lowerRawSILOperations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    // Fixup lifetimes of optional convertEscapeToNoEscape.
+    if (fixupConvertEscapeToNoEscapeLifetime(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
   }
 
 };
