@@ -1559,10 +1559,8 @@ const ClassMetadata *swift::getRootSuperclass() {
 #endif
 }
 
-#if SWIFT_OBJC_INTEROP
 #define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
-#endif
 
 #define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
