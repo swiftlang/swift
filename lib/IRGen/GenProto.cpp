@@ -1829,9 +1829,19 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
 
     table.addIndirectRelativeAddress(requirement);
 
-    auto *witness = IGM.getAddrOfSILFunction(
-        entry.getMethodWitness().Witness,
-        NotForDefinition);
+    SILFunction *Func = entry.getMethodWitness().Witness;
+    llvm::Constant *witness;
+    if (Func) {
+      // Force the thunk to be emitted in the current translation unit
+      // when in multi-threaded mode.
+      IGM.IRGen.forceLocalEmitOfLazyFunction(Func);
+
+      witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+    } else {
+      // The method is removed by dead method elimination.
+      // It should be never called. We add a null pointer.
+      witness = nullptr;
+    }
     table.addRelativeAddress(witness);
   }
 
