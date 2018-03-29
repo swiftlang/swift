@@ -2,12 +2,6 @@
 
 // REQUIRES: swift_stdlib_no_asserts
 
-// The below temporary disables this XFAIL-ed test on Linux for
-// https://github.com/apple/swift/pull/14755, where it unexpectedly passes.
-// @gottesmm is working on a fix.
-//
-// REQUIRES: OS=macosx
-
 //CHECK-LABEL: @$S17unused_containers16empty_array_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple
