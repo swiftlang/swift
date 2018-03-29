@@ -937,9 +937,7 @@ static bool isResilientConformance(const NormalProtocolConformance *conformance)
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-bool irgen::isDependentConformance(IRGenModule &IGM,
-                             const NormalProtocolConformance *conformance,
-                                   ResilienceExpansion expansion) {
+bool irgen::isDependentConformance(const NormalProtocolConformance *conformance) {
   // If the conformance is resilient, this is always true.
   if (isResilientConformance(conformance))
     return true;
@@ -949,10 +947,8 @@ bool irgen::isDependentConformance(IRGenModule &IGM,
     if (inherited->isObjC())
       continue;
 
-    if (isDependentConformance(IGM,
-                               conformance->getInheritedConformance(inherited)
-                                 ->getRootNormalConformance(),
-                               expansion))
+    if (isDependentConformance(conformance->getInheritedConformance(inherited)
+                                 ->getRootNormalConformance()))
       return true;
   }
 
@@ -1813,8 +1809,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   }
 
   // The target metadata is the first argument.
-  assert(isDependentConformance(IGF.IGM, &Conformance,
-                                ResilienceExpansion::Maximal));
+  assert(isDependentConformance(&Conformance));
 
   Explosion params = IGF.collectParameters();
   llvm::Value *metadata;
@@ -2040,8 +2035,7 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
-  if (isDependentConformance(IGM, normalConformance,
-                             ResilienceExpansion::Maximal)) {
+  if (isDependentConformance(normalConformance)) {
     info = new AccessorConformanceInfo(conformance);
     Conformances.insert({conformance, info});
   } else {
@@ -2085,8 +2079,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
-  bool isDependent = isDependentConformance(*this, conf,
-                                            ResilienceExpansion::Maximal);
+  bool isDependent = isDependentConformance(conf);
   auto global = cast<llvm::GlobalVariable>(
     isDependent
       ? getAddrOfWitnessTablePattern(conf, initializer)

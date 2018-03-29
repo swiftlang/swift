@@ -2741,8 +2741,7 @@ namespace {
       llvm::Constant *witnessTableVar;
 
       if (Conformance->getConditionalRequirements().empty()) {
-        if (!isDependentConformance(IGM, Conformance,
-                                    ResilienceExpansion::Maximal)) {
+        if (!isDependentConformance(Conformance)) {
           Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
           witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
         } else {
