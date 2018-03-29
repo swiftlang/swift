@@ -115,7 +115,7 @@ void MetadataResponse::ensureDynamicState(IRGenFunction &IGF) & {
   // If we're statically known complete, we can just fill in
   // MetadataState::Complete.
   if (isStaticallyKnownComplete()) {
-    State.setPointer(getCompletedState(IGF.IGM));
+    DynamicState = getCompletedState(IGF.IGM);
     return;
   }
 
