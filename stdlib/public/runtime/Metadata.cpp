@@ -3176,6 +3176,7 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 /// conformance.
 static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   if (genericTable->Instantiator.isNull() &&
+      genericTable->ResilientWitnesses.isNull() &&
       genericTable->WitnessTablePrivateSizeInWords == 0 &&
       genericTable->WitnessTableSizeInWords ==
         (genericTable->Protocol->NumRequirements +
@@ -3184,6 +3185,51 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   }
 
   return false;
+}
+
+/// Initialize witness table entries from order independent resilient
+/// witnesses stored in the generic witness table structure itself.
+static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
+                                            void **table) {
+  auto protocol = genericTable->Protocol.get();
+
+  auto requirements = protocol->Requirements.get();
+  auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
+
+  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
+    auto &reqt = requirements[i];
+
+    // Only function-like requirements are filled in from the
+    // resilient witness table.
+    switch (reqt.Flags.getKind()) {
+    case ProtocolRequirementFlags::Kind::Method:
+    case ProtocolRequirementFlags::Kind::Init:
+    case ProtocolRequirementFlags::Kind::Getter:
+    case ProtocolRequirementFlags::Kind::Setter:
+    case ProtocolRequirementFlags::Kind::MaterializeForSet:
+      break;
+    case ProtocolRequirementFlags::Kind::BaseProtocol:
+    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
+    case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
+      continue;
+    }
+
+    void *fn = reqt.Function.get();
+    void *impl = reqt.DefaultImplementation.get();
+
+    // Find the witness if there is one, otherwise we use the default.
+    for (auto &witness : witnesses) {
+      if (witness.Function.get() == fn) {
+        impl = witness.Witness.get();
+        break;
+      }
+    }
+
+    assert(impl != nullptr && "no implementation for witness");
+
+    unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
+    table[witnessIndex] = impl;
+  }
 }
 
 /// Instantiate a brand new witness table for a resilient or generic
@@ -3222,13 +3268,17 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
-    void *defaultImpl =
-      requirements[requirementIndex].DefaultImplementation.get();
-    assert(defaultImpl &&
-           "no default implementation for missing requirement");
-    table[i] = defaultImpl;
+  if (genericTable->ResilientWitnesses)
+    initializeResilientWitnessTable(genericTable, table);
+  else {
+    for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
+      size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
+      void *defaultImpl =
+        requirements[requirementIndex].DefaultImplementation.get();
+      assert(defaultImpl &&
+             "no default implementation for missing requirement");
+      table[i] = defaultImpl;
+    }
   }
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);

@@ -2008,10 +2008,6 @@ struct TargetProtocolDescriptor {
   /// as the requirements.
   RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
 
-  void *getDefaultWitness(unsigned index) const {
-    return Requirements.get()[index].DefaultImplementation.get();
-  }
-
   // This is only used in unittests/Metadata.cpp.
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
                       const TargetProtocolDescriptorList<Runtime> *Inherited,
@@ -2274,6 +2270,57 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
 using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
 /// \brief The control structure of a generic or resilient protocol
+/// conformance witness.
+///
+/// Resilient conformances must use a pattern where new requirements
+/// with default implementations can be added and the order of existing
+/// requirements can be changed.
+///
+/// This is accomplished by emitting an order-independent series of
+/// relative pointer pairs, consisting of a protocol requirement together
+/// with a witness. The requirement is identified by an indirect relative
+/// pointer to the protocol dispatch thunk.
+template <typename Runtime>
+struct TargetResilientWitness {
+  RelativeIndirectPointer<void> Function;
+  RelativeDirectPointer<void> Witness;
+};
+using ResilientWitness = TargetResilientWitness<InProcess>;
+
+template <typename Runtime>
+struct TargetResilientWitnessTable final
+  : public swift::ABI::TrailingObjects<
+             TargetResilientWitnessTable<Runtime>,
+             TargetResilientWitness<Runtime>> {
+  uint32_t NumWitnesses;
+
+  using TrailingObjects = swift::ABI::TrailingObjects<
+                             TargetResilientWitnessTable<Runtime>,
+                             TargetResilientWitness<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(
+                        OverloadToken<TargetResilientWitness<Runtime>>) const {
+    return NumWitnesses;
+  }
+
+  llvm::ArrayRef<TargetResilientWitness<Runtime>>
+  getWitnesses() const {
+    return {this->template getTrailingObjects<TargetResilientWitness<Runtime>>(),
+            NumWitnesses};
+  }
+
+  const TargetResilientWitness<Runtime> &
+  getWitness(unsigned i) const {
+    return getWitnesses()[i];
+  }
+};
+using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
+
+/// \brief The control structure of a generic or resilient protocol
 /// conformance.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:
@@ -2301,6 +2348,10 @@ struct TargetGenericWitnessTable {
 
   /// The pattern.
   RelativeDirectPointer<const TargetWitnessTable<Runtime>> Pattern;
+
+  /// The resilient witness table, if any.
+  RelativeDirectPointer<const TargetResilientWitnessTable<Runtime>,
+                        /*nullable*/ true> ResilientWitnesses;
 
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,

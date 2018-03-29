@@ -1829,8 +1829,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    /// The size of the witness table in words.
   //    uint16_t WitnessTableSizeInWords;
   //
-  //    /// The amount to copy from the pattern in words.  The rest is zeroed.
-  //    uint16_t WitnessTableSizeInWordsToCopy;
+  //    /// The amount of private storage to allocate before the address point,
+  //    /// in words. This memory is zeroed out in the instantiated witness table
+  //    /// template.
+  //    uint16_t WitnessTablePrivateSizeInWords;
   //
   //    /// The protocol.
   //    RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
@@ -1838,11 +1840,17 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    /// The pattern.
   //    RelativeDirectPointer<WitnessTable> WitnessTable;
   //
+  //    /// The resilient witness table, if any.
+  //    RelativeDirectPointer<const TargetResilientWitnessTable<Runtime>,
+  //                          /*nullable*/ true> ResilientWitnesses;
+  //
   //    /// The instantiation function, which is called after the template is copied.
   //    RelativeDirectPointer<void(WitnessTable *, const Metadata *, void * const *)>
   //                               Instantiator;
   //
-  //    void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+  //    /// Private data for the instantiator.  Out-of-line so that the rest
+  //    /// of this structure can be constant.
+  //    RelativeDirectPointer<PrivateDataType> PrivateData;
   //  };
 
   // First, create the global.  We have to build this in two phases because
@@ -1876,6 +1884,8 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   cacheData.addRelativeAddress(descriptorRef);
   // RelativePointer<WitnessTable>
   cacheData.addRelativeAddress(wtable);
+  // RelativePointer<ResilientWitnesses>
+  cacheData.addInt(IGM.Int32Ty, 0);
   // Instantiation function
   cacheData.addRelativeAddressOrNull(instantiationFn);
   // Private data

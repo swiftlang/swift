@@ -4052,6 +4052,8 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
       RelativeAddressTy,
       // Pattern
       RelativeAddressTy,
+      // ResilientWitnesses
+      RelativeAddressTy,
       // Instantiator
       RelativeAddressTy,
       // PrivateData
