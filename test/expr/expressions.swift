@@ -533,10 +533,8 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
-  var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
-  var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
+  var y = &x // expected-error{{expression type 'inout Int' is ambiguous without more context}}
+  var z = &arg // expected-error{{expression type 'inout Int' is ambiguous without more context}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -816,11 +814,10 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
-  // expected-warning @-1 {{expression of type 'inout Int' is unused}}
-  let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  (true ? &x : &y) // expected-error {{type of expression is ambiguous without more context}}
+  let a = (true ? &x : &y) // expected-error {{type of expression is ambiguous without more context}}
 
-  inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  inoutTests(true ? &x : &y) // expected-error {{type of expression is ambiguous without more context}}
 
   &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
 
