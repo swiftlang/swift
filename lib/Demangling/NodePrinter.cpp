@@ -403,6 +403,7 @@ private:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::RelatedEntityDeclName:
@@ -1301,6 +1302,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ProtocolWitnessTable:
     Printer << "protocol witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ProtocolWitnessTablePattern:
+    Printer << "protocol witness table pattern for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::GenericProtocolWitnessTable:
