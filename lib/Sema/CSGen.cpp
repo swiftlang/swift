@@ -1406,9 +1406,7 @@ namespace {
     }
     
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(),
-                                     expr->getMember().getDecl(),
-                                     /*FIXME:*/FunctionRefKind::DoubleApply);
+      llvm_unreachable("Already typechecked");
     }
     
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -3110,6 +3108,17 @@ namespace {
                                     memberAndFunctionRef.first,
                                     memberLoc,
                                     expr->isImplicit());
+        }
+      }
+
+      if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
+        if (auto memberRef = dynamicMember->getMember()) {
+          auto base = skipImplicitConversions(dynamicMember->getBase());
+          return new (TC.Context) MemberRefExpr(base,
+                                                dynamicMember->getDotLoc(),
+                                                memberRef,
+                                                dynamicMember->getNameLoc(),
+                                                expr->isImplicit());
         }
       }
 
