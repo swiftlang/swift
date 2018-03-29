@@ -351,16 +351,3 @@ func testOne() {
     if case One.E.SomeError = error {} // expected-error{{generic enum type 'One.E' is ambiguous without explicit generic parameters when matching value of type 'Error'}}
   }
 }
-
-func overload(_ x: Int) -> Int { return x }
-func overload(_ x: Float) -> Float { return x }
-
-func rdar20233198() {
-  let typed: (Int, Int, Int, Int, Int, Int, Int, Int) = (Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1))
-  _ = typed
-  let _ = (Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1))
-  let named = (Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1), Int(1))
-  _ = named;
-  let _ = (overload(1), overload(1), overload(1), overload(1), overload(1), overload(1), overload(1), overload(1))
-  let _ = (overload(1.0), overload(1.0), overload(1.0), overload(1.0), overload(1.0), overload(1.0), overload(1.0), overload(1.0))
-}
