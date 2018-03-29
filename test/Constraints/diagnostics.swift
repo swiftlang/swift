@@ -751,7 +751,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
   var buffer : T 
-  let n = withUnsafePointer(to: &buffer) { (p) in
+  let n = withUnsafeMutablePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
