@@ -2,16 +2,11 @@
 
 // REQUIRES: swift_stdlib_no_asserts
 
-// This is failing bots.
-// REQUIRES: rdar39002151
-
 // The below temporary disables this XFAIL-ed test on Linux for
 // https://github.com/apple/swift/pull/14755, where it unexpectedly passes.
 // @gottesmm is working on a fix.
 //
 // REQUIRES: OS=macosx
-
-// XFAIL: plus_zero_runtime
 
 //CHECK-LABEL: @$S17unused_containers16empty_array_testyyF
 //CHECK: bb0:
