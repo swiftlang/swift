@@ -1724,7 +1724,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
 
     return true;
   }
-  
+
   // Anything without a fix is better than anything with a fix.
   if (constraint->getFix() && !successfulConstraint->getFix())
     return true;
@@ -1990,13 +1990,6 @@ bool ConstraintSystem::solveSimplified(
       }
 
       lastSolvedChoice = {currentChoice, *score};
-
-      // If we see a tuple-to-tuple conversion that succeeded, we're done.
-      // FIXME: This should be more general.
-      if (auto restriction = currentChoice->getRestriction()) {
-        if (*restriction == ConversionRestrictionKind::TupleToTuple)
-          break;
-      }
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
