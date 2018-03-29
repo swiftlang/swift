@@ -252,6 +252,18 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   noescapeNonnullBlockAlias(fn)
 }
 
+public func bridgeNoescapeBlock( optFn: ((String?) -> ())?, optFn2: ((String?) -> ())?) {
+  noescapeBlock3(optFn, optFn2, "Foobar")
+}
+
+
+@_silgen_name("_returnOptionalEscape")
+public func returnOptionalEscape() -> (() ->())?
+
+public func bridgeNoescapeBlock() {
+  noescapeBlock(returnOptionalEscape())
+}
+
 class ObjCClass : NSObject {}
 
 extension ObjCClass {
