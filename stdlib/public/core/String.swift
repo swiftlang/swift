@@ -12,8 +12,8 @@
 
 import SwiftShims
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.partial.never")
 internal func _withCStringAndLength<
   Source : Collection,
@@ -53,8 +53,8 @@ extension _StringGuts {
 
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal func _withCSubstring<Result, TargetEncoding: Unicode.Encoding>(
     in bounds: Range<Int>,
     encoding targetEncoding: TargetEncoding.Type,
@@ -65,8 +65,8 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   internal func _withCSubstringAndLength<
     Result, TargetEncoding: Unicode.Encoding
@@ -97,7 +97,7 @@ extension _StringGuts {
       execute: body)
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   func _opaqueWithCStringAndLength<
     Result, TargetEncoding: Unicode.Encoding
   >(
@@ -134,8 +134,8 @@ extension _StringGuts {
 }
 
 extension String {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal static func _fromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -213,7 +213,7 @@ extension String {
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
@@ -230,7 +230,7 @@ extension String {
   ///     before the first zero code unit.
   ///   - sourceEncoding: The encoding in which the code units should be
   ///     interpreted.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type) {
@@ -258,7 +258,7 @@ extension String {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
@@ -611,12 +611,12 @@ public struct String {
   ///
   ///     let empty = ""
   ///     let alsoEmpty = String()
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init() {
     self._guts = _StringGuts()
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   init(_ _guts: _StringGuts) {
     self._guts = _guts
@@ -630,8 +630,8 @@ extension String {
 }
 
 extension String {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   static func _fromUTF8CodeUnitSequence<C : RandomAccessCollection>(
     _ input: C, repair: Bool
   ) -> String? where C.Element == UInt8 {
@@ -642,8 +642,8 @@ extension String {
       input, encoding: UTF8.self, repairIllFormedSequences: repair)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   static func _fromASCII<C : RandomAccessCollection>(
     _ input: C
   ) -> String where C.Element == UInt8 {
@@ -658,8 +658,8 @@ extension String {
     return String(_StringGuts(_large: storage))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public // FIXME: @_versioned, currently public because testing...
+  @inlinable // FIXME(sil-serialize-all)
+  public // FIXME: @usableFromInline, currently public because testing...
   static func _fromWellFormedUTF8CodeUnitSequence<C : RandomAccessCollection>(
     _ input: C, repair: Bool = false
   ) -> String where C.Element == UTF8.CodeUnit {
@@ -668,13 +668,13 @@ extension String {
 }
 
 extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self.init(Unicode.Scalar(_value: UInt32(value)))
   }
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ scalar: Unicode.Scalar) {
     // Until we have UTF-8 support in small string, need to be large
     //
@@ -701,7 +701,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
 }
 
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-  @_inlineable
+  @inlinable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -717,7 +717,7 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 }
 
 extension String : _ExpressibleByBuiltinUTF16StringLiteral {
-  @_inlineable
+  @inlinable
   @effects(readonly)
   @_semantics("string.makeUTF16")
   public init(
@@ -737,7 +737,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
 }
 
 extension String : _ExpressibleByBuiltinStringLiteral {
-  @_inlineable
+  @inlinable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -775,7 +775,7 @@ extension String : ExpressibleByStringLiteral {
   ///
   /// This assignment to the `nextStop` constant calls this string literal
   /// initializer behind the scenes.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(stringLiteral value: String) {
      self = value
   }
@@ -783,7 +783,7 @@ extension String : ExpressibleByStringLiteral {
 
 extension String : CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
@@ -797,8 +797,8 @@ extension String : CustomDebugStringConvertible {
 extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal func _encodedLength<
     Encoding: Unicode.Encoding
   >(_ encoding: Encoding.Type) -> Int {
@@ -820,8 +820,8 @@ extension String {
   // way -- add a test for that.
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal func _encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
@@ -857,7 +857,7 @@ extension String {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   internal func _opaqueEncode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
@@ -901,7 +901,7 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
     self._guts.append(other._guts)
   }
@@ -918,7 +918,7 @@ extension String {
   }
 
   // TODO(SSO): Consider small-checking version
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public
   init<CodeUnit>(_largeStorage storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
@@ -927,7 +927,7 @@ extension String {
 }
 
 extension String {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @effects(readonly)
   @_semantics("string.concat")
   public static func + (lhs: String, rhs: String) -> String {
@@ -937,7 +937,7 @@ extension String {
   }
 
   // String append
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
@@ -948,7 +948,7 @@ extension String {
   ///
   /// Low-level construction interface used by introspection
   /// implementation in the runtime library.
-  @_inlineable
+  @inlinable
   @_silgen_name("swift_stringFromUTF8InRawMemory")
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
@@ -978,13 +978,13 @@ extension Sequence where Element: StringProtocol {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal func _joined(separator: String = "") -> String {
     let separatorSize = separator._guts.count
     var width = separator._guts.byteWidth
@@ -1040,25 +1040,25 @@ extension BidirectionalCollection where Iterator.Element == String {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
 }
 
 #if _runtime(_ObjC)
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
 internal func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
 internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 #else
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
 
   // TODO (TODO: JIRA): check for small
@@ -1089,8 +1089,8 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   return String(_largeStorage: storage)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
 
   // TODO (TODO: JIRA): check for small
@@ -1131,8 +1131,8 @@ extension String {
   /// To determine which bit corresponds to which ASCII character, subtract 1
   /// from the ASCII value of that character and divide by 2. The bit is set iff
   /// that character is a lower case character.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _asciiLowerCaseTable: UInt64 {
     @inline(__always)
     get {
@@ -1141,8 +1141,8 @@ extension String {
   }
 
   /// The same table for upper case characters.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _asciiUpperCaseTable: UInt64 {
     @inline(__always)
     get {
@@ -1161,7 +1161,7 @@ extension String {
   /// - Returns: A lowercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func lowercased() -> String {
     if _guts.isASCII {
       var guts = _guts
@@ -1209,7 +1209,7 @@ extension String {
   /// - Returns: An uppercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func uppercased() -> String {
     if _guts.isASCII {
       var guts = _guts
@@ -1237,7 +1237,7 @@ extension String {
 
   /// Creates an instance from the description of a given
   /// `LosslessStringConvertible` instance.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<T : LosslessStringConvertible>(_ value: T) {
     self = value.description
   }
@@ -1248,7 +1248,7 @@ extension String : CustomStringConvertible {
   ///
   /// Using this property directly is discouraged. Instead, use simple
   /// assignment to create a new constant or variable equal to this string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return self
   }

@@ -995,8 +995,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Index = Int
     public typealias Indices = Range<Int>
     
-    @_versioned internal var _backing : _DataStorage
-    @_versioned internal var _sliceRange: Range<Index>
+    @usableFromInline internal var _backing : _DataStorage
+    @usableFromInline internal var _sliceRange: Range<Index>
     
     
     // A standard or custom deallocator for `Data`.
@@ -1247,18 +1247,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    @_versioned
+    @usableFromInline
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
         _sliceRange = range
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateIndex(_ index: Int, message: String? = nil) {
         precondition(_sliceRange.contains(index), message ?? "Index \(index) is out of bounds of range \(_sliceRange)")
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateRange<R: RangeExpression>(_ range: R) where R.Bound == Int {
         let lower = R.Bound(_sliceRange.lowerBound)
         let upper = R.Bound(_sliceRange.upperBound)

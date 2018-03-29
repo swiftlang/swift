@@ -83,8 +83,8 @@ public:
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
+  IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(Inlineable)
   IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -111,7 +111,7 @@ public:
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
-  IGNORED_ATTR(Versioned)
+  IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
@@ -881,8 +881,8 @@ public:
   void visitSpecializeAttr(SpecializeAttr *attr);
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
-  void visitVersionedAttr(VersionedAttr *attr);
-  void visitInlineableAttr(InlineableAttr *attr);
+  void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
+  void visitInlinableAttr(InlinableAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
@@ -1946,7 +1946,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*respectVersionedAttr=*/true);
+                                    /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
@@ -1957,11 +1957,11 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   }
 }
 
-void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
+void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   // FIXME: Once protocols can contain nominal types, do we want to allow
-  // these nominal types to have access control (and also @_versioned)?
+  // these nominal types to have access control (and also @usableFromInline)?
   if (isa<ProtocolDecl>(VD->getDeclContext())) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_in_protocol)
@@ -1970,7 +1970,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     return;
   }
 
-  // @_versioned can only be applied to internal declarations.
+  // @usableFromInline can only be applied to internal declarations.
   if (VD->getFormalAccess() != AccessLevel::Internal) {
     TC.diagnose(attr->getLocation(), diag::versioned_attr_with_explicit_access,
                 VD->getFullName(),
@@ -1981,7 +1981,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   }
 
   // Symbols of dynamically-dispatched declarations are never referenced
-  // directly, so marking them as @_versioned does not make sense.
+  // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_dynamic_not_supported);
@@ -1990,11 +1990,11 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   }
 }
 
-void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
-  // @_inlineable cannot be applied to stored properties.
+void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
+  // @inlinable cannot be applied to stored properties.
   //
-  // If the type is fixed-layout, the accessors are inlineable anyway;
-  // if the type is resilient, the accessors cannot be inlineable
+  // If the type is fixed-layout, the accessors are inlinable anyway;
+  // if the type is resilient, the accessors cannot be inlinable
   // because clients cannot directly access storage.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -2010,21 +2010,21 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   // Calls to dynamically-dispatched declarations are never devirtualized,
-  // so marking them as @_inlinable does not make sense.
+  // so marking them as @inlinable does not make sense.
   if (VD->isDynamic()) {
     TC.diagnose(attr->getLocation(),
-                diag::inlineable_dynamic_not_supported);
+                diag::inlinable_dynamic_not_supported);
     attr->setInvalid();
     return;
   }
 
-  // @_inlineable can only be applied to public or @_versioned
+  // @inlinable can only be applied to public or @usableFromInline
   // declarations.
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*respectVersionedAttr=*/true);
+                                    /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
-                diag::inlineable_decl_not_public,
+                diag::inlinable_decl_not_public,
                 VD->getBaseName(),
                 access)
         .fixItRemove(attr->getRangeWithAt());
@@ -2116,7 +2116,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 
   if (cast<EnumDecl>(D)->getFormalAccess() >= AccessLevel::Public)
     return;
-  if (D->getAttrs().hasAttribute<VersionedAttr>())
+  if (D->getAttrs().hasAttribute<UsableFromInlineAttr>())
     return;
   diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
 }

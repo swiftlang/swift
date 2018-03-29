@@ -28,8 +28,8 @@ public // @testable
 enum _HashingDetail {
 
   // FIXME(hasher): Remove
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   @_transparent
   internal static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
@@ -38,8 +38,8 @@ enum _HashingDetail {
   }
 
   // FIXME(hasher): Remove
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   @_transparent
   internal static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
@@ -63,7 +63,7 @@ enum _HashingDetail {
 //
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt32(_ value: UInt32) -> UInt32 {
@@ -78,7 +78,7 @@ func _mixUInt32(_ value: UInt32) -> UInt32 {
 }
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt32(_ value: Int32) -> Int32 {
@@ -86,7 +86,7 @@ func _mixInt32(_ value: Int32) -> Int32 {
 }
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt64(_ value: UInt64) -> UInt64 {
@@ -98,7 +98,7 @@ func _mixUInt64(_ value: UInt64) -> UInt64 {
 }
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt64(_ value: Int64) -> Int64 {
@@ -106,7 +106,7 @@ func _mixInt64(_ value: Int64) -> Int64 {
 }
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt(_ value: UInt) -> UInt {
@@ -118,7 +118,7 @@ func _mixUInt(_ value: UInt) -> UInt {
 }
 
 // FIXME(hasher): Remove
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt(_ value: Int) -> Int {
@@ -203,16 +203,16 @@ internal struct _LegacyHasher {
 public struct _Hasher {
   internal typealias Core = _SipHash13
 
-  // NOT @_versioned
+  // NOT @usableFromInline
   internal var _core: Core
 
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public init() {
     self._core = Core(key: _Hasher._seed)
   }
 
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public init(seed: (UInt64, UInt64)) {
     self._core = Core(key: seed)
@@ -226,7 +226,7 @@ public struct _Hasher {
   /// of test results.
   public // SPI
   static var _isDeterministic: Bool {
-    @_inlineable
+    @inlinable
     @inline(__always)
     get {
       return _swift_stdlib_Hashing_parameters.deterministic;
@@ -237,7 +237,7 @@ public struct _Hasher {
   /// once during process startup.
   public // SPI
   static var _seed: (UInt64, UInt64) {
-    @_inlineable
+    @inlinable
     @inline(__always)
     get {
       // The seed itself is defined in C++ code so that it is initialized during
@@ -250,45 +250,45 @@ public struct _Hasher {
     }
   }
 
-  @_inlineable
+  @inlinable
   @inline(__always)
   public mutating func append<H: Hashable>(_ value: H) {
     value._hash(into: &self)
   }
 
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: UInt) {
     _core.append(bits)
   }
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: UInt32) {
     _core.append(bits)
   }
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: UInt64) {
     _core.append(bits)
   }
 
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: Int) {
     _core.append(UInt(bitPattern: bits))
   }
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: Int32) {
     _core.append(UInt32(bitPattern: bits))
   }
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func append(bits: Int64) {
     _core.append(UInt64(bitPattern: bits))
   }
 
-  // NOT @_inlineable
+  // NOT @inlinable
   @effects(releasenone)
   public mutating func finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
@@ -342,8 +342,8 @@ internal protocol _HashBuffer {
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
@@ -355,8 +355,8 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
 /// FIXME(sil-serialize-all): this should be internal
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSObject_isEqual")
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
@@ -368,27 +368,27 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 /// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
 /// memory accesses. The memory remains bound to managed AnyObjects.
 @_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: UnsafeMutableRawPointer
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
     guard let unwrapped = up else { return nil }
     self.init(unwrapped)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(

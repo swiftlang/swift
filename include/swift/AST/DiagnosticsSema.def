@@ -3712,30 +3712,30 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
-      none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
+      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
 ERROR(versioned_attr_with_explicit_access,
-      none, "'@_versioned' attribute can only be applied to internal "
+      none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (DeclName, AccessLevel))
 
 ERROR(versioned_attr_in_protocol,none,
-      "'@_versioned' attribute cannot be used in protocols", ())
+      "'@usableFromInline' attribute cannot be used in protocols", ())
 
 ERROR(versioned_dynamic_not_supported,none,
-      "'@_versioned' attribute cannot be applied to 'dynamic' declarations", ())
+      "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
-  "an '@_inlineable' function|" \
+  "an '@inlinable' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
-ERROR(local_type_in_inlineable_function,
+ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
@@ -3750,21 +3750,21 @@ NOTE(resilience_decl_declared_here,
      none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
 
 NOTE(resilience_decl_declared_here_versioned,
-     none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
+     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
 
-ERROR(class_designated_init_inlineable_resilient,none,
+ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "'%select{@_transparent|@inline(__always)|@inlinable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
       none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
 
-ERROR(inlineable_dynamic_not_supported,
-      none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
+ERROR(inlinable_dynamic_not_supported,
+      none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
 
-ERROR(inlineable_decl_not_public,
-      none, "'@_inlineable' attribute can only be applied to public declarations, "
+ERROR(inlinable_decl_not_public,
+      none, "'@inlinable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 

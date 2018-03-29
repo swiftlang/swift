@@ -1659,7 +1659,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     // declarations.
     if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      diagnose(ctor, diag::class_designated_init_inlineable_resilient,
+      diagnose(ctor, diag::class_designated_init_inlinable_resilient,
                ClassD->getDeclaredInterfaceType(),
                static_cast<unsigned>(getFragileFunctionKind(ctor)));
     }

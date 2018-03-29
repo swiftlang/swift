@@ -435,8 +435,8 @@ extension StringProtocol where Index == String.Index {
 
   // self can be a Substring so we need to subtract/add this offset when
   // passing _ns to the Foundation APIs. Will be 0 if self is String.
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal var _substringOffset: Int {
     return self.startIndex.encodedOffset
   }
@@ -447,8 +447,8 @@ extension StringProtocol where Index == String.Index {
     return Index(encodedOffset: utf16Index + _substringOffset)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal func _toRelativeNSRange(_ r: Range<String.Index>) -> NSRange {
     return NSRange(
       location: r.lowerBound.encodedOffset - _substringOffset,

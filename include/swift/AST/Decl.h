@@ -2147,6 +2147,9 @@ class ValueDecl : public Decl {
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
 
+private:
+    bool isUsableFromInline() const;
+
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2232,8 +2235,6 @@ public:
   /// \see getFormalAccess
   AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
 
-  bool isVersionedInternalDecl() const;
-
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
@@ -2242,14 +2243,19 @@ public:
   /// being used), features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
+  /// If \p isUsageFromInline is true, the presence of the \c @usableFromInline
+  /// attribute will treat internal declarations as public. This is normally
+  /// false for name lookup and other source language concerns, but true when
+  /// computing the linkage of generated functions.
+  ///
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool respectVersionedAttr = false) const {
+                              bool isUsageFromInline = false) const {
     assert(hasAccess() && "access not computed yet");
     AccessLevel result = TypeAndAccess.getInt().getValue();
-    if (respectVersionedAttr &&
+    if (isUsageFromInline &&
         result == AccessLevel::Internal &&
-        isVersionedInternalDecl()) {
+        isUsableFromInline()) {
       assert(!useDC);
       return AccessLevel::Public;
     }
@@ -2280,8 +2286,8 @@ public:
                        bool respectVersionedAttr = false) const;
 
 
-  /// Copy the formal access level and @_versioned attribute from source.
-  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+  /// Copy the formal access level and @usableFromInline attribute from source.
+  void copyFormalAccessFrom(ValueDecl *source);
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
@@ -5283,7 +5289,7 @@ public:
   /// The ResilienceExpansion for default arguments.
   ///
   /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlineable function bodies.
+  /// obey the restrictions imposed upon inlinable function bodies.
   ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
     return ResilienceExpansion(
         Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
@@ -5835,7 +5841,7 @@ public:
   /// The ResilienceExpansion for default arguments.
   ///
   /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlineable function bodies.
+  /// obey the restrictions imposed upon inlinable function bodies.
   ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
     return ResilienceExpansion(
         Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
