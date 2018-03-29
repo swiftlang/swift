@@ -18,6 +18,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include <functional>
 
@@ -154,10 +156,18 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //===----------------------------------------------------------------------===//
 
 bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
+  bool performFuncDeserialization = false;
+  
+  if (auto sig = AI->getCallee()->getType().castTo<SILFunctionType>()
+                   ->getGenericSignature()) {
+    performFuncDeserialization |= visitApplySubstitutions(
+      sig->getSubstitutionMap(AI->getSubstitutions()));
+  }
+  
   // Ok we have a function ref inst, grab the callee.
   SILFunction *Callee = AI->getReferencedFunction();
   if (!Callee)
-    return false;
+    return performFuncDeserialization;
 
   if (isLinkAll() ||
       hasSharedVisibility(Callee->getLinkage())) {
@@ -165,13 +175,21 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
     return true;
   }
 
-  return false;
+  return performFuncDeserialization;
 }
 
 bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
+  bool performFuncDeserialization = false;
+  
+  if (auto sig = PAI->getCallee()->getType().castTo<SILFunctionType>()
+                    ->getGenericSignature()) {
+    performFuncDeserialization |= visitApplySubstitutions(
+      sig->getSubstitutionMap(PAI->getSubstitutions()));
+  }
+
   SILFunction *Callee = PAI->getReferencedFunction();
   if (!Callee)
-    return false;
+    return performFuncDeserialization;
 
   if (isLinkAll() ||
       hasSharedVisibility(Callee->getLinkage())) {
@@ -179,7 +197,7 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
     return true;
   }
 
-  return false;
+  return performFuncDeserialization;
 }
 
 bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -197,15 +215,29 @@ bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   return false;
 }
 
+// Eagerly visiting all used conformances leads to a large blowup
+// in the amount of SIL we read in. For optimization purposes we can defer
+// reading in most conformances until we need them for devirtualization.
+// However, we *must* pull in shared clang-importer-derived conformances
+// we potentially use, since we may not otherwise have a local definition.
+static bool mustDeserializeProtocolConformance(ProtocolConformanceRef c) {
+  return c.isConcrete()
+    && isa<ClangModuleUnit>(c.getConcrete()->getDeclContext()
+                                           ->getModuleScopeContext());
+}
+
 bool SILLinkerVisitor::visitProtocolConformance(
     ProtocolConformanceRef ref, const Optional<SILDeclRef> &Member) {
   // If an abstract protocol conformance was passed in, just return false.
   if (ref.isAbstract())
     return false;
+  
+  bool mustDeserialize = mustDeserializeProtocolConformance(ref);
 
   // Otherwise try and lookup a witness table for C.
   auto C = ref.getConcrete();
-  SILWitnessTable *WT = Mod.lookUpWitnessTable(C);
+  SILWitnessTable *WT = Mod.lookUpWitnessTable(C,
+                                               /*deserialize*/mustDeserialize);
 
   // If we don't find any witness table for the conformance, bail and return
   // false.
@@ -213,7 +245,16 @@ bool SILLinkerVisitor::visitProtocolConformance(
     Mod.createWitnessTableDeclaration(
         C, getLinkageForProtocolConformance(
                C->getRootNormalConformance(), NotForDefinition));
-    return false;
+
+    // Adding the declaration may allow us to now deserialize the body.
+    // Force the body if we must deserialize this witness table.
+    if (mustDeserialize) {
+      WT = Mod.lookUpWitnessTable(C, true);
+      assert(WT && WT->isDefinition()
+             && "unable to deserialize witness table when we must?!");
+    } else {
+      return false;
+    }
   }
 
   // If the looked up witness table is a declaration, there is nothing we can
@@ -222,10 +263,23 @@ bool SILLinkerVisitor::visitProtocolConformance(
     return false;
 
   bool performFuncDeserialization = false;
+  
+  auto maybeVisitRelatedConformance = [&](ProtocolConformanceRef c) {
+    // Formally all conformances referenced by a used conformance are used.
+    // However, eagerly visiting them all at this point leads to a large blowup
+    // in the amount of SIL we read in. For optimization purposes we can defer
+    // reading in most conformances until we need them for devirtualization.
+    // However, we *must* pull in shared clang-importer-derived conformances
+    // we potentially use, since we may not otherwise have a local definition.
+    if (mustDeserializeProtocolConformance(c))
+      performFuncDeserialization |= visitProtocolConformance(c, None);
+  };
+  
   // For each entry in the witness table...
   for (auto &E : WT->getEntries()) {
+    switch (E.getKind()) {
     // If the entry is a witness method...
-    if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
+    case SILWitnessTable::WitnessKind::Method: {
       // And we are only interested in deserializing a specific requirement
       // and don't have that requirement, don't deserialize this method.
       if (Member.hasValue() && E.getMethodWitness().Requirement != *Member)
@@ -240,9 +294,63 @@ bool SILLinkerVisitor::visitProtocolConformance(
       // to deserialize.
       performFuncDeserialization = true;
       addFunctionToWorklist(E.getMethodWitness().Witness);
+      break;
+    }
+    
+    // If the entry is a related witness table, see whether we need to
+    // eagerly deserialize it.
+    case SILWitnessTable::WitnessKind::BaseProtocol: {
+      auto baseConformance = E.getBaseProtocolWitness().Witness;
+      maybeVisitRelatedConformance(ProtocolConformanceRef(baseConformance));
+      break;
+    }
+    case SILWitnessTable::WitnessKind::AssociatedTypeProtocol: {
+      auto assocConformance = E.getAssociatedTypeProtocolWitness().Witness;
+      maybeVisitRelatedConformance(assocConformance);
+      break;
+    }
+    
+    case SILWitnessTable::WitnessKind::AssociatedType:
+    case SILWitnessTable::WitnessKind::Invalid:
+    case SILWitnessTable::WitnessKind::MissingOptional:
+      break;
     }
   }
 
+  return performFuncDeserialization;
+}
+
+bool SILLinkerVisitor::visitApplySubstitutions(const SubstitutionMap &subs) {
+  bool performFuncDeserialization = false;
+  
+  for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementKind::Conformance: {
+      auto conformance = subs.lookupConformance(
+          reqt.getFirstType()->getCanonicalType(),
+          cast<ProtocolDecl>(reqt.getSecondType()->getAnyNominal()))
+        .getValue();
+      
+      // Formally all conformances referenced in a function application are
+      // used. However, eagerly visiting them all at this point leads to a
+      // large blowup in the amount of SIL we read in, and we aren't very
+      // systematic about laziness. For optimization purposes we can defer
+      // reading in most conformances until we need them for devirtualization.
+      // However, we *must* pull in shared clang-importer-derived conformances
+      // we potentially use, since we may not otherwise have a local definition.
+      if (mustDeserializeProtocolConformance(conformance)) {
+        performFuncDeserialization |=
+                                    visitProtocolConformance(conformance, None);
+      }
+      break;
+    }
+    case RequirementKind::Layout:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      break;
+    }
+  }
+  
   return performFuncDeserialization;
 }
 
