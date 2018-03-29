@@ -136,7 +136,8 @@ namespace {
                            CanType inputSubstType,
                            AbstractionPattern outputOrigType,
                            CanType outputSubstType,
-                           SGFContext ctxt);
+                           SGFContext ctxt,
+                           bool dontPostponeToNoEscapeCleanup = false);
 
     /// Transform a metatype value.
     ManagedValue transformMetatype(ManagedValue fn,
@@ -159,7 +160,8 @@ namespace {
                                    CanAnyFunctionType inputSubstType,
                                    AbstractionPattern outputOrigType,
                                    CanAnyFunctionType outputSubstType,
-                                   const TypeLowering &expectedTL);
+                                   const TypeLowering &expectedTL,
+                                   bool dontPostponeToNoEscapeCleanup = false);
   };
 } // end anonymous namespace
 ;
@@ -356,7 +358,8 @@ ManagedValue Transform::transform(ManagedValue v,
                                   CanType inputSubstType,
                                   AbstractionPattern outputOrigType,
                                   CanType outputSubstType,
-                                  SGFContext ctxt) {
+                                  SGFContext ctxt,
+                                  bool dontPostponeToNoEscapeCleanup) {
   // Look through inout types.
   if (isa<InOutType>(inputSubstType))
     inputSubstType = CanType(inputSubstType->getInOutObjectType());
@@ -440,7 +443,8 @@ ManagedValue Transform::transform(ManagedValue v,
     return transformFunction(v,
                              inputOrigType, inputFnType,
                              outputOrigType, outputFnType,
-                             expectedTL);
+                             expectedTL,
+                             dontPostponeToNoEscapeCleanup);
   }
 
   //  - tuples of transformable values
@@ -3126,7 +3130,8 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
                                           CanAnyFunctionType inputSubstType,
                                           AbstractionPattern outputOrigType,
                                           CanAnyFunctionType outputSubstType,
-                                          const TypeLowering &expectedTL) {
+                                          const TypeLowering &expectedTL,
+                                          bool dontPostponeToNoEscapeCleanup) {
   assert(fn.getType().isObject() &&
          "expected input to emitTransformedFunctionValue to be loaded");
 
@@ -3185,7 +3190,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   } else if (newFnType != expectedFnType) {
     // Escaping to noescape conversion.
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
-    fn = SGF.B.createConvertEscapeToNoEscape(Loc, fn, resTy);
+    fn = SGF.B.createConvertEscapeToNoEscape(Loc, fn, resTy, dontPostponeToNoEscapeCleanup);
   }
 
   return fn;
@@ -3281,11 +3286,12 @@ ManagedValue
 SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                      CanType inputType,
                                      CanType outputType,
-                                     SGFContext ctxt) {
+                                     SGFContext ctxt,
+                                     bool dontPostponeToNoEscapeCleanup) {
   return emitTransformedValue(loc, v,
                               AbstractionPattern(inputType), inputType,
                               AbstractionPattern(outputType), outputType,
-                              ctxt);
+                              ctxt, dontPostponeToNoEscapeCleanup);
 }
 
 ManagedValue
@@ -3294,12 +3300,14 @@ SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                      CanType inputSubstType,
                                      AbstractionPattern outputOrigType,
                                      CanType outputSubstType,
-                                     SGFContext ctxt) {
+                                     SGFContext ctxt,
+                                     bool dontPostponeToNoEscapeCleanup) {
   return Transform(*this, loc).transform(v,
                                          inputOrigType,
                                          inputSubstType,
                                          outputOrigType,
-                                         outputSubstType, ctxt);
+                                         outputSubstType, ctxt,
+                                         dontPostponeToNoEscapeCleanup);
 }
 
 RValue
