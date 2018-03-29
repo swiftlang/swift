@@ -478,9 +478,9 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto sourceEnv = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
         auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
         
-        IGF.Builder.CreateMemCpy(destEnv, sourceEnv,
-          IGM.getPointerSize().getValue() * requirements.size(),
-          IGM.getPointerAlignment().getValue());
+        auto align = IGM.getPointerAlignment().getValue();
+        IGF.Builder.CreateMemCpy(destEnv, align, sourceEnv, align,
+          IGM.getPointerSize().getValue() * requirements.size());
       }
       
       IGF.Builder.CreateRetVoid();
@@ -636,9 +636,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         destGenericEnv = IGF.Builder.CreateInBoundsGEP(dest, offset);
       }
       
-      IGF.Builder.CreateMemCpy(destGenericEnv, src,
-                           IGM.getPointerSize().getValue() * requirements.size(),
-                           IGM.getPointerAlignment().getValue());
+      auto align = IGM.getPointerAlignment().getValue();
+      IGF.Builder.CreateMemCpy(destGenericEnv, align, src, align,
+                         IGM.getPointerSize().getValue() * requirements.size());
     }
     IGF.Builder.CreateRetVoid();
   }

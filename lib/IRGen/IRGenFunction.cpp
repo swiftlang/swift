@@ -98,7 +98,7 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                llvm::Value *size, Alignment align) {
-  Builder.CreateMemCpy(dest, src, size, align.getValue(), false);
+  Builder.CreateMemCpy(dest, align.getValue(), src, align.getValue(), size);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {

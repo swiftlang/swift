@@ -1381,8 +1381,10 @@ void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
   if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                             byteCount, dest.getAlignment().getValue());
+    IGF.Builder.CreateMemCpy(dest.getAddress(),
+                             dest.getAlignment().getValue(),
+                             src.getAddress(),
+                             src.getAlignment().getValue(), byteCount);
     return;
   }
 
@@ -1395,8 +1397,10 @@ void TypeInfo::initializeArrayWithTakeNoAlias(IRGenFunction &IGF, Address dest,
   if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
-                             dest.getAlignment().getValue());
+    IGF.Builder.CreateMemCpy(dest.getAddress(),
+                             dest.getAlignment().getValue(),
+                             src.getAddress(),
+                             src.getAlignment().getValue(), byteCount);
     return;
   }
 
@@ -1410,8 +1414,9 @@ const {
   if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
-                              byteCount, dest.getAlignment().getValue());
+    IGF.Builder.CreateMemMove(dest.getAddress(), dest.getAlignment().getValue(),
+                              src.getAddress(), src.getAlignment().getValue(),
+                              byteCount);
     return;
   }
 
@@ -1425,8 +1430,9 @@ const {
   if (isBitwiseTakable(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
-                              byteCount, dest.getAlignment().getValue());
+    IGF.Builder.CreateMemMove(dest.getAddress(), dest.getAlignment().getValue(),
+                              src.getAddress(), src.getAlignment().getValue(),
+                              byteCount);
     return;
   }
 
@@ -1439,8 +1445,10 @@ void TypeInfo::assignArrayWithCopyNoAlias(IRGenFunction &IGF, Address dest,
   if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
-                             dest.getAlignment().getValue());
+    IGF.Builder.CreateMemCpy(dest.getAddress(),
+                             dest.getAlignment().getValue(),
+                             src.getAddress(),
+                             src.getAlignment().getValue(), byteCount);
     return;
   }
 
@@ -1453,8 +1461,9 @@ void TypeInfo::assignArrayWithCopyFrontToBack(IRGenFunction &IGF, Address dest,
   if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
-                              byteCount, dest.getAlignment().getValue());
+    IGF.Builder.CreateMemMove(dest.getAddress(), dest.getAlignment().getValue(),
+                              src.getAddress(), src.getAlignment().getValue(),
+                              byteCount);
     return;
   }
 
@@ -1467,8 +1476,9 @@ void TypeInfo::assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
   if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
-                              byteCount, dest.getAlignment().getValue());
+    IGF.Builder.CreateMemMove(dest.getAddress(), dest.getAlignment().getValue(),
+                              src.getAddress(), src.getAlignment().getValue(),
+                              byteCount);
     return;
   }
 
@@ -1481,8 +1491,10 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   if (isPOD(ResilienceExpansion::Maximal)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
-    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), byteCount,
-                             dest.getAlignment().getValue());
+    IGF.Builder.CreateMemCpy(dest.getAddress(),
+                             dest.getAlignment().getValue(),
+                             src.getAddress(),
+                             src.getAlignment().getValue(), byteCount);
     return;
   }
 
