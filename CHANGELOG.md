@@ -61,6 +61,12 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* The C `long double` type is now imported as `Float80` on i386 and x86_64
+  macOS and Linux. The tgmath functions in the Darwin and glibc modules now
+  support `Float80` as well as `Float` and `Double`. Several tgmath
+  functions have been made generic over `[Binary]FloatingPoint` so that they
+  will automatically be available for any conforming type.
+
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
