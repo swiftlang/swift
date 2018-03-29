@@ -2168,6 +2168,7 @@ static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
 
     switch (childKind) {
     case Demangle::Node::Kind::Identifier:
+      result._error = "invalid global node";
       break;
     default:
       VisitNode(ast, *child_pos, result);
