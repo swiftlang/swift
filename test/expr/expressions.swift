@@ -824,6 +824,10 @@ func inoutTests(_ arr: inout Int) {
 
   &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
 
+  // The next error is awful, but we don't want regress and let non-immediate
+  // inout usage slip through.
+  inoutTests((&x, 24).0) // expected-error {{cannot pass immutable value of type 'inout Int' as inout argument}}
+
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)
   
