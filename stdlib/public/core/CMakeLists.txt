@@ -115,6 +115,7 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallString.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
